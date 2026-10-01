@@ -176,6 +176,13 @@ class BriefingService:
     def _corrections(self, rid: str) -> list[Any]:
         return self._db.query("SELECT * FROM briefing_corrections WHERE round_id=? ORDER BY seq", (rid,))
 
+    def record(self, rid: str) -> Row | None:
+        """The stored round with its immutable payload (``None`` when it was never generated)."""
+        return self._get(rid)
+
+    def correction_count(self, rid: str) -> int:
+        return int(self._db.one("SELECT COUNT(*) AS n FROM briefing_corrections WHERE round_id=?", (rid,))["n"])
+
     # ---------------------------------------------------------------- windows
     def _window(self, day: date, edition: Edition, row: Row | None, now: datetime) -> dict[str, Any]:
         if row is not None and row.data.get("window"):
@@ -248,7 +255,7 @@ class BriefingService:
             trigger=data.get("trigger"),
             attempts=int(data.get("attempts") or 0),
             delayed=delayed,
-            correction_count=int(self._db.one("SELECT COUNT(*) AS n FROM briefing_corrections WHERE round_id=?", (rid,))["n"]),
+            correction_count=self.correction_count(rid),
             suspension=SuspensionOut(**suspension) if suspension else None,
             reprocessable=reprocessable,
             blocked_reason=blocked if status in ("scheduled", "missing", "failed") else None,
@@ -568,7 +575,7 @@ class BriefingService:
         selected_from: int,
         data: dict[str, Any],
     ) -> dict[str, Any]:
-        graph_version, revision, _ = stamp  # type: ignore[misc]
+        graph_version, revision, (_, rule_revision) = stamp  # type: ignore[misc]
         companies = list(dict.fromkeys(c["id"] for item in items for c in item["companies"]))
         evidence = list(dict.fromkeys(e for item in items for e in item["evidenceIds"]))
         metadata = BriefingMetadata(
@@ -585,6 +592,7 @@ class BriefingService:
             "dataWindow": {"start": window["start"], "end": window["end"], "openStart": bool(window["open_start"])},
             "graphVersion": graph_version,
             "reviewRevision": revision,
+            "ruleRevision": rule_revision,
             "items": items,
             "references": {"eventIds": [i["eventId"] for i in items], "evidenceIds": evidence, "companyIds": companies},
             "emptyReason": None if items else "no_issues_in_window",

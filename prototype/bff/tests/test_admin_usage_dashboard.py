@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 from .conftest import ADMIN, ALPHA_ISSUES, DEMO, base_payload, jobs_settled
+from .chat_support import ask_job, job_body, new_member, open_conversation
 from .fakes import run_report
 
 KST = timezone(timedelta(hours=9))
@@ -39,16 +40,15 @@ def _ledger_run(run_id, *, web, calls, processed, approved, held, errors=0, cost
 
 
 def test_rule_based_features_are_measured_and_report_zero_model_calls(admin):
-    guest = TestClient(admin.client.app)
-    guest.post("/api/auth/guest")
-    session = guest.post("/api/chat/sessions", json={"contextIds": [ALPHA_ISSUES["q2"]]}).json()["id"]
-    answered = guest.post(f"/api/chat/sessions/{session}/messages", json={"question": "어떤 실적을 발표했나요?"})
-    assert answered.status_code == 200
-    refused = guest.post(f"/api/chat/sessions/{session}/messages", json={"question": "내일 주가가 오를까요?"})
-    assert refused.status_code == 200 and refused.json()["status"] == "insufficient_evidence"
-    other = TestClient(admin.client.app)
-    other.post("/api/auth/guest")
-    assert other.post(f"/api/chat/sessions/{session}/messages", json={"question": "훔쳐보기"}).status_code == 403
+    asker = new_member(admin.client)
+    session = open_conversation(asker)
+    answered = ask_job(asker, "어떤 실적을 발표했나요?", [ALPHA_ISSUES["q2"]], session_id=session)
+    assert answered["status"] == "completed" and answered["outcome"] == "answered"
+    refused = ask_job(asker, "내일 주가가 오를까요?", [ALPHA_ISSUES["q2"]], session_id=session)
+    assert refused["outcome"] == "insufficient_evidence"
+    other = new_member(admin.client, "other@example.com", "다른사람")
+    stolen = other.post(f"/api/chat/sessions/{session}/jobs", json=job_body("훔쳐보기", [ALPHA_ISSUES["q2"]]))
+    assert stolen.status_code == 403
 
     chatbot = _feature(_usage(admin), "chatbot")
     assert chatbot["modelBacked"] is False and chatbot["usage"] == {"modelCalls": 0, "inputTokens": 0, "outputTokens": 0}
@@ -59,7 +59,8 @@ def test_rule_based_features_are_measured_and_report_zero_model_calls(admin):
     # A server-side failure is a failed request with its code.
     (admin.state_dir / "graph" / "v1.json").chmod(0o644)
     (admin.state_dir / "graph" / "v1.json").write_text("{}")
-    assert guest.post(f"/api/chat/sessions/{session}/messages", json={"question": "다시"}).status_code == 503
+    broken = asker.post(f"/api/chat/sessions/{session}/jobs", json=job_body("다시", [ALPHA_ISSUES["q2"]]))
+    assert broken.status_code == 503
     chatbot = _feature(_usage(admin), "chatbot")
     assert (chatbot["requests"], chatbot["failed"]) == (3, 1) and chatbot["recentErrors"][0]["code"] == "source_unavailable"
 

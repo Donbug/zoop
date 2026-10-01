@@ -5,6 +5,8 @@
 // - 포커스: 남은 노드를 방사형 자리로 옮기고(전체 배치 위치는 positionsRef에 그대로), 나오면 그 위치로 되돌린다.
 // - 경로(G6): 경로만 선명하게 두고 경로에 맞춰 카메라를 옮긴다(재배치 없음).
 // - 미니맵(G7): 데스크톱에서 보이는 노드가 60개를 넘을 때만 오른쪽 아래(graph-minimap).
+// - 캡션 겹침 정리(R1–R3): 카메라가 멈추거나 보기 상태가 바뀌면 graph-declutter가 낮은 우선순위 캡션을 숨긴다.
+// - 배치 재현(R4)·복귀(FS044): 같은 데이터는 같은 씨앗으로 배치하고, 지도에 돌아오면 기억한 좌표와 카메라를 그대로 쓴다.
 import cytoscape, { type Core, type NodeSingular } from "cytoscape";
 import { GitBranch, Maximize2, Minus, MoreHorizontal, Network, Plus } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
@@ -32,8 +34,10 @@ import {
   type Insets,
   type LayoutName,
   type Positions,
+  type Viewport,
 } from "./graph-layout";
 import { MINIMAP_MIN_NODES, attachMinimap } from "./graph-minimap";
+import { declutterLabels } from "./graph-declutter";
 import { buildStyle, easingVar, lodFor, msVar, type Lod } from "./graph-style";
 
 export type GraphSelection = { kind: "node" | "edge"; id: string };
@@ -42,6 +46,21 @@ export type CenterRequest = { id: string; seq: number };
 
 /** 사이드바에서 고른 기업으로 옮길 때의 최소 배율(기업 원이 화면에서 약 85px). */
 const CENTER_ZOOM = 1.3;
+/** 미니맵(높이 128 + 아래 12)과 그 위 간격 8. 데스크톱 경로 맞춤의 아래 여백. */
+const MINIMAP_BOTTOM_CLEARANCE = 148;
+/** 반 높이 상세 시트가 화면에서 차지하는 비율(bottom-sheet: 높이 90dvh − 반 스냅 40dvh). */
+const SHEET_HALF_RATIO = 0.5;
+
+/** 반 높이 시트가 캔버스 아래를 덮는 높이(px). */
+function sheetCover(cy: Core) {
+  const rect = cy.container()?.getBoundingClientRect();
+  if (!rect) return 0;
+  const sheetTop = window.innerHeight * (1 - SHEET_HALF_RATIO);
+  return Math.max(0, Math.min(rect.height, rect.bottom - sheetTop));
+}
+
+/** 이번 앱 실행 동안 데이터별 전체 배치 좌표(R4·FS044). 메인 지도를 떠났다 돌아오면 다시 계산하지 않고 그대로 쓴다. */
+const layoutMemory = new Map<string, Positions>();
 
 interface GraphCanvasProps {
   nodes: Schemas["GraphNode"][];
@@ -65,6 +84,14 @@ interface GraphCanvasProps {
   path?: GraphPath | null;
   /** 사이드바 기업 선택: 그 노드를 가운데로 확대·이동한다(동작 줄이기면 즉시). */
   centerOn?: CenterRequest | null;
+  /** 데스크톱 상세 패널이 캔버스 오른쪽을 덮는 폭(px). 맞춤·선택 카메라가 덮이지 않은 영역을 쓴다. */
+  occludeRight?: number;
+  /** 모바일 상세 시트(반 높이)가 캔버스 아래를 덮고 있는지. 경로 맞춤이 시트 위 영역을 쓴다. */
+  sheetOver?: boolean;
+  /** 처음 배치가 끝난 뒤 화면 맞춤 대신 쓸 카메라(지도 복귀, FS044). 마운트 때 값만 쓴다. */
+  initialCamera?: Viewport | null;
+  /** 카메라가 멈출 때마다 현재 카메라(복귀용 저장) */
+  onCameraIdle?: (viewport: Viewport) => void;
 }
 
 const NO_HIDDEN: ReadonlySet<LegendKey> = new Set();
@@ -83,18 +110,27 @@ export function GraphCanvas({
   evidence = null,
   path = null,
   centerOn = null,
+  occludeRight = 0,
+  sheetOver = false,
+  initialCamera = null,
+  onCameraIdle,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bundleButtonRef = useRef<HTMLButtonElement>(null);
   const cyRef = useRef<Core | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onCameraIdleRef = useRef(onCameraIdle);
+  onCameraIdleRef.current = onCameraIdle;
+  const restoreCameraRef = useRef(initialCamera);
   const { theme } = useTheme();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const isMobile = useMediaQuery("(max-width: 768px)");
   const [layoutName, setLayoutName] = useState<LayoutName>("fcose");
-  const motionRef = useRef({ reducedMotion, isMobile });
-  motionRef.current = { reducedMotion, isMobile };
+  const motionRef = useRef({ reducedMotion, isMobile, occludeRight });
+  motionRef.current = { reducedMotion, isMobile, occludeRight };
+  const sheetOverRef = useRef(sheetOver);
+  sheetOverRef.current = sheetOver;
   const lodRef = useRef<Lod>(lodFor(1, edges.length));
   // 전체 배치의 노드 위치(포커스 방사형 위치는 담지 않는다). 모드 전환·재배치 때 남는 노드는 여기서 시작하고,
   // 포커스에서 나오면 이 위치로 돌아간다.
@@ -155,12 +191,20 @@ export function GraphCanvas({
       container,
       onTap: (target) => onSelectRef.current(target),
       hasEmphasis: () => Boolean(viewRef.current.selectionId || viewRef.current.evidence || viewRef.current.path),
-      restore: () => void applyViewState(cy, viewRef.current),
+      restore: () => {
+        applyViewState(cy, viewRef.current);
+        declutterLabels(cy);
+      },
       prefs: () => motionRef.current,
       // 포커스 중에 끈 위치는 전체 배치에 남기지 않는다(나오면 원래 자리로).
       onNodeMoved: (id, position) => void (!viewRef.current.focus && positionsRef.current.set(id, position)),
       lod: { get: () => lodRef.current, set: (lod) => void (lodRef.current = lod) },
       onLodChange: (lod) => cy.style(buildStyle(motionRef.current.isMobile, lod)),
+      onViewportIdle: () => {
+        if (layoutRunningRef.current) return;
+        declutterLabels(cy);
+        onCameraIdleRef.current?.({ zoom: cy.zoom(), pan: { ...cy.pan() } });
+      },
     });
     let buttonFrame = 0;
     cy.on("viewport position style", () => {
@@ -195,24 +239,34 @@ export function GraphCanvas({
     cyRef.current?.style(buildStyle(isMobile, lodRef.current));
   }, [theme, isMobile]);
 
-  /** 포커스 화면 여백: 위는 포커스 바(56 + 간격), 모바일은 좌우·아래를 좁혀 방사형 배치를 크게 보인다. */
+  /** 포커스 화면 여백: 위는 포커스 바(56 + 간격), 모바일은 좌우·아래를 좁혀 방사형 배치를 크게 보인다. 데스크톱은 상세 패널 자리를 비운다. */
   const focusInsets = (): Insets =>
-    motionRef.current.isMobile ? { top: 80, right: 16, bottom: 16, left: 16 } : { top: 80, right: FIT_PADDING, bottom: FIT_PADDING, left: FIT_PADDING };
+    motionRef.current.isMobile
+      ? { top: 80, right: 16, bottom: 16, left: 16 }
+      : { top: 80, right: FIT_PADDING + motionRef.current.occludeRight, bottom: FIT_PADDING, left: FIT_PADDING };
 
-  /** 전체 화면 맞춤 여백: 조작 도구가 있는 쪽(데스크톱 아래, 모바일 오른쪽)만 도구 폭(44 + 간격)을 비운다. */
+  /** 전체 화면 맞춤 여백: 조작 도구가 있는 쪽(데스크톱 아래, 모바일 오른쪽)만 도구 폭(44 + 간격)을 비운다. 데스크톱은 상세 패널 자리도. */
   const fitInsets = (): Insets =>
     motionRef.current.isMobile
       ? { top: 16, right: FIT_PADDING, bottom: 16, left: 16 }
-      : { top: 24, right: 24, bottom: FIT_PADDING, left: 24 };
+      : { top: 24, right: 24 + motionRef.current.occludeRight, bottom: FIT_PADDING, left: 24 };
 
   /** 지금 보이는 요소에 맞춘 화면. 포커스 중에는 방사형 배치의 라벨 자리를 알고 있으므로 그 값으로 맞춘다.
-   *  경로 모드에서는 경로에 맞춘다(위는 경로 바, 모바일은 오른쪽 조작 도구를 비운다). 모바일 단계 목록은 경로 바에서 따로 연다. */
+   *  경로 모드(두 기업 경로·영향 경로)에서는 경로에 맞춘다(위는 경로 바, 모바일은 오른쪽 조작 도구를 비운다).
+   *  데스크톱에서 미니맵이 보이면 아래를 미니맵 높이만큼 비워 경로 끝 노드·캡션이 미니맵에 가리지 않게 한다.
+   *  모바일에서 상세 시트가 열려 있으면(반 높이) 시트 위에 남은 캔버스 영역에 맞춘다. 모바일 단계 목록은 경로 바에서 따로 연다. */
   const visibleViewport = (cy: Core) => {
     const route = pathElements(cy, viewRef.current.path);
     if (route.nonempty()) {
+      const minimapShown = shownElements(cy).nodes().length > MINIMAP_MIN_NODES;
       const insets = motionRef.current.isMobile
-        ? { top: 80, right: FIT_PADDING, bottom: 16, left: 16 }
-        : { top: 80, right: FIT_PADDING, bottom: FIT_PADDING, left: FIT_PADDING };
+        ? { top: 80, right: FIT_PADDING, bottom: sheetOverRef.current ? sheetCover(cy) + 16 : 16, left: 16 }
+        : {
+            top: 80,
+            right: FIT_PADDING + motionRef.current.occludeRight,
+            bottom: minimapShown ? MINIMAP_BOTTOM_CLEARANCE : FIT_PADDING,
+            left: FIT_PADDING,
+          };
       return fitViewport(cy, route, insets);
     }
     const shown = shownElements(cy);
@@ -256,7 +310,10 @@ export function GraphCanvas({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    const remembered = positionsRef.current;
+    // 처음 그리는 캔버스(지도 복귀)면 이번 실행에서 같은 데이터로 계산해 둔 좌표를 그대로 쓴다.
+    const memoryKey = `${layoutName}|${isMobile ? "m" : "d"}|${elements.signature}`;
+    const recalled = positionsRef.current.size === 0 ? layoutMemory.get(memoryKey) : undefined;
+    const remembered = recalled ?? positionsRef.current;
     cy.batch(() => {
       cy.elements().remove();
       cy.add(elements.definitions);
@@ -282,9 +339,10 @@ export function GraphCanvas({
       const empty: ViewState = { selectionId: null, bundled: elements.bundled, focus: null, hidden: NO_HIDDEN, evidence: null, path: null };
       applyViewState(cy, empty);
       layoutRunningRef.current = true;
-      const placement = placeNodes(cy, layoutName, isMobile, remembered, elements.bundled.size > 0 ? ISOLATED_BUNDLE_ID : undefined);
+      const placement = placeNodes(cy, layoutName, isMobile, remembered, elements.bundled.size > 0 ? ISOLATED_BUNDLE_ID : undefined, Boolean(recalled));
       layoutRunningRef.current = false;
       positionsRef.current = new Map(placement.final);
+      layoutMemory.set(memoryKey, positionsRef.current);
       const emphasized = applyViewState(cy, viewRef.current);
       // 포커스 중이면 남은 노드는 전체 배치 대신 방사형 자리로 간다(전체 배치 위치는 기억해 둔다).
       const radial = focusTargets(cy);
@@ -292,17 +350,22 @@ export function GraphCanvas({
         placement.final.set(id, position);
         cy.getElementById(id).position(position);
       });
-      const target = visibleViewport(cy);
+      const fitTarget = visibleViewport(cy);
+      // 지도 복귀(FS044)면 떠날 때의 카메라로, 아니면 보이는 요소에 맞춘다. 복귀 카메라는 처음 한 번만 쓴다.
+      const restored = restoreCameraRef.current;
+      restoreCameraRef.current = null;
+      const target = restored ?? fitTarget;
       // 묶음은 맞춘 배율에서의 크기로 비워 둔 가장자리 자리에 놓는다.
       const bundle = cy.getElementById(ISOLATED_BUNDLE_ID);
       if (bundle.nonempty()) {
-        const position = placeEdgeNode(cy, bundle, isMobile, target.zoom);
+        const position = placeEdgeNode(cy, bundle, isMobile, fitTarget.zoom);
         positionsRef.current.set(ISOLATED_BUNDLE_ID, position);
         if (!radial.has(ISOLATED_BUNDLE_ID)) placement.final.set(ISOLATED_BUNDLE_ID, position);
       }
-      // 포커스·경로 화면은 그 전체를 보여 주는 것이 목적이라 선택으로 카메라를 옮기지 않는다.
+      // 포커스·경로 화면은 그 전체를 보여 주는 것이 목적이라 선택으로 카메라를 옮기지 않는다. 복귀한 카메라도 그대로 둔다.
       const follow = (collection: cytoscape.Collection) => {
-        if (!viewRef.current.focus && !viewRef.current.path && collection.nonempty()) focusCamera(cy, collection, "center", motionRef.current);
+        if (!restored && !viewRef.current.focus && !viewRef.current.path && collection.nonempty()) focusCamera(cy, collection, "center", motionRef.current);
+        declutterLabels(cy);
       };
       if (motionRef.current.reducedMotion) {
         cy.viewport(target);
@@ -353,7 +416,7 @@ export function GraphCanvas({
     if (node.empty() || cy.width() <= 0) return;
     const at = positionsRef.current.get(id) ?? (node as NodeSingular).position();
     const zoom = Math.min(cy.maxZoom(), Math.max(cy.zoom(), CENTER_ZOOM));
-    moveCamera(cy, { zoom, pan: { x: cy.width() / 2 - at.x * zoom, y: cy.height() / 2 - at.y * zoom } }, motionRef.current.reducedMotion, "slow");
+    moveCamera(cy, { zoom, pan: { x: (cy.width() - motionRef.current.occludeRight) / 2 - at.x * zoom, y: cy.height() / 2 - at.y * zoom } }, motionRef.current.reducedMotion, "slow");
   };
   useEffect(() => {
     const cy = cyRef.current;
@@ -361,6 +424,7 @@ export function GraphCanvas({
     const previous = previousRef.current;
     previousRef.current = { selectionKey, focusKey, evidenceKey, pathKey, elements };
     const emphasized = applyViewState(cy, viewRef.current);
+    declutterLabels(cy);
     placeBundleButtonRef.current();
     setShownNodes(shownElements(cy).nodes().length);
     // 새 요소는 배치가 끝난 뒤 카메라를 맞춘다(배치 effect가 처리).
@@ -471,10 +535,12 @@ export function GraphCanvas({
           aria-hidden="true"
           data-graph-minimap=""
           className={cn(
-            "absolute right-3 bottom-3 h-[128px] w-[192px] overflow-hidden rounded-lg bg-surface-raised shadow-overlay",
+            "absolute bottom-3 h-[128px] w-[192px] overflow-hidden rounded-lg bg-surface-raised shadow-overlay",
             "[&_.cytoscape-navigatorView]:rounded-sm [&_.cytoscape-navigatorView]:border-2 [&_.cytoscape-navigatorView]:border-brand-primary [&_.cytoscape-navigatorView]:bg-brand-primary/10",
             "[&_.cytoscape-navigatorOverlay]:absolute [&_.cytoscape-navigatorOverlay]:inset-0 [&_.cytoscape-navigatorOverlay]:cursor-pointer [&.mouseover-view_.cytoscape-navigatorOverlay]:cursor-grab",
           )}
+          // 상세 패널이 캔버스 오른쪽을 덮으면 그 왼쪽으로 비켜 선다.
+          style={{ right: 12 + occludeRight }}
         />
       )}
       {isMobile ? (

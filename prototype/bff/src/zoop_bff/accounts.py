@@ -470,6 +470,30 @@ class AccountStore:
         user.version += 1
         return user
 
+    def set_watched(self, user: UserState, company_id: str, watched: bool) -> UserState:
+        """FS027 single toggle: put one company in or out of the watchlist (the wanted final state).
+
+        Idempotent and version-free: the stored list is read and written in one transaction, so a resent or
+        concurrent toggle never duplicates an entry, never undoes another change and never needs a reload.
+        The version still moves on a real change so a pending full-list edit (``update_settings``) sees it."""
+        with self._db.transaction() as conn:
+            row = conn.execute("SELECT watchlist, version FROM members WHERE id=?", (user.id,)).fetchone()
+            ids: list[str] = json.loads(row["watchlist"]) if row and row["watchlist"] else []
+            version = int(row["version"]) if row else user.version
+            if watched and company_id not in ids:
+                ids.append(company_id)
+            elif not watched and company_id in ids:
+                ids = [c for c in ids if c != company_id]
+            else:
+                user.watchlist_ids, user.version = ids, version
+                return user
+            conn.execute(
+                "UPDATE members SET watchlist=?, version=version+1 WHERE id=?",
+                (json.dumps(ids, ensure_ascii=False), user.id),
+            )
+        user.watchlist_ids, user.version = ids, version + 1
+        return user
+
     # -- portfolio connection
     def connect(
         self, user: UserState, portfolio_id: str, label: str, holdings: tuple[HoldingRec, ...]

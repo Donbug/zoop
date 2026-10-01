@@ -20,6 +20,7 @@ from ..schemas import (
     RecommendedCompany,
     SettingsResponse,
     SettingsUpdate,
+    WatchUpdate,
     Unavailable,
 )
 from ..views import meta, mock_meta
@@ -69,6 +70,28 @@ def put_settings(body: SettingsUpdate, user: Member, state: State) -> SettingsRe
         investor=body.investor,
         known_companies=known,
     )
+    return settings_response(user)
+
+
+@router.put("/me/watchlist/{id}", response_model=SettingsResponse)
+def put_watch(
+    company_id: Annotated[str, Path(alias="id", min_length=1, max_length=120)],
+    body: WatchUpdate,
+    user: Member,
+    state: State,
+) -> SettingsResponse:
+    """FS027 single toggle from the sidebar or a company node: the press itself is the save request.
+
+    Sends the wanted final state (``watched``) instead of the settings ``version``: a resent or concurrent
+    toggle is idempotent (no duplicate entry, no 409 to reload), and a toggle never overwrites another
+    company's change made elsewhere. Members only (guest 403). Adding an unknown company is 404; taking out
+    a company that is not watched changes nothing. Holdings are separate, so a held company stays a holding
+    node in the personal graph after it leaves the watchlist. No limit on the number of companies."""
+    if body.watched:
+        known = {*state.provider.get().companies, *state.admin.graphs.published_company_ids()}
+        if company_id not in known:
+            raise ApiError(404, "company_not_found", "관심 종목에 넣을 기업을 찾을 수 없습니다.")
+    state.accounts.set_watched(user, company_id, body.watched)
     return settings_response(user)
 
 

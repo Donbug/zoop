@@ -206,16 +206,24 @@ class RuleStore:
         row = self._db.one("SELECT COALESCE(MAX(id),0) AS r FROM review_rule_changes")
         return int(row["r"]) if row else 0
 
-    def current(self, rule_id: str) -> RuleChange | None:
-        row = self._db.one("SELECT * FROM review_rule_changes WHERE rule_id=? ORDER BY id DESC LIMIT 1", (rule_id,))
+    def revision_at(self, moment: str) -> int:
+        """The revision the log had at ``moment`` (a ``utc_iso`` string): for rounds published before they recorded theirs."""
+        row = self._db.one("SELECT COALESCE(MAX(id),0) AS r FROM review_rule_changes WHERE at <= ?", (moment,))
+        return int(row["r"]) if row else 0
+
+    def current(self, rule_id: str, upto: int | None = None) -> RuleChange | None:
+        row = self._db.one(
+            "SELECT * FROM review_rule_changes WHERE rule_id=? AND id<=? ORDER BY id DESC LIMIT 1",
+            (rule_id, 2**62 if upto is None else upto),
+        )
         return _change(row) if row else None
 
-    def enabled(self, rule_id: str) -> bool:
-        change = self.current(rule_id)
+    def enabled(self, rule_id: str, upto: int | None = None) -> bool:
+        change = self.current(rule_id, upto)
         return RULES[rule_id].default_enabled if change is None else change.enabled
 
-    def enabled_ids(self) -> frozenset[str]:
-        return frozenset(rule_id for rule_id in RULES if self.enabled(rule_id))
+    def enabled_ids(self, upto: int | None = None) -> frozenset[str]:
+        return frozenset(rule_id for rule_id in RULES if self.enabled(rule_id, upto))
 
     def history(self, rule_id: str) -> list[RuleChange]:
         rows = self._db.query("SELECT * FROM review_rule_changes WHERE rule_id=? ORDER BY id DESC", (rule_id,))

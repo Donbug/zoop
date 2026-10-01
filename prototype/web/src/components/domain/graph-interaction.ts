@@ -8,6 +8,8 @@ import { viewportFor, type Viewport } from "./graph-layout";
 export interface MotionPrefs {
   reducedMotion: boolean;
   isMobile: boolean;
+  /** 데스크톱 상세 패널이 캔버스 오른쪽을 덮는 폭(px). 카메라는 덮이지 않은 영역의 가운데를 쓴다. */
+  occludeRight: number;
 }
 
 /** 노드를 고르거나 올렸을 때 요약을 보이는 간선 수(최신 사건 순). 나머지는 간선 호버·선택 때 보인다. */
@@ -24,7 +26,7 @@ export interface ViewState {
   path: GraphPath | null;
 }
 
-const VIEW_CLASSES = "focused dimmed emph faded labelled quiet hover focus-hidden filter-hidden path";
+const VIEW_CLASSES = "focused focus-root dimmed emph faded labelled quiet hover focus-hidden filter-hidden path";
 
 /** 경로 요소(노드·선). 경로가 없거나 지금 지도에 없는 요소는 빈 모음. */
 export function pathElements(cy: Core, path: GraphPath | null): Collection {
@@ -84,6 +86,8 @@ export function applyViewState(cy: Core, state: ViewState): Collection {
     if (state.focus) {
       const root = cy.getElementById(state.focus.id);
       if (root.nonempty() && root.isNode()) {
+        // 포커스 중심: 스타일은 없고 캡션 정리에서 항상 보이게 하는 표시다(graph-declutter).
+        root.addClass("focus-root");
         let nodes: NodeCollection = root as NodeSingular;
         for (let hop = 0; hop < state.focus.hops; hop++) nodes = nodes.closedNeighborhood().nodes();
         cy.elements().difference(nodes.union(nodes.edgesWith(nodes))).addClass("focus-hidden");
@@ -145,6 +149,7 @@ export function focusCamera(cy: Core, target: Collection, mode: "center" | "neig
     viewport = { zoom, pan: { x: cy.width() / 2 - cx * zoom, y: cy.height() / 2 - cyy * zoom } };
   }
   if (prefs.isMobile) viewport.pan.y -= cy.height() * 0.22;
+  else viewport.pan.x -= prefs.occludeRight / 2;
   moveCamera(cy, viewport, prefs.reducedMotion, "slow");
 }
 
@@ -167,14 +172,27 @@ interface InteractionOptions {
   onNodeMoved: (id: string, position: { x: number; y: number }) => void;
   lod: { get: () => Lod; set: (lod: Lod) => void };
   onLodChange: (lod: Lod) => void;
+  /** 카메라가 멈췄을 때(LOD 갱신 뒤). 캡션 겹침 정리·카메라 기억에 쓴다. */
+  onViewportIdle: () => void;
 }
+
+/** 이슈–기업 간선(직접 관련·구조적 관련)은 표시만 하고 누르기·선택 대상으로 쓰지 않는다(명세 FS022·D03).
+ *  기업 간 간선(사건 공유, FS023)과 사건 간 간선(후속 사건)은 누르면 관계 상세가 열린다. */
+export function isDisplayOnlyEdge(relationType: string) {
+  return relationType === "INVOLVES" || relationType === "STRUCTURALLY_RELATED_TO";
+}
+
+/** 카메라가 이만큼(ms) 움직이지 않으면 멈춘 것으로 보고 LOD·캡션 정리를 한 번 한다.
+ *  확대·이동 중에는 스타일을 다시 계산하지 않는다(300노드 측정에서 확대 중 시간의 절반이 스타일 재계산이었다). */
+const VIEWPORT_IDLE_MS = 140;
 
 /** 캔버스 이벤트를 붙인다. 반환값은 정리 함수. */
 export function bindInteractions(cy: Core, options: InteractionOptions) {
   const { container } = options;
   cy.on("tap", (event) => {
     if (event.target === cy) options.onTap(null);
-    else options.onTap({ kind: event.target.isNode() ? "node" : "edge", id: event.target.id() });
+    else if (event.target.isNode()) options.onTap({ kind: "node", id: event.target.id() });
+    else if (!isDisplayOnlyEdge(event.target.data("relationType") as string)) options.onTap({ kind: "edge", id: event.target.id() });
   });
   // 두 번 누르면 그 노드와 이웃이 화면에 꽉 차게 확대한다.
   cy.on("dbltap", "node, edge", (event) => focusCamera(cy, event.target, "neighborhood", options.prefs()));
@@ -185,6 +203,7 @@ export function bindInteractions(cy: Core, options: InteractionOptions) {
     const hood = node.closedNeighborhood().filter((e) => isShown(e));
     cy.batch(() => {
       hood.addClass("emph");
+      node.removeClass("label-cull");
       hood.edges().removeClass("quiet labelled");
       labelEdges(node);
       if (!options.hasEmphasis()) cy.elements().difference(hood).addClass("faded");
@@ -194,8 +213,9 @@ export function bindInteractions(cy: Core, options: InteractionOptions) {
     container.style.removeProperty("cursor");
     options.restore();
   });
+  // 표시 전용 간선도 호버하면 요약을 보이지만, 누를 수 없으므로 손가락 모양 커서를 쓰지 않는다.
   cy.on("mouseover", "edge", (event) => {
-    container.style.setProperty("cursor", "pointer");
+    if (!isDisplayOnlyEdge(event.target.data("relationType") as string)) container.style.setProperty("cursor", "pointer");
     event.target.addClass("emph hover");
   });
   cy.on("mouseout", "edge", () => {
@@ -206,19 +226,20 @@ export function bindInteractions(cy: Core, options: InteractionOptions) {
     const node = event.target as NodeSingular;
     options.onNodeMoved(node.id(), { ...node.position() });
   });
-  // 배율 단계가 바뀔 때만 스타일을 다시 입힌다(프레임당 한 번).
-  let frame = 0;
-  cy.on("zoom", () => {
-    if (frame) return;
-    frame = requestAnimationFrame(() => {
-      frame = 0;
+  // 배율 단계(LOD)는 카메라가 멈춘 뒤 한 번만 바꾼다. 움직이는 동안은 직전 화면 텍스처(textureOnViewport)가 쓰인다.
+  let timer = 0;
+  cy.on("viewport", () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
       if (cy.destroyed()) return;
       const next = lodFor(cy.zoom(), cy.edges().length);
       const prev = options.lod.get();
-      if (next.scale === prev.scale && next.nodeLabels === prev.nodeLabels && next.edgeLabels === prev.edgeLabels && next.badges === prev.badges) return;
-      options.lod.set(next);
-      options.onLodChange(next);
-    });
+      if (next.scale !== prev.scale || next.nodeLabels !== prev.nodeLabels || next.edgeLabels !== prev.edgeLabels || next.badges !== prev.badges) {
+        options.lod.set(next);
+        options.onLodChange(next);
+      }
+      options.onViewportIdle();
+    }, VIEWPORT_IDLE_MS);
   });
-  return () => cancelAnimationFrame(frame);
+  return () => clearTimeout(timer);
 }

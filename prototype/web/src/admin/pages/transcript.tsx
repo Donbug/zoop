@@ -1,11 +1,23 @@
 // AI 대화록 한 건(요구 75): 개인정보를 가린 사본. 저장된 원문은 바뀌지 않고, 이 화면을 여는 것은 감사 로그에 남는다.
-import { ArrowLeft, CircleCheck, MessageSquareText, ShieldCheck, ShieldQuestion, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowLeft, Ban, CircleAlert, CircleCheck, Hourglass, ListChecks, MessageCircleQuestion, MessageSquareText, ShieldCheck, ShieldQuestion, ThumbsDown, ThumbsUp, type LucideIcon } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
 import { useTranscript } from "../api";
-import { AdminPageHeader, KstTime, StatusLabel } from "../ui";
+import { AdminPageHeader, KstTime, StatusLabel, type StatusTone } from "../ui";
+
+// 질문 한 건의 처리 결과(서버가 저장한 상태). 완료는 답변·되묻기·조건 안내·근거 부족, 그 밖에 실패·취소·처리 중이 있다.
+const messageStatus: Record<string, { icon: LucideIcon; label: string; tone: StatusTone }> = {
+  answered: { icon: CircleCheck, label: "답변함", tone: "success" },
+  insufficient_evidence: { icon: ShieldQuestion, label: "근거 부족으로 보류", tone: "warning" },
+  clarification: { icon: MessageCircleQuestion, label: "되물음", tone: "neutral" },
+  guidance: { icon: ListChecks, label: "조건 안내", tone: "neutral" },
+  failed: { icon: CircleAlert, label: "실패", tone: "error" },
+  cancelled: { icon: Ban, label: "취소", tone: "neutral" },
+  queued: { icon: Hourglass, label: "처리 중", tone: "neutral" },
+  running: { icon: Hourglass, label: "처리 중", tone: "neutral" },
+};
 
 const maskedLabel: Record<string, string> = {
   email: "이메일",
@@ -65,11 +77,7 @@ export function AdminTranscriptPage() {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
                   <span className="font-medium text-text-primary">질문 {message.seq}</span>
                   <KstTime value={message.at} seconds />
-                  {message.status === "answered" ? (
-                    <StatusLabel icon={CircleCheck} label="답변함" tone="success" />
-                  ) : (
-                    <StatusLabel icon={ShieldQuestion} label="근거 부족으로 보류" tone="warning" />
-                  )}
+                  <StatusLabel {...(messageStatus[message.status] ?? { icon: CircleAlert, label: message.status, tone: "neutral" as const })} />
                   <span>근거 인용 {message.citationCount}건</span>
                 </div>
                 <p className="text-base font-semibold text-text-primary">

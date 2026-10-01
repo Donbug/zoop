@@ -13,6 +13,7 @@ from zoop_bff.accounts import SESSION_COOKIE
 from zoop_bff.masking import TOKENS, Masker
 
 from .conftest import ALPHA_ISSUES, DEMO
+from .chat_support import ask as chat_ask
 
 KST = timezone(timedelta(hours=9))
 EVENING = "brf-2026-09-16-evening"
@@ -73,11 +74,8 @@ def publish_evening(kit) -> dict:
 
 
 def ask(client: TestClient, question: str, contexts: list[str] | None = None) -> dict:
-    contexts = contexts or [ALPHA_ISSUES["q1"]]
-    session = client.post("/api/chat/sessions", json={"contextIds": contexts}).json()["id"]
-    reply = client.post(f"/api/chat/sessions/{session}/messages", json={"question": question})
-    assert reply.status_code == 200, reply.text
-    return reply.json()
+    """Members only; returns the saved result with ``sessionId`` and ``messageId`` (see chat_support.ask)."""
+    return chat_ask(client, question, contexts)
 
 
 # ---- 74: collection
@@ -160,7 +158,7 @@ def test_a_repeated_exposure_id_is_one_exposure(admin):
 
 def test_active_users_come_from_events_chats_and_votes_without_double_counting(admin):
     publish_evening(admin)
-    watcher, asker, voter = guest(admin), member(admin), guest(admin)
+    watcher, asker, voter = guest(admin), member(admin), member(admin, "voter@example.com", "평가자")
     send(watcher, main_view(vid()))
     send(asker, main_view(vid()))
     answer = ask(asker, "어떤 실적을 발표했나요?")
@@ -168,7 +166,7 @@ def test_active_users_come_from_events_chats_and_votes_without_double_counting(a
     assert vote.status_code == 200
 
     metrics = summary(admin)
-    assert metrics["active_users"]["count"] == 3 and metrics["active_members"]["count"] == 1 and metrics["active_guests"]["count"] == 2
+    assert metrics["active_users"]["count"] == 3 and metrics["active_members"]["count"] == 2 and metrics["active_guests"]["count"] == 1
     assert metrics["ai_questions"]["count"] == 1
     assert (metrics["ai_usage_rate"]["numerator"], metrics["ai_usage_rate"]["denominator"]) == (1, 3)
     assert answer["messageId"].endswith("-m1")
@@ -224,45 +222,92 @@ def test_company_ranking_and_trend_match_what_users_did(admin):
 # ---- 75: votes
 
 
-def test_one_vote_per_person_can_be_switched_and_taken_back(admin):
+def briefing_stat(admin, **params) -> dict:
+    response = admin.client.get("/api/admin/feedback/summary", params={"window": "all", **params})
+    assert response.status_code == 200, response.text
+    return next(f for f in response.json()["features"] if f["feature"] == "briefing_round")
+
+
+def test_ratings_are_for_members_only(admin):
     publish_evening(admin)
-    first, second = guest(admin), member(admin)
+    target = {"feature": "briefing_round", "targetId": EVENING, "value": "up"}
+    visitor = guest(admin)
+    assert visitor.put("/api/feedback", json=target).status_code == 403
+    assert visitor.get("/api/feedback", params={"feature": "briefing_round", "targetIds": EVENING}).status_code == 403
+    assert TestClient(admin.client.app).put("/api/feedback", json=target).status_code == 401
+    assert briefing_stat(admin)["total"] == 0
+
+
+def test_the_wanted_final_state_is_idempotent_and_none_takes_the_rating_back(admin):
+    publish_evening(admin)
+    first, second = member(admin), member(admin, "second@example.com", "두번째")
     target = {"feature": "briefing_round", "targetId": EVENING}
 
-    assert first.put("/api/feedback", json={**target, "value": "up"}).json()["value"] == "up"
-    assert first.put("/api/feedback", json={**target, "value": "up"}).status_code == 200  # same vote again: still one
+    for _ in range(2):  # a resent request keeps one like, it never toggles back
+        assert first.put("/api/feedback", json={**target, "value": "up"}).json()["value"] == "up"
     assert second.put("/api/feedback", json={**target, "value": "down"}).status_code == 200
-    stat = next(f for f in admin.client.get("/api/admin/feedback/summary", params={"window": "all"}).json()["features"] if f["feature"] == "briefing_round")
-    assert (stat["up"], stat["down"], stat["total"]) == (1, 1, 2)
+    assert (briefing_stat(admin)["up"], briefing_stat(admin)["down"], briefing_stat(admin)["total"]) == (1, 1, 2)
 
     assert first.put("/api/feedback", json={**target, "value": "down", "reason": "근거가 부족해요"}).status_code == 200
-    stat = next(f for f in admin.client.get("/api/admin/feedback/summary", params={"window": "all"}).json()["features"] if f["feature"] == "briefing_round")
-    assert (stat["up"], stat["down"]) == (0, 2)  # switched, not added
+    assert (briefing_stat(admin)["up"], briefing_stat(admin)["down"]) == (0, 2)  # switched, not added
     mine = first.get("/api/feedback", params={"feature": "briefing_round", "targetIds": EVENING}).json()["items"]
     assert [(i["value"], i["reason"]) for i in mine] == [("down", "근거가 부족해요")]
 
-    assert first.delete("/api/feedback", params={"feature": "briefing_round", "targetId": EVENING}).status_code == 204
-    assert first.delete("/api/feedback", params={"feature": "briefing_round", "targetId": EVENING}).status_code == 204  # idempotent
+    for _ in range(2):  # taking it back twice stays taken back, and never re-selects
+        assert first.put("/api/feedback", json={**target, "value": "none"}).json()["value"] == "none"
     assert first.get("/api/feedback", params={"feature": "briefing_round", "targetIds": EVENING}).json()["items"] == []
-    stat = next(f for f in admin.client.get("/api/admin/feedback/summary", params={"window": "all"}).json()["features"] if f["feature"] == "briefing_round")
-    assert (stat["up"], stat["down"]) == (0, 1)
-    assert stat["sampleHidden"] is True and stat["rate"] is None  # one vote is not a percentage
+    stat = briefing_stat(admin)
+    assert (stat["up"], stat["down"], stat["total"]) == (0, 1, 1)  # the taken-back rating is out of the count
+    assert stat["rate"] is None  # one rating is not a percentage
+    assert first.delete("/api/feedback", params={"feature": "briefing_round", "targetId": EVENING}).status_code == 405
 
 
-def test_the_like_rate_appears_once_five_votes_exist(admin):
+def test_a_rating_is_linked_to_the_result_version(admin):
+    briefing = publish_evening(admin)
+    user = member(admin)
+    version = briefing["graphVersion"]
+    saved = user.put("/api/feedback", json={"feature": "briefing_round", "targetId": EVENING, "value": "up", "targetVersion": version}).json()
+    assert saved["targetVersion"] == version
+    stale = user.put("/api/feedback", json={"feature": "briefing_round", "targetId": EVENING, "value": "down", "targetVersion": "other"})
+    assert stale.status_code == 409
+    assert user.get("/api/feedback", params={"feature": "briefing_round", "targetIds": EVENING}).json()["items"][0]["value"] == "up"
+
+
+def test_no_rating_means_no_ratio_and_the_rate_appears_once_five_ratings_exist(admin):
     publish_evening(admin)
+    empty = briefing_stat(admin)
+    assert (empty["total"], empty["rate"]) == (0, None)
     for index in range(5):
-        voter = guest(admin)
+        voter = member(admin, f"v{index}@example.com", f"평가자{index}")
         value = "down" if index == 0 else "up"
         assert voter.put("/api/feedback", json={"feature": "briefing_round", "targetId": EVENING, "value": value}).status_code == 200
-    stat = next(f for f in admin.client.get("/api/admin/feedback/summary", params={"window": "all"}).json()["features"] if f["feature"] == "briefing_round")
+    stat = briefing_stat(admin)
     assert stat["sampleHidden"] is False and stat["rate"] == pytest.approx(0.8)
     assert sum(d["up"] for d in stat["days"]) == 4 and sum(d["down"] for d in stat["days"]) == 1
 
 
+def test_the_admin_period_filters_by_the_kst_day_of_the_last_change(admin):
+    publish_evening(admin)
+    early, late = member(admin), member(admin, "late@example.com", "늦게")
+    target = {"feature": "briefing_round", "targetId": EVENING}
+    admin.clock.travel_to(at("2026-09-17", 0, 30))  # 2026-09-16 15:30 UTC: still the 17th in KST
+    assert early.put("/api/feedback", json={**target, "value": "up"}).status_code == 200
+    admin.clock.travel_to(at("2026-09-19", 23, 50))
+    assert late.put("/api/feedback", json={**target, "value": "down"}).status_code == 200
+
+    assert briefing_stat(admin, start="2026-09-17", end="2026-09-17")["up"] == 1
+    assert briefing_stat(admin, start="2026-09-16", end="2026-09-16")["total"] == 0
+    only_late = briefing_stat(admin, start="2026-09-18")
+    assert (only_late["up"], only_late["down"]) == (0, 1)
+    admin.clock.travel_to(at("2026-09-20", 9))
+    assert early.put("/api/feedback", json={**target, "value": "down"}).status_code == 200  # changing moves it to its new day
+    assert briefing_stat(admin, start="2026-09-17", end="2026-09-17")["total"] == 0
+    assert admin.client.get("/api/admin/feedback/summary", params={"start": "2026-09-20", "end": "2026-09-19"}).status_code == 422
+
+
 def test_votes_only_go_to_real_targets_and_answers_only_to_their_asker(admin):
     briefing = publish_evening(admin)
-    user, other = guest(admin), guest(admin)
+    user, other = member(admin), member(admin, "other@example.com", "다른사람")
     answer = ask(user, "어떤 실적을 발표했나요?")
     issue = f"{EVENING}/{briefing['items'][0]['eventId']}"
 
@@ -278,7 +323,6 @@ def test_votes_only_go_to_real_targets_and_answers_only_to_their_asker(admin):
         assert user.put("/api/feedback", json={"feature": feature, "targetId": target, "value": "up"}).status_code == 404, (feature, target)
     assert user.put("/api/feedback", json={"feature": "briefing_round", "targetId": EVENING, "value": "up", "reason": "좋아요에 사유"}).status_code == 422
     assert user.put("/api/feedback", json={"feature": "briefing_round", "targetId": EVENING, "value": "down", "reason": "가" * 201}).status_code == 422
-    assert TestClient(admin.client.app).put("/api/feedback", json={"feature": "briefing_round", "targetId": EVENING, "value": "up"}).status_code == 401
 
 
 # ---- 75: transcripts and masking
@@ -362,7 +406,7 @@ def test_dislike_reasons_are_masked_and_link_to_the_conversation(admin):
 
 
 def test_conversations_survive_a_restart(admin):
-    user = guest(admin)
+    user = member(admin)
     answer = ask(user, "어떤 실적을 발표했나요?")
     restarted = admin.restart()
     restarted.login()

@@ -670,6 +670,10 @@ class BriefingPayload(CamelModel):
     data_window: BriefingWindow
     graph_version: str | None
     review_revision: int
+    rule_revision: int | None = Field(
+        default=None,
+        description="Publication-rule log revision at publication; null for rounds published before it was recorded",
+    )
     items: list[BriefingItem]
     references: BriefingReferences
     empty_reason: Literal["no_issues_in_window"] | None

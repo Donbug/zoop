@@ -1,5 +1,6 @@
-// 기업 상세 사건 탭(요구 37·38·40·41).
-//  - 기간(1일·1개월·1년, 기본 1개월)은 발생 시각 기준. 발생 시각 미상 사건은 보도 시각이 기간 안인 것만 맨 아래 묶음에 따로 둔다.
+// 기업 상세 사건 탭(요구 37·38·40·41, 명세 v1.2 FS040·D05).
+//  - 기간(1일·1개월·1년, 기본 1개월)은 발생 시각 기준이며, 범위는 KST 조회 시각까지다(종료 시각 뒤 예정 사건은 없다).
+//    발생 날짜를 모르는 사건은 보도 시각이 범위 안인 것만 맨 아래 '발생 시점 미상' 묶음에 따로 둔다.
 //  - 같은 날짜의 사건이 여럿이면 날짜 묶음에 사건 수를 적고, 누르면 사건별 카드를 펼친다(사건을 합치지 않는다).
 //  - 사건 카드를 고르면 그 자리에서 상세가 열린다: 영향 경로(이 기업 ↔ 사건 ↔ 다른 기업 목록), 근거 문서, [지도에서 보기].
 //  - 기간·선택·펼친 묶음은 페이지가 주소로 관리한다. 이 파일은 받은 값을 그리고 바뀔 값을 알린다.
@@ -28,6 +29,7 @@ import {
   periodPhrase,
   periods,
   widerPeriodFor,
+  type DetailRange,
   type Period,
 } from "@/lib/company-timeline";
 import { assertionStatusLabel, formatEventTime, formatKst, relationLabel, type RelationType } from "@/lib/labels";
@@ -50,8 +52,8 @@ interface TimelineProps {
   company: Schemas["CompanyDetail"] | undefined;
   events: UseQueryResult<Schemas["EventListResponse"]>;
   selectedEvent: UseQueryResult<Schemas["EventDetail"]>;
-  period: Period;
-  today: string;
+  /** 차트와 함께 쓰는 조회 범위(기간·공통 종료 시각) */
+  range: DetailRange;
   onPeriodChange: (period: Period) => void;
   selectedId: string | null;
   onSelect: (eventId: string | null) => void;
@@ -64,7 +66,8 @@ interface TimelineProps {
 }
 
 export function CompanyTimeline(props: TimelineProps) {
-  const { company, events, period, today, onPeriodChange, openGroups, onToggleGroup } = props;
+  const { company, events, range, onPeriodChange, openGroups, onToggleGroup } = props;
+  const { period, today } = range;
   const [filter, setFilter] = useState<Filter>("all");
   const [focusGroup, setFocusGroup] = useState<string | null>(null);
 
@@ -78,8 +81,8 @@ export function CompanyTimeline(props: TimelineProps) {
       <div className="flex items-center gap-1">
         <Segmented aria-label="조회 기간" value={period} onValueChange={onPeriodChange} options={periodOptions} fill className="min-w-0 flex-1 md:w-60 md:flex-none" />
         <IconHint icon={Clock} label="기간 기준">
-          <p>오늘부터 거슬러 {periodLabel[period]} 안에 일어난 사건이에요. 예정된 사건도 함께 보여 드려요.</p>
-          <p>일어난 때를 확인하지 못한 사건은 기사가 이 기간에 보도된 것만 ‘발생 시각 미상’에 따로 모았어요.</p>
+          <p>지금(한국 시간)부터 거슬러 {periodLabel[period]} 안에 일어난 사건이에요. 1일은 오늘 0시부터예요.</p>
+          <p>일어난 날짜를 확인하지 못한 사건은 기사가 이 기간에 보도된 것만 ‘발생 시점 미상’에 따로 모았어요. 보도 시각은 일어난 때가 아니에요.</p>
           {events.data && <p>자료 기준 {formatKst(events.data.metadata.asOf)}</p>}
         </IconHint>
       </div>
@@ -91,7 +94,7 @@ export function CompanyTimeline(props: TimelineProps) {
 
   // 차트 표시용 날짜 묶음: 타임라인과 같은 거르기를 거친, 발생 시각이 있는 사건만.
   const keepRelation = (e: Schemas["EventSummary"]) => filter === "all" || relationOf.get(e.id) === filter;
-  const chartGroups = events.data ? groupEvents(events.data.items.filter(keepRelation), [], today) : [];
+  const chartGroups = events.data ? groupEvents(events.data.items.filter(keepRelation), []) : [];
 
   let body;
   if (events.isPending) body = <SkeletonRows count={3} label="사건 목록을 불러오고 있어요" />;
@@ -99,7 +102,7 @@ export function CompanyTimeline(props: TimelineProps) {
   else {
     const items = events.data.items.filter(keepRelation);
     const undated = events.data.unknownTimeItems.filter(keepRelation);
-    const groups = groupEvents(items, undated, today);
+    const groups = groupEvents(items, undated);
     const hasMixedRelations = new Set([...items, ...undated].map((e) => relationOf.get(e.id))).size > 1;
     const total = items.length + undated.length;
 
@@ -138,21 +141,12 @@ export function CompanyTimeline(props: TimelineProps) {
                     {group.unknown ? (
                       <>
                         <span>{group.label}</span>
-                        <IconHint icon={CalendarClock} label="발생 시각 미상">
-                          <p>일어난 때를 확인하지 못한 사건이에요. 보도 시각이 이 기간 안이라 함께 보여 드려요. 보도 시각은 사건이 일어난 때가 아니에요.</p>
+                        <IconHint icon={CalendarClock} label="발생 시점 미상">
+                          <p>일어난 날짜를 확인하지 못한 사건이에요. 보도 시각이 이 기간 안이라 함께 보여 드려요. 보도 시각은 사건이 일어난 때가 아니에요.</p>
                         </IconHint>
                       </>
                     ) : (
-                      <>
-                        <time dateTime={group.items[0]!.eventTime ?? undefined}>{group.label}</time>
-                        {group.upcoming && (
-                          <Tooltip content="오늘 뒤로 잡힌 날짜예요">
-                            <span tabIndex={0} role="img" aria-label="예정된 날짜" className="inline-flex rounded-sm">
-                              <CalendarClock className="size-4" aria-hidden="true" />
-                            </span>
-                          </Tooltip>
-                        )}
-                      </>
+                      <time dateTime={group.items[0]!.eventTime ?? undefined}>{group.label}</time>
                     )}
                   </div>
                   <div className="min-w-0">
@@ -216,7 +210,7 @@ export function CompanyTimeline(props: TimelineProps) {
     <div className="flex flex-col gap-3 pt-2">
       <h2 className="sr-only">사건 타임라인</h2>
       {toolbar}
-      <CompanyPriceChart companyId={props.companyId} period={period} groups={chartGroups} onPick={pickGroups} />
+      <CompanyPriceChart companyId={props.companyId} range={range} groups={chartGroups} onPick={pickGroups} />
       {body}
     </div>
   );
@@ -362,8 +356,8 @@ function EventDetailPanel({
     <div id={id} className="mt-2 flex flex-col gap-4 border-t border-border-subtle pt-4">
       <p className="text-sm text-text-secondary tabular-nums">
         {event.timePrecision === "unknown"
-          ? `발생 시각 미상 · 최근 보도 ${summary.reportedAt ? formatKst(summary.reportedAt) : "시각 미상"}`
-          : `발생 ${formatEventTime(event.eventTime, event.timePrecision)}`}
+          ? `발생 시점 미상 · 최근 보도 ${summary.reportedAt ? formatKst(summary.reportedAt) : "시각 미상"}`
+          : `발생 ${formatEventTime(event.eventTime, event.timePrecision)}${event.timePrecision === "day" ? " · 시각 미상" : ""}`}
         {event.period ? ` · 대상 기간 ${event.period}` : ""}
       </p>
       <ApprovalNote approval={event.approval} />

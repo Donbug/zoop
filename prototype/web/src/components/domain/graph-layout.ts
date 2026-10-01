@@ -272,11 +272,32 @@ export function edgeNodeFootprint(side: "bottom" | "right"): Insets {
   return side === "bottom" ? { top: 0, right: 0, bottom: EDGE_GAP_PX + 48 + 28, left: 0 } : { top: 0, right: EDGE_GAP_PX + 48 + 64, bottom: 0, left: 0 };
 }
 
+/** fcose 난수 씨앗(R4). 같은 데이터·같은 화면 종류면 새로고침해도 같은 배치가 나온다. */
+const LAYOUT_SEED = 0x5eed;
+
+/** 작은 결정적 난수 생성기(mulberry32). fcose가 쓰는 Math.random을 배치 동안만 바꿔 끼운다. */
+function seededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
  * 배치를 계산해 노드를 최종 위치에 둔다(동기). 애니메이션은 revealPlacement가 맡는다.
  * edgeNodeId가 있으면 그 노드는 배치에서 빼고 나머지의 가장자리(가로로 긴 화면은 오른쪽 가운데, 세로로 긴 화면은 아래 가운데)에 둔다.
+ * exact면(같은 데이터로 지도에 돌아옴) 기억한 좌표를 그대로 쓰고 배치를 다시 계산하지 않는다(R4·FS044).
  */
-export function placeNodes(cy: Core, layoutName: LayoutName, isMobile: boolean, remembered: Positions, edgeNodeId?: string): Placement {
+export function placeNodes(cy: Core, layoutName: LayoutName, isMobile: boolean, remembered: Positions, edgeNodeId?: string, exact = false): Placement {
+  if (exact && cy.nodes().toArray().every((n) => remembered.has(n.id()))) {
+    const final: Positions = new Map(cy.nodes().map((n) => [n.id(), remembered.get(n.id())!] as const));
+    cy.nodes().positions((n) => final.get(n.id())!);
+    return { start: final, final, firstShow: true };
+  }
   const known = cy.nodes().filter((n) => remembered.has(n.id()));
   const incremental = layoutName === "fcose" && known.length > 0 && known.length >= cy.nodes().length / 2;
   // 시작 위치: 기억한 노드는 제자리, 새 노드는 이미 놓인 이웃 곁(없으면 가운데)에서 출발한다.
@@ -316,7 +337,18 @@ export function placeNodes(cy: Core, layoutName: LayoutName, isMobile: boolean, 
           tilingPaddingHorizontal: 140,
           tilingPaddingVertical: 64,
         } as cytoscape.LayoutOptions);
-  if (laid.nodes().nonempty()) layout.run();
+  if (laid.nodes().nonempty()) {
+    const random = Math.random;
+    Math.random = seededRandom(LAYOUT_SEED);
+    // fcose는 기업 원을 전체 보기에서의 크기(.layout-size)로 보고 배치한다(R2). 흐름 순 배치는 층 간격이 따로 있다.
+    const sized = layoutName === "fcose" ? laid.nodes('[kind = "company"]').addClass("layout-size") : cy.collection();
+    try {
+      layout.run();
+    } finally {
+      Math.random = random;
+      sized.removeClass("layout-size");
+    }
+  }
   if (edgeNode.nonempty()) placeEdgeNode(cy, edgeNode, isMobile, cy.zoom());
 
   const final: Positions = new Map();

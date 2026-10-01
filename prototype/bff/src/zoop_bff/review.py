@@ -70,16 +70,26 @@ class ReviewStore:
         """``payload`` as users see it: effective admin decisions and the enabled rules laid over it."""
         return apply_reviews(payload, self.effective(), self.rules.enabled_ids())
 
+    def apply_as_of(self, payload: dict[str, Any], review_revision: int, rule_revision: int) -> dict[str, Any]:
+        """``payload`` as it looked when the review log stood at these revisions (both logs are append-only)."""
+        return apply_reviews(payload, self.effective(review_revision), self.rules.enabled_ids(rule_revision))
+
     def revision(self) -> int:
         row = self._db.one("SELECT COALESCE(MAX(id),0) AS r FROM review_decisions")
         return int(row["r"]) if row else 0
 
-    def effective(self) -> list[Decision]:
+    def effective(self, upto: int | None = None) -> list[Decision]:
+        """The newest decision per target; ``upto`` ignores decisions recorded after that revision."""
         rows = self._db.query(
             "SELECT * FROM review_decisions WHERE id IN "
-            "(SELECT MAX(id) FROM review_decisions GROUP BY target_type, target_id) ORDER BY id"
+            "(SELECT MAX(id) FROM review_decisions WHERE id <= ? GROUP BY target_type, target_id) ORDER BY id",
+            (self._ceiling(upto),),
         )
         return [_decision(r) for r in rows]
+
+    @staticmethod
+    def _ceiling(upto: int | None) -> int:
+        return 2**62 if upto is None else upto
 
     def current(self, target_type: str, target_id: str) -> Decision | None:
         row = self._db.one(

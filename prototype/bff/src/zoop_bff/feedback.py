@@ -1,22 +1,27 @@
-"""Like/dislike on AI output (requirement 75).
+"""Like/dislike on AI output (requirement 75; spec v1.2 FS066-01/FS066-02, D08).
 
-One voter has at most one vote per target (``feedback`` primary key). A vote can be switched or taken
-back; a dislike may carry a short reason. Targets are the chatbot's answers, a published briefing round and
-one of its key issues. News summaries have no producer in this prototype, so no vote target exists for them.
-Administrators see counts, trends and reasons only with pseudonymous voter ids and masked text.
+Only signed-in members rate. The screen sends the rating it wants to end up with (``up``/``down``/``none``),
+so a resent request never toggles anything; ``none`` takes the rating back and removes it from every count.
+One voter has at most one current rating per target (``feedback`` primary key), linked to the result kind
+(``feature``), the result id and its version (``target_version``: the graph version a briefing round was
+published on; a chatbot answer never changes, so it has none). A dislike may carry a short reason.
+News summaries have no producer in this prototype, so no vote target exists for them.
+Administrators see counts, trends and reasons only with pseudonymous voter ids and masked text, filtered by
+the KST day of each rating's last valid change.
 """
 
 from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Sequence
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Literal
 
 from .accounts import AccountStore
 from .audit import Clock
 from .briefing_rounds import parse_round_id
 from .dataset import Dataset
-from .insights_common import MIN_SAMPLE, SubjectKeys, Subject, day_range, kst_day, ratio, since_iso
+from .insights_common import KST, MAX_TREND_DAYS, MIN_SAMPLE, SubjectKeys, Subject, day_range, kst_day, ratio, since_iso, today_kst
 from .insights_schemas import (
     FEATURE_LABEL,
     DislikePage,
@@ -39,9 +44,49 @@ UNSUPPORTED = [
     )
 ]
 BASIS = (
-    "표본이 적은 비율은 숨기고 건수만 보여 줍니다. 한 사람이 같은 대상에 남길 수 있는 표는 1개이고, "
-    "표를 바꾸면 바꾼 날짜 기준으로 다시 셉니다."
+    "현재 유효한 평가만 셉니다. 취소한 평가는 빠지고, 한 사람이 같은 대상에 남길 수 있는 평가는 1개입니다. "
+    "기간은 평가를 마지막으로 바꾼 시각(한국 시간)으로 나눕니다. 표본이 적은 비율은 숨기고 건수만 보여 줍니다."
 )
+
+
+class Period:
+    """Which ratings an admin view covers: a preset window or explicit KST start/end days (both inclusive)."""
+
+    def __init__(self, clock: Clock, window: str, start: date | None = None, end: date | None = None):
+        self.window = window
+        self.start = start
+        self.end = end
+        self._clock = clock
+
+    @property
+    def custom(self) -> bool:
+        return self.start is not None or self.end is not None
+
+    def where(self) -> tuple[str, list[Any]]:
+        """SQL condition on ``updated_at`` (always prefixed with `` AND ``, or empty) and its parameters."""
+        if not self.custom:
+            since = since_iso(self.window, self._clock)
+            return (" AND updated_at >= ?", [since]) if since else ("", [])
+        sql, params = "", []
+        if self.start:
+            sql += " AND updated_at >= ?"
+            params.append(_kst_midnight_utc(self.start))
+        if self.end:
+            sql += " AND updated_at < ?"
+            params.append(_kst_midnight_utc(self.end + timedelta(days=1)))
+        return sql, params
+
+    def days(self, first_at: str | None) -> list[str]:
+        if not self.custom:
+            return day_range(self.window, self._clock, first_at)
+        end = self.end or today_kst(self._clock)
+        start = self.start or (date.fromisoformat(kst_day(first_at)) if first_at else end)
+        start = max(start, end - timedelta(days=MAX_TREND_DAYS - 1))
+        return [(start + timedelta(days=n)).isoformat() for n in range((end - start).days + 1)]
+
+
+def _kst_midnight_utc(day: date) -> str:
+    return utc_iso(datetime.combine(day, time.min, tzinfo=KST).astimezone(UTC))
 
 
 def issue_target(round_id: str, event_id: str) -> str:
@@ -54,56 +99,70 @@ class FeedbackService:
         self._clock = clock
         self._keys = keys
         self._accounts = accounts
+        # State directories created before the rating carried its result version lack the column.
+        columns = {r["name"] for r in db.query("PRAGMA table_info(feedback)")}
+        if "target_version" not in columns:
+            db.execute("ALTER TABLE feedback ADD COLUMN target_version TEXT")
 
-    # ---- voting (user side)
-    def set_vote(
-        self, subject: Subject, feature: str, target_id: str, value: Literal["up", "down"], reason: str | None
+    def period(self, window: str, start: date | None = None, end: date | None = None) -> Period:
+        return Period(self._clock, window, start, end)
+
+    # ---- rating (member side)
+    def set_rating(
+        self,
+        subject: Subject,
+        feature: str,
+        target_id: str,
+        version: str | None,
+        value: Literal["up", "down", "none"],
+        reason: str | None,
     ) -> FeedbackItem:
-        """Create or switch the voter's vote. Repeating the same vote changes nothing (idempotent)."""
+        """Store the rating the voter wants to end up with. Repeating a request changes nothing (idempotent):
+        the same value keeps the rating and its change time, ``none`` on no rating stays no rating."""
         now = utc_iso(self._clock.now())
+        key = (feature, target_id, subject.id)
         with self._db.transaction() as conn:
+            if value == "none":
+                conn.execute("DELETE FROM feedback WHERE feature=? AND target_id=? AND subject=?", key)
+                return FeedbackItem(feature=feature, target_id=target_id, target_version=version, value="none", reason=None)  # type: ignore[arg-type]
             row = conn.execute(
-                "SELECT value, reason FROM feedback WHERE feature=? AND target_id=? AND subject=?",
-                (feature, target_id, subject.id),
+                "SELECT value, reason, target_version FROM feedback WHERE feature=? AND target_id=? AND subject=?", key
             ).fetchone()
             if row is None:
                 conn.execute(
-                    "INSERT INTO feedback(feature,target_id,subject,subject_kind,value,reason,created_at,updated_at)"
-                    " VALUES (?,?,?,?,?,?,?,?)",
-                    (feature, target_id, subject.id, subject.kind, value, reason, now, now),
+                    "INSERT INTO feedback(feature,target_id,subject,subject_kind,value,reason,created_at,updated_at,target_version)"
+                    " VALUES (?,?,?,?,?,?,?,?,?)",
+                    (feature, target_id, subject.id, subject.kind, value, reason, now, now, version),
                 )
-            elif row["value"] != value or row["reason"] != reason:
+            elif (row["value"], row["reason"], row["target_version"]) != (value, reason, version):
                 conn.execute(
-                    "UPDATE feedback SET value=?, reason=?, updated_at=? WHERE feature=? AND target_id=? AND subject=?",
-                    (value, reason, now, feature, target_id, subject.id),
+                    "UPDATE feedback SET value=?, reason=?, target_version=?, updated_at=?"
+                    " WHERE feature=? AND target_id=? AND subject=?",
+                    (value, reason, version, now, *key),
                 )
-        return FeedbackItem(feature=feature, target_id=target_id, value=value, reason=reason)  # type: ignore[arg-type]
-
-    def cancel(self, subject: Subject, feature: str, target_id: str) -> bool:
-        """Take the vote back. ``False`` when there was none."""
-        cursor = self._db.execute(
-            "DELETE FROM feedback WHERE feature=? AND target_id=? AND subject=?", (feature, target_id, subject.id)
-        )
-        return cursor.rowcount > 0
+        return FeedbackItem(feature=feature, target_id=target_id, target_version=version, value=value, reason=reason)  # type: ignore[arg-type]
 
     def mine(self, subject: Subject, feature: str, target_ids: Sequence[str]) -> list[FeedbackItem]:
         if not target_ids:
             return []
         marks = ",".join("?" for _ in target_ids)
         rows = self._db.query(
-            f"SELECT feature,target_id,value,reason FROM feedback WHERE subject=? AND feature=? AND target_id IN ({marks})",
+            "SELECT feature,target_id,target_version,value,reason FROM feedback"
+            f" WHERE subject=? AND feature=? AND target_id IN ({marks})",
             [subject.id, feature, *target_ids],
         )
-        return [FeedbackItem(feature=r["feature"], target_id=r["target_id"], value=r["value"], reason=r["reason"]) for r in rows]
+        return [
+            FeedbackItem(
+                feature=r["feature"], target_id=r["target_id"], target_version=r["target_version"], value=r["value"], reason=r["reason"]
+            )
+            for r in rows
+        ]
 
     # ---- reading (admin side)
-    def summary(self, window: str) -> FeedbackSummary:
-        since = since_iso(window, self._clock)
-        rows = self._db.query(
-            "SELECT feature, value, updated_at FROM feedback" + (" WHERE updated_at >= ?" if since else ""),
-            (since,) if since else (),
-        )
-        days = day_range(window, self._clock, min((r["updated_at"] for r in rows), default=None))
+    def summary(self, period: Period) -> FeedbackSummary:
+        where, params = period.where()
+        rows = self._db.query("SELECT feature, value, updated_at FROM feedback WHERE 1=1" + where, params)
+        days = period.days(min((r["updated_at"] for r in rows), default=None))
         per_day: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
         for r in rows:
             per_day[r["feature"]][kst_day(r["updated_at"])][r["value"]] += 1
@@ -132,7 +191,9 @@ class FeedbackService:
                 )
             )
         return FeedbackSummary(
-            window=window,  # type: ignore[arg-type]
+            window=period.window,  # type: ignore[arg-type]
+            start=period.start.isoformat() if period.start else None,
+            end=period.end.isoformat() if period.end else None,
             as_of=utc_iso(self._clock.now()),
             min_sample=MIN_SAMPLE,
             features=features,
@@ -190,10 +251,9 @@ class FeedbackService:
         member = self._accounts.member(member_id) if member_id else None
         return Masker(member.email, member.display_name) if member else Masker()
 
-    def dislikes(self, window: str, limit: int, offset: int, ds: Dataset | None) -> DislikePage:
-        since = since_iso(window, self._clock)
-        where = "value='down'" + (" AND updated_at >= ?" if since else "")
-        params: list[Any] = [since] if since else []
+    def dislikes(self, period: Period, limit: int, offset: int, ds: Dataset | None) -> DislikePage:
+        cond, params = period.where()
+        where = "value='down'" + cond
         total = int(self._db.one(f"SELECT COUNT(*) AS n FROM feedback WHERE {where}", params)["n"])  # type: ignore[index]
         rows = self._db.query(
             f"SELECT rowid, * FROM feedback WHERE {where} ORDER BY updated_at DESC, rowid DESC LIMIT ? OFFSET ?",

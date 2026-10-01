@@ -1,3 +1,5 @@
+> **2026-10-01 이후 기준 문서가 아닙니다.** 기능 기준은 팀 확정 [기능·비기능명세서 v1.2](evidence/raw/functional-spec_2026-10-01/00-명세-목차.csv)이고, 현재 구현 상태는 [spec-v1.2-gap.md](evidence/spec-v1.2-gap.md)에 있습니다. 아래는 2026-09-30 시점 기록으로 보존합니다.
+
 # ZOOP feature status and handoff
 
 Reviewed draft for team decisions, 2026-09-30. Priorities and owners below are proposals, not assignments or release commitments. The immediate goal is to reuse the existing prototype, agree on its acceptance boundaries, and separate remaining backend, AI/data, and cloud work.

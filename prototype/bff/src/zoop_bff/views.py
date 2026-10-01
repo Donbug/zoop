@@ -14,6 +14,7 @@ from .schemas import (
     SourceSupportOut,
     Unavailable,
 )
+from .summaries import role_display
 
 SUMMARY_UNAVAILABLE = "요약 생산자(PoC 범위 밖)가 아직 없습니다."
 SENTIMENT_UNAVAILABLE = "감성 평가 생산자(PoC 범위 밖)가 아직 없습니다."
@@ -96,7 +97,7 @@ def company_links(ds: Dataset, issue: IssueRec) -> list[CompanyLink]:
         CompanyLink(
             id=e.target,
             name=company_name(ds, e.target),
-            role=e.role,
+            role=role_display(e.role),
             role_unconfirmed=e.role_unconfirmed,
             relation_type=e.relation_type,  # type: ignore[arg-type]
         )

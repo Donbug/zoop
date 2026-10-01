@@ -266,6 +266,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/watchlist/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Watch
+         * @description FS027 single toggle from the sidebar or a company node: the press itself is the save request.
+         *
+         *     Sends the wanted final state (``watched``) instead of the settings ``version``: a resent or concurrent
+         *     toggle is idempotent (no duplicate entry, no 409 to reload), and a toggle never overwrites another
+         *     company's change made elsewhere. Members only (guest 403). Adding an unknown company is 404; taking out
+         *     a company that is not watched changes nothing. Holdings are separate, so a held company stays a holding
+         *     node in the personal graph after it leaves the watchlist. No limit on the number of companies.
+         */
+        put: operations["put_watch_api_me_watchlist__id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/recommendations": {
         parameters: {
             query?: never;
@@ -417,7 +443,8 @@ export interface paths {
         };
         /**
          * Search Companies
-         * @description Not in spec v0.2 section 8; added for watchlist selection (FR: choose up to 3 companies).
+         * @description Supported companies (FS011-01). With ``q`` (trimmed, case-insensitive): exact code matches first, then
+         *     exact name matches, then partial matches; ties by name, then id. No business cap on the number of results.
          */
         get: operations["search_companies_api_companies_get"];
         put?: never;
@@ -500,6 +527,10 @@ export interface paths {
          * Get Prices
          * @description Price chart for the same periods as the event timeline: the latest session's intraday bars (1d),
          *     or daily bars from the timeline's period start (1m, 1y).
+         *
+         *     With ``from``/``to`` (the timeline's common KST range, FS040) only bars inside it are returned: intraday bars
+         *     by their time, daily bars by their KST day. A closed market leaves a gap; no price is ever filled in, so a
+         *     range without any session (a holiday ``1d``) is ``no_data``.
          */
         get: operations["get_prices_api_companies__id__prices_get"];
         put?: never;
@@ -542,11 +573,15 @@ export interface paths {
         };
         /**
          * List Events
-         * @description Approved issues, newest event first. Issues without an approved event time never match from/to.
+         * @description Approved issues, newest event first.
          *
-         *     With from/to those undated issues are listed apart in ``unknownTimeItems`` when their latest article
-         *     publication (``reportedAt``, KST date) falls in the range. The publication time is a grouping key
-         *     only; it never becomes the event time.
+         *     ``from``/``to`` are a KST date (whole day) or date-time; the detail screen sends the same range as its price
+         *     chart, ending at the query time (FS040), so an event scheduled after ``to`` is not listed. With a range
+         *     (D05): an issue whose event day is known matches by that day (a day without a time stays on that day,
+         *     shown as time unknown); an issue whose event day is unknown (no time, or only a month or year) never matches
+         *     by its event time and is listed apart in ``unknownTimeItems`` when its latest article publication
+         *     (``reportedAt``) falls in the range. The publication time only decides the range; it never becomes the
+         *     event time.
          */
         get: operations["list_events_api_events_get"];
         put?: never;
@@ -635,6 +670,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/briefings/{id}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Graph Basis
+         * @description What the round's relationship graph is anchored to, and whether it can be shown (FS032).
+         *
+         *     ``available``: the round was published and its publication-time graph can be rebuilt; read it with
+         *     ``round=<id>`` on ``/api/graph``, ``/api/graph/edges/{id}``, ``/api/events/{id}``, ``/api/evidence/{id}``
+         *     and ``/api/companies/{id}``. Later reviews, rule switches and graph versions never change it.
+         *     ``suspended`` / ``not_published`` / ``unavailable`` (the version or its evidence is gone): a notice, no graph;
+         *     the newest graph is never shown in its place. An unknown round id is a 404.
+         */
+        get: operations["get_graph_basis_api_briefings__id__graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/briefings/{id}/evaluations": {
         parameters: {
             query?: never;
@@ -655,27 +716,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/chat/sessions": {
+    "/api/chat/sessions/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
+        /**
+         * Get Conversation
+         * @description One conversation of the signed-in member: every job in order, with the saved result of the completed ones.
+         */
+        get: operations["get_conversation_api_chat_sessions__id__get"];
         /**
          * Create Session
-         * @description Needs a member or guest session; a conversation is only readable by its creator.
+         * @description Start a conversation (a new one never inherits the earlier one's questions or selection).
+         *
+         *     Members only (a guest gets 403). The client chooses the id, so resending after a lost response returns the same
+         *     conversation instead of making a second one.
          */
-        post: operations["create_session_api_chat_sessions_post"];
+        put: operations["create_session_api_chat_sessions__id__put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/chat/sessions/{id}/messages": {
+    "/api/chat/sessions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Conversation
+         * @description The member's newest conversation with its jobs and saved results (`conversation: null` when there is none).
+         *
+         *     This is how a closed panel, another page or a reload finds the conversation again.
+         */
+        get: operations["current_conversation_api_chat_sessions_current_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/sessions/{id}/jobs": {
         parameters: {
             query?: never;
             header?: never;
@@ -685,12 +775,78 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Post Message
-         * @description Example answer (no LLM): quotes of approved evidence linked to the context nodes.
+         * Submit Job
+         * @description Ask a question. The first request with a new job id freezes the question, selection, period and the KST day;
+         *     the answer is produced in the background -- read it with `GET /api/chat/jobs/{jobId}`.
          *
-         *     Uses the request's ``contextIds`` when given (non-empty), otherwise the session's.
+         *     * the same job id with the same body returns the stored job (200), it never asks twice;
+         *     * the same job id with another body is 409 `chat_job_conflict` and changes nothing;
+         *     * a conversation with a queued/running job refuses a new job id: 409 `chat_session_busy`.
          */
-        post: operations["post_message_api_chat_sessions__id__messages_post"];
+        post: operations["submit_job_api_chat_sessions__id__jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Job
+         * @description Status and, once completed, the saved result of a job. 404 means the server looked and has no such job;
+         *     a failing read is a 5xx and must not be taken for 'unregistered'.
+         */
+        get: operations["get_job_api_chat_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/jobs/{job_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Job
+         * @description Retry a failed job *only where allowed*: a confirmed temporary failure runs again with the frozen context; a
+         *     failed save of a kept verified result is saved again without asking the engine. A failed validation, a lost
+         *     result or an unclassified error is 409 `chat_job_not_retryable` -- send a new question instead.
+         */
+        post: operations["retry_job_api_chat_jobs__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job
+         * @description Cancel a queued/running job. Closing the panel or starting a new conversation never cancels.
+         */
+        post: operations["cancel_job_api_chat_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1171,21 +1327,20 @@ export interface paths {
         };
         /**
          * My Feedback
-         * @description The caller's own votes on the given targets (empty list when none).
+         * @description The member's own current ratings on the given targets (no item = no rating). Guests get 403.
          */
         get: operations["my_feedback_api_feedback_get"];
         /**
-         * Vote
-         * @description Like or dislike an AI output: one vote per person and target. Sending the other value switches the vote,
-         *     the same value again changes nothing. ``reason`` (optional, max 200 chars) only goes with a dislike.
+         * Rate
+         * @description Set the member's rating to the wanted final state: ``up``, ``down`` or ``none`` (take it back).
+         *
+         *     Members only (guest 403, no session 401). Resending the same request keeps the same state, so a retry
+         *     after a lost response never toggles. ``targetVersion``, when sent, must match the result's current
+         *     version (409 ``feedback_target_changed``). ``reason`` (optional, max 200 chars) only goes with a dislike.
          */
-        put: operations["vote_api_feedback_put"];
+        put: operations["rate_api_feedback_put"];
         post?: never;
-        /**
-         * Cancel
-         * @description Take the vote back. Idempotent: 204 even when there was no vote.
-         */
-        delete: operations["cancel_api_feedback_delete"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1282,7 +1437,9 @@ export interface paths {
         };
         /**
          * Feedback Summary
-         * @description Likes and dislikes per AI feature with a daily trend. Ratios below ``minSample`` votes are null.
+         * @description Current (not taken back) likes and dislikes per AI feature with a daily trend, filtered by the KST day
+         *     of each rating's last valid change: a preset ``window`` (default: everything kept) or ``start``/``end``.
+         *     Ratios below ``minSample`` votes are null; with no rating at all there is no ratio either.
          */
         get: operations["feedback_summary_api_admin_feedback_summary_get"];
         put?: never;
@@ -1302,7 +1459,7 @@ export interface paths {
         };
         /**
          * Dislikes
-         * @description Dislikes, newest first, with the (masked) reason and the voter's pseudonym.
+         * @description Current dislikes, newest change first, with the (masked) reason and the voter's pseudonym.
          */
         get: operations["dislikes_api_admin_feedback_dislikes_get"];
         put?: never;
@@ -1699,6 +1856,66 @@ export interface components {
             briefingId: string;
             metadata: components["schemas"]["Metadata"];
         };
+        /**
+         * BriefingGraphBasis
+         * @description What a briefing's relationship graph is anchored to (FS032): the graph as it stood when the round was published.
+         *
+         *     ``/api/graph?round=<id>`` and the node, edge, event, evidence and company reads that take the same ``round``
+         *     answer from that state, never from the newest graph. Any status but ``available`` has no graph to read.
+         */
+        BriefingGraphBasis: {
+            /** Roundid */
+            roundId: string;
+            /** Date */
+            date: string;
+            /**
+             * Edition
+             * @enum {string}
+             */
+            edition: "morning" | "evening";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "suspended" | "unavailable" | "not_published";
+            /**
+             * Message
+             * @description User-facing notice for every status but available
+             */
+            message: string | null;
+            /**
+             * Reason
+             * @description Admin-written reason, only for suspended rounds
+             */
+            reason: string | null;
+            /** Publishedat */
+            publishedAt: string | null;
+            /**
+             * Dataasof
+             * @description End of the round's data window (KST): the reference time of the relations and evidence shown
+             */
+            dataAsOf: string | null;
+            /**
+             * Graphversion
+             * @description Graph version the round was published from
+             */
+            graphVersion: string | null;
+            /**
+             * Keyissueids
+             * @description The round's key issues in rank order; empty unless available
+             */
+            keyIssueIds: string[];
+            /**
+             * Companyids
+             * @description Companies related to those issues; empty unless available
+             */
+            companyIds: string[];
+            /**
+             * Correctioncount
+             * @description Corrections registered beside the published original
+             */
+            correctionCount: number;
+        };
         /** BriefingItem */
         BriefingItem: {
             /** Eventid */
@@ -1807,6 +2024,11 @@ export interface components {
             graphVersion: string | null;
             /** Reviewrevision */
             reviewRevision: number;
+            /**
+             * Rulerevision
+             * @description Publication-rule log revision at publication; null for rounds published before it was recorded
+             */
+            ruleRevision: number | null;
             /** Items */
             items: components["schemas"]["BriefingItem"][];
             references: components["schemas"]["BriefingReferences"];
@@ -2148,54 +2370,232 @@ export interface components {
              */
             droppedRelations: string[];
         };
-        /** ChatMessageRequest */
-        ChatMessageRequest: {
-            /** Question */
-            question: string;
-            /** Contextids */
-            contextIds?: string[] | null;
+        /** ChatAction */
+        ChatAction: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "set_watchlist";
+            /** Label */
+            label: string;
         };
-        /** ChatMessageResponse */
-        ChatMessageResponse: {
+        /**
+         * ChatApplied
+         * @description What the answer was actually built on.
+         */
+        ChatApplied: {
+            /** Companies */
+            companies: components["schemas"]["ChatAppliedItem"][];
+            /** Issues */
+            issues: components["schemas"]["ChatAppliedItem"][];
+            period: components["schemas"]["ChatAppliedPeriod"] | null;
+            /** Graphversion */
+            graphVersion: string | null;
+            /** Dataasof */
+            dataAsOf: string;
+            /**
+             * Questionoverrodecontext
+             * @description The question named other targets than the selection, so the question won
+             */
+            questionOverrodeContext: boolean;
+        };
+        /** ChatAppliedItem */
+        ChatAppliedItem: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** ChatAppliedPeriod */
+        ChatAppliedPeriod: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+            /**
+             * Basis
+             * @description question/context: asked for; evidence: no period asked, this is the publication span of the cited articles
+             * @enum {string}
+             */
+            basis: "question" | "context" | "evidence";
+            /**
+             * Expression
+             * @description The words of the question the period came from
+             */
+            expression: string | null;
+        };
+        /** ChatChoice */
+        ChatChoice: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** ChatContextItem */
+        ChatContextItem: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "company" | "issue" | "edge" | "evidence";
+            /** Label */
+            label: string;
+        };
+        /**
+         * ChatContextRequest
+         * @description What the member had selected when asking: graph targets, optional evidence references and period.
+         */
+        ChatContextRequest: {
+            /**
+             * Contextids
+             * @description Company, issue, edge or evidence ids
+             */
+            contextIds?: string[];
+            /**
+             * Evidenceids
+             * @description Narrows the evidence to these references
+             */
+            evidenceIds?: string[];
+            /** @description Explicit period of the selection; the question's own period wins */
+            period?: components["schemas"]["ChatPeriod"] | null;
+        };
+        /** ChatConversation */
+        ChatConversation: {
+            session: components["schemas"]["ChatSessionResponse"];
+            /** Jobs */
+            jobs: components["schemas"]["ChatJob"][];
+        };
+        /** ChatCurrentResponse */
+        ChatCurrentResponse: {
+            conversation: components["schemas"]["ChatConversation"] | null;
+        };
+        /** ChatFailure */
+        ChatFailure: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "validation_failed" | "save_failed" | "result_lost" | "transient" | "permission_denied" | "internal";
+            /** Reason */
+            reason: string | null;
+            /** Message */
+            message: string;
+            /**
+             * Retry
+             * @description What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed.
+             */
+            retry: ("rerun" | "save_only") | null;
+        };
+        /**
+         * ChatFrozenContext
+         * @description The selection frozen when the question was first received.
+         */
+        ChatFrozenContext: {
+            /** Items */
+            items: components["schemas"]["ChatContextItem"][];
+            /** Evidencecount */
+            evidenceCount: number;
+            period: components["schemas"]["ChatPeriod"] | null;
+        };
+        /** ChatJob */
+        ChatJob: {
+            /** Id */
+            id: string;
             /** Sessionid */
             sessionId: string;
-            /** Messageid */
-            messageId: string;
+            /** Seq */
+            seq: number;
             /** Question */
             question: string;
             /**
              * Status
              * @enum {string}
              */
-            status: "answered" | "insufficient_evidence";
+            status: "queued" | "running" | "completed" | "failed" | "cancelled";
+            /** Outcome */
+            outcome: ("answered" | "clarification" | "guidance" | "insufficient_evidence") | null;
+            /**
+             * Askedat
+             * @description UTC time the question was first received; relative dates are read against its KST day
+             */
+            askedAt: string;
+            context: components["schemas"]["ChatFrozenContext"];
+            failure: components["schemas"]["ChatFailure"] | null;
+            /** @description Only a saved result; null until the job is completed */
+            result: components["schemas"]["ChatResult"] | null;
+            /**
+             * Runs
+             * @description Executions started so far (a retry starts another)
+             */
+            runs: number;
+            /** Createdat */
+            createdAt: string;
+            /** Updatedat */
+            updatedAt: string;
+            /** Finishedat */
+            finishedAt: string | null;
+        };
+        /** ChatJobRequest */
+        ChatJobRequest: {
+            /**
+             * Jobid
+             * @description Client-made idempotency key of this question (not a request-trace id). Resending it never asks twice.
+             */
+            jobId: string;
+            /** Question */
+            question: string;
+            context?: components["schemas"]["ChatContextRequest"];
+        };
+        /** ChatPeriod */
+        ChatPeriod: {
+            /**
+             * Start
+             * @description Inclusive KST calendar day (ISO date)
+             */
+            start: string;
+            /** End */
+            end: string;
+        };
+        /** ChatResult */
+        ChatResult: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "answered" | "clarification" | "guidance" | "insufficient_evidence";
+            /** Messageid */
+            messageId: string;
             /** Answer */
             answer: string;
             /** Reason */
             reason: string | null;
-            /** Contextids */
-            contextIds: string[];
             /** Sources */
             sources: string[];
             /** Citations */
             citations: components["schemas"]["Citation"][];
             /** Graphtargets */
             graphTargets: components["schemas"]["GraphTarget"][];
+            applied: components["schemas"]["ChatApplied"];
+            /**
+             * Choices
+             * @description clarification: companies the member can pick (each becomes a new question)
+             */
+            choices: components["schemas"]["ChatChoice"][];
+            /** @description guidance: what the member can do to meet the missing condition */
+            action: components["schemas"]["ChatAction"] | null;
             metadata: components["schemas"]["Metadata"];
-        };
-        /** ChatSessionRequest */
-        ChatSessionRequest: {
-            /** Contextids */
-            contextIds?: string[];
         };
         /** ChatSessionResponse */
         ChatSessionResponse: {
             /** Id */
             id: string;
-            /** Contextids */
-            contextIds: string[];
             /** Createdat */
             createdAt: string;
-            metadata: components["schemas"]["Metadata"];
+            /** Jobs */
+            jobs: number;
         };
         /** Citation */
         Citation: {
@@ -2203,10 +2603,20 @@ export interface components {
             evidenceId: string;
             /** Quote */
             quote: string;
+            /** Articleid */
+            articleId: string;
+            /** Articleversion */
+            articleVersion: string;
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
             /** Articletitle */
             articleTitle: string | null;
             /** Publisher */
             publisher: string | null;
+            /** Publishedat */
+            publishedAt: string | null;
             /** Url */
             url: string | null;
         };
@@ -3044,10 +3454,15 @@ export interface components {
             /** Targetid */
             targetId: string;
             /**
+             * Targetversion
+             * @description Result version the rating is linked to; null for chatbot answers (an answer never changes)
+             */
+            targetVersion: string | null;
+            /**
              * Value
              * @enum {string}
              */
-            value: "up" | "down";
+            value: "up" | "down" | "none";
             /** Reason */
             reason: string | null;
         };
@@ -3063,6 +3478,16 @@ export interface components {
              * @enum {string}
              */
             window: "7d" | "30d" | "all";
+            /**
+             * Start
+             * @description Applied KST start day (inclusive); overrides window when start or end is set
+             */
+            start: string | null;
+            /**
+             * End
+             * @description Applied KST end day (inclusive)
+             */
+            end: string | null;
             /** Asof */
             asOf: string;
             /** Minsample */
@@ -3074,7 +3499,11 @@ export interface components {
             /** Basis */
             basis: string;
         };
-        /** FeedbackVote */
+        /**
+         * FeedbackVote
+         * @description The rating the voter wants to end up with (FS066-01, D08). ``none`` takes the rating back, so sending the
+         *     same request again never toggles anything.
+         */
         FeedbackVote: {
             /**
              * Feature
@@ -3087,7 +3516,12 @@ export interface components {
              * Value
              * @enum {string}
              */
-            value: "up" | "down";
+            value: "up" | "down" | "none";
+            /**
+             * Targetversion
+             * @description Result version the voter saw (a briefing's graphVersion). A different current version is 409.
+             */
+            targetVersion?: string | null;
             /**
              * Reason
              * @description Optional, only with a dislike
@@ -5063,6 +5497,14 @@ export interface components {
             /** Evidenceids */
             evidenceIds: string[];
         };
+        /**
+         * WatchUpdate
+         * @description FS027 single toggle: whether the company should end up in the watchlist (a resend changes nothing).
+         */
+        WatchUpdate: {
+            /** Watched */
+            watched: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -6078,6 +6520,86 @@ export interface operations {
             };
         };
     };
+    put_watch_api_me_watchlist__id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     recommendations_api_me_recommendations_get: {
         parameters: {
             query?: {
@@ -6463,6 +6985,8 @@ export interface operations {
                 depth?: number | null;
                 /** @description Maximum node count; newest events first. */
                 limit?: number;
+                /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
+                round?: string | null;
             };
             header?: never;
             path?: never;
@@ -6537,7 +7061,10 @@ export interface operations {
     };
     get_edge_api_graph_edges__id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
+                round?: string | null;
+            };
             header?: never;
             path: {
                 id: string;
@@ -6614,9 +7141,8 @@ export interface operations {
     search_companies_api_companies_get: {
         parameters: {
             query?: {
-                /** @description Substring of id, name, ticker or alias */
+                /** @description Name, alias, ticker or id; empty lists every company by name */
                 q?: string | null;
-                limit?: number;
             };
             header?: never;
             path?: never;
@@ -6691,7 +7217,10 @@ export interface operations {
     };
     get_company_api_companies__id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
+                round?: string | null;
+            };
             header?: never;
             path: {
                 id: string;
@@ -6921,6 +7450,10 @@ export interface operations {
         parameters: {
             query?: {
                 period?: "1d" | "1m" | "1y";
+                /** @description Range start, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
+                from?: string | null;
+                /** @description Range end, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
+                to?: string | null;
             };
             header?: never;
             path: {
@@ -7075,7 +7608,9 @@ export interface operations {
         parameters: {
             query?: {
                 companyId?: string | null;
+                /** @description Range start, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
                 from?: string | null;
+                /** @description Range end, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
                 to?: string | null;
             };
             header?: never;
@@ -7151,7 +7686,10 @@ export interface operations {
     };
     get_event_api_events__id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
+                round?: string | null;
+            };
             header?: never;
             path: {
                 id: string;
@@ -7227,7 +7765,10 @@ export interface operations {
     };
     get_evidence_api_evidence__id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
+                round?: string | null;
+            };
             header?: never;
             path: {
                 id: string;
@@ -7455,6 +7996,82 @@ export interface operations {
             };
         };
     };
+    get_graph_basis_api_briefings__id__graph_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefingGraphBasis"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_evaluations_api_briefings__id__evaluations_get: {
         parameters: {
             query?: never;
@@ -7531,19 +8148,104 @@ export interface operations {
             };
         };
     };
-    create_session_api_chat_sessions_post: {
+    get_conversation_api_chat_sessions__id__get: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Conversation id made by the client */
+                id: string;
+            };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatSessionRequest"];
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConversation"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
+    };
+    create_session_api_chat_sessions__id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Conversation id made by the client */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
+            /** @description The conversation already existed (a resent request). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionResponse"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
@@ -7609,20 +8311,14 @@ export interface operations {
             };
         };
     };
-    post_message_api_chat_sessions__id__messages_post: {
+    current_conversation_api_chat_sessions_current_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatMessageRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7630,7 +8326,337 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ChatMessageResponse"];
+                    "application/json": components["schemas"]["ChatCurrentResponse"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_job_api_chat_sessions__id__jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Conversation id made by the client */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatJobRequest"];
+            };
+        };
+        responses: {
+            /** @description This job id was accepted before: its stored state or result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatJob"];
+                };
+            };
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatJob"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_job_api_chat_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Job id made by the client (idempotency key) */
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatJob"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retry_job_api_chat_jobs__job_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Job id made by the client (idempotency key) */
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nothing to retry: the job is running or completed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatJob"];
+                };
+            };
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatJob"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_job_api_chat_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Job id made by the client (idempotency key) */
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatJob"];
                 };
             };
             /** @description unauthenticated */
@@ -9653,7 +10679,7 @@ export interface operations {
             };
         };
     };
-    vote_api_feedback_put: {
+    rate_api_feedback_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -9674,81 +10700,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FeedbackItem"];
                 };
-            };
-            /** @description unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description forbidden (guest session or foreign resource) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description validation error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description source_unavailable: the approved-issue source could not be read */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    cancel_api_feedback_delete: {
-        parameters: {
-            query: {
-                feature: "chatbot_answer" | "briefing_round" | "briefing_issue";
-                targetId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description unauthenticated */
             401: {
@@ -10114,6 +11065,10 @@ export interface operations {
         parameters: {
             query?: {
                 window?: "7d" | "30d" | "all";
+                /** @description KST day (inclusive) of the rating's last valid change; overrides window */
+                start?: string | null;
+                /** @description KST day (inclusive) of the rating's last valid change; overrides window */
+                end?: string | null;
             };
             header?: never;
             path?: never;
@@ -10190,6 +11145,10 @@ export interface operations {
         parameters: {
             query?: {
                 window?: "7d" | "30d" | "all";
+                /** @description KST day (inclusive) of the rating's last valid change; overrides window */
+                start?: string | null;
+                /** @description KST day (inclusive) of the rating's last valid change; overrides window */
+                end?: string | null;
                 limit?: number;
                 /** @description Offset returned as nextCursor */
                 cursor?: string | null;

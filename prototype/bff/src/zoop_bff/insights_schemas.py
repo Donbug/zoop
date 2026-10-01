@@ -73,12 +73,23 @@ class TelemetryAccepted(CamelModel):
     accepted: int
 
 
+FeedbackValue = Literal["up", "down", "none"]
+
+
 class FeedbackVote(CamelModel):
+    """The rating the voter wants to end up with (FS066-01, D08). ``none`` takes the rating back, so sending the
+    same request again never toggles anything."""
+
     model_config = ConfigDict(extra="forbid")
 
     feature: FeedbackFeature
     target_id: str = Field(min_length=1, max_length=160, pattern=ID_PATTERN)
-    value: Literal["up", "down"]
+    value: FeedbackValue
+    target_version: str | None = Field(
+        default=None,
+        max_length=160,
+        description="Result version the voter saw (a briefing's graphVersion). A different current version is 409.",
+    )
     reason: str | None = Field(default=None, max_length=MAX_REASON, description="Optional, only with a dislike")
 
     @model_validator(mode="after")
@@ -93,7 +104,8 @@ class FeedbackVote(CamelModel):
 class FeedbackItem(CamelModel):
     feature: FeedbackFeature
     target_id: str
-    value: Literal["up", "down"]
+    target_version: str | None = Field(description="Result version the rating is linked to; null for chatbot answers (an answer never changes)")
+    value: FeedbackValue
     reason: str | None
 
 
@@ -246,6 +258,8 @@ class UnsupportedFeedbackFeature(CamelModel):
 
 class FeedbackSummary(CamelModel):
     window: StatsWindow
+    start: str | None = Field(description="Applied KST start day (inclusive); overrides window when start or end is set")
+    end: str | None = Field(description="Applied KST end day (inclusive)")
     as_of: str
     min_sample: int
     features: list[FeedbackFeatureStat]

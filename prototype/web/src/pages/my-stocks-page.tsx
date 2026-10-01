@@ -1,8 +1,10 @@
 // /me/stocks 내 종목 (design-direction §5.8)
 //  보유 종목(가상 계좌): 연결 상태, 종목별 수량·원가 비중, 연결/해제(평가금액은 데이터가 없어 자리를 두지 않는다)
-//  관심 종목: 개수 제한 없음, 검색·추가·빼기(PUT /api/me/settings, version 409·422는 사람말로)
+//  관심 종목: 개수 제한 없음. 검색 결과 선택·빼기는 편집 목록에만 반영하고 [저장]이 PUT /api/me/settings(FS011-01·FS027).
+//    version 409·422는 사람말로, 실패해도 편집 내용은 남는다.
 //  각 종목 행 → 그 종목을 고른 지도, [상세] → 기업 상세. 비회원은 로그인 안내.
 import { ArrowUpRight, Landmark, Star, Wallet, X } from "lucide-react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { ApiError, type Schemas } from "@/api/client";
 import {
@@ -184,36 +186,50 @@ function Holdings() {
   );
 }
 
+/** 관심 종목(FS011-01·FS027): 검색 결과 선택과 빼기는 편집 중인 목록에만 반영하고, [저장]이 실제 저장이다.
+ *  저장이 성공하기 전에는 성공을 알리지 않으며, 실패하면 편집 내용을 그대로 두고 다시 저장할 수 있다. */
 function Watchlist() {
   const settings = useSettings();
   const update = useUpdateSettings();
   const toast = useToast();
-  const watchIds = settings.data?.watchlistIds ?? [];
-  const watchQueries = useCompanies(watchIds);
+  const savedIds = settings.data?.watchlistIds ?? [];
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const editIds = draft ?? savedIds;
+  const added = editIds.filter((id) => !savedIds.includes(id));
+  const removed = savedIds.filter((id) => !editIds.includes(id));
+  const dirty = added.length + removed.length > 0;
+  const watchQueries = useCompanies(editIds);
 
-  const saveList = (next: string[], done: string, name: string) => {
-    if (!settings.data) return;
+  const edit = (next: string[]) => {
+    setDraft(next);
+    update.reset();
+  };
+  const remove = (id: string) => edit(editIds.filter((x) => x !== id));
+  const onToggle = (company: Schemas["CompanySummary"]) =>
+    edit(editIds.includes(company.id) ? editIds.filter((x) => x !== company.id) : [...editIds, company.id]);
+
+  const save = () => {
+    if (!settings.data || !dirty) return;
     update.mutate(
-      { version: settings.data.version, watchlistIds: next },
+      { version: settings.data.version, watchlistIds: editIds },
       {
-        onSuccess: () => toast({ title: done, description: name, tone: "success" }),
+        onSuccess: () => {
+          setDraft(null);
+          toast({ title: "관심 종목을 저장했어요", description: `${editIds.length}개`, tone: "success" });
+        },
         onError: (error) => {
           if (error instanceof ApiError && error.code === "version_conflict") void settings.refetch();
         },
       },
     );
   };
-  const remove = (id: string, name: string) => saveList(watchIds.filter((x) => x !== id), "관심 종목에서 뺐어요", name);
 
-  const onToggle = (company: Schemas["CompanySummary"]) => {
-    if (watchIds.includes(company.id)) {
-      remove(company.id, company.name);
-      return;
-    }
-    saveList([...watchIds, company.id], "관심 종목에 추가했어요", company.name);
-  };
-
-  const updateMessage = update.error instanceof ApiError ? errorReasonMessage(update.error.code) : undefined;
+  const conflict = update.error instanceof ApiError && update.error.code === "version_conflict";
+  const updateMessage = conflict
+    ? "다른 곳에서 관심 종목이 바뀌었어요. 최신 목록을 불러왔으니 편집한 내용으로 다시 저장할 수 있어요."
+    : update.error instanceof ApiError
+      ? errorReasonMessage(update.error.code)
+      : undefined;
 
   return (
     <section aria-labelledby="stocks-watch">
@@ -222,8 +238,8 @@ function Watchlist() {
         icon={Star}
         title="관심 종목"
         action={
-          <data value={watchIds.length} className="text-sm text-text-secondary tabular-nums" aria-label={`관심 종목 ${watchIds.length}개`}>
-            {watchIds.length}개
+          <data value={editIds.length} className="text-sm text-text-secondary tabular-nums" aria-label={`관심 종목 ${editIds.length}개${dirty ? ", 저장 전" : ""}`}>
+            {editIds.length}개{dirty && " · 저장 전"}
           </data>
         }
       />
@@ -232,15 +248,16 @@ function Watchlist() {
         <ErrorState className="px-4" error={settings.error} title="관심 종목을 불러오지 못했어요" onRetry={() => void settings.refetch()} compact />
       )}
       {settings.isSuccess &&
-        (watchIds.length === 0 ? (
+        (editIds.length === 0 ? (
           <p className="px-4 pb-3 text-base text-text-secondary">고른 관심 종목이 없어요. 아래에서 검색해 추가해 주세요.</p>
         ) : (
           <ul>
-            {watchIds.map((id, i) => {
+            {editIds.map((id, i) => {
               const q = watchQueries[i];
               const name = q?.data?.name ?? "종목";
+              const pending = added.includes(id);
               const removeButton = (
-                <Button variant="ghost" size="icon" aria-label={`${name} 관심 종목에서 빼기`} disabled={update.isPending} onClick={() => remove(id, name)}>
+                <Button variant="ghost" size="icon" aria-label={`${name} 관심 종목 목록에서 빼기`} disabled={update.isPending} onClick={() => remove(id)}>
                   <X aria-hidden="true" />
                 </Button>
               );
@@ -251,7 +268,7 @@ function Watchlist() {
                     id={id}
                     mode="watchlist"
                     title={q.data.name}
-                    description={q.data.ticker ?? undefined}
+                    description={[q.data.ticker, pending && "추가 · 저장 전"].filter(Boolean).join(" · ") || undefined}
                     brandColor={q.data.brandColor}
                     logoUrl={q.data.logoUrl}
                     action={removeButton}
@@ -273,14 +290,29 @@ function Watchlist() {
             })}
           </ul>
         ))}
+      {dirty && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          <p className="mr-auto text-sm text-text-secondary tabular-nums" aria-live="polite">
+            저장하지 않은 변경 {added.length > 0 && `추가 ${added.length}개`}
+            {added.length > 0 && removed.length > 0 && " · "}
+            {removed.length > 0 && `빼기 ${removed.length}개`}
+          </p>
+          <Button variant="ghost" disabled={update.isPending} onClick={() => edit(savedIds)}>
+            되돌리기
+          </Button>
+          <Button loading={update.isPending} disabled={!settings.data} onClick={save}>
+            {update.isError ? "다시 저장" : "저장"}
+          </Button>
+        </div>
+      )}
       {update.isError && (
-        <p role="alert" className="px-4 py-2 text-sm font-medium text-error">
-          {updateMessage ?? "관심 종목을 저장하지 못했어요. 잠시 후 다시 시도해 주세요."}
+        <p role="alert" className="px-4 pb-2 text-sm font-medium text-error">
+          {updateMessage ?? "관심 종목을 저장하지 못했어요. 편집한 내용은 그대로 있어요. 다시 저장해 주세요."}
         </p>
       )}
       {settings.isSuccess && (
         <div className="pt-4">
-          <CompanySearch label="관심 종목 추가" selectedIds={watchIds} onToggle={onToggle} showWhenEmpty={false} disabled={update.isPending} />
+          <CompanySearch label="관심 종목 추가" selectedIds={editIds} onToggle={onToggle} disabled={update.isPending} />
         </div>
       )}
     </section>

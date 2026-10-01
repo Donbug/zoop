@@ -63,13 +63,14 @@ def create_app(
     )
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         scheduler = BriefingScheduler(admin.briefings) if settings.briefing_scheduler else None
         if scheduler:
             scheduler.start()
         try:
             yield
         finally:
+            app.state.zoop.chats.close()
             if scheduler:
                 scheduler.stop()
 

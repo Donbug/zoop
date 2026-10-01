@@ -171,6 +171,15 @@ class SettingsUpdate(CamelModel):
     investor: bool | None = Field(default=None, description="Answer to 'do you invest in stocks now?'")
 
 
+class WatchUpdate(CamelModel):
+    """FS027 single toggle: whether the company should end up in the watchlist (a resend changes nothing)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    watched: bool
+
+
+
 class SettingsResponse(CamelModel):
     mode: Literal["assets", "watchlist"]
     watchlist_ids: list[str]
@@ -808,6 +817,29 @@ class BriefingRoundsResponse(CamelModel):
     items: list[BriefingRoundRef]
 
 
+class BriefingGraphBasis(CamelModel):
+    """What a briefing's relationship graph is anchored to (FS032): the graph as it stood when the round was published.
+
+    ``/api/graph?round=<id>`` and the node, edge, event, evidence and company reads that take the same ``round``
+    answer from that state, never from the newest graph. Any status but ``available`` has no graph to read.
+    """
+
+    round_id: str
+    date: str
+    edition: Literal["morning", "evening"]
+    status: Literal["available", "suspended", "unavailable", "not_published"]
+    message: str | None = Field(description="User-facing notice for every status but available")
+    reason: str | None = Field(description="Admin-written reason, only for suspended rounds")
+    published_at: str | None
+    data_as_of: str | None = Field(
+        description="End of the round's data window (KST): the reference time of the relations and evidence shown"
+    )
+    graph_version: str | None = Field(description="Graph version the round was published from")
+    key_issue_ids: list[str] = Field(description="The round's key issues in rank order; empty unless available")
+    company_ids: list[str] = Field(description="Companies related to those issues; empty unless available")
+    correction_count: int = Field(description="Corrections registered beside the published original")
+
+
 class BriefingEvaluationResponse(Unavailable):
     briefing_id: str
     metadata: Metadata
@@ -816,20 +848,38 @@ class BriefingEvaluationResponse(Unavailable):
 # ---- chat
 
 
-class ChatSessionRequest(CamelModel):
-    context_ids: list[str] = Field(default_factory=list, max_length=20)
+ChatOutcome = Literal["answered", "clarification", "guidance", "insufficient_evidence"]
+ChatStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+ChatFailureKind = Literal["validation_failed", "save_failed", "result_lost", "transient", "permission_denied", "internal"]
+_ISO_DATE = r"^\d{4}-\d{2}-\d{2}$"
+
+
+class ChatPeriod(CamelModel):
+    start: str = Field(pattern=_ISO_DATE, description="Inclusive KST calendar day (ISO date)")
+    end: str = Field(pattern=_ISO_DATE)
+
+
+class ChatContextRequest(CamelModel):
+    """What the member had selected when asking: graph targets, optional evidence references and period."""
+
+    context_ids: list[str] = Field(default_factory=list, max_length=20, description="Company, issue, edge or evidence ids")
+    evidence_ids: list[str] = Field(default_factory=list, max_length=50, description="Narrows the evidence to these references")
+    period: ChatPeriod | None = Field(default=None, description="Explicit period of the selection; the question's own period wins")
+
+
+class ChatJobRequest(CamelModel):
+    job_id: str = Field(
+        pattern=r"^[A-Za-z0-9_-]{8,64}$",
+        description="Client-made idempotency key of this question (not a request-trace id). Resending it never asks twice.",
+    )
+    question: str = Field(min_length=1, max_length=1000)
+    context: ChatContextRequest = Field(default_factory=ChatContextRequest)
 
 
 class ChatSessionResponse(CamelModel):
     id: str
-    context_ids: list[str]
     created_at: str
-    metadata: Metadata
-
-
-class ChatMessageRequest(CamelModel):
-    question: str = Field(min_length=1, max_length=1000)
-    context_ids: list[str] | None = Field(default=None, max_length=20)
+    jobs: int
 
 
 class GraphTarget(CamelModel):
@@ -840,20 +890,109 @@ class GraphTarget(CamelModel):
 class Citation(CamelModel):
     evidence_id: str
     quote: str
+    article_id: str
+    article_version: str
+    start: int
+    end: int
     article_title: str | None
     publisher: str | None
+    published_at: str | None
     url: str | None
 
 
-class ChatMessageResponse(CamelModel):
-    session_id: str
+class ChatContextItem(CamelModel):
+    id: str
+    kind: Literal["company", "issue", "edge", "evidence"]
+    label: str
+
+
+class ChatFrozenContext(CamelModel):
+    """The selection frozen when the question was first received."""
+
+    items: list[ChatContextItem]
+    evidence_count: int
+    period: ChatPeriod | None
+
+
+class ChatFailure(CamelModel):
+    kind: ChatFailureKind
+    reason: str | None
+    message: str
+    retry: Literal["rerun", "save_only"] | None = Field(
+        description="What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed."
+    )
+
+
+class ChatAppliedItem(CamelModel):
+    id: str
+    label: str
+
+
+class ChatAppliedPeriod(CamelModel):
+    start: str
+    end: str
+    basis: Literal["question", "context", "evidence"] = Field(
+        description="question/context: asked for; evidence: no period asked, this is the publication span of the cited articles"
+    )
+    expression: str | None = Field(description="The words of the question the period came from")
+
+
+class ChatApplied(CamelModel):
+    """What the answer was actually built on."""
+
+    companies: list[ChatAppliedItem]
+    issues: list[ChatAppliedItem]
+    period: ChatAppliedPeriod | None
+    graph_version: str | None
+    data_as_of: str
+    question_overrode_context: bool = Field(description="The question named other targets than the selection, so the question won")
+
+
+class ChatChoice(CamelModel):
+    id: str
+    label: str
+
+
+class ChatAction(CamelModel):
+    kind: Literal["set_watchlist"]
+    label: str
+
+
+class ChatResult(CamelModel):
+    outcome: ChatOutcome
     message_id: str
-    question: str
-    status: Literal["answered", "insufficient_evidence"]
     answer: str
     reason: str | None = None
-    context_ids: list[str]
     sources: list[str]
     citations: list[Citation]
     graph_targets: list[GraphTarget]
+    applied: ChatApplied
+    choices: list[ChatChoice] = Field(description="clarification: companies the member can pick (each becomes a new question)")
+    action: ChatAction | None = Field(description="guidance: what the member can do to meet the missing condition")
     metadata: Metadata
+
+
+class ChatJob(CamelModel):
+    id: str
+    session_id: str
+    seq: int
+    question: str
+    status: ChatStatus
+    outcome: ChatOutcome | None
+    asked_at: str = Field(description="UTC time the question was first received; relative dates are read against its KST day")
+    context: ChatFrozenContext
+    failure: ChatFailure | None
+    result: ChatResult | None = Field(description="Only a saved result; null until the job is completed")
+    runs: int = Field(description="Executions started so far (a retry starts another)")
+    created_at: str
+    updated_at: str
+    finished_at: str | None
+
+
+class ChatConversation(CamelModel):
+    session: ChatSessionResponse
+    jobs: list[ChatJob]
+
+
+class ChatCurrentResponse(CamelModel):
+    conversation: ChatConversation | None

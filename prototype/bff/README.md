@@ -58,7 +58,7 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | 데모 계정 | 이메일 `demo@zoop.local`, 비밀번호 `zoop-demo`. 상태 DB에 없으면 기동 때 만든다 |
 | 회원가입 | `POST /api/auth/signup {email,password,displayName,agreements:[termId]}` → 201 + 바로 로그인. 비밀번호는 `hashlib.scrypt` 해시로만 저장. 필수 약관은 `GET /api/auth/terms`(제목만, `bodyAvailable:false`) |
 | 소셜 로그인 | 개발용 모의 제공자 `mock`만 있다(실제 IdP 자격 증명 없음). 아래 "소셜 로그인" |
-| 비회원 | `POST /api/auth/guest` → `kind:"guest"`, `user:null`, `setup:{completed:false, tutorialCompleted}`(튜토리얼 완료는 그 비회원 세션에만 저장). 시장 데이터는 열람 가능, 개인 API는 403 `guest_forbidden`. AI 질문은 비회원도 가능(대화는 만든 세션만 읽을 수 있음) |
+| 비회원 | `POST /api/auth/guest` → `kind:"guest"`, `user:null`, `setup:{completed:false, tutorialCompleted}`(튜토리얼 완료는 그 비회원 세션에만 저장). 시장 데이터는 열람 가능, 개인 API는 403 `guest_forbidden`. **AI 질문은 회원만**(비회원은 대화 생성·질문·조회 모두 403 `guest_forbidden`) |
 | 세션 없음 | `GET /api/auth/session`은 200 `kind:"anonymous"`. 개인 API는 401 |
 | 차단 회원 | `members.status='blocked'`이면 로그인 403 `member_blocked`, 열린 세션은 모든 요청이 401 `member_blocked`(로그아웃할 때까지). 차단 해제(`AccountStore.set_status(id,"active")`)는 그 회원의 기존 세션을 모두 지운다 |
 
@@ -82,6 +82,7 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | PUT | `/api/auth/tutorial` `{completed}` | 튜토리얼 완료·건너뛰기. 회원은 계정, 비회원은 비회원 세션에 저장. 같은 값 재전송은 변화 없음 |
 | GET | `/api/auth/terms` · `/api/auth/social/providers` | 약관 제목 목록 · 소셜 제공자(`development:true`면 모의) |
 | GET/PUT | `/api/me/settings` | `{mode, watchlistIds, tutorialCompleted, completed, investor, version}` (아래 규칙) |
+| PUT | `/api/me/watchlist/{id}` | 관심 단건 토글(FS027, 사이드바·기업 노드) `{watched: bool}` → 설정 응답. 아래 "관심 단건 토글" |
 | GET | `/api/me/recommendations?limit=` | 관심종목 추천: 활성 그래프의 승인 사건 수가 많은 기업(`reason:"승인된 사건 N건"`), 이미 관심인 기업 제외. 산업·테마 추천은 생산자가 없어 없다 |
 | GET | `/api/portfolio/mock-portfolios` | **명세 추가 제안.** 연결 가능한 가상 계좌 `{id,label,holdingsCount}` |
 | POST | `/api/portfolio/connections` `{mockPortfolioId}` | 201. 같은 프로필 재전송은 기존 연결 200(중복 연결 없음). 미지 ID 404 `mock_portfolio_not_found`, 다른 프로필이 연결돼 있으면 409 `already_connected` |
@@ -89,10 +90,10 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | DELETE | `/api/portfolio/connections/{id}` | 204 |
 | GET | `/api/graph?mode=all|personal&companyId=&depth=1..6&limit=` | 아래 "그래프". `depth`를 생략하면 중심에서 닿는 연결 요소 전체 |
 | GET | `/api/graph/edges/{id}` | 방향·유형·역할·`summary`·assertionStatus·근거 ID·basis·검증 상태. 파생 간선은 `via` 이슈와 직접 관계가 아니라는 설명 |
-| GET | `/api/companies?q=&limit=` | **명세 추가 제안.** 관심종목 선택용 검색(id·이름·티커·별칭 부분일치). 항목에 `brandColor`·`logoUrl` |
+| GET | `/api/companies?q=` | **명세 추가 제안.** 관심종목 검색(FS011-01). `q`(앞뒤 공백 제거, 대소문자 무시)는 코드 정확 일치(티커·id·시장 접두어 뺀 id) → 이름 정확 일치(이름·별칭) → 부분 일치 순, 동률은 이름·id 순. **개수 제한 없음.** `q`가 없으면 지원 종목 전체(이름순). 항목에 `brandColor`·`logoUrl` |
 | GET | `/api/companies/{id}` | `directIssues`(INVOLVES 역방향, `role`), `structuralIssues`(`basis`), `brandColor`·`logoUrl`, `summary` unavailable, `holding`/`watch`(회원만, 아니면 `null`). 시세는 늦거나 실패해도 개요를 막지 않도록 `/quote`로 따로 준다 |
 | GET | `/api/companies/{id}/quote` | 현재가·통화·기준 시각(`asOf`)·전일 종가·전일 대비(`change`, `changeRate` 비율)·당일 고저·거래량·52주 고저·시가총액(받거나 계산할 수 있을 때만)·`derived`(BFF 계산 항목)와 `source`(공급자·이름·공식 여부·`delayNote`·종목 기호·확인 URL). 없으면 `unavailable`+`reasonCode`. 아래 "시세" |
-| GET | `/api/companies/{id}/prices?period=1d|1m|1y` | 주가 차트 `points[]`(`time`·OHLC·`volume`, 오래된 순)·`interval`·`currency`·`source`. 없으면 `unavailable`+`reasonCode` |
+| GET | `/api/companies/{id}/prices?period=1d|1m|1y&from=&to=` | 주가 차트 `points[]`(`time`·OHLC·`volume`, 오래된 순)·`interval`·`currency`·`source`. `from`/`to`(타임라인과 같은 공통 범위)를 주면 그 안의 봉만(분봉은 시각, 일봉은 KST 날짜로). 휴장 구간은 비워 두고 가격을 채우지 않으며, 범위 안에 거래가 없으면 `unavailable`+`no_data`. 없으면 `unavailable`+`reasonCode` |
 | GET | `/api/companies/{id}/metrics` | 주요 지표 `items[]`(`code`·`label`·`value` 출처 표기 그대로·`basis` 기준 기간)와 `source`·`asOf`(지표 출처 시각). 시세와 출처가 다르다. 없으면 `unavailable`+`reasonCode`. 아래 "주요 지표" |
 | GET | `/api/companies/{id}/documents` | 기업 상세 문서 탭. 이 기업 승인 사건들의 근거 기사를 **중복 없이 최신 발행순**(발행 시각 미상은 뒤)으로. 문서마다 `events[]`(사건 id·제목·`relationType` REPORTS/PROVIDES_BACKGROUND)와 저장한 인용 `quotes[]`(근거 id·인용·`quoteVerified`). `url`이 없으면 `null` 그대로 |
 | GET | `/api/events?companyId=&from=&to=` | 사건 목록(최신 사건순). 항목 `reportedAt` = 기사 발행 시각 중 가장 늦은 것(사건 시각으로 쓰지 않음). 아래 "시간" |
@@ -100,9 +101,15 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | GET | `/api/evidence/{id}` | `{quote,start,end,articleId,articleVersion,article,quoteVerified,eventIds}` |
 | GET | `/api/briefings?date=&edition=morning|evening` | 발행된 출퇴근 브리핑 회차(모두에게 동일). 아래 "브리핑" |
 | GET | `/api/briefings/rounds?limit=` | 열 수 있는(발행·제공 중단) 회차 목록 — 날짜·구분 선택용 |
+| GET | `/api/briefings/{id}/graph` | 회차 기준 그래프의 고정 정보와 상태(FS032). 그래프 읽기는 위 그래프·간선·사건·근거·기업 조회의 `?round=<id>`. 아래 "브리핑" |
 | GET | `/api/briefings/{id}/evaluations` | 항상 unavailable("예측 평가 정책 미정") |
-| POST | `/api/chat/sessions` `{contextIds}` | 201. 세션(회원 또는 비회원) 필요 |
-| POST | `/api/chat/sessions/{id}/messages` `{question, contextIds?}` | 예시 답변 `bff-example-v0` |
+| PUT | `/api/chat/sessions/{id}` | 대화 시작(회원). 대화 id는 클라이언트가 만든다 — 같은 id를 다시 보내면 200으로 같은 대화를 돌려줘 응답을 놓쳐도 대화가 둘 생기지 않는다. 새 대화는 이전 대화의 질문·대상을 이어받지 않는다 |
+| GET | `/api/chat/sessions/current` | 회원의 가장 최근 대화와 작업·저장된 결과(`conversation:null` = 아직 없음). 패널을 닫았다 열거나 화면을 옮기거나 새로고침해도 이 호출로 같은 대화를 찾는다 |
+| GET | `/api/chat/sessions/{id}` | 대화 하나(본인 것만): 작업을 순서대로 |
+| POST | `/api/chat/sessions/{id}/jobs` `{jobId, question, context:{contextIds, evidenceIds?, period?}}` | 질문 접수 → 202(작업이 만들어짐) / 200(이미 접수한 `jobId`의 저장된 상태·결과). 같은 `jobId`에 다른 내용 409 `chat_job_conflict`, 같은 대화에 queued/running 작업이 있으면 다른 `jobId`도 409 `chat_session_busy` |
+| GET | `/api/chat/jobs/{jobId}` | 작업 상태·결과 회수. 404 = 서버가 저장소를 정상 조회하고 기록이 없음을 확인, 조회 장애는 5xx(클라이언트는 '없음'으로 취급하지 않는다) |
+| POST | `/api/chat/jobs/{jobId}/retry` | 실패한 작업의 허용된 재시도만(아래). 불가 409 `chat_job_not_retryable` |
+| POST | `/api/chat/jobs/{jobId}/cancel` | 처리 중 작업 취소. 패널 닫기·새 대화는 취소가 아니다 |
 
 ### 설정 규칙 (`PUT /api/me/settings`)
 
@@ -116,6 +123,10 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | 카탈로그에 없는 기업 ID | 422 `unknown_company` (`details.companyIds`) |
 | `completed:true`, 관심 0개·계좌 미연결 | 200(시장 전체 지도로 시작, 요구 12) |
 | 그 외 | 200 |
+
+### 관심 단건 토글 (`PUT /api/me/watchlist/{id}`)
+
+사이드바·기업 노드의 별 버튼은 누름 자체가 저장 요청이라 원하는 최종 상태 `{watched}`만 보낸다. 목록 편집(`PUT /api/me/settings`)과 달리 `version`을 받지 않는다: 단건 토글은 다른 기업의 변경을 덮어쓰지 않으므로(저장 목록을 한 트랜잭션에서 읽고 고친다) 낡은 화면에서 눌러도 409로 다시 불러오게 할 이유가 없고, 응답을 못 받아 다시 보내도 같은 결과다(멱등). 실제로 바뀌면 `version`이 1 증가해, 편집 중인 목록 저장은 그 변경을 409로 알아챈다. 회원 전용(비회원 403), 넣을 기업이 없으면 404, 관심이 아닌 기업을 빼는 요청은 변화 없음. 보유 종목은 가상 계좌가 정하므로 관심에서 빼도 개인화 그래프의 보유 노드로 남는다. 화면은 저장 성공 뒤에만 상태를 바꾸고 그래프는 다시 조회만 한다(그래프 조회 실패 시 관심 저장을 다시 보내지 않음).
 
 ### 그래프 (`GET /api/graph`)
 
@@ -142,7 +153,7 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 
 - `eventTime`은 PoC가 **승인한** `event_time`만 담는다. 미승인이면 `null`, `timePrecision:"unknown"`이며 기사 발행일(`articles[].publishedAt`)로 채우지 않는다. 필드 판정(`field_decisions`)이 HOLD/REJECT인 `event_time`/`period`도 비운다.
 - `timePrecision`: `year|month|day|datetime|unknown`.
-- `/api/events?from=&to=`: 발생 시각 구간이 겹치는 사건만 `items`에 반환한다. 시각 미상 사건은 범위에 넣을 수 없으므로 `items`에서 빼고 `metadata.excludedUnknownTime`에 개수를 알린다. 그중 `reportedAt`의 KST 날짜(오프셋 없으면 KST)가 범위 안인 사건은 `unknownTimeItems`(최근 보도순)에 따로 담는다. 보도 시각은 묶음 기준일 뿐 `eventTime`은 계속 `null`이다. `from`/`to`가 없으면 `unknownTimeItems`는 빈 배열이다. `metadata.latestEventTime`·`latestReportedAt`은 같은 범위(기업 또는 전체)에서 기간과 무관하게 가장 최근 발생 시각·보도 시각이다(빈 기간 안내용).
+- `/api/events?from=&to=`(FS040·D05): `from`/`to`는 KST 날짜(그날 전체) 또는 날짜·시각(오프셋 없으면 KST). 기업 상세는 차트와 같은 범위를 보내며 `to`는 조회 시각(공통 종료 시각)이라 그 뒤로 잡힌 예정 사건은 나오지 않는다. 발생 **날짜**를 아는 사건만 `items`에 들어간다: 시각까지 알면 시각으로, 날짜만 알면 그 날짜로 범위를 판별한다(화면은 '시각 미상'으로 적는다). 발생 날짜를 모르는 사건(시각 미상, 월·연 정밀도)은 `items`에서 빼고 `metadata.excludedUnknownTime`에 개수를 알리며, 그중 `reportedAt`(오프셋 없으면 KST)이 범위 안인 사건을 `unknownTimeItems`(최근 보도순)에 따로 담는다. 보도 시각은 범위 판별에만 쓰고 `eventTime`은 그대로다. `from`/`to`가 없으면 거르지 않고 `unknownTimeItems`는 빈 배열이다. `metadata.latestEventTime`(발생 날짜를 아는 사건 중 `to` 이전)·`latestReportedAt`은 기간과 무관한 가장 최근 시각이다(빈 기간 안내용).
 - 정렬: 사건 시각 내림차순, 미상은 뒤. 동률은 최신 기사 발행일, 이슈 ID 순(발행일은 정렬 보조에만 쓴다).
 
 ### 근거
@@ -161,10 +172,20 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 - **불변**: 같은 회차는 한 번만 발행되고 발행본(`payload`)은 수정·삭제할 수 없다(SQLite 트리거). 재처리는 미발행(`missing`·`failed`) 회차만, 정정·제공 중단은 발행본 옆에 별도 기록으로 둔다(`status:"suspended"`이면 `items:[]`와 `notice.reason`=관리자 사유).
 - 스케줄러는 BFF 프로세스 안 스레드다(`ZOOP_BRIEFING_SCHEDULER`). 기동 때와 15초마다 "시각이 지났는데 기록이 없는 회차"를 만들되 6시간 안의 것만 따라잡고, 실패한 회차는 자동 재시도하지 않는다. 비정상 종료로 `generating`에 남은 회차는 기동 때 `failed`(`interrupted_by_restart`)로 정리한다.
 - `metadata.schedule = {morning:"07:40", evening:"18:10", confirmed:true}`, `metadata.generatedBy = "bff-rule-v1"`, `metadata.selection = {basis:"market", reason:"recent_in_window"}`. 예측·확률·호재/악재 필드는 없다.
+- **회차 기준 그래프(FS032, D03)**: 브리핑에서 연 관계 그래프는 **그 회차를 발행할 당시의 관계·근거**다. 회차 발행본이 `graphVersion`·`reviewRevision`·`ruleRevision`(검수 결정 로그와 게시 규칙 로그의 발행 시점 번호)을 기록하고, 버전 파일(쓰기 한 번·읽기 전용·SHA-256 검증)과 두 append-only 로그를 그 번호에서 자르면 같은 그래프를 다시 만들 수 있다(`briefing_graph.py`). 그래서 발행 뒤의 검수 거부·게시 규칙 토글·새 그래프 버전 게시·롤백이 과거 회차 그래프를 바꾸지 못한다. `GET /api/graph`·`/api/graph/edges/{id}`·`/api/events/{id}`·`/api/evidence/{id}`·`/api/companies/{id}`는 `?round=<회차 id>`를 받아 그 상태로 답한다(`round`이 있으면 `mode=personal`은 422 `round_all_only`). `GET /api/briefings/{id}/graph`는 `{status: available|suspended|not_published|unavailable, message, reason, dataAsOf, graphVersion, keyIssueIds, companyIds, correctionCount}`로 무엇에 고정된 그래프인지와 볼 수 있는지를 알린다. `available`이 아니면 그래프 조회가 오류(제공 중단 403 `briefing_round_suspended`, 발행 전 404 `briefing_not_published`, 버전·파일·근거를 못 찾거나 발행본과 맞지 않음 404 `briefing_graph_unavailable`)이고 **최신 그래프로 대신 보여주지 않는다**. 정정은 발행본 옆에 따로 있어 그래프를 바꾸지 않는다(`correctionCount`로 알림). 규칙 번호를 기록하기 전에 발행된 회차는 그 회차 생성 시각까지의 규칙 로그로 자른다(같은 초의 규칙 변경은 구분하지 못한다). 버전 파일의 보존 기간·삭제 기준은 **팀 확인 필요**(지금은 삭제·덮어쓰기 경로가 없다 — 파일은 `vN.json`을 한 번 쓰고, 번호는 DB의 최대 순번+1이라 등록된 버전의 파일은 새 게시가 덮지 않는다).
 
 ### AI 예시 답변 (규칙 기반)
 
-맥락(`contextIds`: 이슈·기업·간선·근거 ID)에 연결된 승인 근거 인용을 질문과의 단어 겹침 순으로 최대 3개 나열하는 템플릿이다. `status: answered|insufficient_evidence`, `reason`(insufficient일 때), `sources:[evidenceId]`, `citations`, `graphTargets`, `metadata.generatedBy="bff-example-v0"`. 맥락 없음, 맥락에 근거 없음, 원문 대조 실패, 주가 예측·매매·호재/악재 성격의 질문은 `insufficient_evidence`다. 대화는 만든 세션만 읽을 수 있다(다른 세션 403).
+질문 하나 = 서버가 저장하는 **작업(job)** 하나다(FS045–FS053, NFS001·NFS003·NFS009). 답변은 `chat.py`의 **교체 가능한 엔진**(`AnswerEngine.generate(ds, plan) → Draft`, 지금은 모델 호출 없는 `RuleEngine`)이 만들고, 파이프라인(`chat_jobs.py`)은 엔진이 무엇이든 같은 검증·저장·복구를 적용한다.
+
+- **접수·고정(FS046·FS047)**: `jobId`는 클라이언트가 만든 멱등 키다(통신 추적 id와 다르다). 처음 받은 요청이 질문·선택 대상·근거 수·기간·질문 시각(KST 날짜)·그래프 버전·대화 맥락을 작업에 고정하고, 같은 내용의 재전송은 저장된 상태·결과를 돌려주며 실행을 늘리지 않는다. 대화당 처리 중 작업은 하나(부분 유일 인덱스 `chat_jobs_one_active`)라 서로 다른 `jobId`의 동시 요청도 하나만 접수된다. 상대 날짜는 **고정된 질문 시각의 KST 날짜**로 풀고(작년=직전 달력 연도 전체, 최근=1개월, 이번 주·지난달·올해 등 `chat_interpret.py`) 실제 적용 기간을 답변에 싣는다. 질문에 쓴 기업·기간이 선택 맥락보다 우선한다. 대상이 불명확(‘이 회사’, 여러 기업에 걸친 이름, 대상 없음, ‘그때’ 같은 기간)하면 추정하지 않고 **되묻기**를 저장된 완료 결과(`outcome:"clarification"`, 선택지 `choices`)로 돌려주고 보충 입력은 같은 대화의 새 작업이다.
+- **상태**: `queued·running·completed·failed·cancelled`. 완료 결과 `outcome`: `answered`(답변) · `clarification`(되묻기) · `guidance`(조건 안내, 예: 내 관심·보유 종목이 없는 ‘내 종목’ 질문) · `insufficient_evidence`(근거 부족·예측 거절·고른 기간에 근거 없음·지정한 그래프 버전 사용 불가). 모두 저장된 뒤에만 `completed`로 보이고(`chat_jobs.result` + `chat_messages` 한 트랜잭션), 조건이 나중에 바뀌어도 같은 작업을 다시 평가하지 않는다(새 질문만 새 조건). 고정한 그래프 버전이 더 이상 활성이 아니면 최신 자료로 바꿔 답하지 않고 사용 불가를 안내한다.
+- **검증·저장(FS049)**: 엔진의 초안은 형식·인용(근거 id·원문 구간·기사 버전·출처 일치·원문 대조)·그래프 대상(실제 존재·질문 맥락과 관련)을 검증한 뒤에만 보존(`verified`)·저장한다. **검증 실패(`validation_failed`)는 자동·수동 재생성을 모두 막는다.** 저장이 실패하면 보존된 검증 결과로 **저장만** 다시 한다(`failure.retry:"save_only"`, 엔진 호출 없음). 검증 결과를 보존하지 못하면 `result_lost`(복구 불가, 새 질문만). 이전 실행이 늦게 끝나도 **실행 번호(`run`) 펜스**가 현재 결과를 덮지 못하게 막는다.
+- **재시도(FS053)**: 확정된 일시 장애(`transient`: 엔진·데이터 조회 장애, 시간 초과, 서버 재시작 중단)만 사용자의 요청으로 같은 고정 맥락에서 다시 실행한다(최대 `MAX_RERUNS`회). 분류되지 않은 오류(`internal`)·권한 오류·검증 실패·결과 소실은 같은 작업으로 재실행하지 않는다.
+- **중단 복구(NFS009)**: 기동할 때 시작하지 못한 `queued`는 이어서 실행하고, 검증 결과를 보존한 채 멈춘 실행은 엔진 호출 없이 저장만 이어 가며, 그 밖의 실행 중이던 작업은 `transient/server_restarted`로 표시해 사용자가 재시도하게 한다. 실행 임대(`LEASE_SECONDS`) 안에 끝나지 않으면 읽을 때 `transient/execution_timeout`(보존 결과가 있으면 `save_failed`)으로 바뀌고 이전 실행은 펜스로 막힌다. **[팀 확인 필요]** 임대 시간·재시도 횟수·작업 ID/검증 결과 보관 기간과 매체(지금은 작업 행)·대화 보관 기간·이전 대화 목록 제공 범위는 측정·승인 전까지 보수적 기본값이다.
+- **개인화(FS048)**: ‘내 관심·보유 종목’ 질문은 회원의 관심 종목과 가상 보유를 함께 쓴다(‘통합 개인화’). 없으면 `guidance`(`action.kind:"set_watchlist"`)로 완료하고, 처음 풀이한 결과는 작업에 고정된다. 엔진이 받는 것은 고정된 계획(`AnswerPlan`: 대상·근거 id·기간)이고, 개인 정보는 대상 기업 id로만 반영된다. 지정하지 않은 최신 버전으로 몰래 바꾸지 않는다.
+- 결과 `applied`는 실제 적용한 기업·사건·기간(`question`/`context`/`evidence` 기준)이고, `graphTargets`는 검증을 통과한 실제 그래프 대상뿐이다(AI 문장으로 관계선을 만들지 않는다). 각 `citations`에는 근거 id·기사 id/버전·원문 구간·발행 시각이 있고 `metadata.generatedBy="bff-example-v0"`다. 대화는 만든 회원만 읽을 수 있다(다른 회원 403).
+- 사용량(`admin_usage`)은 작업 **실행**마다 한 번 센다(모델 호출 0). 관리자 대화록은 완료한 질문과 함께 실패·취소·처리 중인 질문도 상태로 보여 준다.
 
 ## 응답 `metadata`
 
@@ -206,7 +227,7 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 
 - **무키 출처 선택 이유:** 키 없이 KRX·미국·도쿄 상장 14사를 한 형식으로 받고, 한 요청에 현재가·전일 종가·지표·당일 분봉이 함께 온다. 시가총액·PER 등은 Yahoo 차트 응답에 없어 아래 "주요 지표"(네이버 증권)에서 따로 받는다.
 - **종목 매핑:** 카탈로그 id만 쓴다(새 카탈로그 키 없음). `KRX:<6자리>` → 토스 `005930`, 야후 `005930.KS`(없으면 `.KQ`), `NASDAQ|NYSE|AMEX:<티커>` → 토스 티커, 야후 티커(`.`→`-`), `TSE:<4자리>` → 야후 `6702.T`(토스 미지원). 그 밖의 접두는 `unsupported_symbol`.
-- **기간:** `/prices?period=1d`는 가장 최근 거래일의 분봉(토스 1분, 야후 5분), `1m`·`1y`는 사건 타임라인과 같은 시작일(오늘 KST에서 1개월·1년 전, 말일 보정)부터의 일봉. 시각은 거래소 오프셋을 붙인 ISO 8601.
+- **기간:** `/prices?period=1d`는 가장 최근 거래일의 분봉(토스 1분, 야후 5분), `1m`·`1y`는 사건 타임라인과 같은 시작일(오늘 KST에서 1개월·1년 전, 말일 보정)부터의 일봉. 기업 상세는 `from`/`to`로 타임라인과 같은 범위(1일은 오늘 0시부터)를 보내므로 휴장일의 1일 차트는 `no_data`다. 시각은 거래소 오프셋을 붙인 ISO 8601. [팀 확인 필요: 실제 시세 공급사의 시간 단위·휴장 구간·기준 시각 제공 방식(FS040 확인 필요 사항)]
 - **캐시·시간 초과:** 현재가 30초, 분봉 60초, 일봉 30~60분, 종목 정보 12시간(프로세스 메모리). 일시 장애는 캐시하지 않아 [다시 시도]가 실제로 다시 묻는다. 요청 시간 초과 `ZOOP_QUOTE_TIMEOUT_SECONDS`(기본 5초), 시간 초과·5xx는 한 번만 재시도, 429는 재시도하지 않는다.
 - **비밀값:** 토스 키는 환경변수로만 받고 `Settings`/클라이언트 `repr`, 응답, 로그에 남기지 않는다.
 
@@ -367,7 +388,7 @@ diff -qr "$SRC/src" "$DST/src"                        # 차이 없음이어야 �
 
 **수집** — `POST /api/telemetry`(회원·비회원 세션 필요, 202). 허용 이벤트는 `screen_view{screen: main|briefing, viewId}`, `graph_node_select`·`graph_edge_select{targetId, viewId?}`, `briefing_view{targetId=회차 id}`, `briefing_issue_open{targetId=이슈 id, roundId}` 뿐이고 그 밖의 필드·타입은 422다. 배치 최대 20개, 본문 16KiB 초과 413, 세션당 분당 60요청·240이벤트 초과 429(배치를 통째로 거절). 저장 주체는 회원 id 또는 비회원 세션의 키 해시(`insights_common.SubjectKeys`; 이름·이메일·IP는 저장하지 않는다). 기업·이슈 연결은 받은 시점의 활성 그래프로 한 번 풀어 저장한다. AI 질문은 서버의 대화 기록(`chat_messages`), 온보딩은 회원 설정에서 센다(클라이언트 이벤트에 의존하지 않음).
 **통계** — `GET /api/admin/insights/{overview|summary|companies|companies/{id}}?window=7d|30d|all`. 기간은 KST 달력일. 모든 지표는 산식·정의 문장을 응답에 담고, **분모가 5 미만이면 비율은 null(`sampleHidden`)이고 건수만** 준다. 노드·간선 클릭률은 "메인 노출(`viewId`) 중 한 번이라도 고른 노출의 비율"이다.
-**선호도** — `PUT|DELETE|GET /api/feedback`: 대상은 챗봇 답변(`chatbot_answer`, 질문한 본인만), 발행된 브리핑 회차(`briefing_round`)·핵심 이슈(`briefing_issue`, `<회차 id>/<이슈 id>`). 1인 1표(`feedback` 기본키), 같은 값 재전송은 변화 없음, 반대 값은 표를 바꾸고, DELETE로 취소한다. 사유(≤200자)는 싫어요에만. 뉴스 요약은 생산자가 없어 대상이 없다(관리자 응답 `unsupported`에 이유 표시). `GET /api/admin/feedback/{summary|dislikes}`, `GET /api/admin/transcripts[/{id}]`.
+**선호도(FS066-01·02, D08)** — `PUT|GET /api/feedback`: **로그인 회원만**(비회원 403, 세션 없음 401). 대상은 챗봇 답변(`chatbot_answer`, 질문한 본인만), 발행된 브리핑 회차(`briefing_round`)·핵심 이슈(`briefing_issue`, `<회차 id>/<이슈 id>`). 화면은 원하는 최종 상태 `value: up|down|none`을 보낸다. 1인·결과당 현재 평가 1개(`feedback` 기본키), 같은 요청 재전송은 변화 없음(토글되지 않음), `none`은 취소(행 삭제 — 모든 집계에서 빠짐). 평가는 결과 종류(`feature`)·결과 id·버전(`targetVersion`: 브리핑은 발행 당시 `graphVersion`, 답변은 바뀌지 않아 `null`)에 연결되고, 보낸 `targetVersion`이 현재 버전과 다르면 409 `feedback_target_changed`. 사유(≤200자)는 싫어요에만. 뉴스 요약은 생산자가 없어 대상이 없다(관리자 응답 `unsupported`에 이유 표시). `GET /api/admin/feedback/{summary|dislikes}?window=7d|30d|all(기본 all)&start=&end=`: 현재 유효 평가만, 평가의 마지막 유효 변경 시각의 KST 날짜로 거른다(`start`/`end`가 있으면 `window`보다 우선, 응답에 적용 범위). 평가 0건이면 비율 `null`(화면 '평가 없음'). `GET /api/admin/transcripts[/{id}]`. [팀 확인 필요: 평가 이력 보존 기간(FS066-02)]
 **대화록 마스킹** — 대화는 `chat_sessions`·`chat_messages`(statedb)에 원문 그대로 영속하고, 관리자 응답에서만 `masking.Masker`가 이메일·전화번호·주민등록번호·카드번호·계좌번호와 작성 회원의 표시 이름·이메일을 `[이메일]` 같은 표지로 바꾼다. 대화록 열람은 감사 로그 `transcript.view`에 남는다. 사용자는 가명 id(`M-XXXXXXXX`/`G-XXXXXXXX`)로만 보인다.
 **회원** — `GET /api/admin/members[?status=&q=]`, `GET /{id}`, `POST /{id}/block|unblock {reason}`. 목록은 가명 id·가린 이메일(`d***@zoop.local`)·가입 방식·시각·활동(세션·그래프 선택·AI 질문·브리핑 조회)·상태만 준다. 사유는 공백만으로는 안 되고, 차단·해제는 멱등이며(이미 같은 상태면 `changed:false`, 감사 기록 없음) 상태 변경과 감사 기록이 한 트랜잭션이다. 차단하면 열린 세션의 다음 요청이 401 `member_blocked`, 로그인은 403 `member_blocked`(회원 저장소는 `accounts.AccountStore.set_status`). 데모 관리자는 관리자 계정이라 회원 목록에 나오지 않는다.
 

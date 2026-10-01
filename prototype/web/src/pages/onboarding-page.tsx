@@ -335,7 +335,7 @@ function WatchlistStep({ settings, onBack }: { settings: Schemas["SettingsRespon
       </section>
 
       <section aria-label="종목 검색" className="pt-6 pb-6">
-        <CompanySearch selectedIds={pickedIds} onToggle={toggle} showWhenEmpty={false} disabled={update.isPending} />
+        <CompanySearch selectedIds={pickedIds} onToggle={toggle} disabled={update.isPending} />
       </section>
     </StepLayout>
   );

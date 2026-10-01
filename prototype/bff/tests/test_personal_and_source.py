@@ -8,6 +8,7 @@ from zoop_bff.app import create_app
 from zoop_bff.config import Settings
 
 from .conftest import ALPHA_ISSUES, DEMO
+from .chat_support import ask_job, job_body, new_member, open_conversation
 
 
 def _put(client, version, **body):
@@ -107,6 +108,34 @@ def test_personal_graph_needs_holdings_or_watchlist_and_marks_each(member):
     assert market["SYNTH-ALPHA"]["watch"] and not market["SYNTH-ALPHA"]["isFocus"]
 
 
+def test_a_single_watch_toggle_is_idempotent_and_keeps_a_held_company_as_a_holding(member, make_client):
+    assert member.post("/api/portfolio/connections", json={"mockPortfolioId": "mock-basic"}).status_code == 201
+    held = member.get("/api/portfolio").json()["holdings"][0]["companyId"]
+    start = member.get("/api/me/settings").json()["version"]
+
+    for _ in range(2):  # a resent toggle adds the company once and moves the version once
+        added = member.put(f"/api/me/watchlist/{held}", json={"watched": True})
+        assert added.status_code == 200 and added.json()["watchlistIds"] == [held]
+    assert added.json()["version"] == start + 1
+    node = next(n for n in member.get("/api/graph?mode=personal").json()["nodes"] if n["id"] == held)
+    assert node["holding"] and node["watch"]
+
+    for _ in range(2):
+        assert member.put(f"/api/me/watchlist/{held}", json={"watched": False}).json()["watchlistIds"] == []
+    node = next(n for n in member.get("/api/graph?mode=personal").json()["nodes"] if n["id"] == held)
+    assert node["holding"] and not node["watch"]  # out of the watchlist, still a holding node
+
+    # A toggle never needs the settings version and never undoes another company's saved change.
+    version = member.get("/api/me/settings").json()["version"]
+    assert _put(member, version, watchlistIds=["SYNTH-C0"]).status_code == 200
+    assert member.put("/api/me/watchlist/SYNTH-C1", json={"watched": True}).json()["watchlistIds"] == ["SYNTH-C0", "SYNTH-C1"]
+    assert member.put("/api/me/watchlist/NOT-A-COMPANY", json={"watched": True}).status_code == 404
+
+    visitor = make_client()
+    assert visitor.post("/api/auth/guest").status_code == 200
+    assert visitor.put("/api/me/watchlist/SYNTH-ALPHA", json={"watched": True}).status_code == 403
+
+
 def test_guest_can_read_the_market_but_every_personal_api_is_403(make_client):
     client = make_client()
     assert client.get("/api/me/settings").status_code == 401  # no session at all
@@ -145,13 +174,18 @@ def test_settings_belong_to_the_session_that_wrote_them(make_client):
 
 
 def test_chat_sessions_are_private_to_their_creator(make_client):
-    owner = make_client()
-    owner.post("/api/auth/guest")
-    session = owner.post("/api/chat/sessions", json={"contextIds": [ALPHA_ISSUES["q1"]]}).json()["id"]
-    other = TestClient(owner.app)
-    other.post("/api/auth/guest")
-    denied = other.post(f"/api/chat/sessions/{session}/messages", json={"question": "무엇인가요?"})
-    assert denied.status_code == 403 and "answer" not in denied.json()
+    owner = new_member(make_client())
+    session = open_conversation(owner)
+    job = ask_job(owner, "어떤 실적을 발표했나요?", [ALPHA_ISSUES["q1"]], session_id=session)
+    other = new_member(owner, "other@example.com", "다른사람")
+    denied = other.post(f"/api/chat/sessions/{session}/jobs", json=job_body("무엇인가요?", [ALPHA_ISSUES["q1"]]))
+    assert denied.status_code == 403 and "result" not in denied.json()
+    # nobody else can read the conversation, the job or its saved answer either
+    assert other.get(f"/api/chat/sessions/{session}").status_code == 403
+    assert other.get(f"/api/chat/jobs/{job['id']}").status_code == 403
+    assert other.post(f"/api/chat/jobs/{job['id']}/retry").status_code == 403
+    assert other.post(f"/api/chat/jobs/{job['id']}/cancel").status_code == 403
+    assert other.put(f"/api/chat/sessions/{session}").status_code == 403
 
 
 def test_source_failure_is_a_503_not_an_empty_result(tmp_path):

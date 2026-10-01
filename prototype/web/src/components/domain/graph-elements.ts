@@ -48,6 +48,8 @@ export interface GraphElements {
   definitions: ElementDefinition[];
   /** 묶음에 들어간 사건 id(묶음이 없으면 비어 있음) */
   bundled: Set<string>;
+  /** 노드·간선 id로 만든 데이터 식별값. 같은 데이터로 지도에 돌아오면 기억한 배치를 그대로 쓴다. */
+  signature: string;
 }
 
 export function toElements(nodes: Schemas["GraphNode"][], edges: Schemas["GraphEdge"][], groupIsolated: boolean): GraphElements {
@@ -106,5 +108,6 @@ export function toElements(nodes: Schemas["GraphNode"][], edges: Schemas["GraphE
       },
     });
   }
-  return { definitions, bundled };
+  const signature = `${nodes.map((n) => n.id).join(",")}|${edges.map((e) => e.id).join(",")}`;
+  return { definitions, bundled, signature };
 }

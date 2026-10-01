@@ -7,7 +7,15 @@
 //    화면은 현재 선택된 B의 칸만 읽으므로 A 결과가 B 화면을 덮어쓸 수 없다(요청 순번 비교와 같은 효과).
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, type Schemas } from "./client";
+import { useSearchParams } from "react-router";
+import type { DetailRange } from "@/lib/company-timeline";
 import type { GraphMode } from "@/lib/labels";
+
+/** 주소의 ?round=<브리핑 회차 id>: 있으면 그래프 화면의 모든 조회가 그 회차를 발행할 당시의 자료를 쓴다(FS032). 없으면 현재 그래프. */
+export function useAsOfRound(): string | null {
+  const [params] = useSearchParams();
+  return params.get("round");
+}
 
 export const queryKeys = {
   health: ["health"] as const,
@@ -16,18 +24,19 @@ export const queryKeys = {
   portfolio: ["portfolio"] as const,
   mockPortfolios: ["mock-portfolios"] as const,
   companies: (q: string) => ["companies", q] as const,
-  company: (id: string) => ["company", id] as const,
+  company: (id: string, round: string | null = null) => ["company", id, round] as const,
   quote: (id: string) => ["quote", id] as const,
   metrics: (id: string) => ["metrics", id] as const,
-  prices: (id: string, period: string) => ["prices", id, period] as const,
-  graph: (mode: GraphMode, companyId?: string) => ["graph", mode, companyId ?? null] as const,
-  edge: (id: string) => ["edge", id] as const,
-  companyEvents: (companyId: string, from: string) => ["events", companyId, from] as const,
+  prices: (id: string, period: string, to: string) => ["prices", id, period, to] as const,
+  graph: (mode: GraphMode, companyId?: string, round: string | null = null) => ["graph", mode, companyId ?? null, round] as const,
+  edge: (id: string, round: string | null = null) => ["edge", id, round] as const,
+  companyEvents: (companyId: string, from: string, to: string) => ["events", companyId, from, to] as const,
   companyDocuments: (companyId: string) => ["company-documents", companyId] as const,
-  event: (id: string) => ["event", id] as const,
-  evidence: (id: string) => ["evidence", id] as const,
+  event: (id: string, round: string | null = null) => ["event", id, round] as const,
+  evidence: (id: string, round: string | null = null) => ["evidence", id, round] as const,
   briefing: (date: string | null, edition: string | null) => ["briefing", date, edition] as const,
   briefingRounds: ["briefing", "rounds"] as const,
+  briefingGraphBasis: (round: string) => ["briefing", "graph", round] as const,
   terms: ["terms"] as const,
   socialProviders: ["social-providers"] as const,
   recommendations: ["recommendations"] as const,
@@ -97,18 +106,20 @@ export function useRecommendations(enabled = true) {
   });
 }
 
+/** 종목 검색(FS011-01): 실행한 검색어마다 따로 조회한다. 빈 검색어는 요청하지 않고, 이전 검색어 결과를 이어 보이지 않는다. */
 export function useCompanySearch(q: string) {
   return useQuery({
     queryKey: queryKeys.companies(q),
-    queryFn: ({ signal }) => api<Schemas["CompanyListResponse"]>("/api/companies", { query: { q, limit: 20 }, signal }),
-    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => api<Schemas["CompanyListResponse"]>("/api/companies", { query: { q }, signal }),
+    enabled: q.length > 0,
   });
 }
 
 export function useCompany(id: string | undefined) {
+  const round = useAsOfRound();
   return useQuery({
-    queryKey: queryKeys.company(id ?? ""),
-    queryFn: ({ signal }) => api<Schemas["CompanyDetail"]>(`/api/companies/${encodeURIComponent(id!)}`, { signal }),
+    queryKey: queryKeys.company(id ?? "", round),
+    queryFn: ({ signal }) => api<Schemas["CompanyDetail"]>(`/api/companies/${encodeURIComponent(id!)}`, { query: { round }, signal }),
     enabled: Boolean(id),
   });
 }
@@ -147,21 +158,25 @@ export function useCompanyMetrics(id: string) {
   });
 }
 
-/** 주가 차트. 사건 타임라인과 같은 기간(1일·1개월·1년)으로 조회하고, 기간마다 칸이 달라 마지막 기간 결과만 보인다(요구 37·52). */
-export function useCompanyPrices(id: string, period: "1d" | "1m" | "1y") {
+/** 주가 차트. 사건 타임라인과 같은 범위(공통 KST 종료 시각·달력 시작)로 조회하고, 범위마다 칸이 달라 마지막 조회 결과만 보인다(FS040). */
+export function useCompanyPrices(id: string, range: DetailRange) {
   return useQuery({
-    queryKey: queryKeys.prices(id, period),
+    queryKey: queryKeys.prices(id, range.period, range.to),
     queryFn: ({ signal }) =>
-      api<PriceResponse>(`/api/companies/${encodeURIComponent(id)}/prices`, { query: { period }, signal }),
+      api<PriceResponse>(`/api/companies/${encodeURIComponent(id)}/prices`, { query: { period: range.period, from: range.from, to: range.to }, signal }),
     staleTime: 60_000,
   });
 }
 
-/** 지도 전체 연결. depth·limit을 주지 않으면 BFF가 포커스에서 닿는 연결 요소 전체를(전체 모드는 전부, 개인화는 보유+관심에서 닿는 것) 기본 한도 500개까지 준다. */
+/**
+ * 지도 전체 연결. depth·limit을 주지 않으면 BFF가 포커스에서 닿는 연결 요소 전체를(전체 모드는 전부, 개인화는 보유+관심에서 닿는 것) 기본 한도 500개까지 준다.
+ * 주소에 ?round=가 있으면 그 브리핑 회차를 발행할 당시의 그래프다(FS032, 전체 모드만).
+ */
 export function useGraph(mode: GraphMode, enabled = true) {
+  const round = useAsOfRound();
   return useQuery({
-    queryKey: queryKeys.graph(mode),
-    queryFn: ({ signal }) => api<Schemas["GraphResponse"]>("/api/graph", { query: { mode }, signal }),
+    queryKey: queryKeys.graph(mode, undefined, round),
+    queryFn: ({ signal }) => api<Schemas["GraphResponse"]>("/api/graph", { query: { mode, round }, signal }),
     enabled,
     // 모드를 바꾸는 동안 이전 지도를 그대로 두어 캔버스가 다시 만들어지지 않게 한다(남는 노드는 제자리에서 이어진다).
     placeholderData: keepPreviousData,
@@ -169,18 +184,19 @@ export function useGraph(mode: GraphMode, enabled = true) {
 }
 
 export function useEdge(id: string | undefined) {
+  const round = useAsOfRound();
   return useQuery({
-    queryKey: queryKeys.edge(id ?? ""),
-    queryFn: ({ signal }) => api<Schemas["EdgeDetail"]>(`/api/graph/edges/${encodeURIComponent(id!)}`, { signal }),
+    queryKey: queryKeys.edge(id ?? "", round),
+    queryFn: ({ signal }) => api<Schemas["EdgeDetail"]>(`/api/graph/edges/${encodeURIComponent(id!)}`, { query: { round }, signal }),
     enabled: Boolean(id),
   });
 }
 
-/** 기업 상세 타임라인: from(KST 날짜) 이후 사건. 기간마다 따로 캐시해 늦게 온 이전 기간 응답이 지금 기간을 덮지 않는다. */
-export function useCompanyEvents(companyId: string, from: string) {
+/** 기업 상세 타임라인: 차트와 같은 범위의 사건. 범위마다 따로 캐시해 늦게 온 이전 기간 응답이 지금 기간을 덮지 않는다(FS040). */
+export function useCompanyEvents(companyId: string, range: DetailRange) {
   return useQuery({
-    queryKey: queryKeys.companyEvents(companyId, from),
-    queryFn: ({ signal }) => api<Schemas["EventListResponse"]>("/api/events", { query: { companyId, from }, signal }),
+    queryKey: queryKeys.companyEvents(companyId, range.from, range.to),
+    queryFn: ({ signal }) => api<Schemas["EventListResponse"]>("/api/events", { query: { companyId, from: range.from, to: range.to }, signal }),
   });
 }
 
@@ -193,32 +209,45 @@ export function useCompanyDocuments(companyId: string) {
   });
 }
 
-/** revalidate: 화면에 들어올 때마다 다시 조회해 사건이 아직 있는지 확인한다(기업 상세 복귀). */
-export function useEvent(id: string | undefined, { revalidate = false }: { revalidate?: boolean } = {}) {
+export function useEvent(id: string | undefined) {
+  const round = useAsOfRound();
   return useQuery({
-    queryKey: queryKeys.event(id ?? ""),
-    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { signal }),
+    queryKey: queryKeys.event(id ?? "", round),
+    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { query: { round }, signal }),
     enabled: Boolean(id),
-    refetchOnMount: revalidate ? "always" : true,
+  });
+}
+
+/** 기업 상세의 선택 사건(FS040·FS044): 조회 범위(종료 시각)마다 따로 조회한다. 기간을 바꾸거나 상세로 돌아오면 새로 조회하고,
+ *  이전 범위의 늦은 응답은 이전 칸에만 들어가 지금 상세를 덮지 않는다. */
+export function useEventInRange(id: string | null, rangeTo: string) {
+  const round = useAsOfRound();
+  return useQuery({
+    queryKey: [...queryKeys.event(id ?? "", round), rangeTo] as const,
+    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { query: { round }, signal }),
+    enabled: Boolean(id),
   });
 }
 
 /** 여러 사건을 한 번에 조회한다(지도 목록의 사건별 근거 수). useEvent와 캐시를 함께 쓴다. */
 export function useEventsByIds(ids: string[]) {
+  const round = useAsOfRound();
   return useQueries({
     queries: ids.map((id) => ({
-      queryKey: queryKeys.event(id),
-      queryFn: ({ signal }: { signal: AbortSignal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id)}`, { signal }),
+      queryKey: queryKeys.event(id, round),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id)}`, { query: { round }, signal }),
     })),
   });
 }
 
 export function useEvidenceItems(ids: string[]) {
+  const round = useAsOfRound();
   return useQueries({
     queries: ids.map((id) => ({
-      queryKey: queryKeys.evidence(id),
+      queryKey: queryKeys.evidence(id, round),
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        api<Schemas["EvidenceResponse"]>(`/api/evidence/${encodeURIComponent(id)}`, { signal }),
+        api<Schemas["EvidenceResponse"]>(`/api/evidence/${encodeURIComponent(id)}`, { query: { round }, signal }),
     })),
   });
 }
@@ -237,6 +266,15 @@ export function useBriefingRounds() {
   return useQuery({
     queryKey: queryKeys.briefingRounds,
     queryFn: ({ signal }) => api<Schemas["BriefingRoundsResponse"]>("/api/briefings/rounds", { query: { limit: 30 }, signal }),
+  });
+}
+
+/** 브리핑 회차 기준 그래프가 무엇에 고정돼 있는지(회차·기준 시점·상태, FS032). available이 아니면 그래프를 읽지 않는다. */
+export function useBriefingGraphBasis(round: string | null) {
+  return useQuery({
+    queryKey: queryKeys.briefingGraphBasis(round ?? ""),
+    queryFn: ({ signal }) => api<Schemas["BriefingGraphBasis"]>(`/api/briefings/${encodeURIComponent(round!)}/graph`, { signal }),
+    enabled: Boolean(round),
   });
 }
 
@@ -319,6 +357,21 @@ export function useUpdateSettings() {
   });
 }
 
+/** FS027 관심 단건 토글: 누름 자체가 저장 요청이다. 원하는 최종 상태를 보내 재전송·동시 요청이 멱등이다.
+ *  저장에 성공한 뒤에만 설정(관심 목록)을 바꾸고, 개인화 그래프는 다시 조회만 한다(그래프 조회가 실패해도 관심 저장을 다시 보내지 않는다). */
+export function useSetWatched() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companyId, watched }: { companyId: string; watched: boolean }) =>
+      api<Schemas["SettingsResponse"]>(`/api/me/watchlist/${encodeURIComponent(companyId)}`, { method: "PUT", body: { watched } }),
+    onSuccess: (settings, { companyId }) => {
+      client.setQueryData(queryKeys.settings, settings);
+      void client.invalidateQueries({ queryKey: ["graph"] });
+      void client.invalidateQueries({ queryKey: ["company", companyId] });
+    },
+  });
+}
+
 export function useConnectPortfolio() {
   const client = useQueryClient();
   return useMutation({
@@ -344,49 +397,79 @@ function refreshAfterConnectionChange(client: QueryClient) {
   return client.invalidateQueries({ queryKey: queryKeys.portfolio });
 }
 
-export function useCreateChatSession() {
-  return useMutation({
-    mutationFn: (contextIds: string[]) =>
-      api<Schemas["ChatSessionResponse"]>("/api/chat/sessions", { method: "POST", body: { contextIds } }),
+// ---- AI 질문(FS045–FS053): 질문 하나 = 서버가 저장하는 작업 하나.
+// 작업 ID는 화면이 만든다. 응답을 받지 못하면 같은 ID로 상태를 먼저 조회하고, 서버가 "없다"고 확인한 경우에만 같은 내용으로 다시 보낸다.
+
+export type ChatJob = Schemas["ChatJob"];
+export type ChatConversation = Schemas["ChatConversation"];
+export type ChatJobRequest = Schemas["ChatJobRequest"];
+
+export const chatKeys = {
+  current: ["chat", "current"] as const,
+  session: (id: string) => ["chat", "session", id] as const,
+};
+
+export const isChatJobActive = (job: Pick<ChatJob, "status">) => job.status === "queued" || job.status === "running";
+
+const sessionPath = (id: string) => `/api/chat/sessions/${encodeURIComponent(id)}`;
+const jobPath = (id: string) => `/api/chat/jobs/${encodeURIComponent(id)}`;
+
+/** 서버와 주고받는 질문 요청. 상태 변경 호출은 모두 멱등이라 응답을 놓친 뒤 다시 보내도 질문이 늘지 않는다. */
+export const chatRequests = {
+  createSession: (id: string) => api<Schemas["ChatSessionResponse"]>(sessionPath(id), { method: "PUT" }),
+  submit: (sessionId: string, body: ChatJobRequest) => api<ChatJob>(`${sessionPath(sessionId)}/jobs`, { method: "POST", body }),
+  job: (jobId: string, signal?: AbortSignal) => api<ChatJob>(jobPath(jobId), { signal }),
+  retry: (jobId: string) => api<ChatJob>(`${jobPath(jobId)}/retry`, { method: "POST" }),
+  cancel: (jobId: string) => api<ChatJob>(`${jobPath(jobId)}/cancel`, { method: "POST" }),
+};
+
+/** 회원의 가장 최근 대화. 패널을 닫았다 다시 열거나 다른 화면에서 열어도 같은 대화를 찾는 방법이다. */
+export function useCurrentChat(enabled: boolean) {
+  const client = useQueryClient();
+  return useQuery({
+    queryKey: chatKeys.current,
+    queryFn: async ({ signal }) => {
+      const { conversation } = await api<Schemas["ChatCurrentResponse"]>("/api/chat/sessions/current", { signal });
+      if (conversation) client.setQueryData(chatKeys.session(conversation.session.id), conversation);
+      return conversation?.session.id ?? null;
+    },
+    enabled,
+    staleTime: 0,
   });
 }
 
-/** contextIds: 사용자가 이번 질문에 연결해 둔 대상(세션 대상 중 확인·해제 후 남은 것). */
-export function useAskQuestion() {
-  return useMutation({
-    mutationFn: ({ sessionId, question, contextIds }: { sessionId: string; question: string; contextIds: string[] }) =>
-      api<Schemas["ChatMessageResponse"]>(`/api/chat/sessions/${encodeURIComponent(sessionId)}/messages`, {
-        method: "POST",
-        body: { question, contextIds },
-      }),
+/** 대화 하나와 그 작업들. 처리 중인 작업이 있는 동안(패널이 열려 있을 때) 상태를 계속 확인한다. */
+export function useChatConversation(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: chatKeys.session(sessionId ?? ""),
+    queryFn: ({ signal }) => api<ChatConversation>(sessionPath(sessionId!), { signal }),
+    enabled: enabled && Boolean(sessionId),
+    staleTime: 0,
+    refetchInterval: (query) => (query.state.data?.jobs.some(isChatJobActive) ? 800 : false),
   });
 }
 
-// ---- AI 출력 좋아요/싫어요(요구 75). 한 사람이 대상마다 표 하나: 같은 값을 다시 누르면 취소, 다른 값을 누르면 바뀐다.
+// ---- AI 결과 평가(FS066-01, D08). 로그인 회원만. 화면은 원하는 최종 상태(up·down·none)를 보내 재전송이 다시 토글되지 않는다.
 
 export type FeedbackFeature = Schemas["FeedbackVote"]["feature"];
+export type FeedbackValue = Schemas["FeedbackVote"]["value"];
 type FeedbackItem = Schemas["FeedbackItem"];
 const feedbackKey = (feature: FeedbackFeature, targetId: string) => ["feedback", feature, targetId] as const;
 
-export function useMyFeedback(feature: FeedbackFeature, targetId: string) {
+export function useMyFeedback(feature: FeedbackFeature, targetId: string, enabled: boolean) {
   return useQuery({
     queryKey: feedbackKey(feature, targetId),
-    queryFn: ({ signal }) => api<Schemas["FeedbackList"]>("/api/feedback", { query: { feature, targetIds: targetId }, signal }).then((list) => list.items[0] ?? null),
+    queryFn: ({ signal }) =>
+      api<Schemas["FeedbackList"]>("/api/feedback", { query: { feature, targetIds: targetId }, signal }).then((list): FeedbackItem | null => list.items[0] ?? null),
+    enabled,
   });
 }
 
-export function useVote(feature: FeedbackFeature, targetId: string) {
+export function useRate(feature: FeedbackFeature, targetId: string, targetVersion?: string | null) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { value: "up" | "down"; reason?: string }) => api<FeedbackItem>("/api/feedback", { method: "PUT", body: { feature, targetId, ...body } }),
-    onSuccess: (item) => client.setQueryData(feedbackKey(feature, targetId), item),
-  });
-}
-
-export function useCancelVote(feature: FeedbackFeature, targetId: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: () => api<void>("/api/feedback", { method: "DELETE", query: { feature, targetId } }),
-    onSuccess: () => client.setQueryData(feedbackKey(feature, targetId), null),
+    mutationFn: (body: { value: FeedbackValue; reason?: string }) =>
+      api<FeedbackItem>("/api/feedback", { method: "PUT", body: { feature, targetId, ...(targetVersion ? { targetVersion } : {}), ...body } }),
+    onSuccess: (item) => client.setQueryData(feedbackKey(feature, targetId), item.value === "none" ? null : item),
   });
 }

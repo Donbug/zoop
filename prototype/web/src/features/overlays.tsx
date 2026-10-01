@@ -88,7 +88,14 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
           }
         />
       )}
-      {chat && <ChatDrawer key={chat.targets.map((t) => t.id).join(",")} context={chat} open={chatOpen} onOpenChange={setChatOpen} />}
+      {chat && (
+        <ChatDrawer
+          context={chat}
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+          onShowEvidence={(title, evidenceIds) => api.openEvidence({ title, evidenceIds })}
+        />
+      )}
     </OverlayContext.Provider>
   );
 }

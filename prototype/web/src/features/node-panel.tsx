@@ -20,6 +20,7 @@ import { EventRow } from "@/components/domain/event-row";
 import type { GraphSelection } from "@/components/domain/graph-canvas";
 import { EdgeGlyph } from "@/components/domain/relation-type-tag";
 import { Button } from "@/components/ui/button";
+import { WatchToggle } from "@/components/domain/watch-toggle";
 import { ErrorState, SkeletonLines, SkeletonRows } from "@/components/ui/feedback";
 import { ISOLATED_BUNDLE_ID, isolatedBundleLabel, isolatedIssues } from "@/lib/graph-view";
 import { IconHint } from "@/components/ui/icon-hint";
@@ -48,6 +49,8 @@ export interface NodeDetailProps {
   focusId?: string | null;
   /** 경로 모드 진입(기업 → 두 번째 기업). 없으면 [다른 기업과의 연결 보기]를 두지 않는다. */
   onPathTo?: (fromId: string, toId: string) => void;
+  /** 기업 패널의 관련 이슈 → 영향 경로(FS022). 없으면 이슈 행은 그 사건을 선택한다. */
+  onImpact?: (companyId: string, issueId: string) => void;
 }
 
 /** 패널·시트 제목. 지도 데이터만으로 바로 정할 수 있어 상세 조회를 기다리지 않는다.
@@ -148,6 +151,7 @@ function CompanyDetailView({
   onFocusNode,
   focusId,
   onPathTo,
+  onImpact,
 }: NodeDetailProps & { companyId: string }) {
   const query = useCompany(companyId);
 
@@ -188,7 +192,8 @@ function CompanyDetailView({
         timePrecision={issue.timePrecision}
         evidenceCount={issue.evidenceCount ?? undefined}
         onShowEvidence={() => onShowEvidence({ title: issue.title, eventId: issue.id })}
-        onSelect={nodeOf(issue.id) ? () => onSelect({ kind: "node", id: issue.id }) : undefined}
+        // 관련 이슈를 고르면 이 기업과 그 사건의 영향 경로를 연다(FS022). 지도 밖 사건은 경로를 만들 수 없다.
+        onSelect={nodeOf(issue.id) ? () => (onImpact ? onImpact(companyId, issue.id) : onSelect({ kind: "node", id: issue.id })) : undefined}
         meta={meta ? <span className="text-sm text-text-secondary">{meta}</span> : undefined}
       />
     </li>
@@ -227,6 +232,7 @@ function CompanyDetailView({
             기업 상세
           </Link>
         </Button>
+        <WatchToggle companyId={company.id} companyName={company.name} />
         <FocusButton id={company.id} onFocusNode={onFocusNode} focusId={focusId} edges={edges} />
         {onPathTo && <PathPicker fromId={company.id} nodes={nodes} onPick={(toId) => onPathTo(company.id, toId)} />}
         <AskButton
@@ -241,7 +247,10 @@ function CompanyDetailView({
         {direct.length === 0 ? (
           <p className="px-4 text-base text-text-secondary">승인된 직접 이슈가 아직 없어요.</p>
         ) : (
-          <ul className="stagger">{direct.map((i) => issueRow({ id: i.issueId, title: i.title, eventTime: i.eventTime, timePrecision: i.timePrecision, evidenceCount: i.evidenceCount }, i.role ?? undefined))}</ul>
+          <>
+            {onImpact && <p className="px-4 pb-1 text-sm text-text-secondary">사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.</p>}
+            <ul className="stagger">{direct.map((i) => issueRow({ id: i.issueId, title: i.title, eventTime: i.eventTime, timePrecision: i.timePrecision, evidenceCount: i.evidenceCount }, i.role ?? undefined))}</ul>
+          </>
         )}
       </section>
 

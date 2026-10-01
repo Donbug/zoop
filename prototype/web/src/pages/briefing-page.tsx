@@ -1,15 +1,16 @@
 // UI-08 출퇴근 브리핑(요구 26–31). 발행된 공통 회차를 날짜·출근/퇴근으로 골라 본다(모두에게 같은 발행본).
 // 머리에 발행일·구분·예정/발행 시각·데이터 기준 시점, 본문은 핵심 이슈 최대 3개. 미준비·실패·제공 중단은 안내 한 줄,
 // 정정은 발행 원문을 지우지 않고 원문과 나란히 따로 보여 준다. 예측·상승 확률 문구는 넣지 않는다.
-import { Ban, CircleAlert, Clock, FilePen, Info, Moon, Newspaper, Sun } from "lucide-react";
+import { Ban, CircleAlert, Clock, FilePen, Info, Moon, Network, Newspaper, Sun } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import type { Schemas } from "@/api/client";
 import { useBriefing, useBriefingRounds } from "@/api/queries";
 import { BriefingCard } from "@/components/domain/briefing-card";
 import { EventRow, IconCount } from "@/components/domain/event-row";
 import { FeedbackButtons } from "@/components/domain/feedback-buttons";
 import { DisclaimerNote } from "@/components/domain/status-labels";
+import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
@@ -19,6 +20,16 @@ import { track, useScreenView, useViewId } from "@/lib/track";
 type Edition = "morning" | "evening";
 type Briefing = Schemas["BriefingResponse"];
 type Correction = Briefing["corrections"][number];
+
+/** 브리핑 회차를 발행할 당시의 관계 그래프 주소(FS032). 이슈를 주면 그 이슈를 중심으로 연다. */
+function roundGraphPath(roundId: string, focusEventId?: string) {
+  const query = new URLSearchParams({ round: roundId });
+  if (focusEventId) {
+    query.set("focus", focusEventId);
+    query.set("hops", "1");
+  }
+  return `/?${query}`;
+}
 
 const editionOptions = [
   { value: "morning" as const, label: <><Sun aria-hidden="true" />출근</>, ariaLabel: "출근" },
@@ -124,6 +135,7 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
   }, [published, briefing.id, viewId]);
   const roundCorrections = briefing.corrections.filter((c) => !c.eventId);
   const totalEvidence = briefing.items.reduce((sum, item) => sum + item.evidenceCount, 0);
+  const openIssue = (eventId: string) => track({ type: "briefing_issue_open", targetId: eventId, roundId: briefing.id, viewId });
 
   let summary: ReactNode = null;
   if (published && briefing.items.length === 0) {
@@ -131,9 +143,16 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
   } else if (published) {
     summary = (
       <section aria-labelledby="briefing-section-title">
-        <h3 id="briefing-section-title" className="pt-4 text-base font-semibold text-text-primary">
-          핵심 이슈
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-4">
+          <h3 id="briefing-section-title" className="text-base font-semibold text-text-primary">
+            핵심 이슈
+          </h3>
+          <Button variant="link" size="sm" asChild>
+            <Link to={roundGraphPath(briefing.id)}>
+              <Network aria-hidden="true" />이 회차 전체 관계 그래프
+            </Link>
+          </Button>
+        </div>
         <ol className="stagger">
           {briefing.items.map((item) => {
             const corrections = briefing.corrections.filter((c) => c.eventId === item.eventId);
@@ -148,8 +167,8 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
                   linkState={{ from: `${location.pathname}${location.search}` }}
                   evidenceCount={item.evidenceCount}
                   onSelect={() => {
-                    track({ type: "briefing_issue_open", targetId: item.eventId, roundId: briefing.id, viewId });
-                    navigate(`/?mode=all&focus=${encodeURIComponent(item.eventId)}&hops=1`);
+                    openIssue(item.eventId);
+                    navigate(roundGraphPath(briefing.id, item.eventId));
                   }}
                   divider={false}
                   className="pb-0"
@@ -158,7 +177,15 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
                 <p className="text-sm text-text-secondary">
                   <span className="font-medium">선정 이유</span> {item.reason}
                 </p>
-                <FeedbackButtons feature="briefing_issue" targetId={`${briefing.id}/${item.eventId}`} subject={`핵심 이슈 ${item.rank}`} />
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <Button variant="link" size="sm" asChild>
+                    <Link to={roundGraphPath(briefing.id, item.eventId)} onClick={() => openIssue(item.eventId)}>
+                      <Network aria-hidden="true" />
+                      이 회차 관계 그래프에서 보기
+                    </Link>
+                  </Button>
+                </div>
+                <FeedbackButtons feature="briefing_issue" targetId={`${briefing.id}/${item.eventId}`} targetVersion={briefing.graphVersion} subject={`핵심 이슈 ${item.rank}`} />
                 {corrections.map((c) => (
                   <CorrectionNote key={c.id} correction={c} />
                 ))}
@@ -168,7 +195,7 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
         </ol>
         <div className="flex flex-wrap items-center gap-x-3 border-t border-border-subtle py-2">
           <span className="text-sm font-medium text-text-primary">이 회차가 도움이 됐나요?</span>
-          <FeedbackButtons feature="briefing_round" targetId={briefing.id} subject="이 브리핑 회차" />
+          <FeedbackButtons feature="briefing_round" targetId={briefing.id} targetVersion={briefing.graphVersion} subject="이 브리핑 회차" />
         </div>
         <p className="flex items-center gap-2 border-t border-border-subtle py-3 text-sm text-text-secondary">
           <Info className="size-4 shrink-0" aria-hidden="true" />

@@ -39,7 +39,8 @@ const EDGE_LABEL_MIN_ZOOM = 0.95;
 // 선이 많으면 확대해도 강조된(호버·선택) 간선의 요약만 보인다.
 const EDGE_LABEL_BUDGET = 160;
 // 배지 숫자가 화면에서 13px 아래로 작아지지 않도록 배지도 배율에 반비례해 키우고, 이 배율 아래에서는 숨긴다.
-const BADGE_MIN_ZOOM = 0.8;
+// R3: 배지는 사건 캡션과 같은 배율부터 보이고, 캡션과 달리 겹침 정리(graph-declutter)로 숨기지 않는다(배지가 캡션보다 우선).
+const BADGE_MIN_ZOOM = NODE_LABEL_MIN_ZOOM;
 /** 배지 지름(모델 좌표, 배율 1 기준). 숫자는 지름의 0.56배라 24px이면 13.4px. */
 const BADGE_SIZE = 24;
 
@@ -57,10 +58,22 @@ export function bundleSizeAt(zoom: number, isMobile: boolean) {
   return Math.max(isMobile ? 56 : 52, 48 * lodFor(zoom, 0).scale);
 }
 
+/** 배치 계산 때 기업 원의 모델 크기. 전체 보기(배율 약 0.2)에서 화면 28px 원 + 이름이 차지하는 자리에 가깝다(R2).
+ *  300노드 합성 데이터에서 64 → 140으로 바꾸면 맞춤 화면의 이름 겹침 없이 보이는 기업이 9 → 15곳으로 늘었다. */
+const LAYOUT_COMPANY_SIZE = 140;
+
+/** 기업 원의 화면 최소 지름(px). 지도를 넓게 볼수록(배율 0.6 → 0.25) 44에서 28로 줄여 원끼리 덜 겹치고 이름 자리가 생긴다
+ *  (의미 기반 확대, R2). 28px도 WCAG 2.2 최소 대상 크기(24px) 이상이다. */
+function companyMinScreen(scale: number) {
+  const zoom = 1 / scale;
+  const t = Math.min(1, Math.max(0, (zoom - 0.25) / (0.6 - 0.25)));
+  return 28 + (44 - 28) * t;
+}
+
 export function buildStyle(isMobile: boolean, lod: Lod): StylesheetJson {
   const font = getComputedStyle(document.documentElement).getPropertyValue("--font-sans").trim();
   const fontSize = BASE_FONT * lod.scale;
-  const companySize = Math.max(isMobile ? 72 : 64, 44 * lod.scale);
+  const companySize = Math.max(isMobile ? 72 : 64, companyMinScreen(lod.scale) * lod.scale);
   const issueSize = isMobile ? 36 : 32;
   const bundleSize = bundleSizeAt(1 / lod.scale, isMobile);
   const badge = BADGE_SIZE * lod.scale;
@@ -97,6 +110,8 @@ export function buildStyle(isMobile: boolean, lod: Lod): StylesheetJson {
     { selector: "node[glyph]", style: { "background-image": "data(glyph)", "background-width": "100%", "background-height": "100%" } },
     { selector: 'node[kind = "company"]', style: { label: "data(caption)", width: companySize, height: companySize, "font-weight": 600 } },
     { selector: 'node[kind = "company"][?isFocus]', style: { width: companySize + 12, height: companySize + 12 } },
+    // 배치 계산 동안만(graph-layout): 기업을 전체 보기 배율에서의 실제 크기에 가깝게 키워 원·이름 자리를 띄운다.
+    { selector: 'node.layout-size[kind = "company"]', style: { width: LAYOUT_COMPANY_SIZE, height: LAYOUT_COMPANY_SIZE } },
     {
       selector: 'node[kind = "issue"]',
       style: {
@@ -194,6 +209,8 @@ export function buildStyle(isMobile: boolean, lod: Lod): StylesheetJson {
     { selector: "edge.emph", style: { width: 3, "z-index": 10 } },
     { selector: "edge.labelled", style: { label: "data(short)", "z-index": 15 } },
     { selector: "edge.quiet", style: { label: "" } },
+    // 겹침 정리(graph-declutter): 우선순위가 낮아 다른 라벨과 겹치는 노드 캡션은 숨긴다. 선택·경로 캡션은 아래 규칙이 다시 보인다.
+    { selector: "node.label-cull", style: { label: "" } },
     // 호버·선택한 간선은 말줄임 없이 전체 요약을 줄바꿈해 보인다.
     { selector: "edge.hover", style: { label: "data(summary)", "text-wrap": "wrap", "text-max-width": `${160 * lod.scale}px`, "z-index": 40 } },
     {

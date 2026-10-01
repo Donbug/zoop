@@ -13,6 +13,7 @@ from .admin_ledger import Ledger, Neo4jProbe, Neo4jReader, PocLedger
 from .admin_pipeline import PipelineService
 from .admin_usage import UsageService
 from .audit import AuditLog, Clock
+from .briefing_graph import BriefingGraphs
 from .briefing_rounds import BriefingService
 from .config import Settings
 from .errors import SourceUnavailable
@@ -40,6 +41,7 @@ class AdminServices:
     usage: UsageService
     jobs: JobRunner
     briefings: BriefingService
+    briefing_graphs: BriefingGraphs
 
 
 class BriefingScheduler:
@@ -115,4 +117,5 @@ def build_admin_services(
         usage=usage,
         jobs=jobs,
         briefings=briefings,
+        briefing_graphs=BriefingGraphs(briefings, provider, reviews),
     )

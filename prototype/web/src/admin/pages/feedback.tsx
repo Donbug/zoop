@@ -1,14 +1,18 @@
-// 선호도(요구 75): AI 기능별 좋아요/싫어요(비율·일별 추이), 싫어요 사유 목록, AI 대화록 목록.
-// 사용자는 가명 id로만 보이고, 사유·질문은 개인정보를 가린 사본이다. 표본이 작으면 비율 대신 건수만 보여 준다.
-import { ChartColumn, EyeOff, Info, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
+// 선호도(요구 75, FS066-02): AI 기능별 좋아요/싫어요(비율·일별 추이), 싫어요 사유 목록, AI 대화록 목록.
+// 현재 유효한 평가(취소한 평가 제외)만 세고, 기간은 평가를 마지막으로 바꾼 시각(KST)으로 거른다. 기본은 전체 보관 기간이며
+// 시작·종료일을 직접 고를 수 있다. 사용자는 가명 id로만 보이고, 사유·질문은 개인정보를 가린 사본이다.
+// 평가가 없으면 비율 대신 '평가 없음', 표본이 작으면 '표본 부족'과 건수만 보여 준다.
+import { CalendarRange, ChartColumn, EyeOff, Info, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
+import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDislikes, useFeedbackSummary, useTranscripts, type StatsWindow } from "../api";
+import { useDislikes, useFeedbackSummary, useTranscripts, type FeedbackPeriod } from "../api";
 import { formatCount } from "../format";
-import { formatPercent, parseWindow, WindowSwitch } from "../insights-ui";
+import { formatPercent, parseWindow, WindowSwitch, windowOptions } from "../insights-ui";
 import { AdminPageHeader, AdminSection, DataTable, KstTime, StatusLabel, Td, Th } from "../ui";
 
 const tabs = ["summary", "dislikes", "transcripts"] as const;
@@ -23,16 +27,26 @@ function Votes({ up, down, rate }: { up: number; down: number; rate?: number | n
   );
 }
 
-function SummaryPanel({ window }: { window: StatsWindow }) {
-  const summary = useFeedbackSummary(window);
+/** 지금 적용된 기간 조건을 한 줄로: 직접 고른 날짜가 있으면 그것, 아니면 미리 정한 기간. */
+function periodText({ window, start, end }: FeedbackPeriod) {
+  if (start || end) return `${start ?? "처음"} ~ ${end ?? "오늘"}`;
+  return window === "all" ? "전체 보관 기간" : `최근 ${windowOptions.find((o) => o.value === window)?.label}`;
+}
+
+function SummaryPanel({ period }: { period: FeedbackPeriod }) {
+  const summary = useFeedbackSummary(period);
   if (summary.isPending) return <SkeletonRows count={3} label="선호도를 불러오고 있어요" />;
-  if (summary.isError) return <ErrorState error={summary.error} title="선호도를 불러오지 못했어요" onRetry={() => void summary.refetch()} />;
+  if (summary.isError) return <ErrorState error={summary.error} title="선호도를 집계하지 못했어요" onRetry={() => void summary.refetch()} />;
   const data = summary.data;
   const dates = (data.features[0]?.days ?? []).map((d) => d.date).reverse();
   return (
     <>
       <p className="text-sm text-text-secondary">
-        집계 시각 <KstTime value={data.asOf} seconds /> · {data.basis} (기준 표 {data.minSample}개)
+        기간 {periodText({ window: data.window, start: data.start, end: data.end })}(평가를 마지막으로 바꾼 한국 시간 기준) · 집계 시각{" "}
+        <KstTime value={data.asOf} seconds />
+      </p>
+      <p className="text-sm text-text-secondary">
+        {data.basis} (기준 표 {data.minSample}개)
       </p>
       <AdminSection title="기능별 좋아요 비율" icon={ThumbsUp} id="feedback-features">
         <DataTable caption="AI 기능별 좋아요·싫어요">
@@ -53,7 +67,9 @@ function SummaryPanel({ window }: { window: StatsWindow }) {
                 <Td className="text-right">{formatCount(f.down)}</Td>
                 <Td className="text-right">{formatCount(f.total)}</Td>
                 <Td className="text-right">
-                  {f.rate == null ? (
+                  {f.total === 0 ? (
+                    <StatusLabel icon={Info} label="평가 없음" />
+                  ) : f.rate == null ? (
                     <StatusLabel icon={EyeOff} label={`표본 부족(${formatCount(f.total)}/${data.minSample})`} tone="warning" />
                   ) : (
                     <span className="font-semibold tabular-nums">{formatPercent(f.rate)}</span>
@@ -106,8 +122,8 @@ function SummaryPanel({ window }: { window: StatsWindow }) {
   );
 }
 
-function DislikesPanel({ window }: { window: StatsWindow }) {
-  const dislikes = useDislikes(window);
+function DislikesPanel({ period }: { period: FeedbackPeriod }) {
+  const dislikes = useDislikes(period);
   const rows = dislikes.data?.pages.flatMap((page) => page.items) ?? [];
   const total = dislikes.data?.pages[0]?.total ?? 0;
   if (dislikes.isPending) return <SkeletonRows count={4} label="싫어요 사유를 불러오고 있어요" />;
@@ -226,9 +242,54 @@ function TranscriptsPanel({ only, onOnlyChange }: { only: "all" | "disliked"; on
   );
 }
 
+const isDay = (value: string | null) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
+
+/** 시작·종료일 직접 지정. 적용하면 미리 정한 기간 대신 쓰이고, [날짜 지정 해제]로 되돌린다. */
+function DateRangeForm({ start, end, onApply }: { start: string | null; end: string | null; onApply: (start: string | null, end: string | null) => void }) {
+  const [from, setFrom] = useState(start ?? "");
+  const [to, setTo] = useState(end ?? "");
+  const invalid = from !== "" && to !== "" && from > to;
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!invalid) onApply(from || null, to || null);
+  };
+  return (
+    <form onSubmit={submit} aria-label="평가 기간 직접 지정" className="flex flex-wrap items-end gap-2">
+      <Input type="date" label="시작일(KST)" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="w-44" />
+      <Input type="date" label="종료일(KST)" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="w-44" />
+      <Button type="submit" variant="secondary" disabled={invalid}>
+        <CalendarRange aria-hidden="true" />
+        기간 적용
+      </Button>
+      {(start || end) && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setFrom("");
+            setTo("");
+            onApply(null, null);
+          }}
+        >
+          날짜 지정 해제
+        </Button>
+      )}
+      {invalid && (
+        <p role="alert" className="basis-full text-sm font-medium text-error">
+          시작일이 종료일보다 늦어요.
+        </p>
+      )}
+    </form>
+  );
+}
+
 export function AdminFeedbackPage() {
   const [params, setParams] = useSearchParams();
-  const window = parseWindow(params.get("window"));
+  // FS066-02: 기본은 전체 보관 기간.
+  const window = params.get("window") === null ? "all" : parseWindow(params.get("window"));
+  const start = isDay(params.get("start"));
+  const end = isDay(params.get("end"));
+  const period: FeedbackPeriod = { window, start, end };
   const tab: FeedbackTab = tabs.includes(params.get("tab") as FeedbackTab) ? (params.get("tab") as FeedbackTab) : "summary";
   const only = params.get("only") === "disliked" ? "disliked" : "all";
   const update = (patch: Record<string, string | null>) => {
@@ -239,13 +300,16 @@ export function AdminFeedbackPage() {
     }
     setParams(next, { replace: true });
   };
-
   return (
     <>
       <AdminPageHeader
         title="선호도"
         icon={ThumbsUp}
-        actions={tab === "transcripts" ? undefined : <WindowSwitch value={window} onChange={(value) => update({ window: value === "7d" ? null : value })} />}
+        actions={
+          tab === "transcripts" ? undefined : (
+            <WindowSwitch value={window} onChange={(value) => update({ window: value === "all" ? null : value, start: null, end: null })} />
+          )
+        }
       />
       <Tabs value={tab} onValueChange={(value) => update({ tab: value === "summary" ? null : value })} className="flex flex-col gap-4">
         <TabsList className="max-w-xl">
@@ -262,11 +326,12 @@ export function AdminFeedbackPage() {
             AI 대화록
           </TabsTrigger>
         </TabsList>
+        {tab !== "transcripts" && <DateRangeForm key={`${start}-${end}`} start={start} end={end} onApply={(s, e) => update({ start: s, end: e })} />}
         <TabsContent value="summary" className="flex flex-col gap-4">
-          <SummaryPanel window={window} />
+          <SummaryPanel period={period} />
         </TabsContent>
         <TabsContent value="dislikes" className="flex flex-col gap-4">
-          <DislikesPanel window={window} />
+          <DislikesPanel period={period} />
         </TabsContent>
         <TabsContent value="transcripts" className="flex flex-col gap-4">
           <TranscriptsPanel only={only} onOnlyChange={(value) => update({ only: value === "all" ? null : value })} />

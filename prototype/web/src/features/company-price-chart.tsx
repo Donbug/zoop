@@ -1,4 +1,5 @@
-// 기업 상세 주가 차트(요구 37). 사건 타임라인과 같은 기간으로 조회하고, 사건 날짜 위치에 표시를 둔다.
+// 기업 상세 주가 차트(요구 37, FS040). 사건 타임라인과 같은 범위(공통 KST 종료 시각·달력 시작)로 조회하고, 사건 날짜 위치에 표시를 둔다.
+//  - 휴장일에는 시세가 없다. 점은 실제 거래 시각의 시세만 찍고 빈 날을 채우는 가격을 만들지 않는다(선은 이웃한 거래 시각끼리 잇는다).
 //  - 차트 라이브러리 없이 SVG 한 줄(종가)로 그린다. 선 색은 기간 첫 종가 대비 마지막 종가의 상승·하락이며,
 //    같은 내용을 위 줄에 부호·화살표·글자로도 적는다(색만으로 구분하지 않음).
 //  - 사건 표시는 '이 날 사건이 있었다'만 뜻한다. 주가 움직임의 원인이라고 말하지 않는다. 누르면 그 날짜 묶음을 펼친다.
@@ -10,7 +11,7 @@ import { ApiError } from "@/api/client";
 import { useCompanyPrices } from "@/api/queries";
 import { ErrorState, LoadingBlock, Skeleton } from "@/components/ui/feedback";
 import { Tooltip } from "@/components/ui/tooltip";
-import { periodLabel, type EventGroup, type Period } from "@/lib/company-timeline";
+import { periodLabel, type DetailRange, type EventGroup } from "@/lib/company-timeline";
 import { formatCompact, formatPrice, placeMarkers, pointLabel, toneOf, type Tone } from "@/lib/market";
 import { cn } from "@/lib/utils";
 import { PriceChange } from "@/components/domain/status-labels";
@@ -23,15 +24,16 @@ const strokeClass: Record<Tone, string> = { up: "stroke-up", down: "stroke-down"
 
 interface Props {
   companyId: string;
-  period: Period;
+  range: DetailRange;
   /** 타임라인과 같은(관계 거르기를 거친) 날짜 묶음 */
   groups: EventGroup[];
   /** 사건 표시를 누르면 그 묶음들을 펼치고 첫 묶음으로 옮긴다 */
   onPick: (keys: string[]) => void;
 }
 
-export function CompanyPriceChart({ companyId, period, groups, onPick }: Props) {
-  const prices = useCompanyPrices(companyId, period);
+export function CompanyPriceChart({ companyId, range, groups, onPick }: Props) {
+  const prices = useCompanyPrices(companyId, range);
+  const period = range.period;
   const [hover, setHover] = useState<number | null>(null);
   const summaryId = useId();
 

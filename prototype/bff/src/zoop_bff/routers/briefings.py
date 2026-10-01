@@ -8,7 +8,7 @@ from fastapi import APIRouter, Path, Query
 from ..briefing_rounds import GENERATED_BY, parse_round_id
 from ..deps import State
 from ..errors import not_found
-from ..schemas import BriefingEvaluationResponse, BriefingResponse, BriefingRoundsResponse
+from ..schemas import BriefingEvaluationResponse, BriefingGraphBasis, BriefingResponse, BriefingRoundsResponse
 from ..views import mock_meta
 from . import ERROR_RESPONSES
 
@@ -35,6 +35,19 @@ def get_briefing(
 def get_rounds(state: State, limit: Annotated[int, Query(ge=1, le=100)] = 30) -> BriefingRoundsResponse:
     """Rounds a user can open (published or suspended), newest first: the date and edition picker."""
     return state.admin.briefings.public_rounds(limit)
+
+
+@router.get("/{id}/graph", response_model=BriefingGraphBasis)
+def get_graph_basis(briefing_id: Annotated[str, Path(alias="id")], state: State) -> BriefingGraphBasis:
+    """What the round's relationship graph is anchored to, and whether it can be shown (FS032).
+
+    ``available``: the round was published and its publication-time graph can be rebuilt; read it with
+    ``round=<id>`` on ``/api/graph``, ``/api/graph/edges/{id}``, ``/api/events/{id}``, ``/api/evidence/{id}``
+    and ``/api/companies/{id}``. Later reviews, rule switches and graph versions never change it.
+    ``suspended`` / ``not_published`` / ``unavailable`` (the version or its evidence is gone): a notice, no graph;
+    the newest graph is never shown in its place. An unknown round id is a 404.
+    """
+    return state.admin.briefing_graphs.basis(briefing_id)
 
 
 @router.get("/{id}/evaluations", response_model=BriefingEvaluationResponse)

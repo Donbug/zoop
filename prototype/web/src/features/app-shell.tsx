@@ -68,7 +68,9 @@ function AccountMenu({ session, showName }: { session: Schemas["SessionResponse"
   const tourOpening = useRef(false);
 
   return (
-    <DropdownMenu.Root>
+    // 비모달: 모달 메뉴는 뒤쪽 전체에 aria-hidden을 걸어 포커스 가능한 요소가 숨겨진 트리에 남는다(axe aria-hidden-focus).
+    // 메뉴는 Esc·바깥 클릭·항목 선택으로 닫히고 화살표 키 탐색은 그대로다.
+    <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
         <Button variant="ghost" size={showName && name ? "md" : "icon"} aria-label={name ? `계정 메뉴: ${name}` : "메뉴"} className={cn(showName && name && "px-3")}>
           <UserRound aria-hidden="true" />

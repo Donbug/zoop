@@ -47,7 +47,7 @@ class TranscriptService:
         return self._keys.pseudonym(subject.kind, subject.id)
 
     def page(self, *, disliked_only: bool, limit: int, offset: int) -> TranscriptPage:
-        where = "s.messages > 0"
+        where = "(s.messages > 0 OR EXISTS (SELECT 1 FROM chat_jobs j WHERE j.session_id=s.id))"
         if disliked_only:
             where += (
                 " AND EXISTS (SELECT 1 FROM chat_messages m JOIN feedback f ON f.feature='chatbot_answer'"
@@ -56,8 +56,10 @@ class TranscriptService:
         total = int(self._db.one(f"SELECT COUNT(*) AS n FROM chat_sessions s WHERE {where}")["n"])  # type: ignore[index]
         rows = self._db.query(
             f"SELECT s.id, s.owner_id, s.owner_kind, s.created_at,"
-            " (SELECT MAX(at) FROM chat_messages m WHERE m.session_id=s.id) AS last_at,"
-            " (SELECT question FROM chat_messages m WHERE m.session_id=s.id ORDER BY seq LIMIT 1) AS first_question,"
+            " COALESCE((SELECT MAX(at) FROM chat_messages m WHERE m.session_id=s.id),"
+            " (SELECT MAX(updated_at) FROM chat_jobs j WHERE j.session_id=s.id)) AS last_at,"
+            " COALESCE((SELECT question FROM chat_messages m WHERE m.session_id=s.id ORDER BY seq LIMIT 1),"
+            " (SELECT json_extract(request, '$.question') FROM chat_jobs j WHERE j.session_id=s.id ORDER BY seq LIMIT 1)) AS first_question,"
             f" s.messages FROM chat_sessions s WHERE {where} ORDER BY last_at DESC, s.id LIMIT ? OFFSET ?",
             (limit, offset),
         )
@@ -121,6 +123,24 @@ class TranscriptService:
                     feedback=TranscriptFeedback(up=up, down=down, reasons=reasons),
                 )
             )
+        # Questions that never produced a saved answer (failed, cancelled, still running) belong to the record too.
+        for job in self._db.query("SELECT * FROM chat_jobs WHERE session_id=? AND status != 'completed' ORDER BY seq", (session_id,)):
+            request = json.loads(job["request"])
+            messages.append(
+                TranscriptMessage(
+                    id=job["id"],
+                    seq=job["seq"],
+                    at=job["updated_at"],
+                    question=masked(request["question"]),
+                    answer="",
+                    status=job["status"],
+                    reason=job["failure_reason"] or job["failure"],
+                    context_labels=[c["label"] for c in request["contexts"]],
+                    citation_count=0,
+                    feedback=TranscriptFeedback(up=0, down=0, reasons=[]),
+                )
+            )
+        messages.sort(key=lambda m: m.seq)
         user = self._pseudonym(session["owner_kind"], session["owner_id"])
         report = MaskingReport(rules=RULES, counts=merge(counters))
         self._audit.record(

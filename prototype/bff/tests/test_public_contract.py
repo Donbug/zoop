@@ -7,6 +7,7 @@ import json
 from zoop_bff.dataset import evidence_id
 
 from .conftest import ALPHA_ISSUES, HELD_ARTICLE, HELD_ISSUE, base_payload, fresh
+from .chat_support import ask_job, new_member
 
 
 def _all_public_text(client) -> str:
@@ -125,7 +126,7 @@ def test_evidence_quote_verification_follows_the_article_body(make_client):
     evidence = bad.get(f"/api/events/{ALPHA_ISSUES['q2']}").json()["evidenceIds"]
     assert [bad.get(f"/api/evidence/{e}").json()["quoteVerified"] for e in evidence] == [False]
     answer = _ask(bad, [ALPHA_ISSUES["q2"]], "어떤 실적을 발표했나요?")
-    assert answer["status"] == "insufficient_evidence" and answer["sources"] == []
+    assert answer["outcome"] == "insufficient_evidence" and answer["sources"] == []
 
     no_bodies = fresh()
     for issue in no_bodies["issues"]:
@@ -137,23 +138,22 @@ def test_evidence_quote_verification_follows_the_article_body(make_client):
 
 
 def _ask(client, context_ids, question):
-    guest = client.post("/api/auth/guest")
-    assert guest.status_code == 200
-    session = client.post("/api/chat/sessions", json={"contextIds": context_ids})
-    assert session.status_code == 201
-    reply = client.post(f"/api/chat/sessions/{session.json()['id']}/messages", json={"question": question})
-    assert reply.status_code == 200
-    return reply.json()
+    member = new_member(client)
+    job = ask_job(member, question, context_ids)
+    assert job["status"] == "completed", job
+    return job["result"]
 
 
-def test_chat_answers_cite_only_real_evidence_and_refuse_without_context(make_client):
+def test_chat_answers_cite_only_real_evidence_and_ask_back_without_a_target(make_client):
     client = make_client()
     answer = _ask(client, [ALPHA_ISSUES["q1"]], "어떤 실적을 발표했나요?")
-    assert answer["status"] == "answered" and answer["sources"]
+    assert answer["outcome"] == "answered" and answer["sources"]
     for source in answer["sources"]:
         assert client.get(f"/api/evidence/{source}").status_code == 200
     assert ALPHA_ISSUES["q1"] in {t["id"] for t in answer["graphTargets"]}
 
-    assert _ask(client, [], "무엇이 있나요?")["status"] == "insufficient_evidence"
+    # No target: the question is asked back (a stored, completed result), never answered from nothing.
+    asked_back = _ask(client, [], "무엇이 있나요?")
+    assert asked_back["outcome"] == "clarification" and asked_back["sources"] == [] and asked_back["citations"] == []
     company_answer = _ask(client, ["SYNTH-ALPHA"], "이 종목 오를까요?")
-    assert company_answer["status"] == "insufficient_evidence" and company_answer["sources"] == []
+    assert company_answer["outcome"] == "insufficient_evidence" and company_answer["sources"] == []

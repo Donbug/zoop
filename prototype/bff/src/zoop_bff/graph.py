@@ -15,7 +15,7 @@ from .schemas import (
     Verification,
     ViaIssue,
 )
-from .summaries import edge_summary
+from .summaries import edge_summary, role_display
 from .views import basis_out, company_name, meta
 
 DERIVED_EXPLANATION = "두 기업이 같은 사건에 함께 등장했다는 뜻이에요. 직접 거래나 영향 관계는 아니에요."
@@ -203,9 +203,10 @@ def edge_detail(ds: Dataset, edge_id: str) -> EdgeDetail:
         directed=not edge.derived,
         source=_ref(ds, edge.source),
         target=_ref(ds, edge.target),
-        role=edge.role,
+        role=role_display(edge.role),
         summary=edge_summary(edge),
-        roles=list(edge.roles),
+        # 상세 패널용 역할(R5): 아는 어휘는 한국어, 모르는 문구는 원문 그대로. 같은 한국어로 겹치면 하나로.
+        roles=list(dict.fromkeys(r for r in map(role_display, edge.roles) if r)),
         assertion_status=edge.assertion_status,
         evidence_ids=list(edge.evidence_ids),
         basis=[basis_out(b) for b in edge.basis],

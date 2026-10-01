@@ -343,19 +343,27 @@ export function useCompanyStats(id: string, window: StatsWindow) {
   });
 }
 
-export function useFeedbackSummary(window: StatsWindow) {
+/** 선호도 조회 기간(FS066-02): 미리 정한 기간 또는 평가를 마지막으로 바꾼 KST 날짜의 시작·종료일(둘 중 하나라도 있으면 우선). */
+export interface FeedbackPeriod {
+  window: StatsWindow;
+  start: string | null;
+  end: string | null;
+}
+
+export function useFeedbackSummary({ window, start, end }: FeedbackPeriod) {
   return useQuery({
-    queryKey: ["admin", "feedback", "summary", window],
-    queryFn: ({ signal }) => adminApi<Schemas["FeedbackSummary"]>("/api/admin/feedback/summary", { signal, query: { window } }),
+    queryKey: ["admin", "feedback", "summary", window, start, end],
+    queryFn: ({ signal }) => adminApi<Schemas["FeedbackSummary"]>("/api/admin/feedback/summary", { signal, query: { window, start, end } }),
     placeholderData: keepPreviousData,
     refetchInterval: 10_000,
   });
 }
 
-export function useDislikes(window: StatsWindow) {
+export function useDislikes({ window, start, end }: FeedbackPeriod) {
   return useInfiniteQuery({
-    queryKey: ["admin", "feedback", "dislikes", window],
-    queryFn: ({ signal, pageParam }) => adminApi<Schemas["DislikePage"]>("/api/admin/feedback/dislikes", { signal, query: { window, limit: 50, cursor: pageParam } }),
+    queryKey: ["admin", "feedback", "dislikes", window, start, end],
+    queryFn: ({ signal, pageParam }) =>
+      adminApi<Schemas["DislikePage"]>("/api/admin/feedback/dislikes", { signal, query: { window, start, end, limit: 50, cursor: pageParam } }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
     placeholderData: keepPreviousData,

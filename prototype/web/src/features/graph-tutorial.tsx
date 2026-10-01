@@ -1,5 +1,7 @@
-// 메인 지도 튜토리얼(요구 15·16, design-direction §5.2). 실제 지도 위에서 5단계를 안내한다.
-//  ① 기본 조작(이동·확대·화면 맞추기) ② 기업·사건 선택 ③ 관계선 선택 ④ 상세와 근거 확인 ⑤ AI에게 묻기
+// 메인 지도 튜토리얼(요구 15·16, 명세 FS015, design-direction §5.2). 실제 지도 위에서 5단계를 안내한다.
+//  ① 기본 조작(이동·확대·화면 맞추기) ② 기업·사건 선택 ③ 영향 경로(기업 상세의 관련 이슈) 또는 기업 사이 관계선 ④ 상세와 근거 확인 ⑤ AI에게 묻기
+// - ③은 명세가 허용한 조작만 안내한다: 이슈–기업 선은 표시 전용이라 누르라고 하지 않는다(FS022·D03).
+// - ⑤ 비회원에게는 AI 질문이 회원 기능이라는 것과 로그인 방법만 알린다(실행 권한을 주지 않음, FS015 수용 기준 2).
 // - 사용자가 그 동작을 실제로 하면 다음 단계로 넘어간다. [다음]·[튜토리얼 건너뛰기]는 언제나 쓸 수 있다.
 // - 대상을 가리는 오버레이를 쓰지 않는다. 패널은 데스크톱에서 왼쪽 목록 자리, 모바일에서 지도 위(문서 흐름 안)에 놓여
 //   바텀시트와 겹치지 않는다. 대상은 테두리(.tutorial-target)로 표시하고, 단계 문구는 aria-live로 읽힌다.
@@ -47,12 +49,12 @@ const STEPS: TutorialStep[] = [
     onMap: true,
   },
   {
-    title: "관계선 고르기",
-    body: "두 노드를 잇는 선을 눌러 보세요. 어떤 관계인지와 근거 수가 보여요.",
-    keyboard: "키보드로는 기업 상세의 [관련 기업] 행을 고르면 그 관계선이 선택돼요.",
-    targets: [{ selector: "[data-graph-canvas]" }, { selector: 'aside[aria-label="상세"]' }],
-    sheetHint: "관계선을 누르려면 이 창을 닫아요. 기업이면 아래 [관련 기업] 행을 눌러도 돼요.",
-    onMap: true,
+    title: "영향 경로 보기",
+    body: "기업을 고른 뒤 상세의 [직접 이슈]에서 사건을 눌러 보세요. 기업과 그 사건이 어떻게 이어졌는지 단계별 근거와 함께 보여요. 기업 사이 점선(사건 공유)을 눌러도 두 기업의 관계가 열려요.",
+    keyboard: "키보드로는 [목록] 보기에서 기업을 고른 뒤 상세의 [직접 이슈] 사건 제목으로 Tab해 Enter를 누르세요.",
+    targets: [{ selector: 'section[aria-label="직접 이슈"]' }, { selector: 'section[aria-label="관련 기업"]' }, { selector: "[data-graph-canvas]" }],
+    sheetHint: "기업 상세의 [직접 이슈]에서 사건을 눌러 보세요.",
+    onMap: false,
   },
   {
     title: "상세와 근거 확인하기",
@@ -71,6 +73,16 @@ const STEPS: TutorialStep[] = [
     onMap: false,
   },
 ];
+
+/** 비회원의 ⑤단계: 질문은 회원 기능이므로 해 보라고 하지 않고 로그인 방법만 알린다. */
+const GUEST_AI_STEP: TutorialStep = {
+  title: "AI에게 묻기(회원 기능)",
+  body: "AI 질문은 로그인한 회원만 쓸 수 있어요. 로그인하면 상세의 [AI에게 묻기]로 고른 대상과 근거를 바탕으로 질문할 수 있어요.",
+  keyboard: "아래 [로그인] 버튼으로 로그인 화면에 갈 수 있어요.",
+  targets: [],
+  sheetHint: "AI 질문은 로그인하면 쓸 수 있어요.",
+  onMap: false,
+};
 
 /** 단계마다 대상 요소에 테두리 표시를 붙인다. 대상은 나중에 나타날 수 있으므로 DOM 변화를 따라간다. */
 function useTargetOutline(step: TutorialStep | undefined) {
@@ -101,15 +113,17 @@ function useTargetOutline(step: TutorialStep | undefined) {
 }
 
 /** 단계별 '실제로 해 봤는지' 감지. 단계에 들어온 뒤의 변화만 센다. */
-function useStepDone(index: number, active: boolean) {
+function useStepDone(index: number, active: boolean, guest: boolean) {
   const [params] = useSearchParams();
   const { evidenceOpen, chatOpen } = useOverlays();
   const select = params.get("select") ?? "";
   const startSelect = useRef(select);
+  const startImpact = useRef(params.get("impact") ?? "");
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     startSelect.current = select;
+    startImpact.current = params.get("impact") ?? "";
     setDone(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, active]);
@@ -142,11 +156,14 @@ function useStepDone(index: number, active: boolean) {
   }, [index, active]);
 
   const changed = select !== startSelect.current;
+  const impact = params.get("impact") ?? "";
+  const impactChanged = impact !== startImpact.current;
   const derived =
     (index === 1 && changed && select.startsWith("node:") && select !== `node:${ISOLATED_BUNDLE_ID}`) ||
-    (index === 2 && changed && select.startsWith("edge:")) ||
+    // ③ 영향 경로를 열었거나(기업 패널의 관련 이슈) 허용된 관계선(기업 사이·사건 사이)을 골랐다. 이슈–기업 선은 지도가 선택하지 않는다.
+    (index === 2 && ((impactChanged && impact !== "") || (changed && select.startsWith("edge:")))) ||
     (index === 3 && evidenceOpen) ||
-    (index === 4 && chatOpen);
+    (index === 4 && !guest && chatOpen);
   return active && (done || derived);
 }
 
@@ -163,15 +180,19 @@ export interface GraphTutorialState {
   finish: () => void;
   previous: () => void;
   next: () => void;
+  /** 비회원 AI 단계에서 보일 로그인 동작 */
+  login?: () => void;
 }
 
-/** active=false면 대상 표시·동작 감지를 멈춘다. 다시 켜지면(다시 보기) 1단계부터 시작한다. */
-export function useGraphTutorial(active: boolean, onClose: () => void): GraphTutorialState {
+/** active=false면 대상 표시·동작 감지를 멈춘다. 다시 켜지면(다시 보기) 1단계부터 시작한다.
+ *  guest면 ⑤단계를 로그인 안내로 바꾸고 onLogin을 그 단계의 [로그인]에 쓴다. */
+export function useGraphTutorial(active: boolean, onClose: () => void, guest = false, onLogin?: () => void): GraphTutorialState {
   const [index, setIndex] = useState(0);
   const [practiced, setPracticed] = useState<boolean[]>(() => STEPS.map(() => false));
   const save = useSetTutorial();
-  const step = STEPS[index] ?? STEPS[0]!;
-  const done = useStepDone(index, active);
+  const guestStep = guest && index === STEPS.length - 1;
+  const step = guestStep ? GUEST_AI_STEP : (STEPS[index] ?? STEPS[0]!);
+  const done = useStepDone(index, active, guest);
   const last = index === STEPS.length - 1;
   useTargetOutline(active ? step : undefined);
   useEffect(() => {
@@ -201,13 +222,19 @@ export function useGraphTutorial(active: boolean, onClose: () => void): GraphTut
     finish,
     previous: () => setIndex(Math.max(0, index - 1)),
     next: () => (last ? finish() : setIndex(index + 1)),
+    login: guestStep ? onLogin : undefined,
   };
 }
 
 function TutorialActions({ tutorial, compact }: { tutorial: GraphTutorialState; compact?: boolean }) {
-  const { index, last, saving, finish, previous, next } = tutorial;
+  const { index, last, saving, finish, previous, next, login } = tutorial;
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {login && (
+        <Button variant="secondary" size="sm" onClick={login}>
+          로그인
+        </Button>
+      )}
       {index > 0 && !compact && (
         <Button variant="secondary" size="sm" onClick={previous}>
           이전

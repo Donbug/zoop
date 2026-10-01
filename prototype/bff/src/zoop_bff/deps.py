@@ -10,9 +10,10 @@ from fastapi import Depends, Request
 from .accounts import SESSION_COOKIE, AccountStore, Principal, UserState
 from .admin_auth import ADMIN_COOKIE, AdminAccount
 from .admin_services import AdminServices
-from .chat import ChatStore
+from .chat_jobs import ChatService
 from .insights import Insights, build_insights
 from .config import Settings
+from .dataset import Dataset
 from .errors import ApiError
 from .market_data import MarketData
 from .sources import DataProvider
@@ -25,12 +26,16 @@ class AppState:
     admin: AdminServices
     accounts: AccountStore
     market: MarketData
-    chats: ChatStore = field(init=False)
+    chats: ChatService = field(init=False)
     insights: Insights = field(init=False)
 
     def __post_init__(self) -> None:
-        self.chats = ChatStore(self.admin.db, self.admin.clock)
+        self.chats = ChatService(self.admin.db, self.admin.clock, self.provider, self.accounts, self.admin.usage)
         self.insights = build_insights(self.admin, self.accounts)
+
+    def dataset(self, round_id: str | None = None) -> Dataset:
+        """The graph users read: the active one, or the state a published briefing round was built from."""
+        return self.provider.get() if round_id is None else self.admin.briefing_graphs.dataset(round_id)
 
 
 def app_state(request: Request) -> AppState:

@@ -75,6 +75,16 @@ const errorMessages: Record<string, string> = {
   internal_error: "일시적인 서버 문제예요. 잠시 후 다시 시도해 주세요.",
   quote_verification_failed: "원문과 인용이 일치하는지 확인하지 못해 답변을 보류했어요.",
   no_evidence_for_context: "수집된 기사에서 근거를 찾지 못해 답변을 보류했어요.",
+  no_evidence_in_period: "고른 기간에 발행된 근거가 없어 답변을 보류했어요.",
+  prediction_or_advice_not_supported: "주가 예측·매매 판단은 제공하지 않아요. 근거 문장만 확인할 수 있어요.",
+  pinned_version_unavailable: "질문할 때 고른 자료를 지금은 쓸 수 없어요. 최신 자료로 바꿔 답하지 않았어요.",
+  chat_session_busy: "이전 질문을 아직 처리하고 있어요. 끝난 뒤에 보내 주세요. 쓰던 질문은 그대로 남겨 뒀어요.",
+  chat_job_conflict: "같은 질문 번호로 다른 내용이 전송됐어요. 처음 받은 질문은 그대로예요. 고친 질문은 새로 보내 주세요.",
+  chat_job_not_found: "질문 기록을 찾을 수 없어요.",
+  chat_job_not_retryable: "이 질문은 다시 실행할 수 없어요. 새 질문으로 보내 주세요.",
+  chat_job_not_cancellable: "이미 끝난 질문은 취소할 수 없어요.",
+  empty_question: "질문을 입력해 주세요.",
+  invalid_period: "기간의 시작과 끝을 확인해 주세요.",
 };
 
 export function errorReasonMessage(code: string | null | undefined): string | undefined {

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query
 
 from ..deps import Admin, State, require_admin
 from ..errors import ApiError
+from ..feedback import Period
 from ..insights_schemas import DislikePage, FeedbackSummary, StatsWindow, TranscriptDetail, TranscriptPage
 from . import ADMIN_ERROR_RESPONSES
 from .telemetry import optional_dataset
@@ -28,21 +30,34 @@ def _offset(cursor: str | None) -> int:
     return int(cursor)
 
 
+Day = Annotated[date | None, Query(description="KST day (inclusive) of the rating's last valid change; overrides window")]
+
+
+def _period(state: State, window: str, start: date | None, end: date | None) -> Period:
+    if start and end and start > end:
+        raise ApiError(422, "invalid_range", "시작일은 종료일보다 늦을 수 없습니다.")
+    return state.insights.feedback.period(window, start, end)
+
+
 @router.get("/feedback/summary", response_model=FeedbackSummary)
-def feedback_summary(state: State, window: StatsWindow = "7d") -> FeedbackSummary:
-    """Likes and dislikes per AI feature with a daily trend. Ratios below ``minSample`` votes are null."""
-    return state.insights.feedback.summary(window)
+def feedback_summary(state: State, window: StatsWindow = "all", start: Day = None, end: Day = None) -> FeedbackSummary:
+    """Current (not taken back) likes and dislikes per AI feature with a daily trend, filtered by the KST day
+    of each rating's last valid change: a preset ``window`` (default: everything kept) or ``start``/``end``.
+    Ratios below ``minSample`` votes are null; with no rating at all there is no ratio either."""
+    return state.insights.feedback.summary(_period(state, window, start, end))
 
 
 @router.get("/feedback/dislikes", response_model=DislikePage)
 def dislikes(
     state: State,
-    window: StatsWindow = "7d",
+    window: StatsWindow = "all",
+    start: Day = None,
+    end: Day = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     cursor: Cursor = None,
 ) -> DislikePage:
-    """Dislikes, newest first, with the (masked) reason and the voter's pseudonym."""
-    return state.insights.feedback.dislikes(window, limit, _offset(cursor), optional_dataset(state))
+    """Current dislikes, newest change first, with the (masked) reason and the voter's pseudonym."""
+    return state.insights.feedback.dislikes(_period(state, window, start, end), limit, _offset(cursor), optional_dataset(state))
 
 
 @router.get("/transcripts", response_model=TranscriptPage)

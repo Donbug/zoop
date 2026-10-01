@@ -103,10 +103,26 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 CREATE INDEX IF NOT EXISTS chat_messages_at ON chat_messages(at);
 CREATE INDEX IF NOT EXISTS chat_messages_session ON chat_messages(session_id, seq);
+-- AI question jobs (chat_jobs.py). ``id`` is the client's idempotency key. ``request`` is frozen at first receipt;
+-- ``digest`` detects a different body under the same id. ``run`` is the fencing token of the current execution: a
+-- late execution (older run, cancelled, timed out) can neither save nor change the job. At most one queued or
+-- running job per conversation (partial unique index). ``verified`` holds the validated result until it is saved.
+CREATE TABLE IF NOT EXISTS chat_jobs (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES chat_sessions(id), owner_id TEXT NOT NULL,
+  seq INTEGER NOT NULL, digest TEXT NOT NULL, request TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled')),
+  outcome TEXT, failure TEXT, failure_reason TEXT,
+  run INTEGER NOT NULL DEFAULT 0, reruns INTEGER NOT NULL DEFAULT 0,
+  resolution TEXT, verified TEXT, result TEXT, message_id TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, finished_at TEXT, lease_until TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS chat_jobs_seq ON chat_jobs(session_id, seq);
+CREATE UNIQUE INDEX IF NOT EXISTS chat_jobs_one_active ON chat_jobs(session_id) WHERE status IN ('queued','running');
+CREATE INDEX IF NOT EXISTS chat_jobs_owner ON chat_jobs(owner_id, created_at);
 CREATE TABLE IF NOT EXISTS feedback (
   feature TEXT NOT NULL, target_id TEXT NOT NULL, subject TEXT NOT NULL, subject_kind TEXT NOT NULL,
   value TEXT NOT NULL CHECK (value IN ('up','down')), reason TEXT,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (feature, target_id, subject)
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, target_version TEXT, PRIMARY KEY (feature, target_id, subject)
 );
 CREATE INDEX IF NOT EXISTS feedback_updated ON feedback(updated_at);
 -- members, sessions and settings (accounts.py). Tokens are stored as SHA-256 digests only.
