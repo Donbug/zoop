@@ -5,7 +5,7 @@ LG CNS AM Inspire Camp 5기 2조 금융 도메인 프로젝트. 내 종목과 �
 | 경로 | 내용 |
 |---|---|
 | [`prototype/`](prototype/README.md) | 실행 가이드. `bff`(FastAPI BFF)와 `web`(Vite + React 사용자 앱·관리자 패널) |
-| [`docs/evidence/`](docs/evidence/README.md) | 요구사항·회의록·PoC 근거. 기능 기준은 `raw/requirements-sheet_2026-10-01/`의 요구사항 정의서 고정본 |
+| [`docs/evidence/`](docs/evidence/README.md) | 요구사항·회의록·PoC 근거. 기능 기준은 `raw/functional-spec_2026-10-01/`의 기능·비기능명세서 v1.2 고정본 |
 | `docs/design/` | 디자인 방향·토큰·화면 캡처·그래프 UX 결정 |
 | `docs/research/` | UX·그래프 시각화 레퍼런스 조사 |
 | `docs/share/` | 팀 공유용 단일 HTML 문서 |

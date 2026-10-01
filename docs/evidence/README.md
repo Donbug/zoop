@@ -8,8 +8,10 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | [requirements-flow.md](requirements-flow.md) | 요구사항명세서 v0.2(FR-01~52, NFR-01~14), WBS(09-29), Mermaid 사용자 플로우 v0.1 재구성, 교차검증 불일치 10건 |
 | [poc-backend.md](poc-backend.md) | `~/InvestMateLogicTest` PoC의 아키텍처·데이터 계약·연동 가능 표면·실행 확인·BFF 매핑 |
 | [review-policy.md](review-policy.md) | 보류가 많은 이유(원인 분포)·자동 검수 규칙 R1@2(역할 문구 미확인은 역할만 빼고 게시)의 효과·표본 판정·문턱값 시뮬레이션과 권고안 |
+| [spec-v1.2-gap.md](spec-v1.2-gap.md) | 기능·비기능명세서 v1.2 93개 명세와 현재 프로토타입 대조: 판정표, 명세와 반대로 동작하는 11건, 팀 결정·데이터가 막는 항목 |
 | `raw/` | 원본 변환본: Notion export(112페이지), 명세서·WBS 변환, 플로우 SVG |
-| `raw/requirements-sheet_2026-10-01/` | **작업용 임시 정본(2026-10-01 11:04 KST 고정본).** 팀 스프레드시트 「줍 요구사항 정의서 v0.1」 원본 xlsx(sha256 `807687b0…`)와 시트별 CSV 3개(요구사항 정의서 82행·검증 기준·정책 결정). 출처: `docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k`. 우선순위는 권고이고 팀 승인 전이며, 다음 날 갱신될 예정이다. |
+| `raw/functional-spec_2026-10-01/` | **기능 정본(2026-10-01 20:41 KST 고정본).** 팀 확정 「줍 기능·비기능명세서 — 상세형 v1.2」 원본 xlsx(sha256 `a7f52731…`)와 시트별 CSV 13개(목차, 영역 9개, 비기능, 변경 내역, 제안·확인 사항 D01–D12). 기능 81개·비기능 12개, 명세마다 상세 항목 11개. 출처: `docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs`. |
+| `raw/requirements-sheet_2026-10-01/` | 이전 작업용 정본(2026-10-01 11:04 KST). 요구사항 정의서 v0.1(82행)·검증 기준·정책 결정. v1.2 명세의 「원본 요구사항 ID」가 이 정의서 계열 번호를 잇는다(번호는 v1.2 목차 기준). 출처: `docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k`. |
 
 ## 증거 범위와 제외
 
@@ -42,7 +44,7 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 
 ## 프로토타입이 채택하는 가정
 
-미정 사항 때문에 작업이 멈추지 않도록 아래를 **프로토타입 한정 가정**으로 둔다. 2026-10-01부터 기능 기준은 [요구사항 정의서 고정본](raw/requirements-sheet_2026-10-01/1-요구사항-정의서.csv)(행 번호 = 요구사항 ID)이며, 같은 폴더의 「검증 기준」「정책 결정」 시트는 플레이스홀더라 충돌하면 정의서를 따른다. 팀 결정이 나오면 교체한다.
+미정 사항 때문에 작업이 멈추지 않도록 아래를 **프로토타입 한정 가정**으로 둔다. 2026-10-01 저녁부터 기능 기준은 [기능·비기능명세서 v1.2 고정본](raw/functional-spec_2026-10-01/00-명세-목차.csv)(명세 ID `FS…`·`NFS…`)이다. 명세의 「확인 필요 사항」으로 남은 값은 아래 가정을 유지하고, 팀 결정이 나오면 교체한다.
 
 1. API 경로는 명세 v0.2 §8 초안(`/api/graph`, `/api/companies/{id}`, `/api/events/{id}`, `/api/evidence/{id}`, `/api/briefings`, `/api/me/settings`, `/api/portfolio` 등)을 기본으로 하고, 정의서 구현에 필요한 경로(가입·소셜·관리자 `/api/admin/*`·계측·피드백·기업 문서)를 더했다. 전체 목록은 BFF `/openapi.json`과 [BFF README](../../prototype/bff/README.md)에 있다.
 2. 그래프·이슈·근거는 PoC의 실제 승인 데이터(`inspect()`)에서 가져온다. 사용자에게는 관리자가 게시한 **그래프 버전**(첫 기동 때 스냅샷이 v1)에 관리자 검수 기록을 덮어 보여 주고, 응답 `metadata.graphVersion`에 버전을 적는다. `datasetKind`는 실제 기사 스냅샷(`approved-snapshot`)과 합성 미리보기(`synthetic-preview`)를 구분한다.
