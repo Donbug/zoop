@@ -1,6 +1,6 @@
 // 후보 목록(통과·보류·폐기 필터, 검색) + 후보 상세(원문 인용·보류 사유·검증 판정·검수 이력·허용/거부).
 // 허용·거부는 사유를 받아야만 실행된다. 거부한 후보는 사용자 그래프에서 바로 빠지고, 허용한 보류 후보는 바로 들어간다.
-import { Check, ExternalLink, FileText, History, Link2Off, Map as MapIcon, MapPinOff, ShieldCheck, X } from "lucide-react";
+import { Check, ExternalLink, FileText, History, Link2Off, ListChecks, Map as MapIcon, MapPinOff, ShieldCheck, X } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,11 +27,98 @@ function DecisionText({ decision }: { decision: CandidateRow["decision"] }) {
   return decision.decision === "allow" ? <StatusLabel icon={Check} label="허용" tone="success" /> : <StatusLabel icon={X} label="거부" tone="error" />;
 }
 
+const ruleNotApplied = {
+  admin_decision: "관리자 결정이 우선해요",
+  rule_disabled: "규칙이 꺼져 있어요",
+  not_published: "이 후보가 든 그래프 버전을 아직 게시하지 않았어요",
+} as const;
+
+/** 목록 행의 규칙 배지: 규칙으로 게시 중이면 규칙 id, 다루지만 게시하지 않으면 그 이유(색 없이 글자). */
+function RuleBadge({ rule }: { rule: CandidateRow["rule"] }) {
+  if (!rule) return null;
+  const short = { admin_decision: "결정 우선", rule_disabled: "꺼짐", not_published: "미게시" } as const;
+  return (
+    <Badge>
+      <ListChecks aria-hidden="true" />
+      {rule.applied ? `규칙 ${rule.ruleId}` : `규칙 대상 · ${short[rule.notAppliedReason ?? "not_published"]}`}
+    </Badge>
+  );
+}
+
+function RuleState({ rule }: { rule: NonNullable<CandidateRow["rule"]> }) {
+  if (rule.applied) return <StatusLabel icon={ListChecks} label={`${rule.ruleId}로 게시 중`} tone="success" />;
+  return (
+    <span className="flex flex-col gap-0.5">
+      <StatusLabel icon={ListChecks} label={`${rule.ruleId} 대상`} />
+      <span className="text-sm text-text-secondary">{ruleNotApplied[rule.notAppliedReason ?? "not_published"]}</span>
+    </span>
+  );
+}
+
+/** 규칙이 사용자에게 비우는(또는 비울) 역할과 게시하지 않는 관계: 모델이 적은 문구와 함께. 다른 값으로 채우지 않는다. */
+function WithheldRoles({ detail }: { detail: CandidateDetail }) {
+  const rule = detail.rule;
+  if (!rule) return null;
+  const relations = detail.relations.filter((r) => rule.withheldRelations.includes(r.relationId));
+  const dropped = detail.relations.filter((r) => rule.droppedRelations.includes(r.relationId));
+  const roleCount = rule.withheldParticipants.length + relations.length;
+  return (
+    <section aria-labelledby="candidate-withheld" className="flex flex-col gap-2">
+      <h3 id="candidate-withheld" className="flex items-center gap-2 text-base font-semibold text-text-primary">
+        <ListChecks className="size-4 text-text-secondary" aria-hidden="true" />
+        {rule.applied ? "규칙이 비운 역할" : "규칙이 비울 역할"} {formatCount(roleCount)}
+      </h3>
+      {roleCount > 0 && (
+        <ul className="flex flex-col divide-y divide-border-subtle">
+          {rule.withheldParticipants.map((index) => {
+            const p = detail.mention.participants[index];
+            return (
+              <li key={`p-${index}`} className="flex flex-col py-2 text-base">
+                <span className="font-medium text-text-primary">{p?.name ?? `참여자 ${index + 1}`}</span>
+                <span className="text-sm text-text-secondary">참여자 · 모델이 적은 역할 “{p?.role || "–"}”</span>
+              </li>
+            );
+          })}
+          {relations.map((r) => (
+            <li key={r.relationId} className="flex flex-col py-2 text-base">
+              <span className="font-medium text-text-primary">{relationLabel[r.relationType as RelationType] ?? r.relationType}</span>
+              <span className="text-sm break-all text-text-secondary">
+                {r.source} → {r.target} · 모델이 적은 역할 “{r.role ?? "–"}”
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-sm text-text-secondary">사용자에게는 ‘역할 미확인’으로 보여요. 다른 값으로 채우지 않아요.</p>
+      {dropped.length > 0 && (
+        <>
+          <h3 className="mt-2 flex items-center gap-2 text-base font-semibold text-text-primary">
+            <ListChecks className="size-4 text-text-secondary" aria-hidden="true" />
+            {rule.applied ? "규칙이 게시하지 않은 관계" : "규칙이 게시하지 않을 관계"} {formatCount(dropped.length)}
+          </h3>
+          <ul className="flex flex-col divide-y divide-border-subtle">
+            {dropped.map((r) => (
+              <li key={r.relationId} className="flex flex-col py-2 text-base">
+                <span className="font-medium text-text-primary">{relationLabel[r.relationType as RelationType] ?? r.relationType}</span>
+                <span className="text-sm break-all text-text-secondary">
+                  {r.source} → {r.target}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-text-secondary">이 사건이 아직 일어나지 않은(계획·예정·예측) 일이라 앞선 사건의 후속으로 잇지 않아요.</p>
+        </>
+      )}
+    </section>
+  );
+}
+
 export function CandidatesPanel({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string | null) => void }) {
   const [status, setStatus] = useState<StatusFilter>("HOLD");
+  const [ruleOnly, setRuleOnly] = useState(false);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const candidates = useCandidates({ status, q: deferredQuery });
+  const candidates = useCandidates({ status, ruleOnly, q: deferredQuery });
   const first = candidates.data?.pages[0];
   const rows = candidates.data?.pages.flatMap((page) => page.items) ?? [];
   const counts = first?.counts;
@@ -48,6 +135,15 @@ export function CandidatesPanel({ selectedId, onSelect }: { selectedId: string |
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <Segmented aria-label="판정 상태" value={status} onValueChange={setStatus} options={options} />
+          <Segmented
+            aria-label="규칙 대상"
+            value={ruleOnly ? "rule" : "all"}
+            onValueChange={(value) => setRuleOnly(value === "rule")}
+            options={[
+              { value: "all", label: "모든 후보" },
+              { value: "rule", label: "규칙 대상만" },
+            ]}
+          />
           <Input
             label="후보 검색"
             hideLabel
@@ -96,7 +192,10 @@ export function CandidatesPanel({ selectedId, onSelect }: { selectedId: string |
                   <Td className="max-w-48 truncate text-text-secondary">{row.companies.map((c) => c.name).join(", ") || "–"}</Td>
                   <Td className="text-right">{formatCount(row.evidenceCount)}</Td>
                   <Td>
-                    <OnUserGraph on={row.onUserGraph} />
+                    <div className="flex flex-col items-start gap-1">
+                      <OnUserGraph on={row.onUserGraph} />
+                      <RuleBadge rule={row.rule} />
+                    </div>
                   </Td>
                   <Td>
                     <DecisionText decision={row.decision} />
@@ -175,6 +274,14 @@ function CandidateDetailView({ id, onClose }: { id: string; onClose: () => void 
         <dd>
           <OnUserGraph on={c.onUserGraph} />
         </dd>
+        {c.rule && (
+          <>
+            <dt className="text-sm text-text-secondary">자동 검수 규칙</dt>
+            <dd>
+              <RuleState rule={c.rule} />
+            </dd>
+          </>
+        )}
         <dt className="text-sm text-text-secondary">사건 시각</dt>
         <dd>
           <KstTime value={c.eventTime} />
@@ -269,6 +376,21 @@ function CandidateDetailView({ id, onClose }: { id: string; onClose: () => void 
                 <p className="text-sm break-all text-text-secondary">
                   {rel.source} → {rel.target}
                 </p>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
+                  {rel.role && <span>모델이 적은 역할 “{rel.role}”</span>}
+                  {c.rule?.withheldRelations.includes(rel.relationId) && (
+                    <Badge>
+                      <ListChecks aria-hidden="true" />
+                      규칙이 비움
+                    </Badge>
+                  )}
+                  {c.rule?.droppedRelations.includes(rel.relationId) && (
+                    <Badge>
+                      <ListChecks aria-hidden="true" />
+                      규칙이 게시하지 않음
+                    </Badge>
+                  )}
+                </p>
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"
@@ -294,6 +416,8 @@ function CandidateDetailView({ id, onClose }: { id: string; onClose: () => void 
           </ul>
         </section>
       )}
+
+      {c.rule && <WithheldRoles detail={c} />}
 
       <VerificationSection verification={c.verification} />
 

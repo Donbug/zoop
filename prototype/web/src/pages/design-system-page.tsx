@@ -1073,8 +1073,8 @@ export function DesignSystemPage() {
           <Demo
             id="c-price"
             name="PriceChange · SentimentLabel"
-            when="등락률은 색, 부호, ▲▼를 함께 써요. 시세가 없으면(지금 앱) 아무것도 그리지 않아요. 감성 4분류는 나중을 위한 규격이고, 확률 수치는 쓰지 않아요. 아래 숫자는 예시예요."
-            code={"<PriceChange changePercent={quote?.changePercent ?? null} />"}
+            when="등락은 색, 부호, ▲▼를 함께 써요. 기업 상세 시세·차트·평가 손익은 금액과 등락률을 같이(받은 통화 그대로), 값이 없으면 아무것도 그리지 않아요. 감성 4분류는 나중을 위한 규격이고, 확률 수치는 쓰지 않아요. 아래 숫자는 예시예요."
+            code={"<PriceChange change={quote.change} changePercent={quote.changeRate * 100} currency={quote.currency} />"}
           >
             <StateRow label="등락률">
               <PriceChange changePercent={2.34} />
@@ -1082,6 +1082,10 @@ export function DesignSystemPage() {
               <PriceChange changePercent={0} />
               <span className="text-sm text-text-secondary">null → (그리지 않음)</span>
               <PriceChange changePercent={null} />
+            </StateRow>
+            <StateRow label="금액 + 등락률">
+              <PriceChange change={5250} changePercent={1.96} currency="KRW" />
+              <PriceChange change={-13.61} changePercent={-1.84} currency="USD" />
             </StateRow>
             <StateRow label="감성">
               <SentimentLabel value="positive" />

@@ -12,7 +12,7 @@ from .config import Settings
 from .dataset import CompanyRec, Dataset, DatasetFormatError, build_dataset, parse_companies
 from .errors import SourceUnavailable
 from .graph_versions import GraphStore
-from .review import ReviewStore, apply_reviews
+from .review import ReviewStore
 
 log = logging.getLogger("zoop_bff.sources")
 
@@ -44,8 +44,9 @@ class PublishedSource:
         return self._active().id
 
     def stamp(self) -> object:
+        """(version id, review revision, (file stamp, rule revision)): the briefing service records the first two."""
         active = self._active()
-        return (active.id, self._reviews.revision(), self._store.file_stamp(active))
+        return (active.id, self._reviews.revision(), (self._store.file_stamp(active), self._reviews.rules.revision()))
 
     def warnings(self) -> list[str]:
         return self._store.warnings()
@@ -53,7 +54,7 @@ class PublishedSource:
     def load(self) -> tuple[dict[str, Any], str]:
         version = self._active()
         payload = self._store.read_payload(version)
-        return apply_reviews(payload, self._reviews.effective()), version.source_as_of
+        return self._reviews.apply(payload), version.source_as_of
 
 
 def _load_catalog(path: Path | None) -> tuple[list[CompanyRec], list[str], object]:

@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS review_decisions (
   payload TEXT
 );
 CREATE INDEX IF NOT EXISTS review_target ON review_decisions(target_type, target_id, id);
+-- Publication rule switches (review_rules.py): append-only; the newest row per rule is its state, no row = the rule's default.
+CREATE TABLE IF NOT EXISTS review_rule_changes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id TEXT NOT NULL, enabled INTEGER NOT NULL CHECK (enabled IN (0,1)), reason TEXT NOT NULL,
+  admin_id TEXT NOT NULL, admin_email TEXT NOT NULL, at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS review_rule_target ON review_rule_changes(rule_id, id);
 CREATE TABLE IF NOT EXISTS graph_versions (
   id TEXT PRIMARY KEY, sequence INTEGER NOT NULL UNIQUE, kind TEXT NOT NULL,
   created_at TEXT NOT NULL, created_by TEXT NOT NULL, reason TEXT, source_label TEXT NOT NULL,

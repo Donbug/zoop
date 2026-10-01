@@ -14,6 +14,7 @@ import { Link } from "react-router";
 import type { Schemas } from "@/api/client";
 import { useCompany, useEdge, useEvent, useEventsByIds } from "@/api/queries";
 import { Badge } from "@/components/ui/badge";
+import { ApprovalNote, RoleUnconfirmed } from "@/components/domain/approval-note";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { EventRow } from "@/components/domain/event-row";
 import type { GraphSelection } from "@/components/domain/graph-canvas";
@@ -307,6 +308,7 @@ function IssueDetailView({ issueId, nodes, edges, onSelect, onShowEvidence, link
         {formatEventTime(event.eventTime, event.timePrecision)}
         {event.period ? ` · 대상 기간 ${event.period}` : ""}
       </p>
+      <ApprovalNote approval={event.approval} className="px-4" />
       <Actions>
         {event.evidenceIds.length > 0 && (
           <Button variant="secondary" onClick={() => onShowEvidence({ title: event.title, evidenceIds: event.evidenceIds, eventId: event.id })}>
@@ -340,12 +342,12 @@ function IssueDetailView({ issueId, nodes, edges, onSelect, onShowEvidence, link
               {group.companies.map((c) => (
                 <li key={c.id}>
                   {nodeIds.has(c.id) ? (
-                    <ListRow leading={markFor(nodes, c.id, c.name)} title={c.name} description={c.role ?? undefined} onClick={() => onSelect({ kind: "node", id: c.id })} />
+                    <ListRow leading={markFor(nodes, c.id, c.name)} title={c.name} description={c.role ?? (c.roleUnconfirmed ? <RoleUnconfirmed /> : undefined)} onClick={() => onSelect({ kind: "node", id: c.id })} />
                   ) : (
                     <ListRow
                       leading={markFor(nodes, c.id, c.name)}
                       title={c.name}
-                      description={c.role ?? undefined}
+                      description={c.role ?? (c.roleUnconfirmed ? <RoleUnconfirmed /> : undefined)}
                       trailing={<ArrowUpRight className="size-4" role="img" aria-label="기업 상세로 이동" />}
                       to={`/companies/${encodeURIComponent(c.id)}`}
                       state={linkState}

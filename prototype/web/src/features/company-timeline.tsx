@@ -3,12 +3,14 @@
 //  - 같은 날짜의 사건이 여럿이면 날짜 묶음에 사건 수를 적고, 누르면 사건별 카드를 펼친다(사건을 합치지 않는다).
 //  - 사건 카드를 고르면 그 자리에서 상세가 열린다: 영향 경로(이 기업 ↔ 사건 ↔ 다른 기업 목록), 근거 문서, [지도에서 보기].
 //  - 기간·선택·펼친 묶음은 페이지가 주소로 관리한다. 이 파일은 받은 값을 그리고 바뀔 값을 알린다.
+//  - 주가 차트(company-price-chart)를 기간 도구 아래에 같은 기간·같은 거르기로 그리고, 차트의 사건 표시를 누르면 그 날짜 묶음을 펼쳐 옮긴다.
 import { CalendarClock, ChevronDown, Clock, FileText, Map as MapIcon, MessageCircleQuestion, Newspaper, Route, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Schemas } from "@/api/client";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useCompanies, useEvidenceItems } from "@/api/queries";
+import { ApprovalNote, RoleUnconfirmed } from "@/components/domain/approval-note";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { DocumentItem, documentRelationLabel } from "@/components/domain/document-item";
 import { IconCount } from "@/components/domain/event-row";
@@ -30,6 +32,7 @@ import {
 } from "@/lib/company-timeline";
 import { assertionStatusLabel, formatEventTime, formatKst, relationLabel, type RelationType } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { CompanyPriceChart } from "./company-price-chart";
 
 type Filter = "all" | "INVOLVES" | "STRUCTURALLY_RELATED_TO";
 
@@ -56,11 +59,14 @@ interface TimelineProps {
   onToggleGroup: (key: string) => void;
   onShowOnMap: (event: Schemas["EventDetail"]) => void;
   onAsk: (event: Schemas["EventDetail"]) => void;
+  /** 묶음들을 펼친다(이미 펼친 것은 그대로) */
+  onOpenGroups: (keys: string[]) => void;
 }
 
 export function CompanyTimeline(props: TimelineProps) {
   const { company, events, period, today, onPeriodChange, openGroups, onToggleGroup } = props;
   const [filter, setFilter] = useState<Filter>("all");
+  const [focusGroup, setFocusGroup] = useState<string | null>(null);
 
   const relationOf = new Map<string, RelationType>([
     ...(company?.structuralIssues ?? []).map((i) => [i.issueId, "STRUCTURALLY_RELATED_TO"] as const),
@@ -83,13 +89,16 @@ export function CompanyTimeline(props: TimelineProps) {
     </div>
   );
 
+  // 차트 표시용 날짜 묶음: 타임라인과 같은 거르기를 거친, 발생 시각이 있는 사건만.
+  const keepRelation = (e: Schemas["EventSummary"]) => filter === "all" || relationOf.get(e.id) === filter;
+  const chartGroups = events.data ? groupEvents(events.data.items.filter(keepRelation), [], today) : [];
+
   let body;
   if (events.isPending) body = <SkeletonRows count={3} label="사건 목록을 불러오고 있어요" />;
   else if (events.isError) body = <ErrorState error={events.error} title="사건 목록을 불러오지 못했어요" onRetry={() => void events.refetch()} />;
   else {
-    const keep = (e: Schemas["EventSummary"]) => filter === "all" || relationOf.get(e.id) === filter;
-    const items = events.data.items.filter(keep);
-    const undated = events.data.unknownTimeItems.filter(keep);
+    const items = events.data.items.filter(keepRelation);
+    const undated = events.data.unknownTimeItems.filter(keepRelation);
     const groups = groupEvents(items, undated, today);
     const hasMixedRelations = new Set([...items, ...undated].map((e) => relationOf.get(e.id))).size > 1;
     const total = items.length + undated.length;
@@ -119,7 +128,12 @@ export function CompanyTimeline(props: TimelineProps) {
               const expanded = !multi || openGroups.has(group.key) || groups.length === 1 || group.items.some((e) => e.id === props.selectedId);
               const listId = `group-${group.key}`;
               return (
-                <li key={group.key} className="grid grid-cols-1 gap-x-3 border-b border-border-subtle last:border-b-0 md:grid-cols-[8rem_minmax(0,1fr)]">
+                <li
+                  key={group.key}
+                  data-group-key={group.key}
+                  tabIndex={-1}
+                  className="grid scroll-mt-16 grid-cols-1 gap-x-3 border-b border-border-subtle last:border-b-0 md:grid-cols-[8rem_minmax(0,1fr)]"
+                >
                   <div className="flex items-center gap-1 px-3 pt-3 text-sm text-text-secondary tabular-nums md:items-start md:px-0 md:pt-4">
                     {group.unknown ? (
                       <>
@@ -183,10 +197,26 @@ export function CompanyTimeline(props: TimelineProps) {
     }
   }
 
+  // 차트 위 사건 표시: 날짜 묶음을 펼치고(주소 ?open=) 펼친 묶음이 그려진 뒤 그 묶음으로 옮겨 포커스한다.
+  const pickGroups = (keys: string[]) => {
+    setFocusGroup(keys[0]!);
+    props.onOpenGroups(keys);
+  };
+  useEffect(() => {
+    if (!focusGroup || !openGroups.has(focusGroup)) return;
+    const target = document.querySelector<HTMLElement>(`[data-group-key="${CSS.escape(focusGroup)}"]`);
+    setFocusGroup(null);
+    if (!target) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    target.focus({ preventScroll: true });
+  }, [focusGroup, openGroups]);
+
   return (
     <div className="flex flex-col gap-3 pt-2">
       <h2 className="sr-only">사건 타임라인</h2>
       {toolbar}
+      <CompanyPriceChart companyId={props.companyId} period={period} groups={chartGroups} onPick={pickGroups} />
       {body}
     </div>
   );
@@ -320,7 +350,7 @@ function EventDetailPanel({
           <p className="flex flex-wrap items-center gap-x-2 text-sm text-text-secondary">
             <EdgeGlyph type={c.relationType} className="w-6" />
             <span>{relationLabel[c.relationType]}</span>
-            {c.role && <span>· {c.role}</span>}
+            {c.role ? <span>· {c.role}</span> : c.roleUnconfirmed && <span className="inline-flex items-center gap-1">· <RoleUnconfirmed /></span>}
             {status && <span>· {assertionStatusLabel(status)}</span>}
           </p>
         </div>
@@ -336,6 +366,7 @@ function EventDetailPanel({
           : `발생 ${formatEventTime(event.eventTime, event.timePrecision)}`}
         {event.period ? ` · 대상 기간 ${event.period}` : ""}
       </p>
+      <ApprovalNote approval={event.approval} />
 
       <section aria-labelledby={`${id}-path`} className="flex flex-col gap-1">
         <h4 id={`${id}-path`} className="flex items-center gap-2 text-base font-semibold text-text-primary">

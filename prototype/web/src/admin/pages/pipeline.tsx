@@ -9,6 +9,7 @@ import { formatCount } from "../format";
 import { candidateStatusSpec, graphDbStatusSpec, Status } from "../labels";
 import { CandidatesPanel } from "../pipeline/candidates";
 import { JobsPanel } from "../pipeline/jobs";
+import { RulesPanel } from "../pipeline/rules";
 import { VersionsPanel } from "../pipeline/versions";
 import { AdminPageHeader, KstTime, Metric } from "../ui";
 
@@ -34,7 +35,11 @@ function Overview() {
           </span>
         }
       />
-      <Metric label="검수 대기(보류)" value={`${formatCount(o.review.holdPendingReview)}건`} detail={`검수 결정 ${formatCount(o.review.decisions)}건 · 리비전 ${o.review.revision}`} />
+      <Metric
+        label="검수 대기(보류)"
+        value={`${formatCount(o.review.holdPendingReview)}건`}
+        detail={`규칙 게시 사건 ${formatCount(o.review.ruleEvents)}건 · 검수 결정 ${formatCount(o.review.decisions)}건`}
+      />
       <Metric
         icon={GitBranch}
         label="사용자에게 보이는 버전"
@@ -79,6 +84,7 @@ export function AdminPipelinePage() {
     <>
       <AdminPageHeader title="이슈 관제" icon={Workflow} />
       <Overview />
+      <RulesPanel />
       <Tabs value={tab} onValueChange={(value) => update({ tab: value === "candidates" ? null : value })} className="flex flex-col gap-4">
         <TabsList className="max-w-xl">
           <TabsTrigger value="candidates">

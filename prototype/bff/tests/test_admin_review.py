@@ -72,7 +72,7 @@ def test_allowing_a_hold_candidate_publishes_it_marked_as_an_admin_approval(admi
     assert response.json()["onUserGraph"] is True
     assert HELD_ISSUE in _public_events(admin)
     event = admin.client.get(f"/api/events/{HELD_ISSUE}").json()
-    assert event["approval"] == {"source": "admin-review", "label": "관리자 승인", "scope": "issue"}
+    assert event["approval"] == {"source": "admin-review", "label": "관리자 승인", "scope": "issue", "ruleId": None}
     assert event["evidenceIds"], "the allowed issue keeps its original quote as evidence"
     other = admin.client.get(f"/api/events/{ALPHA_ISSUES['q1']}").json()
     assert other["approval"] is None  # PoC-approved issues carry no admin label

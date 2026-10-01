@@ -497,7 +497,10 @@ class AccountStore:
                     label,
                     connection.connected_at,
                     json.dumps(
-                        [{"company_id": h.company_id, "quantity": h.quantity, "avg_price": h.avg_price} for h in holdings],
+                        [
+                            {"company_id": h.company_id, "quantity": h.quantity, "avg_price": h.avg_price, "currency": h.currency}
+                            for h in holdings
+                        ],
                         ensure_ascii=False,
                     ),
                 ),

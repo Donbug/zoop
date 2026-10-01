@@ -77,6 +77,8 @@ interface ErrorStateProps {
   showBack?: boolean;
   /** 목록 한 칸처럼 좁은 자리 */
   compact?: boolean;
+  /** 서버가 사용자 말로 준 사유가 있으면 일반 문구 대신 쓴다(예: 시세 출처 일시 장애). */
+  message?: string;
   className?: string;
 }
 
@@ -94,9 +96,11 @@ export function describeError(error: unknown) {
   return { message: "예상하지 못한 문제가 생겼어요. 잠시 후 다시 시도해 주세요.", code: "unknown" };
 }
 
-export function ErrorState({ error, title = "정보를 불러오지 못했어요", onRetry, showBack, compact, className }: ErrorStateProps) {
+export function ErrorState({ error, title = "정보를 불러오지 못했어요", onRetry, showBack, compact, message: given, className }: ErrorStateProps) {
   const navigate = useNavigate();
-  const { message, code } = describeError(error);
+  const described = describeError(error);
+  const message = given ?? described.message;
+  const code = described.code;
   return (
     <div role="alert" className={cn("flex flex-col items-start gap-2", compact ? "py-2" : "py-8", className)}>
       <p className={cn("flex items-center gap-2 font-semibold text-text-primary", compact ? "text-base" : "text-lg")}>

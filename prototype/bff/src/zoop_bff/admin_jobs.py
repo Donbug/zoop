@@ -1,7 +1,8 @@
 """Job runner (requirements 76, 59): runs the real PoC CLI in the sandbox, one job at a time.
 
-``flush-graph`` (GraphDB projection retry, no model call) and ``retry-model-errors``
-(``poc run --live --retry-model-errors``, billable) are launched as child processes of the sandbox
+``flush-graph`` (GraphDB projection retry, no model call), ``retry-model-errors``
+(``poc run --live --retry-model-errors``, billable) and ``ingest-run`` (``poc run --live --dataset FILE``:
+process newly collected articles, billable, bounded by ``max_calls``) are launched as child processes of the sandbox
 interpreter. Job records live in the state database, so a BFF restart can settle jobs that were
 queued or running (``recover``). Secrets only exist in the child's environment; every line that
 reaches the API or the log tail is masked.
@@ -35,15 +36,21 @@ from .admin_schemas import (
     RunReport,
     SandboxInfo,
 )
-from .admin_usage import usage_from_report
+from .admin_usage import PAID_JOB_KINDS, usage_from_report
 from .audit import SYSTEM_STARTUP, Actor, AuditLog, Clock
 from .config import Settings
 from .errors import ApiError
 from .statedb import StateDb, dumps, utc_iso
 
-Kind = Literal["flush-graph", "retry-model-errors"]
-LABELS: dict[str, str] = {"flush-graph": "GraphDB 반영 재시도", "retry-model-errors": "모델 오류 재처리"}
-SANDBOX_SETTINGS = "zoop-real-relaxed-settings.json"
+Kind = Literal["flush-graph", "retry-model-errors", "ingest-run"]
+LABELS: dict[str, str] = {
+    "flush-graph": "GraphDB 반영 재시도",
+    "retry-model-errors": "모델 오류 재처리",
+    "ingest-run": "신규 기사 처리",
+}
+PAID_KINDS = PAID_JOB_KINDS  # the kinds that spend model calls
+DATASET_DIR = "zoop-expansion/datasets"  # inside the sandbox: article JSONL files the ingest-run job may read
+_DATASET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.jsonl")
 LOG_TAIL_LINES = 300
 _MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 _SECRET_KEY = re.compile(r"(KEY|SECRET|TOKEN|PASSWORD|PASSWD)", re.I)
@@ -161,7 +168,26 @@ class Sandbox:
 
     @property
     def settings_file(self) -> Path:
-        return self.path / SANDBOX_SETTINGS
+        return self.path / self._settings.poc_settings_file
+
+    @property
+    def datasets_dir(self) -> Path:
+        return self.path / DATASET_DIR
+
+    def datasets(self) -> list[str]:
+        try:
+            return sorted(p.name for p in self.datasets_dir.glob("*.jsonl") if _DATASET_NAME.fullmatch(p.name) and p.is_file())
+        except OSError:
+            return []
+
+    def dataset_path(self, name: str) -> Path | None:
+        """The dataset file for a plain name, or None (no directories, no symlink out of the datasets folder)."""
+        if not _DATASET_NAME.fullmatch(name):
+            return None
+        path = self.datasets_dir / name
+        if not path.is_file() or path.resolve().parent != self.datasets_dir.resolve():
+            return None
+        return path
 
     def problems(self, *, paid: bool) -> list[str]:
         problems: list[str] = []
@@ -173,7 +199,7 @@ class Sandbox:
             if not self.env_file.is_file():
                 problems.append("샌드박스에 .env가 없어 모델 호출 설정을 읽을 수 없습니다.")
             if not self.settings_file.is_file():
-                problems.append(f"샌드박스에 {SANDBOX_SETTINGS}가 없습니다.")
+                problems.append(f"샌드박스에 {self._settings.poc_settings_file}가 없습니다.")
         return problems
 
     def child_env(self, *, paid: bool) -> dict[str, str]:
@@ -249,6 +275,7 @@ class JobRecord:
     exit_code: int | None = None
     max_model_calls: int | None = None
     command: list[str] = field(default_factory=list)
+    dataset: str | None = None
     retry_of: str | None = None
     cancel_requested: bool = False
     recovered: bool = False
@@ -262,7 +289,7 @@ class JobRecord:
 
     @property
     def paid(self) -> bool:
-        return self.kind == "retry-model-errors"
+        return self.kind in PAID_KINDS
 
 
 def _record(row: Any) -> JobRecord:
@@ -358,6 +385,7 @@ class JobRunner:
         return JobOut(
             id=rec.id,
             kind=rec.kind,
+            dataset=rec.dataset,
             label=LABELS[rec.kind],
             paid=rec.paid,
             status=rec.status,  # type: ignore[arg-type]
@@ -457,6 +485,7 @@ class JobRunner:
                 path=str(self.sandbox.path),
                 problems=problems,
                 policy=policy,
+                datasets=self.sandbox.datasets(),
             ),
         )
 
@@ -470,8 +499,16 @@ class JobRunner:
         confirm_paid: bool | None,
         admin: Actor,
         retry_of: str | None = None,
+        dataset: str | None = None,
     ) -> tuple[JobOut, bool]:
-        paid = kind == "retry-model-errors"
+        paid = kind in PAID_KINDS
+        if kind == "ingest-run":
+            if dataset is None:
+                raise ApiError(422, "dataset_required", "신규 기사 처리에는 처리할 기사 파일(dataset)이 필요합니다.", {"datasets": self.sandbox.datasets()})
+            if self.sandbox.dataset_path(dataset) is None:
+                raise ApiError(422, "dataset_not_found", "샌드박스의 기사 파일 목록에 없는 파일입니다.", {"datasets": self.sandbox.datasets()})
+        elif dataset is not None:
+            raise ApiError(422, "dataset_not_allowed", "기사 파일(dataset)은 신규 기사 처리에서만 쓸 수 있습니다.")
         cap: int | None = None
         if paid:
             if confirm_paid is not True:
@@ -487,7 +524,7 @@ class JobRunner:
         with self._lock:
             active = self._active()
             if active is not None:
-                if active.kind == kind:
+                if active.kind == kind and active.dataset == dataset:
                     return self.to_out(active, with_log=False), True
                 raise ApiError(409, "job_in_progress", "다른 작업이 실행 중입니다. 끝난 뒤 다시 요청해 주세요.", {"jobId": active.id})
         problems = self.sandbox.problems(paid=paid)
@@ -507,7 +544,7 @@ class JobRunner:
         with self._lock:
             active = self._active()
             if active is not None:
-                if active.kind == kind:
+                if active.kind == kind and active.dataset == dataset:
                     return self.to_out(active, with_log=False), True
                 raise ApiError(409, "job_in_progress", "다른 작업이 실행 중입니다. 끝난 뒤 다시 요청해 주세요.", {"jobId": active.id})
             rec = self._insert(
@@ -518,7 +555,8 @@ class JobRunner:
                     requested_at=utc_iso(self._clock.now()),
                     max_model_calls=cap,
                     retry_of=retry_of,
-                    command=self._display_command(kind, cap),
+                    command=self._display_command(kind, cap, dataset),
+                    dataset=dataset,
                 )
             )
             self._audit.record(
@@ -550,12 +588,16 @@ class JobRunner:
             confirm_paid=confirm_paid,
             admin=admin,
             retry_of=rec.id,
+            dataset=rec.dataset,
         )
 
-    def _display_command(self, kind: Kind, cap: int | None) -> list[str]:
+    def _display_command(self, kind: Kind, cap: int | None, dataset: str | None = None) -> list[str]:
         if kind == "flush-graph":
             return ["poc", "flush-graph"]
-        return ["poc", "run", "--live", "--retry-model-errors", "--config", f"{SANDBOX_SETTINGS} (max_calls={cap})"]
+        config = f"{self._settings.poc_settings_file} (max_calls={cap})"
+        if kind == "ingest-run":
+            return ["poc", "run", "--live", "--config", config, "--dataset", f"{DATASET_DIR}/{dataset}"]
+        return ["poc", "run", "--live", "--retry-model-errors", "--config", config]
 
     # ---- execution
     def _spec(self, rec: JobRecord) -> LaunchSpec:
@@ -569,7 +611,13 @@ class JobRunner:
             base["max_calls"] = rec.max_model_calls  # the PoC stops calling the model at this count
             config = job_dir / "settings.json"
             config.write_text(json.dumps(base, ensure_ascii=False, indent=2), encoding="utf-8")
-            argv += ["run", "--live", "--retry-model-errors", "--config", str(config)]
+            if rec.kind == "ingest-run":
+                path = self.sandbox.dataset_path(rec.dataset or "")
+                if path is None:
+                    raise FileNotFoundError(rec.dataset)
+                argv += ["run", "--live", "--config", str(config), "--dataset", str(path)]
+            else:
+                argv += ["run", "--live", "--retry-model-errors", "--config", str(config)]
         return LaunchSpec(
             argv=argv,
             cwd=self.sandbox.path,

@@ -68,6 +68,7 @@ def dashboard(state: State) -> Dashboard:
         active_version=version_out(state, active) if active else None,
         review_revision=admin.reviews.revision(),
         review_decisions=len(effective),
+        rules=admin.pipeline.rules().items,
         graph_db=graph_db,
     )
 

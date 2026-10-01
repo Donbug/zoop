@@ -445,6 +445,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{id}/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quote
+         * @description Current price and indicators from the configured quote provider, with source and as-of time.
+         *
+         *     Separate from ``/companies/{id}`` so a slow or failing quote never blocks the company overview.
+         *     Missing values stay null; ``quote.derived`` lists values the BFF computed (e.g. market cap).
+         */
+        get: operations["get_quote_api_companies__id__quote_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Metrics
+         * @description General indicators (시가총액·PER·PBR·EPS·배당·외국인 소진율) from a separate public source, passed through as
+         *     given with each value's reference period. Independent of the price provider: a failure here leaves quotes alone.
+         */
+        get: operations["get_metrics_api_companies__id__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{id}/prices": {
         parameters: {
             query?: never;
@@ -452,7 +496,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Prices */
+        /**
+         * Get Prices
+         * @description Price chart for the same periods as the event timeline: the latest session's intraday bars (1d),
+         *     or daily bars from the timeline's period start (1m, 1y).
+         */
         get: operations["get_prices_api_companies__id__prices_get"];
         put?: never;
         post?: never;
@@ -811,6 +859,46 @@ export interface paths {
          * @description allow/reject a candidate or one of its relations. Repeating the effective decision is a no-op.
          */
         post: operations["decide_api_admin_pipeline_candidates__candidate_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/pipeline/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rules
+         * @description Publication rules (e.g. ``R1@2``): switch, what they cover, what they published, switch history.
+         */
+        get: operations["rules_api_admin_pipeline_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/pipeline/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch Rule
+         * @description Turn a rule on or off (reason required, audited). Asking for the state it is already in writes nothing.
+         */
+        put: operations["switch_rule_api_admin_pipeline_rules__rule_id__put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1469,16 +1557,21 @@ export interface components {
         ApprovalOut: {
             /**
              * Source
-             * @constant
+             * @enum {string}
              */
-            source: "admin-review";
+            source: "admin-review" | "review-rule";
             /**
              * Label
-             * @description Shown instead of PoC-validated provenance, e.g. '관리자 승인'
+             * @description Shown instead of PoC-validated provenance: '관리자 승인' or '자동 검수 규칙'
              */
             label: string;
             /** Scope */
             scope: string;
+            /**
+             * Ruleid
+             * @description Publication rule that put content on the graph (e.g. 'R1@2'); also set when an admin approval and a rule meet in one event
+             */
+            ruleId: string | null;
         };
         /** ArticleOut */
         ArticleOut: {
@@ -1903,6 +1996,7 @@ export interface components {
             /** Onusergraph */
             onUserGraph: boolean;
             decision: components["schemas"]["ReviewDecisionOut"] | null;
+            rule: components["schemas"]["CandidateRule"] | null;
             mention: components["schemas"]["CandidateMention"];
             /** Articles */
             articles: components["schemas"]["CandidateArticle"][];
@@ -2025,6 +2119,34 @@ export interface components {
             /** Onusergraph */
             onUserGraph: boolean;
             decision: components["schemas"]["ReviewDecisionOut"] | null;
+            rule: components["schemas"]["CandidateRule"] | null;
+        };
+        /**
+         * CandidateRule
+         * @description A candidate a publication rule covers: whether it is on the user graph through the rule, and what it leaves out.
+         */
+        CandidateRule: {
+            /** Ruleid */
+            ruleId: string;
+            /** Applied */
+            applied: boolean;
+            /** Notappliedreason */
+            notAppliedReason: ("admin_decision" | "rule_disabled" | "not_published") | null;
+            /**
+             * Withheldparticipants
+             * @description Indexes into the candidate's mention participants whose role is left out
+             */
+            withheldParticipants: number[];
+            /**
+             * Withheldrelations
+             * @description Relation ids whose role is left out
+             */
+            withheldRelations: string[];
+            /**
+             * Droppedrelations
+             * @description Relation ids the rule does not publish at all (a FOLLOWS whose follow-side event did not occur yet)
+             */
+            droppedRelations: string[];
         };
         /** ChatMessageRequest */
         ChatMessageRequest: {
@@ -2115,7 +2237,6 @@ export interface components {
             /** Structuralissues */
             structuralIssues: components["schemas"]["CompanyIssueRef"][];
             summary: components["schemas"]["Unavailable"];
-            price: components["schemas"]["Unavailable"];
             /**
              * Holding
              * @description null unless a member session is present
@@ -2202,6 +2323,11 @@ export interface components {
             /** Role */
             role: string | null;
             /**
+             * Roleunconfirmed
+             * @description The role text was left out because the PoC could not confirm it (rule R1)
+             */
+            roleUnconfirmed: boolean;
+            /**
              * Relationtype
              * @enum {string}
              */
@@ -2212,6 +2338,71 @@ export interface components {
             /** Items */
             items: components["schemas"]["CompanySummary"][];
             metadata: components["schemas"]["Metadata"];
+        };
+        /** CompanyMetrics */
+        CompanyMetrics: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "available";
+            /** Companyid */
+            companyId: string;
+            source: components["schemas"]["QuoteSourceOut"];
+            /**
+             * Asof
+             * @description Source time of the page the values came from; null when not given.
+             */
+            asOf: string | null;
+            /** Items */
+            items: components["schemas"]["MetricOut"][];
+        };
+        /** CompanyMetricsUnavailable */
+        CompanyMetricsUnavailable: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unavailable";
+            /** Companyid */
+            companyId: string;
+            /**
+             * Reasoncode
+             * @enum {string}
+             */
+            reasonCode: "not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed";
+            /** Reason */
+            reason: string;
+        };
+        /** CompanyQuote */
+        CompanyQuote: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "available";
+            /** Companyid */
+            companyId: string;
+            source: components["schemas"]["QuoteSourceOut"];
+            quote: components["schemas"]["QuoteValues"];
+        };
+        /** CompanyQuoteUnavailable */
+        CompanyQuoteUnavailable: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unavailable";
+            /** Companyid */
+            companyId: string;
+            /**
+             * Reasoncode
+             * @description not_connected: provider off or keys missing; unsupported_symbol; no_data: provider has nothing; auth_failed; temporary_failure: timeout, network, 429 or 5xx (retry later).
+             * @enum {string}
+             */
+            reasonCode: "not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed";
+            /** Reason */
+            reason: string;
         };
         /** CompanySeriesPoint */
         CompanySeriesPoint: {
@@ -2428,6 +2619,8 @@ export interface components {
             reviewRevision: number;
             /** Reviewdecisions */
             reviewDecisions: number;
+            /** Rules */
+            rules: components["schemas"]["ReviewRuleOut"][];
             graphDb: components["schemas"]["GraphDbStatus"] | null;
         };
         /** DashboardJobs */
@@ -3234,6 +3427,11 @@ export interface components {
             quantity: number;
             /** Avgprice */
             avgPrice: number;
+            /**
+             * Avgpricecurrency
+             * @description Currency of avgPrice; null when unknown (connections stored before it was recorded).
+             */
+            avgPriceCurrency: string | null;
             /** Costbasis */
             costBasis: number;
             /**
@@ -3328,7 +3526,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "flush-graph" | "retry-model-errors";
+            kind: "flush-graph" | "retry-model-errors" | "ingest-run";
+            /** Dataset */
+            dataset?: string | null;
             /** Reason */
             reason: string;
             /** Maxmodelcalls */
@@ -3382,7 +3582,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "flush-graph" | "retry-model-errors";
+            kind: "flush-graph" | "retry-model-errors" | "ingest-run";
+            /** Dataset */
+            dataset: string | null;
             /** Label */
             label: string;
             /** Paid */
@@ -3643,6 +3845,26 @@ export interface components {
              */
             graphVersion: string | null;
         };
+        /** MetricOut */
+        MetricOut: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "marketValue" | "per" | "eps" | "pbr" | "bps" | "dividendYieldRatio" | "dividend" | "foreignRate";
+            /** Label */
+            label: string;
+            /**
+             * Value
+             * @description As the source formats it (e.g. `1,609조 1,882억`, `12.35배`); never computed here.
+             */
+            value: string;
+            /**
+             * Basis
+             * @description The source's reference period for this value (e.g. `2026.06.`), when given.
+             */
+            basis: string | null;
+        };
         /** MockIdpConsent */
         MockIdpConsent: {
             /** State */
@@ -3753,7 +3975,9 @@ export interface components {
             /** Name */
             name: string;
             /** Role */
-            role: string;
+            role: string | null;
+            /** Roleunconfirmed */
+            roleUnconfirmed: boolean;
         };
         /** PastRun */
         PastRun: {
@@ -3834,16 +4058,31 @@ export interface components {
             asOf: string | null;
             metadata: components["schemas"]["Metadata"];
         };
-        /** PriceResponse */
-        PriceResponse: {
+        /** PricePoint */
+        PricePoint: {
             /**
-             * Status
-             * @default unavailable
-             * @constant
+             * Time
+             * @description Bar time (ISO 8601 with the exchange offset).
              */
-            status: "unavailable";
-            /** Reason */
-            reason: string;
+            time: string;
+            /** Open */
+            open: number;
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+            /** Close */
+            close: number;
+            /** Volume */
+            volume: number | null;
+        };
+        /** PriceSeries */
+        PriceSeries: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "available";
             /** Companyid */
             companyId: string;
             /**
@@ -3851,7 +4090,41 @@ export interface components {
              * @enum {string}
              */
             period: "1d" | "1m" | "1y";
-            metadata: components["schemas"]["Metadata"];
+            source: components["schemas"]["QuoteSourceOut"];
+            /** Currency */
+            currency: string;
+            /**
+             * Interval
+             * @description Bar size: `1m`/`5m` for the latest session (1d), `1d` otherwise.
+             */
+            interval: string;
+            /**
+             * Points
+             * @description Oldest first.
+             */
+            points: components["schemas"]["PricePoint"][];
+        };
+        /** PriceSeriesUnavailable */
+        PriceSeriesUnavailable: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "unavailable";
+            /** Companyid */
+            companyId: string;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "1d" | "1m" | "1y";
+            /**
+             * Reasoncode
+             * @enum {string}
+             */
+            reasonCode: "not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed";
+            /** Reason */
+            reason: string;
         };
         /** PublicationState */
         PublicationState: {
@@ -3869,6 +4142,82 @@ export interface components {
             version: components["schemas"]["GraphVersionOut"];
             /** Previousactiveversionid */
             previousActiveVersionId: string | null;
+        };
+        /** QuoteSourceOut */
+        QuoteSourceOut: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "toss" | "yahoo" | "naver";
+            /** Name */
+            name: string;
+            /**
+             * Official
+             * @description false for the unofficial keyless public endpoint
+             */
+            official: boolean;
+            /**
+             * Delaynote
+             * @description Set when quotes from this source may be delayed.
+             */
+            delayNote: string | null;
+            /**
+             * Symbol
+             * @description Provider symbol the values were fetched with (e.g. `005930.KS`).
+             */
+            symbol: string;
+            /**
+             * Url
+             * @description Provider page for the symbol to cross-check, when known.
+             */
+            url: string | null;
+        };
+        /** QuoteValues */
+        QuoteValues: {
+            /** Currency */
+            currency: string;
+            /** Price */
+            price: number;
+            /**
+             * Asof
+             * @description Provider time of the price (ISO 8601 with offset); null when not given.
+             */
+            asOf: string | null;
+            /** Previousclose */
+            previousClose: number | null;
+            /**
+             * Change
+             * @description price - previousClose
+             */
+            change: number | null;
+            /**
+             * Changerate
+             * @description (price - previousClose) / previousClose, a fraction
+             */
+            changeRate: number | null;
+            /** Dayhigh */
+            dayHigh: number | null;
+            /** Daylow */
+            dayLow: number | null;
+            /** Volume */
+            volume: number | null;
+            /** Fiftytwoweekhigh */
+            fiftyTwoWeekHigh: number | null;
+            /** Fiftytwoweeklow */
+            fiftyTwoWeekLow: number | null;
+            /**
+             * Marketcap
+             * @description Only when computable from the provider (price x sharesOutstanding).
+             */
+            marketCap: number | null;
+            /** Sharesoutstanding */
+            sharesOutstanding: number | null;
+            /**
+             * Derived
+             * @description camelCase fields the BFF computed from provider data rather than received as-is.
+             */
+            derived: string[];
         };
         /** ReasonRequest */
         ReasonRequest: {
@@ -3921,6 +4270,8 @@ export interface components {
             target: string;
             /** Role */
             role: string | null;
+            /** Roleunconfirmed */
+            roleUnconfirmed: boolean;
             /** Assertionstatus */
             assertionStatus: string | null;
             /** Evidenceids */
@@ -3938,6 +4289,16 @@ export interface components {
             rejected: number;
             /** Holdpendingreview */
             holdPendingReview: number;
+            /**
+             * Rulecandidates
+             * @description Candidates on the user graph through a publication rule right now
+             */
+            ruleCandidates: number;
+            /**
+             * Ruleevents
+             * @description Events on the user graph that exist only because of a publication rule
+             */
+            ruleEvents: number;
         };
         /** ReviewDecisionOut */
         ReviewDecisionOut: {
@@ -3968,6 +4329,39 @@ export interface components {
              * @enum {string}
              */
             origin: "admin" | "snapshot-migration";
+        };
+        /**
+         * ReviewRuleOut
+         * @description A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@2``.
+         */
+        ReviewRuleOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Defaultenabled */
+            defaultEnabled: boolean;
+            /** Changedat */
+            changedAt: string | null;
+            /** Changedby */
+            changedBy: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Eligible
+             * @description HOLD candidates of the active version the rule covers (ignoring the switch and admin decisions)
+             */
+            eligible: number;
+            /** Publishedcandidates */
+            publishedCandidates: number;
+            /** Publishedevents */
+            publishedEvents: number;
+            /** History */
+            history: components["schemas"]["RuleChangeOut"][];
         };
         /** RoundDetail */
         RoundDetail: {
@@ -4103,6 +4497,41 @@ export interface components {
             /** Dislikes */
             dislikes: number;
         };
+        /** RuleChangeOut */
+        RuleChangeOut: {
+            /** Id */
+            id: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason: string;
+            /** Adminemail */
+            adminEmail: string;
+            /** Changedat */
+            changedAt: string;
+        };
+        /** RuleList */
+        RuleList: {
+            /** Items */
+            items: components["schemas"]["ReviewRuleOut"][];
+            /** Asof */
+            asOf: string;
+        };
+        /** RuleSwitchRequest */
+        RuleSwitchRequest: {
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason: string;
+        };
+        /** RuleSwitchResponse */
+        RuleSwitchResponse: {
+            rule: components["schemas"]["ReviewRuleOut"];
+            /** Idempotent */
+            idempotent: boolean;
+            /** Reviewrevision */
+            reviewRevision: number;
+        };
         /** RunReport */
         RunReport: {
             /** Runid */
@@ -4140,6 +4569,8 @@ export interface components {
             /** Problems */
             problems: string[];
             policy: components["schemas"]["PolicyCheck"] | null;
+            /** Datasets */
+            datasets: string[];
         };
         /** SessionResponse */
         SessionResponse: {
@@ -6334,6 +6765,158 @@ export interface operations {
             };
         };
     };
+    get_quote_api_companies__id__quote_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyQuote"] | components["schemas"]["CompanyQuoteUnavailable"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_metrics_api_companies__id__metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyMetrics"] | components["schemas"]["CompanyMetricsUnavailable"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_prices_api_companies__id__prices_get: {
         parameters: {
             query?: {
@@ -6353,7 +6936,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PriceResponse"];
+                    "application/json": components["schemas"]["PriceSeries"] | components["schemas"]["PriceSeriesUnavailable"];
                 };
             };
             /** @description unauthenticated */
@@ -7422,6 +8005,7 @@ export interface operations {
                 decision?: ("none" | "allow" | "reject") | null;
                 active?: boolean | null;
                 published?: boolean | null;
+                rule?: boolean | null;
                 q?: string | null;
                 limit?: number;
                 cursor?: string | null;
@@ -7595,6 +8179,160 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionResponse"];
+                };
+            };
+            /** @description admin_auth_required / admin_session_expired: admin login needed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description admin_forbidden: a member or guest session cannot use admin APIs */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict (state does not allow the change) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description ledger_unavailable / source_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rules_api_admin_pipeline_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleList"];
+                };
+            };
+            /** @description admin_auth_required / admin_session_expired: admin login needed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description admin_forbidden: a member or guest session cannot use admin APIs */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict (state does not allow the change) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description ledger_unavailable / source_unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    switch_rule_api_admin_pipeline_rules__rule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleSwitchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSwitchResponse"];
                 };
             };
             /** @description admin_auth_required / admin_session_expired: admin login needed */

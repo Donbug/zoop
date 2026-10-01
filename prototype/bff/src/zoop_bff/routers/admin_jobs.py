@@ -37,6 +37,7 @@ def create_job(body: JobCreate, response: Response, state: State, admin: Admin) 
         max_model_calls=body.max_model_calls,
         confirm_paid=body.confirm_paid,
         admin=admin.actor,
+        dataset=body.dataset,
     )
     if deduplicated:
         response.status_code = 200

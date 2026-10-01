@@ -104,8 +104,11 @@ def test_company_pairs_are_only_derived_never_approved_edges(make_client):
 def test_summary_sentiment_and_price_are_unavailable_not_invented(make_client):
     client = make_client()
     company = client.get("/api/companies/SYNTH-ALPHA").json()
-    assert company["summary"]["status"] == "unavailable" and company["price"]["status"] == "unavailable"
-    assert client.get("/api/companies/SYNTH-ALPHA/prices?period=1y").json()["status"] == "unavailable"
+    assert company["summary"]["status"] == "unavailable" and "price" not in company
+    # No provider connected: quotes say why instead of returning empty or made-up values.
+    prices = client.get("/api/companies/SYNTH-ALPHA/prices?period=1y").json()
+    quote = client.get("/api/companies/SYNTH-ALPHA/quote").json()
+    assert prices["status"] == quote["status"] == "unavailable" and quote["reasonCode"] == "not_connected"
     assert client.get(f"/api/events/{ALPHA_ISSUES['q1']}").json()["summary"]["status"] == "unavailable"
 
 

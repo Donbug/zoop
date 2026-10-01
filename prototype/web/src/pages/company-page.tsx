@@ -1,5 +1,6 @@
 // UI-06 기업 상세(요구 35–41). 개요(머리글)·가상 보유·사건·문서·기업 정보를 각자 조회해 준비되는 대로 그리고,
 // 한 영역이 실패하면 그 영역만 오류와 [다시 시도]를 보인다(요구 54). 기업이 바뀌면 화면 상태를 통째로 새로 만든다(key).
+// 시세(현재가·지표)는 개요와 따로 조회하고, 주가 차트는 사건 탭에서 타임라인과 같은 기간으로 함께 바뀐다(요구 35·37).
 // 주소 상태(요구 41): ?tab=events|documents|info, ?period=1d|1m|1y(기본 1m), ?event=<사건>, ?open=<펼친 날짜 묶음>.
 //  - 탭·기간은 이력에 쌓고(push, 뒤로 가기로 되돌림), 사건 선택·묶음 펼침은 바꿔 쓴다(replace).
 //  - [지도에서 보기]는 시장 전체 지도에 ?select=node:<사건>&focus=<사건>&hops=1 로 사건과 연결 기업을 강조하고,
@@ -19,6 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { CompanyDocuments } from "@/features/company-documents";
 import { CompanyHolding } from "@/features/company-holding";
+import { CompanyMetrics } from "@/features/company-metrics";
+import { CompanyQuote } from "@/features/company-quote";
 import { CompanyTimeline } from "@/features/company-timeline";
 import { useOverlays } from "@/features/overlays";
 import { parsePeriod, periodFrom, todayKst, type Period } from "@/lib/company-timeline";
@@ -94,6 +97,11 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
       else open.add(key);
       if (open.size > 0) p.set("open", [...open].join(","));
       else p.delete("open");
+    }, true);
+  const openGroupsFor = (keys: string[]) =>
+    update((p) => {
+      const open = new Set([...openGroups, ...keys]);
+      p.set("open", [...open].join(","));
     }, true);
 
   // 선택 사건 확인: 다시 조회해 없어졌거나 이 기간 목록에 없으면 선택을 풀고 알린다.
@@ -210,6 +218,8 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
         />
       )}
       {!company.data && <h1 className="sr-only">기업 상세</h1>}
+      <CompanyQuote companyId={companyId} />
+      <CompanyMetrics companyId={companyId} />
       <CompanyHolding companyId={companyId} />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="flex flex-col gap-2">
@@ -242,6 +252,7 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
             onToggleGroup={toggleGroup}
             onShowOnMap={showOnMap}
             onAsk={ask}
+            onOpenGroups={openGroupsFor}
           />
         </TabsContent>
         <TabsContent value="documents">

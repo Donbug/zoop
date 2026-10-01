@@ -115,7 +115,8 @@ class EvidenceRec:
 class ParticipantRec:
     company_id: str | None
     name: str
-    role: str
+    role: str | None
+    role_unconfirmed: bool = False
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,7 @@ class RelationRec:
     assertion_status: str | None
     evidence_ids: tuple[str, ...]
     basis: tuple[BasisRec, ...]
+    role_unconfirmed: bool = False
 
 
 @dataclass(frozen=True)
@@ -196,17 +198,20 @@ class EdgeRec:
     relation_ids: tuple[str, ...]
     evidence_ids: tuple[str, ...]
     basis: tuple[BasisRec, ...]
+    role_unconfirmed: bool = False
 
 
 @dataclass(frozen=True)
 class ApprovalRec:
-    """Set only when an admin review (not the PoC validation alone) put content on the graph."""
+    """Set only when an admin review or a publication rule (not the PoC validation alone) put content on the graph."""
 
     source: str
     label: str
     scope: str
     candidate_ids: tuple[str, ...]
     relation_ids: tuple[str, ...]
+    rule_id: str | None = None
+    rule_candidate_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -244,6 +249,9 @@ class HoldingRec:
     company_id: str
     quantity: float
     avg_price: float
+    # Currency of avg_price (ISO 4217). None when unknown (e.g. connections stored before it existed);
+    # profit/loss is shown only when it matches the quote currency (never converted).
+    currency: str | None = None
 
 
 @dataclass(frozen=True)
@@ -332,14 +340,17 @@ def _str_or_none(value: Any) -> str | None:
 
 
 def _approval_rec(raw: Any) -> ApprovalRec | None:
-    if not isinstance(raw, dict) or raw.get("source") != "admin-review":
+    if not isinstance(raw, dict) or raw.get("source") not in ("admin-review", "review-rule"):
         return None
+    by_rule = raw["source"] == "review-rule"
     return ApprovalRec(
-        source="admin-review",
-        label=_str_or_none(raw.get("label")) or "관리자 승인",
+        source=raw["source"],
+        label=_str_or_none(raw.get("label")) or ("자동 검수 규칙" if by_rule else "관리자 승인"),
         scope=_str_or_none(raw.get("scope")) or "issue",
         candidate_ids=tuple(raw.get("candidate_ids") or ()),
         relation_ids=tuple(raw.get("relation_ids") or ()),
+        rule_id=_str_or_none(raw.get("rule_id")),
+        rule_candidate_ids=tuple(raw.get("rule_candidate_ids") or ()),
     )
 
 
@@ -418,7 +429,9 @@ def _parse_portfolios(items: Any) -> list[MockPortfolioRec]:
                 and h["avgPrice"] >= 0,
                 "zoop.mockPortfolios[].holdings[]: companyId, quantity>0 and avgPrice>=0 are required",
             )
-            holdings.append(HoldingRec(h["companyId"], h["quantity"], h["avgPrice"]))
+            currency = h.get("currency")
+            _expect(currency is None or isinstance(currency, str), "zoop.mockPortfolios[].holdings[].currency must be a string")
+            holdings.append(HoldingRec(h["companyId"], h["quantity"], h["avgPrice"], currency))
         result.append(MockPortfolioRec(item["id"], item["label"], tuple(holdings), "snapshot"))
     return result
 
@@ -556,7 +569,9 @@ def build_dataset(
                     period=None if "period" in blocked else _str_or_none(m.get("period")),
                     assertion_status=m.get("assertion_status") or "unknown",
                     participants=tuple(
-                        ParticipantRec(p.get("company_id"), p["name"], p["role"])
+                        ParticipantRec(
+                            p.get("company_id"), p["name"], _str_or_none(p.get("role")), bool(p.get("role_unconfirmed"))
+                        )
                         for p in m.get("participants") or []
                     ),
                     evidence_ids=tuple(dict.fromkeys(register(e, issue_id) for e in m.get("evidence") or [])),
@@ -589,6 +604,7 @@ def build_dataset(
                         )
                         for b in r.get("basis") or []
                     ),
+                    role_unconfirmed=bool(r.get("role_unconfirmed")),
                 )
             )
 
@@ -671,6 +687,7 @@ def build_dataset(
             relation_ids=tuple(r.relation_id for r in rels),
             evidence_ids=tuple(dict.fromkeys(e for r in rels for e in r.evidence_ids)),
             basis=tuple(basis.values()),
+            role_unconfirmed=not roles and any(r.role_unconfirmed for r in rels),
         )
         if rtype in COMPANY_LINKS and target not in companies:
             companies[target] = CompanyRec(target, target)
@@ -707,7 +724,8 @@ def build_dataset(
             portfolios["mock-basic"] = MockPortfolioRec(
                 "mock-basic",
                 "가상 계좌 예시",
-                tuple(HoldingRec(c, 10 * (i + 1), 50000 + 10000 * i) for i, c in enumerate(linked)),
+                # BFF-made mock values, defined in KRW.
+                tuple(HoldingRec(c, 10 * (i + 1), 50000 + 10000 * i, "KRW") for i, c in enumerate(linked)),
                 "bff-default",
             )
 

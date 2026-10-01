@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -83,6 +84,22 @@ def test_members_settings_and_sessions_survive_a_restart(tmp_path):
         tokens = [r[0] for r in db.execute("SELECT token_hash FROM member_sessions")]
     assert stored.startswith("scrypt$") and NEW["password"] not in stored
     assert cookie not in tokens
+
+
+def test_holding_currency_survives_restart_and_older_rows_read_as_unknown(tmp_path):
+    first = _client(tmp_path)
+    assert first.post("/api/auth/login", json=DEMO).status_code == 200
+    assert first.post("/api/portfolio/connections", json={"mockPortfolioId": "mock-basic"}).status_code == 201
+    assert {h["avgPriceCurrency"] for h in first.get("/api/portfolio").json()["holdings"]} == {"KRW"}
+    cookie = first.cookies.get("zoop_session")
+    # A connection stored before the currency was recorded: no migration, the currency is unknown.
+    with sqlite3.connect(tmp_path / "state" / "zoop-admin.sqlite3") as db:
+        raw = json.loads(db.execute("SELECT holdings FROM member_connections").fetchone()[0])
+        db.execute("UPDATE member_connections SET holdings = ?", (json.dumps([{k: v for k, v in h.items() if k != "currency"} for h in raw]),))
+    restarted = TestClient(create_app(_settings(tmp_path)))
+    restarted.cookies.set("zoop_session", cookie)
+    holdings = restarted.get("/api/portfolio").json()["holdings"]
+    assert holdings and all(h["avgPriceCurrency"] is None for h in holdings)
 
 
 def test_session_expires(tmp_path):

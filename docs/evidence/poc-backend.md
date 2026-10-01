@@ -114,3 +114,178 @@
 3. **One UI 해외 확대 `FOLLOWS` — 오승인, 공개 제외:** `issue-48bcf76304253fea001492e3 → issue-f571b945ddcd229404238448`의 원문은 “[국내 업데이트] 시작해 글로벌 시장으로 순차 확대한다”와 “지원 기기를 차례로 넓혀갈 계획이다”라고 한다. 같은 기사에서 향후 계획을 언급한 것으로 **별도의 이미 발생한 후속 사건**은 확인되지 않는다. 저장 인용은 정확히 일치하더라도 의미 승인은 별개다. 원장·투영에는 `ALLOW` 기록을 감사용으로 남기고 공개 스냅샷에서 해당 간선만 제외했다. [출처: [삼성전자 원문](https://news.samsung.com/kr/%ec%82%bc%ec%84%b1%ec%a0%84%ec%9e%90-one-ui-9-%ea%b3%b5%ec%8b%9d-%eb%b2%84%ec%a0%84-%ec%97%85%eb%8d%b0%ec%9d%b4%ed%8a%b8-%ec%8b%9c%ec%9e%91); 최종 fixture `review_exclusions`; 원장 조회 파일]
 
 **한계:** 웹 독립 교차 확인을 끄고 문턱을 낮춰 오승인 가능성이 상승했다. 동일 보도자료의 상품 시연 문장들이 여러 개의 개별 승인 이슈로 분할되는 사례가 있으므로 이슈 31개를 독립 뉴스 31건·기업의 실적 영향으로 해석하지 않는다. 선택 필드는 계속 독립 판정되며, 관계 근거·본문 이용 허가·최신 원문 일치는 계속 요구된다. 문서의 세 건은 사람 정답셋이나 전체 정확도 측정이 아니다. 미완료 `pending=4`와 추출 오류 3건은 사용자가 추가 모델 예산을 허용하기 전에는 재시도하지 않는다.
+
+
+## 10. 데이터 확장: 실제 기사 추가 수집과 새 원장
+
+시연 피드백 “기업과 이슈가 적어 핵심 기능이 잘 안 보인다”에 대응해 공식 출처의 실제 기사를 더 모으고, PoC 판정을 샌드박스에서 **실제로 실행**했다. 합성 기사는 쓰지 않았다. 총 유료 모델 호출은 사용자 승인 상한 2,000회 안이다(아래 10.5).
+
+### 10.1 원장 결정: 새 DB `investmate_zoop_real2`
+
+- **무엇이 바뀌나:** 카탈로그를 늘리면 `Settings.policy_for()`의 입력(`companies`)이 바뀌어 정책 해시가 `zoop-real-relaxed-no-web-1:e981aca589fd5113` → `zoop-real-expanded-no-web-1:36ec6aced1831382`로 달라진다. 추출 캐시 키(`prompts.extraction_cache_key`)도 카탈로그를 포함하므로 기존 기사의 추출·검증이 모두 새 키가 된다. [출처: 샌드박스 `src/investmate/domain.py:443-454`, `prompts.py:155-165`]
+- **기존 DB에 `activate-policy`를 하면(무료 명령으로 확인):** 기존 DB를 `pg_dump`로 임시 DB에 복사해 같은 명령(`poc activate-policy --expected-version zoop-real-relaxed-no-web-1:e981aca589fd5113 --live --config zoop-real-expanded-settings.json`)을 실행했다(모델 호출 0회). 활성 후보 `ALLOW 32 + HOLD 52`가 전부 `active=false`(`policy changed`)가 되어 사용자 이슈가 0건이 되고, 투영 취소 작업 178건이 outbox에 쌓였다. 코드 근거는 `storage.py:156-170`. 복사본은 확인 직후 삭제했고 원본은 전과 같다(`ALLOW t 32 / HOLD t 52`). 되돌리려면 같은 정책으로 400회 재처리가 필요하므로 **기존 DB는 그대로 두고 새 DB에서 기존 기사 18건과 신규 기사를 함께 처리**했다.
+- **격리:** Neo4j 투영은 `issue_id`(기사·버전·언급 ID 해시)가 같으면 덮어쓰므로, 새 원장 전용 컨테이너 `zoop-poc-neo4j-real2`(127.0.0.1:58474/58687, 볼륨 `zoop-poc_neo4j-real2-data`)를 `docker run`으로 따로 띄웠다. 기존 `zoop-poc-*` 컨테이너는 건드리지 않았다. 정책 값은 완화 정책 그대로(support 0.65, contradiction 0.10, reject 0.90, 웹 검증 없음).
+
+```bash
+docker volume create zoop-poc_neo4j-real2-data
+docker run -d --name zoop-poc-neo4j-real2 --restart unless-stopped -p 127.0.0.1:58474:7474 -p 127.0.0.1:58687:7687 \
+  -e NEO4J_AUTH=neo4j/investmate-local-only -v zoop-poc_neo4j-real2-data:/data neo4j:5.26-community
+docker exec zoop-poc-postgres-1 psql -U investmate -d postgres -c "CREATE DATABASE investmate_zoop_real2"
+# 샌드박스 zoop-expansion/real2.sh 는 DATABASE_URL/NEO4J_URI 만 새 원장으로 바꿔 .env의 모델 키를 쓴다
+zoop-expansion/real2.sh .venv/bin/poc init-db
+zoop-expansion/real2.sh .venv/bin/poc activate-policy --expected-version - --live --config zoop-real-expanded-settings.json
+```
+
+### 10.2 출처와 권한
+
+모든 본문은 PoC `SourceTools`(`read_document`)로 읽었다. 이 경로가 robots.txt, 호스트 허용 목록, 출처별 `allow_read_body`·`allow_model_send` 부여를 강제하며, `body_scope=full`인 문서만 썼다(부분 본문 제외). 출처 부여 설정은 샌드박스 `zoop-expansion/sources.json`이다.
+
+| 출처 | 호스트 | 구분 | 근거 | 사용 |
+|---|---|---|---|---|
+| NVIDIA 블로그·뉴스룸 | blogs.nvidia.com, nvidianews.nvidia.com | 기존 부여(§8) | robots.txt 허용으로 읽기 성공. **약관(www.nvidia.com Terms of Service, “Single Copy License”)은 로봇·스크레이퍼 접근과 복제를 금지**한다. 기존 18건과 같은 성격이라는 운영자 승인 아래 같은 부여를 이어 썼다 | 사용 |
+| 삼성전자 뉴스룸(국문·영문) | news.samsung.com | 기존 부여 | `robots.txt`: `Allow: /`. 영문 피드는 같은 호스트의 새 피드 URL | 사용 |
+| SK하이닉스 뉴스룸 | news.skhynix.com | 기존 부여 | robots 허용. **약관(Terms of Use)은 로봇 접근·복제를 금지**한다. 기존 부여를 이어 쓰되 1건만 | 사용(1건) |
+| OpenDART | opendart.fss.or.kr API | 기존 부여 | Open DART 이용약관: 저작권은 금융감독원, 저작권 관련은 저작권법·공공데이터법을 따른다. 본문은 API `document.xml`로 받았다(뷰어 `dart.fss.or.kr/dsaf001/main.do`는 robots가 금지하므로 쓰지 않았고 URL은 표기용) | 사용(5건) |
+| AMD IR, Arm 뉴스룸, Microsoft News Center, LG에너지솔루션, SK텔레콤, Meta, Google, HPE | 각 사이트 | **새 후보** | AMD “personal and/or informational purposes only”, Arm “복제·복사 금지(1부 참고용 출력만)”, Microsoft “non-commercial … will not be copied or posted on any network computer”, LGES “personal, non-commercial use, one copy”처럼 저장·외부 전송을 허용하지 않거나 불분명(HPE는 접속 시간 초과, 나머지는 약관 미확인) | **쓰지 않음**(수집한 사본도 삭제) |
+
+한계: 위 “기존 부여” 출처의 약관에도 복제·자동 수집 금지 문구가 있다. 이번 확장은 사용자가 승인한 “기존 18건과 같은 성격”의 범위에서만 했고, 팀 외부 배포나 상업 이용 전에는 출처별 허락을 다시 확인해야 한다.
+
+### 10.3 수집 절차와 선정 기준
+
+- 도구: 샌드박스 `zoop-expansion/acquire.py`(SourceTools 호출만), `build_datasets.py`(선정·배치 파일·수집 목록·카탈로그 생성). `src/`는 원본과 `diff -qr` 동일(10.8).
+- 피드: NVIDIA 블로그 피드 1~9쪽, 삼성 뉴스룸 국문 1~10쪽·영문 1~5쪽, SK하이닉스 영문 1~3쪽, OpenDART 공시 검색(2026-06-01~10-01, 한국 상장사 18개).
+- 선정(모델 호출 없는 문자열 일치): `body_scope=full`, 기존 18건 제외, 제목·본문에 후보 상장사 2곳 이상 등장(공시는 직접 고른 5건), 제품 출시·게임 소식 제외, 길이 1,000~16,000자. 비용이 큰 파트너 나열형 기사(25개 사 동시 등장 등)는 예비 배치로 돌려 이번 실행에서는 처리하지 않았다. 처리하지 않은 예비 18건은 아래 목록에서 제외했다.
+- 기간: 보도 시각 2026-05-18 ~ 2026-10-01(약 136일). 기존 18건은 2026-09-14~17(+연방관보 2건).
+
+처리 대상 신규 기사 35건(제목·게시자·보도 시각 UTC·URL, 권한 근거는 10.2의 출처 행):
+
+| # | 배치 | 게시자 | 보도일 | 제목 | URL |
+|---|---|---|---|---|---|
+| 1 | batch-01 | NVIDIA official blog | 2026-05-18 | NVIDIA CEO Jensen Huang at Dell Technologies World: ‘Demand Is Going P | https://blogs.nvidia.com/blog/dell-technologies-agent-enterprise-ai/ |
+| 2 | batch-01 | NVIDIA official blog | 2026-05-19 | NVIDIA and Google Cloud Empower the Next Wave of AI Builders | https://blogs.nvidia.com/blog/google-cloud-developer-community-ai-builders/ |
+| 3 | batch-01 | NVIDIA official blog | 2026-06-01 | Taiwan’s Industry Titans Turbocharge World’s AI Infrastructure Buildou | https://blogs.nvidia.com/blog/taiwan-ecosystem-ai-infrastructure/ |
+| 4 | batch-01 | NVIDIA official blog | 2026-06-01 | NVIDIA AI Cloud Ecosystem Expands Worldwide to Meet Global AI Compute  | https://blogs.nvidia.com/blog/ai-cloud-ecosystem/ |
+| 5 | batch-01 | NVIDIA official blog | 2026-06-02 | NVIDIA Partners With Microsoft on Unified Stack for Agentic AI Deploym | https://blogs.nvidia.com/blog/microsoft-build-windows-local-cloud-devices/ |
+| 6 | batch-01 | NVIDIA official blog | 2026-06-02 | Industrial Software Leaders Build Secure, Autonomous AI Engineers With | https://blogs.nvidia.com/blog/industrial-software-leaders-secure-autonomous-ai-engineers-nemoclaw/ |
+| 7 | batch-01 | NVIDIA official blog | 2026-06-05 | Seoul Purpose: How NVIDIA and South Korea Are Building the Future of A | https://blogs.nvidia.com/blog/korea-ecosystem-2026/ |
+| 8 | batch-01 | NVIDIA official blog | 2026-06-08 | NVIDIA and LG Group Build an AI Factory to Advance Physical AI, Mobili | https://blogs.nvidia.com/blog/nvidia-and-lg-group-ai-factory/ |
+| 9 | batch-01 | NVIDIA official blog | 2026-06-09 | NVIDIA Confidential Computing to Help Expand Apple’s Private Cloud Com | https://blogs.nvidia.com/blog/nvidia-confidential-computing-apple-private-cloud-compute/ |
+| 10 | batch-01 | NVIDIA official blog | 2026-06-16 | Fastest, Largest, Strongest: NVIDIA Blackwell Sweeps MLPerf Training 6 | https://blogs.nvidia.com/blog/blackwell-mlperf-training-6-0/ |
+| 11 | batch-01 | NVIDIA official blog | 2026-06-23 | NVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations | https://blogs.nvidia.com/blog/telecom-ai-agents-dtw-ignite-2026/ |
+| 12 | batch-01 | NVIDIA official blog | 2026-06-24 | NVIDIA and AWS Collaborate to Bring AI to Production at Scale | https://blogs.nvidia.com/blog/nvidia-aws-ai-production-scale/ |
+| 13 | batch-02 | NVIDIA official blog | 2026-06-29 | Open Models, Closed Environments: Palantir Brings Secure AI to US Agen | https://blogs.nvidia.com/blog/palantir-secure-ai-us-agencies-nemotron-open-models/ |
+| 14 | batch-02 | Samsung Electronics Newsroom | 2026-06-29 | 삼성, 협력회사와 상생 생태계 조성을 위한 협약 체결 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1-%ed%98%91%eb%a0%a5%ed%9a%8c%ec%82%ac%ec%99%80-%ec%83%81%ec%83%9d-%ec%83%9d%ed%83%9c%ea%b3%84-%ec%a1%b0%ec%84%b1%ec%9d%84-%ec%9c%84%ed%95%9c-%ed%98%91%ec%95%bd-%ec%b2%b4%ea%b2%b0 |
+| 15 | batch-02 | Samsung Electronics Newsroom | 2026-06-29 | 삼성, 미래 성장 위해 2,655조원 투자 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1-%eb%af%b8%eb%9e%98-%ec%84%b1%ec%9e%a5-%ec%9c%84%ed%95%b4-2655%ec%a1%b0%ec%9b%90-%ed%88%ac%ec%9e%90 |
+| 16 | batch-02 | NVIDIA official blog | 2026-06-29 | Claude Meets Blackwell Ultra: Anthropic’s Models Now Run on NVIDIA GB3 | https://blogs.nvidia.com/blog/anthropic-nvidia-gb300-blackwell-ultra-microsoft-azure/ |
+| 17 | batch-02 | Samsung Electronics Newsroom | 2026-06-30 | 삼성, 미래 성장 위해 호남에 425조원 투자 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1-%eb%af%b8%eb%9e%98-%ec%84%b1%ec%9e%a5-%ec%9c%84%ed%95%b4-%ed%98%b8%eb%82%a8%ec%97%90-425%ec%a1%b0%ec%9b%90-%ed%88%ac%ec%9e%90 |
+| 18 | batch-02 | Samsung Electronics Newsroom | 2026-07-02 | 삼성, 미래 성장 위해 충청에 140조원 투자 계획 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1-%eb%af%b8%eb%9e%98-%ec%84%b1%ec%9e%a5-%ec%9c%84%ed%95%b4-%ec%b6%a9%ec%b2%ad%ec%97%90-140%ec%a1%b0%ec%9b%90-%ed%88%ac%ec%9e%90-%ea%b3%84%ed%9a%8d |
+| 19 | batch-02 | Samsung Electronics Newsroom | 2026-07-03 | 삼성, 미래 성장 위해 영남에 60조원 투자 계획 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1-%eb%af%b8%eb%9e%98-%ec%84%b1%ec%9e%a5-%ec%9c%84%ed%95%b4-%ec%98%81%eb%82%a8%ec%97%90-60%ec%a1%b0%ec%9b%90-%ed%88%ac%ec%9e%90-%ea%b3%84%ed%9a%8d |
+| 20 | batch-02 | NVIDIA official blog | 2026-07-21 | Built for Vera Rubin, NVIDIA Spectrum-6 Arrives in Gigascale AI Factor | https://blogs.nvidia.com/blog/nvidia-spectrum-six-arrives-in-gigascale-ai-factories/ |
+| 21 | batch-02 | Samsung Electronics Newsroom | 2026-07-22 | 삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1%ec%a0%84%ec%9e%90-%ea%b0%a4%eb%9f%ad%ec%8b%9c-%ec%9b%8c%ec%b9%98-%ec%9a%b8%ed%8a%b8%eb%9d%bc2%c2%b7%ec%9b%8c%ec%b9%989-%ea%b3%b5%ea%b0%9c |
+| 22 | batch-02 | OpenDART | 2026-07-23 | [기재정정]타법인주식및출자증권취득결정 | https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260723801025 |
+| 23 | batch-02 | NVIDIA official blog | 2026-07-24 | At AI Summit, South Korea Outlines Its AI Future With NVIDIA and Partn | https://blogs.nvidia.com/blog/ai-summit-korea-partners-and-nvidia/ |
+| 24 | batch-02 | Samsung Electronics Newsroom | 2026-07-27 | 삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1%ec%a0%84%ec%9e%90-%ea%b0%a4%eb%9f%ad%ec%8b%9c-z-%ed%8f%b4%eb%93%9c8-%ec%9a%b8%ed%8a%b8%eb%9d%bc%c2%b7%ed%8f%b4%eb%93%9c8%c2%b7%ed%94%8c%eb%a6%bd8-%ea%b0%a4%eb%9f%ad%ec%8b%9c |
+| 25 | batch-03 | NVIDIA official blog | 2026-08-04 | As AI Increases Demands on Memory, Storage Steps Up | https://blogs.nvidia.com/blog/ai-storage-fms/ |
+| 26 | batch-03 | OpenDART | 2026-08-07 | 타법인주식및출자증권처분결정 | https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260807800838 |
+| 27 | batch-03 | OpenDART | 2026-08-11 | 투자판단관련주요경영사항 | https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260811800246 |
+| 28 | batch-03 | OpenDART | 2026-08-14 | 동일인등출자계열회사와의상품ㆍ용역거래변경 | https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260814003055 |
+| 29 | batch-03 | Samsung Electronics Newsroom | 2026-09-01 | 삼성전자, ‘New 갤럭시 북6’ 국내 출시 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1%ec%a0%84%ec%9e%90-new-%ea%b0%a4%eb%9f%ad%ec%8b%9c-%eb%b6%816-%ea%b5%ad%eb%82%b4-%ec%b6%9c%ec%8b%9c |
+| 30 | batch-03 | Samsung Electronics Newsroom | 2026-09-08 | 삼성전자, ASML과 차세대 반도체 제조 협력 확대 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1%ec%a0%84%ec%9e%90-asml%ea%b3%bc-%ec%b0%a8%ec%84%b8%eb%8c%80-%eb%b0%98%eb%8f%84%ec%b2%b4-%ec%a0%9c%ec%a1%b0-%ed%98%91%eb%a0%a5-%ed%99%95%eb%8c%80 |
+| 31 | batch-03 | Samsung Electronics Newsroom | 2026-09-23 | Samsung at the Forefront of Korea’s AI RAN Projects with KT and SK Tel | https://news.samsung.com/global/samsung-at-the-forefront-of-koreas-ai-ran-projects-with-kt-and-sk-telecom |
+| 32 | batch-03 | Samsung Electronics Newsroom | 2026-09-28 | Samsung, SK Telecom, and Hana Financial Group Build Korea’s First Priv | https://news.samsung.com/global/samsung-sk-telecom-and-hana-financial-group-buildkoreas-first-private-5g-smart-office-in-the-financial-sector |
+| 33 | batch-03 | Samsung Electronics Newsroom | 2026-09-29 | 삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자 | https://news.samsung.com/kr/%ec%82%bc%ec%84%b1-6%ea%b0%9c%ec%82%ac-%e7%be%8e-ai-%ec%9d%b8%ed%94%84%eb%9d%bc-%ea%b8%b0%ec%97%85-%ed%97%ac%eb%a6%ad%ec%8a%a4%ec%97%90-10%ec%96%b5-%eb%8b%ac%eb%9f%ac-%ed%88%ac%ec%9e%90 |
+| 34 | batch-03 | OpenDART | 2026-10-01 | [기재정정]단일판매ㆍ공급계약체결 | https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261001800119 |
+| 35 | batch-03 | SK hynix Newsroom | 2026-10-01 | Clarification Regarding Recent Media Reports on Solidigm | https://news.skhynix.com/en/fact-11/ |
+
+### 10.4 카탈로그와 로고
+
+- `fixtures/poc-real-companies.json`: 14 → 58개. 처리 기사 본문(기존 18건 포함)에 실제로 이름이 나온 상장사만 넣었다(문자열 일치 + 사람이 문맥 확인; 파트너 나열 속 1회 등장도 포함). id는 `KRX:005930`·`NASDAQ:NVDA`·`NYSE:GM`·`TSE:6702` 형식(시세 매핑 규칙과 동일). 기업 등록은 사건 참여·공급 관계의 증거가 아니며 `basis_edges`는 0개다.
+- 로고 18개 추가(Simple Icons 16.33.0, CC0 도형 데이터, 수정 없이 복사). 패키지에 없는 기업(SK하이닉스·Amazon·Microsoft·Micron·TSMC 등)은 모노그램을 그대로 쓴다. 목록·조건은 `web/public/logos/LICENSE.md`.
+
+### 10.5 실행 기록과 총 사용량
+
+실행은 모두 관리자 작업 러너의 새 작업 종류 `ingest-run`(“신규 기사 처리”: `poc run --live --config <작업별 settings> --dataset zoop-expansion/datasets/<파일>`)과 기존 `retry-model-errors`로 했고 BFF 포트 8823의 AI 사용량 화면에 기록됐다. 작업마다 `max_calls`를 걸었다. 샌드박스 `zoop-real-expanded-settings.json`의 `max_articles=20`, `max_retries=0`.
+
+| 작업 | 종류 | 입력 | 상한 | 처리 | 승인 | 보류 | 반려 | 대기 | 오류 | 호출 | 입력 토큰 | 출력 토큰 | 경과(초) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| job-0009 | retry-model-errors | (원장의 기사 전체) | 250 | 54 | 10 | 44 | 0 | 18 | 6 | 250 | 1,746,260 | 281,012 | 1655 |
+| job-0008 | ingest-run | batch-03.jsonl | 260 | 51 | 19 | 32 | 0 | 3 | 15 | 260 | 1,893,430 | 369,246 | 2296 |
+| job-0007 | ingest-run | batch-02.jsonl | 250 | 53 | 19 | 34 | 0 | 17 | 7 | 250 | 1,877,302 | 447,352 | 2900 |
+| job-0006 | ingest-run | batch-02.jsonl | 260 | 59 | 4 | 55 | 0 | 9 | 8 | 260 | 1,821,396 | 309,218 | 1907 |
+| job-0005 | ingest-run | batch-01.jsonl | 200 | 41 | 5 | 36 | 0 | 2 | 9 | 200 | 1,217,498 | 240,059 | 1692 |
+| job-0004 | ingest-run | batch-01.jsonl | 260 | 56 | 3 | 53 | 0 | 16 | 1 | 260 | 1,950,299 | 289,947 | 1553 |
+| job-0003 | retry-model-errors | (원장의 기사 전체) | 90 | 13 | 6 | 6 | 1 | 0 | 2 | 61 | 405,886 | 83,316 | 581 |
+| job-0002 | ingest-run | batch-00-initial-18.jsonl | 170 | 34 | 14 | 20 | 0 | 6 | 2 | 170 | 1,081,478 | 225,309 | 1350 |
+| job-0001 | ingest-run | batch-00-initial-18.jsonl | 260 | 46 | 22 | 24 | 0 | 11 | 1 | 260 | 1,960,588 | 329,783 | 1845 |
+
+- **총 모델 호출 1,971회**(상한 2,000), 입력 13,954,137·출력 2,575,242토큰. 웹 검색·외부 유료 도구 호출 0회, `estimated_cost`는 PoC가 `null`로 보고해 금액은 제공하지 않는다. 호출 수는 새 원장 `investmate.runs`의 보고서 합계와 같다.
+- 배치 00은 기존 18건을 새 정책으로 다시 처리한 비용이다(기존 완화 실행은 400회였다). 추출 실패(`evidence quote not found`, `repeated evidence quote`, 읽기 시간 초과)는 일부만 마지막 재처리에서 복구됐고 남은 오류는 10.7에 적었다.
+
+### 10.6 전후 규모(`/api/graph?mode=all`, 프로세스 내 측정)
+
+| 지표 | 확장 전(기존 fixture) | 확장 후(새 fixture) |
+|---|---:|---:|
+| 카탈로그 기업 | 14 | 58 |
+| 처리 기사 수 | 18 | 18 + 신규 21 = 39(승인 이슈에 연결된 기사 11 → 39) |
+| 원장 승인 이슈(규칙 R1 미적용) | 31(공개 30) | 95 |
+| 원장 승인 후보 / 전체 후보 | 32 / 149(활성 84) | 95 이슈 / 407 |
+| 승인 `INVOLVES`로 연결된 기업 | 3 | 19 |
+| 기업 2곳 이상을 잇는 승인 이슈 | 1 | 12 |
+| **사용자 그래프(규칙 R1 적용) 사건 노드** | 45 | **138** |
+| **연결된 기업 노드** | 7 | **26** |
+| 직접 관련 `INVOLVES` 간선 | 34 | 130(R1@1에서는 131, NVIDIA–AWS의 AMZN 관계 제외) |
+| 후속 사건 `FOLLOWS` 간선 | 0 | 2(R1@2: PoC 승인 1 + R1 발생 사건 1). R1@1에서는 9였고 그중 7이 계획 사건 |
+| 사건 공유 `SHARES_ISSUE`(기업 쌍) | 7 | 38(R1@1에서는 39) |
+
+“확장 전”은 저장소의 이전 `poc-real-inspect.json`+이전 카탈로그를 같은 BFF 코드(규칙 R1 포함)로 읽은 값이고, “확장 후”는 새 fixture+새 카탈로그의 `/api/graph?mode=all&limit=1000`(`truncated:false`)이다. 연결 없는 사건은 지도에 “연결 없는 사건 41”로 묶여 표시된다.
+
+### 10.7 수동 검수
+
+원문 인용과 대조한 표본 33건(후속 사건 FOLLOWS 전수 9건 + 기업 간 연결을 만드는 사건 24건, 원장 ALLOW·규칙 R1 공개분 포함). 판정 기준은 §9.3과 같다(인용이 관계를 직접 지지하는가, 후속 사건이 이미 발생했는가). **거부 8건**은 관리자 거부 기록(사유 포함, 8823 BFF 상태 DB `review_decisions` 1~8)으로 남겼고 스냅샷 `review_exclusions`에 같은 사유로 옮겼다(기존 제외 1건 포함 총 9건. 이후 #20의 AMZN 관계와 R1 공개 DART 후속 관계 1건을 더해 11건). 원장 ALLOW와 후보 감사 기록은 그대로다.
+
+| # | 사건 → 관계 | 인용 요지 | 판정 |
+|---|---|---|---|
+| 1 | NVIDIA·Apple Private Cloud Compute (`issue-d3e0cac8…`) INVOLVES NVIDIA·Apple | “NVIDIA GPUs … used for confidential inference in Apple’s PCC” | 적합 |
+| 2 | Apple Foundation Models (`issue-4ac67ce2…`) NVIDIA·Apple·Google | “server-side inference for Apple Foundation Models, custom-built by Apple and Google” | 적합 |
+| 3 | Palantir–NVIDIA Nemotron 폐쇄망 (`issue-79a15e59…`) | “Palantir announcement brings NVIDIA Nemotron open models into air-gapped environments” | 적합 |
+| 4 | 삼성전자·삼성SDS 구미 투자 (`issue-7b1d3400…`) | “삼성전자∙삼성SDS, 휴머노이드∙제조AX … 구축 예정” | 적합(계획 사건) |
+| 5 | SK Group–NVIDIA 5,000억 달러+ 파트너십 (`issue-a8d0521c…`) | “SK Group and NVIDIA today announced plans for a $500-billion-plus … partnership” | 적합(발표된 계획) |
+| 6 | 현대차그룹 피지컬 AI 전략 (`issue-d009f6f5…`) | “Hyundai Motor Group outlined a physical AI strategy anchored by a robot reference platform developed with NVIDIA” | 적합 |
+| 7 | NVIDIA DRIVE Hyperion–현대차그룹 (`issue-02cf2206…`) | “integration of NVIDIA DRIVE Hyperion …” | 적합 |
+| 8 | 삼성전자–ASML 대형 마스크 컨소시엄 (`issue-ab86647d…`) | “ASML이 주도하는 ‘대형 마스크 컨소시엄’에 참여하고 … 공동 개발” | 적합 |
+| 9 | 삼성전자–ASML High NA EUV 협력 (`issue-25ac3f6d…`) | “2028년까지 … High NA EUV 도입을 위한 협력도 강화할 계획” | 적합(계획) |
+| 10 | 삼성 AI RAN 계약 KT·SK텔레콤 (`issue-90249aed…`) | “signed contracts with KT and SK Telecom for their AI RAN projects” | 적합 |
+| 11 | 삼성–KT 사족보행 용접 로봇 (`issue-4ee47caf…`) | “Samsung will support KT with … NIS” | 적합 |
+| 12 | TSMC–NVIDIA CUDA-X (규칙 R1, `issue-403cdd9c…`) | “TSMC is applying NVIDIA CUDA-X libraries” | 적합(역할 비움) |
+| 13 | Wistron·NVIDIA·Cadence 번인 시뮬레이션 (R1, `issue-32a894ad…`) | “Wistron is using … NVIDIA Omniverse DSX Blueprint … and Cadence Reality DC Design” | 적합(Wistron은 미등록 비상장 표기) |
+| 14 | Palantir–NVIDIA 맞춤 모델 (R1, `issue-311fcc5c…`) | “Palantir will use NVIDIA Nemotron open models to build custom … models” | 적합 |
+| 15 | Claude(Microsoft Foundry)–NVIDIA GB300 (R1, `issue-48601196…`) | “Claude models in Microsoft Foundry — hosted on Azure … NVIDIA GB300 … generally available” | 적합 |
+| 16 | 삼성 6개사 헬릭스 10억 달러 투자 (R1, `issue-5076a08d…`) | “삼성전자와 삼성물산, 삼성SDS, 삼성SDI, 삼성생명, 삼성화재 등 6개사는 … 헬릭스 … 투자” | 적합(NVIDIA 연결은 같은 기사 언급 범위) |
+| 17 | 삼성·SK텔레콤·하나금융 사설 5G (R1, `issue-952cc29d…`) | “In collaboration with SK Telecom and Samsung, Hana Financial Group built …” | 적합 |
+| 18 | NVIDIA 스토리지·메모리 Storage-Next (R1, `issue-1f101747…`) | “NVIDIA and storage industry leaders are optimizing memory and storage … Storage-Next” | 적합(Micron 포함 나열) |
+| 19 | Spectrum-6 도입 기업 6곳 (R1, `issue-a64478a1…`) | “including CoreWeave, Microsoft, Nebius, OCI, SpaceXAI and Tesla — will be among the first to bring in Spectrum-6” | 적합(도입 예정) |
+| 20 | NVIDIA–AWS 벡터 인덱싱 (R1, `issue-99195142…`) | “It uses GPU-accelerated vector indexing, powered by NVIDIA cuVS” | **거부(관계 단위)**: 인용에 Amazon 명시 없음(대명사). `INVOLVES → AMZN`만 스냅샷 `review_exclusions`에 추가했다(R1@2는 관계 단위 제외를 적용해 사건·NVIDIA 연결은 남긴다) |
+| 21 | Koa 이미 사용 중 FOLLOWS Koa 발표 | “Koa is already running inside Salesforce, powering an employee agent in Slack” | 유지(주의: 발표와 동시 상태) |
+| 22 | One UI 9 해외 확대 FOLLOWS (`relation-c7d7570a…`) | “글로벌 시장으로 순차 확대한다 … 넓혀갈 계획” | **거부**: 계획 서술(기존 제외와 동일 사건 쌍) |
+| 23 | 맨체스터 모델 해상도 확대 FOLLOWS 학습 데이터 생성 (`relation-af3900ca…`) | “plans to further increase the resolution” | **거부**: 계획 |
+| 24 | 맨체스터 오픈소스 공개 FOLLOWS 학습 데이터 생성 (`relation-a76e7af0…`) | “plans to release open source training data” | **거부**: 계획 |
+| 25 | Koa 정식 출시 예정 FOLLOWS Koa 발표 (`relation-ea08d42d…`) | “General availability is expected winter 2026” | **거부**: 예측 |
+| 26 | Koa 정식 출시 예정 FOLLOWS Koa 사용 중 (`relation-758b0c3d…`) | 위와 같음 | **거부**: 예측 |
+| 27 | 갤럭시 워치 7/28 사전 판매 FOLLOWS 공개 (`relation-8c48d9ce…`) | “7월 28일 … 사전 판매 시작” (예정) | **거부**: 예정 |
+| 28 | 삼성SDI–GM 합작 종료 후 단독 운영 FOLLOWS (`relation-76e4169f…`) | “단독법인으로 운영할 계획” | **거부**: 계획 |
+| 29 | AI Summit 무대 행사 → Broadcom INVOLVES (`relation-9ebc5d7a…`) | “The sheer gravity of the global AI boom was displayed Friday on stage …” (Broadcom 미언급) | **거부**: 직접 근거 없음 |
+| 30 | 규칙 R1 FOLLOWS 6건(Koa 파일럿·갤럭시 워치 출시·KT/SKT 현장 시험·맨체스터 DGX Spark 등) | 대부분 `planned` 사건이 앞 사건의 후속으로 공개됨 | **해결(R1@2)**: 계획 사건 FOLLOWS 7개(Koa 파일럿 2·워치 출시 2·KT·SKT·DART 단독법인 계획)는 모두 부적합이라 R1@2가 발생(`occurred`)이 아닌 사건의 FOLLOWS를 게시하지 않는다. 맨체스터 DGX Spark(발생)는 적합이라 유지. DART 쌍은 `review_exclusions`에도 추가(`docs/evidence/review-policy.md` §6) |
+| 31 | 삼성 상업용 에어컨·기후박람회 등 삼성 단독 INVOLVES(기존 18건 재처리분) | 인용이 삼성전자의 행동을 직접 서술 | 적합(기업 간 연결 없음) |
+| 32 | SK하이닉스 입장문 INVOLVES (`relation-17e66057…`) | “nothing has been finalized regarding cooperation with any specific companies” | 적합(해명 사건, 협력 확정 아님) |
+| 33 | DART SK텔레콤 → SK hynix NAND Product Solutions 출자 | “SK hynix NAND Product Solutions Corp. 지분 확보 추진” | 적합(Solidigm 자회사, 카탈로그 밖 법인) |
+
+관측: 정확도 측정이 아니라 위 표본에 한한 점검이다. 거부 8건은 모두 “계획·예정을 후속 사건으로 승인”한 같은 유형이고, 기업 간 INVOLVES 표본 24건 중 명백한 오승인은 1건(#29)이었다.
+
+
+### 10.8 재현·검증과 남은 위험
+
+- 관리자 작업 러너 새 종류 `ingest-run`(`admin_jobs.py`, `admin_schemas.py`, `routers/admin_jobs.py`)과 `ZOOP_POC_SETTINGS`(`config.py`)를 추가하고 `tests/test_admin_jobs.py`에 동작 테스트 1개를 더했다. `uv run`과 같은 환경의 `pytest` 190개 통과(`PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests`, 21초). `tests/test_review_exclusions.py`는 실제 스냅샷 변형을 “모든 제외 항목이 공개에서 빠지고 감사에는 남는다”로 일반화했다(기존 id 고정 단언은 합성 fixture에만 둠).
+- 새 상태 디렉터리 BFF(8823, `ZOOP_SNAPSHOT_PATH`=새 fixture, `ZOOP_COMPANY_CATALOG`=새 카탈로그)와 웹(5273) 브라우저 스모크: 비회원으로 지도 진입 → 기업 26·사건 138·직접 관련 131·후속 사건 9·사건 공유 39 표시, 기업 상세 삼성전자(사건 27)·NVIDIA(46)·Apple(2)·현대자동차(3) 정상, 콘솔 오류 0. `pnpm typecheck` 통과, `src/api/schema.d.ts` 재생성.
+- 샌드박스 `src/`는 원본과 `diff -qr` 차이 없음(원본의 `.DS_Store`만 다름).
+- 남은 위험: (1) 이번 완화 정책(웹 검증 없음)의 신규 기사 ALLOW 비율은 낮고(NVIDIA 파트너 나열 기사 다수가 `title`·`role` 검사에서 보류) 기업 간 연결의 상당수는 규칙 R1(역할 비움)이 공개한다. (2) ~~R1이 공개한 계획·예측 `FOLLOWS`~~는 R1@2가 게시하지 않는다(#30). 단 앞 사건(target) 쪽 상태는 보지 않고, 발생 FOLLOWS 표본은 2건뿐이다. (3) 추출 실패(인용 위치 불일치·읽기 시간 초과) 기사 일부는 상한 때문에 복구하지 못했다(마지막 재처리 후 대기 18·오류 6). (4) 예비 18건과 25개 사 나열형 기사는 호출 예산 때문에 처리하지 않았다. (5) NVIDIA·SK하이닉스 약관의 자동 수집·복제 금지 문구(10.2). (6) 카탈로그는 이름 일치로 정했으므로 파트너 나열 속 1회 등장 기업도 있다. (7) 허브(NVIDIA 46·삼성전자 27)로 쏠린다. (8) 기존 제외 1건(`relation-021ae4e6…`)은 새 원장에 없는 id지만 같은 사건 쌍(One UI)을 새 id로 다시 제외했다.
+- 운영 메모: 기본 원장·Neo4j·설정이 새 값(`investmate_zoop_real2`·58687·`zoop-real-expanded-settings.json`)으로 바뀌었다. 이전 원장은 `ZOOP_ADMIN_POC_DSN=…/investmate_zoop_real ZOOP_ADMIN_NEO4J_URI=bolt://127.0.0.1:57687 ZOOP_POC_SETTINGS=zoop-real-relaxed-settings.json`으로 열 수 있다. 새 Neo4j 컨테이너가 꺼져 있으면 `docker start zoop-poc-neo4j-real2`.

@@ -31,9 +31,12 @@ export type Job = Schemas["JobOut"];
 export type Round = Schemas["RoundOut"];
 export type GraphDbStatus = Schemas["GraphDbStatus"];
 export type CandidateStatus = CandidateRow["status"];
+export type ReviewRule = Schemas["ReviewRuleOut"];
 
 export interface CandidateFilters {
   status: CandidateStatus | "ALL";
+  /** 자동 검수 규칙이 다루는 후보만 */
+  ruleOnly: boolean;
   q: string;
 }
 
@@ -47,6 +50,7 @@ export const adminKeys = {
   session: ["admin", "session"] as const,
   dashboard: ["admin", "dashboard"] as const,
   overview: ["admin", "pipeline", "overview"] as const,
+  rules: ["admin", "pipeline", "rules"] as const,
   candidates: (filters: CandidateFilters) => ["admin", "pipeline", "candidates", filters] as const,
   candidate: (id: string) => ["admin", "pipeline", "candidate", id] as const,
   versions: ["admin", "graph", "versions"] as const,
@@ -111,7 +115,7 @@ export function useCandidates(filters: CandidateFilters) {
     queryFn: ({ signal, pageParam }) =>
       adminApi<Schemas["CandidateList"]>("/api/admin/pipeline/candidates", {
         signal,
-        query: { status: filters.status === "ALL" ? undefined : filters.status, q: filters.q.trim(), limit: 50, cursor: pageParam },
+        query: { status: filters.status === "ALL" ? undefined : filters.status, rule: filters.ruleOnly ? "true" : undefined, q: filters.q.trim(), limit: 50, cursor: pageParam },
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
@@ -138,6 +142,24 @@ export function useDecideCandidate() {
   return useMutation({
     mutationFn: ({ id, ...body }: { id: string } & Schemas["DecisionRequest"]) =>
       adminApi<Schemas["DecisionResponse"]>(`/api/admin/pipeline/candidates/${encodeURIComponent(id)}/decision`, { method: "POST", body }),
+    onSuccess: () => refreshAfterGraphChange(client),
+  });
+}
+
+export function usePipelineRules() {
+  return useQuery({
+    queryKey: adminKeys.rules,
+    queryFn: ({ signal }) => adminApi<Schemas["RuleList"]>("/api/admin/pipeline/rules", { signal }),
+    refetchInterval: 10_000,
+  });
+}
+
+/** 규칙을 켜고 끄면 사용자 그래프가 바뀌므로 결정과 같이 관제·대시보드·사용자 그래프 캐시를 모두 새로 받는다. */
+export function useSwitchRule() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & Schemas["RuleSwitchRequest"]) =>
+      adminApi<Schemas["RuleSwitchResponse"]>(`/api/admin/pipeline/rules/${encodeURIComponent(id)}`, { method: "PUT", body }),
     onSuccess: () => refreshAfterGraphChange(client),
   });
 }

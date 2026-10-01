@@ -14,6 +14,7 @@ from .chat import ChatStore
 from .insights import Insights, build_insights
 from .config import Settings
 from .errors import ApiError
+from .market_data import MarketData
 from .sources import DataProvider
 
 
@@ -23,6 +24,7 @@ class AppState:
     provider: DataProvider
     admin: AdminServices
     accounts: AccountStore
+    market: MarketData
     chats: ChatStore = field(init=False)
     insights: Insights = field(init=False)
 

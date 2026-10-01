@@ -88,6 +88,7 @@ export const auditActionLabel: Record<string, string> = {
   "auth.login_failed": "로그인 실패",
   "auth.logout": "로그아웃",
   "review.decide": "검수 결정",
+  "review.rule": "검수 규칙 전환",
   "graph.publish": "그래프 게시",
   "graph.activate": "그래프 버전 전환",
   "graph.seed": "그래프 최초 등록",

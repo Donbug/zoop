@@ -9,7 +9,8 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Mapping
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from .admin_ledger import Ledger, Neo4jProbe
 from .admin_schemas import (
@@ -22,6 +23,7 @@ from .admin_schemas import (
     CandidateMention,
     CandidateRelation,
     CandidateRow,
+    CandidateRule,
     DecisionRequest,
     DecisionResponse,
     ErrorInfo,
@@ -37,6 +39,11 @@ from .admin_schemas import (
     PublicationState,
     ReviewCounts,
     ReviewDecisionOut,
+    ReviewRuleOut,
+    RuleChangeOut,
+    RuleList,
+    RuleSwitchRequest,
+    RuleSwitchResponse,
     VerdictOut,
     VerificationOut,
 )
@@ -50,7 +57,11 @@ from .review import (
     has_quote,
     published_candidate_ids,
     published_relation_ids,
+    rule_candidate_ids,
+    rule_candidates,
+    rule_event_count,
 )
+from .review_rules import RULE_R1, RULES, RuleDef, r1_effect
 from .statedb import utc_iso
 
 _INSPECT_TTL_SECONDS = 3.0
@@ -79,6 +90,15 @@ def _companies(mention: Mapping[str, Any]) -> list[CandidateCompany]:
     ]
 
 
+@dataclass(frozen=True)
+class _RuleView:
+    """What the candidate views need to tell how rule R1 stands: published through it, switch, admin decisions."""
+
+    applied: frozenset[str]
+    enabled: bool
+    decided: frozenset[str]
+
+
 class PipelineService:
     def __init__(
         self,
@@ -99,7 +119,7 @@ class PipelineService:
         self._lock = threading.Lock()
         self._inspect_cache: tuple[float, dict[str, Any]] | None = None
         self._projection_cache: tuple[float, GraphDbStatus] | None = None
-        self._effective_cache: tuple[Any, dict[str, Any]] | None = None
+        self._effective_cache: tuple[Any, dict[str, Any], int] | None = None
 
     # ---- ledger reads
     @property
@@ -122,21 +142,28 @@ class PipelineService:
             self._inspect_cache = None
             self._projection_cache = None
 
-    def effective_payload(self) -> dict[str, Any]:
-        """What users see right now: the active version with the review records applied."""
+    def _overlay(self) -> tuple[dict[str, Any], int]:
+        """(what users see right now, HOLD candidates rule R1 covers in the active version)."""
         self._graphs.ensure_seed()
         active = self._graphs.active()
         if active is None:
             raise ApiError(503, "source_unavailable", "게시된 그래프 버전이 없습니다.")
-        key = (active.id, self._reviews.revision())
+        key = (active.id, self._reviews.stamp())
         with self._lock:
             cached = self._effective_cache
             if cached is not None and cached[0] == key:
-                return cached[1]
-        payload = apply_reviews(self._graphs.read_payload(active), self._reviews.effective())
+                return cached[1], cached[2]
+        base = self._graphs.read_payload(active)
+        decisions = self._reviews.effective()
+        eligible = len(rule_candidates(base, decisions))
+        payload = apply_reviews(base, decisions, self._reviews.rules.enabled_ids())
         with self._lock:
-            self._effective_cache = (key, payload)
-        return payload
+            self._effective_cache = (key, payload, eligible)
+        return payload, eligible
+
+    def effective_payload(self) -> dict[str, Any]:
+        """What users see right now: the active version with the review records and enabled rules applied."""
+        return self._overlay()[0]
 
     # ---- GraphDB projection (requirement 76: 미반영 실측)
     def projection_status(self, *, fresh: bool = False) -> GraphDbStatus:
@@ -246,7 +273,9 @@ class PipelineService:
         articles = {a.get("article_id") for i in issues for a in i.get("articles") or []}
         effective = self._reviews.effective()
         active = self._graphs.active()
-        pending = self._pending_hold(rows, effective)
+        effective_payload = self.effective_payload()
+        by_rule = rule_candidate_ids(effective_payload)
+        pending = self._pending_hold(rows, effective, by_rule)
         ledger_ids = {i["issue_id"] for i in issues}
         active_payload = self._graphs.read_payload(active) if active else {}
         active_ids = {i["issue_id"] for i in active_payload.get("issues") or []}
@@ -274,6 +303,8 @@ class PipelineService:
                 allowed=sum(1 for d in effective if d.decision == "allow"),
                 rejected=sum(1 for d in effective if d.decision == "reject"),
                 hold_pending_review=pending,
+                rule_candidates=len(by_rule),
+                rule_events=rule_event_count(effective_payload),
             ),
             projection=self.projection_status(),
             publication=PublicationState(
@@ -286,8 +317,9 @@ class PipelineService:
         )
 
     @staticmethod
-    def _pending_hold(rows: list[dict[str, Any]], effective: list[Decision]) -> int:
-        decided = {d.target_id for d in effective if d.target_type == "candidate"}
+    def _pending_hold(rows: list[dict[str, Any]], effective: list[Decision], by_rule: set[str]) -> int:
+        """Active HOLD candidates nobody has decided and no rule has published."""
+        decided = {d.target_id for d in effective if d.target_type == "candidate"} | by_rule
         return sum(
             1
             for r in rows
@@ -295,7 +327,89 @@ class PipelineService:
         )
 
     def hold_pending_review(self) -> int:
-        return self._pending_hold(self.inspect().get("candidates") or [], self._reviews.effective())
+        by_rule = rule_candidate_ids(self.effective_payload())
+        return self._pending_hold(self.inspect().get("candidates") or [], self._reviews.effective(), by_rule)
+
+    # ---- publication rules (review_rules.py)
+    def _rule_view(self, effective_payload: Mapping[str, Any]) -> _RuleView:
+        decisions = self._reviews.effective()
+        return _RuleView(
+            applied=frozenset(rule_candidate_ids(effective_payload)),
+            enabled=RULE_R1 in self._reviews.rules.enabled_ids(),
+            decided=frozenset(d.target_id for d in decisions if d.target_type == "candidate"),
+        )
+
+    @staticmethod
+    def _candidate_rule(raw: Mapping[str, Any], view: _RuleView) -> CandidateRule | None:
+        """What rule R1 does with this ledger row, ``None`` when it does not cover it."""
+        effect = r1_effect(raw)
+        if effect is None:
+            return None
+        cid = raw["candidate"]["candidate_id"]
+        applied = cid in view.applied
+        reason: Literal["admin_decision", "rule_disabled", "not_published"] | None = None
+        if not applied:
+            if cid in view.decided:
+                reason = "admin_decision"
+            elif not view.enabled:
+                reason = "rule_disabled"
+            else:
+                reason = "not_published"  # the active version does not contain this candidate yet
+        return CandidateRule(
+            rule_id=RULE_R1,
+            applied=applied,
+            not_applied_reason=reason,
+            withheld_participants=list(effect.participants),
+            withheld_relations=list(effect.relations),
+            dropped_relations=list(effect.dropped),
+        )
+
+    def _rule_out(self, rule: RuleDef) -> ReviewRuleOut:
+        payload, eligible = self._overlay()
+        store = self._reviews.rules
+        current = store.current(rule.id)
+        return ReviewRuleOut(
+            id=rule.id,
+            title=rule.title,
+            summary=rule.summary,
+            enabled=store.enabled(rule.id),
+            default_enabled=rule.default_enabled,
+            changed_at=current.at if current else None,
+            changed_by=current.admin_email if current else None,
+            reason=current.reason if current else None,
+            eligible=eligible,  # R1 is the only rule, so every rule-published candidate and event is R1's
+            published_candidates=len(rule_candidate_ids(payload)),
+            published_events=rule_event_count(payload),
+            history=[
+                RuleChangeOut(id=c.id, enabled=c.enabled, reason=c.reason, admin_email=c.admin_email, changed_at=c.at)
+                for c in store.history(rule.id)
+            ],
+        )
+
+    def rules(self) -> RuleList:
+        return RuleList(items=[self._rule_out(rule) for rule in RULES.values()], as_of=utc_iso(self._clock.now()))
+
+    def switch_rule(self, rule_id: str, body: RuleSwitchRequest, admin: Actor) -> RuleSwitchResponse:
+        """Turn a publication rule on or off. Asking for the state it is already in writes nothing."""
+        rule = RULES.get(rule_id)
+        if rule is None:
+            raise ApiError(404, "rule_not_found", "규칙을 찾을 수 없습니다.", {"ruleId": rule_id})
+        previous = self._reviews.rules.enabled(rule_id)
+        change, idempotent = self._reviews.rules.switch(
+            rule_id, body.enabled, body.reason, admin_id=admin.id, admin_email=admin.email or admin.id
+        )
+        if not idempotent and change is not None:
+            self._audit.record(
+                admin,
+                "review.rule",
+                "review-rule",
+                rule_id,
+                reason=body.reason,
+                detail={"enabled": body.enabled, "previous": previous, "ruleRevision": change.id},
+            )
+        return RuleSwitchResponse(
+            rule=self._rule_out(rule), idempotent=idempotent, review_revision=self._reviews.revision()
+        )
 
     # ---- candidates
     def _row(
@@ -304,6 +418,7 @@ class PipelineService:
         *,
         published: set[str],
         decisions: Mapping[str, Decision],
+        rules: _RuleView,
     ) -> CandidateRow:
         cand = raw["candidate"]
         mention = cand["mention"]
@@ -334,6 +449,7 @@ class PipelineService:
             reasons=reasons,
             on_user_graph=cand["candidate_id"] in published,
             decision=decision_out(decision) if decision else None,
+            rule=self._candidate_rule(raw, rules),
         )
 
     def candidates(
@@ -343,13 +459,16 @@ class PipelineService:
         decision: str | None,
         active: bool | None,
         published: bool | None,
+        rule: bool | None,
         q: str | None,
         limit: int,
         cursor: str | None,
     ) -> CandidateList:
         payload = self.inspect()
         rows = list(reversed(payload.get("candidates") or []))  # the ledger orders oldest first
-        on_graph = published_candidate_ids(self.effective_payload())
+        effective_payload = self.effective_payload()
+        on_graph = published_candidate_ids(effective_payload)
+        rules = self._rule_view(effective_payload)
         decisions = {d.target_id: d for d in self._reviews.effective() if d.target_type == "candidate"}
         counts = {"ALLOW": 0, "HOLD": 0, "REJECT": 0, "inactive": 0}
         for r in rows:
@@ -367,6 +486,8 @@ class PipelineService:
             if active is not None and bool(r.get("active")) != active:
                 return False
             if published is not None and (cid in on_graph) != published:
+                return False
+            if rule is not None and (self._candidate_rule(r, rules) is not None) != rule:
                 return False
             if decision == "none" and cid in decisions:
                 return False
@@ -389,7 +510,7 @@ class PipelineService:
         limit = max(1, min(limit, _PAGE_MAX))
         page = matched[offset : offset + limit]
         return CandidateList(
-            items=[self._row(r, published=on_graph, decisions=decisions) for r in page],
+            items=[self._row(r, published=on_graph, decisions=decisions, rules=rules) for r in page],
             next_cursor=str(offset + limit) if offset + limit < len(matched) else None,
             counts=counts,
             as_of=utc_iso(self._clock.now()),
@@ -407,7 +528,7 @@ class PipelineService:
         on_graph = published_candidate_ids(effective_payload)
         on_graph_relations = published_relation_ids(effective_payload)
         decisions = {d.target_id: d for d in self._reviews.effective() if d.target_type == "candidate"}
-        base = self._row(raw, published=on_graph, decisions=decisions)
+        base = self._row(raw, published=on_graph, decisions=decisions, rules=self._rule_view(effective_payload))
         cand = raw["candidate"]
         mention = cand["mention"]
         validation = raw.get("validation") or {}

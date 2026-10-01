@@ -16,7 +16,6 @@ from .schemas import (
 )
 
 SUMMARY_UNAVAILABLE = "요약 생산자(PoC 범위 밖)가 아직 없습니다."
-PRICE_UNAVAILABLE = "시세 데이터 공급자가 아직 정해지지 않았습니다."
 SENTIMENT_UNAVAILABLE = "감성 평가 생산자(PoC 범위 밖)가 아직 없습니다."
 
 
@@ -98,6 +97,7 @@ def company_links(ds: Dataset, issue: IssueRec) -> list[CompanyLink]:
             id=e.target,
             name=company_name(ds, e.target),
             role=e.role,
+            role_unconfirmed=e.role_unconfirmed,
             relation_type=e.relation_type,  # type: ignore[arg-type]
         )
         for e in edges

@@ -73,6 +73,19 @@ class CandidateCompany(CamelModel):
     role: str
 
 
+class CandidateRule(CamelModel):
+    """A candidate a publication rule covers: whether it is on the user graph through the rule, and what it leaves out."""
+
+    rule_id: str
+    applied: bool
+    not_applied_reason: Literal["admin_decision", "rule_disabled", "not_published"] | None
+    withheld_participants: list[int] = Field(description="Indexes into the candidate's mention participants whose role is left out")
+    withheld_relations: list[str] = Field(description="Relation ids whose role is left out")
+    dropped_relations: list[str] = Field(
+        description="Relation ids the rule does not publish at all (a FOLLOWS whose follow-side event did not occur yet)"
+    )
+
+
 class CandidateRow(CamelModel):
     candidate_id: str
     issue_id: str
@@ -89,6 +102,7 @@ class CandidateRow(CamelModel):
     reasons: list[str]
     on_user_graph: bool
     decision: ReviewDecisionOut | None
+    rule: CandidateRule | None
 
 
 class CandidateList(CamelModel):
@@ -197,6 +211,47 @@ class DecisionResponse(CamelModel):
     review_revision: int
 
 
+class RuleChangeOut(CamelModel):
+    id: int
+    enabled: bool
+    reason: str
+    admin_email: str
+    changed_at: str
+
+
+class ReviewRuleOut(CamelModel):
+    """A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@2``."""
+
+    id: str
+    title: str
+    summary: str
+    enabled: bool
+    default_enabled: bool
+    changed_at: str | None
+    changed_by: str | None
+    reason: str | None
+    eligible: int = Field(description="HOLD candidates of the active version the rule covers (ignoring the switch and admin decisions)")
+    published_candidates: int
+    published_events: int
+    history: list[RuleChangeOut]
+
+
+class RuleList(CamelModel):
+    items: list[ReviewRuleOut]
+    as_of: str
+
+
+class RuleSwitchRequest(CamelModel):
+    enabled: StrictBool
+    reason: Reason
+
+
+class RuleSwitchResponse(CamelModel):
+    rule: ReviewRuleOut
+    idempotent: bool
+    review_revision: int
+
+
 class Neo4jStatus(CamelModel):
     status: Literal["reachable", "unreachable"]
     issues_in_ledger: int
@@ -274,6 +329,8 @@ class ReviewCounts(CamelModel):
     allowed: int
     rejected: int
     hold_pending_review: int
+    rule_candidates: int = Field(description="Candidates on the user graph through a publication rule right now")
+    rule_events: int = Field(description="Events on the user graph that exist only because of a publication rule")
 
 
 class PublicationState(CamelModel):
@@ -388,7 +445,8 @@ class JobError(CamelModel):
 
 class JobOut(CamelModel):
     id: str
-    kind: Literal["flush-graph", "retry-model-errors"]
+    kind: Literal["flush-graph", "retry-model-errors", "ingest-run"]
+    dataset: str | None
     label: str
     paid: bool
     status: Literal["queued", "running", "succeeded", "failed", "cancelled"]
@@ -437,6 +495,7 @@ class SandboxInfo(CamelModel):
     path: str
     problems: list[str]
     policy: PolicyCheck | None
+    datasets: list[str]  # ingest-run input files available in the sandbox (zoop-expansion/datasets/*.jsonl)
 
 
 class JobList(CamelModel):
@@ -448,7 +507,8 @@ class JobList(CamelModel):
 
 
 class JobCreate(CamelModel):
-    kind: Literal["flush-graph", "retry-model-errors"]
+    kind: Literal["flush-graph", "retry-model-errors", "ingest-run"]
+    dataset: str | None = None  # ingest-run only: article JSONL file name in the sandbox
     reason: Reason
     max_model_calls: StrictInt | None = None
     confirm_paid: StrictBool | None = None  # only a JSON true confirms a billable run
@@ -645,6 +705,7 @@ class DashboardGraph(CamelModel):
     active_version: GraphVersionOut | None
     review_revision: int
     review_decisions: int
+    rules: list[ReviewRuleOut]
     graph_db: GraphDbStatus | None
 
 

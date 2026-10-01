@@ -30,7 +30,7 @@ def _audit_relation(payload):
     return next(r for r in audit["candidate"]["relations"] if r["relation_id"] == RELATION)
 
 
-@pytest.mark.parametrize("path", SNAPSHOTS)
+@pytest.mark.parametrize("path", [SMALL])
 def test_reviewed_fixture_removes_public_relation_but_preserves_audit(path):
     payload = json.loads(path.read_text())
     exclusion = next(e for e in payload["review_exclusions"] if e["relation_id"] == RELATION)
@@ -50,6 +50,30 @@ def test_reviewed_fixture_removes_public_relation_but_preserves_audit(path):
         "FOLLOWS", SOURCE, TARGET
     )
     assert relation["evidence"]
+
+
+@pytest.mark.skipif(not REAL.exists(), reason="local reviewed snapshot not present")
+def test_every_exclusion_of_the_reviewed_real_snapshot_is_off_the_public_view_but_kept_in_the_audit():
+    payload = json.loads(REAL.read_text())
+    exclusions = payload["review_exclusions"]
+    assert exclusions
+    public = {r["relation_id"] for i in payload["issues"] for r in i["relations"]}
+    audit = {
+        r["relation_id"]: (c["candidate"]["candidate_id"], r)
+        for c in payload["candidates"]
+        for r in c["candidate"]["relations"]
+    }
+    for exclusion in exclusions:
+        assert exclusion["publication_decision"] == "EXCLUDED_AFTER_MANUAL_REVIEW"
+        assert exclusion["authority_decision"] == "ALLOW" and exclusion["reason"].strip()
+        assert exclusion["relation_id"] not in public
+        if exclusion["relation_id"] in audit:  # entries kept from an earlier ledger have no audit row here
+            candidate_id, relation = audit[exclusion["relation_id"]]
+            assert candidate_id in exclusion["candidate_ids"]
+            assert (relation["relation_type"], relation["source"], relation["target"]) == (
+                relation["relation_type"], exclusion["source"], exclusion["target"]
+            )
+            assert relation["evidence"]
 
 
 @pytest.mark.parametrize("path", SNAPSHOTS)
@@ -115,3 +139,29 @@ def test_snapshot_exclusion_is_migrated_to_a_review_record_that_filters_a_reintr
     state = client.app.state.zoop.admin
     migrated = state.reviews.current("relation", RELATION)
     assert migrated is not None and (migrated.decision, migrated.origin) == ("reject", "snapshot-migration")
+
+
+@pytest.mark.skipif(not REAL.exists(), reason="local reviewed snapshot not present")
+def test_no_excluded_relation_reaches_a_user_event_even_when_a_publication_rule_published_its_candidate(make_client):
+    payload = json.loads(REAL.read_text())
+    client = make_client(payload)
+    excluded = {e["relation_id"]: e for e in payload["review_exclusions"]}
+    items = client.get("/api/events").json()["items"]
+    seen = set()
+    ruled_issues = {}
+    for item in items:
+        event = client.get(f"/api/events/{item['id']}").json()
+        seen |= {r["id"] for r in event["relations"]}
+        if event["approval"] and event["approval"]["source"] == "review-rule":
+            ruled_issues[item["id"]] = event
+    assert not seen & set(excluded)
+    # Entries about a candidate a rule published: the event is there, only the excluded relation is not.
+    audit = {c["candidate"]["candidate_id"]: c for c in payload["candidates"]}
+    by_rule = [e for e in excluded.values() if e["issue_id"] in ruled_issues and audit[e["candidate_ids"][0]]["status"] == "HOLD"]
+    assert by_rule, "the reviewed snapshot has exclusions on rule-published candidates"
+    for entry in by_rule:
+        event = ruled_issues[entry["issue_id"]]
+        if entry["target"].startswith("issue-"):
+            assert all(f["id"] != entry["target"] for f in event["follows"]["previous"])
+        else:
+            assert entry["target"] not in {c["id"] for c in event["companies"]}

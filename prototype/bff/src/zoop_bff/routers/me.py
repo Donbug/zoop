@@ -28,7 +28,7 @@ from . import ERROR_RESPONSES
 router = APIRouter(prefix="/api", tags=["me"], responses=ERROR_RESPONSES)
 SETTINGS_BY = "bff-mock-settings"
 PORTFOLIO_BY = "bff-mock-portfolio"
-VALUATION_UNAVAILABLE = "시세 공급자가 없어 평가금액을 계산할 수 없습니다. 비중은 매입금액 기준입니다."
+VALUATION_UNAVAILABLE = "보유 목록에는 시세를 붙이지 않아 평가금액이 없습니다(기업 상세에서 종목별로 제공). 비중은 매입금액 기준입니다."
 
 
 def settings_response(user: UserState) -> SettingsResponse:
@@ -176,9 +176,10 @@ def get_portfolio(user: Member, state: State) -> PortfolioResponse:
                 ticker=company.ticker if company else None,
                 quantity=h.quantity,
                 avg_price=h.avg_price,
+                avg_price_currency=h.currency,
                 cost_basis=cost,
                 weight=round(cost / total, 6) if total else 0.0,
-                market_value=Unavailable(reason="시세 공급자가 없습니다."),
+                market_value=Unavailable(reason="보유 목록에는 시세를 붙이지 않습니다(기업 상세 시세 참고)."),
             )
         )
     return PortfolioResponse(

@@ -4,8 +4,8 @@ InvestMate PoC([`Donbug/investmate-poc`](https://github.com/Donbug/investmate-po
 
 - PoC는 **읽기 전용**이다. 비공개 저장소의 고정 커밋을 git 의존성으로 설치한다(`pyproject.toml`의 `[tool.uv.sources]`, 조직 구성원은 `gh auth setup-git` 필요). 이 서버는 PoC DB에 `inspect(None)`과 몇 개의 SELECT만 실행한다. PoC 원장을 바꾸는 일은 BFF가 아니라 관리자 작업이 띄우는 PoC CLI(샌드박스)만 한다.
 - **사용자가 보는 그래프 = 활성 게시 버전(불변 스냅샷) + 관리자 검수 기록**이다. 사용자 API는 PoC DB를 직접 읽지 않는다(`ZOOP_SOURCE=live`는 폐지). 관리자가 원장에서 새 버전을 게시해야 사용자 화면이 바뀐다. 관리자 API는 아래 "관리자 API·운영".
-- PoC에 없는 데이터(요약·감성·시세)는 지어내지 않고 `{"status":"unavailable","reason":...}`로 응답한다. 인증·계좌·관심종목·브리핑 편성·AI 예시 답변은 BFF mock/규칙이며 응답 `metadata.generatedBy`로 표시한다.
-- `HOLD`/`REJECT`는 관리자가 허용하기 전에는 어떤 사용자 응답에도 나오지 않는다(`inspect().issues`만 사용, `candidates`는 모순 검사에만 사용). 관리자가 허용한 HOLD는 사건 상세의 `approval`(`관리자 승인`)로 표시된다.
+- PoC에 없는 데이터(요약·감성)는 지어내지 않고 `{"status":"unavailable","reason":...}`로 응답한다. 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)에서 받아 출처·기준 시각과 함께 주고, 없으면 사유와 함께 `unavailable`이다. 인증·계좌·관심종목·브리핑 편성·AI 예시 답변은 BFF mock/규칙이며 응답 `metadata.generatedBy`로 표시한다.
+- `HOLD`/`REJECT`는 관리자가 허용하기 전에는 어떤 사용자 응답에도 나오지 않는다(`inspect().issues`만 사용, `candidates`는 모순 검사에만 사용). 예외는 **켜져 있는 자동 검수 규칙 R1@2가 다루는 HOLD 후보**(보류 사유가 역할 문구뿐인 후보, 아래 "관제·검수·그래프 버전")뿐이다. 관리자가 허용한 HOLD는 사건 상세의 `approval`(`관리자 승인`), 규칙이 게시한 사건은 `approval`(`자동 검수 규칙`)로 표시된다.
 - 소스 장애는 빈 결과로 위장하지 않고 `503 {"error":{"code":"source_unavailable",...}}`로 응답한다.
 
 ## 실행
@@ -32,15 +32,22 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | `ZOOP_SOURCE` | (없음) | **폐지.** `live`로 두면 기동이 실패한다(사용자 API가 PoC DB를 직접 읽지 않는다) |
 | `ZOOP_SNAPSHOT_PATH` | `fixtures/poc-synthetic-inspect.json` | inspect 형태 JSON. **상태 디렉터리가 비어 있을 때 한 번** `v1`(kind `seed`)로 등록된다. 이후 파일을 바꿔도 v1은 그대로이며 `/api/health`의 `warnings`에 차이가 표시된다(새 상태 디렉터리나 관리자 게시를 사용) |
 | `ZOOP_STATE_DIR` | `prototype/bff/var/` | 관리자 상태(SQLite `zoop-admin.sqlite3`: 감사 로그·검수 기록·그래프 버전 메타·작업·브리핑 회차·AI 사용 기록)와 버전 파일(`graph/vN.json`, 읽기 전용), 작업 로그(`jobs/`). 인스턴스마다 따로 쓴다 |
-| `ZOOP_ADMIN_POC_DSN` | PoC `compose.yaml`의 로컬 전용 접속 `…@127.0.0.1:55432/investmate_zoop_real` | 관리자 원장(실뉴스 DB). 응답·로그에 DSN을 노출하지 않는다 |
-| `ZOOP_ADMIN_NEO4J_URI` / `_USER` / `_PASSWORD` | `bolt://127.0.0.1:57687` / `neo4j` / compose 로컬 값 | GraphDB 반영 상태 비교(읽기 전용)와 작업 러너에 주는 접속 |
+| `ZOOP_ADMIN_POC_DSN` | PoC `compose.yaml`의 로컬 전용 접속 `…@127.0.0.1:55432/investmate_zoop_real2` | 관리자 원장(확장 실뉴스 DB, `docs/evidence/poc-backend.md` §10). 이전 원장은 `…/investmate_zoop_real`. 응답·로그에 DSN을 노출하지 않는다 |
+| `ZOOP_ADMIN_NEO4J_URI` / `_USER` / `_PASSWORD` | `bolt://127.0.0.1:58687`(확장 원장 전용 컨테이너 `zoop-poc-neo4j-real2`; 이전 원장은 57687) / `neo4j` / compose 로컬 값 | GraphDB 반영 상태 비교(읽기 전용)와 작업 러너에 주는 접속 |
 | `ZOOP_POC_SANDBOX` | `~/.local/share/zoop/investmate-sandbox` | PoC 작업을 실행하는 샌드박스(아래 "샌드박스") |
+| `ZOOP_POC_SETTINGS` | `zoop-real-expanded-settings.json` | 샌드박스 안의 PoC 설정 파일 이름(디렉터리 불가). 작업이 이 정책으로 실행되고 `sandbox.policy` 비교도 이 파일로 한다. 이전 정책은 `zoop-real-relaxed-settings.json` |
 | `ZOOP_ADMIN_MAX_MODEL_CALLS` | `200` | 유료 작업 한 번의 모델 호출 상한(요청 기본 50, 최소 1). 이 값이 50보다 작으면 기본도 이 값 |
 | `ZOOP_ADMIN_IDLE_SECONDS` / `ZOOP_ADMIN_ABSOLUTE_SECONDS` | `1800` / `28800` | 관리자 세션 유휴·절대 만료 |
 | `ZOOP_BRIEFING_SCHEDULER` | `true` | BFF 안 스케줄러(07:40·18:10 KST). 테스트는 끈다 |
 | `ZOOP_COMPANY_CATALOG` | 소스 체크아웃: 같은 부모 폴더의 `InvestMateLogicTest/examples/synthetic/settings.json`(PoC 저장소를 다른 이름으로 받았다면 이 변수로 지정) | 최상위 `companies` 배열이 있는 JSON(PoC settings.json 형태). 실제 기사 시연은 `fixtures/poc-real-companies.json`. 기업 표시 확장 키(`brand_color`·`logo`·`brand_source`)는 아래 "기업 카탈로그 확장 키". 읽지 못하면 `/api/health`의 `warnings`에 표시하고 계속한다 |
 | `ZOOP_CORS_ORIGINS` | 위 목록 | 쉼표 구분. 빈 문자열이면 CORS 미들웨어를 끈다 |
 | `ZOOP_COOKIE_SECURE` | `false` | `true`면 쿠키에 `Secure` |
+| `ZOOP_QUOTE_PROVIDER` | `auto` | `auto`(토스 키가 있으면 토스, 없거나 토스 미지원 종목은 Yahoo) / `toss` / `yahoo` / `off`. 아래 "시세". 코드에서 `Settings()`를 직접 만들면 `off`(테스트가 네트워크에 닿지 않게) |
+| `ZOOP_TOSS_CLIENT_ID` / `ZOOP_TOSS_CLIENT_SECRET` | (없음) | 토스증권 Open API 키. 둘 다 있어야 쓴다. 저장소·로그·응답에 남기지 않는다 |
+| `ZOOP_TOSS_BASE_URL` / `ZOOP_YAHOO_BASE_URL` | `https://openapi.tossinvest.com` / `https://query1.finance.yahoo.com` | 시세 출처 주소(장애 주입·가짜 서버용) |
+| `ZOOP_QUOTE_TIMEOUT_SECONDS` | `5` | 시세·지표 요청 시간 초과(최소 0.5) |
+| `ZOOP_METRICS_PROVIDER` | `naver` | 주요 지표 출처. `off`면 끈다. 코드에서 `Settings()`를 직접 만들면 꺼져 있다 |
+| `ZOOP_NAVER_DOMESTIC_URL` / `ZOOP_NAVER_WORLD_URL` / `ZOOP_NAVER_AC_URL` | `https://m.stock.naver.com` / `https://api.stock.naver.com` / `https://ac.stock.naver.com` | 지표 출처 주소(장애 주입용) |
 
 경로 이식성 개선은 `prototype/bff/src` 소스 체크아웃 배치에 한정된다. 패키지 설치에서는 `ZOOP_COMPANY_CATALOG`를 명시한다. 상대 경로 환경변수는 실행 시 작업 디렉터리 기준이다. `pyproject.toml`과 `uv.lock`의 PoC 의존성 절대 경로는 아직 남아 있으며, 설치 이식성은 검증하지 않았다.
 
@@ -78,13 +85,15 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | GET | `/api/me/recommendations?limit=` | 관심종목 추천: 활성 그래프의 승인 사건 수가 많은 기업(`reason:"승인된 사건 N건"`), 이미 관심인 기업 제외. 산업·테마 추천은 생산자가 없어 없다 |
 | GET | `/api/portfolio/mock-portfolios` | **명세 추가 제안.** 연결 가능한 가상 계좌 `{id,label,holdingsCount}` |
 | POST | `/api/portfolio/connections` `{mockPortfolioId}` | 201. 같은 프로필 재전송은 기존 연결 200(중복 연결 없음). 미지 ID 404 `mock_portfolio_not_found`, 다른 프로필이 연결돼 있으면 409 `already_connected` |
-| GET | `/api/portfolio` | 보유 종목·수량·평균단가·매입금액·비중·asOf(연결 시각, 상태 DB에 함께 저장). 시세가 없어 `valuation`/`marketValue`는 unavailable, `weightBasis:"cost"`(비중은 **매입금액 기준**) |
+| GET | `/api/portfolio` | 보유 종목·수량·평균단가와 그 통화(`avgPriceCurrency`, 모르면 `null`: 이 필드 전에 저장된 연결)·매입금액·비중·asOf(연결 시각, 상태 DB에 함께 저장). 보유 목록에는 시세를 붙이지 않아 `valuation`/`marketValue`는 unavailable(평가 금액은 기업 상세에서 `/quote`로), `weightBasis:"cost"`(비중은 **매입금액 기준**) |
 | DELETE | `/api/portfolio/connections/{id}` | 204 |
 | GET | `/api/graph?mode=all|personal&companyId=&depth=1..6&limit=` | 아래 "그래프". `depth`를 생략하면 중심에서 닿는 연결 요소 전체 |
 | GET | `/api/graph/edges/{id}` | 방향·유형·역할·`summary`·assertionStatus·근거 ID·basis·검증 상태. 파생 간선은 `via` 이슈와 직접 관계가 아니라는 설명 |
 | GET | `/api/companies?q=&limit=` | **명세 추가 제안.** 관심종목 선택용 검색(id·이름·티커·별칭 부분일치). 항목에 `brandColor`·`logoUrl` |
-| GET | `/api/companies/{id}` | `directIssues`(INVOLVES 역방향, `role`), `structuralIssues`(`basis`), `brandColor`·`logoUrl`, `summary`/`price` unavailable, `holding`/`watch`(회원만, 아니면 `null`) |
-| GET | `/api/companies/{id}/prices?period=1d|1m|1y` | 항상 unavailable |
+| GET | `/api/companies/{id}` | `directIssues`(INVOLVES 역방향, `role`), `structuralIssues`(`basis`), `brandColor`·`logoUrl`, `summary` unavailable, `holding`/`watch`(회원만, 아니면 `null`). 시세는 늦거나 실패해도 개요를 막지 않도록 `/quote`로 따로 준다 |
+| GET | `/api/companies/{id}/quote` | 현재가·통화·기준 시각(`asOf`)·전일 종가·전일 대비(`change`, `changeRate` 비율)·당일 고저·거래량·52주 고저·시가총액(받거나 계산할 수 있을 때만)·`derived`(BFF 계산 항목)와 `source`(공급자·이름·공식 여부·`delayNote`·종목 기호·확인 URL). 없으면 `unavailable`+`reasonCode`. 아래 "시세" |
+| GET | `/api/companies/{id}/prices?period=1d|1m|1y` | 주가 차트 `points[]`(`time`·OHLC·`volume`, 오래된 순)·`interval`·`currency`·`source`. 없으면 `unavailable`+`reasonCode` |
+| GET | `/api/companies/{id}/metrics` | 주요 지표 `items[]`(`code`·`label`·`value` 출처 표기 그대로·`basis` 기준 기간)와 `source`·`asOf`(지표 출처 시각). 시세와 출처가 다르다. 없으면 `unavailable`+`reasonCode`. 아래 "주요 지표" |
 | GET | `/api/companies/{id}/documents` | 기업 상세 문서 탭. 이 기업 승인 사건들의 근거 기사를 **중복 없이 최신 발행순**(발행 시각 미상은 뒤)으로. 문서마다 `events[]`(사건 id·제목·`relationType` REPORTS/PROVIDES_BACKGROUND)와 저장한 인용 `quotes[]`(근거 id·인용·`quoteVerified`). `url`이 없으면 `null` 그대로 |
 | GET | `/api/events?companyId=&from=&to=` | 사건 목록(최신 사건순). 항목 `reportedAt` = 기사 발행 시각 중 가장 늦은 것(사건 시각으로 쓰지 않음). 아래 "시간" |
 | GET | `/api/events/{id}` | mentions·articles·relations·companies·sourceSupport·fieldDecisions·evidenceIds·follows(이전/다음)·`summary` unavailable |
@@ -182,8 +191,38 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | **PoC (승인 원장)** | 이슈(사건) ID·제목·행동·대상·`event_time`·`period`·`assertion_status`·참여 기업 역할, 기사(제목·발행처·URL·발행일), 관계 5종(`REPORTS`/`PROVIDES_BACKGROUND`→기사 목록, `INVOLVES`/`STRUCTURALLY_RELATED_TO`/`FOLLOWS`→그래프), 근거(인용·위치·기사 버전), `basis`, `source_support`, `field_decisions` | `inspect().issues` |
 | PoC + 카탈로그 | 기업 이름·티커·별칭, 표시용 `brandColor`·`logoUrl`(카탈로그에 있을 때만) | PoC `settings.json` companies < snapshot `zoop.companies` < 승인 언급의 participants 이름 < 기업 ID(이 순서로 덮어씀). 같은 `company_id`는 뒤 항목이 레코드째 덮어쓴다(필드 병합 없음) |
 | BFF 파생 | 기업–기업 `SHARES_ISSUE`, 근거 ID, `quoteVerified`, 시간 정밀도, 간선 ID, 정렬 | 승인 데이터에서 계산 |
-| **unavailable** | 사건·기업 요약(`summary`), 감성, 시세·가격(`price`, `/prices`), 평가금액, 브리핑 예측 평가 | 생산자 없음 |
-| **BFF mock/규칙** | 인증·세션, 설정, 가상 계좌(`mockPortfolios`), 관심종목, 브리핑 편성, AI 예시 답변 | `metadata.generatedBy` |
+| **시세 공급자** | 현재가·전일 대비·지표(`/quote`), 주가 차트(`/prices`) | 토스증권 Open API 또는 Yahoo Finance 공개 차트(아래 "시세"). 출처·기준 시각·지연 여부를 응답에 담고, BFF 계산값은 `quote.derived`에 적는다 |
+| **unavailable** | 사건·기업 요약(`summary`), 감성, 보유 목록의 평가금액(`/api/portfolio`), 브리핑 예측 평가 | 생산자 없음 |
+| **BFF mock/규칙** | 인증·세션, 설정, 가상 계좌(`mockPortfolios`, 평균 매입가 통화 `avgPriceCurrency`: 기본 `mock-basic`은 KRW로 정의), 관심종목, 브리핑 편성, AI 예시 답변 | `metadata.generatedBy` |
+
+## 시세 (요구 35·36·37·72)
+
+`ZOOP_QUOTE_PROVIDER`로 고른다. 실패는 빈 값이 아니라 `{"status":"unavailable","reasonCode","reason"}`이며 `reasonCode`는 `not_connected`(꺼짐·키 없음) / `unsupported_symbol`(출처가 다루지 않는 종목) / `no_data`(출처는 답했지만 그 기간 자료 없음) / `auth_failed`(토스 인증 실패) / `temporary_failure`(시간 초과·네트워크·429·5xx, 다시 시도 가능) / `format_changed`(응답이 JSON이 아니거나 예상한 필드가 없음, 다시 시도해도 같음)로 나뉜다.
+
+| 출처 | 쓰는 경우 | 주는 값 | 비고 |
+|---|---|---|---|
+| **토스증권 Open API**(공식, `https://openapi.tossinvest.com`) | `toss`, 또는 `auto`이고 `ZOOP_TOSS_CLIENT_ID`·`ZOOP_TOSS_CLIENT_SECRET`이 모두 있을 때 KRX·미국 종목 | `/oauth2/token`(client credentials, 토큰은 만료 60초 전·401 뒤 한 번 재발급), `/api/v1/prices`(현재가·시각·통화), `/api/v1/candles`(1m·1d, 200개씩 `nextBefore` 페이지), `/api/v1/stocks`(발행주식수·통화) | 전일 종가·당일 고저·거래량은 일봉에서, 전일 대비·52주 고저·**시가총액(현재가 × 발행주식수)**은 BFF 계산(`derived`). 실제 키 없이 문서 형태대로 가짜 서버(`tests/test_market_data.py`)로만 검증했다 |
+| **Yahoo Finance 공개 차트**(비공식, 무키) | `yahoo`, 또는 `auto`에서 토스 키가 없거나 토스가 다루지 않는 종목(예: `TSE:6702`) | `GET /v8/finance/chart/{symbol}`의 `meta`(현재가·기준 시각·전일 종가·당일 고저·거래량·52주 고저·통화)와 봉 | 시가총액·발행주식수는 이 응답에 없어 비운다(다른 값으로 추정하지 않음). 비공식이고 지연될 수 있어 `source.official=false`, `delayNote`로 표시. 2026-10-01 실측에서 KRX 시세는 약 20분 늦었다 |
+
+- **무키 출처 선택 이유:** 키 없이 KRX·미국·도쿄 상장 14사를 한 형식으로 받고, 한 요청에 현재가·전일 종가·지표·당일 분봉이 함께 온다. 시가총액·PER 등은 Yahoo 차트 응답에 없어 아래 "주요 지표"(네이버 증권)에서 따로 받는다.
+- **종목 매핑:** 카탈로그 id만 쓴다(새 카탈로그 키 없음). `KRX:<6자리>` → 토스 `005930`, 야후 `005930.KS`(없으면 `.KQ`), `NASDAQ|NYSE|AMEX:<티커>` → 토스 티커, 야후 티커(`.`→`-`), `TSE:<4자리>` → 야후 `6702.T`(토스 미지원). 그 밖의 접두는 `unsupported_symbol`.
+- **기간:** `/prices?period=1d`는 가장 최근 거래일의 분봉(토스 1분, 야후 5분), `1m`·`1y`는 사건 타임라인과 같은 시작일(오늘 KST에서 1개월·1년 전, 말일 보정)부터의 일봉. 시각은 거래소 오프셋을 붙인 ISO 8601.
+- **캐시·시간 초과:** 현재가 30초, 분봉 60초, 일봉 30~60분, 종목 정보 12시간(프로세스 메모리). 일시 장애는 캐시하지 않아 [다시 시도]가 실제로 다시 묻는다. 요청 시간 초과 `ZOOP_QUOTE_TIMEOUT_SECONDS`(기본 5초), 시간 초과·5xx는 한 번만 재시도, 429는 재시도하지 않는다.
+- **비밀값:** 토스 키는 환경변수로만 받고 `Settings`/클라이언트 `repr`, 응답, 로그에 남기지 않는다.
+
+### 주요 지표 (`/metrics`, 요구 39 중 출처가 주는 범위)
+
+시세와 **다른 출처**라 따로 조회하고 응답에 자기 `source`·`asOf`를 둔다. 실패해도 `/quote`·`/prices`는 그대로다.
+
+| 출처 | 엔드포인트(2026-10-01 관찰, 비공식·무키) | 주는 값 |
+|---|---|---|
+| **네이버 증권** 국내 | `m.stock.naver.com/api/stock/{6자리}/integration`(`totalInfos`) + `/basic`(`localTradedAt`) | 시가총액·PER·EPS·PBR·BPS·배당수익률·주당배당금·외국인 소진율, 항목별 기준 기간(`valueDesc`, 예: `2026.06.`) |
+| **네이버 증권** 해외(미국·도쿄) | `ac.stock.naver.com/ac?q={티커}&target=stock`으로 거래소가 같은 항목의 `reutersCode`(`NVDA.O`·`PINS.K`·`HPE`·`6702.T`, 접미사가 거래소만으로 정해지지 않아 조회, 12시간 캐시) → `api.stock.naver.com/stock/{reutersCode}/basic`(`stockItemTotalInfos`) | 같은 항목(외국인 소진율 제외), 기준 기간은 `keyDesc`. 해외 행의 `valueDesc`는 원화 환산값이라 쓰지 않는다 |
+
+- 값은 출처가 적은 문자열 그대로(`1,606조 2,650억`, `12.33배`, `5조 5,040억 USD`)이고 계산·환산·추정하지 않는다. `N/A`는 행을 뺀다. 전일·시가·고저·거래량·52주는 시세 공급자가 맡고, 추정 PER/EPS(컨센서스)는 쓰지 않는다. 매출·영업이익 추이 같은 재무제표는 이 출처 응답에 없어 만들지 않는다.
+- 시가총액 우선순위: 토스 키가 있어 `/quote`에 `marketCap`(현재가 × 발행주식수)이 있으면 화면은 그 값을 쓰고 이 출처의 시가총액은 숨긴다. 다른 지표는 이 출처.
+- 캐시: 지표 30분, `reutersCode` 12시간. 미지원(404·409)·형식 변경은 캐시해 같은 실패를 반복 요청하지 않고, 일시 장애는 캐시하지 않는다.
+- **위험과 교체 지점:** 문서 없는 공개 JSON이라 차단·필드 이름 변경·응답 형식 변경이 예고 없이 일어날 수 있다. 형식이 바뀌면 `format_changed`(JSON이 아님·`totalInfos`/`stockItemTotalInfos` 없음), 막히면 `temporary_failure`로 지표 영역만 `unavailable`이 된다. 교체는 `src/zoop_bff/quote_naver.py` 한 파일(`NaverMetricsProvider.metrics(listing) -> (Source, Metrics)`)만 바꾸면 되고, `ZOOP_METRICS_PROVIDER=off`로 끌 수 있다. 상용 배포 전에는 이용 조건을 확인한 공식 출처(토스증권 등)로 바꿔야 한다.
 
 ## Snapshot 확장 키 (`zoop`)
 
@@ -203,7 +242,7 @@ snapshot JSON은 `poc inspect --with-evidence --output` 형태(`{issues, candida
     ],
     "mockPortfolios": [                            // 선택. 없으면 BFF 기본 mock-basic
       { "id": "mock-growth", "label": "가상 성장주 계좌",
-        "holdings": [ { "companyId": "KR-005930", "quantity": 10, "avgPrice": 70000 } ] }
+        "holdings": [ { "companyId": "KRX:005930", "quantity": 10, "avgPrice": 70000, "currency": "KRW" } ] }
     ]
   }
 }
@@ -212,7 +251,7 @@ snapshot JSON은 `poc inspect --with-evidence --output` 형태(`{issues, candida
 | 키 | 규칙 |
 |---|---|
 | `zoop.companies[]` | `company_id`·`name` 문자열 필수. `aliases`는 문자열 배열, `ticker`/`sector`는 문자열 또는 생략/`null`. 표시 확장 키는 아래 "기업 카탈로그 확장 키" |
-| `zoop.mockPortfolios[]` | `id`·`label`·`holdings[]` 필수. `holdings[]`는 `companyId` 문자열, `quantity` > 0, `avgPrice` ≥ 0(숫자). 카탈로그에 없는 `companyId`는 이름 대신 ID로 표시되므로 `zoop.companies`에 넣을 것. `avgPrice`의 통화 단위는 정의하지 않는다(mock) |
+| `zoop.mockPortfolios[]` | `id`·`label`·`holdings[]` 필수. `holdings[]`는 `companyId` 문자열, `quantity` > 0, `avgPrice` ≥ 0(숫자), 선택 `currency`(평균 매입가 통화, ISO 4217). 카탈로그에 없는 `companyId`는 이름 대신 ID로 표시되므로 `zoop.companies`에 넣을 것. `currency`가 없으면 통화를 모르는 것으로 보고 평가 손익을 그리지 않는다(시세 통화와 같을 때만 손익, 환산 없음) |
 | `zoop.asOf` | ISO8601 문자열 |
 | 형식 오류 | 서버는 기동되지만 데이터 요청은 503 `source_unavailable`(`details.reason`에 원인) |
 
@@ -279,8 +318,9 @@ uv run python scripts/make_stress_fixture.py --check   # 커밋된 파일과 다
 
 ### 관제·검수·그래프 버전 (요구 76)
 
-- 원장 = Docker `zoop-poc` Postgres의 실뉴스 DB `investmate_zoop_real`(`docker start zoop-poc-postgres-1 zoop-poc-neo4j-1`). 관리자는 `PostgresRepository.inspect()`의 승인 `issues`와 `candidates`(ALLOW/HOLD/REJECT·active·reasons)를 본다. 원장이 죽으면 원장 조회 API만 503 `ledger_unavailable`이고 사용자 그래프·버전·작업·대시보드는 계속 동작한다.
+- 원장 = Docker `zoop-poc` Postgres의 확장 실뉴스 DB `investmate_zoop_real2`(이전 `investmate_zoop_real`은 보존)(`docker start zoop-poc-postgres-1 zoop-poc-neo4j-1`). 관리자는 `PostgresRepository.inspect()`의 승인 `issues`와 `candidates`(ALLOW/HOLD/REJECT·active·reasons)를 본다. 원장이 죽으면 원장 조회 API만 503 `ledger_unavailable`이고 사용자 그래프·버전·작업·대시보드는 계속 동작한다.
 - **검수 기록**: PoC DB는 수정하지 않는다. `POST /api/admin/pipeline/candidates/{id}/decision {decision: allow|reject, reason, relationId?}`는 BFF 상태 디렉터리에 결정(대상·사유·시각·관리자)을 남기고 **활성 버전 위에 덮어 적용**한다. reject는 즉시 사용자 그래프에서 빠지고, HOLD를 allow하면 후보의 mention·기사·근거 있는 관계로 공개 이슈를 구성해 `관리자 승인`으로 표시한다(원문 인용이 없으면 422 `evidence_required`, REJECT 상태 409 `status_not_reviewable`, 비활성 409 `candidate_inactive`). 같은 결정을 다시 보내면 `idempotent:true`로 기존 기록을 돌려주고 새 기록·감사 로그·리비전을 만들지 않는다. 스냅샷의 `review_exclusions`(FOLLOWS 오승인 1건)는 최초 기동 때 `origin:"snapshot-migration"` reject 기록으로 이관된다.
+- **자동 검수 규칙 R1@2 "역할 문구 미확인은 역할만 빼고 게시"**(`review_rules.py`): PoC 검증기는 참여자 역할(`participant_role:N`)과 관계 `role`을 따로 묻고, 보류의 상당수가 거기서만 막힌다. 활성 HOLD 후보 중 **ALLOW가 아닌 모든 판정의 원인이 역할 검사뿐**(이슈 판정은 `participant_role:N`, 관계 판정은 `role`)이고, REJECT(판정·필드 판정)가 없고, 이슈 mention과 **모든 관계에 원문 인용이 있으며 인용이 기사 본문과 일치**할 때만 적용된다. 적용되면 사건을 게시하되 미확인 역할 문구(참여자 `role`, 관계 `role`)를 `null`로 비우고 `roleUnconfirmed:true`를 붙인다(다른 값으로 채우지 않는다). 선택 필드(event_time·period·countries)는 PoC 판정대로 통과한 것만 게시한다. 이미 일어난 사건(`assertion_status: occurred`)이 아니면 앞선 사건의 후속(`FOLLOWS`)으로 잇지 않는다(R1@2, 이전 R1@1은 후보가 가진 모든 관계를 게시했다. PoC의 후속 판정이 계획·예측도 통과시켰고 수동 검수에서 그런 7쌍이 모두 거부됐다). **읽기 시점에 활성 버전의 `candidates` 행에 적용**되므로 나중에 게시하는 어떤 버전에도 같은 규칙이 적용되고, 끄면 그 사건은 사용자 그래프에서 바로 빠진다. 관리자 결정이 규칙보다 우선한다: 후보에 대한 허용·거부가 있으면 규칙은 그 후보에 손대지 않는다(거부한 것은 규칙으로 살아나지 않고, 허용한 것은 관리자 승인으로 역할 원문 그대로 게시된다). 관계 하나만 거부하면(스냅샷 `review_exclusions`의 관계 단위 제외 포함) 그 관계만 빠지고 사건·나머지 관계는 규칙으로 게시된 채 남는다(PoC 승인 후보와 같은 동작). 사용자 응답: 사건 상세 `approval`이 `{source:"review-rule", label:"자동 검수 규칙", scope:"issue", ruleId:"R1@1"}`(관리자 승인과 규칙이 한 사건에서 만나면 `source:"admin-review"` + `ruleId`), 비운 자리는 `participants[].roleUnconfirmed`·`relations[].roleUnconfirmed`·`companies[].roleUnconfirmed`. 관리자 API: `GET /api/admin/pipeline/rules`(켜짐·다루는 후보 `eligible`·게시한 후보/사건 수·전환 이력), `PUT /api/admin/pipeline/rules/{ruleId} {enabled, reason}`(사유 필수·감사 `review.rule`·이미 같은 상태면 `idempotent:true`로 기록 없음, 알 수 없는 규칙 404 `rule_not_found`). 기본값은 켜짐이다. 후보 목록·상세의 `rule {ruleId, applied, notAppliedReason: admin_decision|rule_disabled|not_published|null, withheldParticipants, withheldRelations, droppedRelations}`, 목록 필터 `?rule=true|false`, 개요 `review.ruleCandidates·ruleEvents`(`holdPendingReview`는 규칙으로 게시된 후보를 뺀다), 대시보드 `graph.rules`. 효과 측정·표본 판정·문턱값 시뮬레이션은 `docs/evidence/review-policy.md`, 재현은 `uv run python scripts/simulate_thresholds.py`(저장된 검증 기록만 쓰므로 모델 호출 없음).
 - **그래프 버전**: 사용자 그래프 = 활성 게시 버전(읽기 전용 파일 + SHA-256, 읽을 때마다 해시 확인) + 검수 기록. 첫 기동 때 `ZOOP_SNAPSHOT_PATH`가 `v1`(seed)이 된다. `POST /api/admin/graph/versions`는 현재 원장 `inspect()`를 새 불변 버전으로 저장하고 곧바로 활성화한다(원장이 활성 버전과 같으면 409 `version_unchanged`). `POST /api/admin/graph/versions/{id}/activate`로 되돌린다. 버전을 게시하거나 되돌려도 **저장된 회원 설정(관심종목·연결한 가상 계좌)은 무효가 되지 않는다**: 관심종목 검증은 카탈로그와 등록된 모든 버전의 기업, 회원이 이미 저장한 ID를 기준으로 하고 활성 버전에만 의존하지 않는다.
 - **GraphDB 반영**: PoC outbox의 미완료 투영 작업 수(`pendingJobs`)와 Neo4j를 **원장 이슈 단위**로 비교한다. `issuesProjected`는 "원장 이슈 중 Neo4j가 모든 관계와 함께 가진 수"라서 `issuesInLedger`와 같은 단위다. `missingIssueIds` = 원장에는 있는데 Neo4j에 없거나 관계가 모자란 이슈(→ `mismatch`), `staleIssueIds` = Neo4j에만 있는 이슈(원장에 아예 없으면 **외부 이슈**로 보고만 하고 상태를 바꾸지 않는다. `zoop-poc` Neo4j는 합성 원장의 투영도 담는다). 버전 게시·되돌리기는 GraphDB를 건드리지 않는다.
 
@@ -291,6 +331,7 @@ uv run python scripts/make_stress_fixture.py --check   # 커밋된 파일과 다
 | kind | 실행 | 비용 |
 |---|---|---|
 | `flush-graph` | `poc flush-graph` (GraphDB 반영 재시도) | 모델 호출 없음 |
+| `ingest-run` | `poc run --live --config <작업별 settings.json> --dataset zoop-expansion/datasets/<파일>.jsonl` | **유료.** 요청에 `dataset`(샌드박스 `zoop-expansion/datasets/`의 파일 이름만, 없으면 422 `dataset_not_found`/`dataset_required`)이 필요하다. 승인·상한 규칙은 `retry-model-errors`와 같다. 재시도하면 같은 파일을 이어서 처리한다(체크포인트). `GET /api/admin/jobs`의 `sandbox.datasets`에 파일 목록 |
 | `retry-model-errors` | `poc run --live --retry-model-errors --config <작업별 settings.json>` | **유료.** `confirmPaid:true`(정확히 JSON true)가 없으면 422 `paid_confirmation_required`, `maxModelCalls`는 기본 50 · 1~`ZOOP_ADMIN_MAX_MODEL_CALLS`(기본 200)이며 벗어나면 422 `max_model_calls_invalid`. 작업별 설정 파일의 `max_calls`로 PoC가 그 횟수에서 모델 호출을 멈춘다 |
 
 - 이미 `queued|running` 작업이 있으면 같은 kind는 그 작업을 돌려주고(200, `deduplicated:true`), 다른 kind는 409 `job_in_progress`다. 상태는 `queued/running/succeeded/failed/cancelled`, 시작·종료 시각, 종료 코드, RunReport(processed·approved·held·rejected·pending·errors·usage), 실행 전후 원장 수치, 로그 꼬리(300줄, 비밀값 마스킹), 취소(SIGINT → SIGTERM → SIGKILL)를 기록한다. CLI가 남은 오류로 종료 코드 1을 내면 `failed`(`cli_nonzero_exit`)로 두되 보고서는 그대로 싣는다.
@@ -341,7 +382,7 @@ diff -qr "$SRC/src" "$DST/src"                        # 차이 없음이어야 �
 | 추가(명세 추가 제안) | `GET /api/companies`(관심종목 선택, FR-08~15), `GET /api/portfolio/mock-portfolios`, `POST /api/auth/guest`(비회원, UI-01), `GET /api/health` |
 | 미구현 | `POST /api/auth/signup`(가입은 데모 계정 1개로 대체), `POST /api/portfolio/sync`, `GET /api/events`의 `scope`·`cursor`, `GET /api/graph`의 `asOf`(PoC는 현재 승인 상태만 제공), 페이지네이션 |
 | 응답 | `GET /api/companies/{id}`의 "기준 시각"은 `metadata.asOf`. 사건 목록은 `items` 배열. `GET /api/auth/session`은 세션이 없어도 200(`kind:"anonymous"`) |
-| 경계 | `GET /api/companies/{id}/prices`, `GET /api/briefings/{id}/evaluations`는 명세상 200이지만 데이터 생산자가 없어 본문이 `unavailable` |
+| 경계 | `GET /api/briefings/{id}/evaluations`는 명세상 200이지만 데이터 생산자가 없어 본문이 `unavailable`. `GET /api/companies/{id}/prices`·`/quote`는 시세 공급자가 있으면 값, 없거나 실패하면 200 `unavailable`+`reasonCode` |
 | 미정 사항 | 브리핑 시각은 07:40/18:10 KST + `confirmed:true`(요구 확정). 계좌 성공 후 관심 선택 강제 여부는 정하지 않음(계좌만 연결해도 설정 완료 가능) |
 
 ## Offline review-exclusion regression

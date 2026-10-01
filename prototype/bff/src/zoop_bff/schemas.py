@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -228,6 +228,9 @@ class HoldingOut(CamelModel):
     ticker: str | None
     quantity: float
     avg_price: float
+    avg_price_currency: str | None = Field(
+        description="Currency of avgPrice; null when unknown (connections stored before it was recorded)."
+    )
     cost_basis: float
     weight: float = Field(description="cost_basis / total cost basis; NOT market-value weight")
     market_value: Unavailable
@@ -390,16 +393,117 @@ class CompanyDetail(CamelModel):
     direct_issues: list[CompanyIssueRef]
     structural_issues: list[CompanyIssueRef]
     summary: Unavailable
-    price: Unavailable
     holding: bool | None = Field(description="null unless a member session is present")
     watch: bool | None = Field(description="null unless a member session is present")
     metadata: Metadata
 
 
-class PriceResponse(Unavailable):
+QuoteReasonCode = Literal[
+    "not_connected", "unsupported_symbol", "no_data", "auth_failed", "temporary_failure", "format_changed"
+]
+
+
+class QuoteSourceOut(CamelModel):
+    provider: Literal["toss", "yahoo", "naver"]
+    name: str
+    official: bool = Field(description="false for the unofficial keyless public endpoint")
+    delay_note: str | None = Field(description="Set when quotes from this source may be delayed.")
+    symbol: str = Field(description="Provider symbol the values were fetched with (e.g. `005930.KS`).")
+    url: str | None = Field(description="Provider page for the symbol to cross-check, when known.")
+
+
+class QuoteValues(CamelModel):
+    currency: str
+    price: float
+    as_of: str | None = Field(description="Provider time of the price (ISO 8601 with offset); null when not given.")
+    previous_close: float | None
+    change: float | None = Field(description="price - previousClose")
+    change_rate: float | None = Field(description="(price - previousClose) / previousClose, a fraction")
+    day_high: float | None
+    day_low: float | None
+    volume: float | None
+    fifty_two_week_high: float | None
+    fifty_two_week_low: float | None
+    market_cap: float | None = Field(description="Only when computable from the provider (price x sharesOutstanding).")
+    shares_outstanding: float | None
+    derived: list[str] = Field(
+        description="camelCase fields the BFF computed from provider data rather than received as-is."
+    )
+
+
+class CompanyQuote(CamelModel):
+    status: Literal["available"] = "available"
+    company_id: str
+    source: QuoteSourceOut
+    quote: QuoteValues
+
+
+class CompanyQuoteUnavailable(CamelModel):
+    status: Literal["unavailable"] = "unavailable"
+    company_id: str
+    reason_code: QuoteReasonCode = Field(
+        description="not_connected: provider off or keys missing; unsupported_symbol; no_data: provider has nothing; "
+        "auth_failed; temporary_failure: timeout, network, 429 or 5xx (retry later)."
+    )
+    reason: str
+
+
+QuoteResponse = Annotated[CompanyQuote | CompanyQuoteUnavailable, Field(discriminator="status")]
+
+
+class PricePoint(CamelModel):
+    time: str = Field(description="Bar time (ISO 8601 with the exchange offset).")
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float | None
+
+
+class PriceSeries(CamelModel):
+    status: Literal["available"] = "available"
     company_id: str
     period: Literal["1d", "1m", "1y"]
-    metadata: Metadata
+    source: QuoteSourceOut
+    currency: str
+    interval: str = Field(description="Bar size: `1m`/`5m` for the latest session (1d), `1d` otherwise.")
+    points: list[PricePoint] = Field(description="Oldest first.")
+
+
+class PriceSeriesUnavailable(CamelModel):
+    status: Literal["unavailable"] = "unavailable"
+    company_id: str
+    period: Literal["1d", "1m", "1y"]
+    reason_code: QuoteReasonCode
+    reason: str
+
+
+PriceResponse = Annotated[PriceSeries | PriceSeriesUnavailable, Field(discriminator="status")]
+
+
+class MetricOut(CamelModel):
+    code: Literal["marketValue", "per", "eps", "pbr", "bps", "dividendYieldRatio", "dividend", "foreignRate"]
+    label: str
+    value: str = Field(description="As the source formats it (e.g. `1,609조 1,882억`, `12.35배`); never computed here.")
+    basis: str | None = Field(description="The source's reference period for this value (e.g. `2026.06.`), when given.")
+
+
+class CompanyMetrics(CamelModel):
+    status: Literal["available"] = "available"
+    company_id: str
+    source: QuoteSourceOut
+    as_of: str | None = Field(description="Source time of the page the values came from; null when not given.")
+    items: list[MetricOut]
+
+
+class CompanyMetricsUnavailable(CamelModel):
+    status: Literal["unavailable"] = "unavailable"
+    company_id: str
+    reason_code: QuoteReasonCode
+    reason: str
+
+
+MetricsResponse = Annotated[CompanyMetrics | CompanyMetricsUnavailable, Field(discriminator="status")]
 
 
 class DocumentEventRef(CamelModel):
@@ -474,7 +578,8 @@ class EventListResponse(CamelModel):
 class ParticipantOut(CamelModel):
     company_id: str | None
     name: str
-    role: str
+    role: str | None
+    role_unconfirmed: bool
 
 
 class MentionOut(CamelModel):
@@ -509,6 +614,7 @@ class RelationOut(CamelModel):
     source: str
     target: str
     role: str | None
+    role_unconfirmed: bool
     assertion_status: str | None
     evidence_ids: list[str]
 
@@ -517,6 +623,7 @@ class CompanyLink(CamelModel):
     id: str
     name: str
     role: str | None
+    role_unconfirmed: bool = Field(description="The role text was left out because the PoC could not confirm it (rule R1)")
     relation_type: Literal["INVOLVES", "STRUCTURALLY_RELATED_TO"]
 
 
@@ -553,9 +660,12 @@ class Follows(CamelModel):
 
 
 class ApprovalOut(CamelModel):
-    source: Literal["admin-review"]
-    label: str = Field(description="Shown instead of PoC-validated provenance, e.g. '관리자 승인'")
+    source: Literal["admin-review", "review-rule"]
+    label: str = Field(description="Shown instead of PoC-validated provenance: '관리자 승인' or '자동 검수 규칙'")
     scope: str
+    rule_id: str | None = Field(
+        description="Publication rule that put content on the graph (e.g. 'R1@2'); also set when an admin approval and a rule meet in one event"
+    )
 
 
 class EventDetail(CamelModel):

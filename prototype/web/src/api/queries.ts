@@ -17,7 +17,9 @@ export const queryKeys = {
   mockPortfolios: ["mock-portfolios"] as const,
   companies: (q: string) => ["companies", q] as const,
   company: (id: string) => ["company", id] as const,
-  prices: (id: string) => ["prices", id] as const,
+  quote: (id: string) => ["quote", id] as const,
+  metrics: (id: string) => ["metrics", id] as const,
+  prices: (id: string, period: string) => ["prices", id, period] as const,
   graph: (mode: GraphMode, companyId?: string) => ["graph", mode, companyId ?? null] as const,
   edge: (id: string) => ["edge", id] as const,
   companyEvents: (companyId: string, from: string) => ["events", companyId, from] as const,
@@ -122,12 +124,36 @@ export function useCompanies(ids: string[]) {
   });
 }
 
-export function useCompanyPrices(id: string | undefined) {
+export type QuoteResponse = Schemas["CompanyQuote"] | Schemas["CompanyQuoteUnavailable"];
+export type PriceResponse = Schemas["PriceSeries"] | Schemas["PriceSeriesUnavailable"];
+
+/** 기업 상세 시세(현재가·지표). 기업 개요와 따로 조회해 늦거나 실패해도 다른 영역을 막지 않는다(요구 54). 보유 영역도 같은 칸을 쓴다. */
+export function useCompanyQuote(id: string) {
   return useQuery({
-    queryKey: queryKeys.prices(id ?? ""),
+    queryKey: queryKeys.quote(id),
+    queryFn: ({ signal }) => api<QuoteResponse>(`/api/companies/${encodeURIComponent(id)}/quote`, { signal }),
+    staleTime: 30_000,
+  });
+}
+
+export type MetricsResponse = Schemas["CompanyMetrics"] | Schemas["CompanyMetricsUnavailable"];
+
+/** 기업 상세 주요 지표(시가총액·PER·PBR 등). 시세와 다른 출처라 따로 조회하고, 실패해도 시세는 그대로다(요구 39·54). */
+export function useCompanyMetrics(id: string) {
+  return useQuery({
+    queryKey: queryKeys.metrics(id),
+    queryFn: ({ signal }) => api<MetricsResponse>(`/api/companies/${encodeURIComponent(id)}/metrics`, { signal }),
+    staleTime: 10 * 60_000,
+  });
+}
+
+/** 주가 차트. 사건 타임라인과 같은 기간(1일·1개월·1년)으로 조회하고, 기간마다 칸이 달라 마지막 기간 결과만 보인다(요구 37·52). */
+export function useCompanyPrices(id: string, period: "1d" | "1m" | "1y") {
+  return useQuery({
+    queryKey: queryKeys.prices(id, period),
     queryFn: ({ signal }) =>
-      api<Schemas["PriceResponse"]>(`/api/companies/${encodeURIComponent(id!)}/prices`, { query: { period: "1m" }, signal }),
-    enabled: Boolean(id),
+      api<PriceResponse>(`/api/companies/${encodeURIComponent(id)}/prices`, { query: { period }, signal }),
+    staleTime: 60_000,
   });
 }
 

@@ -120,6 +120,11 @@ export function AdminDashboardPage() {
               detail={
                 <span>
                   <KstTime value={data.graph.activatedAt} /> 게시 · 검수 {formatCount(data.graph.reviewDecisions)}건 반영
+                  {data.graph.rules.map((rule) => (
+                    <span key={rule.id} className="block">
+                      자동 검수 규칙 {rule.id} {rule.enabled ? "켜짐" : "꺼짐"} · 게시 사건 {formatCount(rule.publishedEvents)}건
+                    </span>
+                  ))}
                 </span>
               }
             />
@@ -145,7 +150,7 @@ export function AdminDashboardPage() {
 
           <div className="grid grid-cols-2 gap-8">
             <AdminSection title="최근 브리핑 회차" icon={Newspaper} id="dash-briefings" actions={<SectionLink to="/admin/briefings" label="브리핑 운영" />}>
-              <DataTable caption="최근 브리핑 회차">
+              <DataTable caption="브리핑 회차 목록">
                 <thead>
                   <tr>
                     <Th>회차</Th>
@@ -178,7 +183,7 @@ export function AdminDashboardPage() {
               {data.jobs.recent.length === 0 ? (
                 <p className="py-4 text-base text-text-secondary">아직 실행한 작업이 없어요.</p>
               ) : (
-                <DataTable caption="최근 작업">
+                <DataTable caption="최근 작업 목록">
                   <thead>
                     <tr>
                       <Th>작업</Th>

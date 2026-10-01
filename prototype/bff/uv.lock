@@ -1023,6 +1023,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "investmate-poc" },
     { name = "pydantic" },
     { name = "uvicorn" },
@@ -1030,20 +1031,17 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "investmate-poc", git = "https://github.com/Donbug/investmate-poc.git?rev=fa446e7c72edfa06ec1a0e8e999199a21d31c695" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "uvicorn", specifier = ">=0.34,<1" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = ">=0.28,<1" },
-    { name = "pytest", specifier = ">=8,<10" },
-]
+dev = [{ name = "pytest", specifier = ">=8,<10" }]

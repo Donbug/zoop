@@ -8,11 +8,14 @@ from fastapi import APIRouter, Path, Query
 from ..dataset import ARTICLE_LINKS, COMPANY_LINKS, Dataset, IssueRec, edge_id, event_interval, sort_recent
 from ..deps import OptionalPrincipal, State
 from ..errors import ApiError, not_found
+from ..market_data import Source
 from ..graph import edge_detail, select_graph
 from ..schemas import (
     ApprovalOut,
     ArticleOut,
     CompanyDetail,
+    CompanyQuote,
+    CompanyQuoteUnavailable,
     CompanyDocument,
     CompanyDocumentsResponse,
     CompanyIssueRef,
@@ -33,11 +36,20 @@ from ..schemas import (
     GraphResponse,
     MentionOut,
     ParticipantOut,
+    PricePoint,
     PriceResponse,
+    PriceSeries,
+    PriceSeriesUnavailable,
+    QuoteResponse,
+    QuoteSourceOut,
+    QuoteValues,
+    CompanyMetrics,
+    CompanyMetricsUnavailable,
+    MetricOut,
+    MetricsResponse,
     RelationOut,
 )
 from ..views import (
-    PRICE_UNAVAILABLE,
     SUMMARY_UNAVAILABLE,
     basis_out,
     company_links,
@@ -207,10 +219,58 @@ def get_company(
         direct_issues=_issue_refs(ds, company_id, "INVOLVES"),
         structural_issues=_issue_refs(ds, company_id, "STRUCTURALLY_RELATED_TO"),
         summary=unavailable(SUMMARY_UNAVAILABLE),
-        price=unavailable(PRICE_UNAVAILABLE),
         holding=company_id in user_holding_ids(ds, user) if user else None,
         watch=company_id in user.watchlist_ids if user else None,
         metadata=meta(ds),
+    )
+
+
+@router.get("/companies/{id}/quote", response_model=QuoteResponse)
+def get_quote(company_id: Annotated[str, Path(alias="id")], state: State) -> CompanyQuote | CompanyQuoteUnavailable:
+    """Current price and indicators from the configured quote provider, with source and as-of time.
+
+    Separate from ``/companies/{id}`` so a slow or failing quote never blocks the company overview.
+    Missing values stay null; ``quote.derived`` lists values the BFF computed (e.g. market cap)."""
+    _require_company(state.provider.get(), company_id)
+    result = state.market.quote(company_id)
+    if result.quote is None or result.source is None:
+        return CompanyQuoteUnavailable(company_id=company_id, reason_code=result.code, reason=result.reason)
+    q = result.quote
+    return CompanyQuote(
+        company_id=company_id,
+        source=_source_out(result.source),
+        quote=QuoteValues(
+            currency=q.currency,
+            price=q.price,
+            as_of=q.as_of.isoformat() if q.as_of else None,
+            previous_close=q.previous_close,
+            change=q.change,
+            change_rate=q.change_rate,
+            day_high=q.day_high,
+            day_low=q.day_low,
+            volume=q.volume,
+            fifty_two_week_high=q.fifty_two_week_high,
+            fifty_two_week_low=q.fifty_two_week_low,
+            market_cap=q.market_cap,
+            shares_outstanding=q.shares_outstanding,
+            derived=list(q.derived),
+        ),
+    )
+
+
+@router.get("/companies/{id}/metrics", response_model=MetricsResponse)
+def get_metrics(company_id: Annotated[str, Path(alias="id")], state: State) -> CompanyMetrics | CompanyMetricsUnavailable:
+    """General indicators (시가총액·PER·PBR·EPS·배당·외국인 소진율) from a separate public source, passed through as
+    given with each value's reference period. Independent of the price provider: a failure here leaves quotes alone."""
+    _require_company(state.provider.get(), company_id)
+    result = state.market.metrics(company_id)
+    if result.metrics is None or result.source is None:
+        return CompanyMetricsUnavailable(company_id=company_id, reason_code=result.code, reason=result.reason)
+    return CompanyMetrics(
+        company_id=company_id,
+        source=_source_out(result.source),
+        as_of=result.metrics.as_of.isoformat() if result.metrics.as_of else None,
+        items=[MetricOut(code=m.code, label=m.label, value=m.value, basis=m.basis) for m in result.metrics.items],
     )
 
 
@@ -219,11 +279,37 @@ def get_prices(
     company_id: Annotated[str, Path(alias="id")],
     state: State,
     period: Literal["1d", "1m", "1y"] = "1m",
-) -> PriceResponse:
-    ds = state.provider.get()
-    _require_company(ds, company_id)
-    return PriceResponse(
-        reason=PRICE_UNAVAILABLE, company_id=company_id, period=period, metadata=meta(ds)
+) -> PriceSeries | PriceSeriesUnavailable:
+    """Price chart for the same periods as the event timeline: the latest session's intraday bars (1d),
+    or daily bars from the timeline's period start (1m, 1y)."""
+    _require_company(state.provider.get(), company_id)
+    result = state.market.series(company_id, period)
+    if result.series is None or result.source is None:
+        return PriceSeriesUnavailable(
+            company_id=company_id, period=period, reason_code=result.code, reason=result.reason
+        )
+    series = result.series
+    return PriceSeries(
+        company_id=company_id,
+        period=period,
+        source=_source_out(result.source),
+        currency=series.currency,
+        interval=series.interval,
+        points=[
+            PricePoint(time=b.time.isoformat(), open=b.open, high=b.high, low=b.low, close=b.close, volume=b.volume)
+            for b in series.bars
+        ],
+    )
+
+
+def _source_out(source: Source) -> QuoteSourceOut:
+    return QuoteSourceOut(
+        provider=source.provider,
+        name=source.name,
+        official=source.official,
+        delay_note=source.delay_note,
+        symbol=source.symbol,
+        url=source.url,
     )
 
 
@@ -391,6 +477,7 @@ def get_event(issue_id: Annotated[str, Path(alias="id")], state: State) -> Event
                 source=r.source,
                 target=r.target,
                 role=r.role,
+                role_unconfirmed=r.role_unconfirmed,
                 assertion_status=r.assertion_status,
                 evidence_ids=list(r.evidence_ids),
             )
@@ -413,7 +500,7 @@ def get_event(issue_id: Annotated[str, Path(alias="id")], state: State) -> Event
                 period=m.period,
                 assertion_status=m.assertion_status,
                 participants=[
-                    ParticipantOut(company_id=p.company_id, name=p.name, role=p.role)
+                    ParticipantOut(company_id=p.company_id, name=p.name, role=p.role, role_unconfirmed=p.role_unconfirmed)
                     for p in m.participants
                 ],
                 evidence_ids=list(m.evidence_ids),
@@ -438,7 +525,12 @@ def get_event(issue_id: Annotated[str, Path(alias="id")], state: State) -> Event
             previous=[follow_ref(ds, i) for i in ds.follows_previous.get(issue.id, ())],
             next=[follow_ref(ds, i) for i in ds.follows_next.get(issue.id, ())],
         ),
-        approval=ApprovalOut(source="admin-review", label=issue.approval.label, scope=issue.approval.scope)
+        approval=ApprovalOut(
+            source=issue.approval.source,  # type: ignore[arg-type]
+            label=issue.approval.label,
+            scope=issue.approval.scope,
+            rule_id=issue.approval.rule_id,
+        )
         if issue.approval
         else None,
         summary=unavailable(SUMMARY_UNAVAILABLE),

@@ -35,6 +35,7 @@
 | `CompanyMark` `id` `name` `brandColor` `logoUrl` `size` | 지도 노드와 같은 기업 표지(상징색 원 + 로고, 없으면 이니셜, 상징색 없으면 폴백 팔레트). 목록 행 leading(24px)·머리글(40~48px). |
 | `EventRow` `title` `eventTime` `timePrecision` `companies` `evidenceCount` `onShowEvidence` `onAsk` `onSelect` `relationType?` `meta` `divider` | 사건 1건 = 1행(IssueCard 대체). 날짜 줄에 아이콘 메타(`meta`, `IconCount`). `relationType`은 관계가 섞인 목록에서만(선 견본 아이콘 + 툴팁). |
 | `IconCount` `icon` `label` `count` | 아이콘 + 숫자 메타(예: 보도 기사 3). 이름은 스크린리더·툴팁에만. |
+| `ApprovalNote` `approval` / `RoleUnconfirmed` | 사건 상세에서 PoC 검증만으로 게시된 것이 아닐 때의 출처 한 줄(배지 `관리자 승인`·`자동 검수 규칙` + 눌러 보는 설명, `approval`이 없으면 그리지 않음). `RoleUnconfirmed`는 자동 검수 규칙이 역할 문구를 비운 자리(`roleUnconfirmed`)에 아이콘 + `역할 미확인`(다른 역할로 채우지 않음). 행 안(ListRow `description`)에서는 `RoleUnconfirmed`만 쓴다(버튼 중첩 금지). |
 | `BriefingCard` `edition` `date` `scheduledAt` `publishedAt` `dataAsOf` `notice` `corrections` `totalEvidence` `summary` `relations` | 브리핑 1회분(바깥 경계 1개, 안은 EventRow). 머리에 발행일·예정 시각(07:40/18:10)·발행 시각·데이터 기준 시점. `notice`는 미준비·실패·제공 중단 안내 한 줄, `corrections`는 회차 전체 정정(발행 원문과 구분). 투자 고지·출처는 화면에서 한 번. |
 | `CompanyHeader` `id` `name` `brandColor` `logoUrl` … | 기업 표지·기업명·업종·티커·보유/관심. 시세가 없으면 시세 자리를 두지 않는다. |
 | `EvidenceList` / `EvidenceQuote` / `VerificationBadge` `mapLink` | 근거 원문 인용(좌측 강조선 없음). 인용 확인은 체크 아이콘(툴팁), 대조 필요만 경고 배지. `mapLink`(지도에서 연 근거 창)가 있으면 인용마다 [지도에서 보기] 토글(`aria-pressed`). |
@@ -45,7 +46,7 @@
 | `PathBar` `from` `to` `steps` `onExit` `onShowSteps` `compact` | 경로 모드 막대(G6): [표지] A ⇆ [표지] B · N단계 · [전체 보기](`compact`면 아이콘). `onShowSteps`가 있으면 `경로 단계 보기` 아이콘(모바일 단계 시트). 주소 `?path=A,B`는 main-page가 push로 관리. 두 번째 기업 고르기(`PathPicker`)와 단계 목록(`PathDetail`)은 `features/path-panel`. |
 | `GraphModeSwitch` `value` `onValueChange` `lockedModes` / `MarkRing` `kind` / `RelationList` / `EdgeGlyph` | 전체(`all`)·개인화(`personal`) 모드 전환(비회원은 `lockedModes={["personal"]}`로 자물쇠), 보유(실선)·관심(점선) 고리 견본(범례·사이드바·디자인시스템), 지도와 같은 내용의 키보드용 목록(묶음 없이 모든 사건), 선 견본. 사건 공유(파생) 의미는 간선 패널에서 설명. |
 | `AiBadge` / `AiNotice` / `AiDisclosure` | AI 생성 표시 1회 + 한 줄 고지, 생성 방식은 팝오버. |
-| `PriceChange` / `SentimentLabel` / `DisclaimerNote` | 등락률(색+부호+▲▼, `null`이면 렌더링 안 함), 감성 규격(디자인시스템 전용), 투자 권유 아님 고지(브리핑·기업 상세 하단). |
+| `PriceChange` / `SentimentLabel` / `DisclaimerNote` | 등락(색+부호+▲▼+스크린리더 `상승/하락/보합`). `change`+`currency`를 주면 `▲ +5,250원 (+1.96%)`(받은 통화 그대로, 기업 상세 시세·차트·평가 손익), 없으면 등락률만. 둘 다 `null`이면 렌더링 안 함. 감성 규격(디자인시스템 전용), 투자 권유 아님 고지(브리핑·기업 상세 하단). |
 
 `QuietValue`·`RelationTypeTag`는 v3에서 삭제했다(없는 값은 자리 자체를 그리지 않고, 관계 유형은 선 견본·섹션 머리 IconHint로).
 

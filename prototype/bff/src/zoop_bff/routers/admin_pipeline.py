@@ -17,6 +17,9 @@ from ..admin_schemas import (
     Overview,
     PublishResponse,
     ReasonRequest,
+    RuleList,
+    RuleSwitchRequest,
+    RuleSwitchResponse,
 )
 from ..deps import Admin, State, require_admin
 from ..errors import ApiError
@@ -78,12 +81,13 @@ def candidates(
     decision: Literal["none", "allow", "reject"] | None = None,
     active: bool | None = None,
     published: bool | None = None,
+    rule: bool | None = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     cursor: str | None = None,
 ) -> CandidateList:
     return state.admin.pipeline.candidates(
-        status=status, decision=decision, active=active, published=published, q=q, limit=limit, cursor=cursor
+        status=status, decision=decision, active=active, published=published, rule=rule, q=q, limit=limit, cursor=cursor
     )
 
 
@@ -96,6 +100,20 @@ def candidate(candidate_id: CandidateId, state: State, _: Admin) -> CandidateDet
 def decide(candidate_id: CandidateId, body: DecisionRequest, state: State, admin: Admin) -> DecisionResponse:
     """allow/reject a candidate or one of its relations. Repeating the effective decision is a no-op."""
     return state.admin.pipeline.decide(candidate_id, body, admin.actor)
+
+
+@router.get("/pipeline/rules", response_model=RuleList)
+def rules(state: State, _: Admin) -> RuleList:
+    """Publication rules (e.g. ``R1@2``): switch, what they cover, what they published, switch history."""
+    return state.admin.pipeline.rules()
+
+
+@router.put("/pipeline/rules/{rule_id}", response_model=RuleSwitchResponse)
+def switch_rule(
+    rule_id: Annotated[str, Path(max_length=64)], body: RuleSwitchRequest, state: State, admin: Admin
+) -> RuleSwitchResponse:
+    """Turn a rule on or off (reason required, audited). Asking for the state it is already in writes nothing."""
+    return state.admin.pipeline.switch_rule(rule_id, body, admin.actor)
 
 
 @router.get("/graph/versions", response_model=GraphVersionList)

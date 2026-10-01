@@ -114,6 +114,40 @@ def test_omitted_cap_uses_the_default_of_fifty(admin):
     assert admin.client.get("/api/admin/jobs").json()["limits"] == {"defaultMaxModelCalls": 50, "maxModelCalls": 200}
 
 
+def test_ingest_run_processes_only_a_sandbox_article_file_within_the_call_cap(admin):
+    ingest = {"kind": "ingest-run", "reason": "신규 기사 처리", "confirmPaid": True, "maxModelCalls": 40}
+    missing = _create(admin, {k: v for k, v in ingest.items() if k != "maxModelCalls"})
+    assert missing.status_code == 422 and missing.json()["error"]["code"] == "dataset_required"
+    for name in ("nope.jsonl", "../.env", "sub/batch-01.jsonl"):
+        unknown = _create(admin, {**ingest, "dataset": name})
+        assert unknown.status_code == 422 and unknown.json()["error"]["code"] == "dataset_not_found", name
+    stray = _create(admin, {**PAID, "dataset": "batch-01.jsonl"})
+    assert stray.status_code == 422 and stray.json()["error"]["code"] == "dataset_not_allowed"
+    assert admin.launcher.launches == []
+
+    dataset = admin.sandbox.datasets_dir / "batch-01.jsonl"
+    dataset.write_text("{}\n")
+    assert admin.client.get("/api/admin/jobs").json()["sandbox"]["datasets"] == ["batch-01.jsonl"]
+    admin.launcher.script(code=1, stdout=json.dumps(run_report(calls=40, errors=1)))
+    created = _create(admin, {**ingest, "dataset": "batch-01.jsonl"}).json()["job"]
+    jobs_settled(admin)
+    argv = admin.launcher.launches[0].spec.argv
+    assert argv[1:4] == ["run", "--live", "--config"] and "--retry-model-errors" not in argv
+    assert argv[argv.index("--dataset") + 1] == str(dataset)
+    assert json.loads(open(argv[4]).read())["max_calls"] == 40  # the cap reaches the PoC settings of this run
+    assert (created["kind"], created["paid"], created["dataset"], created["maxModelCalls"]) == ("ingest-run", True, "batch-01.jsonl", 40)
+
+    admin.launcher.script(stdout=json.dumps(run_report(calls=9, run_id="run-test-2")))
+    retried = admin.client.post(f"/api/admin/jobs/{created['id']}/retry", json={"reason": "남은 기사", "confirmPaid": True, "maxModelCalls": 25}).json()["job"]
+    jobs_settled(admin)
+    again = admin.launcher.launches[1].spec.argv
+    assert again[again.index("--dataset") + 1] == str(dataset) and retried["dataset"] == "batch-01.jsonl"
+
+    usage = admin.client.get("/api/admin/ai-usage", params={"window": "all"}).json()
+    news = next(f for f in usage["features"] if f["feature"] == "news-analysis")
+    assert news["usage"]["modelCalls"] == 49  # 40 + 9: article-processing jobs count toward the AI usage screen
+
+
 def test_a_paid_run_reports_usage_and_a_nonzero_exit_keeps_the_partial_report(admin):
     admin.launcher.script(stdout=json.dumps(run_report(calls=12)))
     ok = _create(admin, PAID).json()["job"]

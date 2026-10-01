@@ -7,6 +7,7 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | [notion-decisions.md](notion-decisions.md) | Notion 회의록 기반 서비스 변천, 최신 정의, 기능·화면 목록, 시나리오·시퀀스, UX 제약, 데이터 소스, 열린 질문 |
 | [requirements-flow.md](requirements-flow.md) | 요구사항명세서 v0.2(FR-01~52, NFR-01~14), WBS(09-29), Mermaid 사용자 플로우 v0.1 재구성, 교차검증 불일치 10건 |
 | [poc-backend.md](poc-backend.md) | `~/InvestMateLogicTest` PoC의 아키텍처·데이터 계약·연동 가능 표면·실행 확인·BFF 매핑 |
+| [review-policy.md](review-policy.md) | 보류가 많은 이유(원인 분포)·자동 검수 규칙 R1@2(역할 문구 미확인은 역할만 빼고 게시)의 효과·표본 판정·문턱값 시뮬레이션과 권고안 |
 | `raw/` | 원본 변환본: Notion export(112페이지), 명세서·WBS 변환, 플로우 SVG |
 | `raw/requirements-sheet_2026-10-01/` | **작업용 임시 정본(2026-10-01 11:04 KST 고정본).** 팀 스프레드시트 「줍 요구사항 정의서 v0.1」 원본 xlsx(sha256 `807687b0…`)와 시트별 CSV 3개(요구사항 정의서 82행·검증 기준·정책 결정). 출처: `docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k`. 우선순위는 권고이고 팀 승인 전이며, 다음 날 갱신될 예정이다. |
 

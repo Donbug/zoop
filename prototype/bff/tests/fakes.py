@@ -87,6 +87,15 @@ class FakeSandbox:
         self.settings_file.write_text(json.dumps({"policy_version": "zoop-test-relaxed-1", "max_calls": 200}))
         self.expected = POLICY
         self.problem_list: list[str] = []
+        self.datasets_dir = self.path / "zoop-expansion" / "datasets"
+        self.datasets_dir.mkdir(parents=True, exist_ok=True)
+
+    def datasets(self) -> list[str]:
+        return sorted(p.name for p in self.datasets_dir.glob("*.jsonl"))
+
+    def dataset_path(self, name: str) -> Path | None:
+        path = self.datasets_dir / name
+        return path if "/" not in name and path.is_file() else None
 
     def problems(self, *, paid: bool) -> list[str]:
         return list(self.problem_list)

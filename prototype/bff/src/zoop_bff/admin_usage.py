@@ -31,6 +31,7 @@ from .errors import ApiError
 from .statedb import StateDb, utc_iso
 
 Window = Literal["24h", "7d", "30d", "all"]
+PAID_JOB_KINDS = frozenset({"retry-model-errors", "ingest-run"})  # job kinds that spend model calls
 _WINDOWS: dict[str, timedelta | None] = {
     "24h": timedelta(hours=24),
     "7d": timedelta(days=7),
@@ -213,7 +214,7 @@ class UsageService:
         in_window = [
             j
             for j in jobs
-            if j["kind"] == "retry-model-errors"
+            if j["kind"] in PAID_JOB_KINDS
             and j["status"] in ("succeeded", "failed")
             and (since is None or (j.get("finishedAt") and j["finishedAt"] >= utc_iso(since)))
         ]

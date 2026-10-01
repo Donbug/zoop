@@ -4,7 +4,10 @@
       "company_id": "KRX:005930",
       "name": "삼성전자",
       "ticker": "005930",
-      "aliases": ["Samsung Electronics", "Samsung"],
+      "aliases": [
+        "Samsung Electronics",
+        "Samsung"
+      ],
       "brand_color": "#1428A0",
       "logo": "samsung.svg",
       "brand_source": "https://www.samsung.com/us/about-us/brand-identity/logo/"
@@ -13,13 +16,19 @@
       "company_id": "KRX:000660",
       "name": "SK하이닉스",
       "ticker": "000660",
-      "aliases": ["SK hynix", "SK Hynix"]
+      "aliases": [
+        "SK hynix",
+        "SK Hynix"
+      ]
     },
     {
       "company_id": "NASDAQ:NVDA",
       "name": "NVIDIA",
       "ticker": "NVDA",
-      "aliases": ["Nvidia", "엔비디아"],
+      "aliases": [
+        "Nvidia",
+        "엔비디아"
+      ],
       "brand_color": "#76B900",
       "logo": "nvidia.svg",
       "brand_source": "https://www.nvidia.com/en-us"
@@ -28,7 +37,9 @@
       "company_id": "NASDAQ:INTC",
       "name": "Intel",
       "ticker": "INTC",
-      "aliases": ["Intel Corporation"],
+      "aliases": [
+        "Intel Corporation"
+      ],
       "brand_color": "#0071C5",
       "logo": "intel.svg",
       "brand_source": "https://www.intel.com/content/www/us/en/newsroom/resources/press-kits-intel-overview.html"
@@ -37,7 +48,9 @@
       "company_id": "NASDAQ:GOOGL",
       "name": "Google",
       "ticker": "GOOGL",
-      "aliases": ["Google LLC"],
+      "aliases": [
+        "Google LLC"
+      ],
       "brand_color": "#4285F4",
       "logo": "google.svg",
       "brand_source": "https://partnermarketinghub.withgoogle.com"
@@ -46,7 +59,10 @@
       "company_id": "NASDAQ:AMZN",
       "name": "Amazon",
       "ticker": "AMZN",
-      "aliases": ["Amazon.com", "Amazon.com, Inc."],
+      "aliases": [
+        "Amazon.com",
+        "Amazon.com, Inc."
+      ],
       "brand_color": "#FF9900",
       "brand_source": "https://pages.awscloud.com/rs/112-TZM-766/images/Amazon%20Global_Brand%20Guidelines_DF_v3.pdf"
     },
@@ -54,13 +70,18 @@
       "company_id": "NASDAQ:MSFT",
       "name": "Microsoft",
       "ticker": "MSFT",
-      "aliases": ["Microsoft Corporation"]
+      "aliases": [
+        "Microsoft Corporation"
+      ]
     },
     {
       "company_id": "NASDAQ:META",
       "name": "Meta",
       "ticker": "META",
-      "aliases": ["Meta Platforms", "Meta Platforms, Inc."],
+      "aliases": [
+        "Meta Platforms",
+        "Meta Platforms, Inc."
+      ],
       "brand_color": "#0467DF",
       "logo": "meta.svg",
       "brand_source": "https://www.meta.com"
@@ -69,7 +90,9 @@
       "company_id": "NASDAQ:AAPL",
       "name": "Apple",
       "ticker": "AAPL",
-      "aliases": ["Apple, Inc."],
+      "aliases": [
+        "Apple, Inc."
+      ],
       "brand_color": "#000000",
       "logo": "apple.svg",
       "brand_source": "https://www.apple.com"
@@ -87,7 +110,9 @@
       "company_id": "NYSE:DELL",
       "name": "Dell",
       "ticker": "DELL",
-      "aliases": ["Dell Technologies"],
+      "aliases": [
+        "Dell Technologies"
+      ],
       "brand_color": "#007DB8",
       "logo": "dell.svg",
       "brand_source": "https://www.dell.com"
@@ -105,13 +130,410 @@
       "company_id": "NYSE:ORCL",
       "name": "Oracle",
       "ticker": "ORCL",
-      "aliases": ["Oracle Cloud Infrastructure"]
+      "aliases": [
+        "Oracle Cloud Infrastructure"
+      ]
     },
     {
       "company_id": "NYSE:HPE",
       "name": "HPE",
       "ticker": "HPE",
-      "aliases": ["Hewlett Packard Enterprise"]
+      "aliases": [
+        "Hewlett Packard Enterprise"
+      ]
+    },
+    {
+      "company_id": "NASDAQ:AMD",
+      "name": "AMD",
+      "ticker": "AMD",
+      "aliases": [
+        "Advanced Micro Devices"
+      ],
+      "brand_color": "#ED1C24",
+      "logo": "amd.svg",
+      "brand_source": "https://www.amd.com"
+    },
+    {
+      "company_id": "NASDAQ:MU",
+      "name": "Micron",
+      "ticker": "MU",
+      "aliases": [
+        "Micron Technology"
+      ]
+    },
+    {
+      "company_id": "NASDAQ:ARM",
+      "name": "Arm",
+      "ticker": "ARM",
+      "aliases": [
+        "Arm Holdings"
+      ],
+      "brand_color": "#0091BD",
+      "logo": "arm.svg",
+      "brand_source": "https://www.arm.com"
+    },
+    {
+      "company_id": "NASDAQ:QCOM",
+      "name": "Qualcomm",
+      "ticker": "QCOM",
+      "aliases": [
+        "Qualcomm Incorporated"
+      ],
+      "brand_color": "#3253DC",
+      "logo": "qualcomm.svg",
+      "brand_source": "https://www.qualcomm.com"
+    },
+    {
+      "company_id": "NASDAQ:AVGO",
+      "name": "Broadcom",
+      "ticker": "AVGO",
+      "aliases": [
+        "Broadcom Inc."
+      ],
+      "brand_color": "#E31837",
+      "logo": "broadcom.svg",
+      "brand_source": "https://www.broadcom.com"
+    },
+    {
+      "company_id": "NASDAQ:CSCO",
+      "name": "Cisco",
+      "ticker": "CSCO",
+      "aliases": [
+        "Cisco Systems"
+      ],
+      "brand_color": "#1BA0D7",
+      "logo": "cisco.svg",
+      "brand_source": "https://www.cisco.com"
+    },
+    {
+      "company_id": "NYSE:IBM",
+      "name": "IBM",
+      "ticker": "IBM",
+      "aliases": [
+        "International Business Machines"
+      ]
+    },
+    {
+      "company_id": "NASDAQ:TSLA",
+      "name": "Tesla",
+      "ticker": "TSLA",
+      "aliases": [
+        "Tesla, Inc."
+      ],
+      "brand_color": "#CC0000",
+      "logo": "tesla.svg",
+      "brand_source": "https://www.tesla.com"
+    },
+    {
+      "company_id": "NYSE:TSM",
+      "name": "TSMC",
+      "ticker": "TSM",
+      "aliases": [
+        "Taiwan Semiconductor Manufacturing",
+        "Taiwan Semiconductor"
+      ]
+    },
+    {
+      "company_id": "NASDAQ:SMCI",
+      "name": "Super Micro Computer",
+      "ticker": "SMCI",
+      "aliases": [
+        "Supermicro",
+        "Super Micro"
+      ],
+      "brand_color": "#151F6D",
+      "logo": "supermicro.svg",
+      "brand_source": "https://www.supermicro.com"
+    },
+    {
+      "company_id": "NASDAQ:CRWV",
+      "name": "CoreWeave",
+      "ticker": "CRWV",
+      "aliases": []
+    },
+    {
+      "company_id": "NASDAQ:ASML",
+      "name": "ASML",
+      "ticker": "ASML",
+      "aliases": [
+        "ASML Holding"
+      ]
+    },
+    {
+      "company_id": "KRX:005380",
+      "name": "현대자동차",
+      "ticker": "005380",
+      "aliases": [
+        "Hyundai Motor",
+        "Hyundai Motor Company"
+      ],
+      "brand_color": "#002C5E",
+      "logo": "hyundai.svg",
+      "brand_source": "https://www.hyundai.com"
+    },
+    {
+      "company_id": "KRX:000270",
+      "name": "기아",
+      "ticker": "000270",
+      "aliases": [
+        "Kia",
+        "Kia Corporation"
+      ],
+      "brand_color": "#05141F",
+      "logo": "kia.svg",
+      "brand_source": "https://www.kia.com"
+    },
+    {
+      "company_id": "KRX:373220",
+      "name": "LG에너지솔루션",
+      "ticker": "373220",
+      "aliases": [
+        "LG Energy Solution",
+        "LGES"
+      ]
+    },
+    {
+      "company_id": "KRX:066570",
+      "name": "LG전자",
+      "ticker": "066570",
+      "aliases": [
+        "LG Electronics"
+      ],
+      "brand_color": "#A50034",
+      "logo": "lg.svg",
+      "brand_source": "https://www.lg.com"
+    },
+    {
+      "company_id": "KRX:006400",
+      "name": "삼성SDI",
+      "ticker": "006400",
+      "aliases": [
+        "Samsung SDI"
+      ]
+    },
+    {
+      "company_id": "KRX:005490",
+      "name": "POSCO홀딩스",
+      "ticker": "005490",
+      "aliases": [
+        "POSCO Holdings",
+        "POSCO"
+      ]
+    },
+    {
+      "company_id": "KRX:017670",
+      "name": "SK텔레콤",
+      "ticker": "017670",
+      "aliases": [
+        "SK Telecom",
+        "SKT"
+      ]
+    },
+    {
+      "company_id": "KRX:035420",
+      "name": "NAVER",
+      "ticker": "035420",
+      "aliases": [
+        "네이버",
+        "Naver"
+      ],
+      "brand_color": "#03C75A",
+      "logo": "naver.svg",
+      "brand_source": "https://www.navercorp.com"
+    },
+    {
+      "company_id": "NYSE:GM",
+      "name": "General Motors",
+      "ticker": "GM",
+      "aliases": [
+        "GM",
+        "제너럴모터스"
+      ],
+      "brand_color": "#0170CE",
+      "logo": "generalmotors.svg",
+      "brand_source": "https://www.gm.com"
+    },
+    {
+      "company_id": "NYSE:UBER",
+      "name": "Uber",
+      "ticker": "UBER",
+      "aliases": [
+        "Uber Technologies"
+      ],
+      "brand_color": "#000000",
+      "logo": "uber.svg",
+      "brand_source": "https://www.uber.com"
+    },
+    {
+      "company_id": "NASDAQ:CRWD",
+      "name": "CrowdStrike",
+      "ticker": "CRWD",
+      "aliases": []
+    },
+    {
+      "company_id": "NASDAQ:PANW",
+      "name": "Palo Alto Networks",
+      "ticker": "PANW",
+      "aliases": [],
+      "brand_color": "#F04E23",
+      "logo": "paloaltonetworks.svg",
+      "brand_source": "https://www.paloaltonetworks.com"
+    },
+    {
+      "company_id": "NYSE:CRM",
+      "name": "Salesforce",
+      "ticker": "CRM",
+      "aliases": []
+    },
+    {
+      "company_id": "NYSE:NOW",
+      "name": "ServiceNow",
+      "ticker": "NOW",
+      "aliases": []
+    },
+    {
+      "company_id": "NASDAQ:PLTR",
+      "name": "Palantir",
+      "ticker": "PLTR",
+      "aliases": [
+        "Palantir Technologies"
+      ],
+      "brand_color": "#101113",
+      "logo": "palantir.svg",
+      "brand_source": "https://www.palantir.com"
+    },
+    {
+      "company_id": "NYSE:SNOW",
+      "name": "Snowflake",
+      "ticker": "SNOW",
+      "aliases": [],
+      "brand_color": "#29B5E8",
+      "logo": "snowflake.svg",
+      "brand_source": "https://www.snowflake.com"
+    },
+    {
+      "company_id": "NASDAQ:SNPS",
+      "name": "Synopsys",
+      "ticker": "SNPS",
+      "aliases": []
+    },
+    {
+      "company_id": "NASDAQ:CDNS",
+      "name": "Cadence",
+      "ticker": "CDNS",
+      "aliases": [
+        "Cadence Design Systems"
+      ]
+    },
+    {
+      "company_id": "NASDAQ:NTAP",
+      "name": "NetApp",
+      "ticker": "NTAP",
+      "aliases": [],
+      "brand_color": "#0067C5",
+      "logo": "netapp.svg",
+      "brand_source": "https://www.netapp.com"
+    },
+    {
+      "company_id": "NASDAQ:NBIS",
+      "name": "Nebius",
+      "ticker": "NBIS",
+      "aliases": []
+    },
+    {
+      "company_id": "NYSE:VRT",
+      "name": "Vertiv",
+      "ticker": "VRT",
+      "aliases": []
+    },
+    {
+      "company_id": "NASDAQ:ADBE",
+      "name": "Adobe",
+      "ticker": "ADBE",
+      "aliases": []
+    },
+    {
+      "company_id": "NYSE:NET",
+      "name": "Cloudflare",
+      "ticker": "NET",
+      "aliases": [],
+      "brand_color": "#F38020",
+      "logo": "cloudflare.svg",
+      "brand_source": "https://www.cloudflare.com"
+    },
+    {
+      "company_id": "TSE:9984",
+      "name": "SoftBank Group",
+      "ticker": "9984",
+      "aliases": [
+        "SoftBank"
+      ]
+    },
+    {
+      "company_id": "KRX:009830",
+      "name": "한화솔루션",
+      "ticker": "009830",
+      "aliases": [
+        "Hanwha Solutions",
+        "Hanwha Q CELLS"
+      ]
+    },
+    {
+      "company_id": "KRX:047050",
+      "name": "포스코인터내셔널",
+      "ticker": "047050",
+      "aliases": [
+        "POSCO International"
+      ]
+    },
+    {
+      "company_id": "KRX:028260",
+      "name": "삼성물산",
+      "ticker": "028260",
+      "aliases": [
+        "Samsung C&T"
+      ]
+    },
+    {
+      "company_id": "KRX:009150",
+      "name": "삼성전기",
+      "ticker": "009150",
+      "aliases": [
+        "Samsung Electro-Mechanics"
+      ]
+    },
+    {
+      "company_id": "KRX:018260",
+      "name": "삼성에스디에스",
+      "ticker": "018260",
+      "aliases": [
+        "Samsung SDS",
+        "삼성SDS"
+      ]
+    },
+    {
+      "company_id": "KRX:030200",
+      "name": "KT",
+      "ticker": "030200",
+      "aliases": [
+        "케이티"
+      ]
+    },
+    {
+      "company_id": "KRX:032640",
+      "name": "LG유플러스",
+      "ticker": "032640",
+      "aliases": [
+        "LG Uplus"
+      ]
+    },
+    {
+      "company_id": "KRX:011070",
+      "name": "LG이노텍",
+      "ticker": "011070",
+      "aliases": [
+        "LG Innotek"
+      ]
     }
   ]
 }
