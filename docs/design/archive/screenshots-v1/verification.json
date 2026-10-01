@@ -1,0 +1,33 @@
+{
+  "surface": "Vite production preview http://127.0.0.1:4173 with BFF http://127.0.0.1:8787",
+  "source": "ZOOP_SOURCE=snapshot, default PoC synthetic inspect fixture; no frontend mock data outside /design-system",
+  "build": "pnpm build and pnpm typecheck passed",
+  "screenshots": ["01-design-system-light.png", "02-design-system-dark.png", "03-login.png", "04-onboarding-watchlist.png", "05-tutorial-node-detail.png", "06-main-graph.png", "07-issue-panel.png", "08-evidence-poc-quote.png", "09-ai-example-answer.png", "10-ai-insufficient-evidence.png", "11-briefing.png", "12-main-mobile.png", "13-approved-edge-panel.png", "14-company-timeline.png", "15-bff-stopped-error.png"],
+  "axe": {
+    "designSystemLight": {"serious": 0, "critical": 0, "violations": 0},
+    "designSystemDark": {"serious": 0, "critical": 0, "violations": 0},
+    "main": {"serious": 0, "critical": 0, "violations": 0},
+    "briefing": {"serious": 0, "critical": 0, "violations": 0}
+  },
+  "console": "0 JavaScript page errors and 0 console.error messages in final scenarios. Browser diagnostics separately recorded canceled requests during route/query transitions (ERR_ABORTED), not JavaScript exceptions.",
+  "checks": [
+    "Graph repair: four reload/mode scenarios market/watchlist kept complete node+label bounding boxes inside canvas with no pairwise overlap; evidence sheet preserved pan/zoom. Measurements: graph-layout-verification.json. Replaced 06-main-graph.png and 11-briefing.png.",
+    "Zero selected watchlist items blocked next button",
+    "Demo login, watchlist selection, tutorial node click, detail focus, completion saved and main opened",
+    "Evidence sheet rendered PoC quote and verified badge; closing preserved identical graph pan, zoom, selection URL and restored trigger focus",
+    "AI example answer displayed BFF citations; prediction question returned insufficient_evidence and visible answer-held state",
+    "Keyboard ArrowDown/Enter opened approved-edge panel, heading received focus, Escape returned to original relation item",
+    "390px mobile main defaulted to list; document scrollWidth equaled innerWidth (390), no horizontal overflow",
+    "BFF process actually stopped; changing graph mode displayed bff_unreachable error and retry instead of empty list",
+    "Guest market-only flow and disabled assets/watchlist controls",
+    "Virtual account connection then tutorial and assets main with cost-basis weights",
+    "Revisiting /onboarding after completion redirected to /"
+  ],
+  "limits": [
+    "Real-news integration deferred to Main per instruction; these quotes are from PoC synthetic snapshot, explicitly labeled synthetic-preview",
+    "Default fixture has one company and no SHARES_ISSUE/FOLLOWS/STRUCTURALLY_RELATED_TO edges; all edge styles shown in static design-system demo, production derived-edge panel not exercised against actual fixture",
+    "Mobile Sheet supports bottom placement up to 90dvh, not draggable three-point snapping",
+    "Initial graph query is capped at 20 nodes; incremental neighbor expansion is not exposed",
+    "Build emits bundle-size warning (~1.15 MB JS before gzip); build succeeds"
+  ]
+}

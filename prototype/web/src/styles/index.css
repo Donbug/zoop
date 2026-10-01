@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@import "./tokens.css";
+/* git 저장소가 아니라 .gitignore 기반 제외가 동작하지 않는다. 빌드 산출물의 옛 클래스가 CSS에 섞이지 않게 뺀다. */
+@source not "../../dist";
+
+/* 모바일은 ≤768px(useMediaQuery("(max-width: 768px)")와 같은 기준). md:는 769px부터 적용된다. */
+@theme {
+  --breakpoint-md: 48.0625rem;
+}
+
+/* SUIT Variable 자체 호스팅(@sun-typeface/suit@2.0.5, OFL-1.1). 글꼴이 늦게 와도 글자는 먼저 보인다. */
+@font-face {
+  font-family: "SUIT Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.woff2") format("woff2-variations");
+}
+
+/* 다크 테마는 <html data-theme="dark">로 켠다. dark: 변형도 같은 기준을 쓴다. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    background: var(--color-surface-base);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    min-height: 100dvh;
+  }
+  /* 수치 요소(시각·표·수치 입력)는 자릿수가 흔들리지 않도록 고정폭 숫자를 쓴다. 문장 속 숫자는 비례폭 그대로. */
+  time,
+  table,
+  data,
+  input,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border-subtle);
+  }
+  /* 키보드 포커스는 항상 보이게: 2px 브랜드 외곽선 + 2px 간격 */
+  :focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-surface-selected);
+  }
+}
+
+/* 사용자가 '동작 줄이기'를 켠 경우 애니메이션·전환을 사실상 끈다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- 모션(SEED Motion 값: docs/design/tokens.json motion) ----
+ * 마이크로(≤200ms): 호버·눌림·선택 표시. 매크로(>200ms): 화면·시트·다이얼로그.
+ * 등장은 enter 곡선 + normal, 퇴장은 exit 곡선 + exit(더 짧게). transform·opacity만 움직이고 오버슈트는 쓰지 않는다.
+ * 동작 줄이기에서는 위 전역 규칙이 시간을 0으로 만든다(Radix는 animationend를 그대로 받는다). */
+
+@utility transition-token {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, scale;
+  transition-duration: var(--zoop-motion-duration-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
+/* SEED Feedback/Scale: 눌리는 동안 세로로 2px 줄어든다. 배율 = (basis-2)/basis, basis = max(높이, 폭÷4, 24).
+ * 44px 컨트롤은 0.955, 36px은 0.945. 넓은 버튼(w-full)은 --press-scale로 0.977을 준다. 로딩·비활성은 줄지 않는다. */
+@utility pressable {
+  transition-property: color, background-color, border-color, box-shadow, opacity, scale;
+  transition-duration: var(--zoop-motion-duration-fast);
+  transition-timing-function: var(--ease-enter);
+  &:active:not(:disabled, [aria-busy="true"], [aria-disabled="true"]) {
+    scale: var(--press-scale, 0.955);
+  }
+}
+
+/* 화면 전환: 새 화면이 아래에서 8px 떠오르며 나타난다(경로가 바뀔 때마다 다시 붙는다). */
+@utility motion-page {
+  /* backwards: 끝난 뒤에는 효과가 남지 않아 고정 위치·쌓임 맥락을 바꾸지 않는다. */
+  animation: zoop-rise-in var(--zoop-motion-duration-normal) var(--ease-enter) backwards;
+}
+
+/* 떠 있는 표면 진입/퇴장(Radix data-state). 퇴장은 fill-mode forwards로 깜박임 없이 끝난다. */
+@utility motion-scrim {
+  &[data-state="open"] {
+    animation: zoop-fade-in var(--zoop-motion-duration-normal) var(--ease-enter);
+  }
+  &[data-state="closed"] {
+    animation: zoop-fade-out var(--zoop-motion-duration-exit) var(--ease-exit) forwards;
+  }
+}
+@utility motion-sheet-bottom {
+  &[data-state="open"] {
+    animation: zoop-sheet-in-bottom var(--zoop-motion-duration-normal) var(--ease-enter);
+  }
+  &[data-state="closed"] {
+    animation: zoop-sheet-out-bottom var(--zoop-motion-duration-exit) var(--ease-exit) forwards;
+  }
+}
+@utility motion-sheet-right {
+  &[data-state="open"] {
+    animation: zoop-sheet-in-right var(--zoop-motion-duration-slow) var(--ease-enter);
+  }
+  &[data-state="closed"] {
+    animation: zoop-sheet-out-right var(--zoop-motion-duration-exit) var(--ease-exit) forwards;
+  }
+}
+@utility motion-dialog {
+  &[data-state="open"] {
+    animation: zoop-zoom-in var(--zoop-motion-duration-normal) var(--ease-enter);
+  }
+  &[data-state="closed"] {
+    animation: zoop-zoom-out var(--zoop-motion-duration-exit) var(--ease-exit) forwards;
+  }
+}
+/* 팝오버·메뉴·툴팁: 마이크로 모션(짧게 떠오름) */
+@utility motion-pop {
+  &[data-state="open"],
+  &[data-state="delayed-open"],
+  &[data-state="instant-open"] {
+    animation: zoop-pop-in var(--zoop-motion-duration-fast) var(--ease-enter);
+  }
+  &[data-state="closed"] {
+    animation: zoop-fade-out var(--zoop-motion-duration-d2) var(--ease-exit) forwards;
+  }
+}
+@utility motion-toast {
+  &[data-state="open"] {
+    animation: zoop-rise-in var(--zoop-motion-duration-normal) var(--ease-enter);
+  }
+  &[data-state="closed"] {
+    animation: zoop-fade-out var(--zoop-motion-duration-exit) var(--ease-exit) forwards;
+  }
+  &[data-swipe="move"] {
+    transform: translateX(var(--radix-toast-swipe-move-x));
+  }
+  &[data-swipe="end"] {
+    animation: zoop-toast-swipe-out var(--zoop-motion-duration-exit) var(--ease-exit) forwards;
+  }
+}
+
+/* 목록 첫 표시: 행이 30ms 간격으로 떠오른다. 8번째 행부터는 같은 지연으로 함께. */
+@utility stagger {
+  & > * {
+    animation: zoop-rise-in var(--zoop-motion-duration-normal) var(--ease-enter) backwards;
+  }
+  & > :nth-child(2) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 1); }
+  & > :nth-child(3) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 2); }
+  & > :nth-child(4) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 3); }
+  & > :nth-child(5) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 4); }
+  & > :nth-child(6) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 5); }
+  & > :nth-child(7) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 6); }
+  & > :nth-child(n + 8) { animation-delay: calc(var(--zoop-motion-duration-stagger) * 7); }
+}
+
+/* 모바일 하단 탭바(56px) + 기기 안전 영역만큼 본문 아래 여백을 둔다. */
+@utility pb-tabbar {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+}
+
+/* 튜토리얼이 가리키는 대상: 오버레이로 덮지 않고 점선 테두리로만 표시한다(키보드 포커스의 실선과 구분). */
+.tutorial-target {
+  outline: 2px dashed var(--color-brand-primary);
+  outline-offset: 3px;
+}
+.tutorial-target[data-graph-canvas],
+aside.tutorial-target {
+  outline-offset: -3px;
+}
+.tutorial-target:focus-visible {
+  outline-style: solid;
+  outline-color: var(--color-border-focus);
+}
+
+@keyframes zoop-sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes zoop-sheet-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes zoop-sheet-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes zoop-sheet-out-bottom {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes zoop-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes zoop-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes zoop-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@keyframes zoop-pop-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+/* 다이얼로그는 가운데 정렬에 transform(translate -50%)을 쓰므로 scale 속성만 움직인다. */
+@keyframes zoop-zoom-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes zoop-zoom-out {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+@keyframes zoop-toast-swipe-out {
+  from {
+    transform: translateX(var(--radix-toast-swipe-end-x));
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}

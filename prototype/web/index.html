@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="줍(Zoop) — 내 종목 주변 사건의 연결과 근거를 보여주는 금융 지도 (프로토타입)" />
+    <title>줍 (Zoop) 프로토타입</title>
+    <script>
+      // 화면이 깜빡이지 않도록 저장된 테마를 가장 먼저 적용한다.
+      try {
+        if (localStorage.getItem("zoop-theme") === "dark") document.documentElement.dataset.theme = "dark";
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

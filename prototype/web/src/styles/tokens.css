@@ -1,0 +1,202 @@
+/* 자동 생성 파일입니다. 직접 수정하지 마세요.
+ * 원본: docs/design/tokens.json → 수정 후 `pnpm tokens` (dev/build 시 자동 실행) */
+
+:root {
+  color-scheme: light;
+  --zoop-brand-primary: #0A5C48;
+  --zoop-brand-primary-hover: #0E7059;
+  --zoop-brand-primary-active: #074838;
+  --zoop-brand-primary-foreground: #FFFFFF;
+  --zoop-surface-base: #F8FAF9;
+  --zoop-surface-raised: #FFFFFF;
+  --zoop-surface-overlay: #FFFFFF;
+  --zoop-surface-sunken: #F0F3F2;
+  --zoop-surface-selected: #E4F5EE;
+  --zoop-border-subtle: #DFE4E2;
+  --zoop-border-strong: #C2C9C6;
+  --zoop-border-control: #818885;
+  --zoop-border-focus: #0A5C48;
+  --zoop-text-primary: #19201D;
+  --zoop-text-secondary: #474F4C;
+  --zoop-text-tertiary: #636B68;
+  --zoop-text-inverse: #FFFFFF;
+  --zoop-up: #BE222A;
+  --zoop-down: #145EC1;
+  --zoop-warning: #915C08;
+  --zoop-error: #B21F41;
+  --zoop-graph-node-issue: #4B5652;
+  --zoop-graph-node-glyph: #FFFFFF;
+  --zoop-graph-node-mark: #19201D;
+  --zoop-graph-company-fallback-1: #2F6F9F;
+  --zoop-graph-company-fallback-2: #8A5A2B;
+  --zoop-graph-company-fallback-3: #6B4FA0;
+  --zoop-graph-company-fallback-4: #2E7D5B;
+  --zoop-graph-company-fallback-5: #A2463F;
+  --zoop-graph-company-fallback-6: #5B6B2A;
+  --zoop-graph-company-fallback-7: #2B7A85;
+  --zoop-graph-company-fallback-8: #8E4A78;
+  --zoop-graph-focus-ring: #0A5C48;
+  --zoop-graph-dimmed-opacity: 0.22;
+  --zoop-graph-edge-involves: #2D6359;
+  --zoop-graph-edge-structurally-related: #626B68;
+  --zoop-graph-edge-follows: #895F34;
+  --zoop-graph-edge-shares-issue: #858B88;
+  --zoop-graph-edge-label: #474F4C;
+  --zoop-motion-duration-d1: 50ms;
+  --zoop-motion-duration-d2: 100ms;
+  --zoop-motion-duration-d3: 150ms;
+  --zoop-motion-duration-d4: 200ms;
+  --zoop-motion-duration-d5: 250ms;
+  --zoop-motion-duration-d6: 300ms;
+  --zoop-motion-duration-fast: 150ms;
+  --zoop-motion-duration-exit: 200ms;
+  --zoop-motion-duration-normal: 250ms;
+  --zoop-motion-duration-slow: 300ms;
+  --zoop-motion-duration-graph-layout: 600ms;
+  --zoop-motion-duration-stagger: 30ms;
+  --zoop-motion-easing-linear: cubic-bezier(0, 0, 1, 1);
+  --zoop-motion-easing-standard: cubic-bezier(0.35, 0, 0.35, 1);
+  --zoop-motion-easing-enter: cubic-bezier(0, 0, 0.15, 1);
+  --zoop-motion-easing-exit: cubic-bezier(0.35, 0, 1, 1);
+  --zoop-motion-easing-enter-expressive: cubic-bezier(0.03, 0.4, 0.1, 1);
+  --zoop-motion-easing-exit-expressive: cubic-bezier(0.35, 0, 0.95, 0.55);
+  --zoop-motion-press-distance: 2px;
+  --zoop-motion-reduced-duration: 0ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --zoop-brand-primary: #47A189;
+  --zoop-brand-primary-hover: #58B198;
+  --zoop-brand-primary-active: #36927A;
+  --zoop-brand-primary-foreground: #0A1612;
+  --zoop-surface-base: #0E1110;
+  --zoop-surface-raised: #161918;
+  --zoop-surface-overlay: #1D2220;
+  --zoop-surface-sunken: #090C0B;
+  --zoop-surface-selected: #1A2A25;
+  --zoop-border-subtle: #2B2F2D;
+  --zoop-border-strong: #3E4442;
+  --zoop-border-control: #6B726F;
+  --zoop-border-focus: #47A189;
+  --zoop-text-primary: #ECEFEE;
+  --zoop-text-secondary: #BABFBD;
+  --zoop-text-tertiary: #979D9A;
+  --zoop-text-inverse: #0E1110;
+  --zoop-up: #EB827B;
+  --zoop-down: #79A6E9;
+  --zoop-warning: #D9AF75;
+  --zoop-error: #EA808A;
+  --zoop-graph-node-issue: #7C8985;
+  --zoop-graph-node-glyph: #0E1110;
+  --zoop-graph-node-mark: #ECEFEE;
+  --zoop-graph-focus-ring: #47A189;
+  --zoop-graph-dimmed-opacity: 0.22;
+  --zoop-graph-edge-involves: #83AFA6;
+  --zoop-graph-edge-structurally-related: #8D9491;
+  --zoop-graph-edge-follows: #C8A47A;
+  --zoop-graph-edge-shares-issue: #6D7371;
+  --zoop-graph-edge-label: #BABFBD;
+}
+
+/* 사용자가 '동작 줄이기'를 켜면 모든 전환 시간을 0으로 만든다. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --zoop-motion-duration-d1: 0ms;
+    --zoop-motion-duration-d2: 0ms;
+    --zoop-motion-duration-d3: 0ms;
+    --zoop-motion-duration-d4: 0ms;
+    --zoop-motion-duration-d5: 0ms;
+    --zoop-motion-duration-d6: 0ms;
+    --zoop-motion-duration-fast: 0ms;
+    --zoop-motion-duration-exit: 0ms;
+    --zoop-motion-duration-normal: 0ms;
+    --zoop-motion-duration-slow: 0ms;
+    --zoop-motion-duration-graph-layout: 0ms;
+    --zoop-motion-duration-stagger: 0ms;
+  }
+}
+
+@theme {
+  --color-*: initial;
+  --text-*: initial;
+  --shadow-*: initial;
+  --radius-*: initial;
+  --font-sans: "SUIT Variable", SUIT, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.02em;
+  --spacing: 4px;
+  --radius-none: 0px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --shadow-none: 0px 0px 0px 0px transparent;
+  --shadow-raised: 0px 1px 2px 0px rgba(12, 18, 16, 0.08);
+  --shadow-overlay: 0px 4px 16px -2px rgba(12, 18, 16, 0.12);
+  --shadow-modal: 0px 12px 32px -4px rgba(12, 18, 16, 0.20);
+  --ease-linear: cubic-bezier(0, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.35, 0, 0.35, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.15, 1);
+  --ease-exit: cubic-bezier(0.35, 0, 1, 1);
+  --ease-enter-expressive: cubic-bezier(0.03, 0.4, 0.1, 1);
+  --ease-exit-expressive: cubic-bezier(0.35, 0, 0.95, 0.55);
+}
+
+/* 색은 테마에 따라 바뀌므로 변수 참조(inline)로 연결한다. */
+@theme inline {
+  --color-brand-primary: var(--zoop-brand-primary);
+  --color-brand-primary-hover: var(--zoop-brand-primary-hover);
+  --color-brand-primary-active: var(--zoop-brand-primary-active);
+  --color-brand-primary-foreground: var(--zoop-brand-primary-foreground);
+  --color-surface-base: var(--zoop-surface-base);
+  --color-surface-raised: var(--zoop-surface-raised);
+  --color-surface-overlay: var(--zoop-surface-overlay);
+  --color-surface-sunken: var(--zoop-surface-sunken);
+  --color-surface-selected: var(--zoop-surface-selected);
+  --color-border-subtle: var(--zoop-border-subtle);
+  --color-border-strong: var(--zoop-border-strong);
+  --color-border-control: var(--zoop-border-control);
+  --color-border-focus: var(--zoop-border-focus);
+  --color-text-primary: var(--zoop-text-primary);
+  --color-text-secondary: var(--zoop-text-secondary);
+  --color-text-tertiary: var(--zoop-text-tertiary);
+  --color-text-inverse: var(--zoop-text-inverse);
+  --color-up: var(--zoop-up);
+  --color-down: var(--zoop-down);
+  --color-warning: var(--zoop-warning);
+  --color-error: var(--zoop-error);
+  --color-graph-node-issue: var(--zoop-graph-node-issue);
+  --color-graph-node-glyph: var(--zoop-graph-node-glyph);
+  --color-graph-node-mark: var(--zoop-graph-node-mark);
+  --color-graph-company-fallback-1: var(--zoop-graph-company-fallback-1);
+  --color-graph-company-fallback-2: var(--zoop-graph-company-fallback-2);
+  --color-graph-company-fallback-3: var(--zoop-graph-company-fallback-3);
+  --color-graph-company-fallback-4: var(--zoop-graph-company-fallback-4);
+  --color-graph-company-fallback-5: var(--zoop-graph-company-fallback-5);
+  --color-graph-company-fallback-6: var(--zoop-graph-company-fallback-6);
+  --color-graph-company-fallback-7: var(--zoop-graph-company-fallback-7);
+  --color-graph-company-fallback-8: var(--zoop-graph-company-fallback-8);
+  --color-graph-focus-ring: var(--zoop-graph-focus-ring);
+  --color-graph-edge-involves: var(--zoop-graph-edge-involves);
+  --color-graph-edge-structurally-related: var(--zoop-graph-edge-structurally-related);
+  --color-graph-edge-follows: var(--zoop-graph-edge-follows);
+  --color-graph-edge-shares-issue: var(--zoop-graph-edge-shares-issue);
+  --color-graph-edge-label: var(--zoop-graph-edge-label);
+}

@@ -1,0 +1,1102 @@
+{
+  "issues": [
+    {
+      "issue_id": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+      "mentions": [
+        {
+          "title": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+          "action": "실적 발표",
+          "period": "2026-Q1",
+          "target": "메모리 실적",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 실적"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-multi",
+          "background": false,
+          "event_time": "2026-04-10",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-q1",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24",
+          "assertion_status": "announced"
+        },
+        {
+          "title": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+          "action": "실적 발표",
+          "period": "2026-Q1",
+          "target": "메모리 실적",
+          "evidence": [
+            {
+              "end": 45,
+              "quote": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+              "start": 0,
+              "article_id": "synthetic-repeat",
+              "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 실적"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-repeat",
+          "background": false,
+          "event_time": "2026-04-10",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-q1-repeat",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16",
+          "assertion_status": "announced"
+        }
+      ],
+      "articles": [
+        {
+          "url": "https://synthetic.invalid/synthetic-multi",
+          "body": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다. 별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+          "title": "[SYNTHETIC] 통제 흐름 예제",
+          "language": "ko",
+          "origin_id": "synthetic-origin-synthetic-multi",
+          "publisher": "SYNTHETIC—not real news",
+          "synthetic": true,
+          "withdrawn": false,
+          "article_id": "synthetic-multi",
+          "input_kind": "body",
+          "collected_at": "2026-09-16T00:00:00+00:00",
+          "published_at": "2026-09-16T00:00:00+00:00",
+          "allow_model_send": false
+        },
+        {
+          "url": "https://synthetic.invalid/synthetic-repeat",
+          "body": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+          "title": "[SYNTHETIC] 통제 흐름 예제",
+          "language": "ko",
+          "origin_id": "synthetic-origin-synthetic-multi",
+          "publisher": "SYNTHETIC—not real news",
+          "synthetic": true,
+          "withdrawn": false,
+          "article_id": "synthetic-repeat",
+          "input_kind": "body",
+          "collected_at": "2026-09-16T00:00:00+00:00",
+          "published_at": "2026-09-16T00:00:00+00:00",
+          "allow_model_send": false
+        }
+      ],
+      "relations": [
+        {
+          "role": null,
+          "basis": [],
+          "source": "synthetic-multi",
+          "target": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "relation_id": "relation-69085a2c5025ec973e62b73d",
+          "relation_type": "REPORTS",
+          "assertion_status": null,
+          "candidate_ids": [
+            "candidate-3112cdeb376c3e4aeb285c5d"
+          ]
+        },
+        {
+          "role": "발표자",
+          "basis": [],
+          "source": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+          "target": "SYNTH-ALPHA",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "relation_id": "relation-5d493f3ab98f88105bcd73cb",
+          "relation_type": "INVOLVES",
+          "assertion_status": "announced",
+          "candidate_ids": [
+            "candidate-3112cdeb376c3e4aeb285c5d"
+          ]
+        },
+        {
+          "role": null,
+          "basis": [],
+          "source": "synthetic-repeat",
+          "target": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+          "evidence": [
+            {
+              "end": 45,
+              "quote": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+              "start": 0,
+              "article_id": "synthetic-repeat",
+              "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16"
+            }
+          ],
+          "relation_id": "relation-925448e9d3a44629b8d33d63",
+          "relation_type": "REPORTS",
+          "assertion_status": null,
+          "candidate_ids": [
+            "candidate-5fbd505e85d52ac3d7896eb5"
+          ]
+        },
+        {
+          "role": "발표자",
+          "basis": [],
+          "source": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+          "target": "SYNTH-ALPHA",
+          "evidence": [
+            {
+              "end": 45,
+              "quote": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+              "start": 0,
+              "article_id": "synthetic-repeat",
+              "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16"
+            }
+          ],
+          "relation_id": "relation-f9ed7497192d2b0f134c645f",
+          "relation_type": "INVOLVES",
+          "assertion_status": "announced",
+          "candidate_ids": [
+            "candidate-5fbd505e85d52ac3d7896eb5"
+          ]
+        }
+      ],
+      "candidate_ids": [
+        "candidate-3112cdeb376c3e4aeb285c5d",
+        "candidate-5fbd505e85d52ac3d7896eb5"
+      ],
+      "field_decisions": [
+        {
+          "candidate_id": "candidate-3112cdeb376c3e4aeb285c5d",
+          "mention_id": "synthetic-q1",
+          "outcomes": []
+        },
+        {
+          "candidate_id": "candidate-5fbd505e85d52ac3d7896eb5",
+          "mention_id": "synthetic-q1-repeat",
+          "outcomes": []
+        }
+      ],
+      "source_support": {
+        "article_count": 2,
+        "known_lineage_count": 1,
+        "unknown_lineage_articles": [],
+        "independent_source_count": 1,
+        "duplicate_groups": []
+      }
+    },
+    {
+      "issue_id": "issue-274a2d51925bcf4e2a20ae5a",
+      "mentions": [
+        {
+          "title": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+          "action": "가동 중단",
+          "period": null,
+          "target": "합성 평택공장",
+          "evidence": [
+            {
+              "end": 68,
+              "quote": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+              "start": 40,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "합성 평택공장"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-multi",
+          "background": false,
+          "event_time": "2026-04-11",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-plant",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24",
+          "assertion_status": "occurred"
+        }
+      ],
+      "articles": [
+        {
+          "url": "https://synthetic.invalid/synthetic-multi",
+          "body": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다. 별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+          "title": "[SYNTHETIC] 통제 흐름 예제",
+          "language": "ko",
+          "origin_id": "synthetic-origin-synthetic-multi",
+          "publisher": "SYNTHETIC—not real news",
+          "synthetic": true,
+          "withdrawn": false,
+          "article_id": "synthetic-multi",
+          "input_kind": "body",
+          "collected_at": "2026-09-16T00:00:00+00:00",
+          "published_at": "2026-09-16T00:00:00+00:00",
+          "allow_model_send": false
+        }
+      ],
+      "relations": [
+        {
+          "role": null,
+          "basis": [],
+          "source": "synthetic-multi",
+          "target": "issue-274a2d51925bcf4e2a20ae5a",
+          "evidence": [
+            {
+              "end": 68,
+              "quote": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+              "start": 40,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "relation_id": "relation-619bbe3e8199a22ee9987d97",
+          "relation_type": "REPORTS",
+          "assertion_status": null,
+          "candidate_ids": [
+            "candidate-b50e4892b26bf2dd42f1050f"
+          ]
+        }
+      ],
+      "candidate_ids": [
+        "candidate-b50e4892b26bf2dd42f1050f"
+      ],
+      "field_decisions": [
+        {
+          "candidate_id": "candidate-b50e4892b26bf2dd42f1050f",
+          "mention_id": "synthetic-plant",
+          "outcomes": []
+        }
+      ],
+      "source_support": {
+        "article_count": 1,
+        "known_lineage_count": 1,
+        "unknown_lineage_articles": [],
+        "independent_source_count": 1,
+        "duplicate_groups": []
+      }
+    },
+    {
+      "issue_id": "issue-89ad5ad44679f34fb1c2c255",
+      "mentions": [
+        {
+          "title": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+          "action": "실적 발표",
+          "period": "2026-Q2",
+          "target": "메모리 실적",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-q2",
+              "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 실적"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-q2",
+          "background": false,
+          "event_time": "2026-07-10",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-q2",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29",
+          "assertion_status": "announced"
+        }
+      ],
+      "articles": [
+        {
+          "url": "https://synthetic.invalid/synthetic-q2",
+          "body": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+          "title": "[SYNTHETIC] 통제 흐름 예제",
+          "language": "ko",
+          "origin_id": "synthetic-origin-synthetic-q2",
+          "publisher": "SYNTHETIC—not real news",
+          "synthetic": true,
+          "withdrawn": false,
+          "article_id": "synthetic-q2",
+          "input_kind": "body",
+          "collected_at": "2026-09-16T00:00:00+00:00",
+          "published_at": "2026-09-16T00:00:00+00:00",
+          "allow_model_send": false
+        }
+      ],
+      "relations": [
+        {
+          "role": null,
+          "basis": [],
+          "source": "synthetic-q2",
+          "target": "issue-89ad5ad44679f34fb1c2c255",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-q2",
+              "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29"
+            }
+          ],
+          "relation_id": "relation-045f7fa3373cd7942a3f8e0d",
+          "relation_type": "REPORTS",
+          "assertion_status": null,
+          "candidate_ids": [
+            "candidate-4ba793fe64ad22a83e594716"
+          ]
+        },
+        {
+          "role": "발표자",
+          "basis": [],
+          "source": "issue-89ad5ad44679f34fb1c2c255",
+          "target": "SYNTH-ALPHA",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-q2",
+              "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29"
+            }
+          ],
+          "relation_id": "relation-6912ca4c4e5d12c91ff72ed5",
+          "relation_type": "INVOLVES",
+          "assertion_status": "announced",
+          "candidate_ids": [
+            "candidate-4ba793fe64ad22a83e594716"
+          ]
+        }
+      ],
+      "candidate_ids": [
+        "candidate-4ba793fe64ad22a83e594716"
+      ],
+      "field_decisions": [
+        {
+          "candidate_id": "candidate-4ba793fe64ad22a83e594716",
+          "mention_id": "synthetic-q2",
+          "outcomes": []
+        }
+      ],
+      "source_support": {
+        "article_count": 1,
+        "known_lineage_count": 1,
+        "unknown_lineage_articles": [],
+        "independent_source_count": 1,
+        "duplicate_groups": []
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "candidate": {
+        "mention": {
+          "title": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+          "action": "실적 발표",
+          "period": "2026-Q1",
+          "target": "메모리 실적",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 실적"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-multi",
+          "background": false,
+          "event_time": "2026-04-10",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-q1",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24",
+          "assertion_status": "announced"
+        },
+        "articles": [
+          {
+            "url": "https://synthetic.invalid/synthetic-multi",
+            "body": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다. 별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+            "title": "[SYNTHETIC] 통제 흐름 예제",
+            "language": "ko",
+            "origin_id": "synthetic-origin-synthetic-multi",
+            "publisher": "SYNTHETIC—not real news",
+            "synthetic": true,
+            "withdrawn": false,
+            "article_id": "synthetic-multi",
+            "input_kind": "body",
+            "collected_at": "2026-09-16T00:00:00+00:00",
+            "published_at": "2026-09-16T00:00:00+00:00",
+            "allow_model_send": false
+          }
+        ],
+        "issue_id": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+        "relations": [
+          {
+            "role": null,
+            "basis": [],
+            "source": "synthetic-multi",
+            "target": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+            "evidence": [
+              {
+                "end": 39,
+                "quote": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+                "start": 0,
+                "article_id": "synthetic-multi",
+                "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+              }
+            ],
+            "relation_id": "relation-69085a2c5025ec973e62b73d",
+            "relation_type": "REPORTS",
+            "assertion_status": null
+          },
+          {
+            "role": "발표자",
+            "basis": [],
+            "source": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+            "target": "SYNTH-ALPHA",
+            "evidence": [
+              {
+                "end": 39,
+                "quote": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다.",
+                "start": 0,
+                "article_id": "synthetic-multi",
+                "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+              }
+            ],
+            "relation_id": "relation-5d493f3ab98f88105bcd73cb",
+            "relation_type": "INVOLVES",
+            "assertion_status": "announced"
+          }
+        ],
+        "supersedes": [],
+        "candidate_id": "candidate-3112cdeb376c3e4aeb285c5d",
+        "prior_issues": [],
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "extraction_version": "fixture-model-1:prompt-1"
+      },
+      "validation": {
+        "trace": null,
+        "verdicts": [
+          {
+            "reason": "SYNTHETIC scripted identity decision",
+            "target": "issue",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-69085a2c5025ec973e62b73d",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-5d493f3ab98f88105bcd73cb",
+            "decision": "ALLOW"
+          }
+        ],
+        "candidate_id": "candidate-3112cdeb376c3e4aeb285c5d",
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "verifier_version": "fixture-model-1",
+        "candidate_revision": "0c49a67cef9b6487b6c5976b9c7748f699f6bffc2281d391a6e07b1830e0e4ca"
+      },
+      "status": "ALLOW",
+      "active": true,
+      "reasons": [],
+      "invalidation_reason": null
+    },
+    {
+      "candidate": {
+        "mention": {
+          "title": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+          "action": "가동 중단",
+          "period": null,
+          "target": "합성 평택공장",
+          "evidence": [
+            {
+              "end": 68,
+              "quote": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+              "start": 40,
+              "article_id": "synthetic-multi",
+              "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "합성 평택공장"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-multi",
+          "background": false,
+          "event_time": "2026-04-11",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-plant",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24",
+          "assertion_status": "occurred"
+        },
+        "articles": [
+          {
+            "url": "https://synthetic.invalid/synthetic-multi",
+            "body": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다. 별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+            "title": "[SYNTHETIC] 통제 흐름 예제",
+            "language": "ko",
+            "origin_id": "synthetic-origin-synthetic-multi",
+            "publisher": "SYNTHETIC—not real news",
+            "synthetic": true,
+            "withdrawn": false,
+            "article_id": "synthetic-multi",
+            "input_kind": "body",
+            "collected_at": "2026-09-16T00:00:00+00:00",
+            "published_at": "2026-09-16T00:00:00+00:00",
+            "allow_model_send": false
+          }
+        ],
+        "issue_id": "issue-274a2d51925bcf4e2a20ae5a",
+        "relations": [
+          {
+            "role": null,
+            "basis": [],
+            "source": "synthetic-multi",
+            "target": "issue-274a2d51925bcf4e2a20ae5a",
+            "evidence": [
+              {
+                "end": 68,
+                "quote": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+                "start": 40,
+                "article_id": "synthetic-multi",
+                "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+              }
+            ],
+            "relation_id": "relation-619bbe3e8199a22ee9987d97",
+            "relation_type": "REPORTS",
+            "assertion_status": null
+          },
+          {
+            "role": "발표자",
+            "basis": [],
+            "source": "issue-274a2d51925bcf4e2a20ae5a",
+            "target": "SYNTH-ALPHA",
+            "evidence": [
+              {
+                "end": 68,
+                "quote": "별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+                "start": 40,
+                "article_id": "synthetic-multi",
+                "article_version": "d748513c12666af6330cf7811bdb6f90cf01db1bf4f975cc0ec64988b144de24"
+              }
+            ],
+            "relation_id": "relation-6c422903510b3e28359c53bd",
+            "relation_type": "INVOLVES",
+            "assertion_status": "occurred"
+          }
+        ],
+        "supersedes": [],
+        "candidate_id": "candidate-b50e4892b26bf2dd42f1050f",
+        "prior_issues": [],
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "extraction_version": "fixture-model-1:prompt-1"
+      },
+      "validation": {
+        "trace": null,
+        "verdicts": [
+          {
+            "reason": "SYNTHETIC scripted identity decision",
+            "target": "issue",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-619bbe3e8199a22ee9987d97",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-6c422903510b3e28359c53bd",
+            "decision": "HOLD"
+          }
+        ],
+        "candidate_id": "candidate-b50e4892b26bf2dd42f1050f",
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "verifier_version": "fixture-model-1",
+        "candidate_revision": "b2f3aa3aa75312cd005d79bcc03d71d659763d6c21366d85edb541eece418d16"
+      },
+      "status": "ALLOW",
+      "active": true,
+      "reasons": [],
+      "invalidation_reason": null
+    },
+    {
+      "candidate": {
+        "mention": {
+          "title": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+          "action": "실적 발표",
+          "period": "2026-Q1",
+          "target": "메모리 실적",
+          "evidence": [
+            {
+              "end": 45,
+              "quote": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+              "start": 0,
+              "article_id": "synthetic-repeat",
+              "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 실적"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-repeat",
+          "background": false,
+          "event_time": "2026-04-10",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-q1-repeat",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16",
+          "assertion_status": "announced"
+        },
+        "articles": [
+          {
+            "url": "https://synthetic.invalid/synthetic-multi",
+            "body": "합성 알파전자는 2026년 1분기 메모리 실적을 4월 10일 발표했다. 별도로 4월 11일 합성 평택공장 가동을 중단했다.",
+            "title": "[SYNTHETIC] 통제 흐름 예제",
+            "language": "ko",
+            "origin_id": "synthetic-origin-synthetic-multi",
+            "publisher": "SYNTHETIC—not real news",
+            "synthetic": true,
+            "withdrawn": false,
+            "article_id": "synthetic-multi",
+            "input_kind": "body",
+            "collected_at": "2026-09-16T00:00:00+00:00",
+            "published_at": "2026-09-16T00:00:00+00:00",
+            "allow_model_send": false
+          },
+          {
+            "url": "https://synthetic.invalid/synthetic-repeat",
+            "body": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+            "title": "[SYNTHETIC] 통제 흐름 예제",
+            "language": "ko",
+            "origin_id": "synthetic-origin-synthetic-multi",
+            "publisher": "SYNTHETIC—not real news",
+            "synthetic": true,
+            "withdrawn": false,
+            "article_id": "synthetic-repeat",
+            "input_kind": "body",
+            "collected_at": "2026-09-16T00:00:00+00:00",
+            "published_at": "2026-09-16T00:00:00+00:00",
+            "allow_model_send": false
+          }
+        ],
+        "issue_id": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+        "relations": [
+          {
+            "role": null,
+            "basis": [],
+            "source": "synthetic-repeat",
+            "target": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+            "evidence": [
+              {
+                "end": 45,
+                "quote": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+                "start": 0,
+                "article_id": "synthetic-repeat",
+                "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16"
+              }
+            ],
+            "relation_id": "relation-925448e9d3a44629b8d33d63",
+            "relation_type": "REPORTS",
+            "assertion_status": null
+          },
+          {
+            "role": "발표자",
+            "basis": [],
+            "source": "issue-b4c3b887f7cbb6aa9ca6f2cf",
+            "target": "SYNTH-ALPHA",
+            "evidence": [
+              {
+                "end": 45,
+                "quote": "합성 알파전자의 4월 10일 발표는 2026년 1분기 메모리 실적에 관한 것이다.",
+                "start": 0,
+                "article_id": "synthetic-repeat",
+                "article_version": "a491b3bf9c91cf55f75374cc70be5f267246e96d620b951221748aa0fb9d9a16"
+              }
+            ],
+            "relation_id": "relation-f9ed7497192d2b0f134c645f",
+            "relation_type": "INVOLVES",
+            "assertion_status": "announced"
+          }
+        ],
+        "supersedes": [],
+        "candidate_id": "candidate-5fbd505e85d52ac3d7896eb5",
+        "prior_issues": [],
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "extraction_version": "fixture-model-1:prompt-1"
+      },
+      "validation": {
+        "trace": null,
+        "verdicts": [
+          {
+            "reason": "SYNTHETIC scripted identity decision",
+            "target": "issue",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-925448e9d3a44629b8d33d63",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-f9ed7497192d2b0f134c645f",
+            "decision": "ALLOW"
+          }
+        ],
+        "candidate_id": "candidate-5fbd505e85d52ac3d7896eb5",
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "verifier_version": "fixture-model-1",
+        "candidate_revision": "a4adf096a0536e49b297c393418ee6940e26c790bc2cea72c98eedff4af97fe8"
+      },
+      "status": "ALLOW",
+      "active": true,
+      "reasons": [],
+      "invalidation_reason": null
+    },
+    {
+      "candidate": {
+        "mention": {
+          "title": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+          "action": "실적 발표",
+          "period": "2026-Q2",
+          "target": "메모리 실적",
+          "evidence": [
+            {
+              "end": 39,
+              "quote": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+              "start": 0,
+              "article_id": "synthetic-q2",
+              "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 실적"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-q2",
+          "background": false,
+          "event_time": "2026-07-10",
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-q2",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29",
+          "assertion_status": "announced"
+        },
+        "articles": [
+          {
+            "url": "https://synthetic.invalid/synthetic-q2",
+            "body": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+            "title": "[SYNTHETIC] 통제 흐름 예제",
+            "language": "ko",
+            "origin_id": "synthetic-origin-synthetic-q2",
+            "publisher": "SYNTHETIC—not real news",
+            "synthetic": true,
+            "withdrawn": false,
+            "article_id": "synthetic-q2",
+            "input_kind": "body",
+            "collected_at": "2026-09-16T00:00:00+00:00",
+            "published_at": "2026-09-16T00:00:00+00:00",
+            "allow_model_send": false
+          }
+        ],
+        "issue_id": "issue-89ad5ad44679f34fb1c2c255",
+        "relations": [
+          {
+            "role": null,
+            "basis": [],
+            "source": "synthetic-q2",
+            "target": "issue-89ad5ad44679f34fb1c2c255",
+            "evidence": [
+              {
+                "end": 39,
+                "quote": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+                "start": 0,
+                "article_id": "synthetic-q2",
+                "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29"
+              }
+            ],
+            "relation_id": "relation-045f7fa3373cd7942a3f8e0d",
+            "relation_type": "REPORTS",
+            "assertion_status": null
+          },
+          {
+            "role": "발표자",
+            "basis": [],
+            "source": "issue-89ad5ad44679f34fb1c2c255",
+            "target": "SYNTH-ALPHA",
+            "evidence": [
+              {
+                "end": 39,
+                "quote": "합성 알파전자는 2026년 2분기 메모리 실적을 7월 10일 발표했다.",
+                "start": 0,
+                "article_id": "synthetic-q2",
+                "article_version": "1bd89a2bb558aad5953d5c6842d9df8631e94f97540ad5f08870824a571aac29"
+              }
+            ],
+            "relation_id": "relation-6912ca4c4e5d12c91ff72ed5",
+            "relation_type": "INVOLVES",
+            "assertion_status": "announced"
+          }
+        ],
+        "supersedes": [],
+        "candidate_id": "candidate-4ba793fe64ad22a83e594716",
+        "prior_issues": [],
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "extraction_version": "fixture-model-1:prompt-1"
+      },
+      "validation": {
+        "trace": null,
+        "verdicts": [
+          {
+            "reason": "SYNTHETIC scripted identity decision",
+            "target": "issue",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-045f7fa3373cd7942a3f8e0d",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-6912ca4c4e5d12c91ff72ed5",
+            "decision": "ALLOW"
+          }
+        ],
+        "candidate_id": "candidate-4ba793fe64ad22a83e594716",
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "verifier_version": "fixture-model-1",
+        "candidate_revision": "889b2173a81cb7ed5029fdd2c21c7d4f4d4c302b5a5f85fb89dc973137bf7310"
+      },
+      "status": "ALLOW",
+      "active": true,
+      "reasons": [],
+      "invalidation_reason": null
+    },
+    {
+      "candidate": {
+        "mention": {
+          "title": "합성 알파전자는 메모리 공급 계약을 논의했다고 밝혔다. 시점과 계약 상대는 알려지지 않았다.",
+          "action": "계약 논의",
+          "period": null,
+          "target": "메모리 공급",
+          "evidence": [
+            {
+              "end": 51,
+              "quote": "합성 알파전자는 메모리 공급 계약을 논의했다고 밝혔다. 시점과 계약 상대는 알려지지 않았다.",
+              "start": 0,
+              "article_id": "synthetic-unknown",
+              "article_version": "4dafeddf288585931bb109382d6d7b6a3d3fd85a2568ce8be919e3b5cd24d031"
+            }
+          ],
+          "keywords": [
+            "합성 알파전자",
+            "메모리 공급"
+          ],
+          "countries": [
+            "KR"
+          ],
+          "article_id": "synthetic-unknown",
+          "background": false,
+          "event_time": null,
+          "event_type": "synthetic-event",
+          "mention_id": "synthetic-unidentified",
+          "participants": [
+            {
+              "name": "합성 알파전자",
+              "role": "발표자",
+              "company_id": "SYNTH-ALPHA"
+            }
+          ],
+          "article_version": "4dafeddf288585931bb109382d6d7b6a3d3fd85a2568ce8be919e3b5cd24d031",
+          "assertion_status": "announced"
+        },
+        "articles": [
+          {
+            "url": "https://synthetic.invalid/synthetic-unknown",
+            "body": "합성 알파전자는 메모리 공급 계약을 논의했다고 밝혔다. 시점과 계약 상대는 알려지지 않았다.",
+            "title": "[SYNTHETIC] 통제 흐름 예제",
+            "language": "ko",
+            "origin_id": "synthetic-origin-synthetic-unknown",
+            "publisher": "SYNTHETIC—not real news",
+            "synthetic": true,
+            "withdrawn": false,
+            "article_id": "synthetic-unknown",
+            "input_kind": "body",
+            "collected_at": "2026-09-16T00:00:00+00:00",
+            "published_at": "2026-09-16T00:00:00+00:00",
+            "allow_model_send": false
+          }
+        ],
+        "issue_id": "issue-bf022d03d6a71a1bb359e610",
+        "relations": [
+          {
+            "role": null,
+            "basis": [],
+            "source": "synthetic-unknown",
+            "target": "issue-bf022d03d6a71a1bb359e610",
+            "evidence": [
+              {
+                "end": 51,
+                "quote": "합성 알파전자는 메모리 공급 계약을 논의했다고 밝혔다. 시점과 계약 상대는 알려지지 않았다.",
+                "start": 0,
+                "article_id": "synthetic-unknown",
+                "article_version": "4dafeddf288585931bb109382d6d7b6a3d3fd85a2568ce8be919e3b5cd24d031"
+              }
+            ],
+            "relation_id": "relation-345ac4a744e9ed406034d14c",
+            "relation_type": "REPORTS",
+            "assertion_status": null
+          },
+          {
+            "role": "발표자",
+            "basis": [],
+            "source": "issue-bf022d03d6a71a1bb359e610",
+            "target": "SYNTH-ALPHA",
+            "evidence": [
+              {
+                "end": 51,
+                "quote": "합성 알파전자는 메모리 공급 계약을 논의했다고 밝혔다. 시점과 계약 상대는 알려지지 않았다.",
+                "start": 0,
+                "article_id": "synthetic-unknown",
+                "article_version": "4dafeddf288585931bb109382d6d7b6a3d3fd85a2568ce8be919e3b5cd24d031"
+              }
+            ],
+            "relation_id": "relation-9acf00cab494f2342b33d605",
+            "relation_type": "INVOLVES",
+            "assertion_status": "announced"
+          }
+        ],
+        "supersedes": [],
+        "candidate_id": "candidate-a14f9dee7d35615c950a6830",
+        "prior_issues": [],
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "extraction_version": "fixture-model-1:prompt-1"
+      },
+      "validation": {
+        "trace": null,
+        "verdicts": [
+          {
+            "reason": "SYNTHETIC scripted identity decision",
+            "target": "issue",
+            "decision": "HOLD"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-345ac4a744e9ed406034d14c",
+            "decision": "ALLOW"
+          },
+          {
+            "reason": "SYNTHETIC independent relation decision",
+            "target": "relation-9acf00cab494f2342b33d605",
+            "decision": "ALLOW"
+          }
+        ],
+        "candidate_id": "candidate-a14f9dee7d35615c950a6830",
+        "policy_version": "policy-1:7ff4c2c0cbb8fadd",
+        "verifier_version": "fixture-model-1",
+        "candidate_revision": "96c8ac03234174f5f601efbe1a5811ec0f397d647ffb2b65789ae6703b47c22b"
+      },
+      "status": "HOLD",
+      "active": true,
+      "reasons": [],
+      "invalidation_reason": null
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,117 @@
+{
+  "companies": [
+    {
+      "company_id": "KRX:005930",
+      "name": "삼성전자",
+      "ticker": "005930",
+      "aliases": ["Samsung Electronics", "Samsung"],
+      "brand_color": "#1428A0",
+      "logo": "samsung.svg",
+      "brand_source": "https://www.samsung.com/us/about-us/brand-identity/logo/"
+    },
+    {
+      "company_id": "KRX:000660",
+      "name": "SK하이닉스",
+      "ticker": "000660",
+      "aliases": ["SK hynix", "SK Hynix"]
+    },
+    {
+      "company_id": "NASDAQ:NVDA",
+      "name": "NVIDIA",
+      "ticker": "NVDA",
+      "aliases": ["Nvidia", "엔비디아"],
+      "brand_color": "#76B900",
+      "logo": "nvidia.svg",
+      "brand_source": "https://www.nvidia.com/en-us"
+    },
+    {
+      "company_id": "NASDAQ:INTC",
+      "name": "Intel",
+      "ticker": "INTC",
+      "aliases": ["Intel Corporation"],
+      "brand_color": "#0071C5",
+      "logo": "intel.svg",
+      "brand_source": "https://www.intel.com/content/www/us/en/newsroom/resources/press-kits-intel-overview.html"
+    },
+    {
+      "company_id": "NASDAQ:GOOGL",
+      "name": "Google",
+      "ticker": "GOOGL",
+      "aliases": ["Google LLC"],
+      "brand_color": "#4285F4",
+      "logo": "google.svg",
+      "brand_source": "https://partnermarketinghub.withgoogle.com"
+    },
+    {
+      "company_id": "NASDAQ:AMZN",
+      "name": "Amazon",
+      "ticker": "AMZN",
+      "aliases": ["Amazon.com", "Amazon.com, Inc."],
+      "brand_color": "#FF9900",
+      "brand_source": "https://pages.awscloud.com/rs/112-TZM-766/images/Amazon%20Global_Brand%20Guidelines_DF_v3.pdf"
+    },
+    {
+      "company_id": "NASDAQ:MSFT",
+      "name": "Microsoft",
+      "ticker": "MSFT",
+      "aliases": ["Microsoft Corporation"]
+    },
+    {
+      "company_id": "NASDAQ:META",
+      "name": "Meta",
+      "ticker": "META",
+      "aliases": ["Meta Platforms", "Meta Platforms, Inc."],
+      "brand_color": "#0467DF",
+      "logo": "meta.svg",
+      "brand_source": "https://www.meta.com"
+    },
+    {
+      "company_id": "NASDAQ:AAPL",
+      "name": "Apple",
+      "ticker": "AAPL",
+      "aliases": ["Apple, Inc."],
+      "brand_color": "#000000",
+      "logo": "apple.svg",
+      "brand_source": "https://www.apple.com"
+    },
+    {
+      "company_id": "NYSE:PINS",
+      "name": "Pinterest",
+      "ticker": "PINS",
+      "aliases": [],
+      "brand_color": "#BD081C",
+      "logo": "pinterest.svg",
+      "brand_source": "https://business.pinterest.com/en/brand-guidelines"
+    },
+    {
+      "company_id": "NYSE:DELL",
+      "name": "Dell",
+      "ticker": "DELL",
+      "aliases": ["Dell Technologies"],
+      "brand_color": "#007DB8",
+      "logo": "dell.svg",
+      "brand_source": "https://www.dell.com"
+    },
+    {
+      "company_id": "TSE:6702",
+      "name": "Fujitsu",
+      "ticker": "6702",
+      "aliases": [],
+      "brand_color": "#FF0000",
+      "logo": "fujitsu.svg",
+      "brand_source": "https://www.fujitsu.com/global/about/brandmanagement/logo/"
+    },
+    {
+      "company_id": "NYSE:ORCL",
+      "name": "Oracle",
+      "ticker": "ORCL",
+      "aliases": ["Oracle Cloud Infrastructure"]
+    },
+    {
+      "company_id": "NYSE:HPE",
+      "name": "HPE",
+      "ticker": "HPE",
+      "aliases": ["Hewlett Packard Enterprise"]
+    }
+  ]
+}

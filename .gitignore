@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# BFF runtime state: members, session hashes, admin audit, published graph copies, job logs
+prototype/bff/var/
+
+# Stray screenshots left at the root on 2026-09-29 (same PNG twice)
+/a
+/i

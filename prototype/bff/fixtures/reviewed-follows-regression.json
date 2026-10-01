@@ -1,0 +1,151 @@
+{
+  "issues": [
+    {
+      "issue_id": "issue-48bcf76304253fea001492e3",
+      "mentions": [
+        {
+          "mention_id": "mention-issue-48bcf76304253fea001492e3",
+          "article_id": "synthetic-reviewed-article",
+          "title": "Synthetic review boundary",
+          "action": "announcement",
+          "event_time": "2026-09-01",
+          "participants": [],
+          "evidence": [
+            {
+              "article_id": "synthetic-reviewed-article",
+              "article_version": "synthetic-version",
+              "start": 0,
+              "end": 9,
+              "quote": "Synthetic"
+            }
+          ]
+        }
+      ],
+      "articles": [
+        {
+          "article_id": "synthetic-reviewed-article",
+          "title": "Synthetic review boundary",
+          "synthetic": true
+        }
+      ],
+      "relations": [],
+      "candidate_ids": [
+        "candidate-bc3b351eee049193db9ec42b"
+      ],
+      "field_decisions": [],
+      "source_support": {
+        "article_count": 1
+      }
+    },
+    {
+      "issue_id": "issue-f571b945ddcd229404238448",
+      "mentions": [
+        {
+          "mention_id": "mention-issue-f571b945ddcd229404238448",
+          "article_id": "synthetic-reviewed-article",
+          "title": "Synthetic review boundary",
+          "action": "announcement",
+          "event_time": "2026-09-01",
+          "participants": [],
+          "evidence": [
+            {
+              "article_id": "synthetic-reviewed-article",
+              "article_version": "synthetic-version",
+              "start": 0,
+              "end": 9,
+              "quote": "Synthetic"
+            }
+          ]
+        }
+      ],
+      "articles": [
+        {
+          "article_id": "synthetic-reviewed-article",
+          "title": "Synthetic review boundary",
+          "synthetic": true
+        }
+      ],
+      "relations": [
+        {
+          "relation_id": "synthetic-involves",
+          "source": "issue-f571b945ddcd229404238448",
+          "target": "SYNTH-REVIEW-COMPANY",
+          "relation_type": "INVOLVES",
+          "evidence": [
+            {
+              "article_id": "synthetic-reviewed-article",
+              "article_version": "synthetic-version",
+              "start": 0,
+              "end": 9,
+              "quote": "Synthetic"
+            }
+          ],
+          "basis": []
+        }
+      ],
+      "candidate_ids": [],
+      "field_decisions": [],
+      "source_support": {
+        "article_count": 1
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "candidate": {
+        "candidate_id": "candidate-bc3b351eee049193db9ec42b",
+        "issue_id": "issue-48bcf76304253fea001492e3",
+        "relations": [
+          {
+            "relation_id": "relation-021ae4e61e1b08cd14affc58",
+            "source": "issue-48bcf76304253fea001492e3",
+            "target": "issue-f571b945ddcd229404238448",
+            "relation_type": "FOLLOWS",
+            "evidence": [
+              {
+                "article_id": "synthetic-reviewed-article",
+                "article_version": "synthetic-version",
+                "start": 0,
+                "end": 9,
+                "quote": "Synthetic"
+              },
+              {
+                "article_id": "synthetic-audit-only-article",
+                "article_version": "synthetic-version",
+                "start": 0,
+                "end": 9,
+                "quote": "Synthetic"
+              }
+            ],
+            "basis": []
+          }
+        ]
+      },
+      "status": "ALLOW",
+      "active": true
+    }
+  ],
+  "errors": [],
+  "review_exclusions": [
+    {
+      "relation_id": "relation-021ae4e61e1b08cd14affc58",
+      "issue_id": "issue-48bcf76304253fea001492e3",
+      "candidate_ids": [
+        "candidate-bc3b351eee049193db9ec42b"
+      ],
+      "source": "issue-48bcf76304253fea001492e3",
+      "target": "issue-f571b945ddcd229404238448",
+      "authority_decision": "ALLOW",
+      "publication_decision": "EXCLUDED_AFTER_MANUAL_REVIEW",
+      "reason": "Synthetic reproduction of a plan incorrectly treated as an occurred follow-up; public issue relation removed, audit retained."
+    }
+  ],
+  "zoop": {
+    "companies": [
+      {
+        "company_id": "SYNTH-REVIEW-COMPANY",
+        "name": "Synthetic review company"
+      }
+    ]
+  }
+}

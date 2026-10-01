@@ -1,0 +1,31 @@
+[project]
+name = "zoop-bff"
+version = "0.1.0"
+description = "Zoop prototype BFF: serves approved InvestMate PoC issues under the requirements v0.2 section 8 API"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "pydantic>=2.12,<3",
+  "investmate-poc",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1"]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+# Pinned PoC commit from the private org repo (org members authenticate through git, e.g. `gh auth setup-git`).
+investmate-poc = { git = "https://github.com/Donbug/investmate-poc.git", rev = "fa446e7c72edfa06ec1a0e8e999199a21d31c695" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zoop_bff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
