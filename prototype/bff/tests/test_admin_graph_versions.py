@@ -184,6 +184,39 @@ def test_graphdb_reflection_is_measured_from_the_outbox_and_neo4j(admin):
     assert admin.client.get("/api/admin/dashboard").json()["graph"]["graphDb"]["status"] == "unavailable"
 
 
+def test_a_candidate_shows_its_issues_graphdb_state_apart_from_verdict_and_publication(admin):
+    HOLD = "candidate-a14f9dee7d35615c950a6830"  # HOLD in the fixture: its issue is not an approved ledger issue
+
+    def detail(candidate):
+        admin.services.pipeline.forget()
+        return admin.client.get(f"/api/admin/pipeline/candidates/{candidate}").json()
+
+    reflected = detail(ALLOWED_Q2)
+    assert (reflected["status"], reflected["onUserGraph"], reflected["graphDb"]) == ("ALLOW", True, "reflected")
+    assert detail(HOLD)["graphDb"] == "not_stored"  # nothing was approved, so nothing can be missing from GraphDB
+
+    admin.neo4j.drop = {ALPHA_ISSUES["q2"]}  # approved and visible to users, but not yet in GraphDB
+    unreflected = detail(ALLOWED_Q2)
+    assert (unreflected["status"], unreflected["onUserGraph"], unreflected["graphDb"]) == ("ALLOW", True, "pending")
+
+    admin.neo4j.down = True
+    assert detail(ALLOWED_Q2)["graphDb"] == "unknown"  # unreachable is not "reflected" and not "pending"
+
+
+def test_the_overview_lists_running_and_failed_jobs_beside_the_ledger_state(admin):
+    empty = admin.client.get("/api/admin/pipeline/overview").json()["jobs"]
+    assert empty["running"] == empty["queued"] == empty["failed24h"] == 0 and empty["lastFailure"] is None
+
+    admin.launcher.script(code=1, stdout='{"completed_projection_jobs": 0}')
+    created = admin.client.post("/api/admin/jobs", json={"kind": "flush-graph", "reason": "GraphDB 미반영 재시도"}).json()["job"]
+    for thread in list(admin.services.jobs._threads.values()):
+        thread.join(timeout=10)
+    jobs = admin.client.get("/api/admin/pipeline/overview").json()["jobs"]
+    assert jobs["failed24h"] == 1 and jobs["running"] == 0
+    assert jobs["lastFailure"]["jobId"] == created["id"] and jobs["lastFailure"]["code"] == "cli_nonzero_exit"
+    assert jobs["ingest"]["at"] is None  # a GraphDB flush is not an article run
+
+
 def test_overview_compares_the_ledger_with_the_active_version(make_admin):
     kit = make_admin(ledger_payload=_ledger_without_q2())
     kit.login()

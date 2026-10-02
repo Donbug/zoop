@@ -3,19 +3,24 @@
 // 있으면 개인화, 아니면 전체로 연다(요구 6·14).
 // 모드·선택·포커스·경로·영향 경로는 주소(?mode=&select=&focus=&hops=&path=&impact=)에 담는다. 모드 전환과 포커스·경로·영향 경로
 // 진입·변경·해제는 이력에 쌓고(push, 뒤로 가기로 복귀), 선택은 바꿔 쓴다(replace). 포커스·경로·영향 경로는 함께 두지 않는다.
-// 비회원이 잠긴 개인화 모드를 누르면 그 모드 주소로 이동해 로그인 안내를 보여준다(요구 51, 뒤로가기로 전체 복귀).
+// 모드 전환(FS019): 대상 모드 지도를 먼저 받고, 성공한 뒤에만 모드 이름·도구 막대·지도를 함께 바꾼다. 받는 동안·실패하면 지금 모드
+// 지도를 그대로 두고(실패는 다시 시도), 늦게 온 이전 전환 응답은 쓰지 않는다. 떠나는 모드의 선택·포커스·경로·카메라·범례 필터는
+// 모드별로 보관했다가(graph-entry) 그 모드로 돌아오면 복원한다. 새 지도에 없는 선택은 풀고 그렇다고 알린다.
+// 지도 조회 실패(FS017): 처음 조회가 실패하면 오류 화면, 이미 지도가 있으면 지도·선택을 그대로 두고 이전 결과라는 안내와 다시 시도를 띄운다.
+// 비회원이 잠긴 개인화 모드를 고르면(또는 그 주소로 오면) 시장 전체 지도를 그대로 두고 로그인 안내를 띄운다(FS019, 요구 51).
 // 사이드바에서 지도에 있는 기업을 고르면 그 노드를 선택하고 카메라를 그 기업 중심으로 확대·이동한다.
 // 데스크톱 사이드바(내 종목)는 도구 막대의 [내 종목]으로 접고 펼친다(넓은 화면은 펼침이 기본, 고른 값은 기억). 접으면 지도가 그 폭을 쓴다.
 // 지도 복귀(FS044): 떠날 때 주소·카메라·범례 필터·보기를 저장한다(기업 상세 [그래프로 복귀]용 진입 그래프 + 이 이력 항목).
 // 돌아오면 [그래프로 복귀]가 넘긴 state.graphRestore, 없으면 브라우저 뒤로 가기로 돌아온 이력 항목의 저장값으로 복원한다.
 // 튜토리얼(요구 15·16): 튜토리얼을 마치지 않은 회원·비회원, 또는 계정 메뉴의 [튜토리얼 다시 보기](?tour=1)에서
 // 지도 위 단계형 안내를 띄운다. 데스크톱은 왼쪽 목록 자리, 모바일은 지도 위(문서 흐름 안)에 놓는다.
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, Star, Wallet } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowLeft, CircleAlert, Info, PanelLeftClose, PanelLeftOpen, RotateCw, Star, Wallet, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Schemas } from "@/api/client";
 import type { CompanyReturn } from "./company-page";
-import { useBriefingGraphBasis, useCompanies, useGraph, useLogout, usePortfolio, useSession, useSettings } from "@/api/queries";
+import { graphQuery, useBriefingGraphBasis, useCompanies, useGraph, useLogout, usePortfolio, useSession, useSettings } from "@/api/queries";
 import { CompanyMark } from "@/components/domain/company-mark";
 import type { CenterRequest, GraphSelection } from "@/components/domain/graph-canvas";
 import type { Viewport } from "@/components/domain/graph-layout";
@@ -29,9 +34,10 @@ import { GraphExplorer, type ExplorerView } from "@/features/graph-explorer";
 import { GraphTutorialPanel, GraphTutorialSheetBar, useGraphTutorial } from "@/features/graph-tutorial";
 import { BriefingGraphBasisBar, BriefingGraphGate } from "@/features/briefing-graph-basis";
 import { parsePathParam } from "@/lib/graph-path";
-import { saveGraphEntry, type GraphEntry, type GraphRestoreState } from "@/lib/graph-entry";
+import { readModeEntry, saveGraphEntry, saveModeEntry, type GraphEntry, type GraphRestoreState } from "@/lib/graph-entry";
 import { ISOLATED_BUNDLE_ID, type GraphFocus, type LegendKey } from "@/lib/graph-view";
 import { emptyReasonMessage, modeLabel, type GraphMode } from "@/lib/labels";
+import { holdingWeightText } from "@/lib/holding";
 import { useMediaQuery } from "@/lib/theme";
 import { track, useScreenView } from "@/lib/track";
 
@@ -74,6 +80,8 @@ export function MainPage() {
   const [view, setView] = useState<ExplorerView>(restore?.view ?? "graph");
   const [hidden, setHidden] = useState<ReadonlySet<LegendKey>>(() => new Set((restore?.hidden ?? []) as LegendKey[]));
   const cameraRef = useRef<Viewport | null>(restore?.camera ?? null);
+  // 캔버스가 다음 배치에서 쓸 카메라: 처음엔 지도 복귀(FS044) 값, 모드가 바뀌면 그 모드에 보관한 값(FS019)
+  const [modeCamera, setModeCamera] = useState<Viewport | null>(restore?.camera ?? null);
   const [center, setCenter] = useState<CenterRequest | null>(null);
   const [sidebarPref, setSidebarPref] = useState(readSidebarPref);
   const sidebarOpen = sidebarPref ?? wide;
@@ -115,12 +123,50 @@ export function MainPage() {
   const modeParam = params.get("mode");
   const requested: GraphMode | null = round ? "all" : modeParam === "all" || modeParam === "personal" ? modeParam : null;
   const locked = isGuest && requested === "personal";
+  const [guestPrompt, setGuestPrompt] = useState(false);
   const watchCount = settings.data?.watchlistIds.length ?? 0;
   const holdingCount = portfolio.data?.holdings.length ?? 0;
   // 기본 모드는 회원의 보유·관심을 알아야 정할 수 있다(설정·계좌 조회가 끝날 때까지 기다린다. 실패하면 전체).
   const personalKnown = (settings.isSuccess || settings.isError) && (portfolio.isSuccess || portfolio.isError);
-  const mode: GraphMode = locked ? "personal" : isGuest ? "all" : (requested ?? (watchCount + holdingCount > 0 ? "personal" : "all"));
-  const graph = useGraph(mode, session.isSuccess && roundReady && !locked && (isGuest || requested !== null || personalKnown));
+  // 비회원은 개인화 주소로 와도 시장 전체 지도를 본다(로그인 안내만 띄운다).
+  const mode: GraphMode = isGuest ? "all" : (requested ?? (watchCount + holdingCount > 0 ? "personal" : "all"));
+  const graph = useGraph(mode, session.isSuccess && roundReady && (isGuest || requested !== null || personalKnown));
+  const queryClient = useQueryClient();
+
+  // 화면에 보이는 지도: 지금 주소(모드·회차)의 데이터, 아직 없거나 받지 못했으면 마지막으로 보인 지도(뒤로 가기 등으로 주소가 먼저 바뀐 경우).
+  // 이름·도구 막대는 보이는 지도의 모드를 따른다(다른 모드 데이터에 새 모드 이름을 붙이지 않는다).
+  const lastShownRef = useRef<{ mode: GraphMode; round: string | null; data: Schemas["GraphResponse"] } | null>(null);
+  if (graph.data) lastShownRef.current = { mode, round, data: graph.data };
+  const shown = lastShownRef.current;
+
+  // 보이는 지도의 모드가 바뀌면(전환 성공·뒤로 가기) 떠난 모드의 상태(주소·카메라·범례 필터)를 보관하고, 돌아온 모드의 필터·카메라를 꺼낸다.
+  // 렌더 중에 바로 바꿔(파생 상태) 새 데이터와 같은 화면에 함께 그린다. 처음 그린 모드는 지도 복귀 값을 그대로 쓴다.
+  const url = location.pathname + location.search;
+  const committedUrlRef = useRef(url);
+  useEffect(() => {
+    committedUrlRef.current = url;
+  });
+  const [appliedMode, setAppliedMode] = useState<GraphMode | null>(null);
+  if (graph.data && appliedMode !== mode) {
+    if (appliedMode !== null) {
+      saveModeEntry(appliedMode, { url: committedUrlRef.current, camera: cameraRef.current ?? undefined, hidden: [...hidden] });
+      const entry = readModeEntry(mode);
+      setHidden(new Set((entry?.hidden ?? []) as LegendKey[]));
+      cameraRef.current = entry?.camera ?? null;
+      setModeCamera(entry?.camera ?? null);
+    }
+    setAppliedMode(mode);
+  }
+
+  // 진행 중인 모드 전환(대상 모드 조회). 번호가 바뀌면 늦게 온 응답은 버린다.
+  const [switching, setSwitching] = useState<{ mode: GraphMode; error: unknown } | null>(null);
+  const switchSeqRef = useRef(0);
+  const [droppedNotice, setDroppedNotice] = useState(false);
+  // 주소의 모드·회차가 전환 밖에서 바뀌면(뒤로 가기 등) 진행 중인 전환을 거둔다.
+  useEffect(() => {
+    switchSeqRef.current += 1;
+    setSwitching(null);
+  }, [requested, round]);
 
   const selectParam = params.get("select");
   const selection: GraphSelection | null = selectParam
@@ -196,18 +242,79 @@ export function MainPage() {
     );
   };
 
-  const setMode = (next: GraphMode) => {
-    if (next === mode) return;
+  const shownMode = shown?.mode ?? mode;
+
+  /** 전환이 성공했을 때: 주소의 모드와 그 모드에 보관한 선택·포커스·경로를 한 번에 바꾼다. 새 지도에 없는 대상은 풀고 알린다.
+   *  범례 필터·카메라는 새 모드 지도가 보일 때(위 파생 상태) 함께 바뀐다. */
+  const applyMode = (next: GraphMode, data: Schemas["GraphResponse"]) => {
+    const saved = readModeEntry(next);
+    const savedParams = new URLSearchParams(saved?.url.split("?")[1] ?? "");
+    const inMap = (id: string) => data.nodes.some((n) => n.id === id);
+    const restored = new URLSearchParams();
+    let dropped = false;
+    const select = savedParams.get("select");
+    if (select) {
+      const id = select.replace(/^(edge|node):/, "");
+      if (select.startsWith("edge:") ? data.edges.some((e) => e.id === id) : id === ISOLATED_BUNDLE_ID || inMap(id)) restored.set("select", select);
+      else dropped = true;
+    }
+    const focusId = savedParams.get("focus");
+    if (focusId && inMap(focusId)) {
+      restored.set("focus", focusId);
+      restored.set("hops", savedParams.get("hops") ?? "1");
+    } else if (focusId) dropped = true;
+    for (const key of ["path", "impact"] as const) {
+      const pair = parsePathParam(savedParams.get(key));
+      if (pair && pair.every(inMap)) restored.set(key, pair.join(","));
+      else if (pair) dropped = true;
+    }
     setParams((prev) => {
       const p = new URLSearchParams(prev);
       p.set("mode", next);
-      p.delete("select");
-      p.delete("focus");
-      p.delete("hops");
-      p.delete("path");
-      p.delete("impact");
+      for (const key of ["select", "focus", "hops", "path", "impact"]) p.delete(key);
+      restored.forEach((value, key) => p.set(key, value));
       return p;
     });
+    setSwitching(null);
+    setDroppedNotice(dropped);
+  };
+
+  /** 모드 전환(FS019): 대상 모드 지도를 먼저 받는다. 받는 동안·실패하면 지금 지도와 모드 표시를 그대로 둔다.
+   *  다시 누르거나 다른 모드를 고르면 번호가 바뀌어 이전 전환의 늦은 응답은 버린다. 비회원의 개인화는 로그인 안내만 띄운다. */
+  const setMode = (next: GraphMode) => {
+    setDroppedNotice(false);
+    if (isGuest && next === "personal") {
+      setGuestPrompt(true);
+      return;
+    }
+    setGuestPrompt(false);
+    const seq = ++switchSeqRef.current;
+    if (next === shownMode && next === mode) {
+      setSwitching(null);
+      return;
+    }
+    setSwitching({ mode: next, error: null });
+    queryClient.fetchQuery({ ...graphQuery(next, null), staleTime: 30_000 }).then(
+      (data) => {
+        if (seq === switchSeqRef.current) applyMode(next, data);
+      },
+      (error: unknown) => {
+        if (seq === switchSeqRef.current) setSwitching({ mode: next, error });
+      },
+    );
+  };
+  const closeGuestPrompt = () => {
+    setGuestPrompt(false);
+    // 개인화 주소로 들어온 비회원이면 주소도 시장 전체로 바꾼다.
+    if (locked)
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("mode", "all");
+          return p;
+        },
+        { replace: true },
+      );
   };
 
   /** 사이드바 선택: 그 기업을 고르고 포커스·경로를 풀어 전체 배치에서 그 기업 중심으로 카메라를 옮긴다. */
@@ -250,10 +357,11 @@ export function MainPage() {
     );
   // 튜토리얼은 지도가 그려졌을 때만. 모바일 상세 시트가 열리면 안내를 시트 안으로 옮기고(지도 위 패널은 시트 뒤),
   // 단계 알림은 시트 쪽만 읽는다.
-  const showTutorial = tutorialOpen && !locked && graph.isSuccess && graph.data.nodes.length > 0;
+  const showTutorial = tutorialOpen && (graph.data?.nodes.length ?? 0) > 0;
   const tutorial = useGraphTutorial(showTutorial, closeTutorial, isGuest, () => goToLogin());
   const sheetOpen = isMobile && (selection !== null || path !== null || impact !== null);
-  const hasSidebar = !isMobile && !locked && !showTutorial && !round;
+  const hasSidebar = !isMobile && !showTutorial && !round;
+  const shownName = shown?.round ? "브리핑 회차 기준" : modeLabel[shownMode];
   const toolbar = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {hasSidebar && (
@@ -274,13 +382,13 @@ export function MainPage() {
       {!round && (
         <>
           <GraphModeSwitch
-            value={mode}
+            value={shownMode}
             onValueChange={setMode}
             lockedModes={isGuest ? guestLockedModes : []}
             fill={isMobile}
             className={isMobile ? "w-full" : undefined}
           />
-          {mode === "personal" && !isGuest && personalKnown && watchCount + holdingCount > 0 && (
+          {shownMode === "personal" && !isGuest && personalKnown && watchCount + holdingCount > 0 && (
             <PersonalBasis holdingCount={holdingCount} watchCount={watchCount} />
           )}
         </>
@@ -290,33 +398,70 @@ export function MainPage() {
 
   const goToLogin = () => logout.mutate(undefined, { onSettled: () => navigate("/login") });
 
+  // 지도 위 안내: 전환 실패 > 주소가 바뀐 지도의 조회 실패 > 지금 지도의 새로 고침 실패 > 비회원 로그인 안내 > 풀린 선택
+  const notices: ReactNode[] = [];
+  const retry = (
+    <Button variant="secondary" size="sm" onClick={() => (switching?.error ? setMode(switching.mode) : void graph.refetch())}>
+      <RotateCw aria-hidden="true" />
+      다시 시도
+    </Button>
+  );
+  if (switching?.error) {
+    notices.push(
+      <MapNotice key="switch" tone="error" action={retry} onDismiss={() => setSwitching(null)}>
+        {modeLabel[switching.mode]} 지도를 불러오지 못했어요. {shownName} 지도를 그대로 보여드려요.
+      </MapNotice>,
+    );
+  } else if (shown && graph.isError) {
+    notices.push(
+      <MapNotice key="refresh" tone="error" action={retry}>
+        {graph.data
+          ? "지도를 새로 불러오지 못했어요. 지금 보이는 지도는 이전에 불러온 결과예요."
+          : `${round ? "브리핑 회차 기준" : modeLabel[mode]} 지도를 불러오지 못했어요. 이전에 보던 ${shownName} 지도를 보여드려요.`}
+      </MapNotice>,
+    );
+  }
+  if (guestPrompt || locked) {
+    notices.push(
+      <MapNotice
+        key="guest"
+        tone="info"
+        onDismiss={closeGuestPrompt}
+        action={
+          <Button size="sm" onClick={goToLogin} loading={logout.isPending}>
+            로그인
+          </Button>
+        }
+      >
+        로그인하면 내 종목 지도를 볼 수 있어요. 지금은 시장 전체 지도예요.
+      </MapNotice>,
+    );
+  }
+  if (droppedNotice) {
+    notices.push(
+      <MapNotice key="dropped" tone="info" onDismiss={() => setDroppedNotice(false)}>
+        전에 고른 대상이 이 지도에 없어서 선택을 풀었어요.
+      </MapNotice>,
+    );
+  }
+  const loadingLabel =
+    switching && !switching.error
+      ? `${modeLabel[switching.mode]} 지도를 불러오고 있어요`
+      : shown && graph.isFetching && (!graph.data || graph.isError)
+        ? "지도를 불러오고 있어요"
+        : undefined;
+
   let content;
   if (round && !roundReady) {
     content = <BriefingGraphGate query={basis} onShowCurrent={showCurrent} />;
-  } else if (locked) {
+  } else if (!shown) {
+    // 처음 조회: 아직 보일 지도가 없으므로 실패하면 오류 화면이다.
     content = (
       <>
         {toolbar}
-        <EmptyState
-          title="로그인하면 내 종목 지도를 볼 수 있어요."
-          action={
-            <>
-              <Button onClick={goToLogin} loading={logout.isPending}>
-                로그인
-              </Button>
-              <Button variant="ghost" onClick={() => setMode("all")}>
-                시장 전체 지도 보기
-              </Button>
-            </>
-          }
-        />
-      </>
-    );
-  } else if (graph.isPending) {
-    content = (
-      <>
-        {toolbar}
-        {view === "list" ? (
+        {graph.isError ? (
+          <ErrorState error={graph.error} title="지도를 불러오지 못했어요" onRetry={() => void graph.refetch()} />
+        ) : view === "list" ? (
           <SkeletonRows count={4} label="지도를 불러오고 있어요" />
         ) : (
           <LoadingBlock label="지도를 불러오고 있어요" className="flex min-h-[360px] flex-1">
@@ -325,25 +470,25 @@ export function MainPage() {
         )}
       </>
     );
-  } else if (graph.isError) {
+  } else if (shown.data.nodes.length === 0 || shown.data.edges.length === 0) {
+    // 관계 0건은 오류가 아니라 '연결 없음'이다(FS017). 내 종목만 있고 연결이 없으면 그 기업들을 밝힌다.
     content = (
       <>
         {toolbar}
-        <ErrorState error={graph.error} title="지도를 불러오지 못했어요" onRetry={() => void graph.refetch()} />
-      </>
-    );
-  } else if (graph.data.nodes.length === 0) {
-    content = (
-      <>
-        {toolbar}
-        <MapEmptyState reason={graph.data.metadata.emptyReason} mode={mode} onMarket={() => setMode("all")} />
+        {loadingLabel && <p role="status" className="sr-only">{loadingLabel}</p>}
+        <MapEmptyState
+          reason={shown.data.metadata.emptyReason}
+          mode={shownMode}
+          companies={shown.data.nodes.filter((n) => n.kind === "company").map((n) => n.label)}
+          onMarket={() => setMode("all")}
+        />
       </>
     );
   } else {
     content = (
       <GraphExplorer
-        graph={graph.data}
-        mapName={round ? "브리핑 회차 기준 지도" : `${modeLabel[mode]} 지도`}
+        graph={shown.data}
+        mapName={`${shownName} 지도`}
         selection={selection}
         onSelectionChange={setSelection}
         view={view}
@@ -357,10 +502,10 @@ export function MainPage() {
         hidden={hidden}
         onHiddenChange={setHidden}
         centerOn={center}
-        initialCamera={restore?.camera ?? null}
+        initialCamera={modeCamera}
         onCameraIdle={(viewport) => void (cameraRef.current = viewport)}
         sheetTop={showTutorial ? <GraphTutorialSheetBar tutorial={tutorial} onCloseSheet={() => setSelection(null)} /> : undefined}
-        loading={graph.isPlaceholderData}
+        loadingLabel={loadingLabel}
         toolbar={toolbar}
         className="flex-1"
       />
@@ -369,13 +514,14 @@ export function MainPage() {
 
   return (
     <div className="mx-auto flex h-[calc(100dvh-3rem-1px-56px-env(safe-area-inset-bottom))] min-h-0 w-full flex-none px-4 py-3 md:h-[calc(100dvh-3.5rem-1px)] md:px-6 md:py-4">
-      <h1 className="sr-only">{round ? "브리핑 회차 기준" : modeLabel[mode]} 지도</h1>
+      <h1 className="sr-only">{shownName} 지도</h1>
       {!isMobile && showTutorial && <GraphTutorialPanel tutorial={tutorial} className="mr-4 w-72 shrink-0 self-start" />}
       {hasSidebar && sidebarOpen && (
         <Sidebar
           isGuest={isGuest}
           settings={settings.data}
-          graphNodes={graph.data?.nodes ?? []}
+          graphNodes={shown?.data.nodes ?? []}
+          graphEdges={shown?.data.edges ?? []}
           selectedId={selection?.kind === "node" ? selection.id : null}
           onPick={pickCompany}
           onLogin={goToLogin}
@@ -386,6 +532,7 @@ export function MainPage() {
         {round && basis.data?.status === "available" && (
           <BriefingGraphBasisBar basis={basis.data} onShowCurrent={showCurrent} className="shrink-0" />
         )}
+        {notices.length > 0 && <div className="flex shrink-0 flex-col gap-2">{notices}</div>}
         {content}
       </section>
     </div>
@@ -413,8 +560,39 @@ function PersonalBasis({ holdingCount, watchCount }: { holdingCount: number; wat
   );
 }
 
-function MapEmptyState({ reason, mode, onMarket }: { reason: string | null; mode: GraphMode; onMarket: () => void }) {
-  const message = emptyReasonMessage(reason, mode);
+/** 지도 위 한 줄 안내(오류·정보). 색만으로 구분하지 않도록 아이콘과 문장으로 상태를 밝힌다. */
+function MapNotice({ tone, children, action, onDismiss }: { tone: "error" | "info"; children: ReactNode; action?: ReactNode; onDismiss?: () => void }) {
+  const Icon = tone === "error" ? CircleAlert : Info;
+  return (
+    <div
+      role={tone === "error" ? "alert" : "status"}
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-border-strong bg-surface-sunken py-2 pr-1 pl-3"
+    >
+      <p className="flex min-w-0 flex-1 basis-60 items-start gap-2 text-base text-text-primary">
+        <Icon className={tone === "error" ? "mt-0.5 size-5 shrink-0 text-error" : "mt-0.5 size-5 shrink-0 text-text-secondary"} aria-hidden="true" />
+        {children}
+      </p>
+      <div className="flex items-center gap-1">
+        {action}
+        {onDismiss && (
+          <Button variant="ghost" size="icon" aria-label="안내 닫기" onClick={onDismiss}>
+            <X aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MapEmptyState({ reason, mode, companies, onMarket }: { reason: string | null; mode: GraphMode; companies: string[]; onMarket: () => void }) {
+  // 내 종목은 있지만 공개 관계가 없으면(FS017) 어느 기업인지 밝힌다.
+  const message =
+    mode === "personal" && reason === "no_related_issues" && companies.length > 0
+      ? {
+          title: "내 종목과 연결된 사건이 아직 없어요",
+          body: `${companies.slice(0, 3).join(", ")}${companies.length > 3 ? ` 외 ${companies.length - 3}곳` : ""}에 연결된 공개 관계가 아직 없어요. 시장 전체 지도를 살펴보세요.`,
+        }
+      : emptyReasonMessage(reason, mode);
   if (reason === "no_personal_stocks") {
     return (
       <EmptyState
@@ -452,6 +630,7 @@ function Sidebar({
   isGuest,
   settings,
   graphNodes,
+  graphEdges,
   selectedId,
   onPick,
   onLogin,
@@ -459,6 +638,7 @@ function Sidebar({
   isGuest: boolean;
   settings: Schemas["SettingsResponse"] | undefined;
   graphNodes: Schemas["GraphNode"][];
+  graphEdges: Schemas["GraphEdge"][];
   selectedId: string | null;
   onPick: (id: string) => void;
   onLogin: () => void;
@@ -487,8 +667,11 @@ function Sidebar({
 
   // 지도에 있는 종목은 지도에서 고르고(그 기업 중심으로 이동), 없는 종목은 기업 상세로 간다.
   // 행 끝 테두리 견본은 지도 노드의 보유(실선)·관심(점선) 표시와 같다. 행 옆 별 버튼은 관심 등록·해제(FS027, 누르면 바로 저장).
-  const row = (kind: "holding" | "watch", id: string, name: string, description?: string) => {
+  // 지도에 있지만 연결선이 없는 종목은 '연결된 사건 없음'을 붙인다(FS017 관계 없음).
+  const linked = new Set(graphEdges.flatMap((e) => [e.source, e.target]));
+  const row = (kind: "holding" | "watch", id: string, name: string, detail?: string) => {
     const node = graphNodes.find((n) => n.id === id);
+    const description = node && !linked.has(id) ? [detail, "연결된 사건 없음"].filter(Boolean).join(" · ") : detail;
     const leading = <CompanyMark id={id} name={name} brandColor={node?.brandColor} logoUrl={node?.logoUrl} />;
     return (
       <li key={id} className="flex items-center">
@@ -533,7 +716,7 @@ function Sidebar({
                   </Button>
                 </div>
               ) : (
-                <ul>{portfolio.data.holdings.map((h) => row("holding", h.companyId, h.name, `원가 비중 ${Math.round(h.weight * 100)}%`))}</ul>
+                <ul>{portfolio.data.holdings.map((h) => row("holding", h.companyId, h.name, holdingWeightText(h)))}</ul>
               ))}
           </section>
           <section ref={watchSectionRef} aria-labelledby="side-watch">

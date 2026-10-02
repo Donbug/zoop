@@ -1,27 +1,37 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, Response
 
-from ..accounts import UserState
+from ..accounts import Connection, UserState
+from ..dataset import Dataset, MockPortfolioRec
 from ..deps import Member, State
 from ..errors import ApiError
+from ..market_data import MarketData, QuoteResult
 from ..schemas import (
     CompanySummary,
     ConnectionInfo,
     ConnectionResponse,
     HoldingOut,
+    HoldingQuote,
+    MockCash,
+    MockHoldingOut,
     MockPortfolioListResponse,
     MockPortfolioOption,
+    MockProfileResponse,
     PortfolioConnectRequest,
     PortfolioResponse,
+    PortfolioValuation,
     RecommendationResponse,
     RecommendedCompany,
     SettingsResponse,
     SettingsUpdate,
     WatchUpdate,
     Unavailable,
+    WeightUnavailableCode,
 )
 from ..views import meta, mock_meta
 from . import ERROR_RESPONSES
@@ -29,7 +39,11 @@ from . import ERROR_RESPONSES
 router = APIRouter(prefix="/api", tags=["me"], responses=ERROR_RESPONSES)
 SETTINGS_BY = "bff-mock-settings"
 PORTFOLIO_BY = "bff-mock-portfolio"
-VALUATION_UNAVAILABLE = "보유 목록에는 시세를 붙이지 않아 평가금액이 없습니다(기업 상세에서 종목별로 제공). 비중은 매입금액 기준입니다."
+WEIGHT_UNAVAILABLE: dict[WeightUnavailableCode, str] = {
+    "missing_price": "주가를 받지 못한 종목이 있어 비중을 계산할 수 없어요.",
+    "mixed_currency": "보유 종목의 시세 통화가 서로 달라요. 환율로 바꾸지 않아 합계와 비중을 계산하지 않았어요.",
+    "zero_total": "평가금액 합계가 0이라 비중을 계산할 수 없어요.",
+}
 
 
 def settings_response(user: UserState) -> SettingsResponse:
@@ -132,14 +146,69 @@ def recommendations(
 
 @router.get("/portfolio/mock-portfolios", response_model=MockPortfolioListResponse)
 def list_mock_portfolios(user: Member, state: State) -> MockPortfolioListResponse:
-    """Virtual accounts that can be connected. Not in spec v0.2 section 8; the UI needs the ids."""
+    """Project mock profiles that can be connected (FS062). Not a brokerage account: no credentials are asked."""
     ds = state.provider.get()
     return MockPortfolioListResponse(
         items=[
-            MockPortfolioOption(id=p.id, label=p.label, holdings_count=len(p.holdings))
+            MockPortfolioOption(id=p.id, label=p.label, account_id=p.account_id, holdings_count=len(p.holdings))
             for p in ds.mock_portfolios.values()
         ],
         metadata=mock_meta(PORTFOLIO_BY),
+    )
+
+
+def _mock_profile(ds: Dataset, profile_id: str) -> MockPortfolioRec:
+    profile = ds.mock_portfolios.get(profile_id)
+    if profile is None:
+        raise ApiError(
+            404,
+            "mock_portfolio_not_found",
+            "연결할 수 있는 가상 계좌가 아닙니다.",
+            {"available": sorted(ds.mock_portfolios)},
+        )
+    return profile
+
+
+def _cash(amount: float | None, currency: str | None) -> MockCash | None:
+    return MockCash(amount=amount, currency=currency) if amount is not None and currency is not None else None
+
+
+@router.get("/portfolio/mock-portfolios/{id}", response_model=MockProfileResponse)
+def get_mock_portfolio(
+    profile_id: Annotated[str, Path(alias="id")], user: Member, state: State
+) -> MockProfileResponse:
+    """One mock profile: account id, cash and holdings of that same profile. An unknown id is 404, never an
+    empty account; a profile with no holdings is a normal account with ``holdings: []``."""
+    ds = state.provider.get()
+    profile = _mock_profile(ds, profile_id)
+    return MockProfileResponse(
+        id=profile.id,
+        label=profile.label,
+        account_id=profile.account_id,
+        cash=_cash(profile.cash, profile.cash_currency),
+        as_of=profile.as_of,
+        holdings=[
+            MockHoldingOut(
+                company_id=h.company_id,
+                name=ds.companies[h.company_id].name if h.company_id in ds.companies else h.company_id,
+                quantity=h.quantity,
+                avg_price=h.avg_price,
+                avg_price_currency=h.currency,
+            )
+            for h in profile.holdings
+        ],
+        metadata=mock_meta(PORTFOLIO_BY, profile.as_of),
+    )
+
+
+def _connection_info(conn: Connection) -> ConnectionInfo:
+    return ConnectionInfo(
+        id=conn.id,
+        mock_portfolio_id=conn.mock_portfolio_id,
+        label=conn.label,
+        connected_at=conn.connected_at,
+        account_id=conn.account_id,
+        cash=_cash(conn.cash, conn.cash_currency),
     )
 
 
@@ -151,47 +220,75 @@ def connect_portfolio(
 ) -> ConnectionResponse:
     """201 on a new connection. Resending the request for the already connected profile returns that
     connection with 200 (no second connection); a different profile while connected is 409."""
-    ds = state.provider.get()
-    portfolio = ds.mock_portfolios.get(body.mock_portfolio_id)
-    if portfolio is None:
-        raise ApiError(
-            404,
-            "mock_portfolio_not_found",
-            "연결할 수 있는 가상 계좌가 아닙니다.",
-            {"available": sorted(ds.mock_portfolios)},
-        )
-    conn, created = state.accounts.connect(user, portfolio.id, portfolio.label, portfolio.holdings)
+    profile = _mock_profile(state.provider.get(), body.mock_portfolio_id)
+    conn, created = state.accounts.connect(user, profile)
     if not created:
         response.status_code = 200
     return ConnectionResponse(
-        id=conn.id,
-        mock_portfolio_id=conn.mock_portfolio_id,
-        label=conn.label,
-        connected_at=conn.connected_at,
+        **_connection_info(conn).model_dump(),
         holdings_count=len(conn.holdings),
-        metadata=mock_meta(PORTFOLIO_BY, conn.connected_at),
+        metadata=mock_meta(PORTFOLIO_BY, conn.mock_as_of),
     )
+
+
+def _read_quotes(market: MarketData, company_ids: list[str]) -> dict[str, QuoteResult]:
+    """All prices of one valuation, read together (cached up to ~30 s by MarketData)."""
+    if not company_ids:
+        return {}
+    with ThreadPoolExecutor(max_workers=min(8, len(company_ids))) as pool:
+        return dict(zip(company_ids, pool.map(market.quote, company_ids), strict=True))
 
 
 @router.get("/portfolio", response_model=PortfolioResponse)
 def get_portfolio(user: Member, state: State) -> PortfolioResponse:
-    """Holdings of the connected virtual account. No quotes exist, so weights are cost-basis weights."""
+    """Holdings of the connected virtual account (FS039·FS054). Quantity and average price are the mock values;
+    market value = quantity x the price read at ``valuation.calculatedAt``; weight = market value / total stock
+    market value (cash excluded). A missing price, prices in different currencies (no exchange rate is
+    assumed) or a zero total make every weight null with a reason, never 0."""
     conn = user.connection
     if conn is None:
         return PortfolioResponse(
             connected=False,
             connection=None,
             holdings=[],
-            valuation=Unavailable(reason=VALUATION_UNAVAILABLE),
-            as_of=None,
+            mock_as_of=None,
+            valuation=None,
             metadata=mock_meta(PORTFOLIO_BY),
         )
     ds = state.provider.get()
-    total = sum(h.quantity * h.avg_price for h in conn.holdings)
-    holdings = []
+    calculated_at = datetime.now(UTC).isoformat(timespec="seconds")
+    quotes = _read_quotes(state.market, list(dict.fromkeys(h.company_id for h in conn.holdings)))
+
+    values: list[tuple[float, str] | None] = []
     for h in conn.holdings:
-        cost = h.quantity * h.avg_price
+        q = quotes[h.company_id].quote
+        values.append((h.quantity * q.price, q.currency) if q else None)
+    currencies = {v[1] for v in values if v}
+    code: WeightUnavailableCode | None = None
+    total: float | None = None
+    if any(v is None for v in values):
+        code = "missing_price"
+    elif len(currencies) > 1:
+        code = "mixed_currency"
+    else:
+        total = sum(v[0] for v in values if v)
+        if total == 0:
+            code = "zero_total"
+
+    holdings = []
+    for h, value in zip(conn.holdings, values, strict=True):
+        result = quotes[h.company_id]
         company = ds.companies.get(h.company_id)
+        quote: HoldingQuote | Unavailable
+        if result.quote and result.source:
+            quote = HoldingQuote(
+                price=result.quote.price,
+                currency=result.quote.currency,
+                as_of=result.quote.as_of.isoformat() if result.quote.as_of else None,
+                source_name=result.source.name,
+            )
+        else:
+            quote = Unavailable(reason=result.reason or "주가를 받지 못했어요.")
         holdings.append(
             HoldingOut(
                 company_id=h.company_id,
@@ -200,23 +297,25 @@ def get_portfolio(user: Member, state: State) -> PortfolioResponse:
                 quantity=h.quantity,
                 avg_price=h.avg_price,
                 avg_price_currency=h.currency,
-                cost_basis=cost,
-                weight=round(cost / total, 6) if total else 0.0,
-                market_value=Unavailable(reason="보유 목록에는 시세를 붙이지 않습니다(기업 상세 시세 참고)."),
+                quote=quote,
+                market_value=round(value[0], 6) if value else None,
+                weight=round(value[0] / total, 6) if value and code is None and total else None,
             )
         )
     return PortfolioResponse(
         connected=True,
-        connection=ConnectionInfo(
-            id=conn.id,
-            mock_portfolio_id=conn.mock_portfolio_id,
-            label=conn.label,
-            connected_at=conn.connected_at,
-        ),
+        connection=_connection_info(conn),
         holdings=holdings,
-        valuation=Unavailable(reason=VALUATION_UNAVAILABLE),
-        as_of=conn.connected_at,
-        metadata=mock_meta(PORTFOLIO_BY, conn.connected_at),
+        mock_as_of=conn.mock_as_of,
+        valuation=PortfolioValuation(
+            calculated_at=calculated_at,
+            currency=next(iter(currencies)) if total is not None and currencies else None,
+            total_market_value=round(total, 6) if total is not None else None,
+            weight_status="unavailable" if code else "available",
+            weight_unavailable_code=code,
+            weight_unavailable_reason=WEIGHT_UNAVAILABLE[code] if code else None,
+        ),
+        metadata=mock_meta(PORTFOLIO_BY, conn.mock_as_of),
     )
 
 

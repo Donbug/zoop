@@ -4,9 +4,12 @@
 // - 디자인시스템 링크는 소비자 내비게이션이 아니라 계정 메뉴 안에 둔다.
 // 가드 규칙: 로그인 안 함 → /login(가려던 주소를 state.from에 담아 로그인 후 복귀), 회원인데 초기 설정 미완료 → /onboarding,
 // 비회원은 시장 전체 모드만. 튜토리얼은 메인 지도 위에서 진행한다(features/graph-tutorial.tsx).
+// 화면 전환 실패(FS001): 접속 정보를 처음 확인하지 못했거나 화면을 그리다 실패하면 그 자리에 안내와 [다시 시도]를 둔다.
+// 다시 시도해도 실패하면 사용자가 [시작 화면으로]를 골라 돌아간다(자동으로 돌려보내는 횟수 기준은 명세에 없어 두지 않는다).
+// 이미 받은 접속 정보를 새로 확인하다 실패하면 지금 화면을 그대로 둔다.
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Bookmark, CircleHelp, LogIn, LogOut, Map as MapIcon, Moon, Newspaper, Palette, Sun, UserRound } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { Component, Fragment, useRef, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import type { Schemas } from "@/api/client";
 import { useHealth, useLogout, useSession } from "@/api/queries";
@@ -200,16 +203,65 @@ function FullPageLoading() {
   );
 }
 
+/** FS001 화면을 불러오지 못했을 때: 다시 시도, 그래도 안 되면 시작 화면으로(로그인·둘러보기 중이면 접속을 끝내고).
+ *  접속 정보는 부모가 넘긴다. 여기서 세션 조회를 새로 구독하면 실패한 조회를 다시 불러 오류·로딩을 오가게 된다. */
+function ScreenLoadError({ error, onRetry, signedIn }: { error: unknown; onRetry: () => void; signedIn: boolean }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useLogout();
+  const toStart = () => (signedIn ? logout.mutate(undefined, { onSettled: () => navigate("/login") }) : navigate("/login"));
+  return (
+    <div className="mx-auto w-full max-w-xl px-4 md:px-8">
+      {/* 화면 제목이 그려지기 전에 실패했으므로 문서 제목 자리를 채운다(보이는 안내 제목은 아래 오류 상태). */}
+      <h1 className="sr-only">화면 오류</h1>
+      <ErrorState
+        error={error}
+        title="화면을 불러오지 못했어요"
+        message={
+          location.pathname === "/login"
+            ? "다시 시도해 주세요."
+            : `다시 시도해 주세요. 계속 안 되면 시작 화면으로 돌아가 다른 방법으로 시작할 수 있어요.${signedIn ? " 이때 지금 접속은 끝나요." : ""}`
+        }
+        onRetry={onRetry}
+        actions={
+          location.pathname !== "/login" && (
+            <Button variant="ghost" onClick={toStart} loading={logout.isPending}>
+              시작 화면으로
+            </Button>
+          )
+        }
+      />
+    </div>
+  );
+}
+
+/** 화면(경로 요소)을 그리다 난 오류를 받아 FS001 안내로 바꾼다. 다시 시도는 그 화면을 새로 그린다. 경로가 바뀌면 새로 만든다(부모 key). */
+class ScreenBoundary extends Component<{ children: ReactNode; signedIn: boolean }, { failed: boolean; error: unknown; attempt: number }> {
+  state = { failed: false, error: null as unknown, attempt: 0 };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { failed: true, error };
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <ScreenLoadError
+          error={this.state.error}
+          signedIn={this.props.signedIn}
+          onRetry={() => this.setState((s) => ({ failed: false, error: null, attempt: s.attempt + 1 }))}
+        />
+      );
+    }
+    return <Fragment key={this.state.attempt}>{this.props.children}</Fragment>;
+  }
+}
+
 function SessionGate({ children }: { children: (session: Schemas["SessionResponse"]) => ReactNode }) {
   const session = useSession();
   if (session.isPending) return <FullPageLoading />;
-  if (session.isError) {
-    return (
-      <div className="mx-auto w-full max-w-xl px-4 md:px-8">
-        <ErrorState error={session.error} title="접속 정보를 확인하지 못했어요" onRetry={() => void session.refetch()} />
-      </div>
-    );
-  }
+  // 이미 받은 접속 정보가 있으면 새로 확인하다 실패해도 지금 화면을 유지한다.
+  if (!session.data) return <ScreenLoadError error={session.error} signedIn={false} onRetry={() => void session.refetch()} />;
   return <>{children(session.data)}</>;
 }
 
@@ -272,7 +324,9 @@ export function AppLayout() {
         <main id="main" className={cn("flex min-h-0 flex-1 flex-col", showTabBar && "pb-tabbar")}>
           {/* 화면 전환: 경로가 바뀌면 새 화면이 짧게 떠오른다(동작 줄이기에서는 즉시). */}
           <div key={location.pathname} className="motion-page flex min-h-0 flex-1 flex-col">
-            <Outlet />
+            <ScreenBoundary signedIn={Boolean(user?.authenticated && user.kind !== "anonymous")}>
+              <Outlet />
+            </ScreenBoundary>
           </div>
         </main>
         {showTabBar && <BottomTabBar tabs={mainTabs} />}

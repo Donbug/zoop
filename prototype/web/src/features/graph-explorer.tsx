@@ -47,8 +47,8 @@ interface GraphExplorerProps {
   onSelectionChange: (selection: GraphSelection | null) => void;
   view: ExplorerView;
   onViewChange: (view: ExplorerView) => void;
-  /** 새 모드의 지도를 받아오는 중(이전 지도를 그대로 보여주는 동안) */
-  loading?: boolean;
+  /** 지도를 다시 받아오는 중이면 그 안내(예: "내 종목 지도를 불러오고 있어요"). 지금 지도는 그대로 보인다. */
+  loadingLabel?: string;
   toolbar?: ReactNode;
   /** 포커스 모드(G2). onFocusChange가 없으면 포커스 진입 동작을 두지 않는다. */
   focus?: GraphFocus | null;
@@ -66,7 +66,7 @@ interface GraphExplorerProps {
   onHiddenChange: (hidden: ReadonlySet<LegendKey>) => void;
   /** 사이드바 기업 선택: 그 기업을 가운데로 확대·이동한다. */
   centerOn?: CenterRequest | null;
-  /** 지도 복귀(FS044): 처음 배치 뒤 쓸 카메라 */
+  /** 지도 복귀(FS044)·모드 복원(FS019): 다음 배치 뒤 쓸 카메라(값이 바뀌면 다시 쓴다) */
   initialCamera?: Viewport | null;
   onCameraIdle?: (viewport: Viewport) => void;
   /** 모바일 상세 시트 안쪽 맨 위(헤더 아래)에 둘 내용(튜토리얼 안내) */
@@ -81,7 +81,7 @@ export function GraphExplorer({
   onSelectionChange,
   view,
   onViewChange,
-  loading,
+  loadingLabel,
   toolbar,
   focus,
   onFocusChange,
@@ -282,9 +282,11 @@ export function GraphExplorer({
     />
   );
   const legend = <GraphLegend nodes={graph.nodes} edges={graph.edges} hidden={hidden} onToggle={toggleLegend} className="min-w-0 flex-1" />;
-  const loadingMark = loading && (
-    <span role="status" aria-label="지도를 새로 불러오고 있어요" className="flex size-7 items-center justify-center text-text-secondary">
+  // 범례와 한 줄이라 범례를 밀어내지 않도록 보이는 것은 아이콘, 글자는 화면 읽기 프로그램과 툴팁에 준다.
+  const loadingMark = loadingLabel && (
+    <span role="status" title={loadingLabel} className="flex size-7 shrink-0 items-center justify-center text-text-secondary">
       <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+      <span className="sr-only">{loadingLabel}</span>
     </span>
   );
   const panelView = panel && (
@@ -341,7 +343,7 @@ export function GraphExplorer({
           </div>
         )}
         {/* 그래프는 목록 보기 중에도 숨겨 둔 채 유지한다(확대 배율·위치 보존). 보이게 되면 크기를 다시 재서 맞춘다. */}
-        <div className={cn("relative flex min-h-0 flex-1 flex-col", view !== "graph" && "hidden")} aria-busy={loading || undefined}>
+        <div className={cn("relative flex min-h-0 flex-1 flex-col", view !== "graph" && "hidden")} aria-busy={Boolean(loadingLabel) || undefined}>
           <GraphCanvas
             nodes={graph.nodes}
             edges={graph.edges}

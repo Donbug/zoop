@@ -97,7 +97,10 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Missing fields 422 ``login_invalid``, wrong credentials 401, blocked member 403 ``member_blocked``.
+         * @description The e-mail is trimmed and lower-cased (at most 254 characters). A missing or malformed field is 422
+         *     ``login_invalid`` with ``details.fields``; wrong credentials 401 ``invalid_credentials`` (the same answer
+         *     whether or not the e-mail is registered); blocked member 403 ``member_blocked``. No attempt limit exists:
+         *     the threshold is an open team decision (FS002).
          */
         post: operations["login_api_auth_login_post"];
         delete?: never;
@@ -322,9 +325,30 @@ export interface paths {
         };
         /**
          * List Mock Portfolios
-         * @description Virtual accounts that can be connected. Not in spec v0.2 section 8; the UI needs the ids.
+         * @description Project mock profiles that can be connected (FS062). Not a brokerage account: no credentials are asked.
          */
         get: operations["list_mock_portfolios_api_portfolio_mock_portfolios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/mock-portfolios/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mock Portfolio
+         * @description One mock profile: account id, cash and holdings of that same profile. An unknown id is 404, never an
+         *     empty account; a profile with no holdings is a normal account with ``holdings: []``.
+         */
+        get: operations["get_mock_portfolio_api_portfolio_mock_portfolios__id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -363,7 +387,10 @@ export interface paths {
         };
         /**
          * Get Portfolio
-         * @description Holdings of the connected virtual account. No quotes exist, so weights are cost-basis weights.
+         * @description Holdings of the connected virtual account (FS039·FS054). Quantity and average price are the mock values;
+         *     market value = quantity x the price read at ``valuation.calculatedAt``; weight = market value / total stock
+         *     market value (cash excluded). A missing price, prices in different currencies (no exchange rate is
+         *     assumed) or a zero total make every weight null with a reason, never 0.
          */
         get: operations["get_portfolio_api_portfolio_get"];
         put?: never;
@@ -956,7 +983,8 @@ export interface paths {
         };
         /**
          * Overview
-         * @description Ledger counts (PoC ``inspect()``), active policy, review state, GraphDB projection and past runs.
+         * @description Ledger counts (PoC ``inspect()``), active policy, review state, GraphDB projection, analysis jobs
+         *     (running, failures, article baseline) and past runs.
          */
         get: operations["overview_api_admin_pipeline_overview_get"];
         put?: never;
@@ -1111,7 +1139,8 @@ export interface paths {
         };
         /**
          * List Jobs
-         * @description Recent jobs, the single-run lock, call limits and the sandbox/policy check.
+         * @description Recent jobs (each with ``retry`` = whether it can run again and why not), the single-run lock, call
+         *     limits, the sandbox/policy check and ``ingest`` = the article baseline the next run starts from.
          */
         get: operations["list_jobs_api_admin_jobs_get"];
         put?: never;
@@ -1152,7 +1181,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry Job */
+        /**
+         * Retry Job
+         * @description Run a failed or cancelled job again (``retryOf`` links it). Refused 409 ``job_not_retryable`` (details.reason)
+         *     when the job is done, still running, already succeeded in a later run or has a newer attempt. The same job
+         *     already running returns that job (200, deduplicated); a different running job is 409 ``job_in_progress``. A
+         *     job never publishes: users keep seeing the active graph version until an admin publishes a new one.
+         */
         post: operations["retry_job_api_admin_jobs__job_id__retry_post"];
         delete?: never;
         options?: never;
@@ -2231,6 +2266,11 @@ export interface components {
             invalidationReason: string | null;
             /** History */
             history: components["schemas"]["ReviewDecisionOut"][];
+            /**
+             * Graphdb
+             * @enum {string}
+             */
+            graphDb: "reflected" | "pending" | "not_stored" | "unknown";
         };
         /** CandidateEvidence */
         CandidateEvidence: {
@@ -2882,6 +2922,13 @@ export interface components {
             /** Connectedat */
             connectedAt: string;
             /**
+             * Accountid
+             * @description null for connections stored before the account id was recorded
+             */
+            accountId: string | null;
+            /** @description null when not provided; 0 is a real 0 */
+            cash: components["schemas"]["MockCash"] | null;
+            /**
              * Status
              * @default connected
              * @constant
@@ -2898,6 +2945,13 @@ export interface components {
             label: string;
             /** Connectedat */
             connectedAt: string;
+            /**
+             * Accountid
+             * @description null for connections stored before the account id was recorded
+             */
+            accountId: string | null;
+            /** @description null when not provided; 0 is a real 0 */
+            cash: components["schemas"]["MockCash"] | null;
             /**
              * Status
              * @default connected
@@ -3857,23 +3911,95 @@ export interface components {
             name: string;
             /** Ticker */
             ticker: string | null;
-            /** Quantity */
+            /**
+             * Quantity
+             * @description Mock quantity
+             */
             quantity: number;
-            /** Avgprice */
+            /**
+             * Avgprice
+             * @description Mock average purchase price
+             */
             avgPrice: number;
             /**
              * Avgpricecurrency
              * @description Currency of avgPrice; null when unknown (connections stored before it was recorded).
              */
             avgPriceCurrency: string | null;
-            /** Costbasis */
-            costBasis: number;
+            /**
+             * Quote
+             * @description Price read at valuation.calculatedAt
+             */
+            quote: components["schemas"]["HoldingQuote"] | components["schemas"]["Unavailable"];
+            /**
+             * Marketvalue
+             * @description quantity x quote.price in quote.currency; null when the price is unavailable (never 0)
+             */
+            marketValue: number | null;
             /**
              * Weight
-             * @description cost_basis / total cost basis; NOT market-value weight
+             * @description marketValue / total stock market value (cash excluded), 0..1; null when it cannot be calculated (see valuation.weightUnavailableCode)
              */
-            weight: number;
-            marketValue: components["schemas"]["Unavailable"];
+            weight: number | null;
+        };
+        /** HoldingQuote */
+        HoldingQuote: {
+            /**
+             * Status
+             * @default available
+             * @constant
+             */
+            status: "available";
+            /** Price */
+            price: number;
+            /** Currency */
+            currency: string;
+            /**
+             * Asof
+             * @description Provider time of the price
+             */
+            asOf: string | null;
+            /** Sourcename */
+            sourceName: string;
+        };
+        /**
+         * IngestBaseline
+         * @description The checkpoint the next article-processing run starts from: the start time of the latest run that
+         *     finished normally, also when it found nothing new. Failed and cancelled runs never move it.
+         *     ``unresolved_failures`` counts article files whose latest run failed or was cancelled.
+         */
+        IngestBaseline: {
+            /** At */
+            at: string | null;
+            /** Jobid */
+            jobId: string | null;
+            /** Outcome */
+            outcome: ("collected" | "empty") | null;
+            /** Newarticles */
+            newArticles: number | null;
+            /** Unresolvedfailures */
+            unresolvedFailures: number;
+        };
+        /**
+         * IngestOutcome
+         * @description What one ``ingest-run`` established (FS058). ``outcome`` is None while the run is queued or running.
+         *     ``collected``: new articles were processed. ``empty``: the run finished normally and found nothing new
+         *     (a success, not a failure). ``failed``/``cancelled``: nothing is confirmed, so no count is recorded
+         *     and the baseline stays where it was.
+         */
+        IngestOutcome: {
+            /** Outcome */
+            outcome: ("collected" | "empty" | "failed" | "cancelled") | null;
+            /** Newarticles */
+            newArticles: number | null;
+            /** Duplicatearticles */
+            duplicateArticles: number | null;
+            /** Baselinebefore */
+            baselineBefore: string | null;
+            /** Baselineafter */
+            baselineAfter: string | null;
+            /** Baselineadvanced */
+            baselineAdvanced: boolean;
         };
         /** InsightCompanyDetail */
         InsightCompanyDetail: {
@@ -3983,6 +4109,19 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** JobFailure */
+        JobFailure: {
+            /** Jobid */
+            jobId: string;
+            /** Label */
+            label: string;
+            /** Finishedat */
+            finishedAt: string | null;
+            /** Code */
+            code: string | null;
+            /** Message */
+            message: string | null;
+        };
         /** JobLimits */
         JobLimits: {
             /** Defaultmaxmodelcalls */
@@ -3998,6 +4137,9 @@ export interface components {
             lock: components["schemas"]["JobLock"];
             limits: components["schemas"]["JobLimits"];
             sandbox: components["schemas"]["SandboxInfo"];
+            ingest: components["schemas"]["IngestBaseline"];
+            /** Retryrule */
+            retryRule: string;
         };
         /** JobLock */
         JobLock: {
@@ -4052,8 +4194,8 @@ export interface components {
             cancelRequested: boolean;
             /** Recovered */
             recovered: boolean;
-            /** Retryable */
-            retryable: boolean;
+            retry: components["schemas"]["RetryState"];
+            ingest: components["schemas"]["IngestOutcome"] | null;
             report: components["schemas"]["RunReport"] | null;
             flush: components["schemas"]["FlushResult"] | null;
             error: components["schemas"]["JobError"] | null;
@@ -4299,6 +4441,29 @@ export interface components {
              */
             basis: string | null;
         };
+        /**
+         * MockCash
+         * @description 예수금 of a mock profile. The field holding it is null when the mock does not provide it (not 0).
+         */
+        MockCash: {
+            /** Amount */
+            amount: number;
+            /** Currency */
+            currency: string;
+        };
+        /** MockHoldingOut */
+        MockHoldingOut: {
+            /** Companyid */
+            companyId: string;
+            /** Name */
+            name: string;
+            /** Quantity */
+            quantity: number;
+            /** Avgprice */
+            avgPrice: number;
+            /** Avgpricecurrency */
+            avgPriceCurrency: string | null;
+        };
         /** MockIdpConsent */
         MockIdpConsent: {
             /** State */
@@ -4333,8 +4498,32 @@ export interface components {
             id: string;
             /** Label */
             label: string;
+            /** Accountid */
+            accountId: string;
             /** Holdingscount */
             holdingsCount: number;
+        };
+        /**
+         * MockProfileResponse
+         * @description FS062: one project mock profile with its account id, cash and holdings (no real brokerage account).
+         */
+        MockProfileResponse: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Accountid */
+            accountId: string;
+            /** @description null when the mock does not provide cash; 0 is a real 0 */
+            cash: components["schemas"]["MockCash"] | null;
+            /**
+             * Asof
+             * @description As-of time of the mock values when the mock gives one
+             */
+            asOf: string | null;
+            /** Holdings */
+            holdings: components["schemas"]["MockHoldingOut"][];
+            metadata: components["schemas"]["Metadata"];
         };
         /** Neo4jStatus */
         Neo4jStatus: {
@@ -4379,6 +4568,7 @@ export interface components {
             review: components["schemas"]["ReviewCounts"];
             projection: components["schemas"]["GraphDbStatus"];
             publication: components["schemas"]["PublicationState"];
+            jobs: components["schemas"]["OverviewJobs"];
             /** Runs */
             runs: components["schemas"]["PastRun"][];
         };
@@ -4392,6 +4582,20 @@ export interface components {
             rate: number | null;
             /** Samplehidden */
             sampleHidden: boolean;
+        };
+        /**
+         * OverviewJobs
+         * @description Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab).
+         */
+        OverviewJobs: {
+            /** Running */
+            running: number;
+            /** Queued */
+            queued: number;
+            /** Failed24H */
+            failed24h: number;
+            lastFailure: components["schemas"]["JobFailure"] | null;
+            ingest: components["schemas"]["IngestBaseline"];
         };
         /** OverviewMembers */
         OverviewMembers: {
@@ -4482,15 +4686,43 @@ export interface components {
             /** Holdings */
             holdings: components["schemas"]["HoldingOut"][];
             /**
-             * Weightbasis
-             * @default cost
-             * @constant
+             * Mockasof
+             * @description As-of time of the mock quantities, prices and cash
              */
-            weightBasis: "cost";
-            valuation: components["schemas"]["Unavailable"];
-            /** Asof */
-            asOf: string | null;
+            mockAsOf: string | null;
+            /** @description null when no account is connected */
+            valuation: components["schemas"]["PortfolioValuation"] | null;
             metadata: components["schemas"]["Metadata"];
+        };
+        /**
+         * PortfolioValuation
+         * @description FS054: market values and weights computed by the BFF from prices read at one calculation time.
+         */
+        PortfolioValuation: {
+            /**
+             * Calculatedat
+             * @description Calculation time (when the prices were read); distinct from mockAsOf
+             */
+            calculatedAt: string;
+            /**
+             * Currency
+             * @description Currency of totalMarketValue; null when it cannot be summed
+             */
+            currency: string | null;
+            /**
+             * Totalmarketvalue
+             * @description Sum of holding market values, cash excluded
+             */
+            totalMarketValue: number | null;
+            /**
+             * Weightstatus
+             * @enum {string}
+             */
+            weightStatus: "available" | "unavailable";
+            /** Weightunavailablecode */
+            weightUnavailableCode: ("missing_price" | "mixed_currency" | "zero_total") | null;
+            /** Weightunavailablereason */
+            weightUnavailableReason: string | null;
         };
         /** PricePoint */
         PricePoint: {
@@ -4710,6 +4942,24 @@ export interface components {
             assertionStatus: string | null;
             /** Evidenceids */
             evidenceIds: string[];
+        };
+        /**
+         * RetryState
+         * @description Whether a job can be run again, judged from job state alone (FS067-03). The environment (sandbox,
+         *     policy hash) is reported in ``SandboxInfo.problems`` and checked again when the request arrives.
+         */
+        RetryState: {
+            /** Allowed */
+            allowed: boolean;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "allowed" | "succeeded" | "in_progress" | "superseded" | "newer_attempt" | "duplicate_running" | "other_running" | "dataset_missing";
+            /** Reason */
+            reason: string;
+            /** Blockedby */
+            blockedBy: string | null;
         };
         /** ReviewCounts */
         ReviewCounts: {
@@ -4986,6 +5236,15 @@ export interface components {
             errorCount: number;
             /** Errors */
             errors: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Collectionerrorcount
+             * @default 0
+             */
+            collectionErrorCount: number;
+            /** Collectionerrors */
+            collectionErrors: {
                 [key: string]: unknown;
             }[];
             /** Elapsedseconds */
@@ -6692,6 +6951,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MockPortfolioListResponse"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_mock_portfolio_api_portfolio_mock_portfolios__id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockProfileResponse"];
                 };
             };
             /** @description unauthenticated */

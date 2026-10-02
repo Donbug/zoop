@@ -12,7 +12,7 @@ import { relationLabel, type RelationType } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { useCandidate, useCandidates, useDecideCandidate, type CandidateDetail, type CandidateFilters, type CandidateRow } from "../api";
 import { formatCount } from "../format";
-import { candidateStatusSpec, Status } from "../labels";
+import { candidateStatusSpec, issueGraphDbSpec, Status } from "../labels";
 import { ReasonDialog } from "../reason-dialog";
 import { DataTable, KstTime, SelectableRow, StatusLabel, Td, Th } from "../ui";
 
@@ -273,6 +273,10 @@ function CandidateDetailView({ id, onClose }: { id: string; onClose: () => void 
         <dt className="text-sm text-text-secondary">사용자 그래프</dt>
         <dd>
           <OnUserGraph on={c.onUserGraph} />
+        </dd>
+        <dt className="text-sm text-text-secondary">GraphDB 반영</dt>
+        <dd>
+          <Status spec={issueGraphDbSpec[c.graphDb]} />
         </dd>
         {c.rule && (
           <>

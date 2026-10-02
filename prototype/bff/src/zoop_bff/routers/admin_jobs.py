@@ -24,7 +24,8 @@ def list_jobs(
     status: Literal["queued", "running", "succeeded", "failed", "cancelled"] | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> JobList:
-    """Recent jobs, the single-run lock, call limits and the sandbox/policy check."""
+    """Recent jobs (each with ``retry`` = whether it can run again and why not), the single-run lock, call
+    limits, the sandbox/policy check and ``ingest`` = the article baseline the next run starts from."""
     return state.admin.jobs.listing(status, limit)
 
 
@@ -51,6 +52,10 @@ def get_job(job_id: JobId, state: State) -> JobOut:
 
 @router.post("/{job_id}/retry", response_model=JobCreated, status_code=202)
 def retry_job(job_id: JobId, body: JobRetry, response: Response, state: State, admin: Admin) -> JobCreated:
+    """Run a failed or cancelled job again (``retryOf`` links it). Refused 409 ``job_not_retryable`` (details.reason)
+    when the job is done, still running, already succeeded in a later run or has a newer attempt. The same job
+    already running returns that job (200, deduplicated); a different running job is 409 ``job_in_progress``. A
+    job never publishes: users keep seeing the active graph version until an admin publishes a new one."""
     job, deduplicated = state.admin.jobs.retry(
         job_id,
         reason=body.reason,

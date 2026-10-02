@@ -28,6 +28,7 @@ export type CandidateRow = Schemas["CandidateRow"];
 export type CandidateDetail = Schemas["CandidateDetail"];
 export type GraphVersion = Schemas["GraphVersionOut"];
 export type Job = Schemas["JobOut"];
+export type IngestBaseline = Schemas["IngestBaseline"];
 export type Round = Schemas["RoundOut"];
 export type GraphDbStatus = Schemas["GraphDbStatus"];
 export type CandidateStatus = CandidateRow["status"];

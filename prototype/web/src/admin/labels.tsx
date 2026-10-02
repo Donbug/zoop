@@ -11,7 +11,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import type { CandidateStatus, GraphDbStatus, Job, Round } from "./api";
+import type { CandidateDetail, CandidateStatus, GraphDbStatus, Job, Round } from "./api";
 import { StatusLabel, type StatusTone } from "./ui";
 
 interface StatusSpec {
@@ -34,6 +34,14 @@ export const graphDbStatusSpec: Record<GraphDbStatus["status"], StatusSpec> = {
   unavailable: { icon: CircleHelp, label: "확인 불가", tone: "neutral" },
 };
 
+/** 후보 이슈 하나의 GraphDB 반영. 판정·사용자 공개와 따로 보인다. */
+export const issueGraphDbSpec: Record<CandidateDetail["graphDb"], StatusSpec> = {
+  reflected: graphDbStatusSpec.reflected,
+  pending: graphDbStatusSpec.pending,
+  not_stored: { icon: CircleDashed, label: "저장 대상 아님", tone: "neutral" },
+  unknown: graphDbStatusSpec.unavailable,
+};
+
 export const versionGraphDbSpec: Record<string, StatusSpec> = {
   reflected: graphDbStatusSpec.reflected,
   pending: graphDbStatusSpec.pending,
@@ -45,6 +53,14 @@ export const jobStatusSpec: Record<Job["status"], StatusSpec> = {
   running: { icon: Loader2, label: "실행 중", tone: "progress", spin: true },
   succeeded: { icon: CircleCheck, label: "성공", tone: "success" },
   failed: { icon: CircleX, label: "실패", tone: "error" },
+  cancelled: { icon: Ban, label: "취소됨", tone: "neutral" },
+};
+
+/** 기사 처리 작업의 결과. 신규 0건이 정상으로 확인된 성공과 확인하지 못한 실패를 서로 다른 이름으로 보인다. */
+export const ingestOutcomeSpec: Record<NonNullable<NonNullable<Job["ingest"]>["outcome"]>, StatusSpec> = {
+  collected: { icon: CircleCheck, label: "신규 기사 처리", tone: "success" },
+  empty: { icon: CircleCheck, label: "신규 0건 (정상 확인)", tone: "success" },
+  failed: { icon: CircleX, label: "결과 확인 못 함", tone: "error" },
   cancelled: { icon: Ban, label: "취소됨", tone: "neutral" },
 };
 
@@ -81,6 +97,7 @@ export const editionLabel = { morning: "출근", evening: "퇴근" } as const;
 export const jobKindLabel: Record<string, string> = {
   "flush-graph": "GraphDB 반영 재시도",
   "retry-model-errors": "모델 오류 재처리",
+  "ingest-run": "신규 기사 처리",
 };
 
 export const auditActionLabel: Record<string, string> = {

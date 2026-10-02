@@ -22,6 +22,8 @@ interface SegmentedProps<T extends string> {
   /** true면 부모 폭을 똑같이 나눈다(모바일 기본). */
   fill?: boolean;
   className?: string;
+  /** 이미 고른 항목을 다시 눌렀을 때(선택은 그대로). 예: 진행 중인 모드 전환을 거두기 */
+  onReselect?: (value: T) => void;
 }
 
 /**
@@ -29,7 +31,7 @@ interface SegmentedProps<T extends string> {
  * 48px 트랙(항목 40px), 선택 항목은 들린 표면 + 굵은 글자(색만으로 구분하지 않음).
  * 들린 표면(thumb)은 하나만 두고 선택한 항목 자리로 미끄러뜨린다(SEED standard 곡선, 200ms).
  */
-export function Segmented<T extends string>({ value, onValueChange, options, fill, className, ...rest }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ value, onValueChange, options, fill, className, onReselect, ...rest }: SegmentedProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ x: number; width: number; animate: boolean } | null>(null);
 
@@ -58,7 +60,8 @@ export function Segmented<T extends string>({ value, onValueChange, options, fil
       ref={rootRef}
       type="single"
       value={value}
-      onValueChange={(next) => next && onValueChange(next as T)}
+      // 고른 항목을 다시 누르면 Radix는 빈 값(선택 해제)을 준다. 선택은 바꾸지 않고 다시 눌렀다고만 알린다.
+      onValueChange={(next) => (next ? onValueChange(next as T) : onReselect?.(value))}
       aria-label={rest["aria-label"]}
       className={cn("relative inline-flex h-12 max-w-full min-w-0 items-stretch gap-1 rounded-sm bg-surface-sunken p-1", fill && "flex w-full", className)}
     >

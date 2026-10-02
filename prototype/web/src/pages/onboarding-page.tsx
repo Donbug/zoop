@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState, SkeletonLines, SkeletonRows } from "@/components/ui/feedback";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionHeader } from "@/components/ui/section-header";
+import { holdingWeightText } from "@/lib/holding";
 import { cn } from "@/lib/utils";
 
 type Step = "investor" | "account" | "watchlist";
@@ -201,7 +202,7 @@ function AccountStep({ settings, onBack, onWatchlist }: { settings: Schemas["Set
                   title={h.name}
                   description={
                     <span className="tabular-nums">
-                      {h.quantity.toLocaleString("ko-KR")}주 · 원가 비중 {Math.round(h.weight * 100)}%
+                      {h.quantity.toLocaleString("ko-KR")}주 · {holdingWeightText(h)}
                     </span>
                   }
                 />

@@ -6,7 +6,9 @@ import json
 import signal
 import time
 
-from .conftest import jobs_settled
+from fastapi.testclient import TestClient
+
+from .conftest import DEMO, jobs_settled
 from .fakes import POLICY, SECRET, run_report
 
 FLUSH = {"kind": "flush-graph", "reason": "GraphDB 미반영 재시도"}
@@ -177,7 +179,11 @@ def test_retry_creates_a_linked_job_only_for_failed_or_cancelled_ones(admin):
     admin.launcher.script(code=1, stdout=json.dumps(run_report(calls=3, errors=1)))
     failed = _create(admin, PAID).json()["job"]
     jobs_settled(admin)
-    assert _job(admin, failed["id"])["retryable"] is True
+    assert _job(admin, failed["id"])["retry"]["allowed"] is True
+
+    unconfirmed = admin.client.post(f"/api/admin/jobs/{failed['id']}/retry", json={"reason": "확인 없이"})
+    assert unconfirmed.status_code == 422 and unconfirmed.json()["error"]["code"] == "paid_confirmation_required"
+    assert len(admin.launcher.launches) == 1
 
     admin.launcher.script(stdout=json.dumps(run_report(calls=3)))
     retry = admin.client.post(
@@ -187,13 +193,93 @@ def test_retry_creates_a_linked_job_only_for_failed_or_cancelled_ones(admin):
     new = retry.json()["job"]
     assert new["retryOf"] == failed["id"] and new["maxModelCalls"] == 10 and new["kind"] == "retry-model-errors"
     jobs_settled(admin)
-    assert _job(admin, new["id"])["retryable"] is False
+    assert _job(admin, new["id"])["retry"]["allowed"] is False
     again = admin.client.post(f"/api/admin/jobs/{new['id']}/retry", json={"reason": "또", "confirmPaid": True})
     assert again.status_code == 409 and again.json()["error"]["code"] == "job_not_retryable"
     assert admin.client.post("/api/admin/jobs/job-9999/retry", json={"reason": "x"}).status_code == 404
 
-    unconfirmed = admin.client.post(f"/api/admin/jobs/{failed['id']}/retry", json={"reason": "확인 없이"})
-    assert unconfirmed.status_code == 422 and unconfirmed.json()["error"]["code"] == "paid_confirmation_required"
+
+def test_a_job_whose_work_was_redone_is_not_retried_again_and_says_why(admin):
+    admin.launcher.script(code=1, stdout=json.dumps(run_report(calls=3, errors=1)))
+    first = _create(admin, PAID).json()["job"]
+    jobs_settled(admin)
+    admin.launcher.script(code=1, stdout=json.dumps(run_report(calls=3, errors=1, run_id="run-test-2")))
+    second = admin.client.post(f"/api/admin/jobs/{first['id']}/retry", json={"reason": "다시", "confirmPaid": True}).json()["job"]
+    jobs_settled(admin)
+
+    # Only the newest attempt of the same work is retryable; the older one points at it.
+    old = _job(admin, first["id"])["retry"]
+    assert old["allowed"] is False and old["code"] == "newer_attempt" and old["blockedBy"] == second["id"]
+    assert _job(admin, second["id"])["retry"] == {"allowed": True, "code": "allowed", "reason": "다시 실행할 수 있어요.", "blockedBy": None}
+    stale = admin.client.post(f"/api/admin/jobs/{first['id']}/retry", json={"reason": "옛 작업", "confirmPaid": True})
+    assert stale.status_code == 409 and stale.json()["error"]["code"] == "job_not_retryable"
+    assert stale.json()["error"]["details"] == {"status": "failed", "reason": "newer_attempt", "blockedBy": second["id"]}
+
+    admin.launcher.script(stdout=json.dumps(run_report(calls=3, run_id="run-test-3")))
+    third = admin.client.post(f"/api/admin/jobs/{second['id']}/retry", json={"reason": "마지막", "confirmPaid": True}).json()["job"]
+    jobs_settled(admin)
+    assert _job(admin, third["id"])["status"] == "succeeded"
+    for job_id in (first["id"], second["id"]):  # the work is done: no further run, no second result
+        state = _job(admin, job_id)["retry"]
+        assert state["allowed"] is False and state["code"] == "superseded" and state["blockedBy"] == third["id"]
+        done = admin.client.post(f"/api/admin/jobs/{job_id}/retry", json={"reason": "또", "confirmPaid": True})
+        assert done.status_code == 409 and done.json()["error"]["details"]["reason"] == "superseded"
+    assert len(admin.launcher.launches) == 3
+
+    listing = admin.client.get("/api/admin/jobs").json()
+    assert "오류 유형별 허용 범위" in listing["retryRule"]  # the open team decision is stated, not guessed
+
+
+def test_retry_never_runs_twice_at_once_and_never_publishes(admin):
+    admin.launcher.script(code=1)
+    failed_flush = _create(admin, FLUSH).json()["job"]
+    jobs_settled(admin)
+    admin.launcher.script(code=1, stdout=json.dumps(run_report(calls=3, errors=1)))
+    failed_paid = _create(admin, PAID).json()["job"]
+    jobs_settled(admin)
+    events_before = _events(admin)
+    versions_before = admin.client.get("/api/admin/graph/versions").json()
+
+    admin.launcher.script(hold=True)
+    retry = {"reason": "다시", "confirmPaid": True}
+    first = admin.client.post(f"/api/admin/jobs/{failed_paid['id']}/retry", json=retry)
+    assert first.status_code == 202
+    running = first.json()["job"]
+    _until(admin, running["id"], "running")
+
+    twice = admin.client.post(f"/api/admin/jobs/{failed_paid['id']}/retry", json=retry)
+    assert twice.status_code == 200 and twice.json()["deduplicated"] is True and twice.json()["job"]["id"] == running["id"]
+    other = admin.client.post(f"/api/admin/jobs/{failed_flush['id']}/retry", json={"reason": "다른 작업"})
+    assert other.status_code == 409 and other.json()["error"]["code"] == "job_in_progress"
+    busy = admin.client.post(f"/api/admin/jobs/{running['id']}/retry", json=retry)
+    assert busy.status_code == 409 and busy.json()["error"]["details"]["reason"] == "in_progress"
+    assert len(admin.launcher.launches) == 3  # the two failures and the one retry
+
+    states = {j["id"]: j["retry"] for j in admin.client.get("/api/admin/jobs").json()["items"]}
+    assert states[failed_paid["id"]]["code"] == "duplicate_running" and states[failed_paid["id"]]["blockedBy"] == running["id"]
+    assert states[failed_flush["id"]]["code"] == "other_running" and states[failed_flush["id"]]["blockedBy"] == running["id"]
+    assert states[running["id"]]["code"] == "in_progress"
+
+    admin.launcher.launches[-1].finish(0, json.dumps(run_report(calls=3, run_id="run-test-4")))
+    _until(admin, running["id"], "succeeded")
+    assert _events(admin) == events_before  # a retried job writes the ledger side only
+    assert admin.client.get("/api/admin/graph/versions").json() == versions_before
+
+
+def test_only_an_admin_can_start_retry_or_cancel_a_job(admin):
+    admin.launcher.script(code=1)
+    failed = _create(admin, FLUSH).json()["job"]
+    jobs_settled(admin)
+    launches = len(admin.launcher.launches)
+
+    member = TestClient(admin.client.app)
+    assert member.post("/api/auth/login", json=DEMO).status_code == 200
+    for client, status in ((TestClient(admin.client.app), 401), (member, 403)):
+        assert client.post(f"/api/admin/jobs/{failed['id']}/retry", json={"reason": "몰래"}).status_code == status
+        assert client.post("/api/admin/jobs", json=FLUSH).status_code == status
+        assert client.post(f"/api/admin/jobs/{failed['id']}/cancel", json={"reason": "몰래"}).status_code == status
+    assert len(admin.launcher.launches) == launches
+    assert len(admin.client.get("/api/admin/jobs").json()["items"]) == 1
 
 
 def test_a_policy_hash_mismatch_or_missing_sandbox_blocks_paid_jobs_only(admin):
@@ -228,7 +314,7 @@ def test_cancel_interrupts_the_process_and_is_idempotent(admin):
     assert admin.launcher.launches[0].signals == [signal.SIGINT]
     assert admin.client.post(f"/api/admin/jobs/{job['id']}/cancel", json={"reason": "또"}).json()["status"] == "cancelled"
     assert admin.client.get("/api/admin/jobs").json()["lock"]["locked"] is False
-    assert _job(admin, job["id"])["retryable"] is True
+    assert _job(admin, job["id"])["retry"]["allowed"] is True
 
     admin.launcher.script(stdout=json.dumps({"completed_projection_jobs": 0}))
     done = _create(admin, FLUSH).json()["job"]

@@ -2,6 +2,8 @@
 @import "./tokens.css";
 /* git 저장소가 아니라 .gitignore 기반 제외가 동작하지 않는다. 빌드 산출물의 옛 클래스가 CSS에 섞이지 않게 뺀다. */
 @source not "../../dist";
+/* 시험 파일(tests/)에 적힌 글이 클래스 후보로 읽혀 CSS에 섞이지 않게 뺀다. */
+@source not "../../tests";
 
 /* 모바일은 ≤768px(useMediaQuery("(max-width: 768px)")와 같은 기준). md:는 769px부터 적용된다. */
 @theme {

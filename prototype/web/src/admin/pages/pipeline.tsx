@@ -1,7 +1,8 @@
 // 이슈 관제(요구 76): 원장 상태 요약 + [후보 | 그래프 버전 | 작업] 탭.
 // 탭·선택한 후보·작업은 주소(?tab=&candidate=&job=)에 둬서 새로고침·공유·뒤로 가기에 남는다.
-import { Database, GitBranch, ListChecks, Workflow } from "lucide-react";
+import { CircleX, Database, GitBranch, ListChecks, Workflow } from "lucide-react";
 import { useSearchParams } from "react-router";
+import { Button } from "@/components/ui/button";
 import { ErrorState, SkeletonLines } from "@/components/ui/feedback";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePipelineOverview } from "../api";
@@ -11,7 +12,7 @@ import { CandidatesPanel } from "../pipeline/candidates";
 import { JobsPanel } from "../pipeline/jobs";
 import { RulesPanel } from "../pipeline/rules";
 import { VersionsPanel } from "../pipeline/versions";
-import { AdminPageHeader, KstTime, Metric } from "../ui";
+import { AdminPageHeader, KstTime, Metric, StatusLabel } from "../ui";
 
 const tabs = ["candidates", "versions", "jobs"] as const;
 type PipelineTab = (typeof tabs)[number];
@@ -66,6 +67,35 @@ function Overview() {
   );
 }
 
+/** 분석 진행과 실패 로그의 입구(FS067-01): 판정·GraphDB·공개 버전과 따로, 작업 탭의 로그로 이어진다. */
+function OverviewJobsLine({ onOpenJobs }: { onOpenJobs: () => void }) {
+  const overview = usePipelineOverview();
+  if (!overview.data) return null;
+  const { jobs } = overview.data;
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-base">
+      <span className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+        <Workflow className="size-4 shrink-0" aria-hidden="true" />
+        분석 작업
+      </span>
+      <span className="tabular-nums">
+        실행 중 {formatCount(jobs.running)} · 대기 {formatCount(jobs.queued)} · 24시간 실패 {formatCount(jobs.failed24h)}건
+      </span>
+      {jobs.lastFailure && (
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+          <StatusLabel icon={CircleX} label="최근 실패" tone="error" />
+          <span>
+            {jobs.lastFailure.label} · <KstTime value={jobs.lastFailure.finishedAt} />
+          </span>
+        </span>
+      )}
+      <Button variant="ghost" size="sm" onClick={onOpenJobs}>
+        작업 로그 보기
+      </Button>
+    </div>
+  );
+}
+
 export function AdminPipelinePage() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
@@ -84,6 +114,7 @@ export function AdminPipelinePage() {
     <>
       <AdminPageHeader title="이슈 관제" icon={Workflow} />
       <Overview />
+      <OverviewJobsLine onOpenJobs={() => update({ tab: "jobs" })} />
       <RulesPanel />
       <Tabs value={tab} onValueChange={(value) => update({ tab: value === "candidates" ? null : value })} className="flex flex-col gap-4">
         <TabsList className="max-w-xl">

@@ -48,7 +48,7 @@ export function ImpactDetail({ impact, nodes, asOf, onSelect, onShowEvidence }: 
   };
   const evidenceButton = (edge: Schemas["GraphEdge"], title: string) =>
     edge.evidenceIds.length > 0 && (
-      <Button variant="ghost" size="sm" onClick={() => onShowEvidence({ title, evidenceIds: edge.evidenceIds, eventId: impact.issueId })}>
+      <Button variant="ghost" size="sm" onClick={() => onShowEvidence({ title, evidenceIds: edge.evidenceIds, eventId: impact.issueId, edgeId: edge.id })}>
         <FileText aria-hidden="true" />
         근거 {edge.evidenceIds.length}건
       </Button>

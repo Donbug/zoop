@@ -78,15 +78,16 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 |---|---|---|
 | GET | `/api/health` | 소스 종류·연결 상태·이슈/기업/간선/근거 수. BFF가 살아 있으면 항상 200(`status: ok|degraded|unavailable`) |
 | GET | `/api/auth/session` | `{authenticated, kind, user, setup:{completed, tutorialCompleted}}` |
-| POST | `/api/auth/login` · `/api/auth/signup` · `/api/auth/guest` · `/api/auth/logout` | login 200 / 422 `login_invalid`(`details.fields`) / 401 `invalid_credentials` / 403 `member_blocked`; signup 201 / 422 `signup_invalid`(`details.fields`·`missingTerms`·`emailTaken`, 모든 항목 한 번에) / 409 `email_taken`(중복만 문제일 때); logout 204 |
+| POST | `/api/auth/login` · `/api/auth/signup` · `/api/auth/guest` · `/api/auth/logout` | login: 이메일은 앞뒤 공백을 지우고 소문자로 바꾼 값으로 검사·조회한다(빈 값 금지, 일반 형식, 254자 이하 — 가입과 같은 규칙). 200 / 422 `login_invalid`(`details.fields`: 누락과 형식·길이 오류를 항목별 문구로 구분) / 401 `invalid_credentials`(없는 이메일과 틀린 비밀번호가 같은 응답) / 403 `member_blocked`. **반복 실패 제한(Rate Limiting)은 기준 수치가 명세에 없어 만들지 않았다**(팀 결정 대기); signup 201 / 422 `signup_invalid`(`details.fields`·`missingTerms`·`emailTaken`, 모든 항목 한 번에) / 409 `email_taken`(중복만 문제일 때); logout 204 |
 | PUT | `/api/auth/tutorial` `{completed}` | 튜토리얼 완료·건너뛰기. 회원은 계정, 비회원은 비회원 세션에 저장. 같은 값 재전송은 변화 없음 |
 | GET | `/api/auth/terms` · `/api/auth/social/providers` | 약관 제목 목록 · 소셜 제공자(`development:true`면 모의) |
 | GET/PUT | `/api/me/settings` | `{mode, watchlistIds, tutorialCompleted, completed, investor, version}` (아래 규칙) |
 | PUT | `/api/me/watchlist/{id}` | 관심 단건 토글(FS027, 사이드바·기업 노드) `{watched: bool}` → 설정 응답. 아래 "관심 단건 토글" |
 | GET | `/api/me/recommendations?limit=` | 관심종목 추천: 활성 그래프의 승인 사건 수가 많은 기업(`reason:"승인된 사건 N건"`), 이미 관심인 기업 제외. 산업·테마 추천은 생산자가 없어 없다 |
-| GET | `/api/portfolio/mock-portfolios` | **명세 추가 제안.** 연결 가능한 가상 계좌 `{id,label,holdingsCount}` |
-| POST | `/api/portfolio/connections` `{mockPortfolioId}` | 201. 같은 프로필 재전송은 기존 연결 200(중복 연결 없음). 미지 ID 404 `mock_portfolio_not_found`, 다른 프로필이 연결돼 있으면 409 `already_connected` |
-| GET | `/api/portfolio` | 보유 종목·수량·평균단가와 그 통화(`avgPriceCurrency`, 모르면 `null`: 이 필드 전에 저장된 연결)·매입금액·비중·asOf(연결 시각, 상태 DB에 함께 저장). 보유 목록에는 시세를 붙이지 않아 `valuation`/`marketValue`는 unavailable(평가 금액은 기업 상세에서 `/quote`로), `weightBasis:"cost"`(비중은 **매입금액 기준**) |
+| GET | `/api/portfolio/mock-portfolios` | **명세 추가 제안.** 연결 가능한 프로젝트 모의 프로필 `{id,label,accountId,holdingsCount}`(FS062, 실계좌 자격 증명 없음) |
+| GET | `/api/portfolio/mock-portfolios/{id}` | 모의 프로필 하나: `accountId`·예수금 `cash{amount,currency}`(모의 데이터가 주지 않으면 `null`, 0과 구분)·`asOf`·보유 `holdings[]`. 없는 프로필은 404 `mock_portfolio_not_found`(빈 계좌로 답하지 않음), 보유가 없는 프로필은 정상 200 `holdings:[]` |
+| POST | `/api/portfolio/connections` `{mockPortfolioId}` | 201. 같은 프로필 재전송은 기존 연결 200(중복 연결 없음). 미지 ID 404 `mock_portfolio_not_found`, 다른 프로필이 연결돼 있으면 409 `already_connected`. 계좌 식별·예수금·보유를 연결 시점에 회원 기록에 고정 |
+| GET | `/api/portfolio` | FS039·FS054. `connection{accountId,cash}`, 보유별 모의 수량·평균 매입가(`avgPriceCurrency`, 모르면 `null`)와 `quote`(계산 시점에 읽은 시세·통화·시세 시각, 없으면 unavailable+사유), `marketValue`(수량 × 시세, 시세 통화, 시세 없으면 `null`), `weight`(평가금액 ÷ 현금 뺀 주식 평가금액 합계). `mockAsOf`(모의 정보 기준 시점: 프로필 `asOf`, 없으면 연결 시각)와 `valuation.calculatedAt`(계산 기준 시점)을 나눠 준다. 주가가 하나라도 없음(`missing_price`)·시세 통화가 섞임(`mixed_currency`, 환율 없음)·합계 0(`zero_total`)이면 모든 `weight`가 `null`이고 `valuation.weightUnavailableCode/Reason`에 사유(0으로 채우지 않음). 연결이 없으면 `valuation:null` |
 | DELETE | `/api/portfolio/connections/{id}` | 204 |
 | GET | `/api/graph?mode=all|personal&companyId=&depth=1..6&limit=` | 아래 "그래프". `depth`를 생략하면 중심에서 닿는 연결 요소 전체 |
 | GET | `/api/graph/edges/{id}` | 방향·유형·역할·`summary`·assertionStatus·근거 ID·basis·검증 상태. 파생 간선은 `via` 이슈와 직접 관계가 아니라는 설명 |
@@ -213,8 +214,8 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | PoC + 카탈로그 | 기업 이름·티커·별칭, 표시용 `brandColor`·`logoUrl`(카탈로그에 있을 때만) | PoC `settings.json` companies < snapshot `zoop.companies` < 승인 언급의 participants 이름 < 기업 ID(이 순서로 덮어씀). 같은 `company_id`는 뒤 항목이 레코드째 덮어쓴다(필드 병합 없음) |
 | BFF 파생 | 기업–기업 `SHARES_ISSUE`, 근거 ID, `quoteVerified`, 시간 정밀도, 간선 ID, 정렬 | 승인 데이터에서 계산 |
 | **시세 공급자** | 현재가·전일 대비·지표(`/quote`), 주가 차트(`/prices`) | 토스증권 Open API 또는 Yahoo Finance 공개 차트(아래 "시세"). 출처·기준 시각·지연 여부를 응답에 담고, BFF 계산값은 `quote.derived`에 적는다 |
-| **unavailable** | 사건·기업 요약(`summary`), 감성, 보유 목록의 평가금액(`/api/portfolio`), 브리핑 예측 평가 | 생산자 없음 |
-| **BFF mock/규칙** | 인증·세션, 설정, 가상 계좌(`mockPortfolios`, 평균 매입가 통화 `avgPriceCurrency`: 기본 `mock-basic`은 KRW로 정의), 관심종목, 브리핑 편성, AI 예시 답변 | `metadata.generatedBy` |
+| **unavailable** | 사건·기업 요약(`summary`), 감성, 브리핑 예측 평가 | 생산자 없음 |
+| **BFF mock/규칙** | 인증·세션, 설정, 가상 계좌(`mockPortfolios`: 계좌 식별·예수금·보유. 기본 `mock-basic`은 계좌 `MOCK-0001`, 예수금 3,000,000원, 평균 매입가는 상장 시장 통화로 정의), 보유 평가금액·비중(시세 공급자 값으로 계산), 관심종목, 브리핑 편성, AI 예시 답변 | `metadata.generatedBy` |
 
 ## 시세 (요구 35·36·37·72)
 
@@ -262,7 +263,8 @@ snapshot JSON은 `poc inspect --with-evidence --output` 형태(`{issues, candida
         "brand_color": "#1428A0", "logo": "samsung.svg", "brand_source": "https://…" }   // 표시 확장(선택)
     ],
     "mockPortfolios": [                            // 선택. 없으면 BFF 기본 mock-basic
-      { "id": "mock-growth", "label": "가상 성장주 계좌",
+      { "id": "mock-growth", "label": "가상 성장주 계좌", "accountId": "MOCK-G-01",
+        "cash": { "amount": 1000000, "currency": "KRW" }, "asOf": "2026-09-30T09:00:00+09:00",   // cash·asOf 선택
         "holdings": [ { "companyId": "KRX:005930", "quantity": 10, "avgPrice": 70000, "currency": "KRW" } ] }
     ]
   }
@@ -272,7 +274,7 @@ snapshot JSON은 `poc inspect --with-evidence --output` 형태(`{issues, candida
 | 키 | 규칙 |
 |---|---|
 | `zoop.companies[]` | `company_id`·`name` 문자열 필수. `aliases`는 문자열 배열, `ticker`/`sector`는 문자열 또는 생략/`null`. 표시 확장 키는 아래 "기업 카탈로그 확장 키" |
-| `zoop.mockPortfolios[]` | `id`·`label`·`holdings[]` 필수. `holdings[]`는 `companyId` 문자열, `quantity` > 0, `avgPrice` ≥ 0(숫자), 선택 `currency`(평균 매입가 통화, ISO 4217). 카탈로그에 없는 `companyId`는 이름 대신 ID로 표시되므로 `zoop.companies`에 넣을 것. `currency`가 없으면 통화를 모르는 것으로 보고 평가 손익을 그리지 않는다(시세 통화와 같을 때만 손익, 환산 없음) |
+| `zoop.mockPortfolios[]` | `id`·`label`·`accountId`·`holdings[]` 필수. 선택 `cash {amount ≥ 0, currency}`(없으면 예수금 미제공), `asOf`(모의 정보 기준 시점, 없으면 연결 시각). `holdings[]`는 `companyId` 문자열, `quantity` > 0, `avgPrice` ≥ 0(숫자), 선택 `currency`(평균 매입가 통화, ISO 4217). 카탈로그에 없는 `companyId`는 이름 대신 ID로 표시되므로 `zoop.companies`에 넣을 것. `currency`가 없으면 통화를 모르는 것으로 보고 평가 손익을 그리지 않는다(시세 통화와 같을 때만 손익, 환산 없음) |
 | `zoop.asOf` | ISO8601 문자열 |
 | 형식 오류 | 서버는 기동되지만 데이터 요청은 503 `source_unavailable`(`details.reason`에 원인) |
 
@@ -343,7 +345,7 @@ uv run python scripts/make_stress_fixture.py --check   # 커밋된 파일과 다
 - **검수 기록**: PoC DB는 수정하지 않는다. `POST /api/admin/pipeline/candidates/{id}/decision {decision: allow|reject, reason, relationId?}`는 BFF 상태 디렉터리에 결정(대상·사유·시각·관리자)을 남기고 **활성 버전 위에 덮어 적용**한다. reject는 즉시 사용자 그래프에서 빠지고, HOLD를 allow하면 후보의 mention·기사·근거 있는 관계로 공개 이슈를 구성해 `관리자 승인`으로 표시한다(원문 인용이 없으면 422 `evidence_required`, REJECT 상태 409 `status_not_reviewable`, 비활성 409 `candidate_inactive`). 같은 결정을 다시 보내면 `idempotent:true`로 기존 기록을 돌려주고 새 기록·감사 로그·리비전을 만들지 않는다. 스냅샷의 `review_exclusions`(FOLLOWS 오승인 1건)는 최초 기동 때 `origin:"snapshot-migration"` reject 기록으로 이관된다.
 - **자동 검수 규칙 R1@2 "역할 문구 미확인은 역할만 빼고 게시"**(`review_rules.py`): PoC 검증기는 참여자 역할(`participant_role:N`)과 관계 `role`을 따로 묻고, 보류의 상당수가 거기서만 막힌다. 활성 HOLD 후보 중 **ALLOW가 아닌 모든 판정의 원인이 역할 검사뿐**(이슈 판정은 `participant_role:N`, 관계 판정은 `role`)이고, REJECT(판정·필드 판정)가 없고, 이슈 mention과 **모든 관계에 원문 인용이 있으며 인용이 기사 본문과 일치**할 때만 적용된다. 적용되면 사건을 게시하되 미확인 역할 문구(참여자 `role`, 관계 `role`)를 `null`로 비우고 `roleUnconfirmed:true`를 붙인다(다른 값으로 채우지 않는다). 선택 필드(event_time·period·countries)는 PoC 판정대로 통과한 것만 게시한다. 이미 일어난 사건(`assertion_status: occurred`)이 아니면 앞선 사건의 후속(`FOLLOWS`)으로 잇지 않는다(R1@2, 이전 R1@1은 후보가 가진 모든 관계를 게시했다. PoC의 후속 판정이 계획·예측도 통과시켰고 수동 검수에서 그런 7쌍이 모두 거부됐다). **읽기 시점에 활성 버전의 `candidates` 행에 적용**되므로 나중에 게시하는 어떤 버전에도 같은 규칙이 적용되고, 끄면 그 사건은 사용자 그래프에서 바로 빠진다. 관리자 결정이 규칙보다 우선한다: 후보에 대한 허용·거부가 있으면 규칙은 그 후보에 손대지 않는다(거부한 것은 규칙으로 살아나지 않고, 허용한 것은 관리자 승인으로 역할 원문 그대로 게시된다). 관계 하나만 거부하면(스냅샷 `review_exclusions`의 관계 단위 제외 포함) 그 관계만 빠지고 사건·나머지 관계는 규칙으로 게시된 채 남는다(PoC 승인 후보와 같은 동작). 사용자 응답: 사건 상세 `approval`이 `{source:"review-rule", label:"자동 검수 규칙", scope:"issue", ruleId:"R1@1"}`(관리자 승인과 규칙이 한 사건에서 만나면 `source:"admin-review"` + `ruleId`), 비운 자리는 `participants[].roleUnconfirmed`·`relations[].roleUnconfirmed`·`companies[].roleUnconfirmed`. 관리자 API: `GET /api/admin/pipeline/rules`(켜짐·다루는 후보 `eligible`·게시한 후보/사건 수·전환 이력), `PUT /api/admin/pipeline/rules/{ruleId} {enabled, reason}`(사유 필수·감사 `review.rule`·이미 같은 상태면 `idempotent:true`로 기록 없음, 알 수 없는 규칙 404 `rule_not_found`). 기본값은 켜짐이다. 후보 목록·상세의 `rule {ruleId, applied, notAppliedReason: admin_decision|rule_disabled|not_published|null, withheldParticipants, withheldRelations, droppedRelations}`, 목록 필터 `?rule=true|false`, 개요 `review.ruleCandidates·ruleEvents`(`holdPendingReview`는 규칙으로 게시된 후보를 뺀다), 대시보드 `graph.rules`. 효과 측정·표본 판정·문턱값 시뮬레이션은 `docs/evidence/review-policy.md`, 재현은 `uv run python scripts/simulate_thresholds.py`(저장된 검증 기록만 쓰므로 모델 호출 없음).
 - **그래프 버전**: 사용자 그래프 = 활성 게시 버전(읽기 전용 파일 + SHA-256, 읽을 때마다 해시 확인) + 검수 기록. 첫 기동 때 `ZOOP_SNAPSHOT_PATH`가 `v1`(seed)이 된다. `POST /api/admin/graph/versions`는 현재 원장 `inspect()`를 새 불변 버전으로 저장하고 곧바로 활성화한다(원장이 활성 버전과 같으면 409 `version_unchanged`). `POST /api/admin/graph/versions/{id}/activate`로 되돌린다. 버전을 게시하거나 되돌려도 **저장된 회원 설정(관심종목·연결한 가상 계좌)은 무효가 되지 않는다**: 관심종목 검증은 카탈로그와 등록된 모든 버전의 기업, 회원이 이미 저장한 ID를 기준으로 하고 활성 버전에만 의존하지 않는다.
-- **GraphDB 반영**: PoC outbox의 미완료 투영 작업 수(`pendingJobs`)와 Neo4j를 **원장 이슈 단위**로 비교한다. `issuesProjected`는 "원장 이슈 중 Neo4j가 모든 관계와 함께 가진 수"라서 `issuesInLedger`와 같은 단위다. `missingIssueIds` = 원장에는 있는데 Neo4j에 없거나 관계가 모자란 이슈(→ `mismatch`), `staleIssueIds` = Neo4j에만 있는 이슈(원장에 아예 없으면 **외부 이슈**로 보고만 하고 상태를 바꾸지 않는다. `zoop-poc` Neo4j는 합성 원장의 투영도 담는다). 버전 게시·되돌리기는 GraphDB를 건드리지 않는다.
+- **GraphDB 반영**: PoC outbox의 미완료 투영 작업 수(`pendingJobs`)와 Neo4j를 **원장 이슈 단위**로 비교한다. `issuesProjected`는 "원장 이슈 중 Neo4j가 모든 관계와 함께 가진 수"라서 `issuesInLedger`와 같은 단위다. `missingIssueIds` = 원장에는 있는데 Neo4j에 없거나 관계가 모자란 이슈(→ `mismatch`), `staleIssueIds` = Neo4j에만 있는 이슈(원장에 아예 없으면 **외부 이슈**로 보고만 하고 상태를 바꾸지 않는다. `zoop-poc` Neo4j는 합성 원장의 투영도 담는다). 버전 게시·되돌리기는 GraphDB를 건드리지 않는다. 후보 상세의 `graphDb`는 그 후보 이슈 하나의 반영 상태(`reflected`·`pending`·`not_stored`=원장에 승인 이슈가 없어 투영 대상이 아님·`unknown`=Neo4j 연결 불가)이며 판정(`status`)·사용자 공개(`onUserGraph`)와 따로 본다. `pipeline/overview`의 `jobs`는 실행·대기 작업 수, 24시간 실패 수, 가장 최근 실패(`lastFailure`: 작업·시각·오류 코드·메시지)와 기사 처리 기준 시점(`ingest`)을 함께 준다.
 
 ### 작업 러너 (요구 76·59)
 
@@ -355,7 +357,9 @@ uv run python scripts/make_stress_fixture.py --check   # 커밋된 파일과 다
 | `ingest-run` | `poc run --live --config <작업별 settings.json> --dataset zoop-expansion/datasets/<파일>.jsonl` | **유료.** 요청에 `dataset`(샌드박스 `zoop-expansion/datasets/`의 파일 이름만, 없으면 422 `dataset_not_found`/`dataset_required`)이 필요하다. 승인·상한 규칙은 `retry-model-errors`와 같다. 재시도하면 같은 파일을 이어서 처리한다(체크포인트). `GET /api/admin/jobs`의 `sandbox.datasets`에 파일 목록 |
 | `retry-model-errors` | `poc run --live --retry-model-errors --config <작업별 settings.json>` | **유료.** `confirmPaid:true`(정확히 JSON true)가 없으면 422 `paid_confirmation_required`, `maxModelCalls`는 기본 50 · 1~`ZOOP_ADMIN_MAX_MODEL_CALLS`(기본 200)이며 벗어나면 422 `max_model_calls_invalid`. 작업별 설정 파일의 `max_calls`로 PoC가 그 횟수에서 모델 호출을 멈춘다 |
 
-- 이미 `queued|running` 작업이 있으면 같은 kind는 그 작업을 돌려주고(200, `deduplicated:true`), 다른 kind는 409 `job_in_progress`다. 상태는 `queued/running/succeeded/failed/cancelled`, 시작·종료 시각, 종료 코드, RunReport(processed·approved·held·rejected·pending·errors·usage), 실행 전후 원장 수치, 로그 꼬리(300줄, 비밀값 마스킹), 취소(SIGINT → SIGTERM → SIGKILL)를 기록한다. CLI가 남은 오류로 종료 코드 1을 내면 `failed`(`cli_nonzero_exit`)로 두되 보고서는 그대로 싣는다.
+- 이미 `queued|running` 작업이 있으면 같은 kind는 그 작업을 돌려주고(200, `deduplicated:true`), 다른 kind는 409 `job_in_progress`다.
+- **재시도(FS067-03)**: `POST /{id}/retry`는 `failed|cancelled` 작업만 받는다. 작업마다 `retry`(`allowed`·`code`·`reason`·`blockedBy`)가 왜 되고 안 되는지 알려 준다. 코드: `allowed`, `succeeded`·`in_progress`(끝났거나 이미 처리 중 — 409 `job_not_retryable`), `superseded`(같은 종류·같은 기사 파일의 이후 작업이 이미 성공 — 409), `newer_attempt`(더 최근 시도가 있음 — 409, 그 작업에서 다시), `duplicate_running`(같은 작업이 실행 중 — 그 작업을 돌려줌, 200), `other_running`(다른 작업이 실행 중 — 409 `job_in_progress`), `dataset_missing`(기사 파일이 샌드박스에 없음 — 422). 샌드박스 준비·정책 해시는 `sandbox.problems`와 요청 시점 검사(409 `sandbox_not_ready`/`policy_mismatch`)가 따로 막는다. 작업은 원장 쪽만 바꾸고 **게시하지 않는다**(사용자 버전은 관리자가 게시해야 바뀌고, 같은 원장은 409 `version_unchanged`). 응답의 `retryRule`이 지금 규칙을 그대로 적는다. **팀 확인 필요**: 오류 유형별 재시도 허용 범위·재실행 단계·운영 권한은 명세에 없어 정하지 않았다. 지금은 오류와 무관하게 위의 작업 상태 규칙만 쓴다.
+- **기사 처리 결과와 기준 시점(FS058·D11)**: `ingest-run` 작업의 `ingest`는 `outcome`(`collected` 신규 있음 / `empty` 정상 확인된 신규 0건 = 성공 / `failed` / `cancelled`), 확인된 `newArticles`·`duplicateArticles`, `baselineBefore`·`baselineAfter`·`baselineAdvanced`를 기록한다. 성공은 종료 코드 0 + 읽을 수 있는 보고서 + 수집 요청 오류 0건일 때만이다. 보고서가 없거나(`ingest_unconfirmed`) 수집 요청이 실패했으면(`collection_failed`, 보고서의 `collectionErrorCount`) 신규 0건으로 기록하지 않고 실패로 둔다. 실패·취소 작업의 `newArticles`는 `null`이다(0이 아님). 기준 시점은 **정상 종료한 가장 최근 기사 처리 작업의 시작 시각**이며 신규 0건 성공도 옮기고, 실패·취소·재시작 중단은 옮기지 않는다(뒤로도 가지 않는다). 재시도하면 마지막 성공 시점에서 다시 시작한다. `GET /api/admin/jobs`의 `ingest`(`at`·`jobId`·`outcome`·`newArticles`·`unresolvedFailures`)와 `pipeline/overview`의 `jobs.ingest`가 현재 기준 시점을 준다. 05·35분 정기 수집, 공급 문서 ID·지연 유입 조회는 외부 수집원이 없어 만들지 않았다. 상태는 `queued/running/succeeded/failed/cancelled`, 시작·종료 시각, 종료 코드, RunReport(processed·approved·held·rejected·pending·errors·usage), 실행 전후 원장 수치, 로그 꼬리(300줄, 비밀값 마스킹), 취소(SIGINT → SIGTERM → SIGKILL)를 기록한다. CLI가 남은 오류로 종료 코드 1을 내면 `failed`(`cli_nonzero_exit`)로 두되 보고서는 그대로 싣는다.
 - 작업 기록은 상태 디렉터리에 영속한다. BFF가 재시작될 때 `queued|running`이던 작업은 남은 프로세스를 정리하고 `failed` + `recovered:true` + `interrupted_by_restart`로 확정한다(출력된 보고서가 있으면 첨부).
 - 작업이 끝나도 **사용자 그래프는 바뀌지 않는다.** 원장이 바뀐 것을 반영하려면 관리자가 버전을 게시해야 한다.
 

@@ -2,7 +2,8 @@
 //  - 휴장일에는 시세가 없다. 점은 실제 거래 시각의 시세만 찍고 빈 날을 채우는 가격을 만들지 않는다(선은 이웃한 거래 시각끼리 잇는다).
 //  - 차트 라이브러리 없이 SVG 한 줄(종가)로 그린다. 선 색은 기간 첫 종가 대비 마지막 종가의 상승·하락이며,
 //    같은 내용을 위 줄에 부호·화살표·글자로도 적는다(색만으로 구분하지 않음).
-//  - 사건 표시는 '이 날 사건이 있었다'만 뜻한다. 주가 움직임의 원인이라고 말하지 않는다. 누르면 그 날짜 묶음을 펼친다.
+//  - 사건 표시는 '이 날 사건이 있었다'만 뜻한다. 주가 움직임의 원인이라고 말하지 않는다. 누르면 그 날짜를 고른다(FS041: 사건이 1건이면
+//    그 사건을 바로 열고, 여러 건이면 카드를 펼쳐 고르게 한다). 선택한 사건의 발생 날짜는 실선·채운 표시로 강조한다(날짜 미상 사건은 강조 없음).
 //  - 키보드·스크린리더: 차트는 요약 문장으로 읽히고, [표로 보기]에 시각별 종가·거래량 표가 있다. 사건 표시는 버튼이다.
 //  - 일시 장애는 이 영역만 [다시 시도], 자료 없음은 한 줄, 미연결·미지원 종목은 시세 영역이 이미 사유를 말하므로 그리지 않는다.
 import { Table, Zap } from "lucide-react";
@@ -27,11 +28,13 @@ interface Props {
   range: DetailRange;
   /** 타임라인과 같은(관계 거르기를 거친) 날짜 묶음 */
   groups: EventGroup[];
-  /** 사건 표시를 누르면 그 묶음들을 펼치고 첫 묶음으로 옮긴다 */
+  /** 사건 표시를 누르면 그 날짜 묶음들을 고른다 */
   onPick: (keys: string[]) => void;
+  /** 선택한 사건이 든 날짜 묶음 키(발생 날짜를 아는 사건만). 그 위치를 강조한다. */
+  selectedKey: string | null;
 }
 
-export function CompanyPriceChart({ companyId, range, groups, onPick }: Props) {
+export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKey }: Props) {
   const prices = useCompanyPrices(companyId, range);
   const period = range.period;
   const [hover, setHover] = useState<number | null>(null);
@@ -109,9 +112,21 @@ export function CompanyPriceChart({ companyId, range, groups, onPick }: Props) {
         onPointerLeave={() => setHover(null)}
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden="true">
-          {markers.map((m) => (
-            <line key={m.keys.join()} x1={m.x * W} x2={m.x * W} y1={0} y2={H} className="stroke-border-strong" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
-          ))}
+          {markers.map((m) => {
+            const selected = selectedKey !== null && m.keys.includes(selectedKey);
+            return (
+              <line
+                key={m.keys.join()}
+                x1={m.x * W}
+                x2={m.x * W}
+                y1={0}
+                y2={H}
+                className={selected ? "stroke-text-primary" : "stroke-border-strong"}
+                strokeDasharray={selected ? undefined : "4 4"}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
           <path d={line} fill="none" strokeWidth={2} strokeLinejoin="round" className={strokeClass[tone]} vectorEffect="non-scaling-stroke" />
           {hover !== null && (
             <line x1={xOf(hover)} x2={xOf(hover)} y1={0} y2={H} className="stroke-text-tertiary" vectorEffect="non-scaling-stroke" />
@@ -129,16 +144,21 @@ export function CompanyPriceChart({ companyId, range, groups, onPick }: Props) {
           {markers.map((m) => {
             const when = m.dates.length > 1 ? `${pointLabel(m.dates.at(-1)!, false)}~${pointLabel(m.dates[0]!, false)}` : pointLabel(m.dates[0]!, false);
             const text = `${when} 사건 ${m.count}건`;
+            const selected = selectedKey !== null && m.keys.includes(selectedKey);
             return (
-              <Tooltip key={m.keys.join()} content={text}>
+              <Tooltip key={m.keys.join()} content={selected ? `${text} · 선택한 사건` : text}>
                 <button
                   type="button"
-                  aria-label={`${text} 보기`}
+                  aria-label={selected ? `${text}, 선택한 사건의 날짜` : `${text} 보기`}
+                  aria-current={selected ? "true" : undefined}
                   onClick={() => onPick(m.keys)}
-                  className="pressable absolute top-0 inline-flex size-11 -translate-x-1/2 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-sunken"
+                  className={cn(
+                    "pressable absolute top-0 inline-flex size-11 -translate-x-1/2 items-center justify-center rounded-sm hover:bg-surface-sunken",
+                    selected ? "bg-surface-selected text-text-primary" : "text-text-secondary",
+                  )}
                   style={{ left: `clamp(22px, ${(m.x * 100).toFixed(2)}%, calc(100% - 22px))` }}
                 >
-                  <Zap className="size-4" aria-hidden="true" />
+                  <Zap className={cn("size-4", selected && "fill-current")} aria-hidden="true" />
                   {m.count > 1 && <span className="text-sm tabular-nums">{m.count}</span>}
                 </button>
               </Tooltip>

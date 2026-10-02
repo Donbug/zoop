@@ -1,15 +1,18 @@
 // 어느 화면에서든 열 수 있는 두 개의 창:
 //  - 근거 창(UI-09, 요구 24): 인용문 원문과 검증 상태. 문서마다 발행 시각을, 창 위에 관계 확인 시점을 따로 보인다
-//    (기준 관계의 검증 시각이 있으면 그것, 없으면 검증을 통과한 자료의 기준 시각). 데이터 출처(datasetKind)는 여기(아이콘)와 앱 헤더에서만 밝힌다.
+//    (기준 관계의 검증 시각이 있으면 그것, 없으면 검증을 통과한 자료의 기준 시각). 관계(연결선) id만 받으면 그 관계 상세에서
+//    검증 시각을 읽는다. 사건·근거·관계 조회는 따로 실패할 수 있고, 실패한 조회만 다시 시도한다(근거 없음과 구분).
+//    데이터 출처(datasetKind)는 여기(아이콘)와 앱 헤더에서만 밝힌다.
 //  - AI 질문 창(UI-10): 예시 답변. 근거가 부족하면 답변을 보류한다.
 // 모바일에서 노드 시트 위에 열면 그 위에 쌓이고, 닫으면 아래 시트로 돌아간다(Radix 대화상자 스택).
 // 지도에서 연 근거 창(request.map)은 인용마다 [지도에서 보기] 토글을 두고, 누른 인용을 mapHighlight로 내보낸다.
 // 지도(GraphExplorer)가 이 값을 읽어 강조하고, 근거 창을 닫으면 강조가 풀린다.
-import { Info } from "lucide-react";
+import { Info, RotateCw } from "lucide-react";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { useEvent, useEvidenceItems } from "@/api/queries";
+import { useEdge, useEvent, useEvidenceItems } from "@/api/queries";
 import { EvidenceList, type EvidenceMapLink } from "@/components/domain/evidence";
 import { SourceIndicator } from "@/components/domain/source-indicator";
+import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
 import { Sheet } from "@/components/ui/dialog";
 import { IconHint } from "@/components/ui/icon-hint";
@@ -27,6 +30,8 @@ export interface EvidenceRequest {
   map?: { issueId?: string };
   /** 기준 관계를 검증한 시각(있을 때만). 없으면 근거 응답의 자료 기준 시각을 관계 확인 시점으로 보인다. */
   checkedAt?: string | null;
+  /** checkedAt을 모르는 관계(연결선) id: 그 관계 상세의 검증 시각을 관계 확인 시점으로 쓴다. */
+  edgeId?: string;
 }
 
 interface OverlayApi {
@@ -147,7 +152,12 @@ function EvidenceSheet({
   } else {
     body = <EvidenceList items={loaded} mapLink={mapLink} />;
   }
-  const checkedAt = request.checkedAt ?? loaded[0]?.metadata.asOf;
+  // 관계 확인 시점: 넘겨받은 값 > 관계 상세의 마지막 검증 시각 > 근거 자료의 기준 시각. 관계 상세를 읽는 중이거나 실패하면 정하지 않는다.
+  const edge = useEdge(request.checkedAt === undefined ? request.edgeId : undefined);
+  const edgeVerifiedAt = edge.data?.basis.map((b) => b.verifiedAt).filter((v): v is string => Boolean(v)).sort().at(-1) ?? null;
+  const verifiedAt = request.checkedAt ?? edgeVerifiedAt;
+  const edgeUnsettled = request.checkedAt === undefined && Boolean(request.edgeId) && !edge.isSuccess;
+  const checkedAt = edgeUnsettled ? null : (verifiedAt ?? loaded[0]?.metadata.asOf);
 
   return (
     <Sheet
@@ -160,12 +170,21 @@ function EvidenceSheet({
       closeLabel="근거 창 닫기"
       headerExtra={loaded[0] && <SourceIndicator kind={loaded[0].metadata.datasetKind} size="sm" className="-ml-1" />}
     >
+      {edgeUnsettled && edge.isError && (
+        <p role="alert" className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
+          관계 확인 시점을 불러오지 못했어요.
+          <Button variant="link" size="sm" onClick={() => void edge.refetch()}>
+            <RotateCw aria-hidden="true" />
+            다시 시도
+          </Button>
+        </p>
+      )}
       {checkedAt && (
         <p className="mb-4 flex items-center gap-1 text-sm text-text-secondary">
           관계 확인 시점 <span className="text-text-primary tabular-nums">{formatKst(checkedAt)}</span>
           <IconHint icon={Info} label="관계 확인 시점">
             <p>
-              {request.checkedAt
+              {verifiedAt
                 ? "기준 관계를 검증한 시각이에요."
                 : "검증을 통과한 자료를 이 시각 기준으로 확인했어요."}{" "}
               아래 문서마다 적힌 발행 시각과는 달라요.

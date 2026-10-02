@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query
@@ -24,6 +25,7 @@ from ..admin_schemas import (
 from ..deps import Admin, State, require_admin
 from ..errors import ApiError
 from ..graph_versions import GraphVersion
+from ..statedb import utc_iso
 from . import ADMIN_ERROR_RESPONSES
 
 router = APIRouter(
@@ -68,9 +70,12 @@ def version_out(state: State, v: GraphVersion) -> GraphVersionOut:
 
 @router.get("/pipeline/overview", response_model=Overview)
 def overview(state: State, _: Admin) -> Overview:
-    """Ledger counts (PoC ``inspect()``), active policy, review state, GraphDB projection and past runs."""
-    usage = state.admin.usage.response("all", state.admin.jobs.all_data())
-    return state.admin.pipeline.overview(usage.past_runs)
+    """Ledger counts (PoC ``inspect()``), active policy, review state, GraphDB projection, analysis jobs
+    (running, failures, article baseline) and past runs."""
+    admin = state.admin
+    usage = admin.usage.response("all", admin.jobs.all_data())
+    jobs = admin.jobs.overview_jobs(utc_iso(admin.clock.now() - timedelta(hours=24)))
+    return admin.pipeline.overview(usage.past_runs, jobs)
 
 
 @router.get("/pipeline/candidates", response_model=CandidateList)

@@ -195,6 +195,9 @@ class CandidateDetail(CandidateRow):
     verification: VerificationOut
     invalidation_reason: str | None
     history: list[ReviewDecisionOut]
+    # GraphDB state of this candidate's issue, apart from the verdict and from what users see:
+    # ``not_stored`` = the ledger holds no approved issue under this id (HOLD/REJECT are never projected).
+    graph_db: Literal["reflected", "pending", "not_stored", "unknown"]
 
 
 class DecisionRequest(CamelModel):
@@ -340,6 +343,69 @@ class PublicationState(CamelModel):
     issues_only_in_active: list[str]
 
 
+class RetryState(CamelModel):
+    """Whether a job can be run again, judged from job state alone (FS067-03). The environment (sandbox,
+    policy hash) is reported in ``SandboxInfo.problems`` and checked again when the request arrives."""
+
+    allowed: bool
+    code: Literal[
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing",
+    ]
+    reason: str
+    blocked_by: str | None  # the job that blocks the retry, when there is one
+
+
+class IngestOutcome(CamelModel):
+    """What one ``ingest-run`` established (FS058). ``outcome`` is None while the run is queued or running.
+    ``collected``: new articles were processed. ``empty``: the run finished normally and found nothing new
+    (a success, not a failure). ``failed``/``cancelled``: nothing is confirmed, so no count is recorded
+    and the baseline stays where it was."""
+
+    outcome: Literal["collected", "empty", "failed", "cancelled"] | None
+    new_articles: int | None
+    duplicate_articles: int | None
+    baseline_before: str | None
+    baseline_after: str | None
+    baseline_advanced: bool
+
+
+class IngestBaseline(CamelModel):
+    """The checkpoint the next article-processing run starts from: the start time of the latest run that
+    finished normally, also when it found nothing new. Failed and cancelled runs never move it.
+    ``unresolved_failures`` counts article files whose latest run failed or was cancelled."""
+
+    at: str | None
+    job_id: str | None
+    outcome: Literal["collected", "empty"] | None
+    new_articles: int | None
+    unresolved_failures: int
+
+
+class JobFailure(CamelModel):
+    job_id: str
+    label: str
+    finished_at: str | None
+    code: str | None
+    message: str | None
+
+
+class OverviewJobs(CamelModel):
+    """Analysis jobs next to the ledger state: what is in progress and what failed (details: jobs tab)."""
+
+    running: int
+    queued: int
+    failed24h: int = Field(alias="failed24h")
+    last_failure: JobFailure | None
+    ingest: IngestBaseline
+
+
 class Overview(CamelModel):
     as_of: str
     ledger: LedgerRef
@@ -349,6 +415,7 @@ class Overview(CamelModel):
     review: ReviewCounts
     projection: GraphDbStatus
     publication: PublicationState
+    jobs: OverviewJobs
     runs: list[PastRun]
 
 
@@ -429,6 +496,8 @@ class RunReport(CamelModel):
     pending: int
     error_count: int
     errors: list[dict[str, Any]]
+    collection_error_count: int = 0  # failed article requests while collecting (not model/analysis errors)
+    collection_errors: list[dict[str, Any]] = Field(default_factory=list)
     elapsed_seconds: float
     execution_mode: str | None
     usage: UsageOut
@@ -462,7 +531,8 @@ class JobOut(CamelModel):
     retry_of: str | None
     cancel_requested: bool
     recovered: bool
-    retryable: bool
+    retry: RetryState
+    ingest: IngestOutcome | None
     report: RunReport | None
     flush: FlushResult | None
     error: JobError | None
@@ -504,6 +574,8 @@ class JobList(CamelModel):
     lock: JobLock
     limits: JobLimits
     sandbox: SandboxInfo
+    ingest: IngestBaseline
+    retry_rule: str  # the rule retry follows today; which errors may be retried is an open team decision
 
 
 class JobCreate(CamelModel):

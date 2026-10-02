@@ -141,7 +141,10 @@ export function LoginPage() {
         <div className="flex flex-col gap-3 text-base text-text-primary">
           <p>시장 전체 지도와 브리핑은 바로 볼 수 있어요.</p>
           <p>가상 계좌 연결, 관심 종목, 내 종목 지도는 로그인해야 쓸 수 있어요.</p>
-          {guest.isError && <ErrorState error={guest.error} title="둘러보기를 시작하지 못했어요" compact />}
+          {/* FS001 화면 전환 실패: 시작 화면(이 창)을 그대로 두고 안내한다. [둘러보기 시작]이 다시 시도, [돌아가기]가 시작 방식 고르기다. */}
+          {guest.isError && (
+            <ErrorState error={guest.error} title="화면을 불러오지 못했어요" message="둘러보기를 시작하지 못했어요. [둘러보기 시작]으로 다시 시도해 주세요." compact />
+          )}
         </div>
       </Dialog>
     </div>

@@ -256,10 +256,17 @@ class HoldingRec:
 
 @dataclass(frozen=True)
 class MockPortfolioRec:
+    """A project mock profile (FS062): profile id, account id, cash (예수금) and holdings. ``cash`` is None when the
+    mock does not provide it (never read as 0). ``as_of`` is the mock information's own as-of time when given."""
+
     id: str
     label: str
     holdings: tuple[HoldingRec, ...]
     generated_by: str
+    account_id: str
+    cash: float | None = None
+    cash_currency: str | None = None
+    as_of: str | None = None
 
 
 @dataclass(frozen=True)
@@ -413,8 +420,9 @@ def _parse_portfolios(items: Any) -> list[MockPortfolioRec]:
             isinstance(item, dict)
             and isinstance(item.get("id"), str)
             and isinstance(item.get("label"), str)
+            and isinstance(item.get("accountId"), str)
             and isinstance(item.get("holdings"), list),
-            "zoop.mockPortfolios[]: id, label and holdings are required",
+            "zoop.mockPortfolios[]: id, label, accountId and holdings are required",
         )
         holdings = []
         for h in item["holdings"]:
@@ -432,8 +440,45 @@ def _parse_portfolios(items: Any) -> list[MockPortfolioRec]:
             currency = h.get("currency")
             _expect(currency is None or isinstance(currency, str), "zoop.mockPortfolios[].holdings[].currency must be a string")
             holdings.append(HoldingRec(h["companyId"], h["quantity"], h["avgPrice"], currency))
-        result.append(MockPortfolioRec(item["id"], item["label"], tuple(holdings), "snapshot"))
+        cash = item.get("cash")
+        _expect(
+            cash is None
+            or (
+                isinstance(cash, dict)
+                and isinstance(cash.get("amount"), (int, float))
+                and not isinstance(cash.get("amount"), bool)
+                and cash["amount"] >= 0
+                and isinstance(cash.get("currency"), str)
+            ),
+            "zoop.mockPortfolios[].cash must be {amount>=0, currency} when given",
+        )
+        as_of = item.get("asOf")
+        _expect(as_of is None or isinstance(as_of, str), "zoop.mockPortfolios[].asOf must be a string")
+        result.append(
+            MockPortfolioRec(
+                item["id"],
+                item["label"],
+                tuple(holdings),
+                "snapshot",
+                item["accountId"],
+                cash["amount"] if cash else None,
+                cash["currency"] if cash else None,
+                as_of,
+            )
+        )
     return result
+
+
+# Currency of the BFF-made default mock prices, by the exchange in the catalog id (KRX:005930 -> KRW).
+_DEFAULT_MOCK_CURRENCY = {"KRX": "KRW", "NASDAQ": "USD", "NYSE": "USD", "AMEX": "USD", "TSE": "JPY"}
+_DEFAULT_MOCK_PRICE = {"KRW": (50000, 10000), "USD": (100, 10), "JPY": (5000, 1000)}
+
+
+def _default_mock_holding(index: int, company_id: str) -> HoldingRec:
+    """BFF-defined mock values (not provider data): KRW unless the listing says otherwise."""
+    currency = _DEFAULT_MOCK_CURRENCY.get(company_id.partition(":")[0].upper(), "KRW")
+    base, step = _DEFAULT_MOCK_PRICE[currency]
+    return HoldingRec(company_id, 10 * (index + 1), base + step * index, currency)
 
 
 def _publicly_approved(issue: Mapping[str, Any], audit: Mapping[str, Mapping[str, Any]]) -> bool:
@@ -724,9 +769,12 @@ def build_dataset(
             portfolios["mock-basic"] = MockPortfolioRec(
                 "mock-basic",
                 "가상 계좌 예시",
-                # BFF-made mock values, defined in KRW.
-                tuple(HoldingRec(c, 10 * (i + 1), 50000 + 10000 * i, "KRW") for i, c in enumerate(linked)),
+                tuple(_default_mock_holding(i, c) for i, c in enumerate(linked)),
                 "bff-default",
+                account_id="MOCK-0001",
+                # BFF-made mock cash (FS062 예수금); excluded from holding weights (FS054).
+                cash=3_000_000,
+                cash_currency="KRW",
             )
 
     override_as_of = extension.get("asOf")

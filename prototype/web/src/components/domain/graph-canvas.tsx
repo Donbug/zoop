@@ -88,7 +88,7 @@ interface GraphCanvasProps {
   occludeRight?: number;
   /** 모바일 상세 시트(반 높이)가 캔버스 아래를 덮고 있는지. 경로 맞춤이 시트 위 영역을 쓴다. */
   sheetOver?: boolean;
-  /** 처음 배치가 끝난 뒤 화면 맞춤 대신 쓸 카메라(지도 복귀, FS044). 마운트 때 값만 쓴다. */
+  /** 다음 배치가 끝난 뒤 화면 맞춤 대신 쓸 카메라(지도 복귀 FS044, 모드 복원 FS019). 값이 바뀔 때마다 한 번 쓴다. */
   initialCamera?: Viewport | null;
   /** 카메라가 멈출 때마다 현재 카메라(복귀용 저장) */
   onCameraIdle?: (viewport: Viewport) => void;
@@ -123,6 +123,12 @@ export function GraphCanvas({
   const onCameraIdleRef = useRef(onCameraIdle);
   onCameraIdleRef.current = onCameraIdle;
   const restoreCameraRef = useRef(initialCamera);
+  // 부모가 새 복원 카메라를 주면(모드 전환으로 돌아온 모드의 카메라, FS019) 다음 배치에서 한 번 쓴다.
+  const cameraPropRef = useRef(initialCamera);
+  if (cameraPropRef.current !== initialCamera) {
+    cameraPropRef.current = initialCamera;
+    restoreCameraRef.current = initialCamera;
+  }
   const { theme } = useTheme();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -310,9 +316,10 @@ export function GraphCanvas({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    // 처음 그리는 캔버스(지도 복귀)면 이번 실행에서 같은 데이터로 계산해 둔 좌표를 그대로 쓴다.
+    // 처음 그리는 캔버스(지도 복귀)나 복원할 카메라가 있는 배치(모드 복원)면 이번 실행에서 같은 데이터로 계산해 둔 좌표를
+    // 그대로 써서 저장한 카메라가 같은 배치를 비추게 한다.
     const memoryKey = `${layoutName}|${isMobile ? "m" : "d"}|${elements.signature}`;
-    const recalled = positionsRef.current.size === 0 ? layoutMemory.get(memoryKey) : undefined;
+    const recalled = positionsRef.current.size === 0 || restoreCameraRef.current ? layoutMemory.get(memoryKey) : undefined;
     const remembered = recalled ?? positionsRef.current;
     cy.batch(() => {
       cy.elements().remove();

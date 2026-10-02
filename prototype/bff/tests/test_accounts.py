@@ -57,6 +57,45 @@ def test_login_reports_missing_fields_and_wrong_password(tmp_path):
     assert client.post("/api/auth/login", json=DEMO).status_code == 200
 
 
+def test_login_tells_missing_malformed_and_wrong_credentials_apart(tmp_path):
+    client = _client(tmp_path)
+
+    def attempt(email, password=DEMO["password"]):
+        fresh = TestClient(client.app)
+        response = fresh.post("/api/auth/login", json={"email": email, "password": password})
+        assert fresh.get("/api/auth/session").json()["kind"] == ("member" if response.status_code == 200 else "anonymous")
+        return response
+
+    # The address is trimmed and lower-cased before it is looked up, exactly as at sign-up.
+    assert attempt(f"  {DEMO['email'].upper()} \t").status_code == 200
+
+    blank = attempt("   ")
+    assert blank.status_code == 422 and blank.json()["error"]["code"] == "login_invalid"
+    assert blank.json()["error"]["details"]["fields"] == {"email": "이메일을 입력해 주세요."}
+    no_password = attempt(DEMO["email"], "")
+    assert no_password.status_code == 422 and set(no_password.json()["error"]["details"]["fields"]) == {"password"}
+
+    for malformed in ("not-an-email", "a@b", "a b@zoop.local", "@zoop.local", "demo@@zoop.local"):
+        bad = attempt(malformed)
+        assert bad.status_code == 422, malformed
+        assert bad.json()["error"]["details"]["fields"] == {"email": "이메일 형식이 올바르지 않아요. 예: name@example.com"}
+        assert bad.json()["error"]["message"] == "이메일 형식을 확인해 주세요."
+
+    # 254 characters is the longest address; one more is refused before any account lookup.
+    longest = "a" * (254 - len("@zoop.local")) + "@zoop.local"
+    assert attempt(longest).status_code == 401
+    too_long = attempt("a" + longest)
+    assert too_long.status_code == 422
+    assert too_long.json()["error"]["details"]["fields"] == {"email": "이메일은 254자 이하로 입력해 주세요."}
+
+    # Wrong password and unknown address give the same answer: nothing says whether the account exists.
+    wrong = attempt(DEMO["email"], "not-the-password")
+    unknown = attempt("nobody@zoop.local", "not-the-password")
+    assert (wrong.status_code, unknown.status_code) == (401, 401)
+    assert wrong.json() == unknown.json() and wrong.json()["error"]["code"] == "invalid_credentials"
+    assert attempt(DEMO["email"]).status_code == 200  # no attempt limit: the threshold is an open team decision
+
+
 def test_members_settings_and_sessions_survive_a_restart(tmp_path):
     first = _client(tmp_path)
     assert first.post("/api/auth/signup", json=NEW).status_code == 201
@@ -90,16 +129,20 @@ def test_holding_currency_survives_restart_and_older_rows_read_as_unknown(tmp_pa
     first = _client(tmp_path)
     assert first.post("/api/auth/login", json=DEMO).status_code == 200
     assert first.post("/api/portfolio/connections", json={"mockPortfolioId": "mock-basic"}).status_code == 201
-    assert {h["avgPriceCurrency"] for h in first.get("/api/portfolio").json()["holdings"]} == {"KRW"}
+    portfolio = first.get("/api/portfolio").json()
+    assert {h["avgPriceCurrency"] for h in portfolio["holdings"]} == {"KRW"}
+    assert portfolio["connection"]["accountId"] == "MOCK-0001" and portfolio["connection"]["cash"]["amount"] > 0
     cookie = first.cookies.get("zoop_session")
-    # A connection stored before the currency was recorded: no migration, the currency is unknown.
+    # A connection stored before the currency and account fields were recorded: a bare holdings list without
+    # currency. No migration: the currency, account id and cash read as unknown (null), never 0.
     with sqlite3.connect(tmp_path / "state" / "zoop-admin.sqlite3") as db:
-        raw = json.loads(db.execute("SELECT holdings FROM member_connections").fetchone()[0])
+        raw = json.loads(db.execute("SELECT holdings FROM member_connections").fetchone()[0])["holdings"]
         db.execute("UPDATE member_connections SET holdings = ?", (json.dumps([{k: v for k, v in h.items() if k != "currency"} for h in raw]),))
     restarted = TestClient(create_app(_settings(tmp_path)))
     restarted.cookies.set("zoop_session", cookie)
-    holdings = restarted.get("/api/portfolio").json()["holdings"]
-    assert holdings and all(h["avgPriceCurrency"] is None for h in holdings)
+    portfolio = restarted.get("/api/portfolio").json()
+    assert portfolio["holdings"] and all(h["avgPriceCurrency"] is None for h in portfolio["holdings"])
+    assert portfolio["connection"]["accountId"] is None and portfolio["connection"]["cash"] is None
 
 
 def test_session_expires(tmp_path):

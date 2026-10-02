@@ -1,5 +1,6 @@
-// UI-06 기업 상세(요구 35–41, 명세 v1.2 FS038·FS040·FS044). 개요(머리글)·가상 보유·사건·문서·기업 정보를 각자 조회해 준비되는
-// 대로 그리고, 한 영역이 실패하면 그 영역만 오류와 [다시 시도]를 보인다. 기업이 바뀌면 화면 상태를 통째로 새로 만든다(key).
+// UI-06 기업 상세(요구 35–41, 명세 v1.2 FS038·FS040·FS041·FS044). 개요(머리글)·시세·지표·가상 보유·차트·사건·문서를 각자 독립 요청으로
+// 화면을 열 때 함께 조회하고(탭에 가려진 차트·문서도 미리 조회한다) 준비되는 대로 그린다. 한 영역이 실패하면 그 영역만 오류와
+// [다시 시도]를 보이고, 자료 없음은 빈 안내, 권한 없음(비회원의 보유)은 영역을 숨긴다. 기업이 바뀌면 화면 상태를 통째로 새로 만든다(key).
 // 시세(현재가·지표)는 개요와 따로 조회하고, 주가 차트는 사건 탭에서 타임라인과 같은 범위로 함께 바뀐다.
 // 주소 상태: ?tab=events|documents|info, ?period=1d|1m|1y(기본 1m), ?event=<사건>, ?open=<펼친 날짜 묶음>.
 //  - 탭·기간은 이력에 쌓고(push, 뒤로 가기로 되돌림), 사건 선택·묶음 펼침은 바꿔 쓴다(replace).
@@ -20,7 +21,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, type Schemas } from "@/api/client";
-import { queryKeys, useCompany, useCompanyEvents, useEventInRange } from "@/api/queries";
+import { queryKeys, useCompany, useCompanyDocuments, useCompanyEvents, useCompanyPrices, useEventInRange } from "@/api/queries";
 import { CompanyHeader } from "@/components/domain/company-header";
 import { DisclaimerNote } from "@/components/domain/status-labels";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,9 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   const listed = events.isSuccess && selectedId !== null && [...events.data.items, ...events.data.unknownTimeItems].some((e) => e.id === selectedId);
   const confirmedId = listed ? selectedId : null;
   const selectedEvent = useEventInRange(confirmedId, range.to);
+  // 탭 안 영역(차트·문서)도 탭을 열기 전에 요청을 시작한다. 같은 키라 탭의 컴포넌트는 이 결과를 그대로 쓴다.
+  useCompanyPrices(companyId, range);
+  useCompanyDocuments(companyId);
 
   // 진입 그래프: 지도에서 들어왔으면 그 상태를 이 이력 항목에 묶어 둔다(뒤로 가기로 돌아와도 같은 진입 그래프).
   const entryKey = location.key;
@@ -113,7 +117,7 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   // 상세를 떠나면 진행 중인 이 기업 조회를 취소한다(FS044: 이탈 전 응답이 복귀 후 화면에 반영되지 않게).
   useEffect(
     () => () => {
-      for (const key of [queryKeys.company(companyId), queryKeys.quote(companyId), queryKeys.metrics(companyId), ["prices", companyId], ["events", companyId], ["event"]])
+      for (const key of [queryKeys.company(companyId), queryKeys.quote(companyId), queryKeys.metrics(companyId), ["prices", companyId], ["events", companyId], queryKeys.companyDocuments(companyId), ["event"]])
         void queryClient.cancelQueries({ queryKey: key, fetchStatus: "fetching" });
     },
     [companyId, queryClient],
@@ -146,18 +150,22 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
     }, false);
   };
   const selectEvent = (eventId: string | null) => update((p) => (eventId ? p.set("event", eventId) : p.delete("event")), true);
-  const toggleGroup = (key: string) =>
+  // 날짜 선택(FS041): 묶음을 펼치면 날짜를 고른 것이라 이전 선택(상세·차트 강조)을 거둔다. 접을 때는 그 묶음 안의 선택만 푼다.
+  const toggleGroup = (key: string, eventIds: string[], expand: boolean) =>
     update((p) => {
       const open = new Set(openGroups);
-      if (open.has(key)) open.delete(key);
-      else open.add(key);
+      if (expand) open.add(key);
+      else open.delete(key);
       if (open.size > 0) p.set("open", [...open].join(","));
       else p.delete("open");
+      if (expand || (selectedId !== null && eventIds.includes(selectedId))) p.delete("event");
     }, true);
-  const openGroupsFor = (keys: string[]) =>
+  // 차트에서 날짜를 고르면 묶음을 펼치고, 그 날짜 사건이 1건이면 자동 선택(상세 조회), 여러 건이면 선택을 비워 카드에서 고르게 한다.
+  const pickDate = (keys: string[], eventIds: string[]) =>
     update((p) => {
-      const open = new Set([...openGroups, ...keys]);
-      p.set("open", [...open].join(","));
+      p.set("open", [...new Set([...openGroups, ...keys])].join(","));
+      if (eventIds.length === 1) p.set("event", eventIds[0]!);
+      else p.delete("event");
     }, true);
 
   // 선택 사건 판정: 새 목록이 성공했는데 없으면(기간 밖) 또는 상세가 404이면 선택을 풀고 알린다. 목록 실패는 판정하지 않는다.
@@ -304,7 +312,7 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
             onToggleGroup={toggleGroup}
             onShowOnMap={showOnMap}
             onAsk={ask}
-            onOpenGroups={openGroupsFor}
+            onPickDate={pickDate}
           />
         </TabsContent>
         <TabsContent value="documents">

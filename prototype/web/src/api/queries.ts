@@ -5,11 +5,32 @@
 //    곧바로 B 노드를 누르면 A 조회는 더 이상 화면에서 쓰이지 않으므로 Query가 요청을 취소(abort)한다.
 //  - 결과는 노드 id가 들어간 queryKey별로 따로 저장된다. 늦게 도착한 A 응답은 A 칸에만 들어가고,
 //    화면은 현재 선택된 B의 칸만 읽으므로 A 결과가 B 화면을 덮어쓸 수 없다(요청 순번 비교와 같은 효과).
+//
+// 로그아웃 뒤 늦은 개인 응답(FS007):
+//  - 개인 조회(설정·보유·가상 계좌·추천·대화·평가)의 키에는 세션 세대(personalEpoch)가 들어간다. 로그인·가입·비회원 시작·로그아웃마다
+//    세대가 바뀌므로, 이전 회원의 요청이 늦게 끝나도 그 응답은 지금 화면이 읽지 않는 이전 세대 칸에만 들어간다.
+//  - 로그아웃은 누르는 즉시 개인 캐시를 비우고(진행 중인 요청은 취소된다) 세션을 미로그인으로 표시해 개인 조회를 멈춘다.
+//    서버 처리가 끝나면 그 사이에 받은 응답까지 한 번 더 비우고 세션을 서버에서 다시 확인한다.
+//  - 로그아웃은 화면 캐시만 비운다. 서버의 대화 기록은 지우지 않는다(삭제가 아니다).
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
 import { api, type Schemas } from "./client";
 import { useSearchParams } from "react-router";
 import type { DetailRange } from "@/lib/company-timeline";
 import type { GraphMode } from "@/lib/labels";
+
+let personalEpoch = 0;
+const epochListeners = new Set<() => void>();
+function subscribeEpoch(listener: () => void) {
+  epochListeners.add(listener);
+  return () => epochListeners.delete(listener);
+}
+/** 개인 조회 훅이 세대가 바뀔 때 새 키로 다시 그리도록 구독한다. */
+export function usePersonalEpoch() {
+  return useSyncExternalStore(subscribeEpoch, () => personalEpoch);
+}
+/** 비동기 작업이 시작될 때의 세대를 기억해 두었다가, 끝났을 때 세대가 바뀌었는지(로그아웃·다른 회원 로그인) 확인하는 데 쓴다. */
+export const currentPersonalEpoch = () => personalEpoch;
 
 /** 주소의 ?round=<브리핑 회차 id>: 있으면 그래프 화면의 모든 조회가 그 회차를 발행할 당시의 자료를 쓴다(FS032). 없으면 현재 그래프. */
 export function useAsOfRound(): string | null {
@@ -20,9 +41,9 @@ export function useAsOfRound(): string | null {
 export const queryKeys = {
   health: ["health"] as const,
   session: ["session"] as const,
-  settings: ["settings"] as const,
-  portfolio: ["portfolio"] as const,
-  mockPortfolios: ["mock-portfolios"] as const,
+  settings: (epoch = personalEpoch) => ["settings", epoch] as const,
+  portfolio: (epoch = personalEpoch) => ["portfolio", epoch] as const,
+  mockPortfolios: (epoch = personalEpoch) => ["mock-portfolios", epoch] as const,
   companies: (q: string) => ["companies", q] as const,
   company: (id: string, round: string | null = null) => ["company", id, round] as const,
   quote: (id: string) => ["quote", id] as const,
@@ -39,7 +60,7 @@ export const queryKeys = {
   briefingGraphBasis: (round: string) => ["briefing", "graph", round] as const,
   terms: ["terms"] as const,
   socialProviders: ["social-providers"] as const,
-  recommendations: ["recommendations"] as const,
+  recommendations: (epoch = personalEpoch) => ["recommendations", epoch] as const,
 };
 
 export function useHealth() {
@@ -58,24 +79,28 @@ export function useSession() {
 }
 
 export function useSettings(enabled = true) {
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: queryKeys.settings,
+    queryKey: queryKeys.settings(epoch),
     queryFn: ({ signal }) => api<Schemas["SettingsResponse"]>("/api/me/settings", { signal }),
     enabled,
   });
 }
 
+/** 연결한 가상 계좌의 모의 보유와 평가(같은 계산 시점 시세의 평가 금액·자산 비중, FS039·FS054). */
 export function usePortfolio(enabled = true) {
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: queryKeys.portfolio,
+    queryKey: queryKeys.portfolio(epoch),
     queryFn: ({ signal }) => api<Schemas["PortfolioResponse"]>("/api/portfolio", { signal }),
     enabled,
   });
 }
 
 export function useMockPortfolios(enabled = true) {
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: queryKeys.mockPortfolios,
+    queryKey: queryKeys.mockPortfolios(epoch),
     queryFn: ({ signal }) => api<Schemas["MockPortfolioListResponse"]>("/api/portfolio/mock-portfolios", { signal }),
     enabled,
   });
@@ -99,8 +124,9 @@ export function useSocialProviders() {
 
 /** 관심 종목 추천: 승인된 사건이 많은 기업(근거 문구 포함). 산업·테마 추천은 데이터가 없어 두지 않는다. */
 export function useRecommendations(enabled = true) {
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: queryKeys.recommendations,
+    queryKey: queryKeys.recommendations(epoch),
     queryFn: ({ signal }) => api<Schemas["RecommendationResponse"]>("/api/me/recommendations", { signal }),
     enabled,
   });
@@ -170,17 +196,20 @@ export function useCompanyPrices(id: string, range: DetailRange) {
 
 /**
  * 지도 전체 연결. depth·limit을 주지 않으면 BFF가 포커스에서 닿는 연결 요소 전체를(전체 모드는 전부, 개인화는 보유+관심에서 닿는 것) 기본 한도 500개까지 준다.
- * 주소에 ?round=가 있으면 그 브리핑 회차를 발행할 당시의 그래프다(FS032, 전체 모드만).
+ * round가 있으면 그 브리핑 회차를 발행할 당시의 그래프다(FS032, 전체 모드만).
+ * 메인 지도의 모드 전환(FS019)은 이 옵션으로 대상 모드를 먼저 받아 두고, 성공한 뒤에만 모드를 바꾼다.
  */
+export function graphQuery(mode: GraphMode, round: string | null) {
+  return {
+    queryKey: queryKeys.graph(mode, undefined, round),
+    queryFn: ({ signal }: { signal: AbortSignal }) => api<Schemas["GraphResponse"]>("/api/graph", { query: { mode, round }, signal }),
+  };
+}
+
+/** 키가 바뀌면(모드·회차) 이전 지도를 이어 쓰지 않는다. 다른 모드·회차의 데이터에 지금 이름이 붙지 않게 하기 위해서다. */
 export function useGraph(mode: GraphMode, enabled = true) {
   const round = useAsOfRound();
-  return useQuery({
-    queryKey: queryKeys.graph(mode, undefined, round),
-    queryFn: ({ signal }) => api<Schemas["GraphResponse"]>("/api/graph", { query: { mode, round }, signal }),
-    enabled,
-    // 모드를 바꾸는 동안 이전 지도를 그대로 두어 캔버스가 다시 만들어지지 않게 한다(남는 노드는 제자리에서 이어진다).
-    placeholderData: keepPreviousData,
-  });
+  return useQuery({ ...graphQuery(mode, round), enabled });
 }
 
 export function useEdge(id: string | undefined) {
@@ -280,9 +309,12 @@ export function useBriefingGraphBasis(round: string | null) {
 
 // ---- 변경(mutation)
 
-// 개인 데이터 캐시(보유·관심·대화·추천 등)를 비운다. 공용 데이터(health)와 헤더가 구독 중인 session만 남긴다.
+// 개인 데이터 캐시(보유·관심·대화·추천 등)를 비우고 세션 세대를 바꾼다. 공용 데이터(health)와 헤더가 구독 중인 session만 남긴다.
+// 지우는 조회의 진행 중인 요청은 취소되고, 그 응답이 늦게 와도 캐시에 다시 들어가지 않는다.
 export function clearPersonalCache(client: QueryClient) {
+  personalEpoch += 1;
   client.removeQueries({ predicate: (q) => !["health", "session", "terms", "social-providers"].includes(String(q.queryKey[0])) });
+  for (const listener of epochListeners) listener();
 }
 
 export function useLogin() {
@@ -320,10 +352,17 @@ export function useGuestStart() {
   });
 }
 
+/** 로그아웃(FS007): 누르는 즉시 이전 회원의 개인 표시를 거두고, 서버 처리가 끝나면 그 사이 받은 응답까지 비운 뒤 세션을 다시 확인한다. */
 export function useLogout() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: () => api<void>("/api/auth/logout", { method: "POST" }),
+    onMutate: () => {
+      client.setQueryData<Schemas["SessionResponse"]>(queryKeys.session, (prev) =>
+        prev && { ...prev, authenticated: false, kind: "anonymous", user: null, setup: null },
+      );
+      clearPersonalCache(client);
+    },
     onSettled: () => {
       clearPersonalCache(client);
       return client.invalidateQueries({ queryKey: queryKeys.session });
@@ -339,7 +378,7 @@ export function useSetTutorial() {
       api<Schemas["SessionResponse"]>("/api/auth/tutorial", { method: "PUT", body: { completed } }),
     onSuccess: (session) => {
       client.setQueryData(queryKeys.session, session);
-      return client.invalidateQueries({ queryKey: queryKeys.settings });
+      return client.invalidateQueries({ queryKey: ["settings"] });
     },
   });
 }
@@ -349,8 +388,10 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (body: Schemas["SettingsUpdate"]) =>
       api<Schemas["SettingsResponse"]>("/api/me/settings", { method: "PUT", body }),
-    onSuccess: (settings) => {
-      client.setQueryData(queryKeys.settings, settings);
+    // 보낸 세대의 칸에 넣는다: 저장 중 로그아웃했으면 이전 회원 설정이 새 세대에 들어가지 않는다.
+    onMutate: () => ({ epoch: personalEpoch }),
+    onSuccess: (settings, _body, context) => {
+      client.setQueryData(queryKeys.settings(context.epoch), settings);
       client.removeQueries({ queryKey: ["graph"] });
       return client.invalidateQueries({ queryKey: queryKeys.session });
     },
@@ -364,8 +405,9 @@ export function useSetWatched() {
   return useMutation({
     mutationFn: ({ companyId, watched }: { companyId: string; watched: boolean }) =>
       api<Schemas["SettingsResponse"]>(`/api/me/watchlist/${encodeURIComponent(companyId)}`, { method: "PUT", body: { watched } }),
-    onSuccess: (settings, { companyId }) => {
-      client.setQueryData(queryKeys.settings, settings);
+    onMutate: () => ({ epoch: personalEpoch }),
+    onSuccess: (settings, { companyId }, context) => {
+      client.setQueryData(queryKeys.settings(context.epoch), settings);
       void client.invalidateQueries({ queryKey: ["graph"] });
       void client.invalidateQueries({ queryKey: ["company", companyId] });
     },
@@ -394,7 +436,7 @@ export function useDisconnectPortfolio() {
 function refreshAfterConnectionChange(client: QueryClient) {
   client.removeQueries({ queryKey: ["graph"] });
   void client.invalidateQueries({ queryKey: ["company"] });
-  return client.invalidateQueries({ queryKey: queryKeys.portfolio });
+  return client.invalidateQueries({ queryKey: ["portfolio"] });
 }
 
 // ---- AI 질문(FS045–FS053): 질문 하나 = 서버가 저장하는 작업 하나.
@@ -404,9 +446,10 @@ export type ChatJob = Schemas["ChatJob"];
 export type ChatConversation = Schemas["ChatConversation"];
 export type ChatJobRequest = Schemas["ChatJobRequest"];
 
+/** 대화 키도 세션 세대별이다(FS007). use-chat의 setQueryData는 부르는 시점의 세대 칸을 쓴다. */
 export const chatKeys = {
-  current: ["chat", "current"] as const,
-  session: (id: string) => ["chat", "session", id] as const,
+  current: (epoch = personalEpoch) => ["chat", epoch, "current"] as const,
+  session: (id: string, epoch = personalEpoch) => ["chat", epoch, "session", id] as const,
 };
 
 export const isChatJobActive = (job: Pick<ChatJob, "status">) => job.status === "queued" || job.status === "running";
@@ -426,11 +469,12 @@ export const chatRequests = {
 /** 회원의 가장 최근 대화. 패널을 닫았다 다시 열거나 다른 화면에서 열어도 같은 대화를 찾는 방법이다. */
 export function useCurrentChat(enabled: boolean) {
   const client = useQueryClient();
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: chatKeys.current,
+    queryKey: chatKeys.current(epoch),
     queryFn: async ({ signal }) => {
       const { conversation } = await api<Schemas["ChatCurrentResponse"]>("/api/chat/sessions/current", { signal });
-      if (conversation) client.setQueryData(chatKeys.session(conversation.session.id), conversation);
+      if (conversation) client.setQueryData(chatKeys.session(conversation.session.id, epoch), conversation);
       return conversation?.session.id ?? null;
     },
     enabled,
@@ -440,8 +484,9 @@ export function useCurrentChat(enabled: boolean) {
 
 /** 대화 하나와 그 작업들. 처리 중인 작업이 있는 동안(패널이 열려 있을 때) 상태를 계속 확인한다. */
 export function useChatConversation(sessionId: string | null, enabled: boolean) {
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: chatKeys.session(sessionId ?? ""),
+    queryKey: chatKeys.session(sessionId ?? "", epoch),
     queryFn: ({ signal }) => api<ChatConversation>(sessionPath(sessionId!), { signal }),
     enabled: enabled && Boolean(sessionId),
     staleTime: 0,
@@ -454,11 +499,12 @@ export function useChatConversation(sessionId: string | null, enabled: boolean) 
 export type FeedbackFeature = Schemas["FeedbackVote"]["feature"];
 export type FeedbackValue = Schemas["FeedbackVote"]["value"];
 type FeedbackItem = Schemas["FeedbackItem"];
-const feedbackKey = (feature: FeedbackFeature, targetId: string) => ["feedback", feature, targetId] as const;
+const feedbackKey = (feature: FeedbackFeature, targetId: string, epoch = personalEpoch) => ["feedback", epoch, feature, targetId] as const;
 
 export function useMyFeedback(feature: FeedbackFeature, targetId: string, enabled: boolean) {
+  const epoch = usePersonalEpoch();
   return useQuery({
-    queryKey: feedbackKey(feature, targetId),
+    queryKey: feedbackKey(feature, targetId, epoch),
     queryFn: ({ signal }) =>
       api<Schemas["FeedbackList"]>("/api/feedback", { query: { feature, targetIds: targetId }, signal }).then((list): FeedbackItem | null => list.items[0] ?? null),
     enabled,
@@ -470,6 +516,7 @@ export function useRate(feature: FeedbackFeature, targetId: string, targetVersio
   return useMutation({
     mutationFn: (body: { value: FeedbackValue; reason?: string }) =>
       api<FeedbackItem>("/api/feedback", { method: "PUT", body: { feature, targetId, ...(targetVersion ? { targetVersion } : {}), ...body } }),
-    onSuccess: (item) => client.setQueryData(feedbackKey(feature, targetId), item.value === "none" ? null : item),
+    onMutate: () => ({ epoch: personalEpoch }),
+    onSuccess: (item, _body, context) => client.setQueryData(feedbackKey(feature, targetId, context.epoch), item.value === "none" ? null : item),
   });
 }

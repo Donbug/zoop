@@ -179,7 +179,7 @@ export function AdminDashboardPage() {
               )}
             </AdminSection>
 
-            <AdminSection title="최근 작업" icon={Workflow} id="dash-jobs" actions={<SectionLink to="/admin/pipeline#jobs" label="작업 관제" />}>
+            <AdminSection title="최근 작업" icon={Workflow} id="dash-jobs" actions={<SectionLink to="/admin/pipeline?tab=jobs" label="작업 관제" />}>
               {data.jobs.recent.length === 0 ? (
                 <p className="py-4 text-base text-text-secondary">아직 실행한 작업이 없어요.</p>
               ) : (

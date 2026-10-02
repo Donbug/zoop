@@ -79,6 +79,8 @@ interface ErrorStateProps {
   compact?: boolean;
   /** 서버가 사용자 말로 준 사유가 있으면 일반 문구 대신 쓴다(예: 시세 출처 일시 장애). */
   message?: string;
+  /** 다시 시도 옆에 둘 다른 복구 동작(예: 시작 화면으로) */
+  actions?: ReactNode;
   className?: string;
 }
 
@@ -96,7 +98,7 @@ export function describeError(error: unknown) {
   return { message: "예상하지 못한 문제가 생겼어요. 잠시 후 다시 시도해 주세요.", code: "unknown" };
 }
 
-export function ErrorState({ error, title = "정보를 불러오지 못했어요", onRetry, showBack, compact, message: given, className }: ErrorStateProps) {
+export function ErrorState({ error, title = "정보를 불러오지 못했어요", onRetry, showBack, compact, message: given, actions, className }: ErrorStateProps) {
   const navigate = useNavigate();
   const described = describeError(error);
   const message = given ?? described.message;
@@ -112,7 +114,7 @@ export function ErrorState({ error, title = "정보를 불러오지 못했어요
         <summary className="cursor-pointer">자세히</summary>
         <p className="mt-1 tabular-nums break-all">오류 코드: {code}</p>
       </details>
-      {(onRetry || showBack) && (
+      {(onRetry || showBack || actions) && (
         <div className="mt-2 flex flex-wrap gap-2">
           {onRetry && (
             <Button variant="secondary" size={compact ? "sm" : "md"} onClick={onRetry}>
@@ -126,6 +128,7 @@ export function ErrorState({ error, title = "정보를 불러오지 못했어요
               이전 화면으로
             </Button>
           )}
+          {actions}
         </div>
       )}
     </div>

@@ -26,13 +26,18 @@ from typing import Any, Literal, Protocol
 from .admin_pipeline import PipelineService
 from .admin_schemas import (
     FlushResult,
+    IngestBaseline,
+    IngestOutcome,
     JobError,
+    JobFailure,
     JobLimits,
     JobList,
     JobLock,
     JobOut,
     LedgerCounts,
+    OverviewJobs,
     PolicyCheck,
+    RetryState,
     RunReport,
     SandboxInfo,
 )
@@ -58,6 +63,12 @@ _DSN_PASSWORD = re.compile(r"(\w+://[^:/\s@]+:)[^@\s]+(@)")
 _BEARER = re.compile(r"(Bearer\s+)[A-Za-z0-9._\-]{8,}")
 _SK_TOKEN = re.compile(r"\bsk-[A-Za-z0-9_\-]{12,}")
 _CANCEL_GRACE = (10.0, 5.0)  # seconds after SIGINT, then after SIGTERM, before SIGKILL
+# The rule a retry follows (FS067-03). The spec leaves which errors may be retried, and from which step, to the
+# team: until then the decision rests on job state only, never on the error, so nothing here is invented.
+RETRY_RULE = (
+    "실패하거나 취소된 작업만, 같은 종류·같은 기사 파일의 가장 최근 시도에 한해 다시 실행해요. "
+    "오류 유형별 허용 범위와 재실행 단계는 정해지지 않아 오류 종류와 상관없이 이 규칙만 적용해요."
+)
 
 
 # ---------------------------------------------------------------- process plumbing
@@ -286,6 +297,7 @@ class JobRecord:
     error: dict[str, str] | None = None
     ledger_before: dict[str, Any] | None = None
     ledger_after: dict[str, Any] | None = None
+    ingest: dict[str, Any] | None = None  # ingest-run only: outcome, confirmed counts and the baseline before/after
 
     @property
     def paid(self) -> bool:
@@ -294,6 +306,53 @@ class JobRecord:
 
 def _record(row: Any) -> JobRecord:
     return JobRecord(seq=row["seq"], **json.loads(row["data"]))
+
+
+@dataclass(frozen=True)
+class _Brief:
+    """Just enough of a job to judge retries and the article baseline without loading logs and reports."""
+
+    seq: int
+    id: str
+    kind: str
+    dataset: str | None
+    status: str
+
+
+def _ingest_out(data: dict[str, Any] | None) -> IngestOutcome | None:
+    if not data:
+        return None
+    outcome = data.get("outcome")
+    return IngestOutcome(
+        outcome=outcome,
+        new_articles=data.get("new_articles"),
+        duplicate_articles=data.get("duplicate_articles"),
+        baseline_before=data.get("baseline_before"),
+        baseline_after=data.get("baseline_after"),
+        baseline_advanced=outcome in ("collected", "empty") and data.get("baseline_after") != data.get("baseline_before"),
+    )
+
+
+def _ingest_result(rec: JobRecord) -> dict[str, Any]:
+    """The ingest verdict of a finished run (FS058). Only a run that finished normally with a readable report
+    confirms a count: 0 new articles is then ``empty`` (success) and the baseline moves to this run's start.
+    A failed or cancelled run confirms nothing: no count (never 0) and the baseline stays."""
+    before = (rec.ingest or {}).get("baseline_before")
+    report = rec.report
+    if rec.status == "succeeded" and report is not None:
+        outcome = "collected" if report["processed"] > 0 else "empty"
+        after = max((t for t in (before, rec.started_at) if t), default=None)  # never moves backwards
+        new, duplicate = report["processed"], report["skipped"]
+    else:
+        outcome = "cancelled" if rec.status == "cancelled" else "failed"
+        after, new, duplicate = before, None, None
+    return {
+        "outcome": outcome,
+        "new_articles": new,
+        "duplicate_articles": duplicate,
+        "baseline_before": before,
+        "baseline_after": after,
+    }
 
 
 class Masker:
@@ -378,7 +437,7 @@ class JobRunner:
                 lines += ["--- stdout ---", *raw[-100:]]
         return [mask(line)[:2000] for line in lines[-LOG_TAIL_LINES:]]
 
-    def to_out(self, rec: JobRecord, *, with_log: bool) -> JobOut:
+    def to_out(self, rec: JobRecord, *, with_log: bool, briefs: list[_Brief] | None = None) -> JobOut:
         duration = rec.elapsed_seconds
         if duration is None and rec.started_at and rec.finished_at:
             duration = (_parse(rec.finished_at) - _parse(rec.started_at)).total_seconds()
@@ -401,7 +460,8 @@ class JobRunner:
             retry_of=rec.retry_of,
             cancel_requested=rec.cancel_requested,
             recovered=rec.recovered,
-            retryable=rec.status in ("failed", "cancelled"),
+            retry=self._retry_state(rec, self._briefs() if briefs is None else briefs),
+            ingest=_ingest_out(rec.ingest),
             report=RunReport(**rec.report) if rec.report else None,
             flush=FlushResult(**rec.flush) if rec.flush else None,
             error=JobError(**rec.error) if rec.error else None,
@@ -421,12 +481,16 @@ class JobRunner:
             rows = self._db.query("SELECT * FROM jobs WHERE status=? ORDER BY seq DESC LIMIT ?", (status, limit))
         else:
             rows = self._db.query("SELECT * FROM jobs ORDER BY seq DESC LIMIT ?", (limit,))
-        return [self.to_out(_record(r), with_log=False) for r in rows]
+        briefs = self._briefs()
+        return [self.to_out(_record(r), with_log=False, briefs=briefs) for r in rows]
 
     def all_data(self) -> list[dict[str, Any]]:
         """Every job as a camelCase dict (AI usage aggregation)."""
         rows = self._db.query("SELECT * FROM jobs ORDER BY seq")
-        return [self.to_out(_record(r), with_log=False).model_dump(by_alias=True, mode="json") for r in rows]
+        briefs = self._briefs()
+        return [
+            self.to_out(_record(r), with_log=False, briefs=briefs).model_dump(by_alias=True, mode="json") for r in rows
+        ]
 
     def counts(self, since_iso: str) -> dict[str, int]:
         def one(sql: str, *params: Any) -> int:
@@ -444,6 +508,92 @@ class JobRunner:
     def active_out(self) -> JobOut | None:
         rec = self._active()
         return self.to_out(rec, with_log=False) if rec else None
+
+    # ---- retry state and the article baseline (FS067-03, FS058)
+    def _briefs(self) -> list[_Brief]:
+        rows = self._db.query(
+            "SELECT id, seq, kind, status, json_extract(data,'$.dataset') AS dataset FROM jobs ORDER BY seq"
+        )
+        return [_Brief(r["seq"], r["id"], r["kind"], r["dataset"], r["status"]) for r in rows]
+
+    def _retry_state(self, rec: JobRecord, briefs: list[_Brief]) -> RetryState:
+        def state(code: str, reason: str, blocked_by: str | None = None) -> RetryState:
+            return RetryState(allowed=code == "allowed", code=code, reason=reason, blocked_by=blocked_by)  # type: ignore[arg-type]
+
+        if rec.status == "succeeded":
+            return state("succeeded", "성공한 작업이라 다시 실행하지 않아요.")
+        if rec.status in ("queued", "running"):
+            return state("in_progress", "이미 처리 중인 작업이라 중복 실행하지 않아요.")
+        later = [b for b in briefs if b.seq > rec.seq and b.kind == rec.kind and b.dataset == rec.dataset]
+        done = next((b for b in later if b.status == "succeeded"), None)
+        if done is not None:
+            return state("superseded", f"이후 같은 작업({done.id})이 성공해서 다시 실행하지 않아요. 중복 실행·중복 반영을 막아요.", done.id)
+        live = next((b for b in later if b.status in ("queued", "running")), None)
+        if live is not None:
+            return state("duplicate_running", f"같은 작업({live.id})이 이미 처리 중이라 중복 실행하지 않아요.", live.id)
+        if later:
+            return state("newer_attempt", f"더 최근에 다시 시도한 작업({later[-1].id})이 있어요. 그 작업에서 다시 실행해 주세요.", later[-1].id)
+        other = next((b for b in briefs if b.status in ("queued", "running")), None)
+        if other is not None:
+            return state("other_running", f"다른 작업({other.id})이 처리 중이에요. 끝난 뒤에 다시 실행해 주세요.", other.id)
+        if rec.kind == "ingest-run" and self.sandbox.dataset_path(rec.dataset or "") is None:
+            return state("dataset_missing", "처리할 기사 파일이 샌드박스에 없어서 다시 실행할 수 없어요.")
+        return state("allowed", "다시 실행할 수 있어요.")
+
+    def _baseline_at(self) -> str | None:
+        """Start time of the latest normally finished article run (the checkpoint the next run starts from)."""
+        row = self._db.one(
+            "SELECT MAX(COALESCE(json_extract(data,'$.ingest.baseline_after'), json_extract(data,'$.started_at'))) "
+            "FROM jobs WHERE kind='ingest-run' AND status='succeeded'"
+        )
+        return row[0] if row else None
+
+    def ingest_baseline(self) -> IngestBaseline:
+        at = self._baseline_at()
+        latest: dict[str | None, _Brief] = {}
+        for brief in self._briefs():
+            if brief.kind == "ingest-run":
+                latest[brief.dataset] = brief  # ordered by seq: the newest run per article file wins
+        unresolved = sum(1 for b in latest.values() if b.status in ("failed", "cancelled"))
+        row = (
+            self._db.one(
+                "SELECT * FROM jobs WHERE kind='ingest-run' AND status='succeeded' "
+                "AND COALESCE(json_extract(data,'$.ingest.baseline_after'), json_extract(data,'$.started_at')) = ? "
+                "ORDER BY seq DESC LIMIT 1",
+                (at,),
+            )
+            if at
+            else None
+        )
+        rec = _record(row) if row else None
+        ingest = (rec.ingest or {}) if rec else {}
+        return IngestBaseline(
+            at=at,
+            job_id=rec.id if rec else None,
+            outcome=ingest.get("outcome"),
+            new_articles=ingest.get("new_articles"),
+            unresolved_failures=unresolved,
+        )
+
+    def overview_jobs(self, since_iso: str) -> OverviewJobs:
+        counts = self.counts(since_iso)
+        row = self._db.one("SELECT * FROM jobs WHERE status='failed' ORDER BY seq DESC LIMIT 1")
+        failed = _record(row) if row else None
+        return OverviewJobs(
+            running=counts["running"],
+            queued=counts["queued"],
+            failed24h=counts["failed24h"],
+            last_failure=JobFailure(
+                job_id=failed.id,
+                label=LABELS[failed.kind],
+                finished_at=failed.finished_at,
+                code=(failed.error or {}).get("code"),
+                message=(failed.error or {}).get("message"),
+            )
+            if failed
+            else None,
+            ingest=self.ingest_baseline(),
+        )
 
     def policy_check(self) -> PolicyCheck:
         expected, error = self.sandbox.expected_policy()
@@ -487,6 +637,8 @@ class JobRunner:
                 policy=policy,
                 datasets=self.sandbox.datasets(),
             ),
+            ingest=self.ingest_baseline(),
+            retry_rule=RETRY_RULE,
         )
 
     # ---- create / retry
@@ -547,6 +699,7 @@ class JobRunner:
                 if active.kind == kind and active.dataset == dataset:
                     return self.to_out(active, with_log=False), True
                 raise ApiError(409, "job_in_progress", "다른 작업이 실행 중입니다. 끝난 뒤 다시 요청해 주세요.", {"jobId": active.id})
+            baseline = self._baseline_at() if kind == "ingest-run" else None
             rec = self._insert(
                 dict(
                     kind=kind,
@@ -557,6 +710,17 @@ class JobRunner:
                     retry_of=retry_of,
                     command=self._display_command(kind, cap, dataset),
                     dataset=dataset,
+                    ingest=(
+                        {
+                            "outcome": None,
+                            "new_articles": None,
+                            "duplicate_articles": None,
+                            "baseline_before": baseline,
+                            "baseline_after": baseline,
+                        }
+                        if kind == "ingest-run"
+                        else None
+                    ),
                 )
             )
             self._audit.record(
@@ -579,8 +743,16 @@ class JobRunner:
         rec = self._load(job_id)
         if rec is None:
             raise ApiError(404, "job_not_found", "작업을 찾을 수 없습니다.")
-        if rec.status not in ("failed", "cancelled"):
-            raise ApiError(409, "job_not_retryable", "실패하거나 취소된 작업만 다시 시도할 수 있습니다.", {"status": rec.status})
+        state = self._retry_state(rec, self._briefs())
+        if rec.status not in ("failed", "cancelled") or state.code in ("superseded", "newer_attempt"):
+            raise ApiError(
+                409,
+                "job_not_retryable",
+                state.reason,
+                {"status": rec.status, "reason": state.code, "blockedBy": state.blocked_by},
+            )
+        # duplicate_running returns the running job and other_running answers 409 job_in_progress: both come
+        # from create(), which looks at the running job again under its lock.
         return self.create(
             kind=rec.kind,
             reason=reason,
@@ -689,9 +861,12 @@ class JobRunner:
             else None
         )
         rec.report, rec.flush = report, flush
+        # An article run is only a success when its report confirms the range: without a readable report, or
+        # with failed collection requests, "nothing new" cannot be told from "the request failed".
+        unconfirmed = rec.kind == "ingest-run" and (report is None or report["collection_error_count"] > 0)
         if cancelled:
             status = "cancelled"
-        elif code == 0:
+        elif code == 0 and not unconfirmed:
             status = "succeeded"
         else:
             status = "failed"
@@ -701,6 +876,18 @@ class JobRunner:
     def _failure(
         self, rec: JobRecord, code: int | None, report: dict[str, Any] | None, job_dir: Path, mask: Masker
     ) -> dict[str, str]:
+        if rec.kind == "ingest-run" and code == 0 and report is None:
+            return {
+                "code": "ingest_unconfirmed",
+                "message": "PoC가 정상 종료했지만 처리 결과 보고서를 읽지 못했어요. 신규 기사가 0건인지 확인할 수 없어 "
+                "실패로 기록하고 기준 시점을 옮기지 않았어요.",
+            }
+        if report is not None and report["collection_error_count"] > 0:
+            tail = " 신규 기사 0건으로 기록하지 않고 기준 시점도 옮기지 않았어요." if rec.kind == "ingest-run" else ""
+            return {
+                "code": "collection_failed",
+                "message": f"기사를 가져오는 요청이 실패했어요(수집 오류 {report['collection_error_count']}건).{tail}",
+            }
         if report is not None:
             calls = int(report["usage"].get("calls") or 0)
             hit = (
@@ -732,6 +919,8 @@ class JobRunner:
         rec.exit_code = code if code is not None else rec.exit_code
         rec.finished_at = utc_iso(self._clock.now())
         rec.ledger_after = self._counts()
+        if rec.kind == "ingest-run":
+            rec.ingest = _ingest_result(rec)
         self._save(rec)
 
     # ---- cancel
@@ -838,6 +1027,8 @@ def _run_report(data: Any, mask: Masker) -> dict[str, Any] | None:
     if not isinstance(data, Mapping) or "run_id" not in data or "processed" not in data:
         return None
     errors = [e for e in data.get("errors") or [] if isinstance(e, Mapping)]
+    raw_collection = data.get("collection_errors")
+    collection = [e for e in (raw_collection if isinstance(raw_collection, list) else []) if isinstance(e, Mapping)]
     usage = usage_from_report(data.get("usage") if isinstance(data.get("usage"), Mapping) else None)
     return {
         "run_id": str(data["run_id"]),
@@ -855,6 +1046,15 @@ def _run_report(data: Any, mask: Masker) -> dict[str, Any] | None:
                 if v is not None
             }
             for e in errors[:50]
+        ],
+        "collection_error_count": len(collection),
+        "collection_errors": [
+            {
+                k: mask(str(v))[:400]
+                for k, v in (("stage", e.get("stage")), ("type", e.get("code")), ("message", e.get("error")))
+                if v is not None
+            }
+            for e in collection[:50]
         ],
         "elapsed_seconds": float(data.get("elapsed_seconds") or 0.0),
         "execution_mode": data.get("execution_mode"),

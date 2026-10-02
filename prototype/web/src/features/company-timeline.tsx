@@ -2,9 +2,11 @@
 //  - 기간(1일·1개월·1년, 기본 1개월)은 발생 시각 기준이며, 범위는 KST 조회 시각까지다(종료 시각 뒤 예정 사건은 없다).
 //    발생 날짜를 모르는 사건은 보도 시각이 범위 안인 것만 맨 아래 '발생 시점 미상' 묶음에 따로 둔다.
 //  - 같은 날짜의 사건이 여럿이면 날짜 묶음에 사건 수를 적고, 누르면 사건별 카드를 펼친다(사건을 합치지 않는다).
+//  - 날짜 선택(FS041): 묶음을 펼치거나 차트의 사건 표시를 누르면 이전 상세·강조를 먼저 거둔다. 그 날짜(들)의 사건이 1건이면 바로 선택해
+//    상세를 조회하고, 여러 건이면 카드를 펼쳐 두고 사용자가 고를 때까지 상세를 정하지 않는다.
 //  - 사건 카드를 고르면 그 자리에서 상세가 열린다: 영향 경로(이 기업 ↔ 사건 ↔ 다른 기업 목록), 근거 문서, [지도에서 보기].
 //  - 기간·선택·펼친 묶음은 페이지가 주소로 관리한다. 이 파일은 받은 값을 그리고 바뀔 값을 알린다.
-//  - 주가 차트(company-price-chart)를 기간 도구 아래에 같은 기간·같은 거르기로 그리고, 차트의 사건 표시를 누르면 그 날짜 묶음을 펼쳐 옮긴다.
+//  - 주가 차트(company-price-chart)를 기간 도구 아래에 같은 기간·같은 거르기로 그리고, 선택한 사건의 발생 날짜를 차트에서 강조한다.
 import { CalendarClock, ChevronDown, Clock, FileText, Map as MapIcon, MessageCircleQuestion, Newspaper, Route, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -58,11 +60,12 @@ interface TimelineProps {
   selectedId: string | null;
   onSelect: (eventId: string | null) => void;
   openGroups: ReadonlySet<string>;
-  onToggleGroup: (key: string) => void;
+  /** 날짜 묶음 펼침(expand)/접힘. 묶음의 사건 id를 함께 알려 이전 선택 정리에 쓴다. */
+  onToggleGroup: (key: string, eventIds: string[], expand: boolean) => void;
   onShowOnMap: (event: Schemas["EventDetail"]) => void;
   onAsk: (event: Schemas["EventDetail"]) => void;
-  /** 묶음들을 펼친다(이미 펼친 것은 그대로) */
-  onOpenGroups: (keys: string[]) => void;
+  /** 날짜 선택(차트 사건 표시): 묶음들을 펼치고, 그 날짜 사건이 1건이면 그 사건을 고른다. */
+  onPickDate: (keys: string[], eventIds: string[]) => void;
 }
 
 export function CompanyTimeline(props: TimelineProps) {
@@ -155,7 +158,7 @@ export function CompanyTimeline(props: TimelineProps) {
                         type="button"
                         aria-expanded={expanded}
                         aria-controls={listId}
-                        onClick={() => onToggleGroup(group.key)}
+                        onClick={() => onToggleGroup(group.key, group.items.map((e) => e.id), !expanded)}
                         className="flex min-h-12 w-full items-center gap-2 px-3 py-3 text-left text-base transition-token hover:bg-surface-sunken"
                       >
                         <Zap className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
@@ -191,11 +194,13 @@ export function CompanyTimeline(props: TimelineProps) {
     }
   }
 
-  // 차트 위 사건 표시: 날짜 묶음을 펼치고(주소 ?open=) 펼친 묶음이 그려진 뒤 그 묶음으로 옮겨 포커스한다.
+  // 차트 위 사건 표시: 날짜를 고르고(1건이면 선택, 여러 건이면 펼침) 그 묶음이 그려진 뒤 그 묶음으로 옮겨 포커스한다.
   const pickGroups = (keys: string[]) => {
+    const picked = chartGroups.filter((g) => keys.includes(g.key)).flatMap((g) => g.items.map((e) => e.id));
     setFocusGroup(keys[0]!);
-    props.onOpenGroups(keys);
+    props.onPickDate(keys, picked);
   };
+  const selectedKey = chartGroups.find((g) => g.items.some((e) => e.id === props.selectedId))?.key ?? null;
   useEffect(() => {
     if (!focusGroup || !openGroups.has(focusGroup)) return;
     const target = document.querySelector<HTMLElement>(`[data-group-key="${CSS.escape(focusGroup)}"]`);
@@ -210,7 +215,7 @@ export function CompanyTimeline(props: TimelineProps) {
     <div className="flex flex-col gap-3 pt-2">
       <h2 className="sr-only">사건 타임라인</h2>
       {toolbar}
-      <CompanyPriceChart companyId={props.companyId} range={range} groups={chartGroups} onPick={pickGroups} />
+      <CompanyPriceChart companyId={props.companyId} range={range} groups={chartGroups} onPick={pickGroups} selectedKey={selectedKey} />
       {body}
     </div>
   );

@@ -35,6 +35,7 @@ from .admin_schemas import (
     Neo4jStatus,
     ObservationOut,
     Overview,
+    OverviewJobs,
     PolicyInfo,
     PublicationState,
     ReviewCounts,
@@ -263,7 +264,7 @@ class PipelineService:
             validation_model=metadata.get("validation_model"),
         )
 
-    def overview(self, runs: list[Any]) -> Overview:
+    def overview(self, runs: list[Any], jobs: OverviewJobs) -> Overview:
         self._graphs.ensure_seed()
         payload = self.inspect(fresh=True)
         rows = payload.get("candidates") or []
@@ -313,6 +314,7 @@ class PipelineService:
                 issues_only_in_ledger=sorted(ledger_ids - active_ids)[:50],
                 issues_only_in_active=sorted(active_ids - ledger_ids)[:50],
             ),
+            jobs=jobs,
             runs=runs,
         )
 
@@ -624,7 +626,18 @@ class PipelineService:
             ),
             invalidation_reason=raw.get("invalidation_reason"),
             history=[decision_out(h) for h in history],
+            graph_db=self._issue_graph_db(cand["issue_id"]),
         )
+
+    def _issue_graph_db(self, issue_id: str) -> Literal["reflected", "pending", "not_stored", "unknown"]:
+        """GraphDB state of one ledger issue. Only approved issues are projected, so a HOLD/REJECT candidate
+        whose issue id the ledger does not hold is ``not_stored``; an unreachable Neo4j is ``unknown``."""
+        if not any(i["issue_id"] == issue_id for i in self.inspect().get("issues") or []):
+            return "not_stored"
+        neo4j = self.projection_status().neo4j
+        if neo4j is None or neo4j.status != "reachable":
+            return "unknown"
+        return "pending" if issue_id in neo4j.missing_issue_ids else "reflected"
 
     # ---- decisions
     def decide(self, candidate_id: str, body: DecisionRequest, admin: Actor) -> DecisionResponse:

@@ -141,6 +141,7 @@ interface GraphModeSwitchProps {
 
 const modeIcon: Record<GraphMode, LucideIcon> = { all: Globe, personal: Bookmark };
 
+/** 지금 모드를 다시 누르면 같은 모드로 onValueChange를 부른다(부모가 진행 중인 전환을 거둘 수 있게, FS019). */
 export function GraphModeSwitch({ value, onValueChange, disabledModes = {}, lockedModes = [], fill, className }: GraphModeSwitchProps) {
   const modes: GraphMode[] = ["all", "personal"];
   return (
@@ -148,6 +149,7 @@ export function GraphModeSwitch({ value, onValueChange, disabledModes = {}, lock
       aria-label="탐색 모드"
       value={value}
       onValueChange={onValueChange}
+      onReselect={onValueChange}
       fill={fill}
       className={className}
       options={modes.map((mode) => {

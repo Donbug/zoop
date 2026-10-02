@@ -102,7 +102,10 @@ def signup(body: SignupRequest, request: Request, response: Response, state: Sta
 
 @router.post("/login", response_model=SessionResponse)
 def login(body: LoginRequest, request: Request, response: Response, state: State) -> SessionResponse:
-    """Missing fields 422 ``login_invalid``, wrong credentials 401, blocked member 403 ``member_blocked``."""
+    """The e-mail is trimmed and lower-cased (at most 254 characters). A missing or malformed field is 422
+    ``login_invalid`` with ``details.fields``; wrong credentials 401 ``invalid_credentials`` (the same answer
+    whether or not the e-mail is registered); blocked member 403 ``member_blocked``. No attempt limit exists:
+    the threshold is an open team decision (FS002)."""
     token = state.accounts.login(body.email, body.password)
     return _open_session(state, request, response, token)
 

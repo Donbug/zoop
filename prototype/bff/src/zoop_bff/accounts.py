@@ -21,7 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Collection, Literal
 
 from .audit import Clock
-from .dataset import HoldingRec
+from .dataset import HoldingRec, MockPortfolioRec
 from .errors import ApiError
 from .social import SocialAuth, SocialIdentity
 from .statedb import StateDb, utc_iso
@@ -40,6 +40,7 @@ TERMS: tuple[tuple[str, str, bool], ...] = (
 )
 REQUIRED_TERMS = frozenset(t[0] for t in TERMS if t[2])
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+EMAIL_MAX = 254
 PASSWORD_MIN = 8
 DISPLAY_NAME_MAX = 20
 
@@ -48,6 +49,20 @@ MemberStatus = Literal["active", "blocked"]
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def check_email(raw: str) -> tuple[str, str | None]:
+    """(normalized e-mail, field message or None). Every lookup and every stored address uses the
+    normalized form: surrounding whitespace removed, lower-cased. Empty, over 254 characters or not
+    shaped like an address is refused."""
+    email = raw.strip().lower()
+    if not email:
+        return email, "이메일을 입력해 주세요."
+    if len(email) > EMAIL_MAX:
+        return email, f"이메일은 {EMAIL_MAX}자 이하로 입력해 주세요."
+    if not _EMAIL.match(email):
+        return email, "이메일 형식이 올바르지 않아요. 예: name@example.com"
+    return email, None
 
 
 # ---- password hashing (scrypt, standard library)
@@ -86,15 +101,21 @@ def _token_key(token: str) -> str:
 
 @dataclass
 class Connection:
-    """A connected virtual account. Holdings are frozen at connect time: publishing or rolling back a
-    graph version must not change (or invalidate) what a member already connected. ``connected_at``
-    is the as-of time of the stored quantities and average prices (requirement 63)."""
+    """A connected virtual account. The mock profile (account id, cash, holdings) is frozen at connect time:
+    publishing or rolling back a graph version must not change (or invalidate) what a member already
+    connected. ``mock_as_of`` is the as-of time of the stored mock values (FS054): the profile's own time
+    when the mock gives one, else the moment the BFF read it (``connected_at``). ``account_id``/``cash`` are
+    None for connections stored before they were recorded (shown as not provided, never 0)."""
 
     id: str
     mock_portfolio_id: str
     label: str
     connected_at: str
     holdings: tuple[HoldingRec, ...] = ()
+    account_id: str | None = None
+    cash: float | None = None
+    cash_currency: str | None = None
+    mock_as_of: str | None = None
 
 
 @dataclass
@@ -173,12 +194,20 @@ class AccountStore:
         conn_row = self._db.one("SELECT * FROM member_connections WHERE member_id = ?", (row["id"],))
         connection = None
         if conn_row is not None:
+            # The ``holdings`` column holds the frozen profile {accountId, cash, cashCurrency, mockAsOf, holdings};
+            # rows written before the account fields existed hold only the holdings list.
+            stored = json.loads(conn_row["holdings"])
+            profile = stored if isinstance(stored, dict) else {"holdings": stored}
             connection = Connection(
                 conn_row["id"],
                 conn_row["mock_portfolio_id"],
                 conn_row["label"],
                 conn_row["connected_at"],
-                tuple(HoldingRec(**h) for h in json.loads(conn_row["holdings"])),
+                tuple(HoldingRec(**h) for h in profile["holdings"]),
+                profile.get("accountId"),
+                profile.get("cash"),
+                profile.get("cashCurrency"),
+                profile.get("mockAsOf") or conn_row["connected_at"],
             )
         return UserState(
             id=row["id"],
@@ -226,13 +255,11 @@ class AccountStore:
     # -- sign-up / login
     def signup(self, email: str, password: str, display_name: str, agreements: Collection[str]) -> str:
         """Server-side validation of every field at once (422 with ``details.fields``); duplicate e-mail 409."""
-        email_n = email.strip().lower()
+        email_n, email_error = check_email(email)
         name = display_name.strip()
         fields: dict[str, str] = {}
-        if not email_n:
-            fields["email"] = "이메일을 입력해 주세요."
-        elif not _EMAIL.match(email_n) or len(email_n) > 254:
-            fields["email"] = "이메일 형식이 올바르지 않아요. 예: name@example.com"
+        if email_error:
+            fields["email"] = email_error
         if not password:
             fields["password"] = "비밀번호를 입력해 주세요."
         elif len(password) < PASSWORD_MIN or len(password) > 128 or not (
@@ -264,16 +291,19 @@ class AccountStore:
         return self._open_member(member_id)
 
     def login(self, email: str, password: str) -> str:
+        """Missing or malformed input is 422 ``login_invalid`` (``details.fields``, one message per field).
+        Wrong credentials are a single 401 ``invalid_credentials`` that never says whether the e-mail exists."""
+        email_n, email_error = check_email(email)
         fields: dict[str, str] = {}
-        if not email.strip():
-            fields["email"] = "이메일을 입력해 주세요."
+        if email_error:
+            fields["email"] = email_error
         if not password:
             fields["password"] = "비밀번호를 입력해 주세요."
         if fields:
-            raise ApiError(422, "login_invalid", "이메일과 비밀번호를 입력해 주세요.", {"fields": fields})
-        row = self._db.one(
-            "SELECT id, password_hash, status FROM members WHERE email = ?", (email.strip().lower(),)
-        )
+            missing = not email_n or not password
+            message = "이메일과 비밀번호를 입력해 주세요." if missing else "이메일 형식을 확인해 주세요."
+            raise ApiError(422, "login_invalid", message, {"fields": fields})
+        row = self._db.one("SELECT id, password_hash, status FROM members WHERE email = ?", (email_n,))
         ok = verify_password(password, row["password_hash"] if row and row["password_hash"] else self._dummy)
         if not ok or row is None or not row["password_hash"]:
             raise ApiError(401, "invalid_credentials", "이메일 또는 비밀번호가 올바르지 않습니다.")
@@ -495,14 +525,12 @@ class AccountStore:
         return user
 
     # -- portfolio connection
-    def connect(
-        self, user: UserState, portfolio_id: str, label: str, holdings: tuple[HoldingRec, ...]
-    ) -> tuple[Connection, bool]:
+    def connect(self, user: UserState, profile: MockPortfolioRec) -> tuple[Connection, bool]:
         """(connection, created). Connecting the already connected profile again returns that connection
         (a retried request does not fail); a different profile while connected is 409."""
         existing = user.connection
         if existing is not None:
-            if existing.mock_portfolio_id == portfolio_id:
+            if existing.mock_portfolio_id == profile.id:
                 return existing, False
             raise ApiError(
                 409,
@@ -510,29 +538,37 @@ class AccountStore:
                 "이미 가상 계좌가 연결되어 있습니다. 먼저 연결을 해제하세요.",
                 {"connectionId": existing.id},
             )
-        connection = Connection(f"conn-{secrets.token_hex(4)}", portfolio_id, label, utc_iso(self._now()), tuple(holdings))
+        connected_at = utc_iso(self._now())
+        connection = Connection(
+            f"conn-{secrets.token_hex(4)}",
+            profile.id,
+            profile.label,
+            connected_at,
+            tuple(profile.holdings),
+            profile.account_id,
+            profile.cash,
+            profile.cash_currency,
+            profile.as_of or connected_at,
+        )
+        frozen = {
+            "accountId": connection.account_id,
+            "cash": connection.cash,
+            "cashCurrency": connection.cash_currency,
+            "mockAsOf": connection.mock_as_of,
+            "holdings": [
+                {"company_id": h.company_id, "quantity": h.quantity, "avg_price": h.avg_price, "currency": h.currency}
+                for h in connection.holdings
+            ],
+        }
         try:
             self._db.execute(
                 "INSERT INTO member_connections(member_id,id,mock_portfolio_id,label,connected_at,holdings) VALUES (?,?,?,?,?,?)",
-                (
-                    user.id,
-                    connection.id,
-                    portfolio_id,
-                    label,
-                    connection.connected_at,
-                    json.dumps(
-                        [
-                            {"company_id": h.company_id, "quantity": h.quantity, "avg_price": h.avg_price, "currency": h.currency}
-                            for h in holdings
-                        ],
-                        ensure_ascii=False,
-                    ),
-                ),
+                (user.id, connection.id, profile.id, profile.label, connected_at, json.dumps(frozen, ensure_ascii=False)),
             )
         except Exception as exc:  # sqlite3.IntegrityError: a concurrent request connected first
             current = self.member(user.id)
             if current and current.connection:
-                return self.connect(current, portfolio_id, label, holdings)
+                return self.connect(current, profile)
             raise exc
         user.connection = connection
         return connection, True

@@ -11,7 +11,7 @@
 | `Button` `variant: primary·secondary·ghost·link` `size: sm·md·lg·icon` `loading` `asChild` | primary는 화면당 주 행동 1개. 누르는 영역은 항상 44px 이상(sm도 투명 영역으로 확장). icon은 `aria-label` 필수. |
 | `Input` `label` `hideLabel` `hint` `error` `variant: default·search` `onClear` | 모든 입력. 모바일 16px 글자. 라벨 필수. |
 | `Select` | 5개 이상 선택지. 2~4개면 `Segmented`. |
-| `Segmented` `value` `onValueChange` `options[{value,label,disabled,disabledReason}]` `aria-label` `fill` | 모드·보기 전환(내용 영역 없음). |
+| `Segmented` `value` `onValueChange` `options[{value,label,disabled,disabledReason}]` `aria-label` `fill` `onReselect?` | 모드·보기 전환(내용 영역 없음). 고른 항목을 다시 누르면 선택은 그대로 두고 `onReselect`만 부른다. |
 | `Tabs` `TabsList` `TabsTrigger` `TabsContent` | 같은 대상의 내용 영역 전환(최대 4개, 폭 균등 분할). |
 | `Dialog` / `Sheet` `open` `onOpenChange` `title` `description` `closeLabel` `footer` (`Sheet.mobileSnap`) | Dialog: 짧은 확인. Sheet: 데스크톱 오른쪽 패널, 모바일에서는 자동으로 BottomSheet. 닫기 문구는 [닫기]. |
 | `BottomSheet` `snap`/`defaultSnap: half·full` `onSnapChange` + Dialog props | 모바일 노드·간선 상세처럼 지도를 반쯤 보이며 탐색할 때. 손잡이 끌기·Enter·↑/↓, Esc, 딤 누르기로 닫기. |
@@ -20,7 +20,7 @@
 | `useToast()({title, description?, tone})` | 한 문장 결과 알림(3초, 경고 5초). 오류는 `ErrorState`. |
 | `Skeleton` `SkeletonLines` `SkeletonRows` `LoadingBlock` | 로딩. 목록 자리는 `SkeletonRows`. |
 | `EmptyState` `title` `description` `action` | 빈 상태: 문장 + 다음 행동. 아이콘 타일 없음. |
-| `ErrorState` `error` `title` `onRetry` `showBack` `compact` | 오류(0건으로 위장 금지). 코드는 [자세히] 안. |
+| `ErrorState` `error` `title` `onRetry` `showBack` `compact` `actions?` | 오류(0건으로 위장 금지). 코드는 [자세히] 안. `actions`는 다시 시도 옆의 다른 복구 동작(예: 시작 화면으로). |
 | `Badge` `variant: neutral·warning·error` | 누를 수 없는 상태 표시, 행당 최대 1~2개. 필터·토글은 Button/Segmented. |
 | `ListRow` `leading` `title` `description` `trailing` `selected` `divider: indented·full·none` + `to`(링크) 또는 `onClick`(버튼) | 카드 대신 쓰는 목록 행. `<li>` 안에. 행 안에 다른 버튼 중첩 금지. |
 | `SectionHeader` `title` `icon` `action` `as` `id` | 목록 머리글. 앞에 종류 아이콘(기업 `Building2`, 사건 `Zap` …). 설명문은 두지 않고 필요하면 `action`에 `IconHint`. |
@@ -44,7 +44,7 @@
 | `GraphLegend` `nodes` `edges` `hidden` `onToggle` | 범례 라벨 칩(표지·이름·개수). `onToggle`을 주면 노드 종류·관계 유형 칩이 표시 토글 버튼(`aria-pressed`): 꺼도 개수 유지, 칩만 흐려짐, 노드 종류는 최소 하나 켜 둠. 보유·관심 칩은 토글하지 않는다. |
 | `FocusBar` `node` `hops` `onHopsChange` `onExit` `compact` | 포커스 모드 막대: [표지] 이름 중심 · 1단계/2단계 `Segmented` · [전체 보기](`compact`면 아이콘). 주소 `?focus=&hops=`는 부모(main-page)가 push로 관리해 뒤로 가기로 복귀. |
 | `PathBar` `from` `to` `steps` `onExit` `onShowSteps` `compact` | 경로 모드 막대(G6): [표지] A ⇆ [표지] B · N단계 · [전체 보기](`compact`면 아이콘). `onShowSteps`가 있으면 `경로 단계 보기` 아이콘(모바일 단계 시트). 주소 `?path=A,B`는 main-page가 push로 관리. 두 번째 기업 고르기(`PathPicker`)와 단계 목록(`PathDetail`)은 `features/path-panel`. |
-| `GraphModeSwitch` `value` `onValueChange` `lockedModes` / `MarkRing` `kind` / `RelationList` / `EdgeGlyph` | 전체(`all`)·개인화(`personal`) 모드 전환(비회원은 `lockedModes={["personal"]}`로 자물쇠), 보유(실선)·관심(점선) 고리 견본(범례·사이드바·디자인시스템), 지도와 같은 내용의 키보드용 목록(묶음 없이 모든 사건), 선 견본. 사건 공유(파생) 의미는 간선 패널에서 설명. |
+| `GraphModeSwitch` `value` `onValueChange` `lockedModes` / `MarkRing` `kind` / `RelationList` / `EdgeGlyph` | 전체(`all`)·개인화(`personal`) 모드 전환(비회원은 `lockedModes={["personal"]}`로 자물쇠, 지금 모드를 다시 누르면 같은 값으로 `onValueChange` — 진행 중인 전환 취소용), 보유(실선)·관심(점선) 고리 견본(범례·사이드바·디자인시스템), 지도와 같은 내용의 키보드용 목록(묶음 없이 모든 사건), 선 견본. 사건 공유(파생) 의미는 간선 패널에서 설명. |
 | `AiBadge` / `AiNotice` / `AiDisclosure` | AI 생성 표시 1회 + 한 줄 고지, 생성 방식은 팝오버. |
 | `PriceChange` / `SentimentLabel` / `DisclaimerNote` | 등락(색+부호+▲▼+스크린리더 `상승/하락/보합`). `change`+`currency`를 주면 `▲ +5,250원 (+1.96%)`(받은 통화 그대로, 기업 상세 시세·차트·평가 손익), 없으면 등락률만. 둘 다 `null`이면 렌더링 안 함. 감성 규격(디자인시스템 전용), 투자 권유 아님 고지(브리핑·기업 상세 하단). |
 

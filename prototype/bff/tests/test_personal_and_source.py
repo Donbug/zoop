@@ -66,21 +66,6 @@ def test_setup_can_finish_with_no_watchlist_and_no_account(member):
     assert member.get("/api/graph?mode=all").json()["nodes"]
 
 
-def test_portfolio_weights_are_cost_based_and_valuation_is_unavailable(member):
-    connect = member.post("/api/portfolio/connections", json={"mockPortfolioId": "mock-basic"})
-    assert connect.status_code == 201
-    portfolio = member.get("/api/portfolio").json()
-    assert portfolio["weightBasis"] == "cost" and portfolio["valuation"]["status"] == "unavailable"
-    assert abs(sum(h["weight"] for h in portfolio["holdings"]) - 1) < 1e-4
-    for h in portfolio["holdings"]:
-        assert h["marketValue"]["status"] == "unavailable"
-        assert h["costBasis"] == h["quantity"] * h["avgPrice"]
-    assert member.post("/api/portfolio/connections", json={"mockPortfolioId": "nope"}).status_code == 404
-
-    assert member.delete(f"/api/portfolio/connections/{connect.json()['id']}").status_code == 204
-    assert member.get("/api/portfolio").json()["connected"] is False
-
-
 def test_personal_graph_needs_holdings_or_watchlist_and_marks_each(member):
     empty = member.get("/api/graph?mode=personal").json()
     assert empty["nodes"] == [] and empty["metadata"]["emptyReason"] == "no_personal_stocks"

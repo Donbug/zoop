@@ -1,5 +1,6 @@
 // /me/stocks 내 종목 (design-direction §5.8)
-//  보유 종목(가상 계좌): 연결 상태, 종목별 수량·원가 비중, 연결/해제(평가금액은 데이터가 없어 자리를 두지 않는다)
+//  보유 종목(가상 계좌, 모의 데이터): 계좌 식별·예수금, 종목별 수량·평가 금액·자산 비중(같은 계산 시점 시세, 현금 제외, 계산 불가는 그대로),
+//  모의 정보 기준 시점과 평가 계산 시점, 연결/해제
 //  관심 종목: 개수 제한 없음. 검색 결과 선택·빼기는 편집 목록에만 반영하고 [저장]이 PUT /api/me/settings(FS011-01·FS027).
 //    version 409·422는 사람말로, 실패해도 편집 내용은 남는다.
 //  각 종목 행 → 그 종목을 고른 지도, [상세] → 기업 상세. 비회원은 로그인 안내.
@@ -26,7 +27,9 @@ import { ListRow } from "@/components/ui/list-row";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
-import { errorReasonMessage } from "@/lib/labels";
+import { holdingWeightText } from "@/lib/holding";
+import { errorReasonMessage, formatKst } from "@/lib/labels";
+import { formatPrice } from "@/lib/market";
 
 export function MyStocksPage() {
   const session = useSession();
@@ -137,6 +140,18 @@ function Holdings() {
         <ErrorState className="px-4" error={portfolio.error} title="보유 종목을 불러오지 못했어요" onRetry={() => void portfolio.refetch()} compact />
       )}
       {disconnect.isError && <ErrorState className="px-4" error={disconnect.error} title="연결을 끊지 못했어요" compact />}
+      {portfolio.data?.connected && portfolio.data.connection && portfolio.data.valuation && (
+        <div className="flex flex-col gap-0.5 px-4 pb-2 text-sm text-text-secondary tabular-nums">
+          <p>
+            모의 계좌 {portfolio.data.connection.accountId ?? "식별 정보 미제공"} · 예수금{" "}
+            {portfolio.data.connection.cash ? formatPrice(portfolio.data.connection.cash.amount, portfolio.data.connection.cash.currency) : "미제공"}
+          </p>
+          <p>
+            모의 정보 기준 {formatKst(portfolio.data.mockAsOf)} · 평가 계산 {formatKst(portfolio.data.valuation.calculatedAt)}
+          </p>
+          {portfolio.data.holdings.length > 0 && portfolio.data.valuation.weightUnavailableReason && <p>{portfolio.data.valuation.weightUnavailableReason}</p>}
+        </div>
+      )}
       {portfolio.data?.connected &&
         (portfolio.data.holdings.length === 0 ? (
           <p className="px-4 py-3 text-base text-text-secondary">이 계좌에는 보유 종목이 없어요.</p>
@@ -150,7 +165,9 @@ function Holdings() {
                 title={h.name}
                 description={
                   <span className="tabular-nums">
-                    {h.quantity.toLocaleString("ko-KR")}주 · 원가 비중 {Math.round(h.weight * 100)}%
+                    {h.quantity.toLocaleString("ko-KR")}주 · 평가{" "}
+                    {h.quote.status === "available" && h.marketValue !== null ? formatPrice(h.marketValue, h.quote.currency) : "미제공"} ·{" "}
+                    {holdingWeightText(h)}
                   </span>
                 }
               />
@@ -170,7 +187,7 @@ function Holdings() {
                 divider="none"
                 leading={<Landmark />}
                 title={account.label}
-                description={<span className="tabular-nums">보유 종목 {account.holdingsCount}개</span>}
+                description={<span className="tabular-nums">모의 계좌 {account.accountId} · 보유 종목 {account.holdingsCount}개</span>}
               />
               <Button variant="secondary" size="sm" loading={connect.isPending} onClick={onConnect}>
                 연결하기

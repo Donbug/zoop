@@ -207,9 +207,17 @@ class PortfolioConnectRequest(CamelModel):
     mock_portfolio_id: str
 
 
+class MockCash(CamelModel):
+    """예수금 of a mock profile. The field holding it is null when the mock does not provide it (not 0)."""
+
+    amount: float
+    currency: str
+
+
 class MockPortfolioOption(CamelModel):
     id: str
     label: str
+    account_id: str
     holdings_count: int
 
 
@@ -218,11 +226,33 @@ class MockPortfolioListResponse(CamelModel):
     metadata: Metadata
 
 
+class MockHoldingOut(CamelModel):
+    company_id: str
+    name: str
+    quantity: float
+    avg_price: float
+    avg_price_currency: str | None
+
+
+class MockProfileResponse(CamelModel):
+    """FS062: one project mock profile with its account id, cash and holdings (no real brokerage account)."""
+
+    id: str
+    label: str
+    account_id: str
+    cash: MockCash | None = Field(description="null when the mock does not provide cash; 0 is a real 0")
+    as_of: str | None = Field(description="As-of time of the mock values when the mock gives one")
+    holdings: list[MockHoldingOut]
+    metadata: Metadata
+
+
 class ConnectionInfo(CamelModel):
     id: str
     mock_portfolio_id: str
     label: str
     connected_at: str
+    account_id: str | None = Field(description="null for connections stored before the account id was recorded")
+    cash: MockCash | None = Field(description="null when not provided; 0 is a real 0")
     status: Literal["connected"] = "connected"
 
 
@@ -231,27 +261,53 @@ class ConnectionResponse(ConnectionInfo):
     metadata: Metadata
 
 
+class HoldingQuote(CamelModel):
+    status: Literal["available"] = "available"
+    price: float
+    currency: str
+    as_of: str | None = Field(description="Provider time of the price")
+    source_name: str
+
+
 class HoldingOut(CamelModel):
     company_id: str
     name: str
     ticker: str | None
-    quantity: float
-    avg_price: float
+    quantity: float = Field(description="Mock quantity")
+    avg_price: float = Field(description="Mock average purchase price")
     avg_price_currency: str | None = Field(
         description="Currency of avgPrice; null when unknown (connections stored before it was recorded)."
     )
-    cost_basis: float
-    weight: float = Field(description="cost_basis / total cost basis; NOT market-value weight")
-    market_value: Unavailable
+    quote: HoldingQuote | Unavailable = Field(description="Price read at valuation.calculatedAt")
+    market_value: float | None = Field(
+        description="quantity x quote.price in quote.currency; null when the price is unavailable (never 0)"
+    )
+    weight: float | None = Field(
+        description="marketValue / total stock market value (cash excluded), 0..1; null when it cannot be "
+        "calculated (see valuation.weightUnavailableCode)"
+    )
+
+
+WeightUnavailableCode = Literal["missing_price", "mixed_currency", "zero_total"]
+
+
+class PortfolioValuation(CamelModel):
+    """FS054: market values and weights computed by the BFF from prices read at one calculation time."""
+
+    calculated_at: str = Field(description="Calculation time (when the prices were read); distinct from mockAsOf")
+    currency: str | None = Field(description="Currency of totalMarketValue; null when it cannot be summed")
+    total_market_value: float | None = Field(description="Sum of holding market values, cash excluded")
+    weight_status: Literal["available", "unavailable"]
+    weight_unavailable_code: WeightUnavailableCode | None
+    weight_unavailable_reason: str | None
 
 
 class PortfolioResponse(CamelModel):
     connected: bool
     connection: ConnectionInfo | None
     holdings: list[HoldingOut]
-    weight_basis: Literal["cost"] = "cost"
-    valuation: Unavailable
-    as_of: str | None
+    mock_as_of: str | None = Field(description="As-of time of the mock quantities, prices and cash")
+    valuation: PortfolioValuation | None = Field(description="null when no account is connected")
     metadata: Metadata
 
 
