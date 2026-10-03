@@ -18,6 +18,7 @@ import { api, type Schemas } from "./client";
 import { useSearchParams } from "react-router";
 import type { DetailRange } from "@/lib/company-timeline";
 import type { GraphMode } from "@/lib/labels";
+import { savePersonalFilter } from "@/lib/personal-filter";
 
 let personalEpoch = 0;
 const epochListeners = new Set<() => void>();
@@ -313,6 +314,8 @@ export function useBriefingGraphBasis(round: string | null) {
 // 지우는 조회의 진행 중인 요청은 취소되고, 그 응답이 늦게 와도 캐시에 다시 들어가지 않는다.
 export function clearPersonalCache(client: QueryClient) {
   personalEpoch += 1;
+  // 개인화 지도 필터는 로그인 세션 범위(FS017): 새 로그인·로그아웃이면 전체로 시작한다.
+  savePersonalFilter("all");
   client.removeQueries({ predicate: (q) => !["health", "session", "terms", "social-providers"].includes(String(q.queryKey[0])) });
   for (const listener of epochListeners) listener();
 }

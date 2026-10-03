@@ -292,7 +292,11 @@ function WatchlistStep({ settings, onBack }: { settings: Schemas["SettingsRespon
           }
         />
         {picked.length === 0 ? (
-          <p className="px-4 pb-3 text-base text-text-secondary">고르지 않아도 시장 전체 지도로 시작할 수 있어요.</p>
+          <p className="px-4 pb-3 text-base text-text-secondary">
+            {portfolio.data?.connected && portfolio.data.holdings.length > 0
+              ? "고르지 않아도 보유 종목 기준 내 종목 지도로 시작할 수 있어요."
+              : "고르지 않아도 시장 전체 지도로 시작할 수 있어요."}
+          </p>
         ) : (
           <ul>
             {picked.map((p) => (

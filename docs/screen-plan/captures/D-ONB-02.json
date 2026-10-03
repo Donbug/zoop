@@ -1,0 +1,104 @@
+{
+  "id": "D-ONB-02",
+  "title": "가상 계좌 연결",
+  "route": "/onboarding",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS009·FS010·FS062",
+  "requirements": "9·10·71",
+  "entry": "투자 중 선택",
+  "states": "미연결·선택 · 연결 중·연결됨 · 연결 실패·건너뛰기",
+  "capturedState": "기본 · 모의 데이터",
+  "stateSource": "pages/onboarding-page.tsx",
+  "stateImages": [
+    "docs/design/v5/onboarding-account-390-light.png"
+  ],
+  "note": "실제 증권 계좌가 아니에요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "선택한 가상 계좌 연결하기",
+        "regex": false
+      },
+      "box": {
+        "x": 448,
+        "y": 784,
+        "width": 544,
+        "height": 48
+      },
+      "result": "모의 보유 종목을 표시해요.",
+      "destination": "D-ONB-02",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "이전 단계"
+      },
+      "box": {
+        "x": 448,
+        "y": 81,
+        "width": 79.890625,
+        "height": 22.5
+      },
+      "result": "투자 여부 선택으로 돌아가요",
+      "destination": "D-ONB-01",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "건너뛰고 관심 종목 고르기"
+      },
+      "box": {
+        "x": 448,
+        "y": 840,
+        "width": 544,
+        "height": 48
+      },
+      "result": "계좌 연결 없이 관심 선택으로 가요",
+      "destination": "D-WAT-01",
+      "mode": "nav"
+    }
+  ],
+  "image": "D-ONB-02.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n가상 계좌를 연결해요\n\n실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 가상 계좌예요.\n\n연결할 가상 계좌\n가상 계좌 예시\n보유 종목 3개\n선택한 가상 계좌 연결하기\n건너뛰고 관심 종목 고르기",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "선택한 가상 계좌 연결하기"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n가상 계좌를 연결했어요\n\n실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 가상 계좌예요.\n\n가상 계좌 예시 보유 종목\nN\nNVIDIA\n10주 · 비중 계산 불가\n삼\n삼성전자\n20주 · 비중 계산 불가\n삼\n삼성SDI\n30주 · 비중 계산 불가\n이 계좌로 지도 보기\n관심 종목도 고르기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "이전 단계"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n지금 주식에 투자하고 계신가요?\n지금 주식에 투자하고 있어요\n가상 계좌를 연결해 보유 종목 주변을 봐요\n아직 투자하지 않아요\n관심 있는 종목을 골라 시작해요",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "건너뛰고 관심 종목 고르기"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n0개\n\n고르지 않아도 시장 전체 지도로 시작할 수 있어요.\n\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n추가\n삼성전자\n005930 · 승인된 사건 27건\n추가\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n추가\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n고르지 않고 지도 보기",
+      "number": 3
+    }
+  ]
+}

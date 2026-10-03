@@ -3,14 +3,15 @@
 //    (기준 관계의 검증 시각이 있으면 그것, 없으면 검증을 통과한 자료의 기준 시각). 관계(연결선) id만 받으면 그 관계 상세에서
 //    검증 시각을 읽는다. 사건·근거·관계 조회는 따로 실패할 수 있고, 실패한 조회만 다시 시도한다(근거 없음과 구분).
 //    데이터 출처(datasetKind)는 여기(아이콘)와 앱 헤더에서만 밝힌다.
-//  - AI 질문 창(UI-10): 예시 답변. 근거가 부족하면 답변을 보류한다.
+//  - AI 질문 창(UI-10): 예시 답변. 근거가 부족하면 답변을 보류한다. 화면 버튼([AI에게 묻기])은 그 자리의 대상을 넘기고,
+//    모바일 하단 [AI] 탭(openScreenChat)은 지금 화면이 useScreenChatTargets로 알린 대상(기업 상세의 기업 등, 없으면 빈 대상)으로 연다.
 // 모바일에서 노드 시트 위에 열면 그 위에 쌓이고, 닫으면 아래 시트로 돌아간다(Radix 대화상자 스택).
 // 지도에서 연 근거 창(request.map)은 인용마다 [지도에서 보기] 토글을 두고, 누른 인용을 mapHighlight로 내보낸다.
 // 지도(GraphExplorer)가 이 값을 읽어 강조하고, 근거 창을 닫으면 강조가 풀린다.
 import { Info, RotateCw } from "lucide-react";
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useEdge, useEvent, useEvidenceItems } from "@/api/queries";
-import { EvidenceList, type EvidenceMapLink } from "@/components/domain/evidence";
+import { EvidenceList, UnavailableEvidenceNote, isEvidenceGone, type EvidenceMapLink } from "@/components/domain/evidence";
 import { SourceIndicator } from "@/components/domain/source-indicator";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
@@ -18,7 +19,7 @@ import { Sheet } from "@/components/ui/dialog";
 import { IconHint } from "@/components/ui/icon-hint";
 import { formatKst } from "@/lib/labels";
 import type { EvidenceHighlight } from "@/lib/graph-view";
-import { ChatDrawer, type ChatContext } from "./chat-drawer";
+import { ChatDrawer, type ChatContext, type ChatTarget } from "./chat-drawer";
 
 export interface EvidenceRequest {
   /** 창 상단에 보여줄 사건·관계 이름 */
@@ -37,6 +38,10 @@ export interface EvidenceRequest {
 interface OverlayApi {
   openEvidence: (request: EvidenceRequest) => void;
   openChat: (context: ChatContext) => void;
+  /** 화면 버튼 없이(하단 [AI] 탭) 질문 창을 연다: 지금 화면이 알린 대상을 넘긴다. */
+  openScreenChat: () => void;
+  /** 지금 화면의 질문 대상을 알리는 자리(useScreenChatTargets가 쓴다) */
+  screenTargets: { current: ChatTarget[] | null };
   /** 근거 창에서 [지도에서 보기]를 누른 인용(창이 닫히면 null) */
   mapHighlight: EvidenceHighlight | null;
   /** 근거 창·AI 질문 창이 열려 있는지(튜토리얼이 '실제로 해 봤는지' 확인할 때 읽는다) */
@@ -52,24 +57,27 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   const [chat, setChat] = useState<ChatContext | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [mapHighlight, setMapHighlight] = useState<EvidenceHighlight | null>(null);
+  const screenTargets = useRef<ChatTarget[] | null>(null);
 
-  const api = useMemo<OverlayApi>(
-    () => ({
+  const api = useMemo<OverlayApi>(() => {
+    const openChat = (context: ChatContext) => {
+      setChat(context);
+      setChatOpen(true);
+    };
+    return {
       openEvidence: (request) => {
         setEvidence(request);
         setEvidenceOpen(true);
         setMapHighlight(null);
       },
-      openChat: (context) => {
-        setChat(context);
-        setChatOpen(true);
-      },
+      openChat,
+      openScreenChat: () => openChat({ targets: screenTargets.current ?? [] }),
+      screenTargets,
       mapHighlight,
       evidenceOpen,
       chatOpen,
-    }),
-    [mapHighlight, evidenceOpen, chatOpen],
-  );
+    };
+  }, [mapHighlight, evidenceOpen, chatOpen]);
 
   const setEvidenceOpenAndClear = (open: boolean) => {
     setEvidenceOpen(open);
@@ -111,6 +119,17 @@ export function useOverlays() {
   return api;
 }
 
+/** 이 화면이 보여 주는 질문 대상(예: 기업 상세의 기업)을 하단 [AI] 탭에 알린다. 화면을 떠나면 지운다. */
+export function useScreenChatTargets(targets: ChatTarget[]) {
+  const { screenTargets } = useOverlays();
+  useEffect(() => {
+    screenTargets.current = targets;
+    return () => {
+      if (screenTargets.current === targets) screenTargets.current = null;
+    };
+  });
+}
+
 function EvidenceSheet({
   request,
   open,
@@ -127,30 +146,37 @@ function EvidenceSheet({
   const ids = request.evidenceIds ?? event.data?.evidenceIds ?? [];
   const items = useEvidenceItems(ids);
   const loaded = items.flatMap((q) => (q.data ? [q.data] : []));
-  const failed = items.find((q) => q.isError);
+  // 받을 수 없는 근거(404 삭제·비공개, 403 권한 없음)는 다시 시도할 대상이 아니다. 일시 장애만 오류로 보이고 그것만 다시 시도한다.
+  const failed = items.filter((q) => q.isError && !isEvidenceGone(q.error));
+  const gone = items.filter((q) => q.isError && isEvidenceGone(q.error)).length;
   const loading = (needsEvent && event.isPending) || items.some((q) => q.isPending);
 
   let body: ReactNode;
   if (needsEvent && event.isError) {
-    body = <ErrorState error={event.error} title="사건 정보를 불러오지 못했어요" onRetry={() => void event.refetch()} />;
+    body = isEvidenceGone(event.error) ? (
+      <EmptyState title="이 사건은 지금 볼 수 없어요" description="삭제됐거나 지금은 제공하지 않는 사건이에요." />
+    ) : (
+      <ErrorState error={event.error} title="사건 정보를 불러오지 못했어요" onRetry={() => void event.refetch()} />
+    );
   } else if (loading) {
     body = <SkeletonRows count={2} label="근거 문서를 불러오고 있어요" />;
-  } else if (failed) {
-    body = (
-      <div className="flex flex-col gap-4">
-        <ErrorState
-          error={failed.error}
-          title={`근거 ${ids.length}건 중 ${ids.length - loaded.length}건을 불러오지 못했어요`}
-          onRetry={() => items.forEach((q) => q.isError && void q.refetch())}
-          compact
-        />
-        {loaded.length > 0 && <EvidenceList items={loaded} mapLink={mapLink} />}
-      </div>
-    );
   } else if (ids.length === 0) {
     body = <EmptyState title="연결된 근거 문서가 없어요" />;
   } else {
-    body = <EvidenceList items={loaded} mapLink={mapLink} />;
+    body = (
+      <div className="flex flex-col gap-4">
+        {failed.length > 0 && (
+          <ErrorState
+            error={failed[0]!.error}
+            title={`근거 ${ids.length}건 중 ${failed.length}건을 불러오지 못했어요`}
+            onRetry={() => failed.forEach((q) => void q.refetch())}
+            compact
+          />
+        )}
+        {gone > 0 && <UnavailableEvidenceNote count={gone} />}
+        {loaded.length > 0 && <EvidenceList items={loaded} mapLink={mapLink} />}
+      </div>
+    );
   }
   // 관계 확인 시점: 넘겨받은 값 > 관계 상세의 마지막 검증 시각 > 근거 자료의 기준 시각. 관계 상세를 읽는 중이거나 실패하면 정하지 않는다.
   const edge = useEdge(request.checkedAt === undefined ? request.edgeId : undefined);

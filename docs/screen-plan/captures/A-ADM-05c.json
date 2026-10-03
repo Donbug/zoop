@@ -1,0 +1,104 @@
+{
+  "id": "A-ADM-05c",
+  "title": "관리자 로그인",
+  "route": "/admin/login",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS073·NFS001",
+  "requirements": "51·82",
+  "entry": "관리자 세션이 없는 /admin 진입",
+  "states": "입력 누락 · 인증·권한 실패 · 세션 만료",
+  "capturedState": "기본",
+  "stateSource": "admin/pages/login.tsx · admin/session.tsx",
+  "stateImages": [],
+  "note": "",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "관리자 로그인",
+        "regex": false
+      },
+      "box": {
+        "x": 528,
+        "y": 544.5,
+        "width": 384,
+        "height": 48
+      },
+      "result": "관리자 세션을 만들고 운영 대시보드로 들어가요.",
+      "destination": "A-ADM-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "textbox",
+        "name": "관리자 이메일"
+      },
+      "box": {
+        "x": 528,
+        "y": 399,
+        "width": 384,
+        "height": 44
+      },
+      "result": "관리자 이메일을 입력해요",
+      "destination": "A-ADM-05c",
+      "mode": "input"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "css",
+        "name": "input[type=password]"
+      },
+      "box": {
+        "x": 528,
+        "y": 484.5,
+        "width": 384,
+        "height": 44
+      },
+      "result": "비밀번호를 가려 입력해요",
+      "destination": "A-ADM-05c",
+      "mode": "input"
+    }
+  ],
+  "image": "A-ADM-05c.png",
+  "visibleText": "줍 관리자\n관리자 이메일\n비밀번호\n관리자 로그인",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "관리자 로그인"
+      },
+      "before": "/admin/login",
+      "url": "/admin",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n대시보드\n\n대시보드를 불러오고 있어요",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "textbox",
+        "name": "관리자 이메일"
+      },
+      "url": "/admin/login",
+      "visibleText": "줍 관리자\n관리자 이메일\n비밀번호\n관리자 로그인",
+      "inputType": "email",
+      "inputWasEntered": true,
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "css",
+        "name": "input[type=password]"
+      },
+      "url": "/admin/login",
+      "visibleText": "줍 관리자\n관리자 이메일\n비밀번호\n관리자 로그인",
+      "inputType": "password",
+      "inputWasEntered": true,
+      "number": 3
+    }
+  ]
+}

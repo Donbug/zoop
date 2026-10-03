@@ -1,0 +1,128 @@
+{
+  "id": "A-ADM-02b",
+  "title": "선호도·대화록",
+  "route": "/admin/feedback",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS066-02·FS066-03",
+  "requirements": "75",
+  "entry": "관리자 로그인 후 전용 메뉴",
+  "states": "집계 중·실패 · 평가·대화 없음 · 표본 부족",
+  "capturedState": "기본",
+  "stateSource": "admin/pages/feedback.tsx · admin/session.tsx",
+  "stateImages": [],
+  "note": "팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "이슈 관제",
+        "regex": false
+      },
+      "box": {
+        "x": 8,
+        "y": 110,
+        "width": 207,
+        "height": 44
+      },
+      "result": "관리자 메뉴의 해당 운영 화면을 열어요.",
+      "destination": "A-ADM-03",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "tab",
+        "name": "싫어요 사유"
+      },
+      "box": {
+        "x": 448,
+        "y": 96,
+        "width": 192,
+        "height": 44
+      },
+      "result": "평가 사유 목록을 보여줘요",
+      "destination": "A-ADM-02b",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "tab",
+        "name": "AI 대화록"
+      },
+      "box": {
+        "x": 640,
+        "y": 96,
+        "width": 192,
+        "height": 44
+      },
+      "result": "마스킹 대화 목록을 보여줘요",
+      "destination": "A-ADM-02b",
+      "mode": "nav"
+    },
+    {
+      "number": 4,
+      "selector": {
+        "role": "button",
+        "name": "기간 적용"
+      },
+      "box": {
+        "x": 624,
+        "y": 182.5,
+        "width": 113.890625,
+        "height": 44
+      },
+      "result": "입력한 조회 기간을 적용해요",
+      "destination": "A-ADM-02b",
+      "mode": "nav"
+    }
+  ],
+  "image": "A-ADM-02b.png",
+  "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n선호도\n7일\n30일\n전체\n요약\n싫어요 사유\nAI 대화록\n시작일(KST)\n종료일(KST)\n기간 적용\n\n기간 전체 보관 기간(평가를 마지막으로 바꾼 한국 시간 기준) · 집계 시각 2026-10-03 19:07:43\n\n현재 유효한 평가만 셉니다. 취소한 평가는 빠지고, 한 사람이 같은 대상에 남길 수 있는 평가는 1개입니다. 기간은 평가를 마지막으로 바꾼 시각(한국 시간)으로 나눕니다. 표본이 적은 비율은 숨기고 건수만 보여 줍니다. (기준 표 5개)\n\n기능별 좋아요 비율\nAI 기능별 좋아요·싫어요\n기능\t좋아요\t싫어요\t표 합계\t좋아요 비율\nAI 챗봇 답변\t0\t0\t0\t\n평가 없음\n브리핑 회차\t0\t0\t0\t\n평가 없음\n브리핑 핵심 이슈\t0\t0\t0\t\n평가 없음\n\n뉴스 요약: 뉴스 요약을 만드는 기능이 아직 없어 평가할 대상이 없습니다.\n\n일별 추이\n일별 좋아요·싫어요\n날짜(KST)\tAI 챗봇 답변\n좋아요 / 싫어요(비율)\n\t브리핑 회차\n좋아요 / 싫어요(비율)\n\t브리핑 핵심 이슈\n좋아요 / 싫어요(비율)\n\n2026-10-03\t0 / 0\t0 / 0\t0 / 0",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "이슈 관제"
+      },
+      "before": "/admin/feedback",
+      "url": "/admin/pipeline",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n이슈 관제\n후보 판정\n407건\n통과 102 · 보류 304 · 폐기 1\n검수 대기(보류)\n260건\n규칙 게시 사건 43건 · 검수 결정 11건\n사용자에게 보이는 버전\nv1\n원장에만 있는 이슈 0건\nGraphDB 반영\n반영됨\n반영 95/95 · 대기 작업 0\n원장 확인\n2026-10-03 19:07:57\n이슈 95 · 관계 190 · 기사 39\n분석 작업\n실행 중 0 · 대기 0 · 24시간 실패 0건\n작업 로그 보기\n자동 검수 규칙\n\n역할 문구 미확인은 역할만 빼고 게시\nR1@2\n켜짐\n\n보류 사유가 참여자·관계의 역할 문구 검사뿐이고 거부 판정이 없으며 원문 인용이 모두 있는 후보를 사건으로 게시합니다. 확인되지 않은 역할 문구는 비워 두고 다른 값으로 채우지 않습니다. 이미 일어난 사건(발생)이 아니면 앞선 사건의 후속(FOLLOWS)으로 잇지 않습니다.\n\n다루는 보류 후보 44건\n사용자 그래프에 사건 43건 (후보 44건)\n기본값(켜짐) 그대로예요\n\n규칙 끄기\n후보\n그래프 버전\n작업\n보류 304\n통과 102\n폐기 1\n전체\n모든 후보\n규칙 대상만\n후보 검색\n후보 목록\n판정\t이슈\t관련 기업\t근거\t사용자 그래프\t검수\n\n보류\t\nAs AI Increases Demands on Memory, Storage Steps Up\n\tNVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\t삼성전자, 플랙트그룹\t1\t\n표시 안 함\n\t–\n\n보류\t\n타법인주식및출자증권처분결정\n\t당사, 포스코인터내셔널\t3\t\n표시 안 함\n\t–\n\n보류\t\n동일인등출자계열회사와의상품ㆍ용역거래변경\n\t삼성전자주식회사, 삼성물산(주)\t2\t\n표시 안 함\n\t–\n\n보류\t\nAdded and trained Earth-2 StormCast for air pollution forecasting\n\tUniversity of Manchester, Hao Zhang, NVIDIA, Isambard-AI\t2\t\n표시 안 함\n\t–\n\n보류\t\nClarification Regarding Recent Media Reports on Solidigm\n\tSK hynix, Intel, Solidigm\t1\t\n표시 안 함\n\t–\n\n보류\t\nClarification Regarding Recent Media Reports on Solidigm\n\tSK hynix\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, SK Group, Chey Tae-won, LG Group, Koo Kwang-mo, NAVER, Lee Hae-jin\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, KRAFTON, NC\t2\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, T1, Lee “Faker” Sang-hyeok\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, Doosan Group, Park Jeong-won\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tSK Telecom, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, SK Group\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, SK Group, Chey Tae-won\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, LG Group, Koo Kwang-mo\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, LG Group\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, Seoul National University\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, Hyundai Motor Group\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER, NVIDIA\t2\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, NAVER, Haejin Lee\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t2\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tKDDI, KDDI Research, NVIDIA, Keysight, Samsung Research America\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tVIAVI Solutions\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tVIAVI Solutions, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tForsk, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tTata Consultancy Services (TCS), NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tNTT DATA, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tAmdocs, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tAmdocs, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tAdaptKey, operators, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tSoftBank Corp., NVIDIA\t2\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tNVIDIA, partners, TM Forum\t1\t\n표시 안 함\n\t–\n\n보류\t\nAddition of Cassava in Africa and Claro in South America to NVIDIA AI Clouds\n\tCassava, Claro, NVIDIA\t1\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\nSix NVIDIA Cloud Partners achieved Exemplar Cloud status\n\tCoreWeave, Crusoe, Lambda, Nebius, Vultr, YTL\t1\t\n표시 안 함\n\t–\n\n보류\t\nNebius adopted NVIDIA Vera Rubin\n\tNebius\t1\t\n표시 안 함\n\t–\n\n보류\t\nCoreWeave among first to adopt NVIDIA Spectrum-X Ethernet Photonics\n\tCoreWeave\t1\t\n표시 안 함\n\t–\n\n보류\t\nCoreWeave adopted NVIDIA Vera Rubin and Vera CPU\n\tCoreWeave\t1\t\n표시 안 함\n\t–\n\n보류\t\nFirmus deployed AI infrastructure in Singapore\n\tFirmus Technologies, ST Telemedia Global Data Centres\t1\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\t헬릭스 디지털 인프라스트럭처(Helix Digital Infrastructure)\t1\t\n표시 안 함\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\tKKR\t1\t\n표시 안 함\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\t삼성전자, 삼성물산, 삼성SDS, 삼성SDI, 삼성생명, 삼성화재, KKR, 엔비디아(Nvidia), 비스트라(Vistra), 쿠웨이트투자청(KIA)\t2\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\tHana Financial Group, Samsung Electronics, SK Telecom\t1\t\n표시 안 함\n\t–\n\n보류\t\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\tSamsung Electronics, Hana Financial Group\t1\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\tHana Financial Group, SK Telecom, Samsung Electronics\t1\t\n표시 중\n규칙 R1@2\n\t–\n후보 더 보기\n\n후보를 골라 주세요\n\n왼쪽 목록에서 후보를 고르면 원문 인용과 판정 근거를 보여 줘요.",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "tab",
+        "name": "싫어요 사유"
+      },
+      "before": "/admin/feedback",
+      "url": "/admin/feedback?tab=dislikes",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n선호도\n7일\n30일\n전체\n요약\n싫어요 사유\nAI 대화록\n시작일(KST)\n종료일(KST)\n기간 적용\n\n이 기간에 싫어요가 없어요",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "tab",
+        "name": "AI 대화록"
+      },
+      "before": "/admin/feedback",
+      "url": "/admin/feedback?tab=transcripts",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n선호도\n요약\n싫어요 사유\nAI 대화록\n모든 대화\n싫어요가 있는 대화\n\n대화 5건 · 열람하면 감사 로그에 남아요. 개인정보는 가려서 보여 줘요.\n\nAI 대화록\n마지막 대화\t사용자\t첫 질문(가림)\t질문 수\t좋아요 / 싫어요\t대화록\n2026-10-03 19:06:43\tM-EBF98301회원\t그 기업은 언제?\t1\t0 / 0\t열람\n2026-10-03 18:50:34\tM-EBF98301회원\t그 기업은 언제?\t1\t0 / 0\t열람\n2026-10-03 18:40:17\tM-EBF98301회원\t그 기업은 언제?\t1\t0 / 0\t열람\n2026-10-03 18:29:57\tM-EBF98301회원\t그 기업은 언제?\t1\t0 / 0\t열람\n2026-10-02 00:57:41\tM-EBF98301회원\tNVIDIA 최근 사건 알려줘\t1\t0 / 0\t열람",
+      "number": 3
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "기간 적용"
+      },
+      "before": "/admin/feedback",
+      "url": "/admin/feedback",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n선호도\n7일\n30일\n전체\n요약\n싫어요 사유\nAI 대화록\n시작일(KST)\n종료일(KST)\n기간 적용\n\n기간 전체 보관 기간(평가를 마지막으로 바꾼 한국 시간 기준) · 집계 시각 2026-10-03 19:07:51\n\n현재 유효한 평가만 셉니다. 취소한 평가는 빠지고, 한 사람이 같은 대상에 남길 수 있는 평가는 1개입니다. 기간은 평가를 마지막으로 바꾼 시각(한국 시간)으로 나눕니다. 표본이 적은 비율은 숨기고 건수만 보여 줍니다. (기준 표 5개)\n\n기능별 좋아요 비율\nAI 기능별 좋아요·싫어요\n기능\t좋아요\t싫어요\t표 합계\t좋아요 비율\nAI 챗봇 답변\t0\t0\t0\t\n평가 없음\n브리핑 회차\t0\t0\t0\t\n평가 없음\n브리핑 핵심 이슈\t0\t0\t0\t\n평가 없음\n\n뉴스 요약: 뉴스 요약을 만드는 기능이 아직 없어 평가할 대상이 없습니다.\n\n일별 추이\n일별 좋아요·싫어요\n날짜(KST)\tAI 챗봇 답변\n좋아요 / 싫어요(비율)\n\t브리핑 회차\n좋아요 / 싫어요(비율)\n\t브리핑 핵심 이슈\n좋아요 / 싫어요(비율)\n\n2026-10-03\t0 / 0\t0 / 0\t0 / 0",
+      "number": 4
+    }
+  ]
+}

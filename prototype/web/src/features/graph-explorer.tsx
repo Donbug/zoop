@@ -50,6 +50,8 @@ interface GraphExplorerProps {
   /** 지도를 다시 받아오는 중이면 그 안내(예: "내 종목 지도를 불러오고 있어요"). 지금 지도는 그대로 보인다. */
   loadingLabel?: string;
   toolbar?: ReactNode;
+  /** false면 범례에서 보유·관심 칩을 뺀다(도구 막대에 개인화 필터가 같은 고리를 보일 때). */
+  legendMarks?: boolean;
   /** 포커스 모드(G2). onFocusChange가 없으면 포커스 진입 동작을 두지 않는다. */
   focus?: GraphFocus | null;
   /** clearSelection: 모바일에서 상세 시트를 닫고 포커스한 지도를 보인다(주소를 한 번에 바꾼다). */
@@ -83,6 +85,7 @@ export function GraphExplorer({
   onViewChange,
   loadingLabel,
   toolbar,
+  legendMarks = true,
   focus,
   onFocusChange,
   path,
@@ -281,7 +284,7 @@ export function GraphExplorer({
       ]}
     />
   );
-  const legend = <GraphLegend nodes={graph.nodes} edges={graph.edges} hidden={hidden} onToggle={toggleLegend} className="min-w-0 flex-1" />;
+  const legend = <GraphLegend nodes={graph.nodes} edges={graph.edges} hidden={hidden} onToggle={toggleLegend} marks={legendMarks} className="min-w-0 flex-1" />;
   // 범례와 한 줄이라 범례를 밀어내지 않도록 보이는 것은 아이콘, 글자는 화면 읽기 프로그램과 툴팁에 준다.
   const loadingMark = loadingLabel && (
     <span role="status" title={loadingLabel} className="flex size-7 shrink-0 items-center justify-center text-text-secondary">
@@ -320,15 +323,18 @@ export function GraphExplorer({
       }}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 md:gap-3">
-        {/* 데스크톱: 도구 막대·범례·보기 전환을 한 줄에 둬 캔버스 높이를 늘린다(좁으면 줄바꿈). */}
+        {/* 데스크톱: 도구 막대·범례·보기 전환을 한 줄에 둬 캔버스 높이를 늘린다. 범례와 보기 전환은 한 묶음이라, 도구 막대 옆이
+            (범례 20rem + 보기 전환)보다 좁으면 범례를 여러 줄로 쪼개거나 보기 전환만 따로 떨어뜨리지 않고 묶음째 다음 줄로 내린다. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="min-w-0 max-md:w-full">{toolbar}</div>
-          {!isMobile && (view === "graph" ? legend : <div className="flex-1" />)}
-          {!isMobile && loadingMark}
           {!isMobile && (
-            <div className="ml-auto flex items-center gap-1">
-              {viewSwitch}
-              <KeyboardHelp />
+            <div className="flex min-w-0 flex-1 basis-[34rem] items-center gap-x-3">
+              {view === "graph" ? legend : <div className="flex-1" />}
+              {loadingMark}
+              <div className="ml-auto flex items-center gap-1">
+                {viewSwitch}
+                <KeyboardHelp />
+              </div>
             </div>
           )}
         </div>

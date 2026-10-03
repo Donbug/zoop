@@ -14,10 +14,13 @@ from .admin_pipeline import PipelineService
 from .admin_usage import UsageService
 from .audit import AuditLog, Clock
 from .briefing_graph import BriefingGraphs
+from .briefing_market import IndicatorHistory, MarketIndicators
 from .briefing_rounds import BriefingService
 from .config import Settings
 from .errors import SourceUnavailable
 from .graph_versions import GraphStore
+from .market_data import TtlCache
+from .quote_yahoo import YahooProvider
 from .review import ReviewStore
 from .sources import DataProvider, PublishedSource
 from .statedb import StateDb
@@ -80,8 +83,12 @@ def build_admin_services(
     neo4j: Neo4jProbe | None = None,
     sandbox: Any | None = None,
     launcher: Launcher = popen_launcher,
+    market: IndicatorHistory | None = None,
 ) -> AdminServices:
-    """Injection points (ledger, Neo4j, sandbox, launcher) exist so tests can replace external systems."""
+    """Injection points (ledger, Neo4j, sandbox, launcher, market source) exist so tests can replace external systems.
+
+    The briefing's market indicators come from the keyless Yahoo chart endpoint (the quote provider modes ``auto`` and
+    ``yahoo``); with the provider off or set to Toss only, rounds store the indicators as not connected."""
     clock = clock or Clock()
     db = StateDb(settings.state_dir)
     audit = AuditLog(db, clock)
@@ -96,7 +103,11 @@ def build_admin_services(
     jobs = JobRunner(
         settings=settings, db=db, clock=clock, audit=audit, pipeline=pipeline, sandbox=sandbox, launcher=launcher
     )
-    briefings = BriefingService(db=db, clock=clock, audit=audit, usage=usage, provider=provider)
+    if market is None and settings.quote_provider in ("auto", "yahoo"):
+        market = YahooProvider(base_url=settings.yahoo_base_url, timeout=settings.quote_timeout_seconds, cache=TtlCache())
+    briefings = BriefingService(
+        db=db, clock=clock, audit=audit, usage=usage, provider=provider, indicators=MarketIndicators(market)
+    )
     jobs.recover()  # settle what the previous process left running (requirement 59)
     briefings.recover()
     try:

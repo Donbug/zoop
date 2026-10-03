@@ -795,6 +795,11 @@ class BriefingItem(CamelModel):
     reason: str = Field(description="Rule-based selection reason (no importance or direction claim)")
     evidence_ids: list[str]
     summary: Unavailable
+    reported_at: str | None = Field(
+        default=None,
+        description="KST time of the newest article behind the issue (the time it entered the round's data window); only "
+        "the date (YYYY-MM-DD) when the article carries no time. null on rounds published before it was stored.",
+    )
 
 
 class BriefingSchedule(CamelModel):
@@ -841,6 +846,85 @@ class BriefingReferences(CamelModel):
     company_ids: list[str]
 
 
+# ---- briefing market indicators (FS031, FS033, FS035)
+
+IndicatorStatus = Literal["ok", "delayed", "unavailable", "failed"]
+IndicatorReasonCode = Literal[
+    "not_connected", "unsupported_symbol", "no_data", "auth_failed", "temporary_failure", "format_changed", "internal"
+]
+
+
+class IndicatorBaseline(CamelModel):
+    value: float
+    date: str = Field(description="KST date of the previous trading day the change is measured against")
+    at: str | None = Field(description="Exact observation time when the baseline is an intraday value (the rate); null for a daily close")
+
+
+class MarketIndicator(CamelModel):
+    """One indicator as it stood when the round was generated. ``status`` separates what each card may claim:
+    ``ok`` and ``delayed`` carry a value (``delayed`` = the newest value the source had is older than the round expects),
+    ``unavailable`` = the source answered but has no value for this point in time (or is not connected),
+    ``failed`` = the request itself failed (network, rate limit, unknown format)."""
+
+    id: Literal["kospi", "kosdaq", "usdkrw"]
+    label: str
+    unit: Literal["pt", "KRW"]
+    status: IndicatorStatus
+    value: float | None
+    value_kind: Literal["close", "latest"] | None = Field(description="close = the session's closing value; latest = the last observation before the cut-off")
+    observed_date: str | None = Field(description="KST date of the value actually used")
+    observed_at: str | None = Field(description="KST time of the value actually used; null for a daily close")
+    baseline: IndicatorBaseline | None
+    change: float | None = Field(description="value - baseline.value, computed by the BFF from the two observed values")
+    change_rate: float | None = Field(description="change / baseline.value as a fraction (0.0123 = +1.23%)")
+    source: QuoteSourceOut | None
+    reason_code: IndicatorReasonCode | None
+    reason: str | None
+
+
+class MarketVariables(CamelModel):
+    """The three market indicators stored with a published round; never changed after publication."""
+
+    status: Literal["available"] = "available"
+    reference_at: str = Field(description="The round's scheduled time (KST)")
+    rate_cutoff_at: str = Field(description="Latest time an observation could have (morning 07:40, evening 18:05, KST)")
+    collected_at: str = Field(description="When the BFF asked the source (UTC)")
+    indicators: list[MarketIndicator]
+
+
+MarketVariablesOut = Annotated[MarketVariables | Unavailable, Field(discriminator="status")]
+
+
+class SinceMorningItem(CamelModel):
+    event_id: str
+    title: str
+    event_time: str | None
+    time_precision: TimePrecision
+    reported_at: str | None = Field(description="As on the key issue: KST time, only the date when the article has no time, null when not stored")
+    company_names: list[str] = Field(description="Names of the companies linked to the issue when its round was published (from the stored key issue)")
+    change: Literal["new", "continuing", "dropped"] = Field(
+        description="new = not among the morning round's key issues; continuing = in both rounds (new evidence since the morning "
+        "put it in this round's window); dropped = only in the morning round"
+    )
+    rank: int | None = Field(description="Rank in this round; null when dropped")
+    morning_rank: int | None = Field(description="Rank in the morning round; null when new")
+    evidence_count: int | None = Field(description="Evidence in this round; null when dropped")
+    morning_evidence_count: int | None = Field(description="Evidence in the morning round; null when new")
+
+
+class SinceMorning(CamelModel):
+    """Key issues of an evening round compared with the same day's published morning round, oldest first."""
+
+    status: Literal["available"] = "available"
+    morning_round_id: str
+    morning_published_at: str | None
+    morning_data_as_of: str
+    items: list[SinceMorningItem]
+
+
+SinceMorningOut = Annotated[SinceMorning | Unavailable, Field(discriminator="status")]
+
+
 class BriefingResponse(CamelModel):
     id: str
     date: str
@@ -848,12 +932,18 @@ class BriefingResponse(CamelModel):
     status: Literal["published", "not_ready", "generating", "failed", "suspended"]
     scheduled_at: str
     published_at: str | None
+    generated_at: str | None = Field(description="When the BFF built the round (UTC); null until it is published")
     data_window: BriefingWindow | None
     data_as_of: str | None
     graph_version: str | None
     items: list[BriefingItem]
-    market_summary: Unavailable
-    market_variables: Unavailable
+    market_summary: Unavailable = Field(description="No producer exists (prose summary), so always unavailable")
+    market_variables: MarketVariablesOut = Field(
+        description="KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none"
+    )
+    since_morning: SinceMorningOut | None = Field(
+        description="Evening rounds only: key issues compared with the same day's published morning round; null for morning rounds"
+    )
     empty_reason: Literal["no_issues_in_window"] | None
     corrections: list[BriefingCorrection]
     notice: BriefingNotice | None

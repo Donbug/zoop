@@ -665,6 +665,9 @@ export interface paths {
          * @description A published commute-briefing round (07:40 morning / 18:10 evening KST), the same for everyone.
          *
          *     At most three key issues chosen by rule from the round's data window; the round is never padded.
+         *     ``marketVariables`` holds KOSPI, KOSDAQ and USD/KRW as they stood when the round was generated (value, change
+         *     against the previous trading day, the real observation time, source, and a per-indicator state); they are
+         *     stored with the published round and never change. An evening round also carries ``sinceMorning``.
          *     A round that is not ready, failed, suspended or corrected says so in ``status``/``notice``/
          *     ``corrections`` instead of an error. No prediction, probability or good/bad-news field exists.
          */
@@ -1987,6 +1990,11 @@ export interface components {
             /** Evidenceids */
             evidenceIds: string[];
             summary: components["schemas"]["Unavailable"];
+            /**
+             * Reportedat
+             * @description KST time of the newest article behind the issue (the time it entered the round's data window); only the date (YYYY-MM-DD) when the article carries no time. null on rounds published before it was stored.
+             */
+            reportedAt: string | null;
         };
         /** BriefingMetadata */
         BriefingMetadata: {
@@ -2071,6 +2079,8 @@ export interface components {
             emptyReason: "no_issues_in_window" | null;
             /** Selectedfrom */
             selectedFrom: number;
+            /** @description Market indicators stored at generation (FS031); null on rounds published before they were collected */
+            marketVariables: components["schemas"]["MarketVariables"] | null;
             metadata: components["schemas"]["BriefingMetadata"];
         };
         /** BriefingReferences */
@@ -2102,6 +2112,11 @@ export interface components {
             scheduledAt: string;
             /** Publishedat */
             publishedAt: string | null;
+            /**
+             * Generatedat
+             * @description When the BFF built the round (UTC); null until it is published
+             */
+            generatedAt: string | null;
             dataWindow: components["schemas"]["BriefingWindow"] | null;
             /** Dataasof */
             dataAsOf: string | null;
@@ -2109,8 +2124,18 @@ export interface components {
             graphVersion: string | null;
             /** Items */
             items: components["schemas"]["BriefingItem"][];
+            /** @description No producer exists (prose summary), so always unavailable */
             marketSummary: components["schemas"]["Unavailable"];
-            marketVariables: components["schemas"]["Unavailable"];
+            /**
+             * Marketvariables
+             * @description KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none
+             */
+            marketVariables: components["schemas"]["MarketVariables"] | components["schemas"]["Unavailable"];
+            /**
+             * Sincemorning
+             * @description Evening rounds only: key issues compared with the same day's published morning round; null for morning rounds
+             */
+            sinceMorning: (components["schemas"]["SinceMorning"] | components["schemas"]["Unavailable"]) | null;
             /** Emptyreason */
             emptyReason: "no_issues_in_window" | null;
             /** Corrections */
@@ -3962,6 +3987,21 @@ export interface components {
             /** Sourcename */
             sourceName: string;
         };
+        /** IndicatorBaseline */
+        IndicatorBaseline: {
+            /** Value */
+            value: number;
+            /**
+             * Date
+             * @description KST date of the previous trading day the change is measured against
+             */
+            date: string;
+            /**
+             * At
+             * @description Exact observation time when the baseline is an intraday value (the rate); null for a daily close
+             */
+            at: string | null;
+        };
         /**
          * IngestBaseline
          * @description The checkpoint the next article-processing run starts from: the start time of the latest run that
@@ -4256,6 +4296,93 @@ export interface components {
              * @default
              */
             password: string;
+        };
+        /**
+         * MarketIndicator
+         * @description One indicator as it stood when the round was generated. ``status`` separates what each card may claim:
+         *     ``ok`` and ``delayed`` carry a value (``delayed`` = the newest value the source had is older than the round expects),
+         *     ``unavailable`` = the source answered but has no value for this point in time (or is not connected),
+         *     ``failed`` = the request itself failed (network, rate limit, unknown format).
+         */
+        MarketIndicator: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "kospi" | "kosdaq" | "usdkrw";
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "pt" | "KRW";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "delayed" | "unavailable" | "failed";
+            /** Value */
+            value: number | null;
+            /**
+             * Valuekind
+             * @description close = the session's closing value; latest = the last observation before the cut-off
+             */
+            valueKind: ("close" | "latest") | null;
+            /**
+             * Observeddate
+             * @description KST date of the value actually used
+             */
+            observedDate: string | null;
+            /**
+             * Observedat
+             * @description KST time of the value actually used; null for a daily close
+             */
+            observedAt: string | null;
+            baseline: components["schemas"]["IndicatorBaseline"] | null;
+            /**
+             * Change
+             * @description value - baseline.value, computed by the BFF from the two observed values
+             */
+            change: number | null;
+            /**
+             * Changerate
+             * @description change / baseline.value as a fraction (0.0123 = +1.23%)
+             */
+            changeRate: number | null;
+            source: components["schemas"]["QuoteSourceOut"] | null;
+            /** Reasoncode */
+            reasonCode: ("not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed" | "internal") | null;
+            /** Reason */
+            reason: string | null;
+        };
+        /**
+         * MarketVariables
+         * @description The three market indicators stored with a published round; never changed after publication.
+         */
+        MarketVariables: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "available";
+            /**
+             * Referenceat
+             * @description The round's scheduled time (KST)
+             */
+            referenceAt: string;
+            /**
+             * Ratecutoffat
+             * @description Latest time an observation could have (morning 07:40, evening 18:05, KST)
+             */
+            rateCutoffAt: string;
+            /**
+             * Collectedat
+             * @description When the BFF asked the source (UTC)
+             */
+            collectedAt: string;
+            /** Indicators */
+            indicators: components["schemas"]["MarketIndicator"][];
         };
         /** MaskingReport */
         MaskingReport: {
@@ -5360,6 +5487,75 @@ export interface components {
              */
             agreements: string[];
         };
+        /**
+         * SinceMorning
+         * @description Key issues of an evening round compared with the same day's published morning round, oldest first.
+         */
+        SinceMorning: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "available";
+            /** Morningroundid */
+            morningRoundId: string;
+            /** Morningpublishedat */
+            morningPublishedAt: string | null;
+            /** Morningdataasof */
+            morningDataAsOf: string;
+            /** Items */
+            items: components["schemas"]["SinceMorningItem"][];
+        };
+        /** SinceMorningItem */
+        SinceMorningItem: {
+            /** Eventid */
+            eventId: string;
+            /** Title */
+            title: string;
+            /** Eventtime */
+            eventTime: string | null;
+            /**
+             * Timeprecision
+             * @enum {string}
+             */
+            timePrecision: "year" | "month" | "day" | "datetime" | "unknown";
+            /**
+             * Reportedat
+             * @description As on the key issue: KST time, only the date when the article has no time, null when not stored
+             */
+            reportedAt: string | null;
+            /**
+             * Companynames
+             * @description Names of the companies linked to the issue when its round was published (from the stored key issue)
+             */
+            companyNames: string[];
+            /**
+             * Change
+             * @description new = not among the morning round's key issues; continuing = in both rounds (new evidence since the morning put it in this round's window); dropped = only in the morning round
+             * @enum {string}
+             */
+            change: "new" | "continuing" | "dropped";
+            /**
+             * Rank
+             * @description Rank in this round; null when dropped
+             */
+            rank: number | null;
+            /**
+             * Morningrank
+             * @description Rank in the morning round; null when new
+             */
+            morningRank: number | null;
+            /**
+             * Evidencecount
+             * @description Evidence in this round; null when dropped
+             */
+            evidenceCount: number | null;
+            /**
+             * Morningevidencecount
+             * @description Evidence in the morning round; null when new
+             */
+            morningEvidenceCount: number | null;
+        };
         /** SocialProviderOut */
         SocialProviderOut: {
             /** Id */
@@ -5658,9 +5854,8 @@ export interface components {
         /** Unavailable */
         Unavailable: {
             /**
-             * Status
-             * @default unavailable
-             * @constant
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
             status: "unavailable";
             /** Reason */

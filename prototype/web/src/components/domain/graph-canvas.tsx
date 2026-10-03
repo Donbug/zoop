@@ -156,6 +156,9 @@ export function GraphCanvas({
   viewRef.current = viewState;
   // 숨겨진 캔버스(목록 보기)에서는 배치를 미뤘다가, 보이게 되어 크기가 정해지면 실행한다.
   const pendingLayoutRef = useRef<(() => void) | null>(null);
+  // 숨겨진 캔버스(크기 0)에서는 선택·근거·경로·포커스 카메라도, 배율에 맞춘 캡션 정리도 할 수 없다(목록 보기에서 고른 뒤 그래프로 전환,
+  // 그 사이 열린 AI 창 뒤 지도). 무엇을 미뤘는지 기억했다가 보이게 되면 직접 고른 것과 같은 규칙으로 맞춘다.
+  const pendingCameraRef = useRef<"focus" | "path" | "select" | null>(null);
 
   /** 묶음 노드 위에 키보드·스크린리더용 버튼을 겹친다(캔버스 노드는 DOM이 아니므로). */
   const placeBundleButton = () => {
@@ -226,7 +229,11 @@ export function GraphCanvas({
       if (cy.width() <= 0 || cy.height() <= 0) return;
       const pending = pendingLayoutRef.current;
       pendingLayoutRef.current = null;
-      if (pending) pending();
+      if (pending) {
+        // 배치가 끝나면 보기 상태(선택 포함)에 맞춰 카메라를 옮기므로 미룬 카메라는 버린다.
+        pendingCameraRef.current = null;
+        pending();
+      } else revealCameraRef.current();
     });
     observer.observe(container);
     return () => {
@@ -436,14 +443,27 @@ export function GraphCanvas({
     setShownNodes(shownElements(cy).nodes().length);
     // 새 요소는 배치가 끝난 뒤 카메라를 맞춘다(배치 effect가 처리).
     if (layoutRunningRef.current || previous.elements !== elements) return;
-    if (previous.focusKey !== focusKey) {
+    // 숨겨져 있으면(목록 보기) 카메라·캡션 정리를 보이게 될 때로 미룬다.
+    const camera =
+      previous.focusKey !== focusKey
+        ? "focus"
+        : previous.pathKey !== pathKey
+          ? "path"
+          : previous.selectionKey !== selectionKey || previous.evidenceKey !== evidenceKey
+            ? "select"
+            : null;
+    if (cy.width() <= 0) {
+      if (camera) pendingCameraRef.current = camera;
+      return;
+    }
+    if (camera === "focus") {
       // 포커스 진입·범위 변경: 남은 노드를 방사형으로 옮긴다. 해제: 전체 배치 위치로 되돌린다(재배치 없음).
       // 포커스에서 경로로 바로 넘어오면 전체 배치로 돌아가며 경로에 맞춘다(visibleViewport).
       moveNodesTo(cy, focus ? focusTargets(cy) : positionsRef.current);
-    } else if (previous.pathKey !== pathKey) {
+    } else if (camera === "path") {
       // 경로 진입: 경로에 맞춘다. 해제: 보이는 전체에 맞춘다.
       moveCamera(cy, visibleViewport(cy), motionRef.current.reducedMotion, "slow");
-    } else if ((previous.selectionKey !== selectionKey || previous.evidenceKey !== evidenceKey) && emphasized.nonempty()) {
+    } else if (camera === "select" && emphasized.nonempty()) {
       focusCamera(cy, emphasized, "center", motionRef.current);
     }
     if (pendingCenterRef.current && pendingCenterRef.current === selection?.id) {
@@ -452,6 +472,26 @@ export function GraphCanvas({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectionKey, focusKey, hiddenKey, evidenceKey, pathKey, elements]);
+
+  // 4-0) 숨겨져 있던 캔버스가 보이게 되면(목록 → 그래프) 그동안 미룬 카메라를 직접 고른 것과 같은 규칙으로 맞추고,
+  // 지금 배율로 캡션을 다시 정리한다(숨김 중에는 크기가 0이라 정리하지 못해 이웃 캡션이 모두 남아 있다).
+  const revealCamera = () => {
+    const cy = cyRef.current;
+    if (!cy || cy.width() <= 0 || layoutRunningRef.current) return;
+    const camera = pendingCameraRef.current;
+    pendingCameraRef.current = null;
+    const emphasized = applyViewState(cy, viewRef.current);
+    if (camera === "focus") moveNodesTo(cy, viewRef.current.focus ? focusTargets(cy) : positionsRef.current);
+    else if (camera === "path") moveCamera(cy, visibleViewport(cy), motionRef.current.reducedMotion, "slow");
+    else if (pendingCenterRef.current && pendingCenterRef.current === viewRef.current.selectionId) {
+      centerNode(cy, pendingCenterRef.current);
+      pendingCenterRef.current = null;
+    } else if (camera === "select" && emphasized.nonempty()) focusCamera(cy, emphasized, "center", motionRef.current);
+    declutterLabels(cy);
+    placeBundleButtonRef.current();
+  };
+  const revealCameraRef = useRef(revealCamera);
+  revealCameraRef.current = revealCamera;
 
   // 4-1) 가운데 이동 요청(사이드바). 이미 그 노드가 선택돼 있으면(같은 기업을 다시 고름) 바로 옮기고,
   // 아니면 지금 옮긴 뒤 선택이 도착하면 4)에서 한 번 더 맞춘다(선택 카메라가 덮어쓰지 않도록).

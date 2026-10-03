@@ -1,0 +1,129 @@
+{
+  "id": "M-GRP-01",
+  "title": "지도·바텀시트",
+  "route": "/?mode=all",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "fs": "FS018·FS020",
+  "requirements": "18·20",
+  "entry": "모바일 시장 전체 지도",
+  "states": "전체·개인화 · 대상 선택 · 조회 중 · 빈 지도·조회 실패",
+  "capturedState": "기본",
+  "stateSource": "pages/main-page.tsx · features/graph-explorer.tsx",
+  "stateImages": [
+    "docs/design/v5/graph-personal-empty-1440-light.png"
+  ],
+  "note": "",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "canvas-node",
+        "name": "KRX:005930",
+        "regex": false
+      },
+      "box": {
+        "x": 140.47456694124872,
+        "y": 418.7477666271031,
+        "width": 28,
+        "height": 28
+      },
+      "result": "기업 바텀시트를 열어요.",
+      "destination": "D-GRP-03",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "radio",
+        "name": "목록으로 보기"
+      },
+      "box": {
+        "x": 330,
+        "y": 121,
+        "width": 40,
+        "height": 40
+      },
+      "result": "기업·사건 목록으로 전환해요",
+      "destination": "M-GRP-01",
+      "mode": "ref"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "AI"
+      },
+      "box": {
+        "x": 195,
+        "y": 788,
+        "width": 97.5,
+        "height": 56
+      },
+      "result": "AI 창을 열어요",
+      "destination": "M-AI-01",
+      "mode": "ref"
+    }
+  ],
+  "image": "M-GRP-01-before.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n시장 전체 지도\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n지도\n브리핑\nAI\n내 종목",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "canvas-node",
+        "name": "KRX:005930"
+      },
+      "before": "/?mode=all",
+      "url": "/?mode=all&select=node%3AKRX%3A005930",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n시장 전체 지도\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n지도\n브리핑\nAI\n내 종목\n삼성전자\n\n상세 닫기\n\n005930\n\n보유 종목\n\n기업 상세\n관심 종목에 담기\n이 노드 중심으로 보기\n다른 기업과의 연결 보기\nAI에게 묻기\n직접 이슈 27건\n\n사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.\n\n2028년\nHigh NA EUV 도…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n2026-09-29\n투자사\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n2026-09-17\nMOU 체결사\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n근거 1건 보기\n2026-09-11\n주최/진행\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n근거 2건 보기\n2026-09-08\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n2026-08-07\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n근거 1건 보기\n2026-07-28\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n2026-07-28\n판매사\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n근거 1건 보기\n2026-07-24\n참여사\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n근거 3건 보기\n2026-07-22\n공개 주체\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n근거 1건 보기\n발생 시각 미상\n협력사·기술 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\n근거 1건 보기\n발생 시각 미상\n계약사\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n근거 1건 보기\n발생 시각 미상\n주최자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 3건 보기\n발생 시각 미상\n시연자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 1건 보기\n발생 시각 미상\n참가 및 전시 주체\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n근거 3건 보기\n발생 시각 미상\n프로모션 주최/운영\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n근거 1건 보기\n발생 시각 미상\n컨소시엄 참여 및 공동…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 3건 보기\n발생 시각 미상\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n발생 시각 미상\n개발사\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n근거 1건 보기\n발생 시각 미상\n투자사\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n발생 시각 미상\n투자자\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n발생 시각 미상\n구축사\n삼성, 미래 성장 위해 2,655조원 투자\n근거 2건 보기\n간접 이슈 0건\n\n데이터로 이어진 간접 이슈가 없어요.\n\n관련 기업 9곳\n삼\n삼성에스디에스\n같은 사건 2건\nA\nASML\n같은 사건 2건\nS\nSK텔레콤\n같은 사건 2건\nK\nKT\n같은 사건 2건\n현대자동차\n같은 사건 1건\nNAVER\n같은 사건 1건\n삼\n삼성SDI\n같은 사건 1건\n삼\n삼성물산\n같은 사건 1건\nNVIDIA\n같은 사건 1건",
+      "number": 1
+    },
+    {
+      "reference": "D-GRP-01",
+      "selector": {
+        "role": "radio",
+        "name": "목록으로 보기",
+        "result": "기업·사건 목록으로 전환해요",
+        "destination": "M-GRP-01",
+        "mode": "ref",
+        "ref": "D-GRP-01"
+      },
+      "number": 2,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "radio",
+          "name": "목록으로 보기"
+        },
+        "before": "/?mode=all",
+        "url": "/?mode=all",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n그래프\n목록\n기업 26곳\n삼성전자\n보유\n사건\n27\nA\nASML\n사건\n2\n삼\n삼성물산\n사건\n2\n삼\n삼성에스디에스\n사건\n2\n삼\n삼성SDI\n보유\n사건\n6\nNVIDIA\n보유 · 관심\n사건\n46\nS\nSK텔레콤\n사건\n6\n현대자동차\n사건\n3\nNAVER\n사건\n1\nS\nSK하이닉스\n사건\n2\nK\nKT\n사건\n3\nS\nSalesforce\n사건\n6\nGeneral Motors\n사건\n1\nM\nMicron\n사건\n1\nC\nCoreWeave\n사건\n3\nM\nMicrosoft\n사건\n2\nN\nNebius\n사건\n2\nO\nOracle\n사건\n1\nTesla\n사건\n1\n삼\n삼성전기\n사건\n1\nPalantir\n사건\n2\nA\nAmazon\n사건\n1\nApple\n사건\n2\nGoogle\n사건\n5\nC\nCadence\n사건\n1\nT\nTSMC\n사건\n1\n사건 138건\n발생 시각 미상\nJensen Huang appears at Salesforce Dreamforce\n\n관련 기업:\nSalesforce\n\n근거 2건 보기\n발생 시각 미상\nSalesforce announces Koa, first CRM reasoning model built on NVIDIA Nemotron 3 Super\n\n관련 기업:\nSalesforce\n\n근거 1건 보기\n발생 시각 미상\nRohan Kumar introduces Koa before Huang takes stage\n\n관련 기업:\nSalesforce\n\n근거 1건 보기\n발생 시각 미상\nLambda releases first validation results of NVIDIA DSX MaxLPS\n\n관련 기업:\nNVIDIA\n\n근거 2건 보기\n발생 시각 미상\nNVIDIA and Google Cloud accelerate 100,000 developers at Google I/O 2026\n\n관련 기업:\nGoogle\n\n근거 1건 보기\n발생 시각 미상\nWebinar AI for Science: From the Lab to the Frontier scheduled\n근거 1건 보기\n발생 시각 미상\nEnhanced Favorable Treatment for the United Arab Emirates Under the Export Administration Regulations\n근거 1건 보기\n발생 시각 미상\nNew JAX learning path for NVIDIA GPUs to become available next month\n\n관련 기업:\nNVIDIA, Google\n\n근거 2건 보기\n발생 시각 미상\nNew NVIDIA Dynamo on GKE inference codelab to become available next month\n\n관련 기업:\nNVIDIA, Google\n\n근거 2건 보기\n발생 시각 미상\nEnhanced Favorable Treatment for the United Arab Emirates Under the Export Administration Regulations\n근거 1건 보기\n발생 시각 미상\nNVIDIA DSX introduced at GTC Taipei in May\n근거 1건 보기\n발생 시각 미상\nNVIDIA CEO Jensen Huang at Dell Technologies World: ‘Demand Is Going Parabolic, Utterly Parabolic’\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n\n관련 기업:\n삼성전자, ASML\n\n근거 2건 보기\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\n관련 기업:\n삼성전자, 삼성물산, 삼성에스디에스 외 2곳\n\n근거 2건 보기\n2026-09-17\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n\n관련 기업:\n삼성전자\n\n근거 3건 보기\n발생 시각 미상\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n근거 1건 보기\n2026-09-16\n삼성전자, One UI 9 공식 버전 업데이트 시작\n근거 1건 보기\n2026-09-11\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n\n관련 기업:\n삼성전자\n\n근거 2건 보기\n2026-09-11\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n근거 1건 보기\n2026-09-08\n최대주주등소유주식변동신고서\n\n관련 기업:\n삼성전자\n\n근거 2건 보기\n2026-08-11\n투자판단관련주요경영사항\n\n관련 기업:\n삼성SDI\n\n근거 3건 보기\n2026-08-07\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n2026-07-31\n[기재정정]타법인주식및출자증권취득결정\n\n관련 기업:\nSK텔레콤\n\n근거 3건 보기\n2026-07-28\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n2026-07-28\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n2026-07-24\nPresident Lee Delivers San Francisco AI Declaration\n근거 2건 보기\n2026-07-24\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n\n관련 기업:\n삼성전자, 현대자동차, NAVER\n\n근거 3건 보기\n2026-07-24\nSK Group and NVIDIA Announce $500-Billion-Plus AI Infrastructure Partnership\n\n관련 기업:\nNVIDIA, SK하이닉스\n\n근거 2건 보기\n2026-07-24\nHyundai Motor Group Outlines Physical AI Strategy Anchored by NVIDIA Robot Reference Platform\n\n관련 기업:\n현대자동차, NVIDIA\n\n근거 1건 보기\n2026-07-24\nNVIDIA and KAIST Announce Joint AI Research Lab in Seoul\n\n관련 기업:\nNVIDIA\n\n근거 3건 보기\n2026-07-24\nHuang and South Korean President Lee Meet in San Francisco\n\n관련 기업:\nNVIDIA\n\n근거 2건 보기\n2026-07-23\nNVIDIA and SK Group Dinner in Woodside, California\n\n관련 기업:\nSK텔레콤\n\n근거 1건 보기\n2026-07-23\n[기재정정]타법인주식및출자증권취득결정\n근거 1건 보기\n2026-07-22\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n2026-07-10\nEnhanced Favorable Treatment for the United Arab Emirates Under the Export Administration Regulations\n근거 1건 보기\n2026-07-10\nEnhanced Favorable Treatment for the United Arab Emirates Under the Export Administration Regulations\n근거 2건 보기\n2026-07-10\nEnhanced Favorable Treatment for the United Arab Emirates Under the Export Administration Regulations\n근거 2건 보기\n2026-07-03\n삼성, 영남에 60조원 투자 계획 발표\n근거 1건 보기\n2026-07-02\n삼성, 미래 성장 위해 충청에 140조원 투자 계획\n근거 1건 보기\n2026-06-30\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n2026년 6월\nSK Telecom Announced Plans in June to Build AI Infrastructure for Physical AI and Robotics\n\n관련 기업:\nSK텔레콤\n\n근거 1건 보기\n2026-01-15\nRevision to License Review Policy for Advanced Computing Commodities\n근거 2건 보기\n1969년\nDARPA connected four university computers in 1969\n근거 1건 보기\n발생 시각 미상\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n\n관련 기업:\n삼성전자\n\n근거 6건 보기\n발생 시각 미상\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 1건 보기\n발생 시각 미상\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\nClarification Regarding Recent Media Reports on Solidigm\n근거 1건 보기\n발생 시각 미상\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\n관련 기업:\nSK텔레콤, 삼성전자\n\n근거 1건 보기\n발생 시각 미상\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\n\n관련 기업:\n삼성전자, KT\n\n근거 1건 보기\n발생 시각 미상\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n\n관련 기업:\n삼성전자, KT, SK텔레콤\n\n근거 1건 보기\n발생 시각 미상\nKT to Carry Out Physical AI Field Trials at HD Hyundai Samho’s Yeongam Shipyard\n\n관련 기업:\nKT\n\n근거 1건 보기\n발생 시각 미상\nSK Telecom to Validate Physical AI Services at SK Incheon Petrochem\n\n관련 기업:\nSK텔레콤\n\n근거 1건 보기\n발생 시각 미상\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n근거 2건 보기\n발생 시각 미상\n삼성전자, One UI 9 공식 버전 업데이트 시작\n근거 2건 보기\n발생 시각 미상\nNVIDIA Vera Rubin NVL72 Delivers Leading Performance in MLPerf Inference v6.1 Debut\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA Vera Rubin NVL72 Delivers Leading Performance in MLPerf Inference v6.1 Debut\n\n관련 기업:\nNVIDIA\n\n근거 3건 보기\n발생 시각 미상\nNVIDIA Vera Rubin NVL72 Delivers Leading Performance in MLPerf Inference v6.1 Debut\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nEmerald AI, Google and NVIDIA Launch Alliance to Advance Flexible AI Data Centers\n근거 1건 보기\n발생 시각 미상\nSK hynix clarifies no finalized plans\n\n관련 기업:\nSK하이닉스\n\n근거 1건 보기\n발생 시각 미상\nPlans to release open source training data and workflows\n근거 1건 보기\n발생 시각 미상\nPlans to increase air pollution model resolution\n근거 1건 보기\n발생 시각 미상\nGenerated training data for air pollution model\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nDemonstrated test-training and inference workflows on NVIDIA DGX Spark\n\n관련 기업:\nNVIDIA\n\n근거 2건 보기\n발생 시각 미상\nKoa general availability expected winter 2026 in U.S. regions\n\n관련 기업:\nSalesforce\n\n근거 1건 보기\n발생 시각 미상\nKoa already running inside Salesforce and powering Slack employee agent\n\n관련 기업:\nSalesforce\n\n근거 3건 보기\n발생 시각 미상\nKoa to enter customer pilots in October as customer-selectable model in Agentforce\n\n관련 기업:\nSalesforce\n\n근거 1건 보기\n발생 시각 미상\nFirst dedicated DSX Flex commercial deployment planned for Manassas, Virginia\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA DSX incorporates 800V DC into reference designs\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA Eos AI factory runs Emerald AI Conductor in Flexible Load Interconnect Program\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nAI Infra Summit: NVIDIA Vera Rubin and DSX Platform Advancements Showcase Energy Efficiencies of Optimizing Tokens Per Watt for AI Factories\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\n삼성전자서비스, 업계 최초 ‘ISMS-P’ 인증 획득\n근거 2건 보기\n발생 시각 미상\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\nPerplexity Portable Computer Is Now Available on Windows, Powered by NVIDIA RTX\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n\n관련 기업:\n삼성전자, ASML\n\n근거 2건 보기\n발생 시각 미상\n최대주주등소유주식변동신고서\n\n관련 기업:\n삼성전자\n\n근거 2건 보기\n발생 시각 미상\n최대주주등소유주식변동신고서\n\n관련 기업:\n삼성전자\n\n근거 3건 보기\n발생 시각 미상\n동일인등출자계열회사와의상품ㆍ용역거래변경\n근거 1건 보기\n발생 시각 미상\n투자판단관련주요경영사항\n\n관련 기업:\n삼성SDI\n\n근거 1건 보기\n발생 시각 미상\n투자판단관련주요경영사항\n\n관련 기업:\n삼성SDI, General Motors\n\n근거 2건 보기\n발생 시각 미상\nAs AI Increases Demands on Memory, Storage Steps Up\n\n관련 기업:\nNVIDIA, Micron\n\n근거 2건 보기\n발생 시각 미상\nAs AI Increases Demands on Memory, Storage Steps Up\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA DRIVE Hyperion to Be Integrated With Hyundai Motor Group Vehicle Platforms\n\n관련 기업:\n현대자동차, NVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA and KAIST Mechanical Engineering Plan NVIDIA AI Technology Center\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA and Seoul National University Plan NVIDIA AI Technology Center\n\n관련 기업:\nNVIDIA\n\n근거 2건 보기\n발생 시각 미상\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\n삼성전자, 갤럭시 워치 사전구매 알림신청 및 추첨 증정\n근거 1건 보기\n발생 시각 미상\nBuilt for Vera Rubin, NVIDIA Spectrum-6 Arrives in Gigascale AI Factories\n\n관련 기업:\nCoreWeave, Microsoft, Nebius 외 2곳\n\n근거 1건 보기\n발생 시각 미상\nEnhanced Favorable Treatment for the United Arab Emirates Under the Export Administration Regulations\n근거 1건 보기\n발생 시각 미상\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n\n관련 기업:\n삼성전자, 삼성에스디에스\n\n근거 2건 보기\n발생 시각 미상\n삼성SDI, 울산서 전고체 배터리 세계 최초 양산 목표\n\n관련 기업:\n삼성SDI\n\n근거 2건 보기\n발생 시각 미상\n삼성전기, 부산에 AI서버용 패키지 기판·MLCC 핵심 기지 육성 추진\n근거 2건 보기\n발생 시각 미상\n삼성중공업, 거제에 자율형 조선소 구축 계획\n근거 2건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 충청에 140조원 투자 계획\n\n관련 기업:\n삼성SDI\n\n근거 1건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 충청에 140조원 투자 계획\n\n관련 기업:\n삼성전기\n\n근거 1건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 충청에 140조원 투자 계획\n근거 1건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 충청에 140조원 투자 계획\n근거 1건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 호남에 425조원 투자\n\n관련 기업:\n삼성물산\n\n근거 2건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 호남에 425조원 투자\n\n관련 기업:\n삼성전자\n\n근거 1건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n발생 시각 미상\nNVIDIA working with Anthropic to integrate NVIDIA tools into Anthropic stack\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nClaude models in Microsoft Foundry now generally available on NVIDIA GB300 in Azure\n\n관련 기업:\nMicrosoft, NVIDIA\n\n근거 1건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 2,655조원 투자\n\n관련 기업:\n삼성전자\n\n근거 2건 보기\n발생 시각 미상\n삼성, 미래 성장 위해 2,655조원 투자\n근거 1건 보기\n발생 시각 미상\nPalantir will use NVIDIA Nemotron open models to build custom frontier-quality models for U.S. government\n\n관련 기업:\nPalantir, NVIDIA\n\n근거 1건 보기\n발생 시각 미상\nPalantir announcement brings NVIDIA Nemotron open models into air-gapped environments on NVIDIA accelerated computing\n\n관련 기업:\nPalantir, NVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA and AWS Collaborate to Bring AI to Production at Scale\n\n관련 기업:\nAmazon\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA and AWS Collaborate to Bring AI to Production at Scale\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFastest, Largest, Strongest: NVIDIA Blackwell Sweeps MLPerf Training 6.0\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFastest, Largest, Strongest: NVIDIA Blackwell Sweeps MLPerf Training 6.0\n근거 1건 보기\n발생 시각 미상\nFastest, Largest, Strongest: NVIDIA Blackwell Sweeps MLPerf Training 6.0\n근거 1건 보기\n발생 시각 미상\nNVIDIA Confidential Computing to Help Expand Apple’s Private Cloud Compute\n\n관련 기업:\nNVIDIA, Apple, Google\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA Confidential Computing to Help Expand Apple’s Private Cloud Compute\n\n관련 기업:\nNVIDIA, Apple\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA and LG Group Build an AI Factory to Advance Physical AI, Mobility and AI Infrastructure\n근거 1건 보기\n발생 시각 미상\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNVIDIA Partners With Microsoft on Unified Stack for Agentic AI Deployment, From Windows Devices to Cloud to Local\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFirmus developing AI factories through Project Southgate\n근거 1건 보기\n발생 시각 미상\nNVIDIA introduced Exemplar Cloud last year\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nNebius expanding its NVIDIA AI Cloud\n\n관련 기업:\nNebius\n\n근거 2건 보기\n발생 시각 미상\nFirmus deployed AI infrastructure in Singapore\n근거 1건 보기\n발생 시각 미상\nCoreWeave expanding its NVIDIA AI Cloud platform\n\n관련 기업:\nCoreWeave\n\n근거 1건 보기\n발생 시각 미상\nCoreWeave extending its platform for robotics and physical AI workflows\n\n관련 기업:\nCoreWeave\n\n근거 1건 보기\n발생 시각 미상\nAddition of Cassava in Africa and Claro in South America to NVIDIA AI Clouds\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFirmus Technologies is expanding its AI factory footprint across South Australia and Southeast Asia, building energy-efficient infrastructure to support growing demand for large-scale training, inference and agentic AI workloads.\n근거 1건 보기\n발생 시각 미상\nPegatron uses Defect Image Generation agent skill for synthetic defect data\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nTechman Robot uses NVIDIA Jetson Thor and Isaac GR00T for next-generation robots\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFoxconn applies NVIDIA Isaac and ROS 2 to wheeled humanoid robots\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFoxconn uses DeepHow’s SOP Verification vision AI system\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nWistron uses NVIDIA Omniverse DSX Blueprint and PhysicsNeMo to simulate burn-in environments\n\n관련 기업:\nNVIDIA, Cadence\n\n근거 1건 보기\n발생 시각 미상\nTSMC applies NVIDIA CUDA-X libraries and AI models\n\n관련 기업:\nTSMC, NVIDIA\n\n근거 1건 보기\n발생 시각 미상\nFoxconn builds MoMClaw manufacturing operations management agent\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nInventec validation produces over 10,000 synthetic defect images\n근거 1건 보기\n발생 시각 미상\nPegatron adopts NVIDIA Omniverse DSX Blueprint\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nQCT uses NVIDIA Omniverse-based digital twins for factory planning\n\n관련 기업:\nNVIDIA\n\n근거 1건 보기\n발생 시각 미상\nJoint NVIDIA-Google Cloud developer community launched at Google I/O 2025\n\n관련 기업:\nNVIDIA, Google\n\n근거 1건 보기\n\n기업이나 사건을 골라 주세요.",
+        "number": 3
+      }
+    },
+    {
+      "reference": "M-AI-01",
+      "selector": {
+        "role": "button",
+        "name": "AI",
+        "result": "AI 창을 열어요",
+        "destination": "M-AI-01",
+        "mode": "ref",
+        "ref": "M-AI-01"
+      },
+      "number": 3,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "AI"
+        },
+        "before": "/?mode=all",
+        "url": "/?mode=all",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n시장 전체 지도\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n지도\n브리핑\nAI\n내 종목\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n\n내 질문:\n그 기업은 언제?\n\n연결한 대상: 없음\n\n‘그 기업’만으로는 어느 대상인지 알 수 없어요. 그래프에서 기업이나 사건을 고르거나 기업 이름을 알려 주세요.\n\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
+        "number": 1
+      }
+    }
+  ],
+  "pair": "M-GRP-01-after.png"
+}

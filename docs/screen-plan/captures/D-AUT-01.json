@@ -1,0 +1,181 @@
+{
+  "id": "D-AUT-01",
+  "title": "시작·이메일 로그인",
+  "route": "/login",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS001·FS002·FS005·FS006",
+  "requirements": "1·2·5·6",
+  "entry": "세션 없는 시작 화면",
+  "states": "입력 전 · 누락·형식 오류 · 인증 실패 · 시작 실패",
+  "capturedState": "기본",
+  "stateSource": "pages/login-page.tsx · features/app-shell.tsx",
+  "stateImages": [
+    "docs/design/v5/signup-error-390-dark.png"
+  ],
+  "note": "",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "이메일로 회원가입",
+        "regex": false
+      },
+      "box": {
+        "x": 544,
+        "y": 585.5,
+        "width": 352,
+        "height": 48
+      },
+      "result": "이메일 가입 폼을 열어요.",
+      "destination": "D-AUT-02",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "로그인"
+      },
+      "box": {
+        "x": 544,
+        "y": 474,
+        "width": 352,
+        "height": 48
+      },
+      "result": "설정 상태에 따라 지도·초기 설정으로 이동",
+      "destination": "D-GRP-01b",
+      "mode": "ref"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "link",
+        "name": "개발용 모의 로그인으로 계속"
+      },
+      "box": {
+        "x": 544,
+        "y": 645.5,
+        "width": 352,
+        "height": 48
+      },
+      "result": "모의 제공자 동의 화면을 열어요",
+      "destination": "D-AUT-03",
+      "mode": "ref"
+    },
+    {
+      "number": 4,
+      "selector": {
+        "role": "button",
+        "name": "로그인 없이 둘러보기"
+      },
+      "box": {
+        "x": 544,
+        "y": 729,
+        "width": 352,
+        "height": 48
+      },
+      "result": "비회원 권한 확인창을 열어요",
+      "destination": "D-AUT-01",
+      "mode": "escape"
+    },
+    {
+      "number": 5,
+      "selector": {
+        "role": "textbox",
+        "name": "이메일"
+      },
+      "box": {
+        "x": 544,
+        "y": 303,
+        "width": 352,
+        "height": 44
+      },
+      "result": "이메일을 입력·수정해요",
+      "destination": "D-AUT-01",
+      "mode": "input"
+    }
+  ],
+  "image": "D-AUT-01.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n줍\n\n내 종목 주변의 사건과 근거를 탐색해요\n\n이메일로 로그인\n이메일\n비밀번호\n\n데모 계정이 입력되어 있어요\n\n로그인\n\n처음이거나 다른 방법으로 시작하기\n\n이메일로 회원가입\n개발용 모의 로그인으로 계속\n\n개발용 모의 제공자예요. 실제 소셜 계정과 연결되지 않아요.\n\n로그인 없이 둘러보기\n\n본 서비스는 투자 권유를 제공하지 않아요.",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "이메일로 회원가입"
+      },
+      "before": "/login",
+      "url": "/signup",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n시작 화면으로\n이메일로 가입하기\n이메일\n비밀번호\n\n영문과 숫자를 섞어 8자 이상\n\n표시 이름\n\n화면에 보이는 이름이에요. 20자까지\n\n약관 동의\n모두 동의\n서비스 이용약관 (필수)\n본문 보기\n개인정보 수집·이용 동의 (필수)\n본문 보기\n가입하고 시작하기",
+      "number": 1
+    },
+    {
+      "reference": "D-GRP-01b",
+      "selector": {
+        "role": "button",
+        "name": "로그인",
+        "result": "설정 상태에 따라 지도·초기 설정으로 이동",
+        "destination": "D-GRP-01b",
+        "mode": "ref",
+        "ref": "D-GRP-01b"
+      },
+      "number": 2,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "로그인",
+          "regex": false
+        },
+        "before": "/login",
+        "url": "/",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n23\n사건\n89\n직접 관련\n122\n후속 사건\n1\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬"
+      }
+    },
+    {
+      "reference": "D-AUT-03",
+      "selector": {
+        "role": "link",
+        "name": "개발용 모의 로그인으로 계속",
+        "result": "모의 제공자 동의 화면을 열어요",
+        "destination": "D-AUT-03",
+        "mode": "ref",
+        "ref": "D-AUT-03"
+      },
+      "number": 3,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "link",
+          "name": "개발용 모의 로그인으로 계속",
+          "regex": false
+        },
+        "before": "/login",
+        "url": "/mock-idp",
+        "visibleText": "개발용 모의 로그인\n\n모의 소셜 계정으로 로그인\n\n실제 소셜 서비스가 아니에요. 입력한 이메일이 모의 계정이 되고, 줍에 이메일과 이름을 전달해요.\n\n모의 계정 이메일\n이름\n\n비워 두면 이메일 앞부분을 써요\n\n동의하고 계속\n취소"
+      }
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "로그인 없이 둘러보기"
+      },
+      "before": "/login",
+      "url": "/login",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n줍\n\n내 종목 주변의 사건과 근거를 탐색해요\n\n이메일로 로그인\n이메일\n비밀번호\n\n데모 계정이 입력되어 있어요\n\n로그인\n\n처음이거나 다른 방법으로 시작하기\n\n이메일로 회원가입\n개발용 모의 로그인으로 계속\n\n개발용 모의 제공자예요. 실제 소셜 계정과 연결되지 않아요.\n\n로그인 없이 둘러보기\n\n본 서비스는 투자 권유를 제공하지 않아요.\n\n로그인 없이 둘러볼까요?\n\n닫기\n\n시장 전체 지도와 브리핑은 바로 볼 수 있어요.\n\n가상 계좌 연결, 관심 종목, 내 종목 지도는 로그인해야 쓸 수 있어요.\n\n돌아가기\n둘러보기 시작",
+      "number": 4
+    },
+    {
+      "selector": {
+        "role": "textbox",
+        "name": "이메일"
+      },
+      "url": "/login",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n줍\n\n내 종목 주변의 사건과 근거를 탐색해요\n\n이메일로 로그인\n이메일\n비밀번호\n로그인\n\n처음이거나 다른 방법으로 시작하기\n\n이메일로 회원가입\n개발용 모의 로그인으로 계속\n\n개발용 모의 제공자예요. 실제 소셜 계정과 연결되지 않아요.\n\n로그인 없이 둘러보기\n\n본 서비스는 투자 권유를 제공하지 않아요.",
+      "inputType": "email",
+      "inputWasEntered": true,
+      "number": 5
+    }
+  ]
+}

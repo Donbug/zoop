@@ -1,0 +1,102 @@
+{
+  "id": "A-ADM-03",
+  "title": "그래프 관제·검수",
+  "route": "/admin/pipeline",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS067-01·FS067-02·FS067-03",
+  "requirements": "76",
+  "entry": "관리자 로그인 후 전용 메뉴",
+  "states": "통과·보류·폐기 · 실행·대기·실패 · 원장 조회 실패",
+  "capturedState": "기본",
+  "stateSource": "admin/pages/pipeline.tsx · admin/session.tsx",
+  "stateImages": [],
+  "note": "팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "AI 운영",
+        "regex": false
+      },
+      "box": {
+        "x": 8,
+        "y": 156,
+        "width": 207,
+        "height": 44
+      },
+      "result": "관리자 메뉴의 해당 운영 화면을 열어요.",
+      "destination": "A-ADM-04b",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "tab",
+        "name": "그래프 버전"
+      },
+      "box": {
+        "x": 448,
+        "y": 494,
+        "width": 192,
+        "height": 44
+      },
+      "result": "공개 버전과 반영 상태를 보여줘요",
+      "destination": "A-ADM-03",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "tab",
+        "name": "작업"
+      },
+      "box": {
+        "x": 640,
+        "y": 494,
+        "width": 192,
+        "height": 44
+      },
+      "result": "작업 상태·로그 목록을 보여줘요",
+      "destination": "A-ADM-03",
+      "mode": "nav"
+    }
+  ],
+  "image": "A-ADM-03.png",
+  "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n이슈 관제\n후보 판정\n407건\n통과 102 · 보류 304 · 폐기 1\n검수 대기(보류)\n260건\n규칙 게시 사건 43건 · 검수 결정 11건\n사용자에게 보이는 버전\nv1\n원장에만 있는 이슈 0건\nGraphDB 반영\n반영됨\n반영 95/95 · 대기 작업 0\n원장 확인\n2026-10-03 19:07:58\n이슈 95 · 관계 190 · 기사 39\n분석 작업\n실행 중 0 · 대기 0 · 24시간 실패 0건\n작업 로그 보기\n자동 검수 규칙\n\n역할 문구 미확인은 역할만 빼고 게시\nR1@2\n켜짐\n\n보류 사유가 참여자·관계의 역할 문구 검사뿐이고 거부 판정이 없으며 원문 인용이 모두 있는 후보를 사건으로 게시합니다. 확인되지 않은 역할 문구는 비워 두고 다른 값으로 채우지 않습니다. 이미 일어난 사건(발생)이 아니면 앞선 사건의 후속(FOLLOWS)으로 잇지 않습니다.\n\n다루는 보류 후보 44건\n사용자 그래프에 사건 43건 (후보 44건)\n기본값(켜짐) 그대로예요\n\n규칙 끄기\n후보\n그래프 버전\n작업\n보류 304\n통과 102\n폐기 1\n전체\n모든 후보\n규칙 대상만\n후보 검색\n후보 목록\n판정\t이슈\t관련 기업\t근거\t사용자 그래프\t검수\n\n보류\t\nAs AI Increases Demands on Memory, Storage Steps Up\n\tNVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\t삼성전자, 플랙트그룹\t1\t\n표시 안 함\n\t–\n\n보류\t\n타법인주식및출자증권처분결정\n\t당사, 포스코인터내셔널\t3\t\n표시 안 함\n\t–\n\n보류\t\n동일인등출자계열회사와의상품ㆍ용역거래변경\n\t삼성전자주식회사, 삼성물산(주)\t2\t\n표시 안 함\n\t–\n\n보류\t\nAdded and trained Earth-2 StormCast for air pollution forecasting\n\tUniversity of Manchester, Hao Zhang, NVIDIA, Isambard-AI\t2\t\n표시 안 함\n\t–\n\n보류\t\nClarification Regarding Recent Media Reports on Solidigm\n\tSK hynix, Intel, Solidigm\t1\t\n표시 안 함\n\t–\n\n보류\t\nClarification Regarding Recent Media Reports on Solidigm\n\tSK hynix\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, SK Group, Chey Tae-won, LG Group, Koo Kwang-mo, NAVER, Lee Hae-jin\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, KRAFTON, NC\t2\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, T1, Lee “Faker” Sang-hyeok\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, Doosan Group, Park Jeong-won\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tSK Telecom, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, SK Group\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, SK Group, Chey Tae-won\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, LG Group, Koo Kwang-mo\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, LG Group\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, Seoul National University\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, Hyundai Motor Group\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNAVER, NVIDIA\t2\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang, NAVER, Haejin Lee\t1\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t2\t\n표시 안 함\n\t–\n\n보류\t\nSeoul Purpose: How NVIDIA and South Korea Are Building the Future of AI\n\tNVIDIA, Jensen Huang\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tKDDI, KDDI Research, NVIDIA, Keysight, Samsung Research America\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tVIAVI Solutions\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tVIAVI Solutions, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tForsk, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tTata Consultancy Services (TCS), NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tNTT DATA, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tAmdocs, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tAmdocs, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tAdaptKey, operators, NVIDIA\t1\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tSoftBank Corp., NVIDIA\t2\t\n표시 안 함\n\t–\n\n보류\t\nNVIDIA Brings Trusted, 24/7 AI Agents to Telecom Operations\n\tNVIDIA, partners, TM Forum\t1\t\n표시 안 함\n\t–\n\n보류\t\nAddition of Cassava in Africa and Claro in South America to NVIDIA AI Clouds\n\tCassava, Claro, NVIDIA\t1\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\nSix NVIDIA Cloud Partners achieved Exemplar Cloud status\n\tCoreWeave, Crusoe, Lambda, Nebius, Vultr, YTL\t1\t\n표시 안 함\n\t–\n\n보류\t\nNebius adopted NVIDIA Vera Rubin\n\tNebius\t1\t\n표시 안 함\n\t–\n\n보류\t\nCoreWeave among first to adopt NVIDIA Spectrum-X Ethernet Photonics\n\tCoreWeave\t1\t\n표시 안 함\n\t–\n\n보류\t\nCoreWeave adopted NVIDIA Vera Rubin and Vera CPU\n\tCoreWeave\t1\t\n표시 안 함\n\t–\n\n보류\t\nFirmus deployed AI infrastructure in Singapore\n\tFirmus Technologies, ST Telemedia Global Data Centres\t1\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\t헬릭스 디지털 인프라스트럭처(Helix Digital Infrastructure)\t1\t\n표시 안 함\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\tKKR\t1\t\n표시 안 함\n\t–\n\n보류\t\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\t삼성전자, 삼성물산, 삼성SDS, 삼성SDI, 삼성생명, 삼성화재, KKR, 엔비디아(Nvidia), 비스트라(Vistra), 쿠웨이트투자청(KIA)\t2\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\tHana Financial Group, Samsung Electronics, SK Telecom\t1\t\n표시 안 함\n\t–\n\n보류\t\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\tSamsung Electronics, Hana Financial Group\t1\t\n표시 중\n규칙 R1@2\n\t–\n\n보류\t\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\tHana Financial Group, SK Telecom, Samsung Electronics\t1\t\n표시 중\n규칙 R1@2\n\t–\n후보 더 보기\n\n후보를 골라 주세요\n\n왼쪽 목록에서 후보를 고르면 원문 인용과 판정 근거를 보여 줘요.",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "AI 운영"
+      },
+      "before": "/admin/pipeline",
+      "url": "/admin/ai",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\nAI 운영\n24시간\n7일\n30일\n전체\n\n집계 시각 2026-10-03 19:08:09 · 비용 미제공(PoC가 보고한 estimated_cost가 없고 단가 기준도 정해지지 않아 실제·추정 비용을 제공하지 않습니다.)\n\n기능별 사용량\nAI 기능별 사용량\n기능\t처리 방식\t요청\t성공\t실패\t평균 처리\tp95\t모델 호출\t입력 토큰\t출력 토큰\t비용\t집계 출처\nAI 챗봇\n\tBFF 규칙 기반 답변 · 모델 호출 없음\t5\t5\t0\t6ms\t14ms\t0\t0\t0\t미제공\n\tBFF 실측\n뉴스 분석(PoC 파이프라인)\n\tInvestMate PoC · 모델 호출(유료)\t0\t0\t0\t–\t–\t0\t0\t0\t미제공\n\t작업 러너\n출퇴근 브리핑\n\tBFF 규칙 기반 선정 · 모델 호출 없음\t30\t30\t0\t243ms\t389ms\t0\t0\t0\t미제공\n\tBFF 실측\n최근 오류\n\n이 기간에 기록된 오류가 없어요.\n\n뉴스 분석 실행 기록\n뉴스 분석 실행 기록\n실행\t정책\t처리\t승인\t보류\t거부\t오류\t모델 호출\t입력 토큰\t걸린 시간\t출처\n완화 정책(웹 검증 없음) · 5cb8582b\t완화(웹 검증 없음)\t46\t22\t24\t0\t1\t260\t1,960,588\t30분 45초\t원장 DB\n완화 정책(웹 검증 없음) · f3cf7ebb\t완화(웹 검증 없음)\t34\t14\t20\t0\t2\t170\t1,081,478\t22분 30초\t원장 DB\n완화 정책(웹 검증 없음) · 47a71f86\t완화(웹 검증 없음)\t13\t6\t6\t1\t2\t61\t405,886\t9분 41초\t원장 DB\n완화 정책(웹 검증 없음) · 43365715\t완화(웹 검증 없음)\t56\t3\t53\t0\t1\t260\t1,950,299\t25분 53초\t원장 DB\n완화 정책(웹 검증 없음) · 2783665a\t완화(웹 검증 없음)\t41\t5\t36\t0\t9\t200\t1,217,498\t28분 12초\t원장 DB\n완화 정책(웹 검증 없음) · 0eae8419\t완화(웹 검증 없음)\t59\t4\t55\t0\t8\t260\t1,821,396\t31분 47초\t원장 DB\n완화 정책(웹 검증 없음) · 0095f34b\t완화(웹 검증 없음)\t53\t19\t34\t0\t7\t250\t1,877,302\t48분 20초\t원장 DB\n완화 정책(웹 검증 없음) · 4cae96ef\t완화(웹 검증 없음)\t51\t19\t32\t0\t15\t260\t1,893,430\t38분 16초\t원장 DB\n완화 정책(웹 검증 없음) · dbd6ae53\t완화(웹 검증 없음)\t54\t10\t44\t0\t6\t250\t1,746,260\t27분 35초\t원장 DB",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "tab",
+        "name": "그래프 버전"
+      },
+      "before": "/admin/pipeline",
+      "url": "/admin/pipeline?tab=versions",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n이슈 관제\n후보 판정\n407건\n통과 102 · 보류 304 · 폐기 1\n검수 대기(보류)\n260건\n규칙 게시 사건 43건 · 검수 결정 11건\n사용자에게 보이는 버전\nv1\n원장에만 있는 이슈 0건\nGraphDB 반영\n반영됨\n반영 95/95 · 대기 작업 0\n원장 확인\n2026-10-03 19:07:58\n이슈 95 · 관계 190 · 기사 39\n분석 작업\n실행 중 0 · 대기 0 · 24시간 실패 0건\n작업 로그 보기\n자동 검수 규칙\n\n역할 문구 미확인은 역할만 빼고 게시\nR1@2\n켜짐\n\n보류 사유가 참여자·관계의 역할 문구 검사뿐이고 거부 판정이 없으며 원문 인용이 모두 있는 후보를 사건으로 게시합니다. 확인되지 않은 역할 문구는 비워 두고 다른 값으로 채우지 않습니다. 이미 일어난 사건(발생)이 아니면 앞선 사건의 후속(FOLLOWS)으로 잇지 않습니다.\n\n다루는 보류 후보 44건\n사용자 그래프에 사건 43건 (후보 44건)\n기본값(켜짐) 그대로예요\n\n규칙 끄기\n후보\n그래프 버전\n작업\n그래프 버전\n원장에서 새 버전 게시\n그래프 버전 목록\n버전\t사용자 표시\t만든 시각\t출처\t이슈\t관계\tGraphDB\t사유\t\n행동\n\nv1\t\n표시 중\t2026-10-01 20:27\tsnapshot:poc-real-inspect.json\t95\t182\t\n모름\t최초 기동 시드 스냅샷 등록\t\n전환 이력\n그래프 버전 전환 이력\n시각\t동작\t버전\t관리자\t사유\n2026-10-01 20:27:54\t최초 등록\tv1\tsystem\t최초 기동 시드 스냅샷 등록",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "tab",
+        "name": "작업"
+      },
+      "before": "/admin/pipeline",
+      "url": "/admin/pipeline?tab=jobs",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n이슈 관제\n후보 판정\n407건\n통과 102 · 보류 304 · 폐기 1\n검수 대기(보류)\n260건\n규칙 게시 사건 43건 · 검수 결정 11건\n사용자에게 보이는 버전\nv1\n원장에만 있는 이슈 0건\nGraphDB 반영\n반영됨\n반영 95/95 · 대기 작업 0\n원장 확인\n2026-10-03 19:08:03\n이슈 95 · 관계 190 · 기사 39\n분석 작업\n실행 중 0 · 대기 0 · 24시간 실패 0건\n작업 로그 보기\n자동 검수 규칙\n\n역할 문구 미확인은 역할만 빼고 게시\nR1@2\n켜짐\n\n보류 사유가 참여자·관계의 역할 문구 검사뿐이고 거부 판정이 없으며 원문 인용이 모두 있는 후보를 사건으로 게시합니다. 확인되지 않은 역할 문구는 비워 두고 다른 값으로 채우지 않습니다. 이미 일어난 사건(발생)이 아니면 앞선 사건의 후속(FOLLOWS)으로 잇지 않습니다.\n\n다루는 보류 후보 44건\n사용자 그래프에 사건 43건 (후보 44건)\n기본값(켜짐) 그대로예요\n\n규칙 끄기\n후보\n그래프 버전\n작업\nGraphDB 반영 재시도\n무료\n모델 오류 재처리\n유료\n\n아직 실행한 작업이 없어요\n\n작업을 골라 주세요\n\n상세 로그와 결과 보고를 보여 줘요.",
+      "number": 3
+    }
+  ]
+}

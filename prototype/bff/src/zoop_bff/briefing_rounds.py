@@ -34,6 +34,9 @@ from .admin_schemas import (
 )
 from .admin_usage import UsageService
 from .audit import SYSTEM_SCHEDULER, Actor, AuditLog, Clock
+from .briefing_market import MarketIndicators
+from .briefing_since import compare as compare_with_morning
+from .briefing_since import unavailable_reason
 from .dataset import Dataset, IssueRec, sort_recent
 from .errors import ApiError, SourceUnavailable
 from .schemas import (
@@ -48,6 +51,8 @@ from .schemas import (
     BriefingSchedule,
     BriefingSelection,
     BriefingWindow,
+    MarketVariables,
+    SinceMorning,
     Unavailable,
 )
 from .statedb import StateDb, dumps, utc_iso
@@ -66,7 +71,9 @@ GRACE = timedelta(minutes=10)  # later than this after the scheduled time counts
 CATCH_UP = timedelta(hours=6)  # a restarted scheduler only fills a missed round this recent
 GENERATED_BY = "bff-rule-v1"
 FAILURE_NOTICE = "이번 회차는 아직 발행하지 못했어요. 잠시 뒤에 다시 확인해 주세요."
-MARKET_UNAVAILABLE = "시장 요약·시장 변수 생산자(PoC 범위 밖)가 아직 없습니다."
+MARKET_SUMMARY_UNAVAILABLE = "시장 요약 생산자(PoC 범위 밖)가 아직 없습니다."
+MARKET_NOT_STORED = "이 회차에는 시장 지표가 저장되지 않았어요."
+MARKET_NOT_SHOWN = "발행된 회차에서만 시장 지표를 볼 수 있어요."
 _ID = re.compile(r"^brf-(\d{4}-\d{2}-\d{2})-(morning|evening)$")
 SCHEDULE_LABEL = {"morning": "07:40", "evening": "18:10"}
 
@@ -120,6 +127,17 @@ def _kst(moment: datetime) -> str:
     return moment.astimezone(KST).isoformat(timespec="seconds")
 
 
+_HAS_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
+
+
+def _reported_at(value: str | None) -> str | None:
+    """The newest article's time in KST for a round item; only its date when the article carries no time (never midnight)."""
+    at = _published_at(value)
+    if at is None or value is None:
+        return None
+    return _kst(at) if _HAS_TIME.match(value) else at.astimezone(KST).date().isoformat()
+
+
 @dataclass
 class Row:
     id: str
@@ -156,12 +174,14 @@ class BriefingService:
         audit: AuditLog,
         usage: UsageService,
         provider: DataProvider,
+        indicators: MarketIndicators,
     ):
         self._db = db
         self._clock = clock
         self._audit = audit
         self._usage = usage
         self._provider = provider
+        self._indicators = indicators
         self._gen = threading.Lock()
 
     # ---------------------------------------------------------------- storage
@@ -417,7 +437,9 @@ class BriefingService:
                 if problems:
                     failure = ("verify", "verification_failed", "검증 실패: " + "; ".join(problems))
                 else:
-                    published = self._payload(rid, day, edition, dataset, stamp, window, items, selected_from, data)
+                    # Fixed now, at generation: the stored values are what the round shows from then on (FS035).
+                    market = self._indicators.collect(day, edition, scheduled_at(day, edition), now=self._clock.now())
+                    published = self._payload(rid, day, edition, dataset, stamp, window, items, selected_from, data, market)
         except Exception as exc:  # a bug must end as a visible failed round, never a stuck "generating"
             log.exception("briefing generation crashed for %s", rid)
             failure = ("generate", "generation_error", f"생성 중 예기치 않은 오류({type(exc).__name__})")
@@ -513,6 +535,7 @@ class BriefingService:
         ranked = sort_recent(inside)[:MAX_ITEMS]
         items = []
         for rank, issue in enumerate(ranked, start=1):
+            assert issue.latest_published_at is not None  # only issues with a report time were selected
             item = BriefingItem(
                 event_id=issue.id,
                 title=issue.title,
@@ -526,6 +549,7 @@ class BriefingService:
                 reason=f"이번 회차 데이터 창 안의 승인 이슈 {len(inside)}건 중 사건 시각이 {rank}번째로 최근입니다 · 근거 {len(issue.evidence_ids)}건",
                 evidence_ids=list(issue.evidence_ids),
                 summary=Unavailable(reason=SUMMARY_UNAVAILABLE),
+                reported_at=_reported_at(issue.latest_published_at),
             )
             items.append(item.model_dump(by_alias=True, mode="json"))
         return items, len(inside)
@@ -574,6 +598,7 @@ class BriefingService:
         items: list[dict[str, Any]],
         selected_from: int,
         data: dict[str, Any],
+        market: MarketVariables,
     ) -> dict[str, Any]:
         graph_version, revision, (_, rule_revision) = stamp  # type: ignore[misc]
         companies = list(dict.fromkeys(c["id"] for item in items for c in item["companies"]))
@@ -597,6 +622,7 @@ class BriefingService:
             "references": {"eventIds": [i["eventId"] for i in items], "evidenceIds": evidence, "companyIds": companies},
             "emptyReason": None if items else "no_issues_in_window",
             "selectedFrom": selected_from,
+            "marketVariables": market.model_dump(by_alias=True, mode="json"),
             "metadata": metadata.model_dump(by_alias=True, mode="json"),
         }
 
@@ -732,8 +758,9 @@ class BriefingService:
             "date": day.isoformat(),
             "edition": edition,
             "scheduled_at": _kst(sched),
-            "market_summary": Unavailable(reason=MARKET_UNAVAILABLE),
-            "market_variables": Unavailable(reason=MARKET_UNAVAILABLE),
+            "market_summary": Unavailable(reason=MARKET_SUMMARY_UNAVAILABLE),
+            "market_variables": Unavailable(reason=MARKET_NOT_SHOWN),
+            "since_morning": None,
             "references": BriefingReferences(event_ids=[], evidence_ids=[], company_ids=[]),
         }
 
@@ -750,6 +777,7 @@ class BriefingService:
             return BriefingResponse(
                 status=status,  # type: ignore[arg-type]
                 published_at=None,
+                generated_at=None,
                 data_window=BriefingWindow(start=window["start"], end=window["end"], open_start=bool(window["open_start"])),
                 data_as_of=None,
                 graph_version=None,
@@ -789,6 +817,7 @@ class BriefingService:
         shown = {
             **base,
             "published_at": row.data.get("published_at"),
+            "generated_at": payload.get("generatedAt"),
             "data_window": BriefingWindow(**{"start": payload["dataWindow"]["start"], "end": payload["dataWindow"]["end"], "open_start": payload["dataWindow"]["openStart"]}),
             "data_as_of": payload["dataWindow"]["end"],
             "graph_version": payload["graphVersion"],
@@ -809,12 +838,36 @@ class BriefingService:
             evidence_ids=payload["references"]["evidenceIds"],
             company_ids=payload["references"]["companyIds"],
         )
+        shown["market_variables"] = self._stored_market(payload)
+        shown["since_morning"] = self._since_morning(day, edition, payload)
         return BriefingResponse(
             status="published",
             items=[BriefingItem.model_validate(i) for i in payload["items"]],
             empty_reason=payload["emptyReason"],
             notice=None,
             **shown,
+        )
+
+    @staticmethod
+    def _stored_market(payload: dict[str, Any]) -> MarketVariables | Unavailable:
+        """The indicators stored with the round; rounds published before they were collected say so."""
+        raw = payload.get("marketVariables")
+        return MarketVariables.model_validate(raw) if raw else Unavailable(reason=MARKET_NOT_STORED)
+
+    def _since_morning(self, day: date, edition: Edition, payload: dict[str, Any]) -> SinceMorning | Unavailable | None:
+        """Evening rounds only: the key issues compared with the same day's published morning round."""
+        if edition != "evening":
+            return None
+        morning = self._get(round_id(day, "morning"))
+        reason = unavailable_reason(morning.status if morning else None)
+        if reason is not None:
+            return Unavailable(reason=reason)
+        assert morning is not None and morning.payload is not None  # published rounds always carry their payload
+        return compare_with_morning(
+            morning_id=morning.id,
+            morning_published_at=morning.data.get("published_at"),
+            morning=morning.payload,
+            evening_items=payload["items"],
         )
 
     def count_view(self) -> None:

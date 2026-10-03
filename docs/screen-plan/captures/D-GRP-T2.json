@@ -1,0 +1,117 @@
+{
+  "id": "D-GRP-T2",
+  "title": "지도 튜토리얼 2/5",
+  "route": "/?mode=all&tour=1",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS015·FS016",
+  "requirements": "15·16",
+  "entry": "지도에서 튜토리얼 다시 보기",
+  "states": "1~5단계 · 실습 감지·다음·이전 · 완료 저장 실패\n비회원 5단계는 로그인 안내",
+  "capturedState": "기본",
+  "stateSource": "features/graph-tutorial.tsx",
+  "stateImages": [
+    "docs/design/v5/tutorial-step1-1440-light.png",
+    "docs/design/v6/tutorial-step3-1440.png"
+  ],
+  "note": "1 이동 → 2 대상 선택 → 3 영향 경로 → 4 근거 → 5 AI. 다음 버튼으로 단계 확인. 실습 자동 진행은 별도 동작이에요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "다음",
+        "regex": false
+      },
+      "box": {
+        "x": 97.734375,
+        "y": 280.25,
+        "width": 46.734375,
+        "height": 36
+      },
+      "result": "다음 단계로 가요.",
+      "destination": "D-GRP-T",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "튜토리얼 건너뛰기"
+      },
+      "box": {
+        "x": 177.109375,
+        "y": 280.25,
+        "width": 117.890625,
+        "height": 36
+      },
+      "result": "완료를 저장하고 지도를 보여줘요",
+      "destination": "D-GRP-01",
+      "mode": "ref"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "이전"
+      },
+      "box": {
+        "x": 41,
+        "y": 280.25,
+        "width": 48.734375,
+        "height": 36
+      },
+      "result": "이전 안내 단계로 돌아가요",
+      "destination": "D-GRP-T",
+      "mode": "undo"
+    }
+  ],
+  "image": "D-GRP-T2.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n화면계획 시연님\n시장 전체 지도\n튜토리얼 2/5\n기업이나 사건 고르기\n\n기업(동그라미)이나 사건 노드를 눌러 보세요. 무엇과 연결됐는지 상세가 열려요.\n\n키보드로는 [목록] 보기에서 기업·사건 행을 Tab으로 골라 Enter를 누르세요.\n\n1단계 지도 움직이기\n2단계 기업이나 사건 고르기, 지금 단계\n3단계 영향 경로 보기\n4단계 상세와 근거 확인하기\n5단계 AI에게 묻기\n이전\n다음\n튜토리얼 건너뛰기\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "다음"
+      },
+      "before": "/?mode=all&tour=1",
+      "url": "/?mode=all&tour=1",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n화면계획 시연님\n시장 전체 지도\n튜토리얼 3/5\n영향 경로 보기\n\n기업을 고른 뒤 상세의 [직접 이슈]에서 사건을 눌러 보세요. 기업과 그 사건이 어떻게 이어졌는지 단계별 근거와 함께 보여요. 기업 사이 점선(사건 공유)을 눌러도 두 기업의 관계가 열려요.\n\n키보드로는 [목록] 보기에서 기업을 고른 뒤 상세의 [직접 이슈] 사건 제목으로 Tab해 Enter를 누르세요.\n\n1단계 지도 움직이기\n2단계 기업이나 사건 고르기\n3단계 영향 경로 보기, 지금 단계\n4단계 상세와 근거 확인하기\n5단계 AI에게 묻기\n이전\n다음\n튜토리얼 건너뛰기\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 1
+    },
+    {
+      "reference": "D-GRP-01",
+      "selector": {
+        "role": "button",
+        "name": "튜토리얼 건너뛰기",
+        "result": "완료를 저장하고 지도를 보여줘요",
+        "destination": "D-GRP-01",
+        "mode": "ref",
+        "ref": "D-GRP-01"
+      },
+      "number": 2,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "튜토리얼 건너뛰기",
+          "regex": false
+        },
+        "before": "/",
+        "url": "/",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n비회원 체험 중\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬"
+      }
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "이전"
+      },
+      "before": "/?mode=all&tour=1",
+      "url": "/?mode=all&tour=1",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n화면계획 시연님\n시장 전체 지도\n튜토리얼 1/5\n지도 움직이기\n\n빈 곳을 끌어 지도를 옮기고, 휠이나 두 손가락으로 확대해 보세요. 점선으로 표시한 [화면에 맞추기]를 누르면 전체가 다시 보여요.\n\n키보드로는 [확대]·[축소]·[화면에 맞추기] 버튼을 쓸 수 있어요.\n\n1단계 지도 움직이기, 지금 단계\n2단계 기업이나 사건 고르기\n3단계 영향 경로 보기\n4단계 상세와 근거 확인하기\n5단계 AI에게 묻기\n다음\n튜토리얼 건너뛰기\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 3
+    }
+  ]
+}

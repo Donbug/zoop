@@ -1,4 +1,5 @@
 // GraphLegend(Neo4j Browser식 라벨 칩: 표지 + 이름 + 개수, 누르면 표시 켜기/끄기) · GraphModeSwitch(전체/개인화 모드 Segmented)
+// · PersonalFilterSwitch(개인화 모드 안의 전체/보유/관심 필터 Segmented)
 import { Bookmark, Building2, Globe, Info, Lock, Zap, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Schemas } from "@/api/client";
@@ -6,6 +7,7 @@ import { hitArea } from "@/components/ui/button";
 import { IconHint } from "@/components/ui/icon-hint";
 import { Segmented } from "@/components/ui/segmented";
 import type { LegendKey } from "@/lib/graph-view";
+import { personalFilterLabel, type PersonalFilter } from "@/lib/personal-filter";
 import { modeLabel, relationLabel, type GraphMode, type RelationType } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { EdgeGlyph } from "./relation-type-tag";
@@ -62,6 +64,9 @@ interface GraphLegendProps {
   /** 꺼 둔 항목. onToggle과 함께 주면 칩이 토글 버튼이 된다(G5). */
   hidden?: ReadonlySet<LegendKey>;
   onToggle?: (key: LegendKey) => void;
+  /** false면 보유·관심 칩을 뺀다(내 종목 모드에서 개인화 필터가 같은 고리를 이미 보일 때 도구 막대 폭을 아끼려고).
+   *  지도에 있는 보유·관심 기업 수는 「지도 읽는 법」에 적는다. */
+  marks?: boolean;
   className?: string;
 }
 
@@ -69,7 +74,7 @@ interface GraphLegendProps {
  * 지도에 있는 노드 종류·관계 유형만 개수와 함께 칩으로 보여준다. 크기·거리의 뜻은 정보 아이콘 안에.
  * onToggle이 있으면 노드 종류·관계 유형 칩은 표시 켜기/끄기 버튼(aria-pressed)이다. 보유·관심은 표시 규칙이라 토글하지 않는다.
  */
-export function GraphLegend({ nodes, edges, hidden, onToggle, className }: GraphLegendProps) {
+export function GraphLegend({ nodes, edges, hidden, onToggle, marks = true, className }: GraphLegendProps) {
   const companies = nodes.filter((n) => n.kind === "company").length;
   const issues = nodes.length - companies;
   const holding = nodes.filter((n) => n.holding).length;
@@ -109,13 +114,18 @@ export function GraphLegend({ nodes, edges, hidden, onToggle, className }: Graph
             "사건",
             issues,
           )}
-        {holding > 0 && <Chip mark={<MarkRing kind="holding" />} label="보유" count={holding} />}
-        {watch > 0 && <Chip mark={<MarkRing kind="watch" />} label="관심" count={watch} />}
+        {marks && holding > 0 && <Chip mark={<MarkRing kind="holding" />} label="보유" count={holding} />}
+        {marks && watch > 0 && <Chip mark={<MarkRing kind="watch" />} label="관심" count={watch} />}
         {byType.map(({ type, count }) => chip(type, <EdgeGlyph type={type} className="w-6" />, relationLabel[type], count))}
       </ul>
       <IconHint icon={Info} label="지도 읽는 법">
         <p>기업은 상징색 원, 사건은 번개 원이에요. 선 가운데 글자는 관계 요약이에요.</p>
         {(holding > 0 || watch > 0) && <p>보유 종목은 실선 테두리, 관심 종목은 점선 테두리이고 이름 아래에 보유·관심이라고 적어요. 둘 다면 이중 테두리예요.</p>}
+        {!marks && (holding > 0 || watch > 0) && (
+          <p className="tabular-nums">
+            이 지도에 보유 기업 {holding}곳, 관심 기업 {watch}곳이 있어요.
+          </p>
+        )}
         {onToggle && <p>범례 칩을 누르면 그 종류를 지도에서 숨기거나 다시 보여요.</p>}
         <p>노드 크기와 거리는 인과 관계나 중요도를 뜻하지 않아요.</p>
       </IconHint>
@@ -168,6 +178,42 @@ export function GraphModeSwitch({ value, onValueChange, disabledModes = {}, lock
           disabledReason: disabledModes[mode],
         };
       })}
+    />
+  );
+}
+
+interface PersonalFilterSwitchProps {
+  value: PersonalFilter;
+  onValueChange: (filter: PersonalFilter) => void;
+  /** 회원의 보유·관심 종목 수(모르거나 받지 못했으면 null, 숫자를 적지 않는다). 0개여도 고를 수 있고, 고르면 지도 자리에
+   *  빈 상태 안내가 나온다(FS017 예외 처리). */
+  holdingCount: number | null;
+  watchCount: number | null;
+  fill?: boolean;
+  className?: string;
+}
+
+/** 개인화 지도의 기준 종목 범위(FS017). 보유·관심 칸에는 지도 노드와 같은 실선·점선 고리와 종목 수를 붙인다. */
+export function PersonalFilterSwitch({ value, onValueChange, holdingCount, watchCount, fill, className }: PersonalFilterSwitchProps) {
+  const counts: Record<PersonalFilter, number | null> = { all: null, holding: holdingCount, watch: watchCount };
+  return (
+    <Segmented
+      aria-label="내 종목 범위"
+      value={value}
+      onValueChange={onValueChange}
+      fill={fill}
+      className={className}
+      options={(["all", "holding", "watch"] as const).map((filter) => ({
+        value: filter,
+        label: (
+          <>
+            {filter !== "all" && <MarkRing kind={filter} />}
+            {personalFilterLabel[filter]}
+            {counts[filter] !== null && <span className="tabular-nums">{counts[filter]}</span>}
+          </>
+        ),
+        ariaLabel: counts[filter] === null ? `${personalFilterLabel[filter]} 종목` : `${personalFilterLabel[filter]} 종목 ${counts[filter]}개`,
+      }))}
     />
   );
 }

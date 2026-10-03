@@ -1,0 +1,232 @@
+{
+  "id": "D-GRP-03",
+  "title": "기업 패널",
+  "route": "/?mode=all&select=node%3AKRX%3A005930",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS020·FS026·FS027",
+  "requirements": "20",
+  "entry": "지도 삼성전자 노드를 직접 누르기",
+  "states": "조회 중·조회 실패 · 직접·간접 이슈 없음 · 관심 저장 실패",
+  "capturedState": "기본",
+  "stateSource": "features/node-panel.tsx · components/domain/watch-toggle.tsx",
+  "stateImages": [
+    "docs/design/v5/graph-company-panel-1440-light.png",
+    "docs/design/v6/watch-toggle-1440-light.png"
+  ],
+  "note": "",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "기업 상세",
+        "regex": false
+      },
+      "box": {
+        "x": 1052,
+        "y": 254.5,
+        "width": 113.890625,
+        "height": 44
+      },
+      "result": "삼성전자 기업 상세로 가요.",
+      "destination": "D-COM-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "^삼성전자 관심 종목",
+        "regex": true
+      },
+      "box": {
+        "x": 1173.890625,
+        "y": 254.5,
+        "width": 156.671875,
+        "height": 44
+      },
+      "result": "관심 등록·해제를 저장해요",
+      "destination": "D-GRP-03",
+      "mode": "watch"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "이 노드 중심으로 보기"
+      },
+      "box": {
+        "x": 1052,
+        "y": 306.5,
+        "width": 184.34375,
+        "height": 44
+      },
+      "result": "이 기업 중심 포커스로 바꿔요",
+      "destination": "D-GRP-07b",
+      "mode": "ref"
+    },
+    {
+      "number": 4,
+      "selector": {
+        "role": "button",
+        "name": "다른 기업과의 연결 보기"
+      },
+      "box": {
+        "x": 1052,
+        "y": 358.5,
+        "width": 197.453125,
+        "height": 44
+      },
+      "result": "두 번째 기업 선택창을 열어요",
+      "destination": "D-GRP-07",
+      "mode": "ref"
+    },
+    {
+      "number": 5,
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "box": {
+        "x": 1257.453125,
+        "y": 358.5,
+        "width": 127.421875,
+        "height": 44
+      },
+      "result": "기업 후보를 넘겨 AI 창을 열어요",
+      "destination": "D-AI-01",
+      "mode": "ref"
+    },
+    {
+      "number": 6,
+      "selector": {
+        "role": "button",
+        "name": "삼성전자, ASML과 차세대 반도체 제조 협력 확대"
+      },
+      "box": {
+        "x": 1052,
+        "y": 527.5,
+        "width": 289.671875,
+        "height": 20.625
+      },
+      "result": "기업과 이 사건의 영향 경로를 열어요",
+      "destination": "D-GRP-06",
+      "mode": "ref"
+    }
+  ],
+  "image": "D-GRP-03.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자\n\n005930\n\n보유 종목\n\n기업 상세\n관심 종목에 담기\n이 노드 중심으로 보기\n다른 기업과의 연결 보기\nAI에게 묻기\n직접 이슈 27건\n\n사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.\n\n2028년\nHigh NA EUV 도…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n2026-09-29\n투자사\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n2026-09-17\nMOU 체결사\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n근거 1건 보기\n2026-09-11\n주최/진행\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n근거 2건 보기\n2026-09-08\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n2026-08-07\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n근거 1건 보기\n2026-07-28\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n2026-07-28\n판매사\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n근거 1건 보기\n2026-07-24\n참여사\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n근거 3건 보기\n2026-07-22\n공개 주체\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n근거 1건 보기\n발생 시각 미상\n협력사·기술 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\n근거 1건 보기\n발생 시각 미상\n계약사\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n근거 1건 보기\n발생 시각 미상\n주최자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 3건 보기\n발생 시각 미상\n시연자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 1건 보기\n발생 시각 미상\n참가 및 전시 주체\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n근거 3건 보기\n발생 시각 미상\n프로모션 주최/운영\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n근거 1건 보기\n발생 시각 미상\n컨소시엄 참여 및 공동…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 3건 보기\n발생 시각 미상\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n발생 시각 미상\n개발사\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n근거 1건 보기\n발생 시각 미상\n투자사\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n발생 시각 미상\n투자자\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n발생 시각 미상\n구축사\n삼성, 미래 성장 위해 2,655조원 투자\n근거 2건 보기\n간접 이슈 0건\n\n데이터로 이어진 간접 이슈가 없어요.\n\n관련 기업 9곳\n삼\n삼성에스디에스\n같은 사건 2건\nA\nASML\n같은 사건 2건\nS\nSK텔레콤\n같은 사건 2건\nK\nKT\n같은 사건 2건\n현대자동차\n같은 사건 1건\nNAVER\n같은 사건 1건\n삼\n삼성SDI\n같은 사건 1건\n삼\n삼성물산\n같은 사건 1건\nNVIDIA\n같은 사건 1건",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "기업 상세"
+      },
+      "before": "/?mode=all&select=node%3AKRX%3A005930",
+      "url": "/companies/KRX%3A005930",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n그래프로 돌아가기\n삼성전자\n005930\n보유\n시세\n\n276,000원\n\n전일 대비\n0원 (0.00%)\n보합\n\n전일 대비 · 기준 2026-10-02 15:30 KST · Yahoo Finance · 지연 가능\n거래량\n1150.1만주\n당일 저가 ~ 고가\n271,500원 ~ 277,000원\n52주 저가 ~ 고가\n89,750원 ~ 374,500원\n주요 지표\n주요 지표 · 네이버 증권 · 기준 2026-10-02 20:20 KST\n시가총액\n1,613조 5,729억\nPER\n12.38배\n(2026.06. 기준)\nEPS\n22,292원\n(2026.06. 기준)\nPBR\n3.21배\n(2026.06. 기준)\nBPS\n86,052원\n(2026.06. 기준)\n배당수익률\n0.60%\n(2025.12. 기준)\n주당배당금\n1,668원\n(2025.12. 기준)\n외국인 소진율\n46.41%\n가상 계좌 보유\n보유 수량\n20주\n평균 매입가\n60,000원\n평가 금액\n5,520,000원\n자산 비중\n계산 불가\n평가 손익\n▲ +4,320,000원 (+360.00%)\n상승\n\n모의 정보 기준 2026-10-03 18:50 KST · 평가 계산 2026-10-03 19:04 KST\n\n자산 비중: 보유 종목의 시세 통화가 서로 달라요. 환율로 바꾸지 않아 합계와 비중을 계산하지 않았어요.\n\n사건\n문서\n기업 정보\n사건 타임라인\n1일\n1개월\n1년\n전체\n직접 관련\n구조적 관련\n\n1개월 주가. 처음 9월 3일 250,000원, 마지막 10월 2일 276,000원. 최고 285,500원(9월 23일), 최저 248,500원(9월 15일). 사건이 있었던 날 4곳을 표시했어요.\n\n1개월 · 처음 시세 대비\n▲ +26,000원 (+10.40%)\n상승\n285,500원\n248,500원\n9월 3일\n10월 2일\nYahoo Finance · 일별 종가\n\n차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지는 않아요.\n\n표로 보기\n\n1개월 · 사건 17건\n\n2026-09-29\n근거 문서\n1\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\nHelix Digital Infrastructure\n\n2026-09-17\n근거 문서\n1\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n\n그란츠 포레스트 파크 개발사업 (필리핀 세부)\n\n2026-09-11\n근거 문서\n1\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n\n갤럭시 Z 폴드8과 민음사가 함께하는 북토크\n\n2026-09-08\n근거 문서\n1\n최대주주등소유주식변동신고서\n발생 시점 미상\n사건 13건\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\n본 정보는 참고용이며 투자 권유가 아니에요.",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "^삼성전자 관심 종목",
+        "regex": true
+      },
+      "before": "/?mode=all&select=node%3AKRX%3A005930",
+      "url": "/?mode=all&select=node%3AKRX%3A005930",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n2\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자\n\n005930\n\n보유 종목\n관심 종목\n\n기업 상세\n관심 종목\n이 노드 중심으로 보기\n다른 기업과의 연결 보기\nAI에게 묻기\n직접 이슈 27건\n\n사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.\n\n2028년\nHigh NA EUV 도…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n2026-09-29\n투자사\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n2026-09-17\nMOU 체결사\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n근거 1건 보기\n2026-09-11\n주최/진행\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n근거 2건 보기\n2026-09-08\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n2026-08-07\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n근거 1건 보기\n2026-07-28\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n2026-07-28\n판매사\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n근거 1건 보기\n2026-07-24\n참여사\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n근거 3건 보기\n2026-07-22\n공개 주체\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n근거 1건 보기\n발생 시각 미상\n협력사·기술 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\n근거 1건 보기\n발생 시각 미상\n계약사\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n근거 1건 보기\n발생 시각 미상\n주최자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 3건 보기\n발생 시각 미상\n시연자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 1건 보기\n발생 시각 미상\n참가 및 전시 주체\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n근거 3건 보기\n발생 시각 미상\n프로모션 주최/운영\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n근거 1건 보기\n발생 시각 미상\n컨소시엄 참여 및 공동…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 3건 보기\n발생 시각 미상\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n발생 시각 미상\n개발사\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n근거 1건 보기\n발생 시각 미상\n투자사\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n발생 시각 미상\n투자자\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n발생 시각 미상\n구축사\n삼성, 미래 성장 위해 2,655조원 투자\n근거 2건 보기\n간접 이슈 0건\n\n데이터로 이어진 간접 이슈가 없어요.\n\n관련 기업 9곳\n삼\n삼성에스디에스\n같은 사건 2건\nA\nASML\n같은 사건 2건\nS\nSK텔레콤\n같은 사건 2건\nK\nKT\n같은 사건 2건\n현대자동차\n같은 사건 1건\nNAVER\n같은 사건 1건\n삼\n삼성SDI\n같은 사건 1건\n삼\n삼성물산\n같은 사건 1건\nNVIDIA\n같은 사건 1건",
+      "number": 2
+    },
+    {
+      "reference": "D-GRP-07b",
+      "selector": {
+        "role": "button",
+        "name": "이 노드 중심으로 보기",
+        "result": "이 기업 중심 포커스로 바꿔요",
+        "destination": "D-GRP-07b",
+        "mode": "ref",
+        "ref": "D-GRP-07b"
+      },
+      "number": 3,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "이 노드 중심으로 보기",
+          "regex": false
+        },
+        "before": "/?mode=all&select=node%3AKRX%3A005930",
+        "url": "/?mode=all&select=node%3AKRX%3A005930&focus=KRX%3A005930&hops=1",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n\n삼성전자 중심\n\n1단계\n2단계\n전체 보기\n삼성전자\n\n005930\n\n보유 종목\n\n기업 상세\n관심 종목에 담기\n다른 기업과의 연결 보기\nAI에게 묻기\n직접 이슈 27건\n\n사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.\n\n2028년\nHigh NA EUV 도…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n2026-09-29\n투자사\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n2026-09-17\nMOU 체결사\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n근거 1건 보기\n2026-09-11\n주최/진행\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n근거 2건 보기\n2026-09-08\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n2026-08-07\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n근거 1건 보기\n2026-07-28\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n2026-07-28\n판매사\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n근거 1건 보기\n2026-07-24\n참여사\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n근거 3건 보기\n2026-07-22\n공개 주체\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n근거 1건 보기\n발생 시각 미상\n협력사·기술 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\n근거 1건 보기\n발생 시각 미상\n계약사\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n근거 1건 보기\n발생 시각 미상\n주최자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 3건 보기\n발생 시각 미상\n시연자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 1건 보기\n발생 시각 미상\n참가 및 전시 주체\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n근거 3건 보기\n발생 시각 미상\n프로모션 주최/운영\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n근거 1건 보기\n발생 시각 미상\n컨소시엄 참여 및 공동…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 3건 보기\n발생 시각 미상\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n발생 시각 미상\n개발사\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n근거 1건 보기\n발생 시각 미상\n투자사\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n발생 시각 미상\n투자자\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n발생 시각 미상\n구축사\n삼성, 미래 성장 위해 2,655조원 투자\n근거 2건 보기\n간접 이슈 0건\n\n데이터로 이어진 간접 이슈가 없어요.\n\n관련 기업 9곳\n삼\n삼성에스디에스\n같은 사건 2건\nA\nASML\n같은 사건 2건\nS\nSK텔레콤\n같은 사건 2건\nK\nKT\n같은 사건 2건\n현대자동차\n같은 사건 1건\nNAVER\n같은 사건 1건\n삼\n삼성SDI\n같은 사건 1건\n삼\n삼성물산\n같은 사건 1건\nNVIDIA\n같은 사건 1건"
+      }
+    },
+    {
+      "reference": "D-GRP-07",
+      "selector": {
+        "role": "button",
+        "name": "다른 기업과의 연결 보기",
+        "result": "두 번째 기업 선택창을 열어요",
+        "destination": "D-GRP-07",
+        "mode": "ref",
+        "ref": "D-GRP-07"
+      },
+      "number": 4,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "다른 기업과의 연결 보기",
+          "regex": false
+        },
+        "before": "/?mode=all&select=node%3AKRX%3A005930",
+        "url": "/?mode=all&select=node%3AKRX%3A005930",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자\n\n005930\n\n보유 종목\n\n기업 상세\n관심 종목에 담기\n이 노드 중심으로 보기\n다른 기업과의 연결 보기\nAI에게 묻기\n직접 이슈 27건\n\n사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.\n\n2028년\nHigh NA EUV 도…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n2026-09-29\n투자사\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n2026-09-17\nMOU 체결사\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n근거 1건 보기\n2026-09-11\n주최/진행\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n근거 2건 보기\n2026-09-08\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n2026-08-07\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n근거 1건 보기\n2026-07-28\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n2026-07-28\n판매사\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n근거 1건 보기\n2026-07-24\n참여사\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n근거 3건 보기\n2026-07-22\n공개 주체\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n근거 1건 보기\n발생 시각 미상\n협력사·기술 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n근거 1건 보기\n발생 시각 미상\n솔루션 제공사\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\n근거 1건 보기\n발생 시각 미상\n계약사\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n근거 1건 보기\n발생 시각 미상\n주최자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 3건 보기\n발생 시각 미상\n시연자\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n근거 1건 보기\n발생 시각 미상\n참가 및 전시 주체\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n근거 3건 보기\n발생 시각 미상\n프로모션 주최/운영\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n근거 1건 보기\n발생 시각 미상\n컨소시엄 참여 및 공동…\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 2건 보기\n발생 시각 미상\n발행회사\n최대주주등소유주식변동신고서\n근거 3건 보기\n발생 시각 미상\n제공사\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n근거 1건 보기\n발생 시각 미상\n개발사\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n근거 1건 보기\n발생 시각 미상\n투자사\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n발생 시각 미상\n투자자\n삼성, 미래 성장 위해 호남에 425조원 투자\n근거 1건 보기\n발생 시각 미상\n구축사\n삼성, 미래 성장 위해 2,655조원 투자\n근거 2건 보기\n간접 이슈 0건\n\n데이터로 이어진 간접 이슈가 없어요.\n\n관련 기업 9곳\n삼\n삼성에스디에스\n같은 사건 2건\nA\nASML\n같은 사건 2건\nS\nSK텔레콤\n같은 사건 2건\nK\nKT\n같은 사건 2건\n현대자동차\n같은 사건 1건\nNAVER\n같은 사건 1건\n삼\n삼성SDI\n같은 사건 1건\n삼\n삼성물산\n같은 사건 1건\nNVIDIA\n같은 사건 1건\n연결을 볼 기업\n삼\n삼성물산\n삼\n삼성에스디에스\n삼\n삼성전기\n삼\n삼성SDI\n현대자동차\nA\nAmazon\nApple\nA\nASML\nC\nCadence\nC\nCoreWeave\nGeneral Motors\nGoogle\nK\nKT\nM\nMicron\nM\nMicrosoft\nNAVER\nN\nNebius\nNVIDIA\nO\nOracle\nPalantir\nS\nSalesforce\nS\nSK텔레콤\nS\nSK하이닉스\nTesla\nT\nTSMC"
+      }
+    },
+    {
+      "reference": "D-AI-01",
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기",
+        "result": "기업 후보를 넘겨 AI 창을 열어요",
+        "destination": "D-AI-01",
+        "mode": "ref",
+        "ref": "D-AI-01"
+      },
+      "number": 5,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "AI에게 묻기"
+        },
+        "before": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+        "url": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자 · 영향 경로\n\n직접 연결 · 지도 기준 2026-10-01 20:21 KST\n\n사건 상세 보기\nAI에게 묻기\n확인된 연결\n기업:\n삼성전자\n직접 관련\nHigh NA EUV 도…\n· 계획\n근거 2건\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n함께 연결된 기업 1곳\nA\nASML\n직접 관련 · 협력 파트너(노광 설비…\n근거 2건\n해석 한계\n위 연결은 기사에 적힌 사실과 등록된 사업 관계예요. 이 사건이 주가나 실적에 주는 영향은 판단하지 않아요.\n보도 표현이 발생이 아닌 연결(계획·전망 등)은 아직 일어난 일로 확인되지 않았어요.\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n질문에 연결할 대상\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건\n삼성전자\n\n내 질문:\n그 기업은 언제?\n\n연결한 대상: 없음\n\n‘그 기업’만으로는 어느 대상인지 알 수 없어요. 그래프에서 기업이나 사건을 고르거나 기업 이름을 알려 주세요.\n\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
+        "number": 3
+      }
+    },
+    {
+      "reference": "D-GRP-06",
+      "selector": {
+        "role": "button",
+        "name": "삼성전자, ASML과 차세대 반도체 제조 협력 확대",
+        "result": "기업과 이 사건의 영향 경로를 열어요",
+        "destination": "D-GRP-06",
+        "mode": "ref",
+        "ref": "D-GRP-06"
+      },
+      "number": 6,
+      "verifiedInteraction": {
+        "selector": {
+          "role": "button",
+          "name": "삼성전자, ASML과 차세대 반도체 제조 협력 확대"
+        },
+        "before": "/?mode=all&select=node%3AKRX%3A005930",
+        "url": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자 · 영향 경로\n\n직접 연결 · 지도 기준 2026-10-01 20:21 KST\n\n사건 상세 보기\nAI에게 묻기\n확인된 연결\n기업:\n삼성전자\n직접 관련\nHigh NA EUV 도…\n· 계획\n근거 2건\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n함께 연결된 기업 1곳\nA\nASML\n직접 관련 · 협력 파트너(노광 설비…\n근거 2건\n해석 한계\n위 연결은 기사에 적힌 사실과 등록된 사업 관계예요. 이 사건이 주가나 실적에 주는 영향은 판단하지 않아요.\n보도 표현이 발생이 아닌 연결(계획·전망 등)은 아직 일어난 일로 확인되지 않았어요."
+      }
+    }
+  ]
+}

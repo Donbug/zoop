@@ -1,0 +1,103 @@
+{
+  "id": "A-ADM-05b",
+  "title": "관리자 감사 로그",
+  "route": "/admin/audit",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "NFS008",
+  "requirements": "58",
+  "entry": "관리자 로그인 후 전용 메뉴",
+  "states": "조회 중 · 조건에 맞는 자료 없음 · 영역 오류\n관리자 세션 없음·만료 → 로그인",
+  "capturedState": "기본",
+  "stateSource": "admin/pages/audit.tsx · admin/session.tsx",
+  "stateImages": [],
+  "note": "팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "대시보드",
+        "regex": false
+      },
+      "box": {
+        "x": 8,
+        "y": 64,
+        "width": 207,
+        "height": 44
+      },
+      "result": "관리자 메뉴의 해당 운영 화면을 열어요.",
+      "destination": "A-ADM-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "combobox",
+        "name": "동작"
+      },
+      "box": {
+        "x": 256,
+        "y": 96,
+        "width": 224,
+        "height": 44
+      },
+      "result": "관리 동작 필터를 펼쳐요",
+      "destination": "A-ADM-05b",
+      "mode": "escape"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "searchbox",
+        "name": "감사 로그 검색"
+      },
+      "box": {
+        "x": 492,
+        "y": 96,
+        "width": 320,
+        "height": 44
+      },
+      "result": "대상·사유·관리자로 검색해요",
+      "destination": "A-ADM-05b",
+      "mode": "input"
+    }
+  ],
+  "image": "A-ADM-05b.png",
+  "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n감사 로그\n동작\n모든 동작\n감사 로그 검색\n감사 로그\n시각\t주체\t동작\t대상\t결과\t사유\n2026-10-03 19:07:15\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:51:06\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:40:49\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:30:29\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:10:12\t시스템\t브리핑 생성\tbriefing-round · brf-2026-10-03-evening\t\n완료\t–\n2026-10-03 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-03-morning\t\n완료\t–\n2026-10-02 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-evening\t\n완료\t–\n2026-10-02 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-morning\t\n완료\t–\n2026-10-01 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-evening\t\n완료\t–\n2026-10-01 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-morning\t\n완료\t–\n2026-09-30 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-evening\t\n완료\t–\n2026-09-30 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-morning\t\n완료\t–\n2026-09-29 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-evening\t\n완료\t–\n2026-09-29 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-morning\t\n완료\t–\n2026-09-28 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-evening\t\n완료\t–\n2026-09-28 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-morning\t\n완료\t–\n2026-09-27 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-27-evening\t\n완료\t–\n2026-09-27 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-27-morning\t\n완료\t–\n2026-09-26 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-26-evening\t\n완료\t–\n2026-09-26 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-26-morning\t\n완료\t–\n2026-09-25 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-25-evening\t\n완료\t–\n2026-09-25 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-25-morning\t\n완료\t–\n2026-09-24 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-24-evening\t\n완료\t–\n2026-09-24 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-24-morning\t\n완료\t–\n2026-09-23 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-23-evening\t\n완료\t–\n2026-09-23 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-23-morning\t\n완료\t–\n2026-09-22 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-22-evening\t\n완료\t–\n2026-09-22 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-22-morning\t\n완료\t–\n2026-09-21 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-21-evening\t\n완료\t–\n2026-09-21 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-21-morning\t\n완료\t–\n2026-09-20 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-20-evening\t\n완료\t–\n2026-09-20 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-20-morning\t\n완료\t–\n2026-09-19 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-19-evening\t\n완료\t–\n2026-09-19 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-19-morning\t\n완료\t–\n2026-09-18 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-18-evening\t\n완료\t–\n2026-09-18 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-18-morning\t\n완료\t–\n2026-09-17 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-17-evening\t\n완료\t–\n2026-09-17 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-17-morning\t\n완료\t–\n2026-09-16 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-16-evening\t\n완료\t–\n2026-09-16 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-16-morning\t\n완료\t–\n2026-10-03 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-03-morning\t\n완료\t–\n2026-10-02 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-evening\t\n완료\t–\n2026-10-02 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-morning\t\n완료\t–\n2026-10-01 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-evening\t\n완료\t–\n2026-10-01 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-morning\t\n완료\t–\n2026-09-30 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-evening\t\n완료\t–\n2026-09-30 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-morning\t\n완료\t–\n2026-09-29 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-evening\t\n완료\t–\n2026-09-29 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-morning\t\n완료\t–\n2026-09-28 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-evening\t\n완료\t–\n기록 더 보기",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "대시보드"
+      },
+      "before": "/admin/audit",
+      "url": "/admin",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n대시보드\n\n갱신 2026-10-03 19:08:50\n\n검수 대기\n260건\n통과 102 · 보류 304 · 폐기 1\n사용자에게 보이는 그래프\nv1\n2026-10-01 20:27 게시 · 검수 11건 반영\n자동 검수 규칙 R1@2 켜짐 · 게시 사건 43건\nGraphDB 반영\n반영됨\n대기 작업 0건\n작업\n실행 0 · 대기 0\n24시간 실패 0건\nAI 요청(7일)\n35건\n성공 35 · 실패 0\n최근 브리핑 회차\n브리핑 운영\n브리핑 회차 목록\n회차\t상태\t데이터 기준 시점\n2026-10-03 퇴근\t\n발행됨\t2026-10-03 18:10\n2026-10-03 출근\t\n발행됨\t2026-10-03 07:40\n2026-10-02 퇴근\t\n발행됨\t2026-10-02 18:10\n2026-10-02 출근\t\n발행됨\t2026-10-02 07:40\n최근 작업\n작업 관제\n\n아직 실행한 작업이 없어요.\n\nAI 기능별 요청(7일)\nAI 운영\nAI 기능별 요청\n기능\t요청\t실패\nAI 챗봇\t5\t0\n뉴스 분석(PoC 파이프라인)\t0\t0\n출퇴근 브리핑\t30\t0\n이용 현황\n감사 로그\n등록 회원\n8\n회원 접속 세션\n20\n비회원 0\n감사 기록(24시간)\n7\n이용·선호도(7일)\n이용 통계\n선호도\n회원 관리\n활성 사용자\n9명\n노드 클릭률\n29.9%\n43 / 144노출\n브리핑 조회율\n11.1%\n1 / 9명\nAI 질문 이용률\n11.1%\n1 / 9명\nAI 좋아요 비율\n표본 부족\n좋아요 0 · 싫어요 0\n등록 회원\n8명\n차단 0명",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "combobox",
+        "name": "동작"
+      },
+      "before": "/admin/audit",
+      "url": "/admin/audit",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n감사 로그\n동작\n모든 동작\n감사 로그 검색\n감사 로그\n시각\t주체\t동작\t대상\t결과\t사유\n2026-10-03 19:07:15\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:51:06\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:40:49\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:30:29\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:10:12\t시스템\t브리핑 생성\tbriefing-round · brf-2026-10-03-evening\t\n완료\t–\n2026-10-03 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-03-morning\t\n완료\t–\n2026-10-02 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-evening\t\n완료\t–\n2026-10-02 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-morning\t\n완료\t–\n2026-10-01 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-evening\t\n완료\t–\n2026-10-01 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-morning\t\n완료\t–\n2026-09-30 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-evening\t\n완료\t–\n2026-09-30 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-morning\t\n완료\t–\n2026-09-29 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-evening\t\n완료\t–\n2026-09-29 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-morning\t\n완료\t–\n2026-09-28 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-evening\t\n완료\t–\n2026-09-28 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-morning\t\n완료\t–\n2026-09-27 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-27-evening\t\n완료\t–\n2026-09-27 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-27-morning\t\n완료\t–\n2026-09-26 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-26-evening\t\n완료\t–\n2026-09-26 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-26-morning\t\n완료\t–\n2026-09-25 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-25-evening\t\n완료\t–\n2026-09-25 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-25-morning\t\n완료\t–\n2026-09-24 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-24-evening\t\n완료\t–\n2026-09-24 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-24-morning\t\n완료\t–\n2026-09-23 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-23-evening\t\n완료\t–\n2026-09-23 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-23-morning\t\n완료\t–\n2026-09-22 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-22-evening\t\n완료\t–\n2026-09-22 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-22-morning\t\n완료\t–\n2026-09-21 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-21-evening\t\n완료\t–\n2026-09-21 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-21-morning\t\n완료\t–\n2026-09-20 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-20-evening\t\n완료\t–\n2026-09-20 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-20-morning\t\n완료\t–\n2026-09-19 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-19-evening\t\n완료\t–\n2026-09-19 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-19-morning\t\n완료\t–\n2026-09-18 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-18-evening\t\n완료\t–\n2026-09-18 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-18-morning\t\n완료\t–\n2026-09-17 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-17-evening\t\n완료\t–\n2026-09-17 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-17-morning\t\n완료\t–\n2026-09-16 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-16-evening\t\n완료\t–\n2026-09-16 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-16-morning\t\n완료\t–\n2026-10-03 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-03-morning\t\n완료\t–\n2026-10-02 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-evening\t\n완료\t–\n2026-10-02 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-morning\t\n완료\t–\n2026-10-01 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-evening\t\n완료\t–\n2026-10-01 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-morning\t\n완료\t–\n2026-09-30 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-evening\t\n완료\t–\n2026-09-30 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-morning\t\n완료\t–\n2026-09-29 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-evening\t\n완료\t–\n2026-09-29 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-morning\t\n완료\t–\n2026-09-28 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-evening\t\n완료\t–\n기록 더 보기\n모든 동작\n로그인\n로그인 실패\n로그아웃\n검수 결정\n검수 규칙 전환\n그래프 게시\n그래프 버전 전환\n그래프 최초 등록\n작업 실행\n작업 재시도\n작업 취소\n작업 복구\n브리핑 생성\n브리핑 재처리\n브리핑 정정\n브리핑 제공 중단\n브리핑 제공 재개\nAI 대화록 열람\n회원 차단\n회원 차단 해제",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "searchbox",
+        "name": "감사 로그 검색"
+      },
+      "url": "/admin/audit",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n감사 로그\n동작\n모든 동작\n감사 로그 검색\n\n조건에 맞는 기록이 없어요",
+      "inputType": "search",
+      "inputWasEntered": true,
+      "number": 3
+    }
+  ]
+}

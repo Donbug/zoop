@@ -1,0 +1,1241 @@
+{
+  "families": {
+    "AUT": {
+      "states": "입력 전 · 누락·형식 오류 · 인증 실패 · 시작 실패",
+      "source": "pages/login-page.tsx · features/app-shell.tsx",
+      "images": [
+        "docs/design/v5/signup-error-390-dark.png"
+      ]
+    },
+    "ONB": {
+      "states": "선택 전 · 저장 중 · 저장 실패·재시도",
+      "source": "pages/onboarding-page.tsx",
+      "images": [
+        "docs/design/v5/onboarding-investor-390-light.png"
+      ]
+    },
+    "WAT": {
+      "states": "0개 · 선택·해제 · 검색·결과 없음 · 저장 실패",
+      "source": "pages/onboarding-page.tsx · components/domain/company-search.tsx",
+      "images": [
+        "docs/design/v6/search-explicit-390-light.png"
+      ]
+    },
+    "GRP": {
+      "states": "전체·개인화 · 대상 선택 · 조회 중 · 빈 지도·조회 실패",
+      "source": "pages/main-page.tsx · features/graph-explorer.tsx",
+      "images": [
+        "docs/design/v5/graph-personal-empty-1440-light.png"
+      ]
+    },
+    "COM": {
+      "states": "영역별 조회 중 · 자료 없음 · 부분 실패·재시도",
+      "source": "pages/company-page.tsx · features/company-timeline.tsx",
+      "images": [
+        "docs/design/v5/company-events-error.png"
+      ]
+    },
+    "BRF": {
+      "states": "발행 전·생성 중·발행·발행 실패·제공 중단\n지표 정상·지연·미제공·실패",
+      "source": "pages/briefing-page.tsx · features/briefing-market.tsx",
+      "images": [
+        "docs/design/v7/briefing-states-1440-light.png"
+      ]
+    },
+    "AI": {
+      "states": "대상 연결 · 되묻기 · 처리 중·결과 회수 · 조회 오류\n조건·근거 부족 · 비회원 로그인 안내",
+      "source": "features/chat-drawer.tsx · features/chat-job-view.tsx",
+      "images": [
+        "docs/design/v6/chat-job-recovered-1440.png",
+        "docs/design/v7/mobile-ai-tab-guest-390-light.png"
+      ]
+    },
+    "MY": {
+      "states": "계좌 미연결·연결됨 · 관심 0개·편집·저장 실패",
+      "source": "pages/my-stocks-page.tsx",
+      "images": [
+        "docs/design/v6/holding-valuation-1440-light.png"
+      ]
+    },
+    "ADM": {
+      "states": "조회 중 · 조건에 맞는 자료 없음 · 영역 오류\n관리자 세션 없음·만료 → 로그인",
+      "source": "admin/session.tsx · admin/pages/{page}.tsx",
+      "images": []
+    }
+  },
+  "screens": {
+    "D-AUT-01": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "로그인",
+          "result": "설정 상태에 따라 지도·초기 설정으로 이동",
+          "destination": "D-GRP-01b",
+          "mode": "ref",
+          "ref": "D-GRP-01b"
+        },
+        {
+          "role": "link",
+          "name": "개발용 모의 로그인으로 계속",
+          "result": "모의 제공자 동의 화면을 열어요",
+          "destination": "D-AUT-03",
+          "mode": "ref",
+          "ref": "D-AUT-03"
+        },
+        {
+          "role": "button",
+          "name": "로그인 없이 둘러보기",
+          "result": "비회원 권한 확인창을 열어요",
+          "destination": "D-AUT-01",
+          "mode": "escape"
+        },
+        {
+          "role": "textbox",
+          "name": "이메일",
+          "result": "이메일을 입력·수정해요",
+          "destination": "D-AUT-01",
+          "mode": "input"
+        }
+      ]
+    },
+    "D-AUT-02": {
+      "controls": [
+        {
+          "role": "textbox",
+          "name": "이메일",
+          "result": "가입 이메일을 입력해요",
+          "destination": "D-AUT-02",
+          "mode": "input"
+        },
+        {
+          "role": "css",
+          "name": "input[type=password]",
+          "result": "비밀번호를 가려 입력해요",
+          "destination": "D-AUT-02",
+          "mode": "input"
+        },
+        {
+          "role": "checkbox",
+          "name": "모두 동의",
+          "result": "필수 약관을 함께 선택·해제해요",
+          "destination": "D-AUT-02",
+          "mode": "toggle"
+        },
+        {
+          "role": "button",
+          "name": "가입하고 시작하기",
+          "result": "필수 입력 누락을 안내해요",
+          "destination": "D-AUT-02",
+          "mode": "nav"
+        },
+        {
+          "role": "link",
+          "name": "시작 화면으로",
+          "result": "시작 화면으로 돌아가요",
+          "destination": "D-AUT-01",
+          "mode": "nav",
+          "ref": "D-AUT-01"
+        }
+      ],
+      "states": "필수 입력·약관 선택 · 형식·중복 오류 · 가입 실패",
+      "source": "pages/signup-page.tsx"
+    },
+    "D-AUT-03": {
+      "controls": [
+        {
+          "role": "textbox",
+          "name": "모의 계정 이메일",
+          "result": "모의 계정 이메일을 입력해요",
+          "destination": "D-AUT-03",
+          "mode": "input"
+        },
+        {
+          "role": "textbox",
+          "name": "이름",
+          "result": "제공할 표시 이름을 입력해요",
+          "destination": "D-AUT-03",
+          "mode": "input"
+        },
+        {
+          "role": "button",
+          "name": "동의하고 계속",
+          "result": "이메일 없이 보내면 입력 오류를 안내해요",
+          "destination": "D-AUT-03",
+          "mode": "nav"
+        }
+      ],
+      "states": "동의 입력 · 취소 · 요청·동의 처리 오류",
+      "source": "pages/mock-idp-page.tsx",
+      "images": []
+    },
+    "D-ONB-01": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "아직 투자하지 않아요",
+          "result": "관심 종목 선택으로 가요",
+          "destination": "D-WAT-01",
+          "mode": "undo",
+          "regex": true,
+          "undo_role": "button",
+          "undo_name": "이전 단계"
+        },
+        {
+          "role": "button",
+          "name": "^데이터 출처:",
+          "result": "기사 저장본 출처 안내를 열어요",
+          "destination": "D-ONB-01",
+          "mode": "escape",
+          "regex": true
+        }
+      ]
+    },
+    "D-ONB-02": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "이전 단계",
+          "result": "투자 여부 선택으로 돌아가요",
+          "destination": "D-ONB-01",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "건너뛰고 관심 종목 고르기",
+          "result": "계좌 연결 없이 관심 선택으로 가요",
+          "destination": "D-WAT-01",
+          "mode": "nav"
+        }
+      ],
+      "states": "미연결·선택 · 연결 중·연결됨 · 연결 실패·건너뛰기",
+      "images": [
+        "docs/design/v5/onboarding-account-390-light.png"
+      ]
+    },
+    "D-WAT-01b": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "삼성전자 빼기",
+          "result": "삼성전자를 선택 목록에서 빼요",
+          "destination": "D-WAT-01",
+          "mode": "picked",
+          "restore_css": "ul[aria-label=\"추천 종목\"] li:nth-child(2) button"
+        },
+        {
+          "role": "button",
+          "name": "SK텔레콤 빼기",
+          "result": "SK텔레콤을 선택 목록에서 빼요",
+          "destination": "D-WAT-01",
+          "mode": "picked",
+          "restore_css": "ul[aria-label=\"추천 종목\"] li:nth-child(3) button"
+        }
+      ]
+    },
+    "D-WAT-01": {
+      "controls": [
+        {
+          "role": "css",
+          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(1) button",
+          "result": "추천 첫 기업을 선택·해제해요",
+          "destination": "D-WAT-01",
+          "mode": "toggle"
+        },
+        {
+          "role": "css",
+          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(2) button",
+          "result": "추천 둘째 기업을 선택·해제해요",
+          "destination": "D-WAT-01",
+          "mode": "toggle"
+        }
+      ]
+    },
+    "D-GRP-01": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "내 종목",
+          "result": "회원의 개인화 지도로 바꿔요",
+          "destination": "D-GRP-01b",
+          "mode": "nav"
+        },
+        {
+          "role": "radio",
+          "name": "목록으로 보기",
+          "result": "기업·사건 목록을 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "확대",
+          "result": "지도를 확대해요",
+          "destination": "D-GRP-01",
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "축소"
+        }
+      ]
+    },
+    "D-GRP-01b": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "^관심 종목",
+          "result": "관심 기준으로 지도를 거릅니다",
+          "destination": "D-GRP-01b",
+          "mode": "undo",
+          "regex": true,
+          "undo_role": "radio",
+          "undo_name": "전체 종목"
+        },
+        {
+          "role": "radio",
+          "name": "시장 전체",
+          "result": "개인화 필터 없이 전체 지도로 전환",
+          "destination": "D-GRP-01",
+          "mode": "nav"
+        }
+      ],
+      "states": "전체·보유·관심 범위 · 기준 종목 0개 · 관계 0건 · 조회 실패",
+      "images": [
+        "docs/design/v7/graph-filter-1440-light.png",
+        "docs/design/v5/graph-personal-empty-1440-light.png"
+      ]
+    },
+    "D-GRP-T": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "튜토리얼 건너뛰기",
+          "result": "완료를 저장하고 지도를 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "ref",
+          "ref": "D-GRP-01"
+        },
+        {
+          "role": "button",
+          "name": "확대",
+          "result": "지도 조작을 해 보고 다음 단계로 가요",
+          "destination": "D-GRP-T2",
+          "mode": "tour",
+          "step": 1
+        }
+      ],
+      "states": "1~5단계 · 실습 감지·다음·이전 · 완료 저장 실패\n비회원 5단계는 로그인 안내",
+      "source": "features/graph-tutorial.tsx",
+      "images": [
+        "docs/design/v5/tutorial-step1-1440-light.png",
+        "docs/design/v6/tutorial-step3-1440.png"
+      ]
+    },
+    "D-GRP-T2": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "튜토리얼 건너뛰기",
+          "result": "완료를 저장하고 지도를 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "ref",
+          "ref": "D-GRP-01"
+        },
+        {
+          "role": "button",
+          "name": "이전",
+          "result": "이전 안내 단계로 돌아가요",
+          "destination": "D-GRP-T",
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "다음"
+        }
+      ],
+      "states": "1~5단계 · 실습 감지·다음·이전 · 완료 저장 실패\n비회원 5단계는 로그인 안내",
+      "source": "features/graph-tutorial.tsx",
+      "images": [
+        "docs/design/v5/tutorial-step1-1440-light.png",
+        "docs/design/v6/tutorial-step3-1440.png"
+      ]
+    },
+    "D-GRP-T3": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "튜토리얼 건너뛰기",
+          "result": "완료를 저장하고 지도를 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "ref",
+          "ref": "D-GRP-01"
+        },
+        {
+          "role": "button",
+          "name": "이전",
+          "result": "이전 안내 단계로 돌아가요",
+          "destination": "D-GRP-T",
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "다음"
+        }
+      ],
+      "states": "1~5단계 · 실습 감지·다음·이전 · 완료 저장 실패\n비회원 5단계는 로그인 안내",
+      "source": "features/graph-tutorial.tsx",
+      "images": [
+        "docs/design/v5/tutorial-step1-1440-light.png",
+        "docs/design/v6/tutorial-step3-1440.png"
+      ]
+    },
+    "D-GRP-T4": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "튜토리얼 건너뛰기",
+          "result": "완료를 저장하고 지도를 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "ref",
+          "ref": "D-GRP-01"
+        },
+        {
+          "role": "button",
+          "name": "이전",
+          "result": "이전 안내 단계로 돌아가요",
+          "destination": "D-GRP-T",
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "다음"
+        }
+      ],
+      "states": "1~5단계 · 실습 감지·다음·이전 · 완료 저장 실패\n비회원 5단계는 로그인 안내",
+      "source": "features/graph-tutorial.tsx",
+      "images": [
+        "docs/design/v5/tutorial-step1-1440-light.png",
+        "docs/design/v6/tutorial-step3-1440.png"
+      ]
+    },
+    "D-GRP-T5": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "튜토리얼 건너뛰기",
+          "result": "완료를 저장하고 지도를 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "ref",
+          "ref": "D-GRP-01"
+        },
+        {
+          "role": "button",
+          "name": "이전",
+          "result": "이전 안내 단계로 돌아가요",
+          "destination": "D-GRP-T",
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "다음"
+        }
+      ],
+      "states": "1~5단계 · 실습 감지·다음·이전 · 완료 저장 실패\n비회원 5단계는 로그인 안내",
+      "source": "features/graph-tutorial.tsx",
+      "images": [
+        "docs/design/v5/tutorial-step1-1440-light.png",
+        "docs/design/v6/tutorial-step3-1440.png"
+      ]
+    },
+    "D-GRP-03": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "^삼성전자 관심 종목",
+          "result": "관심 등록·해제를 저장해요",
+          "destination": "D-GRP-03",
+          "mode": "watch",
+          "regex": true
+        },
+        {
+          "role": "button",
+          "name": "이 노드 중심으로 보기",
+          "result": "이 기업 중심 포커스로 바꿔요",
+          "destination": "D-GRP-07b",
+          "mode": "ref",
+          "ref": "D-GRP-07b"
+        },
+        {
+          "role": "button",
+          "name": "다른 기업과의 연결 보기",
+          "result": "두 번째 기업 선택창을 열어요",
+          "destination": "D-GRP-07",
+          "mode": "ref",
+          "ref": "D-GRP-07"
+        },
+        {
+          "role": "button",
+          "name": "AI에게 묻기",
+          "result": "기업 후보를 넘겨 AI 창을 열어요",
+          "destination": "D-AI-01",
+          "mode": "ref",
+          "ref": "D-AI-01"
+        },
+        {
+          "role": "button",
+          "name": "삼성전자, ASML과 차세대 반도체 제조 협력 확대",
+          "result": "기업과 이 사건의 영향 경로를 열어요",
+          "destination": "D-GRP-06",
+          "mode": "ref",
+          "ref": "D-GRP-06"
+        }
+      ],
+      "states": "조회 중·조회 실패 · 직접·간접 이슈 없음 · 관심 저장 실패",
+      "source": "features/node-panel.tsx · components/domain/watch-toggle.tsx",
+      "images": [
+        "docs/design/v5/graph-company-panel-1440-light.png",
+        "docs/design/v6/watch-toggle-1440-light.png"
+      ]
+    },
+    "D-GRP-02": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "상세 닫기",
+          "result": "선택을 풀고 지도만 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "AI에게 묻기",
+          "result": "이 사건을 질문 후보로 넘겨요",
+          "destination": "D-AI-01",
+          "mode": "overlay",
+          "close": "AI 질문 창 닫기"
+        }
+      ],
+      "states": "조회 중·조회 실패 · 관련 기업 없음 · 근거 0건",
+      "source": "features/node-panel.tsx"
+    },
+    "D-GRP-04": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "상세 닫기",
+          "result": "연결선 선택을 해제해요",
+          "destination": "D-GRP-01",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "AI에게 묻기",
+          "result": "연결선을 질문 후보로 넘겨요",
+          "destination": "D-AI-01",
+          "mode": "overlay",
+          "close": "AI 질문 창 닫기"
+        }
+      ],
+      "states": "연결선 선택 · 상세 조회 중·실패 · 공유·근거 0건",
+      "source": "features/node-panel.tsx",
+      "images": [
+        "docs/design/v5/graph-edge-panel-1440-light.png"
+      ]
+    },
+    "D-GRP-05": {
+      "controls": [
+        {
+          "role": "link",
+          "name": "^원문 기사 보기",
+          "result": "원문을 새 창으로 열어요",
+          "destination": "D-GRP-05",
+          "mode": "popup",
+          "regex": true
+        },
+        {
+          "role": "button",
+          "name": "지도에서 보기",
+          "result": "이 인용의 연결선을 지도에서 강조해요",
+          "destination": "D-GRP-05",
+          "mode": "toggle"
+        },
+        {
+          "role": "button",
+          "name": "관계 확인 시점",
+          "result": "관계 검증 시점과 문서 발행을 구분해요",
+          "destination": "D-GRP-05",
+          "mode": "escape"
+        }
+      ],
+      "states": "근거 0건 · 링크 있음·없음 · 일부 조회 실패\n삭제·비공개·권한 없음 → 제공 불가",
+      "source": "features/overlays.tsx · components/domain/evidence.tsx",
+      "images": [
+        "docs/design/v7/evidence-sheet-gone-390-dark.png",
+        "docs/design/v5/graph-evidence-times-1440-light.png"
+      ]
+    },
+    "D-GRP-06": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "사건 상세 보기",
+          "result": "이 사건의 패널을 열어요",
+          "destination": "D-GRP-02",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "AI에게 묻기",
+          "result": "이 경로의 대상을 AI 창으로 넘겨요",
+          "destination": "D-AI-01",
+          "mode": "overlay",
+          "close": "AI 질문 창 닫기"
+        },
+        {
+          "role": "button",
+          "name": "연결을 찾는 방법",
+          "result": "최소 단계 경로의 계산 규칙을 보여줘요",
+          "destination": "D-GRP-06",
+          "mode": "escape"
+        }
+      ],
+      "states": "직접·중간 연결 · 관계 조회 실패 · 근거 없음",
+      "source": "features/impact-panel.tsx",
+      "images": [
+        "docs/design/v6/impact-path-1440-light.png"
+      ]
+    },
+    "D-GRP-07": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "다른 기업 고르기",
+          "result": "두 번째 기업 선택창을 다시 열어요",
+          "destination": "D-GRP-07",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "경로를 찾는 방법",
+          "result": "방향을 무시한 최소 단계 규칙을 보여줘요",
+          "destination": "D-GRP-07",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "경로 닫기",
+          "result": "두 기업 경로를 해제해요",
+          "destination": "D-GRP-01",
+          "mode": "nav"
+        }
+      ],
+      "states": "연결됨 · 두 기업을 잇는 사건 없음 · 경로 해제",
+      "source": "features/path-panel.tsx · features/graph-explorer.tsx"
+    },
+    "D-GRP-07b": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "2단계: 이웃의 이웃까지",
+          "result": "포커스 연결 범위를 2단계로 넓혀요",
+          "destination": "D-GRP-07b",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "상세 닫기",
+          "result": "기업 패널을 닫아요",
+          "destination": "D-GRP-07b",
+          "mode": "nav"
+        }
+      ],
+      "states": "포커스 1·2단계 · 전체 보기 · 선택 해제",
+      "source": "features/graph-explorer.tsx",
+      "images": [
+        "docs/design/v6/focus-390-light.png"
+      ]
+    },
+    "D-COM-01": {
+      "controls": [
+        {
+          "role": "tab",
+          "name": "기업 정보",
+          "result": "등록된 기업 정보를 보여줘요",
+          "destination": "D-COM-02",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "시세 출처: Yahoo Finance",
+          "result": "시세 출처와 관측 시각을 설명해요",
+          "destination": "D-COM-01",
+          "mode": "escape"
+        }
+      ]
+    },
+    "D-COM-02": {
+      "controls": [
+        {
+          "role": "tab",
+          "name": "기업 정보",
+          "result": "등록된 기업 정보를 보여줘요",
+          "destination": "D-COM-02",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "시세 출처: Yahoo Finance",
+          "result": "시세 출처와 지연 가능성을 설명해요",
+          "destination": "D-COM-01",
+          "mode": "escape"
+        }
+      ],
+      "source": "features/company-documents.tsx · pages/company-page.tsx",
+      "images": [
+        "docs/design/v5/company-documents.png",
+        "docs/design/v7/evidence-gone-390-dark.png"
+      ]
+    },
+    "D-COM-01b": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "1일",
+          "result": "차트와 사건을 오늘 범위로 바꿔요",
+          "destination": "D-COM-01b",
+          "mode": "nav"
+        },
+        {
+          "role": "radio",
+          "name": "직접 관련",
+          "result": "직접 관련 사건만 보여줘요",
+          "destination": "D-COM-01b",
+          "mode": "nav"
+        },
+        {
+          "role": "css",
+          "name": "details summary",
+          "result": "시세를 표로 펼쳐요",
+          "destination": "D-COM-01b",
+          "mode": "toggle"
+        }
+      ],
+      "source": "features/company-price-chart.tsx · features/company-timeline.tsx",
+      "images": [
+        "docs/design/v7/company-chart-notice-1440-light.png",
+        "docs/design/v5/company-events-error.png"
+      ]
+    },
+    "D-MY-01": {
+      "controls": [
+        {
+          "role": "searchbox",
+          "name": "관심 종목 추가",
+          "result": "검색할 이름·코드를 입력해요",
+          "destination": "D-MY-01",
+          "mode": "input"
+        },
+        {
+          "role": "link",
+          "name": "NVIDIA 기업 상세",
+          "result": "보유 기업 상세를 열어요",
+          "destination": "D-COM-01",
+          "mode": "nav",
+          "ref": "D-COM-01"
+        },
+        {
+          "role": "button",
+          "name": "연결 끊기",
+          "result": "모의 계좌를 해제하고 보유 표시를 없애요",
+          "destination": "D-MY-01",
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "연결하기"
+        }
+      ]
+    },
+    "D-BRF-01": {
+      "controls": [
+        {
+          "role": "combobox",
+          "name": "발행일",
+          "result": "발행된 날짜 선택지를 열어요",
+          "destination": "D-BRF-01",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "시장 지표 안내",
+          "result": "회차 고정·출처·수집 시각을 보여줘요",
+          "destination": "D-BRF-01",
+          "mode": "escape"
+        },
+        {
+          "role": "link",
+          "name": "이 회차 전체 관계 그래프",
+          "result": "발행 당시 전체 지도를 열어요",
+          "destination": "D-BRF-04",
+          "mode": "nav"
+        }
+      ]
+    },
+    "D-BRF-02": {
+      "controls": [
+        {
+          "role": "combobox",
+          "name": "발행일",
+          "result": "조회할 발행일 선택지를 열어요",
+          "destination": "D-BRF-02",
+          "mode": "escape"
+        },
+        {
+          "role": "radio",
+          "name": "출근",
+          "result": "같은 날짜의 출근 회차로 바꿔요",
+          "destination": "D-BRF-01",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "시장 지표 안내",
+          "result": "발행본에 고정된 시장 지표를 설명해요",
+          "destination": "D-BRF-02",
+          "mode": "escape"
+        }
+      ]
+    },
+    "D-BRF-04": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "현재 그래프로 보기",
+          "result": "round를 풀고 현재 지도로 가요",
+          "destination": "D-GRP-01",
+          "mode": "nav"
+        },
+        {
+          "role": "radio",
+          "name": "목록으로 보기",
+          "result": "회차 기준 기업·사건 목록을 보여줘요",
+          "destination": "D-BRF-04",
+          "mode": "nav"
+        }
+      ],
+      "states": "회차 기준 조회 · 제공 중단·자료 없음·조회 실패",
+      "source": "pages/main-page.tsx · features/briefing-graph-basis.tsx",
+      "images": [
+        "docs/design/v6/briefing-graph-asof-1440-light.png"
+      ]
+    },
+    "D-AI-01": {
+      "controls": [
+        {
+          "role": "textbox",
+          "name": "질문",
+          "result": "질문을 입력·수정해요",
+          "destination": "D-AI-01",
+          "mode": "input"
+        },
+        {
+          "role": "button",
+          "name": "보내기",
+          "result": "빈 질문은 전송되지 않아요",
+          "destination": "D-AI-01",
+          "mode": "disabled"
+        },
+        {
+          "role": "button",
+          "name": "AI 질문 창 닫기",
+          "result": "질문 창을 닫고 지도로 돌아가요",
+          "destination": "D-GRP-03",
+          "mode": "overlay_close",
+          "open_role": "button",
+          "open_name": "AI에게 묻기"
+        }
+      ]
+    },
+    "D-AI-01b": {
+      "controls": [
+        {
+          "role": "checkbox",
+          "name": "^삼성전자",
+          "result": "다음 질문의 기업 연결을 바꿔요",
+          "destination": "D-AI-01b",
+          "mode": "toggle",
+          "regex": true
+        },
+        {
+          "role": "button",
+          "name": "이 답변: 도움이 됐어요",
+          "result": "좋아요를 등록·취소해요",
+          "destination": "D-AI-01b",
+          "mode": "toggle"
+        },
+        {
+          "role": "button",
+          "name": "AI 질문 창 닫기",
+          "result": "창을 닫아도 저장한 대화는 유지돼요",
+          "destination": "D-GRP-03",
+          "mode": "overlay_close",
+          "open_role": "button",
+          "open_name": "AI에게 묻기"
+        }
+      ]
+    },
+    "D-AI-02": {
+      "controls": [
+        {
+          "role": "checkbox",
+          "name": "^삼성전자",
+          "result": "다음 질문의 기업 연결을 바꿔요",
+          "destination": "D-AI-02",
+          "mode": "toggle",
+          "regex": true
+        },
+        {
+          "role": "button",
+          "name": "이 답변: 도움이 됐어요",
+          "result": "좋아요를 등록·취소해요",
+          "destination": "D-AI-02",
+          "mode": "toggle"
+        },
+        {
+          "role": "button",
+          "name": "AI 질문 창 닫기",
+          "result": "창을 닫아도 저장한 대화는 유지돼요",
+          "destination": "D-GRP-03",
+          "mode": "overlay_close",
+          "open_role": "button",
+          "open_name": "AI에게 묻기"
+        }
+      ]
+    },
+    "D-AI-02b": {
+      "controls": [
+        {
+          "role": "textbox",
+          "name": "질문",
+          "result": "대화 확인 중에는 입력할 수 없어요",
+          "destination": "D-AI-02b",
+          "mode": "disabled"
+        },
+        {
+          "role": "button",
+          "name": "보내기",
+          "result": "조회 실패 상태에서는 보낼 수 없어요",
+          "destination": "D-AI-02b",
+          "mode": "disabled"
+        }
+      ]
+    },
+    "A-ADM-05c": {
+      "controls": [
+        {
+          "role": "textbox",
+          "name": "관리자 이메일",
+          "result": "관리자 이메일을 입력해요",
+          "destination": "A-ADM-05c",
+          "mode": "input"
+        },
+        {
+          "role": "css",
+          "name": "input[type=password]",
+          "result": "비밀번호를 가려 입력해요",
+          "destination": "A-ADM-05c",
+          "mode": "input"
+        }
+      ],
+      "states": "입력 누락 · 인증·권한 실패 · 세션 만료",
+      "source": "admin/pages/login.tsx · admin/session.tsx"
+    },
+    "A-ADM-01": {
+      "controls": [
+        {
+          "role": "link",
+          "name": "브리핑 운영",
+          "result": "브리핑 회차 운영을 열어요",
+          "destination": "A-ADM-04",
+          "mode": "nav"
+        },
+        {
+          "role": "link",
+          "name": "이용 통계",
+          "result": "이용 통계를 열어요",
+          "destination": "A-ADM-02",
+          "mode": "nav"
+        },
+        {
+          "role": "link",
+          "name": "회원 관리",
+          "result": "회원 활동 목록을 열어요",
+          "destination": "A-ADM-05",
+          "mode": "nav"
+        }
+      ],
+      "source": "admin/pages/dashboard.tsx · admin/session.tsx"
+    },
+    "A-ADM-02": {
+      "controls": [
+        {
+          "role": "tab",
+          "name": "종목 순위",
+          "result": "기업별 활동 순위를 보여줘요",
+          "destination": "A-ADM-02",
+          "mode": "nav"
+        },
+        {
+          "role": "radio",
+          "name": "30일",
+          "result": "최근 30일로 집계 범위를 바꿔요",
+          "destination": "A-ADM-02",
+          "mode": "nav"
+        }
+      ],
+      "source": "admin/pages/stats.tsx · admin/session.tsx",
+      "states": "집계 조회 중·실패 · 표본 부족 · 활동 없음"
+    },
+    "A-ADM-02b": {
+      "controls": [
+        {
+          "role": "tab",
+          "name": "싫어요 사유",
+          "result": "평가 사유 목록을 보여줘요",
+          "destination": "A-ADM-02b",
+          "mode": "nav"
+        },
+        {
+          "role": "tab",
+          "name": "AI 대화록",
+          "result": "마스킹 대화 목록을 보여줘요",
+          "destination": "A-ADM-02b",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "기간 적용",
+          "result": "입력한 조회 기간을 적용해요",
+          "destination": "A-ADM-02b",
+          "mode": "nav"
+        }
+      ],
+      "source": "admin/pages/feedback.tsx · admin/session.tsx",
+      "states": "집계 중·실패 · 평가·대화 없음 · 표본 부족"
+    },
+    "A-ADM-03": {
+      "controls": [
+        {
+          "role": "tab",
+          "name": "그래프 버전",
+          "result": "공개 버전과 반영 상태를 보여줘요",
+          "destination": "A-ADM-03",
+          "mode": "nav"
+        },
+        {
+          "role": "tab",
+          "name": "작업",
+          "result": "작업 상태·로그 목록을 보여줘요",
+          "destination": "A-ADM-03",
+          "mode": "nav"
+        }
+      ],
+      "source": "admin/pages/pipeline.tsx · admin/session.tsx",
+      "states": "통과·보류·폐기 · 실행·대기·실패 · 원장 조회 실패"
+    },
+    "A-ADM-04": {
+      "controls": [
+        {
+          "role": "css",
+          "name": "tbody tr:nth-child(2) button",
+          "result": "선택 회차 원문·처리 이력을 보여줘요",
+          "destination": "A-ADM-04",
+          "mode": "nav"
+        },
+        {
+          "role": "link",
+          "name": "감사 로그",
+          "result": "생성·관리 행위 기록을 열어요",
+          "destination": "A-ADM-05b",
+          "mode": "nav"
+        }
+      ],
+      "source": "admin/pages/briefings.tsx · admin/session.tsx",
+      "states": "예정·생성·발행·실패·중단 · 정정 이력 · 조회 실패"
+    },
+    "A-ADM-04b": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "24시간",
+          "result": "최근 24시간 사용량을 집계해요",
+          "destination": "A-ADM-04b",
+          "mode": "nav"
+        },
+        {
+          "role": "radio",
+          "name": "30일",
+          "result": "최근 30일 사용량을 집계해요",
+          "destination": "A-ADM-04b",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "비용 미제공 이유",
+          "result": "실제 비용을 제공하지 못한 이유를 열어요",
+          "destination": "A-ADM-04b",
+          "mode": "escape"
+        }
+      ],
+      "source": "admin/pages/ai.tsx · admin/session.tsx",
+      "states": "집계 중·실패 · 오류 없음 · 비용 미제공"
+    },
+    "A-ADM-05": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "차단됨",
+          "result": "차단 회원만 보여줘요",
+          "destination": "A-ADM-05",
+          "mode": "nav"
+        },
+        {
+          "role": "searchbox",
+          "name": "회원 검색",
+          "result": "가명·가린 이메일로 검색해요",
+          "destination": "A-ADM-05",
+          "mode": "input"
+        }
+      ],
+      "source": "admin/pages/members.tsx · admin/session.tsx"
+    },
+    "A-ADM-05b": {
+      "controls": [
+        {
+          "role": "combobox",
+          "name": "동작",
+          "result": "관리 동작 필터를 펼쳐요",
+          "destination": "A-ADM-05b",
+          "mode": "escape"
+        },
+        {
+          "role": "searchbox",
+          "name": "감사 로그 검색",
+          "result": "대상·사유·관리자로 검색해요",
+          "destination": "A-ADM-05b",
+          "mode": "input"
+        }
+      ],
+      "source": "admin/pages/audit.tsx · admin/session.tsx"
+    },
+    "M-GRP-01-before": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "목록으로 보기",
+          "result": "기업·사건 목록으로 전환해요",
+          "destination": "M-GRP-01",
+          "mode": "ref",
+          "ref": "D-GRP-01"
+        },
+        {
+          "role": "button",
+          "name": "AI",
+          "result": "AI 창을 열어요",
+          "destination": "M-AI-01",
+          "mode": "ref",
+          "ref": "M-AI-01"
+        }
+      ]
+    },
+    "M-GRP-01-after": {
+      "controls": [
+        {
+          "role": "link",
+          "name": "기업 상세",
+          "result": "기업 상세로 이동해요",
+          "destination": "D-COM-01",
+          "mode": "ref",
+          "ref": "D-COM-01"
+        },
+        {
+          "role": "button",
+          "name": "^삼성전자 관심 종목",
+          "result": "관심을 등록·해제해요",
+          "destination": "M-GRP-01",
+          "mode": "watch",
+          "regex": true
+        },
+        {
+          "role": "button",
+          "name": "AI에게 묻기",
+          "result": "이 기업 후보로 질문 창을 열어요",
+          "destination": "D-AI-01",
+          "mode": "overlay",
+          "close": "AI 질문 창 닫기"
+        }
+      ]
+    },
+    "M-COM-01-before": {
+      "controls": [
+        {
+          "role": "tab",
+          "name": "기업 정보",
+          "result": "등록된 기업 정보를 보여줘요",
+          "destination": "M-COM-01",
+          "mode": "nav"
+        },
+        {
+          "role": "tab",
+          "name": "사건",
+          "result": "사건·차트 탭을 유지해요",
+          "destination": "M-COM-01",
+          "mode": "nav"
+        }
+      ]
+    },
+    "M-COM-01-after": {
+      "controls": []
+    },
+    "M-AI-01-before": {
+      "controls": [
+        {
+          "role": "link",
+          "name": "브리핑",
+          "result": "공통 브리핑으로 이동해요",
+          "destination": "M-BRF-01",
+          "mode": "nav",
+          "ref": "M-BRF-01"
+        },
+        {
+          "role": "link",
+          "name": "내 종목",
+          "result": "내 종목 관리로 이동해요",
+          "destination": "D-MY-01",
+          "mode": "nav",
+          "ref": "D-MY-01"
+        }
+      ]
+    },
+    "M-AI-01-after": {
+      "controls": []
+    },
+    "M-BRF-01-before": {
+      "controls": [
+        {
+          "role": "combobox",
+          "name": "발행일",
+          "result": "발행일 선택지를 열어요",
+          "destination": "M-BRF-01",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "시장 지표 안내",
+          "result": "회차 고정·출처·수집 시각을 설명해요",
+          "destination": "M-BRF-01",
+          "mode": "escape"
+        }
+      ]
+    },
+    "M-BRF-01-after": {
+      "controls": [
+        {
+          "role": "link",
+          "name": "출근 브리핑 보기",
+          "result": "같은 날 출근 회차로 돌아가요",
+          "destination": "D-BRF-01",
+          "mode": "nav"
+        }
+      ]
+    }
+  }
+}

@@ -14,7 +14,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -164,3 +164,36 @@ class YahooProvider:
         if not bars or not isinstance(currency, str):
             raise QuoteUnavailable("no_data", "이 기간의 시세가 없어요.")
         return self._source(symbol), Series(currency, _RANGES[period][1], tuple(bars))
+
+    def history(
+        self, symbol: str, start: datetime, end: datetime, interval: Literal["1d", "5m"]
+    ) -> tuple[Source, Series]:
+        """Bars of one provider symbol (an index such as ``^KS11`` or a rate such as ``KRW=X``) between two instants.
+
+        Used for the briefing's market indicators, which are fixed to a point in time. The provider's own window
+        edges are not trusted, so callers filter the bars by time. A range the provider refuses (5-minute bars older
+        than about 60 days answer 422) is ``no_data``: asking again cannot help.
+        """
+        response = request_json(
+            self._client,
+            "GET",
+            f"/v8/finance/chart/{symbol}",
+            params={"period1": int(start.timestamp()), "period2": int(end.timestamp()), "interval": interval},
+        )
+        if response.status_code == 404:
+            raise QuoteUnavailable("unsupported_symbol", NOT_LISTED)
+        if response.status_code in (400, 422):
+            raise QuoteUnavailable("no_data", "출처에 이 기간의 자료가 없어요.")
+        if not response.is_success:
+            raise QuoteUnavailable("temporary_failure", TEMPORARY)
+        body = json_body(response)
+        chart = body.get("chart") if isinstance(body, dict) else None
+        results = chart.get("result") if isinstance(chart, dict) else None
+        if not results or not isinstance(results[0], dict):
+            raise QuoteUnavailable("no_data", "출처에 이 기간의 자료가 없어요.")
+        currency = (results[0].get("meta") or {}).get("currency")
+        bars = self._bars(results[0])
+        if not bars or not isinstance(currency, str):
+            raise QuoteUnavailable("no_data", "출처에 이 기간의 자료가 없어요.")
+        bars.sort(key=lambda b: b.time)
+        return self._source(symbol), Series(currency, interval, tuple(bars))

@@ -1,0 +1,130 @@
+{
+  "id": "D-AUT-03",
+  "title": "개발용 모의 소셜 제공자",
+  "route": "/mock-idp",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS004·FS061",
+  "requirements": "4·70",
+  "entry": "시작 → 개발용 모의 로그인으로 계속",
+  "states": "동의 입력 · 취소 · 요청·동의 처리 오류",
+  "capturedState": "기본",
+  "stateSource": "pages/mock-idp-page.tsx",
+  "stateImages": [],
+  "note": "실제 소셜 IdP가 아니에요. 동의·가입 성공은 이 캡처에서 실행하지 않았어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "취소",
+        "regex": false
+      },
+      "box": {
+        "x": 544,
+        "y": 629.5,
+        "width": 352,
+        "height": 48
+      },
+      "result": "동의를 취소하고 시작 화면에 취소 안내를 보여줘요.",
+      "destination": "D-AUT-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "textbox",
+        "name": "모의 계정 이메일"
+      },
+      "box": {
+        "x": 544,
+        "y": 394.5,
+        "width": 352,
+        "height": 44
+      },
+      "result": "모의 계정 이메일을 입력해요",
+      "destination": "D-AUT-03",
+      "mode": "input"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "textbox",
+        "name": "이름"
+      },
+      "box": {
+        "x": 544,
+        "y": 480,
+        "width": 352,
+        "height": 44
+      },
+      "result": "제공할 표시 이름을 입력해요",
+      "destination": "D-AUT-03",
+      "mode": "input"
+    },
+    {
+      "number": 4,
+      "selector": {
+        "role": "button",
+        "name": "동의하고 계속"
+      },
+      "box": {
+        "x": 544,
+        "y": 565.5,
+        "width": 352,
+        "height": 48
+      },
+      "result": "이메일 없이 보내면 입력 오류를 안내해요",
+      "destination": "D-AUT-03",
+      "mode": "nav"
+    }
+  ],
+  "image": "D-AUT-03.png",
+  "visibleText": "개발용 모의 로그인\n\n모의 소셜 계정으로 로그인\n\n실제 소셜 서비스가 아니에요. 입력한 이메일이 모의 계정이 되고, 줍에 이메일과 이름을 전달해요.\n\n모의 계정 이메일\n이름\n\n비워 두면 이메일 앞부분을 써요\n\n동의하고 계속\n취소",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "취소"
+      },
+      "before": "/mock-idp",
+      "url": "/login?social=cancelled",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n줍\n\n내 종목 주변의 사건과 근거를 탐색해요\n\n소셜 로그인을 취소했어요. 다른 방법을 골라 주세요.\n\n이메일로 로그인\n이메일\n비밀번호\n\n데모 계정이 입력되어 있어요\n\n로그인\n\n처음이거나 다른 방법으로 시작하기\n\n이메일로 회원가입\n개발용 모의 로그인으로 계속\n\n개발용 모의 제공자예요. 실제 소셜 계정과 연결되지 않아요.\n\n로그인 없이 둘러보기\n\n본 서비스는 투자 권유를 제공하지 않아요.",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "textbox",
+        "name": "모의 계정 이메일"
+      },
+      "url": "/mock-idp",
+      "visibleText": "개발용 모의 로그인\n\n모의 소셜 계정으로 로그인\n\n실제 소셜 서비스가 아니에요. 입력한 이메일이 모의 계정이 되고, 줍에 이메일과 이름을 전달해요.\n\n모의 계정 이메일\n이름\n\n비워 두면 이메일 앞부분을 써요\n\n동의하고 계속\n취소",
+      "inputType": "email",
+      "inputWasEntered": true,
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "textbox",
+        "name": "이름"
+      },
+      "url": "/mock-idp",
+      "visibleText": "개발용 모의 로그인\n\n모의 소셜 계정으로 로그인\n\n실제 소셜 서비스가 아니에요. 입력한 이메일이 모의 계정이 되고, 줍에 이메일과 이름을 전달해요.\n\n모의 계정 이메일\n이름\n\n비워 두면 이메일 앞부분을 써요\n\n동의하고 계속\n취소",
+      "inputType": null,
+      "inputWasEntered": true,
+      "number": 3
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "동의하고 계속"
+      },
+      "before": "/mock-idp",
+      "url": "/mock-idp",
+      "visibleText": "개발용 모의 로그인\n\n모의 소셜 계정으로 로그인\n\n실제 소셜 서비스가 아니에요. 입력한 이메일이 모의 계정이 되고, 줍에 이메일과 이름을 전달해요.\n\n모의 계정 이메일\n\n이메일 형식으로 입력해 주세요.\n\n이름\n\n비워 두면 이메일 앞부분을 써요\n\n동의하고 계속\n취소",
+      "number": 4
+    }
+  ]
+}

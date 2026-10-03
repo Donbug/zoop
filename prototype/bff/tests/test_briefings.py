@@ -52,7 +52,10 @@ def test_scheduler_pass_publishes_the_due_round_once_with_an_open_first_window(a
     assert {i["eventId"] for i in briefing["items"]} == set(ALPHA_ISSUES.values())
     assert all(i["matchedCompanyIds"] == [] and i["reason"] and i["evidenceIds"] for i in briefing["items"])
     assert briefing["references"]["eventIds"] == [i["eventId"] for i in briefing["items"]]
-    assert briefing["marketSummary"]["status"] == "unavailable" and briefing["marketVariables"]["status"] == "unavailable"
+    assert briefing["marketSummary"]["status"] == "unavailable"
+    market = briefing["marketVariables"]  # no market source in this app: the round says so for each indicator
+    assert market["status"] == "available" and [i["id"] for i in market["indicators"]] == ["kospi", "kosdaq", "usdkrw"]
+    assert all(i["status"] == "unavailable" and i["reasonCode"] == "not_connected" and i["value"] is None for i in market["indicators"])
     assert briefing["metadata"]["schedule"] == {"morning": "07:40", "evening": "18:10", "confirmed": True}
     assert briefing["notice"] is None and briefing["corrections"] == []
 

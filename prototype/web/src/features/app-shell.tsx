@@ -1,6 +1,7 @@
 // 앱 셸(전역 헤더·모바일 탭바)과 인증 가드.
 // - 데스크톱(>768px): 한 줄 헤더 [로고 · 지도 · 브리핑 · 내 종목 | 출처 · 테마 · 계정 메뉴]
-// - 모바일(≤768px): 한 줄 AppBar [로고 | 출처 · 테마 · 계정 메뉴] + 하단 BottomTabBar(지도 · 브리핑 · 내 종목)
+// - 모바일(≤768px): 한 줄 AppBar [로고 | 출처 · 테마 · 계정 메뉴] + 하단 BottomTabBar(지도 · 브리핑 · AI · 내 종목)
+//   [AI] 탭은 화면이 아니라 AI 질문 창(features/chat-drawer)을 연다. 창이 열려 있는 동안 [AI] 탭이 활성으로 보인다.
 // - 디자인시스템 링크는 소비자 내비게이션이 아니라 계정 메뉴 안에 둔다.
 // 가드 규칙: 로그인 안 함 → /login(가려던 주소를 state.from에 담아 로그인 후 복귀), 회원인데 초기 설정 미완료 → /onboarding,
 // 비회원은 시장 전체 모드만. 튜토리얼은 메인 지도 위에서 진행한다(features/graph-tutorial.tsx).
@@ -8,19 +9,19 @@
 // 다시 시도해도 실패하면 사용자가 [시작 화면으로]를 골라 돌아간다(자동으로 돌려보내는 횟수 기준은 명세에 없어 두지 않는다).
 // 이미 받은 접속 정보를 새로 확인하다 실패하면 지금 화면을 그대로 둔다.
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Bookmark, CircleHelp, LogIn, LogOut, Map as MapIcon, Moon, Newspaper, Palette, Sun, UserRound } from "lucide-react";
+import { Bookmark, CircleHelp, LogIn, LogOut, Map as MapIcon, Moon, Newspaper, Palette, Sparkles, Sun, UserRound } from "lucide-react";
 import { Component, Fragment, useRef, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import type { Schemas } from "@/api/client";
 import { useHealth, useLogout, useSession } from "@/api/queries";
 import { SourceIndicator } from "@/components/domain/source-indicator";
 import { AppBar } from "@/components/ui/app-bar";
-import { BottomTabBar, type BottomTab } from "@/components/ui/bottom-tab-bar";
+import { BottomTabBar, type RouteTab } from "@/components/ui/bottom-tab-bar";
 import { Button } from "@/components/ui/button";
 import { ErrorState, Skeleton } from "@/components/ui/feedback";
 import { useMediaQuery, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { OverlayProvider } from "./overlays";
+import { OverlayProvider, useOverlays } from "./overlays";
 
 /** 회원의 초기 설정(투자 여부·계좌·관심 종목)이 끝났는지. 비회원은 초기 설정이 없다. */
 export function isSetupDone(session: Schemas["SessionResponse"]) {
@@ -33,11 +34,17 @@ export function returnPath(state: unknown): string | null {
   return typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && !from.startsWith("/login") ? from : null;
 }
 
-const mainTabs: BottomTab[] = [
-  { to: "/", label: "지도", icon: MapIcon, end: true },
-  { to: "/briefing", label: "브리핑", icon: Newspaper },
-  { to: "/me/stocks", label: "내 종목", icon: Bookmark },
-];
+const mapTab: RouteTab = { to: "/", label: "지도", icon: MapIcon, end: true };
+const briefingTab: RouteTab = { to: "/briefing", label: "브리핑", icon: Newspaper };
+const stocksTab: RouteTab = { to: "/me/stocks", label: "내 종목", icon: Bookmark };
+/** 데스크톱 헤더 메뉴(AI는 화면마다 [AI에게 묻기] 버튼으로 연다) */
+const mainTabs = [mapTab, briefingTab, stocksTab];
+
+/** 모바일 하단 탭: 지도 · 브리핑 · AI · 내 종목. AI는 지금 화면의 대상으로 질문 창을 연다(비회원은 창 안에서 로그인 안내). */
+function MobileTabBar() {
+  const { openScreenChat, chatOpen } = useOverlays();
+  return <BottomTabBar tabs={[mapTab, briefingTab, { id: "ai", label: "AI", icon: Sparkles, onPress: openScreenChat, open: chatOpen }, stocksTab]} />;
+}
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
@@ -329,7 +336,7 @@ export function AppLayout() {
             </ScreenBoundary>
           </div>
         </main>
-        {showTabBar && <BottomTabBar tabs={mainTabs} />}
+        {showTabBar && <MobileTabBar />}
       </div>
     </OverlayProvider>
   );

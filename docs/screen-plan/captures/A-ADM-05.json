@@ -1,0 +1,103 @@
+{
+  "id": "A-ADM-05",
+  "title": "회원·접근 관리",
+  "route": "/admin/members",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS069-01·FS069-02·FS073",
+  "requirements": "78·82",
+  "entry": "관리자 로그인 후 전용 메뉴",
+  "states": "조회 중 · 조건에 맞는 자료 없음 · 영역 오류\n관리자 세션 없음·만료 → 로그인",
+  "capturedState": "기본",
+  "stateSource": "admin/pages/members.tsx · admin/session.tsx",
+  "stateImages": [],
+  "note": "팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "감사 로그",
+        "regex": false
+      },
+      "box": {
+        "x": 8,
+        "y": 386,
+        "width": 207,
+        "height": 44
+      },
+      "result": "관리자 메뉴의 해당 운영 화면을 열어요.",
+      "destination": "A-ADM-05b",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "radio",
+        "name": "차단됨"
+      },
+      "box": {
+        "x": 361.46875,
+        "y": 100,
+        "width": 58.09375,
+        "height": 40
+      },
+      "result": "차단 회원만 보여줘요",
+      "destination": "A-ADM-05",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "searchbox",
+        "name": "회원 검색"
+      },
+      "box": {
+        "x": 435.5625,
+        "y": 98,
+        "width": 320,
+        "height": 44
+      },
+      "result": "가명·가린 이메일로 검색해요",
+      "destination": "A-ADM-05",
+      "mode": "input"
+    }
+  ],
+  "image": "A-ADM-05.png",
+  "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n회원 관리\n전체\n정상\n차단됨\n회원 검색\n\n전체 8명 · 정상 8 · 차단 0\n\n회원 목록\n회원(가명 id)\t이메일(가림)\t가입 방식\t가입\t최근 활동\t로그인 세션\t그래프 선택\tAI 질문\t브리핑 조회\t상태\nM-0AC0D62C\tp***@example.test\t이메일\t2026-10-03 19:03\t2026-10-03 19:03\t1\t0\t0\t0\t\n정상\nM-4B3BDDAF\tp***@example.test\t이메일\t2026-10-03 18:47\t2026-10-03 18:47\t1\t0\t0\t0\t\n정상\nM-FAE85F55\tp***@example.test\t이메일\t2026-10-03 18:37\t2026-10-03 18:37\t1\t0\t0\t0\t\n정상\nM-A1A39D76\tp***@example.test\t이메일\t2026-10-03 18:26\t2026-10-03 18:26\t1\t0\t0\t0\t\n정상\nM-F7104FCC\tp***@example.test\t이메일\t2026-10-03 18:14\t2026-10-03 18:14\t1\t0\t0\t0\t\n정상\nM-F95D0111\tp***@example.test\t이메일\t2026-10-03 17:55\t2026-10-03 17:55\t1\t0\t0\t0\t\n정상\nM-A85C3F86\ts***@zoop.local\t이메일\t2026-10-03 17:12\t2026-10-03 17:12\t1\t0\t0\t0\t\n정상\nM-EBF98301\td***@zoop.local\t이메일\t2026-10-01 20:27\t2026-10-03 19:06\t13\t71\t5\t28\t\n정상",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "감사 로그"
+      },
+      "before": "/admin/members",
+      "url": "/admin/audit",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n감사 로그\n동작\n모든 동작\n감사 로그 검색\n감사 로그\n시각\t주체\t동작\t대상\t결과\t사유\n2026-10-03 19:07:15\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:51:06\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:40:49\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:30:29\tadmin@zoop.local\t로그인\tadmin-session · admin-demo\t\n완료\t–\n2026-10-03 18:10:12\t시스템\t브리핑 생성\tbriefing-round · brf-2026-10-03-evening\t\n완료\t–\n2026-10-03 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-03-morning\t\n완료\t–\n2026-10-02 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-evening\t\n완료\t–\n2026-10-02 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-morning\t\n완료\t–\n2026-10-01 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-evening\t\n완료\t–\n2026-10-01 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-morning\t\n완료\t–\n2026-09-30 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-evening\t\n완료\t–\n2026-09-30 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-morning\t\n완료\t–\n2026-09-29 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-evening\t\n완료\t–\n2026-09-29 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-morning\t\n완료\t–\n2026-09-28 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-evening\t\n완료\t–\n2026-09-28 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-morning\t\n완료\t–\n2026-09-27 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-27-evening\t\n완료\t–\n2026-09-27 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-27-morning\t\n완료\t–\n2026-09-26 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-26-evening\t\n완료\t–\n2026-09-26 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-26-morning\t\n완료\t–\n2026-09-25 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-25-evening\t\n완료\t–\n2026-09-25 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-25-morning\t\n완료\t–\n2026-09-24 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-24-evening\t\n완료\t–\n2026-09-24 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-24-morning\t\n완료\t–\n2026-09-23 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-23-evening\t\n완료\t–\n2026-09-23 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-23-morning\t\n완료\t–\n2026-09-22 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-22-evening\t\n완료\t–\n2026-09-22 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-22-morning\t\n완료\t–\n2026-09-21 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-21-evening\t\n완료\t–\n2026-09-21 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-21-morning\t\n완료\t–\n2026-09-20 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-20-evening\t\n완료\t–\n2026-09-20 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-20-morning\t\n완료\t–\n2026-09-19 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-19-evening\t\n완료\t–\n2026-09-19 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-19-morning\t\n완료\t–\n2026-09-18 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-18-evening\t\n완료\t–\n2026-09-18 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-18-morning\t\n완료\t–\n2026-09-17 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-17-evening\t\n완료\t–\n2026-09-17 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-17-morning\t\n완료\t–\n2026-09-16 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-16-evening\t\n완료\t–\n2026-09-16 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-16-morning\t\n완료\t–\n2026-10-03 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-03-morning\t\n완료\t–\n2026-10-02 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-evening\t\n완료\t–\n2026-10-02 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-02-morning\t\n완료\t–\n2026-10-01 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-evening\t\n완료\t–\n2026-10-01 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-10-01-morning\t\n완료\t–\n2026-09-30 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-evening\t\n완료\t–\n2026-09-30 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-30-morning\t\n완료\t–\n2026-09-29 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-evening\t\n완료\t–\n2026-09-29 07:41:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-29-morning\t\n완료\t–\n2026-09-28 18:11:30\tdemo-replay@zoop.local\t브리핑 생성\tbriefing-round · brf-2026-09-28-evening\t\n완료\t–\n기록 더 보기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "radio",
+        "name": "차단됨"
+      },
+      "before": "/admin/members",
+      "url": "/admin/members",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n회원 관리\n전체\n정상\n차단됨\n회원 검색\n\n전체 8명 · 정상 8 · 차단 0\n\n조건에 맞는 회원이 없어요",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "searchbox",
+        "name": "회원 검색"
+      },
+      "url": "/admin/members",
+      "visibleText": "본문으로 건너뛰기\n줍\n관리자\n대시보드\n이슈 관제\nAI 운영\n브리핑 운영\n이용 통계\n선호도\n회원 관리\n감사 로그\n\n데모 관리자\n\n로그아웃\n회원 관리\n전체\n정상\n차단됨\n회원 검색\n\n전체 8명 · 정상 8 · 차단 0\n\n조건에 맞는 회원이 없어요",
+      "inputType": "search",
+      "inputWasEntered": true,
+      "number": 3
+    }
+  ]
+}

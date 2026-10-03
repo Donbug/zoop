@@ -2,13 +2,30 @@
 // 인용 확인 상태는 아이콘(툴팁·스크린리더 이름)으로, 대조가 필요할 때만 경고 배지 글자를 쓴다.
 // 문서 시각은 '발행'으로 적어 관계 확인 시점과 구분한다(요구 24). 원문 링크가 없으면 정해진 안내 문구를 둔다(요구 40).
 // 지도에서 연 근거 창이면 인용마다 [지도에서 보기] 토글이 붙어 그 근거가 뒷받침하는 연결선을 지도에서 강조한다(G4).
-import { CheckCircle2, ExternalLink, Link2Off, Map as MapIcon, TriangleAlert } from "lucide-react";
-import type { Schemas } from "@/api/client";
+// 근거 조회가 404(삭제·비공개)·403(볼 권한 없음)이면 다시 시도해도 같으므로 오류가 아니라 상태 한 줄(UnavailableEvidenceNote)로 알리고,
+// 그 근거의 내용은 아무것도 그리지 않는다. 일시 장애(5xx·연결 끊김)만 오류 + [다시 시도]다.
+import { CheckCircle2, ExternalLink, FileX, Link2Off, Map as MapIcon, TriangleAlert } from "lucide-react";
+import { ApiError, type Schemas } from "@/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatKst } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+
+/** 근거(또는 그 근거를 담은 사건)가 지워졌거나 비공개·권한 없음이라 다시 시도해도 받을 수 없는 응답인지 */
+export function isEvidenceGone(error: unknown) {
+  return error instanceof ApiError && (error.status === 404 || error.status === 403);
+}
+
+/** 받을 수 없는 근거 건수만 알린다(오류 표시·다시 시도 없음, 보호 내용 없음). */
+export function UnavailableEvidenceNote({ count, className }: { count: number; className?: string }) {
+  return (
+    <p className={cn("flex items-center gap-2 text-sm text-text-secondary tabular-nums", className)}>
+      <FileX className="size-4 shrink-0" aria-hidden="true" />
+      근거 {count}건은 삭제됐거나 지금 볼 수 없는 자료예요.
+    </p>
+  );
+}
 
 type Evidence = Pick<Schemas["EvidenceResponse"], "id" | "quote" | "quoteVerified" | "article">;
 

@@ -1,0 +1,752 @@
+{
+  "root_id": "3cafef49-d8d5-80cb-9a25-e53f97ec3f90",
+  "source_url": "https://app.notion.com/p/2-3cafef49d8d580cb9a25e53f97ec3f90",
+  "export_date": "2026-10-03",
+  "auth": "none",
+  "page_count": 120,
+  "baseline_page_count": 112,
+  "added_pages": [
+    {
+      "notion_id": "3ebfef49-d8d5-80d9-8cad-dbe89796de4d",
+      "file": "docs/evidence/raw/notion_2026-10-03/0930_데일리_스크럼_피드백__9796de4d.md",
+      "title": "0930 데일리 스크럼 피드백"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-805f-8d50-e3ecd4c594fa",
+      "file": "docs/evidence/raw/notion_2026-10-03/1001_데일리_스크럼_준비__d4c594fa.md",
+      "title": "1001 데일리 스크럼 준비"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-8064-b672-de8323d5478b",
+      "file": "docs/evidence/raw/notion_2026-10-03/1001_데일리_스크럼_피드백__23d5478b.md",
+      "title": "1001 데일리 스크럼 피드백"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80ae-81fe-d64373c38c4c",
+      "file": "docs/evidence/raw/notion_2026-10-03/1002_데일리_스크럼_준비__73c38c4c.md",
+      "title": "1002 데일리 스크럼 준비"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-8047-86f5-f6f3f5f4059f",
+      "file": "docs/evidence/raw/notion_2026-10-03/1002_데일리_스크럼_피드백__f5f4059f.md",
+      "title": "1002 데일리 스크럼 피드백"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-8031-929f-efaec1d5684e",
+      "file": "docs/evidence/raw/notion_2026-10-03/기능명세서_예시__c1d5684e.md",
+      "title": "기능명세서 예시"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-8044-a94e-d2ffce938765",
+      "file": "docs/evidence/raw/notion_2026-10-03/시퀀스_다이어그램_최종__ce938765.md",
+      "title": "시퀀스 다이어그램 최종"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80c5-8c43-c30b18ce9cbb",
+      "file": "docs/evidence/raw/notion_2026-10-03/역할_배정__18ce9cbb.md",
+      "title": "역할 배정"
+    }
+  ],
+  "deleted_pages": [],
+  "content_changed_pages": [
+    {
+      "notion_id": "3cafef49-d8d5-80cb-9a25-e53f97ec3f90",
+      "file": "docs/evidence/raw/notion_2026-10-03/2조_금융_도메인__97ec3f90.md",
+      "baseline": "docs/evidence/raw/notion/2조_금융_도메인__97ec3f90.md"
+    },
+    {
+      "notion_id": "3e9fef49-d8d5-80f5-9abf-f85aeb19fc00",
+      "file": "docs/evidence/raw/notion_2026-10-03/시퀀스_다이어그램__eb19fc00.md",
+      "baseline": "docs/evidence/raw/notion/시퀀스_다이어그램__eb19fc00.md"
+    }
+  ],
+  "metadata_only_edited_page": {
+    "notion_id": "3e3fef49-d8d5-80d7-bb46-e40d5636eb05",
+    "file": "docs/evidence/raw/notion_2026-10-03/사용자_여정(사용자_이용_시나리오)__5636eb05.md",
+    "last_edited_time": "2026-09-30T14:33:51.730000+09:00",
+    "note": "Visible content unchanged after Markdown normalization; baseline had no edit timestamp."
+  },
+  "comparison_note": "IDs matched. Export-only differences in Markdown formatting, table column order, empty table cells, duplicated image URLs, page expansion and exclusion markers are not source changes. Token/character comparisons were followed by targeted inspection of non-equivalent pages.",
+  "excluded": [
+    {
+      "collection": "3c1fef49-d8d5-8217-8ef0-872104fe00a9",
+      "reason": "강의 일정 캘린더"
+    },
+    {
+      "block": "f3bfef49-d8d5-83bc-af2f-01e525486905",
+      "title": "3기_금융_요구사항정의서.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "ee6fef49-d8d5-83ca-ae2c-01ce0c9b53ce",
+      "title": "3기_금융_수행계획서.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "51efef49-d8d5-8219-a149-019511569018",
+      "title": "[3기] 금융 클라우드 사용계획서.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "ddafef49-d8d5-822b-9019-012c6a9d6b76",
+      "title": "3기_금융_데일리스크럼.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "f89fef49-d8d5-83d8-970d-81c95f72a724",
+      "title": "[3기] 금융 중간발표자료.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "74cfef49-d8d5-828d-b1d4-8188c0f19022",
+      "title": "3. LG CNS AM Inspire Camp 4기_프로젝트계획서_금융.pdf",
+      "reason": "3기·4기 자료"
+    }
+  ],
+  "database_row_counts": {
+    "3cbfef49-d8d5-80de-85b2-000bd4865730": 60,
+    "266fef49-d8d5-83aa-ad33-871ebf2e1c0b": 8,
+    "b73fef49-d8d5-8291-b967-87d18d091160": 7
+  },
+  "requests": [
+    {
+      "method": "loadPageChunk",
+      "http_status": 200,
+      "count": 147
+    },
+    {
+      "method": "queryCollection",
+      "http_status": 200,
+      "count": 3
+    },
+    {
+      "method": "syncRecordValues",
+      "http_status": 200,
+      "count": 351
+    },
+    {
+      "method": "syncRecordValues",
+      "http_status": 429,
+      "count": 242
+    }
+  ],
+  "http429_response_body": "error code: 1015\n",
+  "request_interval_seconds": 0.65,
+  "rate_limit_note": "syncRecordValues produced repeated HTTP 429 while resolving missing nested blocks. After a 15-second wait, one probe and four batched requests with an additional 3-second interval recovered all remaining blocks; all five returned 200.",
+  "unresolved_reachable_blocks": 0,
+  "verification": {
+    "markdown_files": 120,
+    "unique_page_ids": 120,
+    "missing_edit_metadata": 0,
+    "unbalanced_code_fences": 0,
+    "previous_page_ids_missing": 0
+  },
+  "limitations": [
+    "Only the publicly readable recursive subtree was exported. External Figma/ClovaNote contents and attachment/image bytes were not fetched.",
+    "Class calendar and cohort 3/4 attachments are marked as excluded, not used as project evidence.",
+    "Password-like literal source values are redacted.",
+    "A last-edited timestamp alone is not evidence of changed requirements."
+  ],
+  "pages": [
+    {
+      "notion_id": "3cefef49-d8d5-8067-a8a7-ee91c59ed0ba",
+      "file": "docs/evidence/raw/notion_2026-10-03/0901_데일리스크럼_준비__c59ed0ba.md",
+      "last_edited_time": "2026-09-02T10:04:45.728000+09:00"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-8014-bce8-c97ca2ef6e43",
+      "file": "docs/evidence/raw/notion_2026-10-03/0901_데일리스크럼_피드백_내용__a2ef6e43.md",
+      "last_edited_time": "2026-09-02T15:11:31.621000+09:00"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-8067-b965-e23468f5d677",
+      "file": "docs/evidence/raw/notion_2026-10-03/0901_데일리스크럼_피드백_내용__원본__68f5d677.md",
+      "last_edited_time": "2026-09-02T14:58:23.848000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-80a0-a6d9-ea1f3e278c5f",
+      "file": "docs/evidence/raw/notion_2026-10-03/0902_데일리스크럼_준비__3e278c5f.md",
+      "last_edited_time": "2026-09-03T09:19:16.439000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8051-9e4a-e52ca95e6495",
+      "file": "docs/evidence/raw/notion_2026-10-03/0902_데일리스크럼_피드백_내용__a95e6495.md",
+      "last_edited_time": "2026-09-03T09:26:07.896000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8067-b8ba-e3da1c7c54bf",
+      "file": "docs/evidence/raw/notion_2026-10-03/0902_데일리스크럼_피드백_내용__요약__1c7c54bf.md",
+      "last_edited_time": "2026-09-02T16:17:18.523000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-808e-9ca4-ddaade7334b2",
+      "file": "docs/evidence/raw/notion_2026-10-03/0902_데일리스크럼_피드백_내용__원본__de7334b2.md",
+      "last_edited_time": "2026-09-03T09:24:45.496000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8061-a468-f83c3bceb72c",
+      "file": "docs/evidence/raw/notion_2026-10-03/0903_데일리_스크럼_준비__3bceb72c.md",
+      "last_edited_time": "2026-09-03T15:14:05.451000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-80d7-aa11-f4b70515bbc5",
+      "file": "docs/evidence/raw/notion_2026-10-03/0903_데일리_스크럼_피드백_내용__0515bbc5.md",
+      "last_edited_time": "2026-09-03T17:08:59.557000+09:00"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8050-a609-ff6bc6f4c82a",
+      "file": "docs/evidence/raw/notion_2026-10-03/0903_데일리_스크럼_피드백_내용__요약__c6f4c82a.md",
+      "last_edited_time": "2026-09-03T17:08:56.852000+09:00"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8012-a005-f3f2dce0759b",
+      "file": "docs/evidence/raw/notion_2026-10-03/0903_데일리_스크럼_피드백_내용__원본__dce0759b.md",
+      "last_edited_time": "2026-09-03T17:08:59.557000+09:00"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8014-bb45-c142468f4294",
+      "file": "docs/evidence/raw/notion_2026-10-03/0904_데일리_스크럼_준비__468f4294.md",
+      "last_edited_time": "2026-09-05T09:10:23.464000+09:00"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8034-aa67-d4c9f7e89116",
+      "file": "docs/evidence/raw/notion_2026-10-03/0904_데일리_스크럼_피드백_내용__f7e89116.md",
+      "last_edited_time": "2026-09-05T09:14:14.881000+09:00"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80a3-926e-c068e05be3a2",
+      "file": "docs/evidence/raw/notion_2026-10-03/0904_데일리_스크럼_피드백_내용__요약__e05be3a2.md",
+      "last_edited_time": "2026-09-05T09:48:00.409000+09:00"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80b7-90bf-f16d5ae3994f",
+      "file": "docs/evidence/raw/notion_2026-10-03/0904_데일리_스크럼_피드백_내용__원본__5ae3994f.md",
+      "last_edited_time": "2026-09-05T09:14:14.881000+09:00"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80d6-95bf-fd8a879a122d",
+      "file": "docs/evidence/raw/notion_2026-10-03/0905_멘토링__879a122d.md",
+      "last_edited_time": "2026-09-05T16:46:22.477000+09:00"
+    },
+    {
+      "notion_id": "3d4fef49-d8d5-8093-afb0-c9d21838ebbc",
+      "file": "docs/evidence/raw/notion_2026-10-03/0908_데일리_스크럼_준비__1838ebbc.md",
+      "last_edited_time": "2026-09-08T16:49:15.622000+09:00"
+    },
+    {
+      "notion_id": "3d4fef49-d8d5-802b-a9df-c534588d2fe2",
+      "file": "docs/evidence/raw/notion_2026-10-03/0908_데일리_스크럼_피드백_내용__588d2fe2.md",
+      "last_edited_time": "2026-09-08T16:51:00.041000+09:00"
+    },
+    {
+      "notion_id": "3d5fef49-d8d5-808d-ae61-d2c25b7442ce",
+      "file": "docs/evidence/raw/notion_2026-10-03/0908_데일리_스크럼_피드백_내용__요약__5b7442ce.md",
+      "last_edited_time": "2026-09-08T16:36:18.733000+09:00"
+    },
+    {
+      "notion_id": "3d5fef49-d8d5-80cb-bb19-d95e547a2218",
+      "file": "docs/evidence/raw/notion_2026-10-03/0909_데일리_스크럼_준비__547a2218.md",
+      "last_edited_time": "2026-09-09T13:21:39.246000+09:00"
+    },
+    {
+      "notion_id": "3d5fef49-d8d5-80cd-ba8d-feea1b98b6cc",
+      "file": "docs/evidence/raw/notion_2026-10-03/0909_데일리_스크럼_피드백__1b98b6cc.md",
+      "last_edited_time": "2026-09-09T13:52:31.103000+09:00"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-804d-a532-fe48c286c7d6",
+      "file": "docs/evidence/raw/notion_2026-10-03/0909_데일리_스크럼_피드백__요약__c286c7d6.md",
+      "last_edited_time": "2026-09-09T14:42:35.396000+09:00"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-80e0-a0e1-d6fe73e3e914",
+      "file": "docs/evidence/raw/notion_2026-10-03/0910_데일리_스크럼_준비__73e3e914.md",
+      "last_edited_time": "2026-09-11T09:04:57.482000+09:00"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-808a-8caf-d17559e6b26e",
+      "file": "docs/evidence/raw/notion_2026-10-03/0910_데일리_스크럼_피드백__59e6b26e.md",
+      "last_edited_time": "2026-09-11T08:57:40.367000+09:00"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80f8-9190-e691a2616fed",
+      "file": "docs/evidence/raw/notion_2026-10-03/0910_데일리_스크럼_피드백__요약__a2616fed.md",
+      "last_edited_time": "2026-09-10T14:42:07.909000+09:00"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80a4-93eb-d70608b94877",
+      "file": "docs/evidence/raw/notion_2026-10-03/0910_데일리_스크럼_피드백__원본__08b94877.md",
+      "last_edited_time": "2026-09-10T11:09:11.729000+09:00"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-8041-b4c9-ca45fca11a46",
+      "file": "docs/evidence/raw/notion_2026-10-03/0911_데일리_스크럼_준비__fca11a46.md",
+      "last_edited_time": "2026-09-11T17:42:09.961000+09:00"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80fe-b74e-d29b8a399700",
+      "file": "docs/evidence/raw/notion_2026-10-03/0911_데일리_스크럼_피드백__8a399700.md",
+      "last_edited_time": "2026-09-13T23:02:00.074000+09:00"
+    },
+    {
+      "notion_id": "3dafef49-d8d5-8003-88ec-dda0b58a870e",
+      "file": "docs/evidence/raw/notion_2026-10-03/0911_데일리_스크럼_피드백__요약__b58a870e.md",
+      "last_edited_time": "2026-09-14T10:19:17.165000+09:00"
+    },
+    {
+      "notion_id": "3dafef49-d8d5-80a4-a929-ff5464518b5e",
+      "file": "docs/evidence/raw/notion_2026-10-03/0911_데일리_스크럼_피드백__원문__64518b5e.md",
+      "last_edited_time": "2026-09-13T22:58:47.040000+09:00"
+    },
+    {
+      "notion_id": "3d8fef49-d8d5-8033-8f1d-fed2eb7fba6b",
+      "file": "docs/evidence/raw/notion_2026-10-03/0914_데일리_스크럼_준비__eb7fba6b.md",
+      "last_edited_time": "2026-09-14T14:30:38.597000+09:00"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-800a-ae86-d91d88f407ec",
+      "file": "docs/evidence/raw/notion_2026-10-03/0914_데일리_스크럼_피드백__88f407ec.md",
+      "last_edited_time": "2026-09-14T15:14:35.148000+09:00"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-804a-9189-c3b0e443cd3a",
+      "file": "docs/evidence/raw/notion_2026-10-03/0914_데일리_스크럼_피드백__요약__e443cd3a.md",
+      "last_edited_time": "2026-09-14T16:09:56.579000+09:00"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-80e8-b336-fab22cb16167",
+      "file": "docs/evidence/raw/notion_2026-10-03/0914_데일리_스크럼_피드백__원본__2cb16167.md",
+      "last_edited_time": "2026-09-14T20:04:18.368000+09:00"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-8091-91cf-f230a2a5685a",
+      "file": "docs/evidence/raw/notion_2026-10-03/0915_데일리_스크럼_준비__a2a5685a.md",
+      "last_edited_time": "2026-09-15T09:28:04.670000+09:00"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-8023-9c32-cadb9839d445",
+      "file": "docs/evidence/raw/notion_2026-10-03/0915_데일리_스크럼_피드백__9839d445.md",
+      "last_edited_time": "2026-09-15T16:05:48.308000+09:00"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-80d4-bf0a-d7f4c8e2632a",
+      "file": "docs/evidence/raw/notion_2026-10-03/0915_데일리_스크럼_피드백__요약__c8e2632a.md",
+      "last_edited_time": "2026-09-15T16:06:55.157000+09:00"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-80da-949e-ff7e2656a805",
+      "file": "docs/evidence/raw/notion_2026-10-03/0915_데일리_스크럼_피드백__원본__2656a805.md",
+      "last_edited_time": "2026-09-15T16:05:42.529000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-80ea-973e-d9c15e5feb7c",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_준비__(untitled)__5e5feb7c.md",
+      "last_edited_time": "2026-09-16T10:35:48.092000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-807b-8c0a-d46083993ba9",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_준비__(untitled)__83993ba9.md",
+      "last_edited_time": "2026-09-16T10:35:48.092000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-80d4-837e-ee11e402a771",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_준비__(untitled)__e402a771.md",
+      "last_edited_time": "2026-09-16T10:35:48.092000+09:00"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-8045-9170-cd4522c63c14",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_준비__22c63c14.md",
+      "last_edited_time": "2026-09-16T16:29:42.075000+09:00"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-8010-be77-cfba6b09775a",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_피드백__6b09775a.md",
+      "last_edited_time": "2026-09-21T10:18:58.964000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-806e-ab6d-e6e0a00da9d0",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_피드백__요약__a00da9d0.md",
+      "last_edited_time": "2026-09-16T16:33:39.520000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-80f3-aa32-ec67b2fd4f7f",
+      "file": "docs/evidence/raw/notion_2026-10-03/0916_데일리_스크럼_피드백__원본__b2fd4f7f.md",
+      "last_edited_time": "2026-09-16T16:18:00.138000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-8088-a533-cb657fe792f4",
+      "file": "docs/evidence/raw/notion_2026-10-03/0917_데일리_스크럼_준비__7fe792f4.md",
+      "last_edited_time": "2026-09-17T11:19:03.683000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-805b-b850-fd5b0a2d7c60",
+      "file": "docs/evidence/raw/notion_2026-10-03/0917_데일리_스크럼_피드백__0a2d7c60.md",
+      "last_edited_time": "2026-09-17T16:32:34.395000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-8046-9c94-d746f56c4047",
+      "file": "docs/evidence/raw/notion_2026-10-03/0917_데일리_스크럼_피드백__요약__f56c4047.md",
+      "last_edited_time": "2026-09-17T16:43:54.720000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-804a-a2ce-eb79f8b86be7",
+      "file": "docs/evidence/raw/notion_2026-10-03/0917_데일리_스크럼_피드백__원본__f8b86be7.md",
+      "last_edited_time": "2026-09-17T16:32:35.091000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-808b-bac7-d8d82cf9e235",
+      "file": "docs/evidence/raw/notion_2026-10-03/0918_강사님_PPT_피드백__2cf9e235.md",
+      "last_edited_time": "2026-09-19T11:16:21.460000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80c0-bf53-eedfd8d8b74d",
+      "file": "docs/evidence/raw/notion_2026-10-03/0918_강사님_PPT_피드백__요약__d8d8b74d.md",
+      "last_edited_time": "2026-09-18T18:13:30.456000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80ff-89bd-f33d967f3b87",
+      "file": "docs/evidence/raw/notion_2026-10-03/0918_강사님_PPT_피드백__원본__967f3b87.md",
+      "last_edited_time": "2026-09-18T16:56:23.319000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-8047-aab4-c5d18d63c6bc",
+      "file": "docs/evidence/raw/notion_2026-10-03/0918_매니저님_PPT_피드백__8d63c6bc.md",
+      "last_edited_time": "2026-09-18T15:05:37.811000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-801d-8a71-d0d03cdced09",
+      "file": "docs/evidence/raw/notion_2026-10-03/0918_매니저님_PPT_피드백__요약__3cdced09.md",
+      "last_edited_time": "2026-09-18T14:44:04.102000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80e3-bd8f-c8468860e432",
+      "file": "docs/evidence/raw/notion_2026-10-03/0918_매니저님_PPT_피드백__원본__8860e432.md",
+      "last_edited_time": "2026-09-18T14:38:42.237000+09:00"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-8059-a7f2-e0f78ab3f839",
+      "file": "docs/evidence/raw/notion_2026-10-03/0919_멘토링__8ab3f839.md",
+      "last_edited_time": "2026-09-21T14:54:50.127000+09:00"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-808c-b0aa-f058b0e7a919",
+      "file": "docs/evidence/raw/notion_2026-10-03/0919_중간발표_피드백__b0e7a919.md",
+      "last_edited_time": "2026-09-21T09:27:01.775000+09:00"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-8071-a410-de2b9360e50d",
+      "file": "docs/evidence/raw/notion_2026-10-03/0921_발표_멘토링_피드백__9360e50d.md",
+      "last_edited_time": "2026-09-22T09:30:18.431000+09:00"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-8010-b482-c3916515e6fa",
+      "file": "docs/evidence/raw/notion_2026-10-03/0921_발표_멘토링_피드백__원문__6515e6fa.md",
+      "last_edited_time": "2026-09-22T09:30:14.040000+09:00"
+    },
+    {
+      "notion_id": "3eafef49-d8d5-801d-86c5-ff81b34c8d8d",
+      "file": "docs/evidence/raw/notion_2026-10-03/0929_데일리_스크럼_피드백__b34c8d8d.md",
+      "last_edited_time": "2026-09-29T16:11:25.697000+09:00"
+    },
+    {
+      "notion_id": "3eafef49-d8d5-8049-b42e-c17826447660",
+      "file": "docs/evidence/raw/notion_2026-10-03/0929_데일리_스크럼_피드백__요약__26447660.md",
+      "last_edited_time": "2026-09-29T16:10:58.475000+09:00"
+    },
+    {
+      "notion_id": "3ebfef49-d8d5-80d9-8cad-dbe89796de4d",
+      "file": "docs/evidence/raw/notion_2026-10-03/0930_데일리_스크럼_피드백__9796de4d.md",
+      "last_edited_time": "2026-10-01T15:41:39.905000+09:00"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-805f-8d50-e3ecd4c594fa",
+      "file": "docs/evidence/raw/notion_2026-10-03/1001_데일리_스크럼_준비__d4c594fa.md",
+      "last_edited_time": "2026-10-02T11:22:54.805000+09:00"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-8064-b672-de8323d5478b",
+      "file": "docs/evidence/raw/notion_2026-10-03/1001_데일리_스크럼_피드백__23d5478b.md",
+      "last_edited_time": "2026-10-01T16:15:00.682000+09:00"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80ae-81fe-d64373c38c4c",
+      "file": "docs/evidence/raw/notion_2026-10-03/1002_데일리_스크럼_준비__73c38c4c.md",
+      "last_edited_time": "2026-10-02T17:40:07.539000+09:00"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-8047-86f5-f6f3f5f4059f",
+      "file": "docs/evidence/raw/notion_2026-10-03/1002_데일리_스크럼_피드백__f5f4059f.md",
+      "last_edited_time": "2026-10-02T14:36:37.015000+09:00"
+    },
+    {
+      "notion_id": "3cbfef49-d8d5-8048-b579-f7eaf0e32c68",
+      "file": "docs/evidence/raw/notion_2026-10-03/2026-08-29_멘토링_&_아이데이션__f0e32c68.md",
+      "last_edited_time": "2026-09-03T15:38:04.384000+09:00"
+    },
+    {
+      "notion_id": "3cafef49-d8d5-80cb-9a25-e53f97ec3f90",
+      "file": "docs/evidence/raw/notion_2026-10-03/2조_금융_도메인__97ec3f90.md",
+      "last_edited_time": "2026-10-02T16:20:46.808000+09:00"
+    },
+    {
+      "notion_id": "5b9fef49-d8d5-8368-af4c-01594cebd022",
+      "file": "docs/evidence/raw/notion_2026-10-03/Github_링크__4cebd022.md",
+      "last_edited_time": "2026-08-28T16:21:02.104000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-804b-a40f-cbdcac4396e3",
+      "file": "docs/evidence/raw/notion_2026-10-03/PoC__ac4396e3.md",
+      "last_edited_time": "2026-09-18T15:41:06.231000+09:00"
+    },
+    {
+      "notion_id": "a5afef49-d8d5-8288-b2ee-81cbb9ebc18c",
+      "file": "docs/evidence/raw/notion_2026-10-03/[멘토링_내용_정리(오전)]__b9ebc18c.md",
+      "last_edited_time": "2026-08-28T16:13:02.809000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-8020-8e9a-d7955673e153",
+      "file": "docs/evidence/raw/notion_2026-10-03/ppt_예상질문__5673e153.md",
+      "last_edited_time": "2026-09-19T11:05:06.332000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-8025-9893-d94cc712dc90",
+      "file": "docs/evidence/raw/notion_2026-10-03/ppt_페이지별_대본_내용__c712dc90.md",
+      "last_edited_time": "2026-09-18T16:51:15.180000+09:00"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80c8-be19-e69b9664f947",
+      "file": "docs/evidence/raw/notion_2026-10-03/ppt_페이지별_대본_내용__주차별ㅣ__9664f947.md",
+      "last_edited_time": "2026-09-18T15:10:52.848000+09:00"
+    },
+    {
+      "notion_id": "ab3fef49-d8d5-83bf-be9f-019179e13231",
+      "file": "docs/evidence/raw/notion_2026-10-03/고민균__79e13231.md",
+      "last_edited_time": "2026-08-28T16:13:07.565000+09:00"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-80c1-9ae0-f4a1ba95f9bf",
+      "file": "docs/evidence/raw/notion_2026-10-03/기능_구체화__ba95f9bf.md",
+      "last_edited_time": "2026-09-28T23:24:57.279000+09:00"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-8031-929f-efaec1d5684e",
+      "file": "docs/evidence/raw/notion_2026-10-03/기능명세서_예시__c1d5684e.md",
+      "last_edited_time": "2026-10-01T14:55:33.500000+09:00"
+    },
+    {
+      "notion_id": "19efef49-d8d5-83dc-9ba0-8144dc03c594",
+      "file": "docs/evidence/raw/notion_2026-10-03/김다윤__dc03c594.md",
+      "last_edited_time": "2026-08-28T16:13:09.201000+09:00"
+    },
+    {
+      "notion_id": "746fef49-d8d5-822f-8313-014462456db7",
+      "file": "docs/evidence/raw/notion_2026-10-03/나영은__62456db7.md",
+      "last_edited_time": "2026-08-28T16:13:05.918000+09:00"
+    },
+    {
+      "notion_id": "4cafef49-d8d5-836a-b548-01b5a7707842",
+      "file": "docs/evidence/raw/notion_2026-10-03/나혜빈__a7707842.md",
+      "last_edited_time": "2026-08-28T16:13:07.698000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-801d-be72-d2bd917ac045",
+      "file": "docs/evidence/raw/notion_2026-10-03/뉴스_긍_부정_평가__917ac045.md",
+      "last_edited_time": "2026-09-17T14:30:04.433000+09:00"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-80dc-a87c-c1fd3bba63aa",
+      "file": "docs/evidence/raw/notion_2026-10-03/데이터_API_+_은행별_상품약관_사이트__3bba63aa.md",
+      "last_edited_time": "2026-09-04T13:41:52.590000+09:00"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80a4-83c1-c67ae9bacc03",
+      "file": "docs/evidence/raw/notion_2026-10-03/데이터셋__e9bacc03.md",
+      "last_edited_time": "2026-09-10T15:57:02.916000+09:00"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-808b-9893-fb503e93f5d5",
+      "file": "docs/evidence/raw/notion_2026-10-03/돈_흐름_&_금융_키워드__3e93f5d5.md",
+      "last_edited_time": "2026-09-01T17:33:16.151000+09:00"
+    },
+    {
+      "notion_id": "496fef49-d8d5-83a5-bc0f-81b4182e9158",
+      "file": "docs/evidence/raw/notion_2026-10-03/멘토님_Q&A_내용_올려요._(오전_타임_기준)__182e9158.md",
+      "last_edited_time": "2026-08-28T16:13:06.701000+09:00"
+    },
+    {
+      "notion_id": "5cbfef49-d8d5-8391-922a-01fa8fd4c360",
+      "file": "docs/evidence/raw/notion_2026-10-03/멘토링_DAY1__8fd4c360.md",
+      "last_edited_time": "2026-09-07T22:49:06.805000+09:00"
+    },
+    {
+      "notion_id": "d1afef49-d8d5-8302-b995-01b778ceda26",
+      "file": "docs/evidence/raw/notion_2026-10-03/멘토링_DAY2__78ceda26.md",
+      "last_edited_time": "2026-08-28T17:36:57.505000+09:00"
+    },
+    {
+      "notion_id": "a07fef49-d8d5-83e6-a435-815be16b7b85",
+      "file": "docs/evidence/raw/notion_2026-10-03/멘토링_DAY3_중간발표__e16b7b85.md",
+      "last_edited_time": "2026-09-08T13:09:50.391000+09:00"
+    },
+    {
+      "notion_id": "8d1fef49-d8d5-823e-9864-01ba55c5bb02",
+      "file": "docs/evidence/raw/notion_2026-10-03/멘토링_DAY4__55c5bb02.md",
+      "last_edited_time": "2026-09-08T13:09:47.752000+09:00"
+    },
+    {
+      "notion_id": "a78fef49-d8d5-8335-b8c8-8160c53798ca",
+      "file": "docs/evidence/raw/notion_2026-10-03/멘토링_DAY5__c53798ca.md",
+      "last_edited_time": "2026-08-28T17:37:30.898000+09:00"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-80e2-bdf5-f16f8290119e",
+      "file": "docs/evidence/raw/notion_2026-10-03/벤치마킹__8290119e.md",
+      "last_edited_time": "2026-09-17T09:46:11.115000+09:00"
+    },
+    {
+      "notion_id": "5e4fef49-d8d5-8323-90a5-01ca7743eb58",
+      "file": "docs/evidence/raw/notion_2026-10-03/블로그_링크__7743eb58.md",
+      "last_edited_time": "2026-08-28T16:20:59.210000+09:00"
+    },
+    {
+      "notion_id": "3d2fef49-d8d5-808a-9ef4-dee33884b54c",
+      "file": "docs/evidence/raw/notion_2026-10-03/사용자_시나리오__3884b54c.md",
+      "last_edited_time": "2026-09-05T11:26:00.438000+09:00"
+    },
+    {
+      "notion_id": "3d2fef49-d8d5-80aa-9abe-f75fe4a85ce3",
+      "file": "docs/evidence/raw/notion_2026-10-03/사용자_시나리오__e4a85ce3.md",
+      "last_edited_time": "2026-09-22T10:04:41.345000+09:00"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-80d7-bb46-e40d5636eb05",
+      "file": "docs/evidence/raw/notion_2026-10-03/사용자_여정(사용자_이용_시나리오)__5636eb05.md",
+      "last_edited_time": "2026-09-30T14:33:51.730000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-809a-a527-c8009a09ba3b",
+      "file": "docs/evidence/raw/notion_2026-10-03/서비스목표,_페르소나,_페이포인트,_벤치마킹_-_정세빈__9a09ba3b.md",
+      "last_edited_time": "2026-09-17T13:31:00.693000+09:00"
+    },
+    {
+      "notion_id": "3e9fef49-d8d5-80f5-9abf-f85aeb19fc00",
+      "file": "docs/evidence/raw/notion_2026-10-03/시퀀스_다이어그램__eb19fc00.md",
+      "last_edited_time": "2026-10-02T16:53:41.289000+09:00"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-8044-a94e-d2ffce938765",
+      "file": "docs/evidence/raw/notion_2026-10-03/시퀀스_다이어그램_최종__ce938765.md",
+      "last_edited_time": "2026-10-02T16:53:21.230000+09:00"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80dc-a02f-e167e9f0279a",
+      "file": "docs/evidence/raw/notion_2026-10-03/아이디어_구체화__e9f0279a.md",
+      "last_edited_time": "2026-09-17T10:35:21.833000+09:00"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-80b9-93e0-fef05ae38b45",
+      "file": "docs/evidence/raw/notion_2026-10-03/아이디어_카테고리화__5ae38b45.md",
+      "last_edited_time": "2026-09-01T17:27:01.127000+09:00"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80c5-8c43-c30b18ce9cbb",
+      "file": "docs/evidence/raw/notion_2026-10-03/역할_배정__18ce9cbb.md",
+      "last_edited_time": "2026-10-02T19:50:41.524000+09:00"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-80c6-ad10-e1c6ef56c9d2",
+      "file": "docs/evidence/raw/notion_2026-10-03/오픈_api_+_크롤링__ef56c9d2.md",
+      "last_edited_time": "2026-09-10T15:59:06.180000+09:00"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8088-bceb-c2b713d924cd",
+      "file": "docs/evidence/raw/notion_2026-10-03/요약__(untitled)__13d924cd.md",
+      "last_edited_time": "2026-09-02T16:17:26.761000+09:00"
+    },
+    {
+      "notion_id": "8eafef49-d8d5-83d8-ad86-016ccb3e589e",
+      "file": "docs/evidence/raw/notion_2026-10-03/은종혁__cb3e589e.md",
+      "last_edited_time": "2026-08-28T16:13:07.871000+09:00"
+    },
+    {
+      "notion_id": "ee6fef49-d8d5-8285-8aa0-81150cfe9ae9",
+      "file": "docs/evidence/raw/notion_2026-10-03/이준혁__0cfe9ae9.md",
+      "last_edited_time": "2026-08-28T16:13:07.409000+09:00"
+    },
+    {
+      "notion_id": "d89fef49-d8d5-8325-bc57-81867f86c370",
+      "file": "docs/evidence/raw/notion_2026-10-03/자기소개__7f86c370.md",
+      "last_edited_time": "2026-08-28T16:20:55.245000+09:00"
+    },
+    {
+      "notion_id": "cc1fef49-d8d5-8390-9792-01cbb85f16de",
+      "file": "docs/evidence/raw/notion_2026-10-03/조보름__b85f16de.md",
+      "last_edited_time": "2026-08-28T16:13:06.059000+09:00"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-805a-b090-fd1b4d19fa02",
+      "file": "docs/evidence/raw/notion_2026-10-03/중간_발표_준비_-_자료조사__4d19fa02.md",
+      "last_edited_time": "2026-09-17T17:25:52.891000+09:00"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80a3-848c-ea83931f8fad",
+      "file": "docs/evidence/raw/notion_2026-10-03/최종_플젝_문제정의__931f8fad.md",
+      "last_edited_time": "2026-09-17T13:28:06.965000+09:00"
+    },
+    {
+      "notion_id": "57cfef49-d8d5-8375-a3ba-0180f671ed3a",
+      "file": "docs/evidence/raw/notion_2026-10-03/최종산출물_마감__f671ed3a.md",
+      "last_edited_time": "2026-08-28T17:38:07.960000+09:00"
+    },
+    {
+      "notion_id": "7dbfef49-d8d5-8213-ba69-01492f5dd85b",
+      "file": "docs/evidence/raw/notion_2026-10-03/최종프로젝트_발표회_및_수료식__2f5dd85b.md",
+      "last_edited_time": "2026-08-28T17:38:28.822000+09:00"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-8077-85f4-f8d1a2dc8216",
+      "file": "docs/evidence/raw/notion_2026-10-03/추후_정해야_할_사항__a2dc8216.md",
+      "last_edited_time": "2026-09-04T16:06:42.572000+09:00"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-80eb-aca3-d044ae402c85",
+      "file": "docs/evidence/raw/notion_2026-10-03/추후_해야할_목록__ae402c85.md",
+      "last_edited_time": "2026-09-28T19:47:41.955000+09:00"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-80f7-9640-c00dda076853",
+      "file": "docs/evidence/raw/notion_2026-10-03/출퇴근_브리핑_결정해야할_사항__da076853.md",
+      "last_edited_time": "2026-09-22T17:09:13.489000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-8057-a0dd-deeb139826c0",
+      "file": "docs/evidence/raw/notion_2026-10-03/프로젝트_개요__139826c0.md",
+      "last_edited_time": "2026-09-17T17:37:10.622000+09:00"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-80bc-afec-eeefabebafc1",
+      "file": "docs/evidence/raw/notion_2026-10-03/피드백_요약_참고__abebafc1.md",
+      "last_edited_time": "2026-09-01T15:27:53.872000+09:00"
+    },
+    {
+      "notion_id": "c0cfef49-d8d5-8328-953c-8111aba32544",
+      "file": "docs/evidence/raw/notion_2026-10-03/하지혁__aba32544.md",
+      "last_edited_time": "2026-08-28T16:13:05.719000+09:00"
+    },
+    {
+      "notion_id": "3defef49-d8d5-80ac-8711-f6191bf93995",
+      "file": "docs/evidence/raw/notion_2026-10-03/홍정현__1bf93995.md",
+      "last_edited_time": "2026-09-17T11:19:11.202000+09:00"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-80fa-9a64-cde03fa5f8f9",
+      "file": "docs/evidence/raw/notion_2026-10-03/화면별_데이터__3fa5f8f9.md",
+      "last_edited_time": "2026-09-15T14:34:12.621000+09:00"
+    },
+    {
+      "notion_id": "3cbfef49-d8d5-805d-a20f-e0ab3ed1517a",
+      "file": "docs/evidence/raw/notion_2026-10-03/휴지통__3ed1517a.md",
+      "last_edited_time": "2026-09-29T16:58:16.370000+09:00"
+    }
+  ]
+}

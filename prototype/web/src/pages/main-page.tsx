@@ -14,8 +14,11 @@
 // 돌아오면 [그래프로 복귀]가 넘긴 state.graphRestore, 없으면 브라우저 뒤로 가기로 돌아온 이력 항목의 저장값으로 복원한다.
 // 튜토리얼(요구 15·16): 튜토리얼을 마치지 않은 회원·비회원, 또는 계정 메뉴의 [튜토리얼 다시 보기](?tour=1)에서
 // 지도 위 단계형 안내를 띄운다. 데스크톱은 왼쪽 목록 자리, 모바일은 지도 위(문서 흐름 안)에 놓는다.
+// 개인화 필터(FS017·FS019·FS026): 내 종목 모드 안에서 전체·보유·관심으로 기준 종목을 좁힌다(lib/personal-filter). 모드와 따로 두고
+// 같은 탭 세션 동안 기억한다. 필터를 바꿔 지금 선택·포커스·경로가 지도에서 빠지면 풀고 알린다. 사이드바에서 필터로 빠진 기업을
+// 고르면 필터를 바꾸지 않고 안내와 [전체로 보기]를 띄운다.
 import { ArrowLeft, CircleAlert, Info, PanelLeftClose, PanelLeftOpen, RotateCw, Star, Wallet, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Schemas } from "@/api/client";
@@ -24,7 +27,7 @@ import { graphQuery, useBriefingGraphBasis, useCompanies, useGraph, useLogout, u
 import { CompanyMark } from "@/components/domain/company-mark";
 import type { CenterRequest, GraphSelection } from "@/components/domain/graph-canvas";
 import type { Viewport } from "@/components/domain/graph-layout";
-import { GraphModeSwitch, MarkRing } from "@/components/domain/graph-legend";
+import { GraphModeSwitch, MarkRing, PersonalFilterSwitch } from "@/components/domain/graph-legend";
 import { WatchToggle } from "@/components/domain/watch-toggle";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingBlock, Skeleton, SkeletonLines, SkeletonRows } from "@/components/ui/feedback";
@@ -36,6 +39,7 @@ import { BriefingGraphBasisBar, BriefingGraphGate } from "@/features/briefing-gr
 import { parsePathParam } from "@/lib/graph-path";
 import { readModeEntry, saveGraphEntry, saveModeEntry, type GraphEntry, type GraphRestoreState } from "@/lib/graph-entry";
 import { ISOLATED_BUNDLE_ID, type GraphFocus, type LegendKey } from "@/lib/graph-view";
+import { filterPersonalGraph, personalFilterLabel, readPersonalFilter, retainTargets, savePersonalFilter, type PersonalFilter } from "@/lib/personal-filter";
 import { emptyReasonMessage, modeLabel, type GraphMode } from "@/lib/labels";
 import { holdingWeightText } from "@/lib/holding";
 import { useMediaQuery } from "@/lib/theme";
@@ -126,6 +130,9 @@ export function MainPage() {
   const [guestPrompt, setGuestPrompt] = useState(false);
   const watchCount = settings.data?.watchlistIds.length ?? 0;
   const holdingCount = portfolio.data?.holdings.length ?? 0;
+  // 필터 칸의 종목 수: 아직 모르거나 받지 못했으면 숫자를 적지 않는다.
+  const knownWatchCount = settings.data ? watchCount : null;
+  const knownHoldingCount = portfolio.data ? holdingCount : null;
   // 기본 모드는 회원의 보유·관심을 알아야 정할 수 있다(설정·계좌 조회가 끝날 때까지 기다린다. 실패하면 전체).
   const personalKnown = (settings.isSuccess || settings.isError) && (portfolio.isSuccess || portfolio.isError);
   // 비회원은 개인화 주소로 와도 시장 전체 지도를 본다(로그인 안내만 띄운다).
@@ -138,6 +145,18 @@ export function MainPage() {
   const lastShownRef = useRef<{ mode: GraphMode; round: string | null; data: Schemas["GraphResponse"] } | null>(null);
   if (graph.data) lastShownRef.current = { mode, round, data: graph.data };
   const shown = lastShownRef.current;
+
+  // 개인화 필터(FS017): 회원의 내 종목 지도만 거른다. 보유·관심이 모두 없는 지도는 거르지 않는다(그 빈 상태를 그대로 보인다).
+  const [personalFilter, setPersonalFilter] = useState(readPersonalFilter);
+  const filterable = !isGuest && shown?.mode === "personal" && shown.data.metadata.emptyReason !== "no_personal_stocks";
+  const shownData = shown?.data;
+  const filtered = useMemo(
+    () => (filterable && shownData ? filterPersonalGraph(shownData, personalFilter) : null),
+    [filterable, shownData, personalFilter],
+  );
+  const display = filtered?.graph ?? shownData;
+  // 사이드바에서 고른 기업이 지금 필터에서 빠져 있을 때(FS026): 필터는 그대로 두고 안내한다.
+  const [excludedPick, setExcludedPick] = useState<{ id: string; name: string } | null>(null);
 
   // 보이는 지도의 모드가 바뀌면(전환 성공·뒤로 가기) 떠난 모드의 상태(주소·카메라·범례 필터)를 보관하고, 돌아온 모드의 필터·카메라를 꺼낸다.
   // 렌더 중에 바로 바꿔(파생 상태) 새 데이터와 같은 화면에 함께 그린다. 처음 그린 모드는 지도 복귀 값을 그대로 쓴다.
@@ -161,7 +180,7 @@ export function MainPage() {
   // 진행 중인 모드 전환(대상 모드 조회). 번호가 바뀌면 늦게 온 응답은 버린다.
   const [switching, setSwitching] = useState<{ mode: GraphMode; error: unknown } | null>(null);
   const switchSeqRef = useRef(0);
-  const [droppedNotice, setDroppedNotice] = useState(false);
+  const [droppedNotice, setDroppedNotice] = useState<string | null>(null);
   // 주소의 모드·회차가 전환 밖에서 바뀌면(뒤로 가기 등) 진행 중인 전환을 거둔다.
   useEffect(() => {
     switchSeqRef.current += 1;
@@ -248,41 +267,46 @@ export function MainPage() {
    *  범례 필터·카메라는 새 모드 지도가 보일 때(위 파생 상태) 함께 바뀐다. */
   const applyMode = (next: GraphMode, data: Schemas["GraphResponse"]) => {
     const saved = readModeEntry(next);
-    const savedParams = new URLSearchParams(saved?.url.split("?")[1] ?? "");
-    const inMap = (id: string) => data.nodes.some((n) => n.id === id);
-    const restored = new URLSearchParams();
-    let dropped = false;
-    const select = savedParams.get("select");
-    if (select) {
-      const id = select.replace(/^(edge|node):/, "");
-      if (select.startsWith("edge:") ? data.edges.some((e) => e.id === id) : id === ISOLATED_BUNDLE_ID || inMap(id)) restored.set("select", select);
-      else dropped = true;
-    }
-    const focusId = savedParams.get("focus");
-    if (focusId && inMap(focusId)) {
-      restored.set("focus", focusId);
-      restored.set("hops", savedParams.get("hops") ?? "1");
-    } else if (focusId) dropped = true;
-    for (const key of ["path", "impact"] as const) {
-      const pair = parsePathParam(savedParams.get(key));
-      if (pair && pair.every(inMap)) restored.set(key, pair.join(","));
-      else if (pair) dropped = true;
-    }
+    // 개인화 지도는 지금 필터로 거른 지도에 있는 대상만 복원한다.
+    const target = next === "personal" && data.metadata.emptyReason !== "no_personal_stocks" ? filterPersonalGraph(data, personalFilter).graph : data;
+    const { kept, dropped } = retainTargets(new URLSearchParams(saved?.url.split("?")[1] ?? ""), target);
     setParams((prev) => {
       const p = new URLSearchParams(prev);
       p.set("mode", next);
       for (const key of ["select", "focus", "hops", "path", "impact"]) p.delete(key);
-      restored.forEach((value, key) => p.set(key, value));
+      kept.forEach((value, key) => p.set(key, value));
       return p;
     });
     setSwitching(null);
-    setDroppedNotice(dropped);
+    setDroppedNotice(dropped ? "전에 고른 대상이 이 지도에 없어서 선택을 풀었어요." : null);
+  };
+
+  /** 개인화 필터 전환(FS017·FS019): 모드·주소 이력과 따로 두고 이 탭 세션에 기억한다. 새 범위에 없는 선택·포커스·경로는 풀고 알린다. */
+  const changeFilter = (next: PersonalFilter) => {
+    setExcludedPick(null);
+    if (next === personalFilter) return;
+    setPersonalFilter(next);
+    savePersonalFilter(next);
+    if (!shownData) return;
+    const { kept, dropped } = retainTargets(params, filterPersonalGraph(shownData, next).graph);
+    setDroppedNotice(dropped ? `고른 대상이 ${personalFilterLabel[next]} 범위에 없어서 선택을 풀었어요.` : null);
+    if (dropped)
+      setParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          for (const key of ["select", "focus", "hops", "path", "impact"]) p.delete(key);
+          kept.forEach((value, key) => p.set(key, value));
+          return p;
+        },
+        { replace: true },
+      );
   };
 
   /** 모드 전환(FS019): 대상 모드 지도를 먼저 받는다. 받는 동안·실패하면 지금 지도와 모드 표시를 그대로 둔다.
    *  다시 누르거나 다른 모드를 고르면 번호가 바뀌어 이전 전환의 늦은 응답은 버린다. 비회원의 개인화는 로그인 안내만 띄운다. */
   const setMode = (next: GraphMode) => {
-    setDroppedNotice(false);
+    setDroppedNotice(null);
+    setExcludedPick(null);
     if (isGuest && next === "personal") {
       setGuestPrompt(true);
       return;
@@ -318,7 +342,7 @@ export function MainPage() {
   };
 
   /** 사이드바 선택: 그 기업을 고르고 포커스·경로를 풀어 전체 배치에서 그 기업 중심으로 카메라를 옮긴다. */
-  const pickCompany = (id: string) => {
+  const selectCompany = (id: string) => {
     track({ type: "graph_node_select", targetId: id, viewId });
     const leavesMode = params.has("focus") || params.has("path") || params.has("impact");
     setParams(
@@ -334,6 +358,16 @@ export function MainPage() {
       { replace: !leavesMode },
     );
     setCenter((prev) => ({ id, seq: (prev?.seq ?? 0) + 1 }));
+  };
+  /** 개인화 필터로 빠진 기업이면(FS026) 필터를 자동으로 바꾸지 않고 안내와 [전체로 보기]를 띄운다. */
+  const pickCompany = (id: string) => {
+    const node = shownData?.nodes.find((n) => n.id === id);
+    if (node && filtered && !filtered.graph.nodes.some((n) => n.id === id)) {
+      setExcludedPick({ id, name: node.label });
+      return;
+    }
+    setExcludedPick(null);
+    selectCompany(id);
   };
 
   /** 회차 기준 그래프에서 현재 그래프로: 회차만 풀고 선택·포커스는 그대로 둔다(현재 그래프에 없는 대상은 지도가 알아서 해제한다). 뒤로 가기로 회차 기준 그래프에 돌아온다. */
@@ -357,7 +391,7 @@ export function MainPage() {
     );
   // 튜토리얼은 지도가 그려졌을 때만. 모바일 상세 시트가 열리면 안내를 시트 안으로 옮기고(지도 위 패널은 시트 뒤),
   // 단계 알림은 시트 쪽만 읽는다.
-  const showTutorial = tutorialOpen && (graph.data?.nodes.length ?? 0) > 0;
+  const showTutorial = tutorialOpen && (display?.nodes.length ?? 0) > 0;
   const tutorial = useGraphTutorial(showTutorial, closeTutorial, isGuest, () => goToLogin());
   const sheetOpen = isMobile && (selection !== null || path !== null || impact !== null);
   const hasSidebar = !isMobile && !showTutorial && !round;
@@ -388,8 +422,15 @@ export function MainPage() {
             fill={isMobile}
             className={isMobile ? "w-full" : undefined}
           />
-          {shownMode === "personal" && !isGuest && personalKnown && watchCount + holdingCount > 0 && (
-            <PersonalBasis holdingCount={holdingCount} watchCount={watchCount} />
+          {filterable && (
+            <PersonalFilterSwitch
+              value={personalFilter}
+              onValueChange={changeFilter}
+              holdingCount={knownHoldingCount}
+              watchCount={knownWatchCount}
+              fill={isMobile}
+              className={isMobile ? "w-full" : undefined}
+            />
           )}
         </>
       )}
@@ -437,10 +478,34 @@ export function MainPage() {
       </MapNotice>,
     );
   }
+  if (excludedPick && filtered) {
+    const { id } = excludedPick;
+    notices.push(
+      <MapNotice
+        key="excluded"
+        tone="info"
+        onDismiss={() => setExcludedPick(null)}
+        action={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              changeFilter("all");
+              selectCompany(id);
+            }}
+          >
+            전체로 보기
+          </Button>
+        }
+      >
+        지금은 {personalFilterLabel[personalFilter]} 종목만 보고 있어요. {excludedPick.name} 기업은 전체로 볼 때 보여요.
+      </MapNotice>,
+    );
+  }
   if (droppedNotice) {
     notices.push(
-      <MapNotice key="dropped" tone="info" onDismiss={() => setDroppedNotice(false)}>
-        전에 고른 대상이 이 지도에 없어서 선택을 풀었어요.
+      <MapNotice key="dropped" tone="info" onDismiss={() => setDroppedNotice(null)}>
+        {droppedNotice}
       </MapNotice>,
     );
   }
@@ -470,7 +535,24 @@ export function MainPage() {
         )}
       </>
     );
-  } else if (shown.data.nodes.length === 0 || shown.data.edges.length === 0) {
+  } else if (filtered && personalFilter !== "all" && display && (display.nodes.length === 0 || display.edges.length === 0)) {
+    // 고른 범위에 기준 종목이 없거나 연결된 사건이 없는 것은 오류가 아니라 빈 결과다(FS017 예외 처리). 다른 범위로 바꿀 수 있게 한다.
+    content = (
+      <>
+        {toolbar}
+        {loadingLabel && <p role="status" className="sr-only">{loadingLabel}</p>}
+        <FilterEmptyState
+          filter={personalFilter}
+          count={personalFilter === "holding" ? knownHoldingCount : knownWatchCount}
+          otherCount={personalFilter === "holding" ? knownWatchCount : knownHoldingCount}
+          loadError={personalFilter === "holding" ? portfolio.error : settings.error}
+          onRetry={() => void (personalFilter === "holding" ? portfolio.refetch() : settings.refetch())}
+          companies={display.nodes.filter((n) => n.kind === "company").map((n) => n.label)}
+          onFilter={changeFilter}
+        />
+      </>
+    );
+  } else if (!display || display.nodes.length === 0 || display.edges.length === 0) {
     // 관계 0건은 오류가 아니라 '연결 없음'이다(FS017). 내 종목만 있고 연결이 없으면 그 기업들을 밝힌다.
     content = (
       <>
@@ -487,7 +569,7 @@ export function MainPage() {
   } else {
     content = (
       <GraphExplorer
-        graph={shown.data}
+        graph={display}
         mapName={`${shownName} 지도`}
         selection={selection}
         onSelectionChange={setSelection}
@@ -507,6 +589,8 @@ export function MainPage() {
         sheetTop={showTutorial ? <GraphTutorialSheetBar tutorial={tutorial} onCloseSheet={() => setSelection(null)} /> : undefined}
         loadingLabel={loadingLabel}
         toolbar={toolbar}
+        // 개인화 필터가 보유·관심 고리를 보이므로 범례에서는 빼 도구 막대 줄 수를 늘리지 않는다(§4.9 지도 면적 우선).
+        legendMarks={!filterable}
         className="flex-1"
       />
     );
@@ -539,24 +623,65 @@ export function MainPage() {
   );
 }
 
-/** 개인화 지도의 기준: 보유가 없으면 관심 종목만으로 만든다는 것을 함께 보인다. */
-function PersonalBasis({ holdingCount, watchCount }: { holdingCount: number; watchCount: number }) {
+/** 개인화 필터로 고른 범위가 비었을 때(FS017 예외 처리). 오류가 아니라 빈 결과이므로 다른 범위로 바꾸는 길을 둔다.
+ *  종목 수를 받지 못했으면 '없음'으로 단정하지 않고 불러오지 못했다고 적는다. */
+function FilterEmptyState({
+  filter,
+  count,
+  otherCount,
+  loadError,
+  onRetry,
+  companies,
+  onFilter,
+}: {
+  filter: Exclude<PersonalFilter, "all">;
+  count: number | null;
+  otherCount: number | null;
+  loadError: unknown;
+  onRetry: () => void;
+  companies: string[];
+  onFilter: (filter: PersonalFilter) => void;
+}) {
+  const label = personalFilterLabel[filter];
+  const other = filter === "holding" ? "watch" : "holding";
+  const toAll = (
+    <Button variant="ghost" onClick={() => onFilter("all")}>
+      전체로 보기
+    </Button>
+  );
+  if (count === null && loadError) return <ErrorState error={loadError} title={`${label} 종목을 불러오지 못했어요`} onRetry={onRetry} />;
+  if (count === 0) {
+    return (
+      <EmptyState
+        title={`${label} 종목이 없어요`}
+        description={filter === "holding" ? "가상 계좌를 연결하면 보유 종목 기준으로 볼 수 있어요." : "관심 종목을 고르면 그 기준으로 볼 수 있어요."}
+        action={
+          <>
+            <Button asChild>
+              <Link to="/me/stocks">{filter === "holding" ? "가상 계좌 연결하기" : "관심 종목 고르기"}</Link>
+            </Button>
+            {(otherCount ?? 0) > 0 && (
+              <Button variant="ghost" onClick={() => onFilter(other)}>
+                {other === "watch" ? "관심으로 보기" : "보유로 보기"}
+              </Button>
+            )}
+            {toAll}
+          </>
+        }
+      />
+    );
+  }
+  // 기준 종목은 있지만 연결된 공개 관계가 없다(관계 0건). 기준 기업은 밝힌다.
   return (
-    <p className="flex items-center gap-2 text-sm text-text-secondary tabular-nums">
-      {holdingCount > 0 && (
-        <span className="flex items-center gap-1">
-          <MarkRing kind="holding" />
-          보유 {holdingCount}
-        </span>
-      )}
-      {watchCount > 0 && (
-        <span className="flex items-center gap-1">
-          <MarkRing kind="watch" />
-          관심 {watchCount}
-        </span>
-      )}
-      <span>{holdingCount === 0 ? "기준 · 보유 종목 없음" : "기준"}</span>
-    </p>
+    <EmptyState
+      title={`${label} 종목과 연결된 사건이 아직 없어요`}
+      description={
+        companies.length > 0
+          ? `${companies.slice(0, 3).join(", ")}${companies.length > 3 ? ` 외 ${companies.length - 3}곳` : ""}에 연결된 공개 관계가 아직 없어요.`
+          : "확인된 공개 관계가 아직 없어요."
+      }
+      action={toAll}
+    />
   );
 }
 

@@ -1,0 +1,104 @@
+{
+  "id": "D-GRP-04",
+  "title": "연결선 상세",
+  "route": "/?mode=all&select=edge%3Aedge-f53400022fc7c812",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS023·FS024",
+  "requirements": "23·24",
+  "entry": "기업 패널의 사건 공유 기업 선택",
+  "states": "연결선 선택 · 상세 조회 중·실패 · 공유·근거 0건",
+  "capturedState": "기본",
+  "stateSource": "features/node-panel.tsx",
+  "stateImages": [
+    "docs/design/v5/graph-edge-panel-1440-light.png"
+  ],
+  "note": "기업 간 사건 공유·사건 간 후속 관계만 선택해요. 공급·경쟁 직결 관계를 만들지 않아요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "근거 .*건 보기",
+        "regex": true
+      },
+      "box": {
+        "x": 1052,
+        "y": 374,
+        "width": 139.703125,
+        "height": 44
+      },
+      "result": "공유 사건의 근거를 한 창에서 보여줘요.",
+      "destination": "D-GRP-05",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "상세 닫기"
+      },
+      "box": {
+        "x": 1367,
+        "y": 142,
+        "width": 44,
+        "height": 44
+      },
+      "result": "연결선 선택을 해제해요",
+      "destination": "D-GRP-01",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "box": {
+        "x": 1199.703125,
+        "y": 374,
+        "width": 127.421875,
+        "height": 44
+      },
+      "result": "연결선을 질문 후보로 넘겨요",
+      "destination": "D-AI-01",
+      "mode": "overlay"
+    }
+  ],
+  "image": "D-GRP-04.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n같은 사건 2건 연결선 선택됨\n\n흐름 순으로 정렬\n삼성전자 – 삼성에스디에스\n\n같은 사건 2건\n사건 공유\n\n두 기업이 같은 사건에 함께 등장했다는 뜻이에요. 직접 거래나 영향 관계는 아니에요.\n\n방향\n방향 없음\n공유 사건\n2건 · 2026-09-29\n확인 시점\n2026-10-01 20:21 KST\n근거 4건 보기\nAI에게 묻기\n연결된 두 대상\n기업:\n삼성전자\n삼\n기업:\n삼성에스디에스\n함께 언급된 사건 2건\n발생 시각 미상\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "근거 .*건 보기"
+      },
+      "before": "/?mode=all&select=edge%3Aedge-f53400022fc7c812",
+      "url": "/?mode=all&select=edge%3Aedge-f53400022fc7c812",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n같은 사건 2건 연결선 선택됨\n\n흐름 순으로 정렬\n삼성전자 – 삼성에스디에스\n\n같은 사건 2건\n사건 공유\n\n두 기업이 같은 사건에 함께 등장했다는 뜻이에요. 직접 거래나 영향 관계는 아니에요.\n\n방향\n방향 없음\n공유 사건\n2건 · 2026-09-29\n확인 시점\n2026-10-01 20:21 KST\n근거 4건 보기\nAI에게 묻기\n연결된 두 대상\n기업:\n삼성전자\n삼\n기업:\n삼성에스디에스\n함께 언급된 사건 2건\n발생 시각 미상\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n근거 문서\n\n삼성전자 – 삼성에스디에스\n\n관계 확인 시점\n2026-10-01 20:21 KST\n\nSamsung Electronics Newsroom (news.samsung.com)\n·\n발행 2026-07-04 01:25 KST\n\n삼성, 미래 성장 위해 영남에 60조원 투자 계획\n\n“① 삼성전자∙삼성SDS, 휴머노이드∙제조AX 접목, 최첨단 미래 제조단지 구축 예정”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nSamsung Electronics Newsroom (news.samsung.com)\n·\n발행 2026-07-04 01:25 KST\n\n삼성, 미래 성장 위해 영남에 60조원 투자 계획\n\n“구미에 ▲휴머노이드 양산 체계 및 로봇 데이터 팩토리 구축 ▲제조∙로봇 자동화 산업 핵심 인프라인 AI 데이터센터 신축 등에 투자할 계획이다.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nSamsung Electronics Newsroom (news.samsung.com)\n·\n발행 2026-09-29 17:00 KST\n\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\n“삼성전자와 삼성물산, 삼성SDS, 삼성SDI, 삼성생명, 삼성화재 등 6개사는 29일 미국의 글로벌 투자 회사 KKR이 설립한 AI 인프라 기업 ‘헬릭스 디지털 인프라스트럭처(Helix Digital Infrastructure, 이하 헬릭스)’에 총 10억 달러를 투자하기로 결정했다고 밝혔다.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nSamsung Electronics Newsroom (news.samsung.com)\n·\n발행 2026-09-29 17:00 KST\n\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\n“삼성 관계사들은 KKR, 엔비디아(Nvidia), 미국 전력 회사 비스트라(Vistra), 쿠웨이트투자청(KIA) 등 글로벌 AI 인프라 생태계를 이끄는 투자사, 반도체 기업, 전력 회사와 나란히 헬릭스의 창립 투자자로 참여했다.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "상세 닫기"
+      },
+      "before": "/?mode=all&select=edge%3Aedge-f53400022fc7c812",
+      "url": "/?mode=all",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "before": "/?mode=all&select=edge%3Aedge-f53400022fc7c812",
+      "url": "/?mode=all&select=edge%3Aedge-f53400022fc7c812",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n같은 사건 2건 연결선 선택됨\n\n흐름 순으로 정렬\n삼성전자 – 삼성에스디에스\n\n같은 사건 2건\n사건 공유\n\n두 기업이 같은 사건에 함께 등장했다는 뜻이에요. 직접 거래나 영향 관계는 아니에요.\n\n방향\n방향 없음\n공유 사건\n2건 · 2026-09-29\n확인 시점\n2026-10-01 20:21 KST\n근거 4건 보기\nAI에게 묻기\n연결된 두 대상\n기업:\n삼성전자\n삼\n기업:\n삼성에스디에스\n함께 언급된 사건 2건\n발생 시각 미상\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n근거 2건 보기\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n질문에 연결할 대상\n삼성전자 – 삼성에스디에스 사건 공유\n함께 언급된 사건 2건 · 2026-09-29 · 근거 4건\n삼성전자\n삼성에스디에스\n\n내 질문:\n그 기업은 언제?\n\n연결한 대상: 없음\n\n‘그 기업’만으로는 어느 대상인지 알 수 없어요. 그래프에서 기업이나 사건을 고르거나 기업 이름을 알려 주세요.\n\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
+      "number": 3
+    }
+  ]
+}

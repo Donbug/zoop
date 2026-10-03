@@ -12,6 +12,7 @@ from .schemas import (
     BriefingReferences,
     BriefingWindow,
     CamelModel,
+    MarketVariables,
 )
 
 Reason = Annotated[str, Field(min_length=1, max_length=500)]
@@ -750,6 +751,10 @@ class BriefingPayload(CamelModel):
     references: BriefingReferences
     empty_reason: Literal["no_issues_in_window"] | None
     selected_from: int
+    market_variables: MarketVariables | None = Field(
+        default=None,
+        description="Market indicators stored at generation (FS031); null on rounds published before they were collected",
+    )
     metadata: BriefingMetadata
 
 

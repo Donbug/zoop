@@ -1,7 +1,7 @@
 // UI-08 출퇴근 브리핑(요구 26–31). 발행된 공통 회차를 날짜·출근/퇴근으로 골라 본다(모두에게 같은 발행본).
-// 머리에 발행일·구분·예정/발행 시각·데이터 기준 시점, 본문은 핵심 이슈 최대 3개. 미준비·실패·제공 중단은 안내 한 줄,
-// 정정은 발행 원문을 지우지 않고 원문과 나란히 따로 보여 준다. 예측·상승 확률 문구는 넣지 않는다.
-import { Ban, CircleAlert, Clock, FilePen, Info, Moon, Network, Newspaper, Sun } from "lucide-react";
+// 머리에 발행일·회차 상태·예정/생성/발행 시각·데이터 기준 시점, 본문은 주요 시장 지표(FS031) → 핵심 이슈 최대 3개 → (퇴근) 아침 이후 바뀐 내용.
+// 미준비·실패·제공 중단은 안내 한 줄, 정정은 발행 원문을 지우지 않고 원문과 나란히 따로 보여 준다. 예측·상승 확률 문구는 넣지 않는다.
+import { Ban, CircleAlert, Clock, FilePen, Moon, Network, Newspaper, Sun } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import type { Schemas } from "@/api/client";
@@ -10,6 +10,8 @@ import { BriefingCard } from "@/components/domain/briefing-card";
 import { EventRow, IconCount } from "@/components/domain/event-row";
 import { FeedbackButtons } from "@/components/domain/feedback-buttons";
 import { DisclaimerNote } from "@/components/domain/status-labels";
+import { MarketIndicatorsSection } from "@/features/briefing-market";
+import { SinceMorningSection } from "@/features/briefing-since-morning";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
 import { Segmented } from "@/components/ui/segmented";
@@ -138,79 +140,85 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
   const openIssue = (eventId: string) => track({ type: "briefing_issue_open", targetId: eventId, roundId: briefing.id, viewId });
 
   let summary: ReactNode = null;
-  if (published && briefing.items.length === 0) {
-    summary = <EmptyState title="이번 회차에 담을 핵심 이슈가 없어요" description="데이터 범위 안에서 선정 기준을 충족한 사건이 없었어요." />;
-  } else if (published) {
+  if (published) {
     summary = (
-      <section aria-labelledby="briefing-section-title">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-4">
-          <h3 id="briefing-section-title" className="text-base font-semibold text-text-primary">
-            핵심 이슈
-          </h3>
-          <Button variant="link" size="sm" asChild>
-            <Link to={roundGraphPath(briefing.id)}>
-              <Network aria-hidden="true" />이 회차 전체 관계 그래프
-            </Link>
-          </Button>
-        </div>
-        <ol className="stagger">
-          {briefing.items.map((item) => {
-            const corrections = briefing.corrections.filter((c) => c.eventId === item.eventId);
-            return (
-              <li key={item.eventId} className="flex flex-col gap-2 border-b border-border-subtle pb-4 last:border-b-0">
-                <EventRow
-                  headingLevel="h4"
-                  title={`${item.rank}. ${item.title}`}
-                  eventTime={item.eventTime}
-                  timePrecision={item.timePrecision}
-                  companies={item.companies.map((c) => ({ id: c.id, name: c.name }))}
-                  linkState={{ from: `${location.pathname}${location.search}` }}
-                  evidenceCount={item.evidenceCount}
-                  onSelect={() => {
-                    openIssue(item.eventId);
-                    navigate(roundGraphPath(briefing.id, item.eventId));
-                  }}
-                  divider={false}
-                  className="pb-0"
-                  meta={<IconCount icon={Newspaper} label="보도 기사" count={item.sourceSupport.articleCount} />}
-                />
-                <p className="text-sm text-text-secondary">
-                  <span className="font-medium">선정 이유</span> {item.reason}
-                </p>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <Button variant="link" size="sm" asChild>
-                    <Link to={roundGraphPath(briefing.id, item.eventId)} onClick={() => openIssue(item.eventId)}>
-                      <Network aria-hidden="true" />
-                      이 회차 관계 그래프에서 보기
-                    </Link>
-                  </Button>
-                </div>
-                <FeedbackButtons feature="briefing_issue" targetId={`${briefing.id}/${item.eventId}`} targetVersion={briefing.graphVersion} subject={`핵심 이슈 ${item.rank}`} />
-                {corrections.map((c) => (
-                  <CorrectionNote key={c.id} correction={c} />
-                ))}
-              </li>
-            );
-          })}
-        </ol>
-        <div className="flex flex-wrap items-center gap-x-3 border-t border-border-subtle py-2">
-          <span className="text-sm font-medium text-text-primary">이 회차가 도움이 됐나요?</span>
-          <FeedbackButtons feature="briefing_round" targetId={briefing.id} targetVersion={briefing.graphVersion} subject="이 브리핑 회차" />
-        </div>
-        <p className="flex items-center gap-2 border-t border-border-subtle py-3 text-sm text-text-secondary">
-          <Info className="size-4 shrink-0" aria-hidden="true" />
-          시장 요약과 주요 시장 변수는 아직 제공하지 않아요.
-        </p>
-      </section>
+      <div className="flex flex-col">
+        <MarketIndicatorsSection market={briefing.marketVariables} />
+        {briefing.items.length === 0 ? (
+          <EmptyState title="이번 회차에 담을 핵심 이슈가 없어요" description="데이터 범위 안에서 선정 기준을 충족한 사건이 없었어요." />
+        ) : (
+          <section aria-labelledby="briefing-section-title" className="mt-3 border-t border-border-subtle">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-4">
+              <h3 id="briefing-section-title" className="text-base font-semibold text-text-primary">
+                핵심 이슈
+              </h3>
+              <Button variant="link" size="sm" asChild>
+                <Link to={roundGraphPath(briefing.id)}>
+                  <Network aria-hidden="true" />이 회차 전체 관계 그래프
+                </Link>
+              </Button>
+            </div>
+            <ol className="stagger">
+              {briefing.items.map((item) => {
+                const corrections = briefing.corrections.filter((c) => c.eventId === item.eventId);
+                return (
+                  <li key={item.eventId} className="flex flex-col gap-2 border-b border-border-subtle pb-4 last:border-b-0">
+                    <EventRow
+                      headingLevel="h4"
+                      title={`${item.rank}. ${item.title}`}
+                      eventTime={item.eventTime}
+                      timePrecision={item.timePrecision}
+                      companies={item.companies.map((c) => ({ id: c.id, name: c.name }))}
+                      linkState={{ from: `${location.pathname}${location.search}` }}
+                      evidenceCount={item.evidenceCount}
+                      onSelect={() => {
+                        openIssue(item.eventId);
+                        navigate(roundGraphPath(briefing.id, item.eventId));
+                      }}
+                      divider={false}
+                      className="pb-0"
+                      meta={<IconCount icon={Newspaper} label="보도 기사" count={item.sourceSupport.articleCount} />}
+                    />
+                    <p className="text-sm text-text-secondary">
+                      <span className="font-medium">선정 이유</span> {item.reason}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <Button variant="link" size="sm" asChild>
+                        <Link to={roundGraphPath(briefing.id, item.eventId)} onClick={() => openIssue(item.eventId)}>
+                          <Network aria-hidden="true" />
+                          이 회차 관계 그래프에서 보기
+                        </Link>
+                      </Button>
+                    </div>
+                    <FeedbackButtons feature="briefing_issue" targetId={`${briefing.id}/${item.eventId}`} targetVersion={briefing.graphVersion} subject={`핵심 이슈 ${item.rank}`} />
+                    {corrections.map((c) => (
+                      <CorrectionNote key={c.id} correction={c} />
+                    ))}
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        )}
+        {briefing.sinceMorning && <SinceMorningSection since={briefing.sinceMorning} roundId={briefing.id} roundDate={briefing.date} graphHref={roundGraphPath} />}
+        {briefing.items.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 border-t border-border-subtle py-2">
+            <span className="text-sm font-medium text-text-primary">이 회차가 도움이 됐나요?</span>
+            <FeedbackButtons feature="briefing_round" targetId={briefing.id} targetVersion={briefing.graphVersion} subject="이 브리핑 회차" />
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
     <BriefingCard
       edition={briefing.edition}
+      status={briefing.status}
       date={briefing.date}
       scheduledAt={formatKst(briefing.scheduledAt).slice(11, 16)}
       publishedAt={briefing.publishedAt ? formatKst(briefing.publishedAt) : null}
+      generatedAt={briefing.generatedAt ? formatKst(briefing.generatedAt) : null}
       dataAsOf={briefing.dataAsOf ? formatKst(briefing.dataAsOf) : null}
       notice={<RoundNotice briefing={briefing} />}
       corrections={

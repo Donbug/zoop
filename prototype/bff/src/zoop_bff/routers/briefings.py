@@ -24,6 +24,9 @@ def get_briefing(
     """A published commute-briefing round (07:40 morning / 18:10 evening KST), the same for everyone.
 
     At most three key issues chosen by rule from the round's data window; the round is never padded.
+    ``marketVariables`` holds KOSPI, KOSDAQ and USD/KRW as they stood when the round was generated (value, change
+    against the previous trading day, the real observation time, source, and a per-indicator state); they are
+    stored with the published round and never change. An evening round also carries ``sinceMorning``.
     A round that is not ready, failed, suspended or corrected says so in ``status``/``notice``/
     ``corrections`` instead of an error. No prediction, probability or good/bad-news field exists.
     """

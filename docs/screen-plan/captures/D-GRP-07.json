@@ -1,0 +1,130 @@
+{
+  "id": "D-GRP-07",
+  "title": "포커스·두 기업 사이 경로",
+  "route": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS020·FS023",
+  "requirements": "20·23",
+  "entry": "기업 패널 → 다른 기업과의 연결 보기 → NVIDIA",
+  "states": "연결됨 · 두 기업을 잇는 사건 없음 · 경로 해제",
+  "capturedState": "기본",
+  "stateSource": "features/path-panel.tsx · features/graph-explorer.tsx",
+  "stateImages": [
+    "docs/design/v5/graph-personal-empty-1440-light.png"
+  ],
+  "note": "경로는 실제 사건을 거쳐요. 주가의 원인·영향 크기가 아니에요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "전체 보기",
+        "regex": false
+      },
+      "box": {
+        "x": 311.09375,
+        "y": 149,
+        "width": 96.453125,
+        "height": 36
+      },
+      "result": "두 기업 경로를 풀고 전체 지도를 보여줘요.",
+      "destination": "D-GRP-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "다른 기업 고르기"
+      },
+      "box": {
+        "x": 1052,
+        "y": 194,
+        "width": 154.671875,
+        "height": 44
+      },
+      "result": "두 번째 기업 선택창을 다시 열어요",
+      "destination": "D-GRP-07",
+      "mode": "escape"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "경로를 찾는 방법"
+      },
+      "box": {
+        "x": 1371,
+        "y": 262,
+        "width": 28,
+        "height": 28
+      },
+      "result": "방향을 무시한 최소 단계 규칙을 보여줘요",
+      "destination": "D-GRP-07",
+      "mode": "escape"
+    },
+    {
+      "number": 4,
+      "selector": {
+        "role": "button",
+        "name": "경로 닫기"
+      },
+      "box": {
+        "x": 1367,
+        "y": 142,
+        "width": 44,
+        "height": 44
+      },
+      "result": "두 기업 경로를 해제해요",
+      "destination": "D-GRP-01",
+      "mode": "nav"
+    }
+  ],
+  "image": "D-GRP-07.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬\n\n삼성전자에서 NVIDIA까지 경로,\n삼성전자\nNVIDIA\n· 2단계\n\n전체 보기\n삼성전자 ↔ NVIDIA\n다른 기업 고르기\n2단계\n기업:\n삼성전자\n직접 관련:\n투자사\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n직접 관련:\n공동 설립 투자사\n기업:\nNVIDIA",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "전체 보기"
+      },
+      "before": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+      "url": "/?mode=all",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "다른 기업 고르기"
+      },
+      "before": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+      "url": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬\n\n삼성전자에서 NVIDIA까지 경로,\n삼성전자\nNVIDIA\n· 2단계\n\n전체 보기\n삼성전자 ↔ NVIDIA\n다른 기업 고르기\n2단계\n기업:\n삼성전자\n직접 관련:\n투자사\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n직접 관련:\n공동 설립 투자사\n기업:\nNVIDIA\n연결을 볼 기업\n삼\n삼성물산\n삼\n삼성에스디에스\n삼\n삼성전기\n삼\n삼성SDI\n현대자동차\nA\nAmazon\nApple\nA\nASML\nC\nCadence\nC\nCoreWeave\nGeneral Motors\nGoogle\nK\nKT\nM\nMicron\nM\nMicrosoft\nNAVER\nN\nNebius\nNVIDIA\nO\nOracle\nPalantir\nS\nSalesforce\nS\nSK텔레콤\nS\nSK하이닉스\nTesla\nT\nTSMC",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "경로를 찾는 방법"
+      },
+      "before": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+      "url": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬\n\n삼성전자에서 NVIDIA까지 경로,\n삼성전자\nNVIDIA\n· 2단계\n\n전체 보기\n삼성전자 ↔ NVIDIA\n다른 기업 고르기\n2단계\n기업:\n삼성전자\n직접 관련:\n투자사\n2026-09-29\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n근거 2건 보기\n직접 관련:\n공동 설립 투자사\n기업:\nNVIDIA\n\n경로를 찾는 방법\n\n승인된 관계 선만 따라 가장 적은 단계로 잇는 경로예요. 선의 방향은 따지지 않고, 같은 사건에 함께 언급된 파생 경로(사건 공유)는 쓰지 않아요.",
+      "number": 3
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "경로 닫기"
+      },
+      "before": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA",
+      "url": "/?mode=all",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 4
+    }
+  ]
+}

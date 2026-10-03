@@ -991,7 +991,7 @@ export function DesignSystemPage() {
             />
           </Demo>
 
-          <Demo id="c-appbar" name="AppBar · BottomTabBar" when="모바일(768px 이하) 위아래 고정 바예요. 앱 셸이 이미 쓰고 있어서 화면에서는 따로 넣지 않아요. 아래는 390px 폭 예시예요." code={'<BottomTabBar tabs={[{ to: "/", label: "지도", icon: MapIcon, end: true }, …]} />'}>
+          <Demo id="c-appbar" name="AppBar · BottomTabBar" when="모바일(768px 이하) 위아래 고정 바예요. 앱 셸이 이미 쓰고 있어서 화면에서는 따로 넣지 않아요. AI 탭은 화면을 옮기지 않고 AI 질문 창을 열어요. 아래는 390px 폭 예시예요." code={'<BottomTabBar tabs={[{ to: "/", label: "지도", icon: MapIcon, end: true }, …, { id: "ai", label: "AI", icon: Sparkles, onPress: openScreenChat, open: chatOpen }, …]} />'}>
             <div className="w-full max-w-[390px] bg-surface-raised">
               <AppBar leading={<span className="text-lg font-bold text-text-primary">줍</span>} title="예시 화면" trailing={<SourceIndicator kind="synthetic-preview" />} />
               <div className="h-24 bg-surface-base" aria-hidden="true" />
@@ -1001,6 +1001,7 @@ export function DesignSystemPage() {
                 tabs={[
                   { to: ".", label: "지도", icon: MapIcon },
                   { to: "/briefing", label: "브리핑", icon: Newspaper },
+                  { id: "ai", label: "AI", icon: Sparkles, onPress: () => toast({ title: "예시: AI 질문 창을 열어요" }), open: false },
                   { to: "/me/stocks", label: "내 종목", icon: Bookmark },
                 ]}
               />
@@ -1125,12 +1126,12 @@ export function DesignSystemPage() {
             id="c-briefing"
             name="BriefingCard"
             when="브리핑 1회분이에요. 바깥 경계는 이것 하나이고, 안은 EventRow로 채워요. 그래서 이 예시는 프레임 없이 보여줘요."
-            code={'<BriefingCard edition="morning" date={date} scheduledAt="07:40" publishedAt={…} dataAsOf={…} notice={…} corrections={…} totalEvidence={3} summary={…} relations={…} />'}
-            frame={false}
+            code={'<BriefingCard edition="morning" status="published" date={date} scheduledAt="07:40" publishedAt={…} dataAsOf={…} notice={…} corrections={…} totalEvidence={3} summary={…} relations={…} />'}
           >
             <BriefingCard
               className="max-w-2xl"
               edition="morning"
+              status="published"
               date="2026-09-29"
               scheduledAt="07:40"
               publishedAt="2026-09-29 07:41 KST"

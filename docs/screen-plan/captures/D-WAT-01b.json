@@ -1,0 +1,104 @@
+{
+  "id": "D-WAT-01b",
+  "title": "관심 종목 4개 선택",
+  "route": "/onboarding",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS012",
+  "requirements": "12",
+  "entry": "추천 기업을 네 번 선택",
+  "states": "0개 · 선택·해제 · 검색·결과 없음 · 저장 실패",
+  "capturedState": "4개 선택",
+  "stateSource": "pages/onboarding-page.tsx · components/domain/company-search.tsx",
+  "stateImages": [
+    "docs/design/v6/search-explicit-390-light.png"
+  ],
+  "note": "3개 상한 없이 실제 4개를 선택했어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "NVIDIA 빼기",
+        "regex": false
+      },
+      "box": {
+        "x": 956,
+        "y": 220.25,
+        "width": 44,
+        "height": 44
+      },
+      "result": "선택 목록에서 NVIDIA를 빼고 3개로 바꿔요.",
+      "destination": "D-WAT-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "삼성전자 빼기"
+      },
+      "box": {
+        "x": 956,
+        "y": 268.25,
+        "width": 44,
+        "height": 44
+      },
+      "result": "삼성전자를 선택 목록에서 빼요",
+      "destination": "D-WAT-01",
+      "mode": "picked"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "SK텔레콤 빼기"
+      },
+      "box": {
+        "x": 956,
+        "y": 316.25,
+        "width": 44,
+        "height": 44
+      },
+      "result": "SK텔레콤을 선택 목록에서 빼요",
+      "destination": "D-WAT-01",
+      "mode": "picked"
+    }
+  ],
+  "image": "D-WAT-01b.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n4개\nNVIDIA\n삼성전자\nS\nSK텔레콤\nS\nSalesforce\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n선택됨\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n4개 종목으로 시작하기",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "NVIDIA 빼기"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nS\nSalesforce\n삼성전자\nS\nSK텔레콤\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n추가\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n선택됨\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n3개 종목으로 시작하기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "삼성전자 빼기"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nNVIDIA\nS\nSK텔레콤\nS\nSalesforce\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n추가\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n선택됨\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n3개 종목으로 시작하기",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "SK텔레콤 빼기"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nNVIDIA\nS\nSalesforce\n삼성전자\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n3개 종목으로 시작하기",
+      "number": 3
+    }
+  ]
+}

@@ -9,9 +9,14 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | [poc-backend.md](poc-backend.md) | `~/InvestMateLogicTest` PoC의 아키텍처·데이터 계약·연동 가능 표면·실행 확인·BFF 매핑 |
 | [review-policy.md](review-policy.md) | 보류가 많은 이유(원인 분포)·자동 검수 규칙 R1@2(역할 문구 미확인은 역할만 빼고 게시)의 효과·표본 판정·문턱값 시뮬레이션과 권고안 |
 | [spec-v1.2-gap.md](spec-v1.2-gap.md) | 기능·비기능명세서 v1.2 93개 명세와 현재 프로토타입 대조: 판정표, 명세와 반대로 동작하는 11건, 팀 결정·데이터가 막는 항목 |
+| [spec-wbs-delta-2026-10-03.md](spec-wbs-delta-2026-10-03.md) | 10-03 갱신 명세(15시트, v2 시트 2개)·WBS v0.2와 10-01 고정본의 차이, 팀 결정 6개 반영 여부, WBS 전수 작업표, 현재 구현과의 충돌·중복 |
+| [notion-delta-2026-10-03.md](notion-delta-2026-10-03.md) | Notion 10-03 재수집(120페이지)과 9/29 대비 변경: 9/30·10/1·10/2 회의 결정, AI v1.3, 역할안, 문서 간 충돌 |
+| [screen-plan-v1.7-review.md](screen-plan-v1.7-review.md) | 팀 화면계획서 v1.7·Figma 평가: 채택·불채택과 근거, 우리 프로토타입 약점(머리 정정 포함) |
 | `raw/` | 원본 변환본: Notion export(112페이지), 명세서·WBS 변환, 플로우 SVG |
 | `raw/functional-spec_2026-10-01/` | **기능 정본(2026-10-01 20:41 KST 고정본).** 팀 확정 「줍 기능·비기능명세서 — 상세형 v1.2」 원본 xlsx(sha256 `a7f52731…`)와 시트별 CSV 13개(목차, 영역 9개, 비기능, 변경 내역, 제안·확인 사항 D01–D12). 기능 81개·비기능 12개, 명세마다 상세 항목 11개. 출처: `docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs`. |
 | `raw/requirements-sheet_2026-10-01/` | 이전 작업용 정본(2026-10-01 11:04 KST). 요구사항 정의서 v0.1(82행)·검증 기준·정책 결정. v1.2 명세의 「원본 요구사항 ID」가 이 정의서 계열 번호를 잇는다(번호는 v1.2 목차 기준). 출처: `docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k`. |
+| `raw/functional-spec_2026-10-03/` | 갱신 명세 고정본(2026-10-03 14:19 KST 수집). 원본 `zoop-functional-spec_2026-10-03.xlsx`와 계산값 기준 시트별 CSV 15개. 기존 시트와 `메인그래프 v2`·`AI 챗봇 v2`가 함께 있으며 기준 채택 여부는 별도 판단한다. 출처: `https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs`. sha256: `b48f1a7fc73e10f75a1c52ec199125c5b14afa069c2f87fb31aac88f384f7c0e`. |
+| `raw/wbs_2026-10-03/` | 새 WBS v0.2 고정본(2026-10-03 14:19 KST 수집, 문서 최종 수정일 10-02). 원본 `zoop-wbs_2026-10-03.xlsx`와 계산값 기준 CSV 3개(표지·변경이력, 프로젝트 WBS, 개발 일정 요약). 출처: `https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c`. sha256: `e613b38d1adef34c5cbd4ee80cdae2d7df39f25f1957e01632e4180e74c28258`. |
 
 ## 증거 범위와 제외
 

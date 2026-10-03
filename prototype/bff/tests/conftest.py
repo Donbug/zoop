@@ -71,6 +71,7 @@ class AdminKit:
     launcher: FakeLauncher
     settings: Settings
     state_dir: Path
+    market: Any = None
 
     @property
     def clock(self):
@@ -84,13 +85,13 @@ class AdminKit:
 
     def restart(self) -> AdminKit:
         """A new app over the same state directory, ledger and sandbox (a BFF process restart)."""
-        return _assemble(self.settings, self.ledger, self.neo4j, self.sandbox, self.launcher)
+        return _assemble(self.settings, self.ledger, self.neo4j, self.sandbox, self.launcher, self.market)
 
 
-def _assemble(settings, ledger, neo4j, sandbox, launcher) -> AdminKit:
-    services = build_admin_services(settings, ledger=ledger, neo4j=neo4j, sandbox=sandbox, launcher=launcher)
+def _assemble(settings, ledger, neo4j, sandbox, launcher, market=None) -> AdminKit:
+    services = build_admin_services(settings, ledger=ledger, neo4j=neo4j, sandbox=sandbox, launcher=launcher, market=market)
     client = TestClient(create_app(settings, services=services))
-    return AdminKit(client, services, ledger, neo4j, sandbox, launcher, settings, settings.state_dir)
+    return AdminKit(client, services, ledger, neo4j, sandbox, launcher, settings, settings.state_dir, market)
 
 
 @pytest.fixture
@@ -99,7 +100,7 @@ def make_admin(tmp_path: Path) -> Callable[..., AdminKit]:
     built = 0
 
     def build(
-        payload: dict[str, Any] | None = None, *, ledger_payload: dict[str, Any] | None = None, **settings: Any
+        payload: dict[str, Any] | None = None, *, ledger_payload: dict[str, Any] | None = None, market: Any = None, **settings: Any
     ) -> AdminKit:
         nonlocal built
         built += 1
@@ -112,7 +113,7 @@ def make_admin(tmp_path: Path) -> Callable[..., AdminKit]:
         config = Settings(snapshot_path=snapshot, **settings)
         ledger = FakeLedger(copy.deepcopy(ledger_payload if ledger_payload is not None else seed))
         sandbox = FakeSandbox(tmp_path / f"admin-sandbox-{built}")
-        return _assemble(config, ledger, FakeNeo4j(ledger), sandbox, FakeLauncher())
+        return _assemble(config, ledger, FakeNeo4j(ledger), sandbox, FakeLauncher(), market)
 
     return build
 

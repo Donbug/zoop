@@ -4,16 +4,19 @@ import { formatPrice } from "@/lib/market";
 import { cn } from "@/lib/utils";
 
 /** 등락: 색 + 부호 + ▲/▼를 함께 쓴다(색만으로 전달 금지). 금액(change)과 통화가 있으면 `▲ +5,250원 (+1.96%)`,
- *  없으면 등락률만 `▲ +1.96%`. 값이 둘 다 없으면 아무것도 그리지 않는다. */
+ *  없으면 등락률만 `▲ +1.96%`. 통화가 아닌 값(지수 포인트 등)은 `formatAmount`로 절댓값 표기를 직접 준다.
+ *  값이 둘 다 없으면 아무것도 그리지 않는다. */
 export function PriceChange({
   changePercent,
   change = null,
   currency,
+  formatAmount,
   className,
 }: {
   changePercent: number | null;
   change?: number | null;
   currency?: string;
+  formatAmount?: (absolute: number) => string;
   className?: string;
 }) {
   const basis = change ?? changePercent;
@@ -21,7 +24,9 @@ export function PriceChange({
   const up = basis > 0;
   const down = basis < 0;
   const percent = changePercent === null ? null : `${up ? "+" : ""}${changePercent.toFixed(2)}%`;
-  const amount = change !== null && currency ? `${up ? "+" : down ? "-" : ""}${formatPrice(Math.abs(change), currency)}` : null;
+  const sign = up ? "+" : down ? "-" : "";
+  const format = formatAmount ?? (currency ? (value: number) => formatPrice(value, currency) : null);
+  const amount = change !== null && format ? `${sign}${format(Math.abs(change))}` : null;
   const text = [up ? "▲" : down ? "▼" : null, amount, amount && percent ? `(${percent})` : percent].filter(Boolean).join(" ");
   return (
     <data

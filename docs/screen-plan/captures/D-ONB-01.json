@@ -1,0 +1,108 @@
+{
+  "id": "D-ONB-01",
+  "title": "투자 여부 선택",
+  "route": "/onboarding",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS008",
+  "requirements": "8",
+  "entry": "가입 성공 후 초기 설정",
+  "states": "선택 전 · 저장 중 · 저장 실패·재시도",
+  "capturedState": "기본",
+  "stateSource": "pages/onboarding-page.tsx",
+  "stateImages": [
+    "docs/design/v5/onboarding-investor-390-light.png"
+  ],
+  "note": "",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "지금 주식에 투자",
+        "regex": true
+      },
+      "box": {
+        "x": 448,
+        "y": 147,
+        "width": 544,
+        "height": 80
+      },
+      "result": "가상 계좌 선택 단계로 가요.",
+      "destination": "D-ONB-02",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "아직 투자하지 않아요",
+        "regex": true
+      },
+      "box": {
+        "x": 448,
+        "y": 239,
+        "width": 544,
+        "height": 80
+      },
+      "result": "관심 종목 선택으로 가요",
+      "destination": "D-WAT-01",
+      "mode": "undo"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "^데이터 출처:",
+        "regex": true
+      },
+      "box": {
+        "x": 1189.46875,
+        "y": 6,
+        "width": 44,
+        "height": 44
+      },
+      "result": "기사 저장본 출처 안내를 열어요",
+      "destination": "D-ONB-01",
+      "mode": "escape"
+    }
+  ],
+  "image": "D-ONB-01.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n지금 주식에 투자하고 계신가요?\n지금 주식에 투자하고 있어요\n가상 계좌를 연결해 보유 종목 주변을 봐요\n아직 투자하지 않아요\n관심 있는 종목을 골라 시작해요",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "지금 주식에 투자"
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n가상 계좌를 연결해요\n\n실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 가상 계좌예요.\n\n연결할 가상 계좌\n가상 계좌 예시\n보유 종목 3개\n선택한 가상 계좌 연결하기\n건너뛰고 관심 종목 고르기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "아직 투자하지 않아요",
+        "regex": true
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n0개\n\n고르지 않아도 시장 전체 지도로 시작할 수 있어요.\n\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n추가\n삼성전자\n005930 · 승인된 사건 27건\n추가\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n추가\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n고르지 않고 지도 보기",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "^데이터 출처:",
+        "regex": true
+      },
+      "before": "/onboarding",
+      "url": "/onboarding",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n지금 주식에 투자하고 계신가요?\n지금 주식에 투자하고 있어요\n가상 계좌를 연결해 보유 종목 주변을 봐요\n아직 투자하지 않아요\n관심 있는 종목을 골라 시작해요\n\n데이터 출처: 실제 기사 · 저장본\n\n검증 절차를 통과한 기사를 저장한 시점 기준으로 보여줘요.",
+      "number": 3
+    }
+  ]
+}

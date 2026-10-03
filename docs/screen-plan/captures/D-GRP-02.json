@@ -1,0 +1,104 @@
+{
+  "id": "D-GRP-02",
+  "title": "사건 패널",
+  "route": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS021·FS024",
+  "requirements": "21·24",
+  "entry": "지도 사건 노드를 직접 누르기",
+  "states": "조회 중·조회 실패 · 관련 기업 없음 · 근거 0건",
+  "capturedState": "기본",
+  "stateSource": "features/node-panel.tsx",
+  "stateImages": [
+    "docs/design/v5/graph-personal-empty-1440-light.png"
+  ],
+  "note": "영향 방향 값은 생산자가 없어 표시하지 않아요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "근거 .*건 보기",
+        "regex": true
+      },
+      "box": {
+        "x": 1052,
+        "y": 253,
+        "width": 138.921875,
+        "height": 44
+      },
+      "result": "사건에 연결된 인용문을 열어요.",
+      "destination": "D-GRP-05",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "상세 닫기"
+      },
+      "box": {
+        "x": 1367,
+        "y": 142,
+        "width": 44,
+        "height": 44
+      },
+      "result": "선택을 풀고 지도만 보여줘요",
+      "destination": "D-GRP-01",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "box": {
+        "x": 1052,
+        "y": 305,
+        "width": 127.421875,
+        "height": 44
+      },
+      "result": "이 사건을 질문 후보로 넘겨요",
+      "destination": "D-AI-01",
+      "mode": "overlay"
+    }
+  ],
+  "image": "D-GRP-02.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "근거 .*건 보기"
+      },
+      "before": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
+      "url": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST\n근거 문서\n\nJensen Huang appears at Salesforce Dreamforce\n\n관계 확인 시점\n2026-10-01 20:21 KST\n\nNVIDIA official blog (blogs.nvidia.com)\n·\n발행 2026-09-16 07:24 KST\n\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\n\n“NVIDIA founder and CEO Jensen Huang brought to Salesforce Dreamforce Tuesday, joining CEO Marc Benioff onstage in an appearance”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nNVIDIA official blog (blogs.nvidia.com)\n·\n발행 2026-09-16 07:24 KST\n\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\n\n“He walked into the crowd — threading through the audience at Moscone Center, mic in hand, with Benioff alongside.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "상세 닫기"
+      },
+      "before": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
+      "url": "/?mode=all",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "before": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
+      "url": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n질문에 연결할 대상\nJensen Huang appears at Salesforce Dreamforce\n근거 2건\n\n내 질문:\n그 기업은 언제?\n\n연결한 대상: 없음\n\n‘그 기업’만으로는 어느 대상인지 알 수 없어요. 그래프에서 기업이나 사건을 고르거나 기업 이름을 알려 주세요.\n\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
+      "number": 3
+    }
+  ]
+}

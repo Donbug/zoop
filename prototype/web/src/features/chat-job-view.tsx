@@ -7,6 +7,7 @@ import {
   ExternalLink,
   FileText,
   Info,
+  Link2Off,
   ListChecks,
   Map as MapIcon,
   MessageCircleQuestion,
@@ -163,7 +164,10 @@ function Citations({ result }: { result: ChatResult }) {
                 <span className="sr-only">(새 창에서 열림)</span>
               </a>
             ) : (
-              <p className="text-sm text-text-tertiary">원문 링크가 없는 자료예요.</p>
+              <p className="inline-flex min-h-11 items-center gap-1 text-sm text-text-secondary">
+                <Link2Off className="size-4" aria-hidden="true" />
+                원문을 제공하지 않는 자료입니다
+              </p>
             )}
           </li>
         ))}

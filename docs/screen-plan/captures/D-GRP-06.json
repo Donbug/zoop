@@ -1,0 +1,130 @@
+{
+  "id": "D-GRP-06",
+  "title": "기업에서 여는 영향 경로",
+  "route": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS022·FS024",
+  "requirements": "22·24",
+  "entry": "기업 패널 → 직접 이슈 제목",
+  "states": "직접·중간 연결 · 관계 조회 실패 · 근거 없음",
+  "capturedState": "기본",
+  "stateSource": "features/impact-panel.tsx",
+  "stateImages": [
+    "docs/design/v6/impact-path-1440-light.png"
+  ],
+  "note": "팀 v1.7 D-GRP-06 간선 모달 대신 영향 경로. 사건–기업 선은 표시 전용이에요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "button",
+        "name": "근거 .*건 보기",
+        "regex": true
+      },
+      "box": {
+        "x": 1052,
+        "y": 517.125,
+        "width": 94.84375,
+        "height": 19.5
+      },
+      "result": "인용문과 출처를 근거 창에서 보여줘요.",
+      "destination": "D-GRP-05",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "button",
+        "name": "사건 상세 보기"
+      },
+      "box": {
+        "x": 1052,
+        "y": 225.5,
+        "width": 119.5625,
+        "height": 44
+      },
+      "result": "이 사건의 패널을 열어요",
+      "destination": "D-GRP-02",
+      "mode": "nav"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "box": {
+        "x": 1179.5625,
+        "y": 225.5,
+        "width": 127.421875,
+        "height": 44
+      },
+      "result": "이 경로의 대상을 AI 창으로 넘겨요",
+      "destination": "D-AI-01",
+      "mode": "overlay"
+    },
+    {
+      "number": 4,
+      "selector": {
+        "role": "button",
+        "name": "연결을 찾는 방법"
+      },
+      "box": {
+        "x": 1371,
+        "y": 293.5,
+        "width": 28,
+        "height": 28
+      },
+      "result": "최소 단계 경로의 계산 규칙을 보여줘요",
+      "destination": "D-GRP-06",
+      "mode": "escape"
+    }
+  ],
+  "image": "D-GRP-06.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자 · 영향 경로\n\n직접 연결 · 지도 기준 2026-10-01 20:21 KST\n\n사건 상세 보기\nAI에게 묻기\n확인된 연결\n기업:\n삼성전자\n직접 관련\nHigh NA EUV 도…\n· 계획\n근거 2건\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n함께 연결된 기업 1곳\nA\nASML\n직접 관련 · 협력 파트너(노광 설비…\n근거 2건\n해석 한계\n위 연결은 기사에 적힌 사실과 등록된 사업 관계예요. 이 사건이 주가나 실적에 주는 영향은 판단하지 않아요.\n보도 표현이 발생이 아닌 연결(계획·전망 등)은 아직 일어난 일로 확인되지 않았어요.",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "button",
+        "name": "근거 .*건 보기"
+      },
+      "before": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "url": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자 · 영향 경로\n\n직접 연결 · 지도 기준 2026-10-01 20:21 KST\n\n사건 상세 보기\nAI에게 묻기\n확인된 연결\n기업:\n삼성전자\n직접 관련\nHigh NA EUV 도…\n· 계획\n근거 2건\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n함께 연결된 기업 1곳\nA\nASML\n직접 관련 · 협력 파트너(노광 설비…\n근거 2건\n해석 한계\n위 연결은 기사에 적힌 사실과 등록된 사업 관계예요. 이 사건이 주가나 실적에 주는 영향은 판단하지 않아요.\n보도 표현이 발생이 아닌 연결(계획·전망 등)은 아직 일어난 일로 확인되지 않았어요.\n근거 문서\n\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n\n관계 확인 시점\n2026-10-01 20:21 KST\n\nSamsung Electronics Newsroom (news.samsung.com)\n·\n발행 2026-09-09 00:03 KST\n\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n\n“한편, 삼성전자는 ASML과 2028년까지 첨단 D램 제조에 차세대 노광 설비 High NA EUV 도입을 위한 협력도 강화할 계획이다.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nSamsung Electronics Newsroom (news.samsung.com)\n·\n발행 2026-09-09 00:03 KST\n\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n\n“2028년 업계 최초로 메모리 제조에 High NA EUV 도입 추진”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "사건 상세 보기"
+      },
+      "before": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "url": "/?mode=all&select=node%3Aissue-25ac3f6d1288d2b7ffa5454d",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자, ASML과 차세대 반도체 제조 협력 확대 선택됨\n\n흐름 순으로 정렬\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n\n2028년\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 2곳\n삼성전자\nHigh NA EUV 도…\nA\nASML\n협력 파트너(노광 설비…\n보도 기사 1건\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\nSamsung Electronics Newsroom (news.samsung.com) · 2026-09-09 00:03 KST",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "AI에게 묻기"
+      },
+      "before": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "url": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자 · 영향 경로\n\n직접 연결 · 지도 기준 2026-10-01 20:21 KST\n\n사건 상세 보기\nAI에게 묻기\n확인된 연결\n기업:\n삼성전자\n직접 관련\nHigh NA EUV 도…\n· 계획\n근거 2건\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n함께 연결된 기업 1곳\nA\nASML\n직접 관련 · 협력 파트너(노광 설비…\n근거 2건\n해석 한계\n위 연결은 기사에 적힌 사실과 등록된 사업 관계예요. 이 사건이 주가나 실적에 주는 영향은 판단하지 않아요.\n보도 표현이 발생이 아닌 연결(계획·전망 등)은 아직 일어난 일로 확인되지 않았어요.\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n질문에 연결할 대상\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건\n삼성전자\n\n내 질문:\n그 기업은 언제?\n\n연결한 대상: 없음\n\n‘그 기업’만으로는 어느 대상인지 알 수 없어요. 그래프에서 기업이나 사건을 고르거나 기업 이름을 알려 주세요.\n\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
+      "number": 3
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "연결을 찾는 방법"
+      },
+      "before": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "url": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n삼성전자 선택됨\n\n흐름 순으로 정렬\n삼성전자 · 영향 경로\n\n직접 연결 · 지도 기준 2026-10-01 20:21 KST\n\n사건 상세 보기\nAI에게 묻기\n확인된 연결\n기업:\n삼성전자\n직접 관련\nHigh NA EUV 도…\n· 계획\n근거 2건\n2028년\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n근거 2건 보기\n함께 연결된 기업 1곳\nA\nASML\n직접 관련 · 협력 파트너(노광 설비…\n근거 2건\n해석 한계\n위 연결은 기사에 적힌 사실과 등록된 사업 관계예요. 이 사건이 주가나 실적에 주는 영향은 판단하지 않아요.\n보도 표현이 발생이 아닌 연결(계획·전망 등)은 아직 일어난 일로 확인되지 않았어요.\n\n연결을 찾는 방법\n\n승인된 관계 선만 따라 가장 적은 단계로 이은 경로예요. 사건을 공유한다는 파생 선은 쓰지 않아요.",
+      "number": 4
+    }
+  ]
+}

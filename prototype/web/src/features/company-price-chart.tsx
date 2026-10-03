@@ -4,6 +4,7 @@
 //    같은 내용을 위 줄에 부호·화살표·글자로도 적는다(색만으로 구분하지 않음).
 //  - 사건 표시는 '이 날 사건이 있었다'만 뜻한다. 주가 움직임의 원인이라고 말하지 않는다. 누르면 그 날짜를 고른다(FS041: 사건이 1건이면
 //    그 사건을 바로 열고, 여러 건이면 카드를 펼쳐 고르게 한다). 선택한 사건의 발생 날짜는 실선·채운 표시로 강조한다(날짜 미상 사건은 강조 없음).
+//    차트를 그릴 때는 출처 줄 아래에 '시점이 겹쳐도 인과관계가 아님' 고지를 한 번 둔다(팀 화면계획서 슬라이드 19). 차트가 없으면 고지도 없다.
 //  - 키보드·스크린리더: 차트는 요약 문장으로 읽히고, [표로 보기]에 시각별 종가·거래량 표가 있다. 사건 표시는 버튼이다.
 //  - 일시 장애는 이 영역만 [다시 시도], 자료 없음은 한 줄, 미연결·미지원 종목은 시세 영역이 이미 사유를 말하므로 그리지 않는다.
 import { Table, Zap } from "lucide-react";
@@ -15,13 +16,14 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { periodLabel, type DetailRange, type EventGroup } from "@/lib/company-timeline";
 import { formatCompact, formatPrice, placeMarkers, pointLabel, toneOf, type Tone } from "@/lib/market";
 import { cn } from "@/lib/utils";
-import { PriceChange } from "@/components/domain/status-labels";
+import { DisclaimerNote, PriceChange } from "@/components/domain/status-labels";
 import { QuoteSourceHint, UnavailableLine } from "./company-quote";
 
 const W = 1000;
 const H = 200;
 const PAD = 12;
 const strokeClass: Record<Tone, string> = { up: "stroke-up", down: "stroke-down", flat: "stroke-text-secondary" };
+const chartCausalityText = "차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지는 않아요.";
 
 interface Props {
   companyId: string;
@@ -176,6 +178,8 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
         </span>
         <QuoteSourceHint source={source} />
       </figcaption>
+      {/* 사건 표시와 같은 화면에 그리므로 시점 겹침을 인과로 읽지 않게 한 번 알린다(차트를 그릴 때만). */}
+      <DisclaimerNote>{chartCausalityText}</DisclaimerNote>
       <details className="text-sm">
         <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-text-secondary">
           <Table className="size-4" aria-hidden="true" />

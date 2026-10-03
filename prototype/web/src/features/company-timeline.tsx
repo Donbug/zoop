@@ -16,6 +16,7 @@ import { useCompanies, useEvidenceItems } from "@/api/queries";
 import { ApprovalNote, RoleUnconfirmed } from "@/components/domain/approval-note";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { DocumentItem, documentRelationLabel } from "@/components/domain/document-item";
+import { UnavailableEvidenceNote, isEvidenceGone } from "@/components/domain/evidence";
 import { IconCount } from "@/components/domain/event-row";
 import { EdgeGlyph } from "@/components/domain/relation-type-tag";
 import { Button } from "@/components/ui/button";
@@ -325,7 +326,9 @@ function EventDetailPanel({
     list.push({ id: q.data.id, quote: q.data.quote, quoteVerified: q.data.quoteVerified });
     quotesByArticle.set(q.data.articleId, list);
   }
-  const evidenceFailed = evidence.some((q) => q.isError);
+  // 일시 장애만 다시 시도한다. 지워졌거나(404) 볼 권한이 없는(403) 인용은 건수만 알리고 문서(제목·출처)는 사건 상세 값으로 그대로 둔다.
+  const evidenceFailed = evidence.filter((q) => q.isError && !isEvidenceGone(q.error));
+  const evidenceGone = evidence.filter((q) => q.isError && isEvidenceGone(q.error)).length;
   const statusOf = (c: Schemas["CompanyLink"]) => event.relations.find((r) => r.source === event.id && r.target === c.id)?.assertionStatus;
 
   const pathRow = (c: Schemas["CompanyLink"], isSelf: boolean) => {
@@ -390,14 +393,15 @@ function EventDetailPanel({
           <FileText className="size-4 text-text-secondary" aria-hidden="true" />
           근거 문서 {event.articles.length}건
         </h4>
-        {evidenceFailed && (
+        {evidenceFailed.length > 0 && (
           <ErrorState
             compact
-            error={evidence.find((q) => q.isError)?.error}
+            error={evidenceFailed[0]!.error}
             title="인용 일부를 불러오지 못했어요"
-            onRetry={() => evidence.forEach((q) => q.isError && void q.refetch())}
+            onRetry={() => evidenceFailed.forEach((q) => void q.refetch())}
           />
         )}
+        {evidenceGone > 0 && <UnavailableEvidenceNote count={evidenceGone} />}
         {event.articles.length === 0 ? (
           <p className="text-sm text-text-secondary">연결된 근거 문서가 없어요.</p>
         ) : (

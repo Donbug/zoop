@@ -1,0 +1,107 @@
+{
+  "id": "D-GRP-01b",
+  "title": "내 종목 지도·범위 필터",
+  "route": "/?mode=personal",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS017·FS019·FS026",
+  "requirements": "17·19",
+  "entry": "회원 → 내 종목 모드",
+  "states": "전체·보유·관심 범위 · 기준 종목 0개 · 관계 0건 · 조회 실패",
+  "capturedState": "기본",
+  "stateSource": "pages/main-page.tsx · features/graph-explorer.tsx",
+  "stateImages": [
+    "docs/design/v7/graph-filter-1440-light.png",
+    "docs/design/v5/graph-personal-empty-1440-light.png"
+  ],
+  "note": "전체·보유·관심은 내 종목 모드 안의 필터예요. 깊이 1단계는 프로토타입 가정이에요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "radio",
+        "name": "^보유 종목",
+        "regex": true
+      },
+      "box": {
+        "x": 369.34375,
+        "y": 77,
+        "width": 80.78125,
+        "height": 40
+      },
+      "result": "보유 기준 기업과 연결 사건 범위로 좁혀요.",
+      "destination": "D-GRP-01b",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "radio",
+        "name": "^관심 종목",
+        "regex": true
+      },
+      "box": {
+        "x": 454.125,
+        "y": 77,
+        "width": 80.78125,
+        "height": 40
+      },
+      "result": "관심 기준으로 지도를 거릅니다",
+      "destination": "D-GRP-01b",
+      "mode": "undo"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "radio",
+        "name": "시장 전체"
+      },
+      "box": {
+        "x": 117.078125,
+        "y": 77,
+        "width": 94.453125,
+        "height": 40
+      },
+      "result": "개인화 필터 없이 전체 지도로 전환",
+      "destination": "D-GRP-01",
+      "mode": "nav"
+    }
+  ],
+  "image": "D-GRP-01b.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n23\n사건\n89\n직접 관련\n122\n후속 사건\n1\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "radio",
+        "name": "^보유 종목"
+      },
+      "before": "/?mode=personal",
+      "url": "/?mode=personal",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n19\n사건\n77\n직접 관련\n106\n후속 사건\n1\n사건 공유\n28\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "radio",
+        "name": "^관심 종목",
+        "regex": true
+      },
+      "before": "/?mode=personal",
+      "url": "/?mode=personal",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n14\n사건\n46\n직접 관련\n65\n후속 사건\n1\n사건 공유\n20\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "radio",
+        "name": "시장 전체"
+      },
+      "before": "/?mode=personal",
+      "url": "/?mode=all",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "number": 3
+    }
+  ]
+}

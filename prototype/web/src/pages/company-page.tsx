@@ -33,7 +33,7 @@ import { CompanyHolding } from "@/features/company-holding";
 import { CompanyMetrics } from "@/features/company-metrics";
 import { CompanyQuote } from "@/features/company-quote";
 import { CompanyTimeline } from "@/features/company-timeline";
-import { useOverlays } from "@/features/overlays";
+import { useOverlays, useScreenChatTargets } from "@/features/overlays";
 import { detailRange, parsePeriod, type Period } from "@/lib/company-timeline";
 import { FULL_GRAPH_URL, isGraphUrl, readGraphEntry, type GraphEntry, type GraphRestoreState } from "@/lib/graph-entry";
 import { formatEventTime } from "@/lib/labels";
@@ -88,6 +88,8 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   if (range.period !== period) setRange(detailRange(period));
 
   const company = useCompany(companyId);
+  // 하단 [AI] 탭으로 질문 창을 열면 이 기업을 질문 대상으로 넘긴다(기업 정보를 받기 전에는 넘기지 않는다).
+  useScreenChatTargets(company.data ? [{ id: companyId, kind: "company", label: company.data.name }] : []);
   const events = useCompanyEvents(companyId, range);
   // 선택 사건은 새 목록에서 확인된 뒤에만 상세를 조회하고 강조한다. 그 전까지 주소의 id는 잠정 보관이다.
   const listed = events.isSuccess && selectedId !== null && [...events.data.items, ...events.data.unknownTimeItems].some((e) => e.id === selectedId);
