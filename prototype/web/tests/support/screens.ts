@@ -33,7 +33,7 @@ export function readCompanyScreen(): CompanyScreen {
     quote: text(screen.queryByRole("region", { name: "시세" })),
     metrics: text(screen.queryByRole("region", { name: "주요 지표" })),
     holding: text(screen.queryByRole("region", { name: "가상 계좌 보유" })),
-    events: timeline ? within(timeline).queryAllByRole("button").map((b) => text(b)!) : [],
+    events: timeline ? [...timeline.querySelectorAll("article h3 button")].map((b) => text(b)!) : [],
     chart: text(chart?.querySelector("p")),
     alerts: screen.queryAllByRole("alert").map((a) => text(a)!),
   };
@@ -53,8 +53,8 @@ export function shown(c: TestCompany, period: Period) {
   } satisfies Record<keyof CompanyScreen, unknown>;
 }
 
-const mainText = () => text(screen.getByRole("main")) ?? "";
-const allPeriods: Period[] = ["1d", "1m", "1y"];
+const mainText = () => text(document.querySelector("[data-company-detail-body]") ?? screen.getByRole("main")) ?? "";
+const allPeriods: Period[] = ["1d", "1w", "1m", "1y"];
 const periodValues = (c: TestCompany, period: Period) => [...c.events[period].map((e) => e.title), ...c.closes[period].map(won)];
 
 /** 화면에 남아 있는 기업 c의 흔적(이름·현재가·모든 기간의 사건 제목·차트 종가). 비어 있어야 c의 값이 섞이지 않은 것이다. */
@@ -69,7 +69,7 @@ export function traceOfPeriod(c: TestCompany, period: Period): string[] {
   return periodValues(c, period).filter((needle) => body.includes(needle));
 }
 
-export const periodButton = (label: "1일" | "1개월" | "1년") => screen.getByRole("radio", { name: label });
+export const periodButton = (label: "1일" | "1주" | "1개월" | "1년") => screen.getByRole("radio", { name: label });
 
 /** 영역마다 오류 안내의 제목이 다르다. 제목으로 "어느 영역의 오류인가"를 가린다. */
 export const errorTitle = {

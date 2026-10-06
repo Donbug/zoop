@@ -61,6 +61,16 @@
       "states": "조회 중 · 조건에 맞는 자료 없음 · 영역 오류\n관리자 세션 없음·만료 → 로그인",
       "source": "admin/session.tsx · admin/pages/{page}.tsx",
       "images": []
+    },
+    "STK": {
+      "states": "전체·내 종목 · 검색·결과 없음 · 관심 변경 · 조회 실패",
+      "source": "pages/companies-page.tsx",
+      "images": []
+    },
+    "SEN": {
+      "states": "디자인시스템 예시 · 판정 근거 펼침 · null은 숨김",
+      "source": "components/domain/status-labels.tsx · components/domain/briefing-outlook.tsx",
+      "images": []
     }
   },
   "screens": {
@@ -260,10 +270,10 @@
           "mode": "nav"
         },
         {
-          "role": "radio",
-          "name": "목록으로 보기",
-          "result": "기업·사건 목록을 보여줘요",
-          "destination": "D-GRP-01",
+          "role": "link",
+          "name": "종목",
+          "result": "독립 종목 목록으로 이동해요",
+          "destination": "D-STK-01",
           "mode": "nav"
         },
         {
@@ -441,47 +451,31 @@
       "controls": [
         {
           "role": "button",
-          "name": "^삼성전자 관심 종목",
-          "result": "관심 등록·해제를 저장해요",
+          "name": "상세 닫기",
+          "result": "기업 선택을 해제하고 지도를 보여줘요",
+          "destination": "D-GRP-01",
+          "mode": "overlay_close",
+          "open_role": "canvas-node",
+          "open_name": "KRX:005930"
+        },
+        {
+          "role": "button",
+          "name": "^시세 출처:",
+          "result": "시세 출처와 관측 시각을 확인해요",
           "destination": "D-GRP-03",
-          "mode": "watch",
+          "mode": "escape",
           "regex": true
         },
         {
-          "role": "button",
-          "name": "이 노드 중심으로 보기",
-          "result": "이 기업 중심 포커스로 바꿔요",
-          "destination": "D-GRP-07b",
-          "mode": "ref",
-          "ref": "D-GRP-07b"
-        },
-        {
-          "role": "button",
-          "name": "다른 기업과의 연결 보기",
-          "result": "두 번째 기업 선택창을 열어요",
-          "destination": "D-GRP-07",
-          "mode": "ref",
-          "ref": "D-GRP-07"
-        },
-        {
-          "role": "button",
-          "name": "AI에게 묻기",
-          "result": "기업 후보를 넘겨 AI 창을 열어요",
-          "destination": "D-AI-01",
-          "mode": "ref",
-          "ref": "D-AI-01"
-        },
-        {
-          "role": "button",
-          "name": "삼성전자, ASML과 차세대 반도체 제조 협력 확대",
-          "result": "기업과 이 사건의 영향 경로를 열어요",
-          "destination": "D-GRP-06",
-          "mode": "ref",
-          "ref": "D-GRP-06"
+          "role": "css",
+          "name": "aside[aria-label=\"상세\"] details summary",
+          "result": "받은 주요 지표를 펼쳐요",
+          "destination": "D-GRP-03",
+          "mode": "toggle"
         }
       ],
       "states": "조회 중·조회 실패 · 직접·간접 이슈 없음 · 관심 저장 실패",
-      "source": "features/node-panel.tsx · components/domain/watch-toggle.tsx",
+      "source": "features/node-panel.tsx · features/company-quote.tsx · features/company-metrics.tsx",
       "images": [
         "docs/design/v5/graph-company-panel-1440-light.png",
         "docs/design/v6/watch-toggle-1440-light.png"
@@ -655,11 +649,11 @@
           "mode": "nav"
         },
         {
-          "role": "button",
-          "name": "시세 출처: Yahoo Finance",
-          "result": "시세 출처와 관측 시각을 설명해요",
-          "destination": "D-COM-01",
-          "mode": "escape"
+          "role": "radio",
+          "name": "2단계",
+          "result": "기업 중심 관계를 2단계로 넓혀요",
+          "destination": "D-COM-04",
+          "mode": "nav"
         }
       ]
     },
@@ -673,11 +667,11 @@
           "mode": "nav"
         },
         {
-          "role": "button",
-          "name": "시세 출처: Yahoo Finance",
-          "result": "시세 출처와 지연 가능성을 설명해요",
-          "destination": "D-COM-01",
-          "mode": "escape"
+          "role": "radio",
+          "name": "1단계",
+          "result": "관계 탐색을 1단계로 좁혀요",
+          "destination": "D-COM-04",
+          "mode": "nav"
         }
       ],
       "source": "features/company-documents.tsx · pages/company-page.tsx",
@@ -690,8 +684,8 @@
       "controls": [
         {
           "role": "radio",
-          "name": "1일",
-          "result": "차트와 사건을 오늘 범위로 바꿔요",
+          "name": "1주",
+          "result": "차트와 사건을 1주 범위로 바꿔요",
           "destination": "D-COM-01b",
           "mode": "nav"
         },
@@ -701,13 +695,6 @@
           "result": "직접 관련 사건만 보여줘요",
           "destination": "D-COM-01b",
           "mode": "nav"
-        },
-        {
-          "role": "css",
-          "name": "details summary",
-          "result": "시세를 표로 펼쳐요",
-          "destination": "D-COM-01b",
-          "mode": "toggle"
         }
       ],
       "source": "features/company-price-chart.tsx · features/company-timeline.tsx",
@@ -804,10 +791,10 @@
           "mode": "nav"
         },
         {
-          "role": "radio",
-          "name": "목록으로 보기",
-          "result": "회차 기준 기업·사건 목록을 보여줘요",
-          "destination": "D-BRF-04",
+          "role": "link",
+          "name": "종목",
+          "result": "회차 지도와 별개인 종목 목록을 열어요",
+          "destination": "D-STK-01",
           "mode": "nav"
         }
       ],
@@ -1119,12 +1106,12 @@
     "M-GRP-01-before": {
       "controls": [
         {
-          "role": "radio",
-          "name": "목록으로 보기",
-          "result": "기업·사건 목록으로 전환해요",
-          "destination": "M-GRP-01",
+          "role": "link",
+          "name": "종목",
+          "result": "독립 종목 메뉴로 이동해요",
+          "destination": "M-STK-01",
           "mode": "ref",
-          "ref": "D-GRP-01"
+          "ref": "M-STK-01"
         },
         {
           "role": "button",
@@ -1139,28 +1126,30 @@
     "M-GRP-01-after": {
       "controls": [
         {
-          "role": "link",
-          "name": "기업 상세",
-          "result": "기업 상세로 이동해요",
-          "destination": "D-COM-01",
-          "mode": "ref",
-          "ref": "D-COM-01"
-        },
-        {
           "role": "button",
-          "name": "^삼성전자 관심 종목",
-          "result": "관심을 등록·해제해요",
+          "name": "시트 크게 보기",
+          "result": "기업 패널을 화면 위까지 펼쳐요",
           "destination": "M-GRP-01",
-          "mode": "watch",
-          "regex": true
+          "mode": "undo",
+          "undo_role": "button",
+          "undo_name": "시트 작게 보기"
         },
         {
           "role": "button",
-          "name": "AI에게 묻기",
-          "result": "이 기업 후보로 질문 창을 열어요",
-          "destination": "D-AI-01",
-          "mode": "overlay",
-          "close": "AI 질문 창 닫기"
+          "name": "상세 닫기",
+          "result": "선택을 해제하고 지도만 보여줘요",
+          "destination": "M-GRP-01",
+          "mode": "overlay_close",
+          "open_role": "canvas-node",
+          "open_name": "KRX:005930"
+        },
+        {
+          "role": "button",
+          "name": "^시세 출처:",
+          "result": "시세 출처와 관측 시각을 확인해요",
+          "destination": "M-GRP-01",
+          "mode": "escape",
+          "regex": true
         }
       ]
     },
@@ -1233,6 +1222,214 @@
           "name": "출근 브리핑 보기",
           "result": "같은 날 출근 회차로 돌아가요",
           "destination": "D-BRF-01",
+          "mode": "nav"
+        }
+      ]
+    },
+    "D-STK-01": {
+      "controls": [
+        {
+          "role": "searchbox",
+          "name": "기업명·영문명·티커 검색",
+          "result": "기업명·티커를 입력해요",
+          "destination": "D-STK-01",
+          "mode": "input"
+        },
+        {
+          "role": "button",
+          "name": "^삼성전자 관심 종목",
+          "result": "삼성전자 관심을 등록·해제해요",
+          "destination": "D-STK-01",
+          "mode": "watch",
+          "regex": true
+        }
+      ]
+    },
+    "M-STK-01-before": {
+      "controls": [
+        {
+          "role": "searchbox",
+          "name": "기업명·영문명·티커 검색",
+          "result": "검색어를 입력해요",
+          "destination": "M-STK-01",
+          "mode": "input"
+        },
+        {
+          "role": "button",
+          "name": "^삼성전자 관심 종목",
+          "result": "관심 등록·해제를 저장해요",
+          "destination": "M-STK-01",
+          "mode": "watch",
+          "regex": true
+        }
+      ]
+    },
+    "M-STK-01-after": {
+      "controls": []
+    },
+    "D-COM-03": {
+      "controls": [
+        {
+          "role": "searchbox",
+          "name": "기업 검색",
+          "result": "다른 기업을 검색해요",
+          "destination": "D-COM-03",
+          "mode": "input"
+        },
+        {
+          "role": "button",
+          "name": "검색",
+          "result": "입력한 기업명으로 검색해요",
+          "destination": "D-COM-03",
+          "mode": "nav"
+        }
+      ]
+    },
+    "D-COM-04": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "1단계",
+          "result": "기업 중심의 1단계 관계로 좁혀요",
+          "destination": "D-COM-04",
+          "mode": "nav"
+        },
+        {
+          "role": "radio",
+          "name": "2단계",
+          "result": "2단계 관계로 넓혀요",
+          "destination": "D-COM-04",
+          "mode": "nav"
+        }
+      ]
+    },
+    "D-COM-05": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "1개월",
+          "result": "일 단위 버킷으로 조회해요",
+          "destination": "D-COM-05",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "최신 시점",
+          "result": "현재 공개 기준 시점으로 돌아가요",
+          "destination": "D-COM-05",
+          "mode": "nav"
+        }
+      ]
+    },
+    "D-COM-06": {
+      "controls": [
+        {
+          "role": "radio",
+          "name": "1개월",
+          "result": "1개월 조회를 유지해요",
+          "destination": "D-COM-06",
+          "mode": "nav"
+        },
+        {
+          "role": "button",
+          "name": "최신 시점",
+          "result": "현재 공개 기준 시점으로 돌아가요",
+          "destination": "D-COM-06",
+          "mode": "nav"
+        }
+      ]
+    },
+    "M-COM-02-before": {
+      "controls": [
+        {
+          "role": "link",
+          "name": "종목",
+          "result": "종목 목록으로 이동해요",
+          "destination": "M-STK-01",
+          "mode": "nav"
+        },
+        {
+          "role": "link",
+          "name": "지도",
+          "result": "시장 지도로 이동해요",
+          "destination": "M-GRP-01",
+          "mode": "nav"
+        }
+      ]
+    },
+    "M-COM-02-after": {
+      "controls": [
+        {
+          "role": "searchbox",
+          "name": "기업 검색",
+          "result": "전환할 기업을 검색해요",
+          "destination": "M-COM-02",
+          "mode": "input"
+        },
+        {
+          "role": "button",
+          "name": "기업 전환 닫기",
+          "result": "기업 전환 시트를 닫아요",
+          "destination": "M-COM-01",
+          "mode": "overlay_close",
+          "open_role": "button",
+          "open_name": "삼성전자 · 다른 기업 보기"
+        }
+      ]
+    },
+    "D-SEN-01": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "예시 · 긍정 판정 근거 보기",
+          "result": "긍정 예시의 사유·인용·판정 시각을 열어요",
+          "destination": "D-SEN-01",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "예시 · 부정 판정 근거 보기",
+          "result": "부정 예시의 사유·인용·판정 시각을 열어요",
+          "destination": "D-SEN-01",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "예시 · 혼재 판정 근거 보기",
+          "result": "혼재 예시의 사유·인용·판정 시각을 열어요",
+          "destination": "D-SEN-01",
+          "mode": "escape"
+        },
+        {
+          "role": "button",
+          "name": "예시 · 판단 보류 판정 근거 보기",
+          "result": "판단 보류 예시의 사유·인용·판정 시각을 열어요",
+          "destination": "D-SEN-01",
+          "mode": "escape"
+        }
+      ]
+    },
+    "D-SEN-02": {
+      "controls": [
+        {
+          "role": "button",
+          "name": "회차 · 혼재 판정 근거 보기",
+          "result": "회차 판단 예시의 근거를 열어요",
+          "destination": "D-SEN-02",
+          "mode": "escape"
+        },
+        {
+          "role": "link",
+          "name": "1. 예시전자 2분기 실적 발표",
+          "result": "회차 본문의 예시 이슈로 이동해요",
+          "destination": "D-SEN-02",
+          "mode": "nav"
+        },
+        {
+          "role": "css",
+          "name": "#c-briefing [role=\"tab\"]:nth-child(2)",
+          "result": "예시 회차의 관계도 탭을 보여줘요",
+          "destination": "D-SEN-02",
           "mode": "nav"
         }
       ]

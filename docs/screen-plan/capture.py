@@ -55,6 +55,7 @@ def settle(page):
 
 
 def loc(page, role, name, exact=True):
+    if role=='css': return page.locator(name).first
     if role=='canvas-node': return CanvasTarget(page,name)
     return page.get_by_role(role,name=name,exact=exact).first
 
@@ -105,14 +106,14 @@ def goto(page, route):
     settle(page)
 
 
-# 요구사항 정의서 2026-10-01의 ID 열 기준. 사이드바·관심 수정은 원문 ID가 비어 있어 만들지 않는다.
-REQ={**{f'FS{n:03}':n for n in range(1,26)}, 'FS011-01':11,'FS011-02':11,
-     **{f'FS{n:03}':n-2 for n in range(28,37)}, **{f'FS{n:03}':n-3 for n in range(38,50)},
-     'FS050-01':47,'FS050-02':47,'FS051':48,'FS052-01':49,'FS052-02':49,'FS053':50,
-     'FS054':63,'FS055':64,'FS056':65,'FS058':67,'FS059':68,'FS060':69,'FS061':70,'FS062':71,'FS063':72,'FS064':73,'FS065':74,
-     'FS066-01':75,'FS066-02':75,'FS066-03':75,'FS067-01':76,'FS067-02':76,'FS067-03':76,'FS068':77,'FS069-01':78,'FS069-02':78,
-     'FS070-01':79,'FS070-02':79,'FS071-01':80,'FS071-02':80,'FS072':81,'FS073':82,
-     **{f'NFS{n:03}':n+50 for n in range(1,13)}}
+# 요구사항 정의서 2026-10-06의 기능 의미 기준(doc-delta §2.2).
+REQ={**{f'FS{n:03}':n for n in range(1,28)}, 'FS011-01':11,'FS011-02':11,
+     **{f'FS{n:03}':n for n in range(28,37)}, **{f'FS{n:03}':n for n in range(38,50)},
+     'FS050-01':50,'FS050-02':50,'FS051':51,'FS052-01':52,'FS052-02':52,'FS053':53,
+     'FS054':66,'FS055':67,'FS056':68,'FS058':70,'FS059':71,'FS060':72,'FS061':73,'FS062':74,'FS063':75,'FS064':76,'FS065':77,
+     'FS066-01':78,'FS066-02':78,'FS066-03':78,'FS067-01':79,'FS067-02':79,'FS067-03':79,'FS068':80,'FS069-01':81,'FS069-02':81,
+     'FS070-01':82,'FS070-02':82,'FS071-01':83,'FS071-02':83,'FS072':84,'FS073':85,
+     **{f'NFS{n:03}':n+53 for n in range(1,13)}}
 
 def control_locator(page, control):
     if control['role']=='css': return page.locator(control['name']).first
@@ -124,8 +125,9 @@ def restore_page(page, url, scroll, inputs):
     page.goto(url); settle(page)
     fields=page.locator('input')
     for n,field in enumerate(inputs):
-        if n<fields.count() and field['type'] not in ('checkbox','radio'):
-            fields.nth(n).fill(field['value'])
+        if n<fields.count() and field['type'] not in ('checkbox','radio','range','file','hidden','button','submit'):
+            target=fields.nth(n)
+            if target.is_visible() and target.is_editable(): target.fill(field['value'])
     page.evaluate('([x,y])=>window.scrollTo(x,y)',scroll)
     settle(page)
 
@@ -215,6 +217,9 @@ def snap(page, sid, title, fs, entry, states='기본', checks=None, note='', suf
         b=element.bounding_box()
         if not b or b['x']<0 or b['y']<0 or b['x']+b['width']>page.viewport_size['width']+.5 or b['y']+b['height']>page.viewport_size['height']+.5:
             raise RuntimeError(f'번호 대상이 화면 밖: {key}: {action}: {b}')
+        if action['role']!='canvas-node':
+            uncovered=element.evaluate('(el)=>{const r=el.getBoundingClientRect();const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return Boolean(hit&&(el.contains(hit)||hit.contains(el)));}')
+            if not uncovered: raise RuntimeError(f'번호 대상이 다른 요소에 가림: {key}: {action}')
         markers.append({'number':offset+len(markers)+1,'selector':{k:action[k] for k in ('role','name','regex') if k in action},'box':b,'result':action['result'],'destination':action['destination'],'mode':action['mode']})
     state=state_details(sid)
     page.screenshot(path=str(OUT/f'{key}.png'),full_page=False)
@@ -326,7 +331,8 @@ def run(browser):
     goto(page,'/?mode=all')
     snap(page, 'D-GRP-01', '시장 전체 지도', 'FS018·FS019', '회원 또는 비회원의 전체 지도',checks=[('button','지도 읽는 법','크기·거리는 인과·중요도가 아니라는 설명을 열어요.','D-GRP-01')])
     select_company(page)
-    snap(page, 'D-GRP-03', '기업 패널', 'FS020·FS026·FS027', '지도 삼성전자 노드를 직접 누르기',checks=[('link','기업 상세','삼성전자 기업 상세로 가요.','D-COM-01')])
+    snap(page, 'D-GRP-03', '기업 패널·시세·1개월 추이', 'FS020·FS026·FS027', '지도 삼성전자 노드를 직접 누르기',checks=[],note='아래로 스크롤하면 모의 보유·사건·관련 기업·뉴스를 확인해요. 주요 지표는 기본 접힘이에요.')
+    click(page,'link','기업 상세')
     select_company(page)
     # 사건 제목 버튼과 근거 버튼 중 제목을 고른다.
     buttons=page.locator('section[aria-label="직접 이슈"]').get_by_role('button')
@@ -336,7 +342,7 @@ def run(browser):
     snap(page, 'D-GRP-05', '근거 문서 창', 'FS024', '사건·관계·영향 경로의 근거 버튼',checks=[('button','근거 창 닫기','근거 창을 닫고 영향 경로를 유지해요.','D-GRP-06')])
     goto(page,'/?mode=all')
     CanvasTarget(page,'issue-04153e2e4c2a1b58e40a0e57').click(); settle(page)
-    snap(page, 'D-GRP-02', '사건 패널', 'FS021·FS024', '지도 사건 노드를 직접 누르기',checks=[('button',re.compile('근거 .*건 보기'),'사건에 연결된 인용문을 열어요.','D-GRP-05')],note='영향 방향 값은 생산자가 없어 표시하지 않아요.')
+    snap(page, 'D-GRP-02', '사건 패널', 'FS021·FS024', '지도 사건 노드를 직접 누르기',checks=[('button',re.compile('근거 .*건 보기'),'사건에 연결된 인용문을 열어요.','D-GRP-05')],note='데모에는 실제 모델 판정값이 없어 표시하지 않아요.')
     select_company(page)
     click(page,'button','이 노드 중심으로 보기')
     snap(page,'D-GRP-07b','선택 기업 포커스','FS020','기업 패널 → 이 노드 중심으로 보기',checks=[('button','전체 보기','포커스를 풀고 전체 지도 배치로 돌아가요.','D-GRP-01')],note='삼성전자와 이어진 사건을 중심으로 보여줘요.')
@@ -353,11 +359,35 @@ def run(browser):
         related=page.locator('aside[aria-label="상세"]').get_by_role('button',name=re.compile('같은 사건|공유 사건'))
     related.first.click(); settle(page)
     snap(page, 'D-GRP-04', '연결선 상세', 'FS023·FS024', '기업 패널의 사건 공유 기업 선택',checks=[('button',re.compile('근거 .*건 보기'),'공유 사건의 근거를 한 창에서 보여줘요.','D-GRP-05')],note='기업 간 사건 공유·사건 간 후속 관계만 선택해요. 공급·경쟁 직결 관계를 만들지 않아요.')
+    goto(page,'/companies?q=삼성')
+    snap(page,'D-STK-01','종목 메뉴·검색·관심','FS037·FS027','헤더 종목 → 삼성 검색',checks=[('link','삼성전자 기업 상세','선택 기업의 상세 화면으로 이동해요.','D-COM-01')],note='지도 목록 보기를 대체하는 독립 메뉴예요. 비회원도 시장 전체 목록을 볼 수 있어요.')
     goto(page,'/companies/KRX%3A005930')
     snap(page, 'D-COM-01', '기업 상세·시세·모의 보유', 'FS038·FS039·FS040·FS044', '기업 패널 → 기업 상세',checks=[('tab','문서','이 기업 사건의 근거 문서 목록을 보여줘요.','D-COM-02')],note='시세·보유 영역의 출처·기준 시각을 확인해요. 차트·인과관계 고지는 D-COM-01b에서 확인해요.')
     snap(page, 'D-COM-02', '사건 타임라인·문서 탭', 'FS040·FS041·FS043', '기업 상세의 문서 탭',checks=[('tab','사건','기간별 사건 타임라인으로 돌아가요.','D-COM-01')])
-    page.get_by_text('차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지는 않아요.',exact=True).scroll_into_view_if_needed()
-    snap(page,'D-COM-01b','차트·사건 타임라인·인과관계 고지','FS040·FS041','기업 상세 사건 탭에서 차트 아래까지 스크롤',checks=[('radio','1년','차트와 사건의 조회 기간을 1년으로 바꿔요.','D-COM-01b')],note='화면의 시점 겹침은 주가의 원인이라는 뜻이 아니에요.')
+    page.get_by_role('radiogroup',name='조회 기간').evaluate('(el)=>window.scrollTo(0,scrollY+el.getBoundingClientRect().top-88)')
+    settle(page)
+    snap(page,'D-COM-01b','차트·시간 버킷·인과관계 고지','FS040·FS041','기업 상세 사건 탭에서 차트 아래까지 스크롤',checks=[('radio','1년','차트와 사건을 주 단위 버킷의 1년으로 바꿔요.','D-COM-01b')],note='1일/1주/1개월/1년과 해상도를 함께 표시해요. 시점 겹침은 인과관계가 아니에요.')
+    detail_route='/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events'
+    goto(page,detail_route)
+    snap(page,'D-COM-03','기업 상세·좌측 기업 전환','FS038·FS044','기업 상세의 기업 전환 사이드바',checks=[('css','aside[aria-label="기업 전환"] ul[aria-label="보유 기업"] li:nth-child(1) button','기업을 바꾸고 기간·기준 시점·탭은 유지해요.','D-COM-03')],note='검색·보유·관심·최근·연결 기업. 기업 전환 시 사건·버킷 선택은 해제해요.')
+    assert '/companies/NASDAQ%3ANVDA' in page.url and 'asOf=2026-09-30' in page.url
+    goto(page,detail_route)
+    snap(page,'D-COM-04','기업 중심 관계 그래프','FS038·FS040·FS044','기업 상세 오른쪽 관계 그래프',checks=[('button','지도에서 보기','같은 기업·기준 시점의 지도로 이동해요.','D-GRP-01')],note='공개 기준 asOf 이전의 검증 관계만 보여요. 1단계·2단계를 선택해요.')
+    goto(page,detail_route)
+    marker=page.get_by_role('group',name='사건이 있었던 시간 버킷').get_by_role('button').first
+    marker.wait_for(); marker.scroll_into_view_if_needed(); settle(page)
+    marker_name=marker.get_attribute('aria-label')
+    snap(page,'D-COM-05','타임라인 버킷·차트·그래프 연동','FS040·FS041·FS044','차트의 사건 수 표식 선택',checks=[('button',marker_name,'해당 버킷의 사건을 펼치고 차트·관계 그래프에 강조해요.','D-COM-05')],note='복수 사건은 한 사건으로 합치지 않아요. 사건 선택은 issue 주소로 복원해요.')
+    goto(page,detail_route)
+    slider=page.get_by_role('slider',name='차트 기준 시점. 화살표로 이동하고 Enter로 선택해요')
+    slider.scroll_into_view_if_needed(); settle(page)
+    snap(page,'D-COM-06','차트 시점 선택·asOf 변경','FS040·FS041·FS044','실제 거래 바를 눌러 공개 기준 시점 변경',checks=[('slider','차트 기준 시점. 화살표로 이동하고 Enter로 선택해요','누른 거래 바의 시각으로 asOf를 바꾸고 관계·사건을 다시 조회해요.','D-COM-06')],note='주소의 period·asOf·tab·issue로 재진입 상태를 복원해요. 최신 시점으로 돌아갈 수 있어요.')
+    goto(page,'/design-system#c-price')
+    page.locator('#c-price').scroll_into_view_if_needed(); settle(page)
+    snap(page,'D-SEN-01','긍부정 표시 규칙·디자인시스템 예시','FS021','디자인시스템의 판정 예시',note='디자인시스템 예시만 캡처했어요. 실제 모델 호출 전이며 데모 기사에는 판정값이 없어요. 중성 글자·아이콘·AI 판정으로 구분하고 주가 등락색·확률을 쓰지 않아요.')
+    goto(page,'/design-system#c-briefing')
+    page.locator('#c-briefing').scroll_into_view_if_needed(); settle(page)
+    snap(page,'D-SEN-02','회차 판단·디자인시스템 예시','FS028·FS029·FS030','디자인시스템 BriefingCard 예시',note='디자인시스템 예시이며 데모 브리핑에는 outlook 값이 없어요. 회차 판단과 사유는 발행 시 고정하며 주가 전망이 아니에요.')
     goto(page,'/me/stocks')
     page.get_by_placeholder('종목명이나 종목 코드').fill('삼성')
     snap(page, 'D-MY-01', '내 종목 관리', 'FS027·FS054·FS062', '회원 → 상단 내 종목',checks=[('button','검색','입력한 이름의 종목 검색 결과를 보여줘요.','D-MY-01')],note='보유는 모의 계좌, 관심은 직접 등록한 목록이에요.')
@@ -399,7 +429,8 @@ def run(browser):
     for sid,title,route,fs,nav in admin:
         goto(page,route)
         destinations={'이슈 관제':'A-ADM-03','선호도':'A-ADM-02b','AI 운영':'A-ADM-04b','회원 관리':'A-ADM-05','감사 로그':'A-ADM-05b','대시보드':'A-ADM-01'}
-        snap(page, sid, title, fs, '관리자 로그인 후 전용 메뉴',checks=[('link',nav,'관리자 메뉴의 해당 운영 화면을 열어요.',destinations[nav])],note='팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.')
+        note='문서×기업 판정(document-sentiment)·회차 판단(briefing-outlook)의 사용량 행이 있어요. 실제 모델 호출 전이며 데모 판정값은 없어요.' if sid=='A-ADM-04b' else '팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.'
+        snap(page, sid, title, fs, '관리자 로그인 후 전용 메뉴',checks=[('link',nav,'관리자 메뉴의 해당 운영 화면을 열어요.',destinations[nav])],note=note)
     # 변경 중인 필터·브리핑을 마지막에 캡처한다.
     goto(page,'/?mode=personal')
     snap(page, 'D-GRP-01b', '내 종목 지도·범위 필터', 'FS017·FS019·FS026', '회원 → 내 종목 모드',checks=[('radio',re.compile('^보유 종목'),'보유 기준 기업과 연결 사건 범위로 좁혀요.','D-GRP-01b')],note='전체·보유·관심은 내 종목 모드 안의 필터예요. 깊이 1단계는 프로토타입 가정이에요.')
@@ -421,6 +452,13 @@ def run(browser):
     goto(page,'/companies/KRX%3A005930')
     m=snap(page, 'M-COM-01', '기업 상세·문서 전환', 'FS038·FS043', '모바일 기업 상세',checks=[('tab','문서','근거 문서 탭으로 바꿔요.','D-COM-02')],suffix='-before')
     n=snap(page, 'M-COM-01', '기업 상세·문서 전환', 'FS038·FS043', '문서 탭 선택 뒤',checks=[],suffix='-after'); m['pair']=n['image']; slides.append(m)
+    goto(page,'/companies?q=삼성')
+    m=snap(page,'M-STK-01','종목 메뉴·기업 상세 이동','FS037·FS027','모바일 하단 종목 → 삼성 검색',checks=[('link','삼성전자 기업 상세','선택 기업의 상세로 이동해요.','M-COM-01')],suffix='-before')
+    n=snap(page,'M-STK-01','종목 메뉴·기업 상세 이동','FS037·FS027','기업 상세 이동 뒤',checks=[],suffix='-after'); m['pair']=n['image']; slides.append(m)
+    goto(page,detail_route)
+    m=snap(page,'M-COM-02','모바일 기업 전환 시트','FS038·FS044','기업 상세 → 다른 기업 보기',checks=[('button','삼성전자 · 다른 기업 보기','검색·보유·관심·최근·연결 기업의 전환 시트를 열어요.','M-COM-02')],suffix='-before')
+    n=snap(page,'M-COM-02','모바일 기업 전환 시트','FS038·FS044','기업 전환 시트 열린 뒤',checks=[('css','[role="dialog"] ul[aria-label="보유 기업"] li:nth-child(1) button','기업을 바꾸고 기간·기준 시점·탭은 유지해요.','M-COM-01')],suffix='-after'); m['pair']=n['image']; slides.append(m)
+    assert '/companies/NASDAQ%3ANVDA' in page.url and 'asOf=2026-09-30' in page.url
     goto(page,'/?mode=all')
     m=snap(page, 'M-AI-01', '하단 AI 탭', 'FS045·FS052-02', '모바일 하단 AI 탭',checks=[('button','AI','AI 질문 창을 열어요. 화면 라우트는 유지해요.','D-AI-01')],suffix='-before')
     n=snap(page, 'M-AI-01', '하단 AI 탭', 'FS045·FS052-02', 'AI 탭 선택 뒤',checks=[],suffix='-after'); m['pair']=n['image']; slides.append(m)
@@ -447,10 +485,16 @@ def run(browser):
     assert not g.get_by_role('button',name='보내기',exact=True).count()
     goto(g,'/me/stocks'); stocks_text=g.locator('body').inner_text()
     assert '로그인하면 내 종목을 관리할 수 있어요' in stocks_text
+    goto(g,'/companies?q=삼성')
+    assert g.get_by_role('link',name='삼성전자 기업 상세',exact=True).is_visible()
+    guest_catalog_text=g.locator('body').inner_text()
+    click(g,'link','삼성전자 기업 상세')
+    guest_company_text=g.locator('body').inner_text()
+    assert '삼성전자' in guest_company_text
     goto(g,'/briefing?date=2026-09-17&edition=evening')
     briefing_text=g.locator('body').inner_text(); assert '퇴근 브리핑' in briefing_text
     goto(g,'/admin'); assert '/admin/login' in g.url
-    (OUT/'auth-proof.json').write_text(json.dumps({'guestPersonal':personal_text,'guestAI':ai_text,'guestStocks':stocks_text,'guestBriefing':briefing_text,'adminRedirect':g.url,'guestSendButtonCount':0},ensure_ascii=False,indent=2))
+    (OUT/'auth-proof.json').write_text(json.dumps({'guestPersonal':personal_text,'guestAI':ai_text,'guestStocks':stocks_text,'guestCatalog':guest_catalog_text,'guestCompany':guest_company_text,'guestBriefing':briefing_text,'adminRedirect':g.url,'guestSendButtonCount':0},ensure_ascii=False,indent=2))
     guest.close()
     # 기존 이동 참조도 이번 실행의 실제 클릭 이력으로만 확정한다.
     records=list(slides)
@@ -464,7 +508,7 @@ def run(browser):
             evidence['verifiedInteraction']=matches[0]
         (OUT/record['image'].replace('.png','.json')).write_text(json.dumps(record,ensure_ascii=False,indent=2))
     (OUT/'interaction-history.json').write_text(json.dumps(click_history,ensure_ascii=False,indent=2))
-    for name in ('failure.png','failure.json'):
+    for name in ('failure.png','failure.json','targeted-capture.json'):
         (OUT/name).unlink(missing_ok=True)
     (OUT/'manifest.json').write_text(json.dumps(slides,ensure_ascii=False,indent=2))
     print('DONE',len(slides),'slides',flush=True)
@@ -481,11 +525,14 @@ try:
         browser=p.chromium.launch(executable_path=str(executable))
         try:
             run_watchlist_only(browser) if args.slides else run(browser)
-        except Exception:
+        except Exception as error:
+            import traceback
+            traceback.print_exc()
             for context in browser.contexts:
                 for page in context.pages:
-                    page.screenshot(path=str(OUT/'failure.png'))
-                    (OUT/'failure.json').write_text(json.dumps({'url':page.url,'text':page.locator('body').inner_text(),'aria':page.locator('body').aria_snapshot()},ensure_ascii=False,indent=2))
+                    (OUT/'failure.json').write_text(json.dumps({'error':str(error),'url':page.url,'text':page.locator('body').inner_text(),'aria':page.locator('body').aria_snapshot()},ensure_ascii=False,indent=2))
+                    try: page.screenshot(path=str(OUT/'failure.png'),timeout=10000)
+                    except Exception as capture_error: print('FAILURE screenshot:',capture_error,flush=True)
             raise
         finally:
             browser.close()

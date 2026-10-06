@@ -1,21 +1,22 @@
 // 노드·연결선 상세(UI-04·UI-05). 데스크톱은 지도 오른쪽 패널, 모바일은 바텀시트 안에 그린다(감싸는 틀은 graph-explorer).
 // 내부는 평탄하게: SectionHeader(아이콘) + ListRow/EventRow + 구분선. 관계 유형의 뜻은 섹션 머리의 정보 아이콘 안에 둔다.
 //  - 기업(요구 20): 상징색 표지·티커·업종·보유/관심, 직접 이슈(INVOLVES)와 간접 이슈(구조적 관련 + 직접 이슈의 앞뒤 사건)를
-//    나눠 보이고, 같은 사건을 공유하는 관련 기업, 기업 상세 이동. 생산자가 없는 시세·재무·AI 요약은 자리를 두지 않는다.
+//    나눠 보이고, 기업 상세와 같은 시세·주요 지표·시세 추이·모의 보유를 독립 조회한다. 생산자가 없는 재무·AI 요약은 두지 않는다.
 //  - 사건: 시각(정밀도), 근거, 관련 기업, 보도 기사, 앞뒤 사건. 긍정·부정 해석은 데이터가 없어 두지 않는다.
 //  - 연결선(요구 23): 두 대상·방향·공유 사건·확인 시점. 관계 유형(공급·고객 등)은 데이터에 없으므로 만들지 않는다.
 //  - 연결 없는 사건 묶음(G1): 묶인 사건을 최신순 EventRow로, 각 행에서 근거를 연다.
 //  - 기업·사건에는 [이 노드 중심으로 보기](G2 포커스 모드 진입)를 둔다.
 //  - 기업에는 [다른 기업과의 연결 보기](G6 경로)를 둔다(path-panel).
 //  - [AI에게 묻기](요구 25): 선택 대상과 기간·근거 수를 질문 대상으로 넘기고, 질문 창에서 확인·해제한다.
-import { ArrowUpRight, Building2, ExternalLink, FileText, Focus, GitFork, History, Info, Link2, MessageCircleQuestion, Newspaper, Star, Unlink, Wallet, Zap } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { ArrowUpRight, Building2, ExternalLink, FileText, Focus, GitFork, History, Info, Link2, MessageCircleQuestion, Newspaper, Unlink, Zap } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Link, useSearchParams } from "react-router";
 import type { Schemas } from "@/api/client";
-import { useCompany, useEdge, useEvent, useEventsByIds } from "@/api/queries";
-import { Badge } from "@/components/ui/badge";
+import { useAsOfRound, useCompany, useCompanyDocuments, useEdge, useEvent, useEventsByIds } from "@/api/queries";
 import { ApprovalNote, RoleUnconfirmed } from "@/components/domain/approval-note";
 import { CompanyMark } from "@/components/domain/company-mark";
+import { CompanyIssueSentiments, CompanyPanelNews, CompanyPanelSummary } from "@/components/domain/company-summary";
+import { detailRange, exchangeZone, parseAsOf, type DetailRange } from "@/lib/company-timeline";
 import { EventRow } from "@/components/domain/event-row";
 import type { GraphSelection } from "@/components/domain/graph-canvas";
 import { EdgeGlyph } from "@/components/domain/relation-type-tag";
@@ -80,7 +81,7 @@ export function NodeDetail(props: NodeDetailProps) {
       ) : node?.kind === "issue" ? (
         <IssueDetailView key={selection.id} issueId={selection.id} {...props} />
       ) : (
-        <CompanyDetailView key={selection.id} companyId={selection.id} {...props} />
+        <CompanyPanel key={selection.id} companyId={selection.id} {...props} />
       )}
     </div>
   );
@@ -141,6 +142,29 @@ interface IndirectIssue {
   why: string;
 }
 
+const panelRanges = new Map<string, { range: DetailRange; createdAt: number }>();
+
+/** 조회 시점을 패널 수명 동안 고정하고 상세 이동 주소에 넘겨 차트 캐시를 공유한다. */
+function CompanyPanel(props: NodeDetailProps & { companyId: string }) {
+  const [params] = useSearchParams();
+  const [range] = useState(() => {
+    const asOf = parseAsOf(params.get("asOf"));
+    if (asOf) return detailRange("1m", asOf, exchangeZone(props.companyId));
+    const cached = panelRanges.get(props.companyId);
+    if (cached && Date.now() - cached.createdAt < 60_000) return cached.range;
+    const next = detailRange("1m", new Date(), exchangeZone(props.companyId));
+    panelRanges.set(props.companyId, { range: next, createdAt: Date.now() });
+    return next;
+  });
+  return (
+    <>
+      <CompanyPanelSummary companyId={props.companyId} range={range} />
+      <CompanyDetailView {...props} range={range} />
+      <CompanyPanelNews companyId={props.companyId} range={range} />
+    </>
+  );
+}
+
 function CompanyDetailView({
   companyId,
   nodes,
@@ -152,8 +176,11 @@ function CompanyDetailView({
   focusId,
   onPathTo,
   onImpact,
-}: NodeDetailProps & { companyId: string }) {
-  const query = useCompany(companyId);
+  range,
+}: NodeDetailProps & { companyId: string; range: DetailRange }) {
+  const round = useAsOfRound();
+  const query = useCompany(companyId, round ? null : range.to);
+  const documents = useCompanyDocuments(companyId, round ? undefined : range);
 
   if (query.isPending) return <div className="px-4"><SkeletonRows count={2} label="기업 정보를 불러오고 있어요" /></div>;
   if (query.isError) return <ErrorState className="px-4" error={query.error} onRetry={() => void query.refetch()} />;
@@ -191,43 +218,19 @@ function CompanyDetailView({
         eventTime={issue.eventTime}
         timePrecision={issue.timePrecision}
         evidenceCount={issue.evidenceCount ?? undefined}
-        onShowEvidence={() => onShowEvidence({ title: issue.title, eventId: issue.id })}
+        onShowEvidence={() => onShowEvidence({ title: issue.title, eventId: issue.id, companyId })}
         // 관련 이슈를 고르면 이 기업과 그 사건의 영향 경로를 연다(FS022). 지도 밖 사건은 경로를 만들 수 없다.
         onSelect={nodeOf(issue.id) ? () => (onImpact ? onImpact(companyId, issue.id) : onSelect({ kind: "node", id: issue.id })) : undefined}
-        meta={meta ? <span className="text-sm text-text-secondary">{meta}</span> : undefined}
+        meta={<>{meta && <span className="text-sm text-text-secondary">{meta}</span>}<CompanyIssueSentiments issueId={issue.id} documents={documents.data?.items ?? []} /></>}
       />
     </li>
   );
 
   return (
     <>
-      <div className="flex items-center gap-3 px-4">
-        <CompanyMark id={company.id} name={company.name} brandColor={company.brandColor} logoUrl={company.logoUrl} size={40} />
-        <div className="flex min-w-0 flex-col gap-1">
-          {(company.ticker || company.sector) && (
-            <p className="text-base text-text-secondary tabular-nums">{[company.ticker, company.sector].filter(Boolean).join(" · ")}</p>
-          )}
-          {(company.holding || company.watch) && (
-            <p className="flex flex-wrap gap-1.5">
-              {company.holding && (
-                <Badge>
-                  <Wallet aria-hidden="true" />
-                  보유 종목
-                </Badge>
-              )}
-              {company.watch && (
-                <Badge>
-                  <Star aria-hidden="true" />
-                  관심 종목
-                </Badge>
-              )}
-            </p>
-          )}
-        </div>
-      </div>
       <Actions>
         <Button variant="secondary" asChild>
-          <Link to={`/companies/${encodeURIComponent(company.id)}`} state={linkState}>
+          <Link to={`/companies/${encodeURIComponent(company.id)}?asOf=${encodeURIComponent(range.to)}&period=${range.period}`} state={linkState}>
             <ArrowUpRight aria-hidden="true" />
             기업 상세
           </Link>
@@ -249,7 +252,8 @@ function CompanyDetailView({
         ) : (
           <>
             {onImpact && <p className="px-4 pb-1 text-sm text-text-secondary">사건을 누르면 이 기업과 이어진 경로와 근거가 보여요.</p>}
-            <ul className="stagger">{direct.map((i) => issueRow({ id: i.issueId, title: i.title, eventTime: i.eventTime, timePrecision: i.timePrecision, evidenceCount: i.evidenceCount }, i.role ?? undefined))}</ul>
+            <ul className="stagger">{direct.slice(0, 3).map((i) => issueRow({ id: i.issueId, title: i.title, eventTime: i.eventTime, timePrecision: i.timePrecision, evidenceCount: i.evidenceCount }, i.role ?? undefined))}</ul>
+            {direct.length > 3 && <details className="px-4"><summary className="min-h-11 cursor-pointer py-3 text-sm text-text-secondary">직접 이슈 {direct.length - 3}건 더 보기</summary><ul>{direct.slice(3).map((i) => issueRow({ id: i.issueId, title: i.title, eventTime: i.eventTime, timePrecision: i.timePrecision, evidenceCount: i.evidenceCount }, i.role ?? undefined))}</ul></details>}
           </>
         )}
       </section>
@@ -268,7 +272,7 @@ function CompanyDetailView({
         {indirect.length === 0 ? (
           <p className="px-4 text-base text-text-secondary">데이터로 이어진 간접 이슈가 없어요.</p>
         ) : (
-          <ul className="stagger">{indirect.map((i) => issueRow(i, i.why))}</ul>
+          <><ul className="stagger">{indirect.slice(0, 3).map((i) => issueRow(i, i.why))}</ul>{indirect.length > 3 && <details className="px-4"><summary className="min-h-11 cursor-pointer py-3 text-sm text-text-secondary">간접 이슈 {indirect.length - 3}건 더 보기</summary><ul>{indirect.slice(3).map((i) => issueRow(i, i.why))}</ul></details>}</>
         )}
       </section>
 

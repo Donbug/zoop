@@ -36,6 +36,8 @@ interface BriefingCardProps {
   notice?: ReactNode;
   /** 회차 전체에 대한 정정(원문과 구분해 표시) */
   corrections?: ReactNode;
+  /** 발행본에 고정된 회차 판단. 없으면 자리 자체를 그리지 않는다. */
+  outlook?: ReactNode;
   /** 근거 문서 합계. 없으면 꼬리 줄을 그리지 않는다. */
   totalEvidence?: number;
   summary?: ReactNode;
@@ -45,7 +47,7 @@ interface BriefingCardProps {
 
 export const editionTitle = { morning: "출근 브리핑", evening: "퇴근 브리핑" } as const;
 
-export function BriefingCard({ edition, status, date, scheduledAt, publishedAt, generatedAt, dataAsOf, notice, corrections, totalEvidence, summary, relations, className }: BriefingCardProps) {
+export function BriefingCard({ edition, status, date, scheduledAt, publishedAt, generatedAt, dataAsOf, notice, corrections, outlook, totalEvidence, summary, relations, className }: BriefingCardProps) {
   const EditionIcon = edition === "morning" ? Sun : Moon;
   const state = status ? roundStatus[status] : null;
   const StatusIcon = state?.icon;
@@ -98,6 +100,7 @@ export function BriefingCard({ edition, status, date, scheduledAt, publishedAt, 
       </div>
       {notice && <div className="px-4 pb-2">{notice}</div>}
       {corrections && <div className="px-4 pb-2">{corrections}</div>}
+      {outlook && <div className="px-4">{outlook}</div>}
       {summary &&
         (relations ? (
           <Tabs defaultValue="summary" className="flex flex-col">

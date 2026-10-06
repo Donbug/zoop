@@ -7,7 +7,7 @@
     "height": 900
   },
   "fs": "FS004·FS061",
-  "requirements": "4·70",
+  "requirements": "4·73",
   "entry": "시작 → 개발용 모의 로그인으로 계속",
   "states": "동의 입력 · 취소 · 요청·동의 처리 오류",
   "capturedState": "기본",

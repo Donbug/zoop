@@ -51,7 +51,7 @@ def test_rule_based_features_are_measured_and_report_zero_model_calls(admin):
     assert stolen.status_code == 403
 
     chatbot = _feature(_usage(admin), "chatbot")
-    assert chatbot["modelBacked"] is False and chatbot["usage"] == {"modelCalls": 0, "inputTokens": 0, "outputTokens": 0}
+    assert chatbot["modelBacked"] is False and chatbot["usage"] == {"modelCalls": 0, "inputTokens": 0, "outputTokens": 0, "replayCalls": 0, "retries": 0}
     assert (chatbot["requests"], chatbot["succeeded"], chatbot["failed"]) == (2, 2, 0)  # a 403 is not an AI request
     assert chatbot["latencyMs"]["max"] >= chatbot["latencyMs"]["avg"] > 0 and chatbot["source"] == "measured"
     assert chatbot["cost"]["status"] == "unavailable" and chatbot["cost"]["estimated"] is None
@@ -156,7 +156,7 @@ def test_dashboard_summarises_every_area(admin):
     assert body["candidates"] == {"allow": 4, "hold": 1, "reject": 0, "inactive": 0, "holdPendingReview": 0}
     assert body["jobs"]["failed24h"] == 1 and body["jobs"]["running"] == 0 and body["jobs"]["recent"][0]["status"] == "failed"
     assert body["members"] == {"registered": 1, "activeMemberSessions": 1, "activeGuestSessions": 1, "source": "bff-mock"}
-    assert [f["feature"] for f in body["ai"]["features"]] == ["chatbot", "news-analysis", "briefing"]
+    assert [f["feature"] for f in body["ai"]["features"]] == ["chatbot", "news-analysis", "briefing", "document-sentiment", "briefing-outlook"]
     assert body["briefings"]["latest"][0]["id"] == "brf-2026-09-17-morning"
     assert body["briefings"]["latest"][0]["status"] == "missing" and body["briefings"]["delayedOrFailed"] == 1
     assert body["audit"]["last24h"] >= 3

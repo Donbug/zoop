@@ -528,17 +528,17 @@ class PricePoint(CamelModel):
 class PriceSeries(CamelModel):
     status: Literal["available"] = "available"
     company_id: str
-    period: Literal["1d", "1m", "1y"]
+    period: Literal["1d", "1w", "1m", "1y"]
     source: QuoteSourceOut
     currency: str
-    interval: str = Field(description="Bar size: `1m`/`5m` for the latest session (1d), `1d` otherwise.")
+    interval: str = Field(description="Bar size: 5m (1d), 1h (1w), 1d (1m), 1wk (1y).")
     points: list[PricePoint] = Field(description="Oldest first.")
 
 
 class PriceSeriesUnavailable(CamelModel):
     status: Literal["unavailable"] = "unavailable"
     company_id: str
-    period: Literal["1d", "1m", "1y"]
+    period: Literal["1d", "1w", "1m", "1y"]
     reason_code: QuoteReasonCode
     reason: str
 
@@ -571,6 +571,33 @@ class CompanyMetricsUnavailable(CamelModel):
 MetricsResponse = Annotated[CompanyMetrics | CompanyMetricsUnavailable, Field(discriminator="status")]
 
 
+SentimentCode = Literal["positive", "negative", "mixed", "undetermined"]
+
+
+class DocumentSentiment(CamelModel):
+    label: SentimentCode
+    company_id: str
+    rationale: str
+    quotes: list[str]
+    judged_at: str
+    model: str
+    prompt_version: str
+
+
+class BriefingOutlook(CamelModel):
+    label: SentimentCode
+    rationale: str
+    issue_ids: list[str]
+    judged_at: str
+    model: str
+    prompt_version: str
+
+
+class BriefingDocumentSentiment(CamelModel):
+    article_id: str
+    sentiment: DocumentSentiment
+
+
 class DocumentEventRef(CamelModel):
     event_id: str
     title: str
@@ -592,6 +619,7 @@ class CompanyDocument(CamelModel):
     synthetic: bool
     events: list[DocumentEventRef] = Field(description="This company's approved events the article supports")
     quotes: list[DocumentQuote] = Field(description="Stored evidence quotes from this article for those events")
+    sentiment: DocumentSentiment | None = None
 
 
 class CompanyDocumentsResponse(CamelModel):
@@ -775,6 +803,7 @@ class EvidenceResponse(CamelModel):
     )
     event_ids: list[str]
     metadata: Metadata
+    sentiment: DocumentSentiment | None = None
 
 
 # ---- briefings
@@ -795,6 +824,7 @@ class BriefingItem(CamelModel):
     reason: str = Field(description="Rule-based selection reason (no importance or direction claim)")
     evidence_ids: list[str]
     summary: Unavailable
+    document_sentiments: list[BriefingDocumentSentiment] = Field(default_factory=list)
     reported_at: str | None = Field(
         default=None,
         description="KST time of the newest article behind the issue (the time it entered the round's data window); only "
@@ -937,6 +967,7 @@ class BriefingResponse(CamelModel):
     data_as_of: str | None
     graph_version: str | None
     items: list[BriefingItem]
+    outlook: BriefingOutlook | None = None
     market_summary: Unavailable = Field(description="No producer exists (prose summary), so always unavailable")
     market_variables: MarketVariablesOut = Field(
         description="KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none"

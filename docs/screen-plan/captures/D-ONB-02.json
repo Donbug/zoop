@@ -7,7 +7,7 @@
     "height": 900
   },
   "fs": "FS009·FS010·FS062",
-  "requirements": "9·10·71",
+  "requirements": "9·10·74",
   "entry": "투자 중 선택",
   "states": "미연결·선택 · 연결 중·연결됨 · 연결 실패·건너뛰기",
   "capturedState": "기본 · 모의 데이터",

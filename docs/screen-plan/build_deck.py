@@ -1,6 +1,6 @@
 """캡처 manifest로 16:9 PPTX를 만들고 LibreOffice PDF·페이지 PNG를 출력한다."""
 from pathlib import Path
-import json, subprocess, os, argparse, math
+import json, subprocess, os, argparse, math, shutil
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -43,7 +43,7 @@ def new(sid,title,route='',source=''):
     box(slide,.63,.92,14.8,.35,route,11,color=C('text-secondary'))
     line=slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT,Inches(.6),Inches(1.27),Inches(15.4),Inches(1.27))
     line.line.color.rgb=C('border-subtle'); line.line.width=Pt(.8)
-    box(slide,.63,8.45,13.7,.3,'줍 화면계획서 v2.0 · 프로토타입 기준'+('  |  '+source if source else ''),9,color=C('text-tertiary'))
+    box(slide,.63,8.45,13.7,.3,'줍 화면계획서 v2.1 · 프로토타입 기준'+('  |  '+source if source else ''),9,color=C('text-tertiary'))
     box(slide,14.6,8.4,.8,.4,f'{len(prs.slides):02}',12,bold=True,color=BRAND)
     index.append({'page':len(prs.slides),'id':sid,'title':title,'route':route})
     return slide
@@ -76,22 +76,23 @@ def table(sid,title,headers,rows,widths,source=''):
     return s
 
 
-s=new('COVER','줍 화면계획서 v2.0','프로토타입 기준 · 2026-10-03')
+s=new('COVER','줍 화면계획서 v2.1','프로토타입 기준 · 2026-10-06')
 box(s,.8,2.0,13.7,1.55,'실제 화면에서\n근거 확인까지',40,True,color=BRAND)
-box(s,.8,4.3,13.5,2.7,'기능명세 v1.2 10-01 고정본 + 10-03 채택 항목(§0.3)\nNotion 10-03 고정본 · 팀 화면계획서 v1.7 최종 42쪽 묶음\n모의 계좌 + 실제 기사 39건의 저장본을 사용한 시연이에요.\n규칙 기반 AI 예시 답변이며, 실제 서비스 데이터·생성형 AI가 아니에요.',21)
+box(s,.8,4.3,13.5,2.7,'기능명세·요구사항 10-06 고정본 + 현재 프로토타입\n종목 메뉴 · 기업 전환 · 시점 관계 그래프 · 시간 버킷\n모의 계좌 + 실제 기사 저장본을 사용한 시연이에요.\n긍부정은 디자인시스템 예시만 있으며 데모 판정값은 없어요.',21)
 columns('HISTORY','변경 이력·v1.7 대비','채택 6','1. 장 마감 보드의 회차 비교 → 퇴근 브리핑\n2. 모바일 아침 이후 바뀐 내용 → 신규·이어짐·빠짐\n3. 근거·원문 접근 상태 → 제공 불가와 실패 분리\n4. 차트·사건 시점 겹침 → 인과관계 아님 고지\n5. 모바일 AI 탭 → 기존 질문 창 열기\n6. 비회원 권한표·관리자 감사 규칙의 형식','불채택 6','1. D-GRP-06 간선 모달 → FS022·D03과 충돌\n2. 외부 원인 10종·공급/경쟁 직결선 → 데이터 없음\n3. 긍정/부정 가능 배지 → 방향 값 생산자 없음\n4. 모듈별 6색·카드 좌측 막대 → 색은 뜻에만\n5. 관심 최대 3개 → 무제한·0개 허용\n6. 08:00/18:00 → 07:40/18:10 생성 시작','작성 명세 §팀 v1.7 판정 · review.md 머리 Main 정정')
-columns('GUIDE','읽는 법','화면·번호','D: 데스크톱 · M: 모바일 · A: 관리자\nAUT 시작 / ONB 설정 / WAT 관심\nGRP 지도 / COM 기업 / BRF 브리핑\nAI 질문 / MY 내 종목 / ADM 운영\nb/c: 추가 상태 · T2~T5: 튜토리얼 단계\n상자: 실제 조작 요소 · 원: 32px 번호\n번호 원은 상자 밖에 두고 겹치면 비켜요.\n한 화면의 주요 조작은 3~6개예요.','상태·근거','상태 칸: 그 화면에 구현된 상태\n기존 상태 캡처는 docs/design/ 파일로 참조\n코드 경로는 prototype/web/src/ 기준\n번호 행동: 실제 클릭 결과 또는 확인한 이동 참조\n모바일: 누르기 전 / 누른 뒤\n빈 상태와 요청 실패·권한 제한을 구분해요.\n실행에서 못 본 결과는 성공으로 쓰지 않아요.','captures/*.json clickEvidence · spec-v1.2-gap.md §0.3')
+columns('HISTORY-21','변경 이력 · v2.0 → v2.1','화면·동작','1. 지도 목록을 독립 종목 메뉴로 분리\n2. 데스크톱 4메뉴·모바일 하단 5탭\n3. 기업 패널의 시세·추이·주요 지표\n4. 기업 상세의 좌측 전환·관계 그래프\n5. 시간 버킷·차트·그래프 선택 연동\n6. 차트 시점 선택 → asOf 공개 기준 변경','근거·문서','요구사항 10-06의 85개 레코드 번호로 갱신\nFS037 종목 메뉴를 데스크톱·모바일에 추가\n모바일 기업 전환 시트를 별도 화면으로 기록\n긍부정·회차 판단은 디자인시스템 예시 명시\n데모에는 실제 모델 호출·판정값이 없어요.\n부록 문서 체계와 기능·API·WBS 추적 연결','doc-delta-2026-10-06.md §2.2 · design-direction.md §5.3·§5.10')
+columns('GUIDE','읽는 법','화면·번호','D: 데스크톱 · M: 모바일 · A: 관리자\nAUT 시작 / ONB 설정 / WAT 관심\nGRP 지도 / STK 종목 / COM 기업\nBRF 브리핑 / AI 질문 / MY 내 종목\nADM 운영 / SEN 디자인시스템 예시\nb/c: 추가 상태 · T2~T5: 튜토리얼 단계\n상자: 실제 조작 요소 · 원: 32px 번호\n한 화면의 주요 조작은 3~6개예요.','상태·근거','상태 칸: 그 화면에 구현된 상태\n기존 상태 캡처는 docs/design/ 파일로 참조\n코드 경로는 prototype/web/src/ 기준\n번호 행동: 실제 클릭 결과 또는 확인한 이동 참조\n모바일: 누르기 전 / 누른 뒤\n빈 상태와 요청 실패·권한 제한을 구분해요.\n실행에서 못 본 결과는 성공으로 쓰지 않아요.','captures/*.json clickEvidence · spec-v1.2-gap.md §0.3')
 
 manifest=json.loads((CAP/'manifest.json').read_text())
 SCREEN_ORDER=['D-AUT-01','D-AUT-02','D-AUT-03','D-ONB-01','D-ONB-02','D-WAT-01','D-WAT-01b',
     'D-GRP-01','D-GRP-01b','D-GRP-T','D-GRP-T2','D-GRP-T3','D-GRP-T4','D-GRP-T5',
     'D-GRP-02','D-GRP-03','D-GRP-04','D-GRP-05','D-GRP-06','D-GRP-07','D-GRP-07b',
-    'D-COM-01','D-COM-01b','D-COM-02','D-MY-01','D-BRF-01','D-BRF-02','D-BRF-04',
-    'D-AI-01','D-AI-01b','D-AI-02','D-AI-02b','M-GRP-01','M-BRF-01','M-AI-01','M-COM-01',
+    'D-STK-01','D-COM-01','D-COM-01b','D-COM-02','D-COM-03','D-COM-04','D-COM-05','D-COM-06','D-MY-01','D-BRF-01','D-BRF-02','D-BRF-04',
+    'D-AI-01','D-AI-01b','D-AI-02','D-AI-02b','M-GRP-01','M-STK-01','M-BRF-01','M-AI-01','M-COM-01','M-COM-02','D-SEN-01','D-SEN-02',
     'A-ADM-05c','A-ADM-01','A-ADM-02','A-ADM-02b','A-ADM-03','A-ADM-04','A-ADM-04b','A-ADM-05','A-ADM-05b']
 assert {x['id'] for x in manifest}==set(SCREEN_ORDER)
 manifest.sort(key=lambda x:SCREEN_ORDER.index(x['id']))
-ui={'AUT':'UI-01','ONB':'UI-02','WAT':'UI-02','GRP':'UI-03','COM':'UI-06/07','BRF':'UI-08','AI':'UI-10','MY':'신규'}
+ui={'AUT':'UI-01','ONB':'UI-02','WAT':'UI-02','GRP':'UI-03','STK':'FS037','COM':'UI-06/07','BRF':'UI-08','AI':'UI-10','MY':'신규','SEN':'예시 전용'}
 ui_detail={'D-AUT-03':'개발용','D-GRP-02':'UI-04','D-GRP-03':'UI-04','D-GRP-04':'UI-05','D-GRP-05':'UI-09','D-GRP-06':'UI-03+04','M-GRP-01':'UI-03+04','D-BRF-04':'UI-03'}
 rows=[]
 for item in manifest:
@@ -99,7 +100,7 @@ for item in manifest:
     route=item['route']
     # 주소는 실제 캡처 주소를 유지하되 길이가 긴 대상 id는 일반화한다.
     if mod=='GRP': route='/?mode=…'+ ('&impact=…' if 'impact=' in route else '&path=…' if 'path=' in route else '&round=…' if 'round=' in route else '&select=…' if 'select=' in route else '&tour=1' if 'tour=' in route else '')
-    if mod=='COM': route='/companies/:id'+ ('?tab='+item['route'].split('tab=')[1].split('&')[0] if 'tab=' in item['route'] else '')
+    if mod=='COM': route='/companies/:id?period=…&asOf=…&tab=…'+('&issue=…' if 'issue=' in item['route'] else '')
     if mod=='BRF': route='/briefing?date=…&edition=…' if ident!='D-BRF-04' else '/?round=…'
     if mod=='AI': route='/?select=… (AI 질문 창)' if 'select=' in item['route'] else '/ (AI 질문 창)'
     rows.append((ident,route,ui_detail.get(ident,ui.get(mod,'관리자 전용')),' · '.join(item['fs'].split('·'))))
@@ -122,7 +123,7 @@ box(s,.9,6.75,14.2,1.05,'기업 패널의 직접 이슈 → 영향 경로 → �
 columns('SEMANTICS','색과 아이콘의 뜻','색은 의미를 구분해요','브랜드: 주 행동·선택·포커스\n중성 회색: 내용·구분선·보조 정보\n상승/하락: 부호·▲/▼·수치와 함께\n경고/오류: 문구·아이콘과 함께\n모듈은 색이 아니라 ID·아이콘으로 구분해요.\n캡처 안 기업 상징색은 기업 구별용이에요.','같은 뜻에 같은 아이콘','Map 지도 · Globe 시장 전체\nBookmark 내 종목 · Star 관심 · Wallet 보유\nBuilding2 기업 · Zap 사건\nGitFork 간접 이슈 · Link2 연결\nFileText 근거 · Sparkles AI · Info 설명\n색만으로 상태나 관계를 전달하지 않아요.','tokens.json v3.0.0 · design-direction.md §4.6')
 columns('STATE-01','공통 상태 규칙','조회·자료','로딩: 조회 중 표시, 다른 영역은 유지\n빈: 자료 없음 + 가능한 다음 행동\n부분 실패: 받은 자료 유지, 실패만 재조회\n오류: 사유와 해당 조회의 다시 시도\n자료 삭제·비공개·권한 없음: 제공 불가\n404·403 근거를 일시 장애로 재시도하지 않아요.','권한·작업','비회원: 시장 전체·근거 확인 가능\n내 종목·AI 전송: 로그인 안내\nAI: 결과 회수와 새 작업 실행은 별개\n발행 브리핑: 지표 한 개 실패도 본문은 유지\n지표 미제공과 실패를 글자로 구분해요.\n이 슬라이드는 소스 규칙이며 전 상태 캡처는 아니에요.','spec-v1.2-gap.md §0.2·§0.3 · design-direction.md §5.5')
 table('M-RULE-01','모바일 전환 규칙',['PC 요소','모바일 표면','동작'],[
-('헤더 메뉴','하단 4탭','지도 · 브리핑 · AI · 내 종목'),('기업·사건 오른쪽 패널','바텀시트','절반/확장, 닫기 제공'),('모드 옆 범위 필터','모드 아래 전체 폭','전체 · 보유 · 관심'),('지도 도구 가로 줄','오른쪽 아래 세로 버튼','탭바 위 44px 조작 영역'),('시장 지표 3열','시장 지표 3행','관측 시각·출처·상태 유지'),('기업 상세 가운데 한 열','같은 순서 세로','사건/문서 탭 + 내부 스크롤'),('AI에게 묻기','AI 하단 탭','화면 이동 없이 질문 창 열기')],[4.1,4.3,6.25],'design-direction.md §3.2·§4.4·§4.8 · M-* 캡처')
+('헤더 메뉴','하단 5탭','지도 · 종목 · 브리핑 · AI · 내 종목'),('기업·사건 오른쪽 패널','바텀시트','절반/확장, 닫기 제공'),('모드 옆 범위 필터','모드 아래 전체 폭','전체 · 보유 · 관심'),('지도 도구 가로 줄','오른쪽 아래 세로 버튼','탭바 위 44px 조작 영역'),('시장 지표 3열','시장 지표 3행','관측 시각·출처·상태 유지'),('기업 상세 좌측 전환','기업 전환 시트','검색·보유·관심·최근·연결 기업'),('기업 상세 오른쪽 관계','본문 아래 관계 그래프','같은 기준 시점·선택 사건 유지'),('AI에게 묻기','AI 하단 탭','화면 이동 없이 질문 창 열기')],[4.1,4.3,6.25],'design-direction.md §4.8·§5.3·§5.10 · M-* 캡처')
 table('AUTHORITY','비회원·회원·관리자 권한',['행동','비회원','회원','관리자 세션'],[
 ('시장 전체·기업·근거 조회','가능','가능','회원 세션과 분리'),('내 종목 지도·관심 저장','로그인 안내','가능','회원 세션과 분리'),('모의 계좌 연결','로그인 안내','가능','회원 세션과 분리'),('발행된 공통 브리핑 조회','가능','가능','운영은 별도 세션'),('AI 창 열기 / 질문 전송','안내 / 불가','가능 / 가능','회원 세션과 분리'),('평가 등록','불가','가능','운영 집계 조회'),('관리자 라우트','관리자 로그인','관리자 로그인','가능')],[5.1,3.05,3.05,3.45],'접근 가드·spec-v1.2-gap.md FS045·FS066-01. 실제 권한 smoke는 captures/auth-proof.json')
 
@@ -192,6 +193,8 @@ for item in manifest:
         shot(s,item,item['image'],.4,1.45,10.8,6.75)
     state_refs='코드 근거: '+item['stateSource']+'\n'+'\n'.join('기존 캡처: '+p for p in item['stateImages'])
     sections=[('진입 조건',item['entry']),('누르면','\n'.join(f"{m['number']}  {m['result']} → {m['destination']}" for m in all_markers)),('상태','현재 캡처: '+item['capturedState']+'\n구현 상태: '+item['states']+'\n'+state_refs),('명세',' · '.join(item['fs'].split('·'))+' / 요구 '+(item['requirements'] or '미기재'))]
+    if item['id'].startswith('D-SEN-'): sections.insert(0,('예시·데이터 한계',item['note']))
+    elif item['id'] in ('D-GRP-02','D-GRP-03','D-COM-03','D-COM-04','D-COM-05','D-COM-06','A-ADM-04b'): sections.append(('조회·선택 규칙',item['note']))
     # 반복 범위 고지는 발표자 노트에 둔다. 모의·근거·시점 고지는 실제 화면과 공통 규칙에 있다.
     team={
         'D-AUT-02':'가입 필드와 약관 본문을 확정해야 해요.',
@@ -221,7 +224,7 @@ for item in manifest:
 # 부록은 정책 문서와 실제 캡처 범위를 명확히 구분한다.
 table('APP-EVIDENCE','근거·원문 접근 상태 매트릭스',['상태','화면 표시','다음 행동'],[
 ('원문 링크 있음','인용·출처 + 원문 링크','새 창. 기존 패널·대화 유지'),('원문 링크 없음','원문을 제공하지 않는 자료입니다','인용·출처 유지'),('원문 접근 실패','앱이 외부 사이트 접근을 검사하지 않음','외부 사이트에서 처리. 앱 오류 만들지 않음'),('연결 자료 0건','근거 없음. 근거 버튼 생략','빈 상태, 오류 아님'),('근거 조회 일시 실패','받은 근거 유지 + 실패 건수','실패한 근거만 다시 시도'),('삭제·비공개·권한 없음','제공 불가. 보호 내용 표시 안 함','404·403은 재시도 없음'),('이전 대상 늦은 응답','현재 대상에 섞이지 않음','대상별 조회 칸 분리')],[3.25,6.15,5.25],'design-direction.md §5.5. 전 상태 실측 아님 · FS024·FS050-01·FS043')
-table('APP-ID','팀 v1.7 ↔ v2.0 화면 ID 대응',['팀 v1.7','프로토타입 v2.0','판정·차이'],[
+table('APP-ID','팀 v1.7 ↔ v2.1 화면 ID 대응',['팀 v1.7','프로토타입 v2.1','판정·차이'],[
 ('D-GRP-05 필터','D-GRP-01 · D-GRP-01b','두 모드와 개인화 내부 필터로 분리'),
 ('D-GRP-02 동시 이슈','D-GRP-02 사건 패널','명칭·단위 변경'),
 ('D-GRP-03 영향 경로','D-GRP-03 기업 패널','기업 정보 패널과 경로 역할 분리'),
@@ -229,6 +232,7 @@ table('APP-ID','팀 v1.7 ↔ v2.0 화면 ID 대응',['팀 v1.7','프로토타입
 ('D-GRP-04 근거','D-GRP-05 근거 창','ID 이동'),
 ('D-GRP-03 영향 경로 · D-GRP-06 간선 모달','D-GRP-06 영향 경로','기업 패널의 관련 사건에서 진입'),
 ('D-BRF-03 장 마감 보드','D-BRF-02 퇴근 회차 비교','독립 화면 없이 흡수'),
+('지도 안 목록 보기','D-STK-01 · M-STK-01','독립 종목 메뉴 /companies로 분리'),
 ('A-ADM-01~05','관리자 로그인 → 최종 5개 묶음','42쪽 기준, 28쪽의 이전 분류는 승계하지 않음')],[4.6,5.3,4.75],'팀 원문 screen-plan-v1.7.txt · 본문과 같은 화면 흐름 순서')
 table('APP-VERDICT-01','팀 v1.7 판정표 · 채택',['팀 항목','v2.0 적용','근거'],[
 ('D-BRF-03 회차 비교','D-BRF-02에 흡수','공통 발행본을 날짜·출근/퇴근으로 비교'),
@@ -246,9 +250,16 @@ table('APP-VERDICT-02','팀 v1.7 판정표 · 불채택',['팀 항목','v2.0 판
 ('브리핑 08:00/18:00','07:40/18:10 생성 시작','10-01 명세 정본')],[4.7,4.25,5.7],'작성 명세 팀 v1.7 확정 판정 · review.md Main 정정')
 columns('APP-POLICY-01','팀 확인 필요 · 관리자와 운영','팀에 요청한 결정 1~3','1. R1을 자동 검증 정책의 일부로 인정할지\n역할이 확인되지 않은 후보를 역할 없이 공개해요.\n2. 관리자 권한 등급·대화록 범위·마스킹\n별도 열람 권한·목적·실패 차단은 남은 충돌이에요.\n3. 관리자 허용 → 재검증 전환\n현재 즉시 공개와 FS067-02가 충돌해요.','팀에 요청한 결정 4~6','4. 운영 값: 로그인 실패 제한·재시도 범위·보존 기간\nAI 재시도 3회·중단 120초는 프로토타입 기본값\n5. 그래프 기본값: 사이드바·패널·원 최소 크기\n영향 경로라는 이름의 오해 가능성 확인\n6. 시세 공급원: 토스 API 이용 목적·제3자 제공\n키 발급과 별개로 약관·배포 권한 확인','progress-2026-10-02.md §1. 여섯 항목은 확정 결정이 아니라 결정 요청이에요.')
 columns('APP-POLICY-02','팀 확인 필요 · 10-03 명세 충돌','명세 갱신본','FS017: 기존 시트 제품 노드 vs v2 기업·사건 두 노드\n현재 캡처는 기업·사건만. 정본 대체 선언은 없어요.\nFS004 vs FS061: 제공자·신규 계정·연결 정책 정합화\n현재는 /mock-idp 모의 제공자예요.\nFS014: 초기 그래프에 튜토리얼 기준 혼입\n초기 설정·튜토리얼 계약을 분리해야 해요.','Notion 최종 시퀀스 vs 9/30','비회원 관심 선택·저장 금지 vs 임시 저장 허용\n관심 무제한·0개 허용 vs 최소1/최대3\n사건–기업 간선 클릭 제거 vs 상세 패널 진입\n보유·관심 한 모드 내 필터 vs 세 모드 혼재\n가입 자동 로그인 vs 로그인 화면으로 복귀\n문서 제목 최종만으로 팀 승인으로 보지 않아요.','spec-wbs-delta-2026-10-03.md §6 · notion-delta-2026-10-03.md §7')
-columns('APP-LIMIT','근거 버전·남은 한계','현재 근거','기능명세: 10-01 v1.2 고정본\n10-03 반영: spec-v1.2-gap.md §0.3\nNotion: raw/notion_2026-10-03 고정본\n팀 v1.7: review.md 머리 Main 정정 우선\n화면: captures/ 원본 PNG·좌표·클릭 결과\n디자인: tokens.json v3.0.0 · design-direction.md','정책·데이터 한계','시장 요약·재무 추이·산업/테마 생산자 없음\n영향 방향 생산자 없음. 표시 규격만 존재\n생성형 AI·실 소셜 IdP·정기 수집원 미연결\n환율 변화 기준·지연 수치는 프로토타입 가정\n발행 뒤 지표 재조회는 회차 불변 정책과 충돌\n실제 오류·권한·외부 원문 실패 전수 캡처는 아님','공급자 공백을 가짜 값·전망·확률로 채우지 않아요.')
+columns('APP-LIMIT','근거 버전·남은 한계','현재 근거','기능명세: functional-spec_2026-10-06\n요구사항: requirements-sheet_2026-10-06\nWBS: wbs_2026-10-03(내용 동일)\n변경 대응: doc-delta-2026-10-06.md §2.2\n화면: captures/ 원본·좌표·클릭 결과\n디자인: design-direction.md · sentiment.md','정책·데이터 한계','시장 요약·재무 추이·산업/테마 생산자 없음\n데모 판정값 없음. 예시 화면과 실제 데이터 분리\n생성형 AI·실 소셜 IdP·정기 수집원 미연결\n환율 변화 기준·지연 수치는 프로토타입 가정\n발행 뒤 지표 재조회는 회차 불변 정책과 충돌\n실제 오류·권한·외부 원문 실패 전수 캡처는 아님','없는 데이터·전망·확률을 만들어 채우지 않아요.')
+table('APP-DOCS','문서 체계 · 화면에서 구현 추적까지',['문서','확인할 내용','저장소 위치'],[
+('화면계획서','실제 화면·번호 조작·상태·화면 ID','docs/screen-plan/zoop-screen-plan-v2.1.pdf'),
+('기능 명세','10-06 고정본의 FS·NFS 원문','docs/evidence/raw/functional-spec_2026-10-06/'),
+('목표 API 명세','기능·화면별 API 계약과 BFF 차이','docs/api/out/zoop-api-spec.md'),
+('WBS','업무 번호·명세 연결·담당·일정','docs/evidence/raw/wbs_2026-10-03/'),
+('통합 추적표','화면 ↔ 기능 ↔ API ↔ WBS ↔ 구현 판정','docs/system/out/zoop-trace.xlsx'),
+('통합 문서 목록','화면별·기능별 문서와 검사 결과','docs/system/out/index.md')],[2.5,5.2,6.95],'docs/system/README.md · links.yaml · API 정본 openapi.yaml')
 
-pptx=BASE/'zoop-screen-plan-v2.0.pptx'; prs.save(pptx)
+pptx=BASE/'zoop-screen-plan-v2.1.pptx'; prs.save(pptx)
 # SUIT가 시스템에 없어도 편집·PDF 변환에 쓰도록 OFL 글꼴을 PPTX 안에 넣는다.
 # EOT 0x00010000 구조: https://www.w3.org/submissions/EOT/Overview.html §3.1
 import struct, zipfile
@@ -305,8 +316,10 @@ if args.pdf:
     subprocess.run(['/Applications/LibreOffice.app/Contents/MacOS/soffice','-env:UserInstallation=file:///tmp/zoop-screen-plan-lo','--headless','--convert-to','pdf:impress_pdf_Export:{"EmbedStandardFonts":{"type":"boolean","value":"true"}}','--outdir',str(BASE),str(pptx)],env=os.environ|{'SAL_FONTPATH':str(fonts)},check=True)
     import pymupdf as fitz
     from PIL import Image, ImageDraw
-    pdf=fitz.open(BASE/'zoop-screen-plan-v2.0.pdf')
-    render=CAP/'rendered'; render.mkdir(exist_ok=True)
+    pdf=fitz.open(BASE/'zoop-screen-plan-v2.1.pdf')
+    render=CAP/'rendered'
+    if render.exists(): shutil.rmtree(render)
+    render.mkdir()
     audit=[]
     for n,page in enumerate(pdf,1):
         pix=page.get_pixmap(matrix=fitz.Matrix(1.5,1.5)); pix.save(render/f'page-{n:02}.png')
@@ -322,4 +335,41 @@ if args.pdf:
             # 16:9 전체를 630×354로 배치해 검토 번호와 함께 출력한다.
             im.thumbnail((630,354)); contact.paste(im,(x,y)); draw.text((x+640,y+20),f'{n+1:02} {index[n]["id"]}',fill='black')
         contact.save(render/f'contact-{start//6+1:02}.png')
+    outside=[]; overlaps=[]; fallbacks=[]
+    for number,page in enumerate(pdf,1):
+        lines=[]
+        for block in page.get_text('dict')['blocks']:
+            for line in block.get('lines',[]):
+                text=''.join(span['text'] for span in line['spans']).strip()
+                if not text: continue
+                rect=fitz.Rect(line['bbox'])
+                if not page.rect.contains(rect): outside.append({'page':number,'text':text,'box':list(rect)})
+                lines.append((text,rect))
+        for n,(text,rect) in enumerate(lines):
+            for other,area in lines[n+1:]:
+                cross=rect & area
+                if cross.width<=1 or cross.height<=1: continue
+                issue={'page':number,'first':text,'second':other,'intersection':list(cross)}
+                if text in ('§','–','·') or other in ('§','–','·'): fallbacks.append(issue)
+                else: overlaps.append(issue)
+    density={}; references=0
+    for item in manifest:
+        records=[item]
+        if item.get('pair'): records.append(json.loads((CAP/item['pair'].replace('.png','.json')).read_text()))
+        density[item['id']]=sum(len(record['markers']) for record in records)
+        for record in records:
+            assert len(record['markers'])==len(record['clickEvidence']), record['id']
+            for evidence in record['clickEvidence']:
+                if 'reference' in evidence:
+                    assert 'verifiedInteraction' in evidence, (record['id'],evidence)
+                    references+=1
+    assert all(3<=n<=6 for n in density.values()), density
+    checks={'pdfPages':len(pdf),'pptxSlides':len(prs.slides),'captureGroups':len(manifest),
+        'numberedControls':sum(density.values()),'densityById':density,'confirmedNavigationReferences':references,
+        'annotationBoxesAndCirclesMatch':len(annotation_geometry),'textOutsidePage':outside,
+        'possibleTextOverlaps':overlaps,'fontFallbackSpanIntersections':fallbacks,
+        'allFontsEmbedded':all(font['embedded'] for page in audit for font in page['fonts']),
+        'visualReview':'미기록: page-*.png 전 페이지를 직접 검토한 뒤 결과를 기록한다.'}
+    (CAP/'verification.json').write_text(json.dumps(checks,ensure_ascii=False,indent=2)+'\n')
+    print('AUDIT',sum(density.values()),'controls;',len(outside),'outside;',len(overlaps),'possible overlaps')
     print('PDF',len(pdf),'pages; rendered',render)

@@ -21,7 +21,7 @@ const ARTICLE: Schemas["ArticleOut"] = {
   synthetic: true,
   relationType: "REPORTS",
 };
-const quoteOf = (id: string) => ({
+const quoteOf = (id: string): Schemas["EvidenceResponse"] => ({
   id,
   quote: `${id} 인용문`,
   start: 0,
@@ -32,11 +32,12 @@ const quoteOf = (id: string) => ({
   quoteVerified: true,
   eventIds: [EVENT.id],
   metadata,
+  sentiment: null,
 });
 
 /** 근거 id마다 응답(함수면 요청할 때마다 다시 정한다) */
 function open(replies: Record<string, Reply | (() => Reply)>) {
-  return openApp(pageOf(ALPHA, `?event=${EVENT.id}`), (bff) => {
+  return openApp(pageOf(ALPHA, `?issue=${EVENT.id}`), (bff) => {
     bff.on("GET", "/api/events/:id", json({ ...eventDetail(EVENT, ALPHA), articles: [ARTICLE], evidenceIds: Object.keys(replies) }));
     bff.on("GET", "/api/evidence/:id", (_, { id }) => {
       const reply = replies[id!]!;

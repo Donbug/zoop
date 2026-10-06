@@ -1,0 +1,2294 @@
+{
+  "root_id": "3cafef49-d8d5-80cb-9a25-e53f97ec3f90",
+  "source_url": "https://app.notion.com/p/2-3cafef49d8d580cb9a25e53f97ec3f90",
+  "export_date": "2026-10-06",
+  "collected_at_start_kst": "2026-10-06T11:05:06.215948+09:00",
+  "collected_at_end_kst": "2026-10-06T11:14:42.694596+09:00",
+  "auth": "none",
+  "page_count": 121,
+  "baseline_page_count": 120,
+  "added_pages": [
+    {
+      "notion_id": "3f1fef49-d8d5-808b-b6ea-f975a38ca7c9",
+      "file": "docs/evidence/raw/notion_2026-10-06/10월_6일_데일리스크럼_준비__a38ca7c9.md",
+      "last_edited_time": "2026-10-06T10:47:52.988000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "4a41ebe08126f95d348635c64b01e09a7bd7766b6a34b15609e14b1d1a6fc833",
+      "serialization": "fresh visible block Markdown"
+    }
+  ],
+  "deleted_pages": [],
+  "content_changed_pages": [
+    {
+      "notion_id": "3cbfef49-d8d5-805d-a20f-e0ab3ed1517a",
+      "file": "docs/evidence/raw/notion_2026-10-06/휴지통__3ed1517a.md",
+      "last_edited_time": "2026-10-06T10:06:42.676000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "a8c848c3e4085c6742d603deff437adf8530435344f7daa59c5686d0d044cfe8",
+      "serialization": "fresh visible block Markdown"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80c5-8c43-c30b18ce9cbb",
+      "file": "docs/evidence/raw/notion_2026-10-06/역할_배정__18ce9cbb.md",
+      "last_edited_time": "2026-10-06T10:07:06.887000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "3e24b2741ff9b960cec256214e786b3abf2fd8b8aacc29c5211d1c7fec78f613",
+      "serialization": "fresh visible block Markdown"
+    }
+  ],
+  "root_collection_change": "회의록 신규 빈 페이지 1개 추가",
+  "unchanged_pages": 117,
+  "excluded": [
+    {
+      "collection": "3c1fef49-d8d5-8217-8ef0-872104fe00a9",
+      "reason": "강의 일정 캘린더"
+    },
+    {
+      "block": "f3bfef49-d8d5-83bc-af2f-01e525486905",
+      "title": "3기_금융_요구사항정의서.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "ee6fef49-d8d5-83ca-ae2c-01ce0c9b53ce",
+      "title": "3기_금융_수행계획서.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "51efef49-d8d5-8219-a149-019511569018",
+      "title": "[3기] 금융 클라우드 사용계획서.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "ddafef49-d8d5-822b-9019-012c6a9d6b76",
+      "title": "3기_금융_데일리스크럼.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "f89fef49-d8d5-83d8-970d-81c95f72a724",
+      "title": "[3기] 금융 중간발표자료.pdf",
+      "reason": "3기·4기 자료"
+    },
+    {
+      "block": "74cfef49-d8d5-828d-b1d4-8188c0f19022",
+      "title": "3. LG CNS AM Inspire Camp 4기_프로젝트계획서_금융.pdf",
+      "reason": "3기·4기 자료"
+    }
+  ],
+  "database_row_counts": {
+    "회의록": 61,
+    "일정": 7
+  },
+  "requests": [
+    {
+      "time_kst": "2026-10-06T11:04:53.323800+09:00",
+      "method": "GET",
+      "url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs/export?format=xlsx",
+      "status": 200,
+      "bytes": 217244
+    },
+    {
+      "time_kst": "2026-10-06T11:04:57.694508+09:00",
+      "method": "GET",
+      "url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/export?format=xlsx",
+      "status": 200,
+      "bytes": 65679
+    },
+    {
+      "time_kst": "2026-10-06T11:05:01.936256+09:00",
+      "method": "GET",
+      "url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k/export?format=xlsx",
+      "status": 200,
+      "bytes": 48994
+    },
+    {
+      "time_kst": "2026-10-06T11:05:06.215948+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/loadPageChunk",
+      "status": 200,
+      "bytes": 184119
+    },
+    {
+      "time_kst": "2026-10-06T11:05:33.307772+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/queryCollection",
+      "status": 200,
+      "bytes": 325468
+    },
+    {
+      "time_kst": "2026-10-06T11:06:09.306004+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/queryCollection",
+      "status": 200,
+      "bytes": 60324
+    },
+    {
+      "time_kst": "2026-10-06T11:06:12.149256+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 484861
+    },
+    {
+      "time_kst": "2026-10-06T11:06:15.084272+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 76391
+    },
+    {
+      "time_kst": "2026-10-06T11:06:30.647950+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 270492
+    },
+    {
+      "time_kst": "2026-10-06T11:06:33.394187+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 286718
+    },
+    {
+      "time_kst": "2026-10-06T11:06:36.144550+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 269859
+    },
+    {
+      "time_kst": "2026-10-06T11:06:39.098471+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 268143
+    },
+    {
+      "time_kst": "2026-10-06T11:06:41.720809+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 616076
+    },
+    {
+      "time_kst": "2026-10-06T11:06:44.459194+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 669442
+    },
+    {
+      "time_kst": "2026-10-06T11:06:47.235859+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 884974
+    },
+    {
+      "time_kst": "2026-10-06T11:06:50.029617+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 674712
+    },
+    {
+      "time_kst": "2026-10-06T11:06:52.779056+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 718469
+    },
+    {
+      "time_kst": "2026-10-06T11:06:55.403595+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 723216
+    },
+    {
+      "time_kst": "2026-10-06T11:06:58.008293+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 657076
+    },
+    {
+      "time_kst": "2026-10-06T11:07:00.661293+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 291910
+    },
+    {
+      "time_kst": "2026-10-06T11:07:03.416151+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 261760
+    },
+    {
+      "time_kst": "2026-10-06T11:07:06.074632+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 273567
+    },
+    {
+      "time_kst": "2026-10-06T11:07:08.848389+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 260010
+    },
+    {
+      "time_kst": "2026-10-06T11:07:11.747736+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 280257
+    },
+    {
+      "time_kst": "2026-10-06T11:07:14.651845+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 286145
+    },
+    {
+      "time_kst": "2026-10-06T11:07:17.819242+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 273525
+    },
+    {
+      "time_kst": "2026-10-06T11:07:20.444506+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 277945
+    },
+    {
+      "time_kst": "2026-10-06T11:07:23.750207+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 274561
+    },
+    {
+      "time_kst": "2026-10-06T11:07:26.435206+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 279991
+    },
+    {
+      "time_kst": "2026-10-06T11:07:29.101377+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 306777
+    },
+    {
+      "time_kst": "2026-10-06T11:07:31.773682+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 281508
+    },
+    {
+      "time_kst": "2026-10-06T11:07:34.448587+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 217552
+    },
+    {
+      "time_kst": "2026-10-06T11:07:37.390110+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 246007
+    },
+    {
+      "time_kst": "2026-10-06T11:07:40.075718+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 237954
+    },
+    {
+      "time_kst": "2026-10-06T11:07:42.704699+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 241098
+    },
+    {
+      "time_kst": "2026-10-06T11:07:45.391692+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 261679
+    },
+    {
+      "time_kst": "2026-10-06T11:07:48.084756+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 289248
+    },
+    {
+      "time_kst": "2026-10-06T11:07:50.691411+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 580387
+    },
+    {
+      "time_kst": "2026-10-06T11:07:53.322138+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 389454
+    },
+    {
+      "time_kst": "2026-10-06T11:07:55.731717+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 422501
+    },
+    {
+      "time_kst": "2026-10-06T11:07:58.303242+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 592023
+    },
+    {
+      "time_kst": "2026-10-06T11:08:00.879812+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 240175
+    },
+    {
+      "time_kst": "2026-10-06T11:08:03.502369+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 239858
+    },
+    {
+      "time_kst": "2026-10-06T11:08:06.171110+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 245798
+    },
+    {
+      "time_kst": "2026-10-06T11:08:09.005856+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 240310
+    },
+    {
+      "time_kst": "2026-10-06T11:08:11.678158+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 256109
+    },
+    {
+      "time_kst": "2026-10-06T11:08:14.378817+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 242580
+    },
+    {
+      "time_kst": "2026-10-06T11:08:17.054343+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 234115
+    },
+    {
+      "time_kst": "2026-10-06T11:08:19.752094+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 236031
+    },
+    {
+      "time_kst": "2026-10-06T11:08:22.505327+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 240483
+    },
+    {
+      "time_kst": "2026-10-06T11:08:25.233079+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252250
+    },
+    {
+      "time_kst": "2026-10-06T11:08:27.978824+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 248322
+    },
+    {
+      "time_kst": "2026-10-06T11:08:30.588079+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 235742
+    },
+    {
+      "time_kst": "2026-10-06T11:08:33.469344+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 217762
+    },
+    {
+      "time_kst": "2026-10-06T11:08:36.132141+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 267307
+    },
+    {
+      "time_kst": "2026-10-06T11:08:38.947141+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 292385
+    },
+    {
+      "time_kst": "2026-10-06T11:08:41.565242+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 346277
+    },
+    {
+      "time_kst": "2026-10-06T11:08:44.192927+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 481174
+    },
+    {
+      "time_kst": "2026-10-06T11:08:46.621475+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 256462
+    },
+    {
+      "time_kst": "2026-10-06T11:08:49.700708+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 246554
+    },
+    {
+      "time_kst": "2026-10-06T11:08:52.464357+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 253486
+    },
+    {
+      "time_kst": "2026-10-06T11:08:55.227751+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 238230
+    },
+    {
+      "time_kst": "2026-10-06T11:08:57.890844+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 133532
+    },
+    {
+      "time_kst": "2026-10-06T11:09:00.418323+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 297739
+    },
+    {
+      "time_kst": "2026-10-06T11:09:03.104178+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 344648
+    },
+    {
+      "time_kst": "2026-10-06T11:09:05.729194+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 600489
+    },
+    {
+      "time_kst": "2026-10-06T11:09:08.408829+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 296739
+    },
+    {
+      "time_kst": "2026-10-06T11:09:11.146595+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 286329
+    },
+    {
+      "time_kst": "2026-10-06T11:09:13.666491+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 270068
+    },
+    {
+      "time_kst": "2026-10-06T11:09:16.246427+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 78277
+    },
+    {
+      "time_kst": "2026-10-06T11:09:18.615367+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 256931
+    },
+    {
+      "time_kst": "2026-10-06T11:09:21.237069+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 381627
+    },
+    {
+      "time_kst": "2026-10-06T11:09:23.830236+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 283994
+    },
+    {
+      "time_kst": "2026-10-06T11:09:26.458900+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252618
+    },
+    {
+      "time_kst": "2026-10-06T11:09:29.781128+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 28482
+    },
+    {
+      "time_kst": "2026-10-06T11:09:32.114744+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 267929
+    },
+    {
+      "time_kst": "2026-10-06T11:09:34.830095+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 828366
+    },
+    {
+      "time_kst": "2026-10-06T11:09:37.795191+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 601162
+    },
+    {
+      "time_kst": "2026-10-06T11:09:40.466785+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 760205
+    },
+    {
+      "time_kst": "2026-10-06T11:09:43.140045+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 260126
+    },
+    {
+      "time_kst": "2026-10-06T11:09:45.941183+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 241679
+    },
+    {
+      "time_kst": "2026-10-06T11:09:48.710434+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 286645
+    },
+    {
+      "time_kst": "2026-10-06T11:09:51.448735+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 267214
+    },
+    {
+      "time_kst": "2026-10-06T11:09:54.219128+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 267436
+    },
+    {
+      "time_kst": "2026-10-06T11:09:56.926745+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 291101
+    },
+    {
+      "time_kst": "2026-10-06T11:09:59.655861+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 353072
+    },
+    {
+      "time_kst": "2026-10-06T11:10:02.224531+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 743388
+    },
+    {
+      "time_kst": "2026-10-06T11:10:05.145004+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 649028
+    },
+    {
+      "time_kst": "2026-10-06T11:10:07.986319+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 415595
+    },
+    {
+      "time_kst": "2026-10-06T11:10:10.627881+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 527252
+    },
+    {
+      "time_kst": "2026-10-06T11:10:13.239680+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 744804
+    },
+    {
+      "time_kst": "2026-10-06T11:10:16.158078+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 810526
+    },
+    {
+      "time_kst": "2026-10-06T11:10:19.018750+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 617771
+    },
+    {
+      "time_kst": "2026-10-06T11:10:21.978570+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 771437
+    },
+    {
+      "time_kst": "2026-10-06T11:10:24.654474+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 376398
+    },
+    {
+      "time_kst": "2026-10-06T11:10:27.505958+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 276902
+    },
+    {
+      "time_kst": "2026-10-06T11:10:30.362019+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 268625
+    },
+    {
+      "time_kst": "2026-10-06T11:10:33.091381+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 274321
+    },
+    {
+      "time_kst": "2026-10-06T11:10:35.817978+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 284115
+    },
+    {
+      "time_kst": "2026-10-06T11:10:39.050463+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 248520
+    },
+    {
+      "time_kst": "2026-10-06T11:10:41.808867+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 281333
+    },
+    {
+      "time_kst": "2026-10-06T11:10:44.459621+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 269805
+    },
+    {
+      "time_kst": "2026-10-06T11:10:47.224688+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 265126
+    },
+    {
+      "time_kst": "2026-10-06T11:10:50.171837+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 257068
+    },
+    {
+      "time_kst": "2026-10-06T11:10:52.986948+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 18822
+    },
+    {
+      "time_kst": "2026-10-06T11:10:55.374995+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 239746
+    },
+    {
+      "time_kst": "2026-10-06T11:10:58.091877+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 257533
+    },
+    {
+      "time_kst": "2026-10-06T11:11:00.945578+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 328448
+    },
+    {
+      "time_kst": "2026-10-06T11:11:03.738834+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252647
+    },
+    {
+      "time_kst": "2026-10-06T11:11:06.300153+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 334890
+    },
+    {
+      "time_kst": "2026-10-06T11:11:08.972021+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 419058
+    },
+    {
+      "time_kst": "2026-10-06T11:11:11.721471+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 331017
+    },
+    {
+      "time_kst": "2026-10-06T11:11:14.359472+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 279149
+    },
+    {
+      "time_kst": "2026-10-06T11:11:16.924683+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 292678
+    },
+    {
+      "time_kst": "2026-10-06T11:11:19.437045+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 266939
+    },
+    {
+      "time_kst": "2026-10-06T11:11:22.017709+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 526230
+    },
+    {
+      "time_kst": "2026-10-06T11:11:24.838319+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 426537
+    },
+    {
+      "time_kst": "2026-10-06T11:11:28.287491+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 256295
+    },
+    {
+      "time_kst": "2026-10-06T11:11:30.960632+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 259108
+    },
+    {
+      "time_kst": "2026-10-06T11:11:33.759830+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 319951
+    },
+    {
+      "time_kst": "2026-10-06T11:11:36.615957+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 254152
+    },
+    {
+      "time_kst": "2026-10-06T11:11:39.346232+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 253646
+    },
+    {
+      "time_kst": "2026-10-06T11:11:42.108095+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 246694
+    },
+    {
+      "time_kst": "2026-10-06T11:11:44.884707+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 247708
+    },
+    {
+      "time_kst": "2026-10-06T11:11:47.770458+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 253990
+    },
+    {
+      "time_kst": "2026-10-06T11:11:50.531096+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 251240
+    },
+    {
+      "time_kst": "2026-10-06T11:11:53.194333+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 268158
+    },
+    {
+      "time_kst": "2026-10-06T11:11:56.017987+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 255565
+    },
+    {
+      "time_kst": "2026-10-06T11:11:58.945519+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 55795
+    },
+    {
+      "time_kst": "2026-10-06T11:12:01.349907+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 263234
+    },
+    {
+      "time_kst": "2026-10-06T11:12:04.070425+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252300
+    },
+    {
+      "time_kst": "2026-10-06T11:12:06.830132+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252134
+    },
+    {
+      "time_kst": "2026-10-06T11:12:09.504873+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 372038
+    },
+    {
+      "time_kst": "2026-10-06T11:12:12.298590+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 265360
+    },
+    {
+      "time_kst": "2026-10-06T11:12:14.845521+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 264343
+    },
+    {
+      "time_kst": "2026-10-06T11:12:17.423456+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 295333
+    },
+    {
+      "time_kst": "2026-10-06T11:12:20.031349+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 300773
+    },
+    {
+      "time_kst": "2026-10-06T11:12:22.751070+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 270370
+    },
+    {
+      "time_kst": "2026-10-06T11:12:25.489019+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 258733
+    },
+    {
+      "time_kst": "2026-10-06T11:12:28.159582+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 253723
+    },
+    {
+      "time_kst": "2026-10-06T11:12:31.001912+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 254418
+    },
+    {
+      "time_kst": "2026-10-06T11:12:33.819322+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 249438
+    },
+    {
+      "time_kst": "2026-10-06T11:12:36.542688+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 246762
+    },
+    {
+      "time_kst": "2026-10-06T11:12:39.234331+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 253316
+    },
+    {
+      "time_kst": "2026-10-06T11:12:41.883170+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 275739
+    },
+    {
+      "time_kst": "2026-10-06T11:12:44.698947+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252588
+    },
+    {
+      "time_kst": "2026-10-06T11:12:47.524918+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 252729
+    },
+    {
+      "time_kst": "2026-10-06T11:12:51.024886+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 282622
+    },
+    {
+      "time_kst": "2026-10-06T11:12:53.581912+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 247611
+    },
+    {
+      "time_kst": "2026-10-06T11:12:56.261444+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 217392
+    },
+    {
+      "time_kst": "2026-10-06T11:12:58.841491+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 239967
+    },
+    {
+      "time_kst": "2026-10-06T11:13:01.481286+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 258048
+    },
+    {
+      "time_kst": "2026-10-06T11:13:04.091391+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 249674
+    },
+    {
+      "time_kst": "2026-10-06T11:13:06.892478+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 235009
+    },
+    {
+      "time_kst": "2026-10-06T11:13:09.633087+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 259011
+    },
+    {
+      "time_kst": "2026-10-06T11:13:12.405296+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 245558
+    },
+    {
+      "time_kst": "2026-10-06T11:13:15.122679+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 240883
+    },
+    {
+      "time_kst": "2026-10-06T11:13:17.907947+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 240380
+    },
+    {
+      "time_kst": "2026-10-06T11:13:20.671735+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 174006
+    },
+    {
+      "time_kst": "2026-10-06T11:13:23.337432+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 267017
+    },
+    {
+      "time_kst": "2026-10-06T11:13:26.749716+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 257055
+    },
+    {
+      "time_kst": "2026-10-06T11:13:29.414507+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 269708
+    },
+    {
+      "time_kst": "2026-10-06T11:13:32.446328+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 189875
+    },
+    {
+      "time_kst": "2026-10-06T11:13:35.381489+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 263427
+    },
+    {
+      "time_kst": "2026-10-06T11:13:38.138318+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 240557
+    },
+    {
+      "time_kst": "2026-10-06T11:13:40.887126+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 232167
+    },
+    {
+      "time_kst": "2026-10-06T11:13:43.577311+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 67381
+    },
+    {
+      "time_kst": "2026-10-06T11:13:46.068579+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 398087
+    },
+    {
+      "time_kst": "2026-10-06T11:13:48.843087+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 68075
+    },
+    {
+      "time_kst": "2026-10-06T11:13:51.503695+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 61335
+    },
+    {
+      "time_kst": "2026-10-06T11:13:53.905945+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/syncRecordValues",
+      "status": 200,
+      "bytes": 24629
+    },
+    {
+      "time_kst": "2026-10-06T11:14:35.698418+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/loadPageChunk",
+      "status": 200,
+      "bytes": 184119
+    },
+    {
+      "time_kst": "2026-10-06T11:14:37.999973+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/loadPageChunk",
+      "status": 200,
+      "bytes": 39330
+    },
+    {
+      "time_kst": "2026-10-06T11:14:40.355569+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/loadPageChunk",
+      "status": 200,
+      "bytes": 118689
+    },
+    {
+      "time_kst": "2026-10-06T11:14:42.694596+09:00",
+      "method": "POST",
+      "url": "https://www.notion.so/api/v3/loadPageChunk",
+      "status": 200,
+      "bytes": 33676
+    }
+  ],
+  "request_count": 175,
+  "request_interval_seconds": 2,
+  "status_counts": {
+    "200": 175
+  },
+  "unresolved_reachable_blocks": 0,
+  "redacted_share_password_blocks": 2,
+  "record_map_sha256": "07dfad10d5b7412210c96823c12c184e505b468aab9ea01dd5ae814a5e227759",
+  "pages": [
+    {
+      "notion_id": "19efef49-d8d5-83dc-9ba0-8144dc03c594",
+      "file": "docs/evidence/raw/notion_2026-10-06/김다윤__dc03c594.md",
+      "last_edited_time": "2026-08-28T16:13:09.201000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "5f1b2dfdaad572e2a8bd885530f65122b1b287445faa2d056da5e33b9d47052d",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cafef49-d8d5-80cb-9a25-e53f97ec3f90",
+      "file": "docs/evidence/raw/notion_2026-10-06/2조_금융_도메인__97ec3f90.md",
+      "last_edited_time": "2026-10-02T16:20:46.808000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "2f3fae6330a13fa5d7ccf830879d6acf5b587376b0a7571f0cdab7ca3d229094",
+      "serialization": "fresh visible block Markdown"
+    },
+    {
+      "notion_id": "3cbfef49-d8d5-8048-b579-f7eaf0e32c68",
+      "file": "docs/evidence/raw/notion_2026-10-06/2026-08-29_멘토링_&_아이데이션__f0e32c68.md",
+      "last_edited_time": "2026-09-03T15:38:04.384000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "69e434bb087b2efef582b6f78acc30a85b3d3346673ffab0b953ca9042a3eca5",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cbfef49-d8d5-805d-a20f-e0ab3ed1517a",
+      "file": "docs/evidence/raw/notion_2026-10-06/휴지통__3ed1517a.md",
+      "last_edited_time": "2026-10-06T10:06:42.676000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "a8c848c3e4085c6742d603deff437adf8530435344f7daa59c5686d0d044cfe8",
+      "serialization": "fresh visible block Markdown"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-8014-bce8-c97ca2ef6e43",
+      "file": "docs/evidence/raw/notion_2026-10-06/0901_데일리스크럼_피드백_내용__a2ef6e43.md",
+      "last_edited_time": "2026-09-02T15:11:31.621000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "75955775d7aef7e637487d33ec8bdbc27991abacc02b7d121d66f818158f8642",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-8067-a8a7-ee91c59ed0ba",
+      "file": "docs/evidence/raw/notion_2026-10-06/0901_데일리스크럼_준비__c59ed0ba.md",
+      "last_edited_time": "2026-09-02T10:04:45.728000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "14527dcfe57eaa9f265b89554495a022852cd62ad0ef6a8cd46571c06df51cf5",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-8067-b965-e23468f5d677",
+      "file": "docs/evidence/raw/notion_2026-10-06/0901_데일리스크럼_피드백_내용__원본__68f5d677.md",
+      "last_edited_time": "2026-09-02T14:58:23.848000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "e29f7d2e553114aadd061a5a19dbfe94e19c2fff43e459b35135ffb6d12ae828",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-808b-9893-fb503e93f5d5",
+      "file": "docs/evidence/raw/notion_2026-10-06/돈_흐름_&_금융_키워드__3e93f5d5.md",
+      "last_edited_time": "2026-09-01T17:33:16.151000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "dae26f356711d128b1d54b0c6f38de3caae7a3cfccfde6d72971f77894f5d73a",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-80b9-93e0-fef05ae38b45",
+      "file": "docs/evidence/raw/notion_2026-10-06/아이디어_카테고리화__5ae38b45.md",
+      "last_edited_time": "2026-09-01T17:27:01.127000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "1949ec81b0e807e8e07ca3e0312caf2b4fa5821560482175c659f28805007379",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cefef49-d8d5-80bc-afec-eeefabebafc1",
+      "file": "docs/evidence/raw/notion_2026-10-06/피드백_요약_참고__abebafc1.md",
+      "last_edited_time": "2026-09-01T15:27:53.872000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "4c499cd67c6aff16d5182165f1a02f576c4b60e536a7567db4a3c01f17e86735",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8051-9e4a-e52ca95e6495",
+      "file": "docs/evidence/raw/notion_2026-10-06/0902_데일리스크럼_피드백_내용__a95e6495.md",
+      "last_edited_time": "2026-09-03T09:26:07.896000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "a56f77464b5e3f25d2ecdd955b8d849375f45225094b4e422295e83c23c760d0",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8061-a468-f83c3bceb72c",
+      "file": "docs/evidence/raw/notion_2026-10-06/0903_데일리_스크럼_준비__3bceb72c.md",
+      "last_edited_time": "2026-09-03T15:14:05.451000+09:00",
+      "last_edited_by_ref": "24fb8cd4-fe34-4383-9cf9-f3e50cc2370e",
+      "sha256": "6db90ee43b807d4035943c7d6df515b7af957e1c1b19de72d3e8dd81e30a1258",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8067-b8ba-e3da1c7c54bf",
+      "file": "docs/evidence/raw/notion_2026-10-06/0902_데일리스크럼_피드백_내용__요약__1c7c54bf.md",
+      "last_edited_time": "2026-09-02T16:17:18.523000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "4618813df565d67a628fea63ce6b7e45ceb05981a20cac9c48dff4d0221bf3dd",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-8088-bceb-c2b713d924cd",
+      "file": "docs/evidence/raw/notion_2026-10-06/요약__(untitled)__13d924cd.md",
+      "last_edited_time": "2026-09-02T16:17:26.761000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "58117a11755df9e87b8a70b7ce50e78b679fb366f02533b38cda4a09ea3a3072",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-808e-9ca4-ddaade7334b2",
+      "file": "docs/evidence/raw/notion_2026-10-06/0902_데일리스크럼_피드백_내용__원본__de7334b2.md",
+      "last_edited_time": "2026-09-03T09:24:45.496000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "50e34d651b236e5f7114c5a6947b205bdd3494660da3bfcbc804fe2f4200fa98",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-80a0-a6d9-ea1f3e278c5f",
+      "file": "docs/evidence/raw/notion_2026-10-06/0902_데일리스크럼_준비__3e278c5f.md",
+      "last_edited_time": "2026-09-03T09:19:16.439000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "279b8a4c182c82863486b4d099d6b84f4e8e3426631261c8fc219a2d1d26e6f8",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3cffef49-d8d5-80d7-aa11-f4b70515bbc5",
+      "file": "docs/evidence/raw/notion_2026-10-06/0903_데일리_스크럼_피드백_내용__0515bbc5.md",
+      "last_edited_time": "2026-09-03T17:08:59.557000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "2bc4b2b1e735188be3e67f38efeaad96f50c9807a0959fb44fa624c1b90715ed",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8012-a005-f3f2dce0759b",
+      "file": "docs/evidence/raw/notion_2026-10-06/0903_데일리_스크럼_피드백_내용__원본__dce0759b.md",
+      "last_edited_time": "2026-09-03T17:08:59.557000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "8403ac6a5738a7a379fc05ea96441b7b2bc210fdb49746ba26506a0b71fcb730",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8014-bb45-c142468f4294",
+      "file": "docs/evidence/raw/notion_2026-10-06/0904_데일리_스크럼_준비__468f4294.md",
+      "last_edited_time": "2026-09-05T09:10:23.464000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "f0c621ecd2ea60e5e11ef1d43792362dbfd98b49b997229a1593ec12f1d47a99",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8034-aa67-d4c9f7e89116",
+      "file": "docs/evidence/raw/notion_2026-10-06/0904_데일리_스크럼_피드백_내용__f7e89116.md",
+      "last_edited_time": "2026-09-05T09:14:14.881000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "067a630acb4230a4d12090f145fcaff8ab89d73fa72c0fd3f29e6bca8d0d5138",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-8050-a609-ff6bc6f4c82a",
+      "file": "docs/evidence/raw/notion_2026-10-06/0903_데일리_스크럼_피드백_내용__요약__c6f4c82a.md",
+      "last_edited_time": "2026-09-03T17:08:56.852000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "a82b4fb1564d8b1839b8a6719dbd8e6d60580ebb753f6cfe7812eeb94bbd0e5f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d0fef49-d8d5-80dc-a87c-c1fd3bba63aa",
+      "file": "docs/evidence/raw/notion_2026-10-06/데이터_API_+_은행별_상품약관_사이트__3bba63aa.md",
+      "last_edited_time": "2026-09-04T13:41:52.590000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "1635b43311ac528d19d9b49170abc331e136e1653abfdcf1aa407e13c3e6fdb1",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-8077-85f4-f8d1a2dc8216",
+      "file": "docs/evidence/raw/notion_2026-10-06/추후_정해야_할_사항__a2dc8216.md",
+      "last_edited_time": "2026-09-04T16:06:42.572000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "404bc84217daa6e16a6f54ff96ed3a231c8fa2e4fe1cd8d4d94cea8227312f6d",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80a3-848c-ea83931f8fad",
+      "file": "docs/evidence/raw/notion_2026-10-06/최종_플젝_문제정의__931f8fad.md",
+      "last_edited_time": "2026-09-17T13:28:06.965000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "fccdd5833b7ea07a6d79566adb1e70fbd71bd2cf11b7b1198ca3a1819b45833a",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80a3-926e-c068e05be3a2",
+      "file": "docs/evidence/raw/notion_2026-10-06/0904_데일리_스크럼_피드백_내용__요약__e05be3a2.md",
+      "last_edited_time": "2026-09-05T09:48:00.409000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "65659ef990074a1eca4cd7312af9f03481942a77d2de914aa7eda8bb0b79c316",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80b7-90bf-f16d5ae3994f",
+      "file": "docs/evidence/raw/notion_2026-10-06/0904_데일리_스크럼_피드백_내용__원본__5ae3994f.md",
+      "last_edited_time": "2026-09-05T09:14:14.881000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "bccbc221a2cba70f0920a3799d1ccd100841a8203c59419d44761bfe2ecf3b80",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d1fef49-d8d5-80d6-95bf-fd8a879a122d",
+      "file": "docs/evidence/raw/notion_2026-10-06/0905_멘토링__879a122d.md",
+      "last_edited_time": "2026-09-05T16:46:22.477000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "1c6a6ae90a95f7b7df093d75e9afb31d93a5b952f75b8714d25526fc5fd0b8ad",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d2fef49-d8d5-808a-9ef4-dee33884b54c",
+      "file": "docs/evidence/raw/notion_2026-10-06/사용자_시나리오__3884b54c.md",
+      "last_edited_time": "2026-09-05T11:26:00.438000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "2c8a3aa6ba3842bba543397845cde2e1708983028d3d84be3f2ceca7b78350e1",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d2fef49-d8d5-80aa-9abe-f75fe4a85ce3",
+      "file": "docs/evidence/raw/notion_2026-10-06/사용자_시나리오__e4a85ce3.md",
+      "last_edited_time": "2026-09-22T10:04:41.345000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "d0140239a3a198523f73b8c421b46d8898e077119390de8ed06413ef8d71d345",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d4fef49-d8d5-802b-a9df-c534588d2fe2",
+      "file": "docs/evidence/raw/notion_2026-10-06/0908_데일리_스크럼_피드백_내용__588d2fe2.md",
+      "last_edited_time": "2026-09-08T16:51:00.041000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "53ba576d0126de242bbc99825f961d01784543a780cfea99cb632681401937b1",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d4fef49-d8d5-8093-afb0-c9d21838ebbc",
+      "file": "docs/evidence/raw/notion_2026-10-06/0908_데일리_스크럼_준비__1838ebbc.md",
+      "last_edited_time": "2026-09-08T16:49:15.622000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "c2c975a3bbe9bebddc9273cb84690dbe99251b0f99b5eec13b8a0f953722da36",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d5fef49-d8d5-808d-ae61-d2c25b7442ce",
+      "file": "docs/evidence/raw/notion_2026-10-06/0908_데일리_스크럼_피드백_내용__요약__5b7442ce.md",
+      "last_edited_time": "2026-09-08T16:36:18.733000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "0df1e6d0315c034b40e2d5593fc48dd9d538fd7a3070846d86f0734dfa870141",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d5fef49-d8d5-80cb-bb19-d95e547a2218",
+      "file": "docs/evidence/raw/notion_2026-10-06/0909_데일리_스크럼_준비__547a2218.md",
+      "last_edited_time": "2026-09-09T13:21:39.246000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "2327a53c0400760810c62f1a398e618ff42c195e37be8bb67d3241c0147a36a2",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d5fef49-d8d5-80cd-ba8d-feea1b98b6cc",
+      "file": "docs/evidence/raw/notion_2026-10-06/0909_데일리_스크럼_피드백__1b98b6cc.md",
+      "last_edited_time": "2026-09-09T13:52:31.103000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "a98362343f4a9d6d31fef3bd55dc055245ea76511ed291e0ce1921de2c8eb79e",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-804d-a532-fe48c286c7d6",
+      "file": "docs/evidence/raw/notion_2026-10-06/0909_데일리_스크럼_피드백__요약__c286c7d6.md",
+      "last_edited_time": "2026-09-09T14:42:35.396000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "af38c2a35e10c6168582cecd251c1401650a96e1ee07fc78cdb97e45edcc2567",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-808a-8caf-d17559e6b26e",
+      "file": "docs/evidence/raw/notion_2026-10-06/0910_데일리_스크럼_피드백__59e6b26e.md",
+      "last_edited_time": "2026-09-11T08:57:40.367000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "bc511723314fa9c4938438e80447915e5ecf4d607dcf6e985355512ad58e6299",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-80c6-ad10-e1c6ef56c9d2",
+      "file": "docs/evidence/raw/notion_2026-10-06/오픈_api_+_크롤링__ef56c9d2.md",
+      "last_edited_time": "2026-09-10T15:59:06.180000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "0b80cf1704f34f93815aa75cfd85e4616252667c669596e0a048301a8eb25df0",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-80e0-a0e1-d6fe73e3e914",
+      "file": "docs/evidence/raw/notion_2026-10-06/0910_데일리_스크럼_준비__73e3e914.md",
+      "last_edited_time": "2026-09-11T09:04:57.482000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "a9620e65bc3ef2062cc0d4448dcff1949a53ec148cbc1a5f6c451471487bc920",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d6fef49-d8d5-80e2-bdf5-f16f8290119e",
+      "file": "docs/evidence/raw/notion_2026-10-06/벤치마킹__8290119e.md",
+      "last_edited_time": "2026-09-17T09:46:11.115000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "743d403ca8f18901ad4684a53ce53aa4b488082bdf7dad056bc51d70938e9ffc",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-8041-b4c9-ca45fca11a46",
+      "file": "docs/evidence/raw/notion_2026-10-06/0911_데일리_스크럼_준비__fca11a46.md",
+      "last_edited_time": "2026-09-11T17:42:09.961000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "cd7f9b745d3cfa0f92d36884d201ce3e55bb843aeec4d49ba9ba06195e016983",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80a4-83c1-c67ae9bacc03",
+      "file": "docs/evidence/raw/notion_2026-10-06/데이터셋__e9bacc03.md",
+      "last_edited_time": "2026-09-10T15:57:02.916000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "7f67b428e1eb89e60084e48b4acef5aee26603414a8d960808de704887437718",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80a4-93eb-d70608b94877",
+      "file": "docs/evidence/raw/notion_2026-10-06/0910_데일리_스크럼_피드백__원본__08b94877.md",
+      "last_edited_time": "2026-09-10T11:09:11.729000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "3fd68b12432c736ae9fb013d909d627d869bcba70dfecc789e1aa5dd08c8a1a3",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80dc-a02f-e167e9f0279a",
+      "file": "docs/evidence/raw/notion_2026-10-06/아이디어_구체화__e9f0279a.md",
+      "last_edited_time": "2026-09-17T10:35:21.833000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "4d295f781d8778254f32c042f7675a2aa093d8f558033ba7509dbea98227494e",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80f8-9190-e691a2616fed",
+      "file": "docs/evidence/raw/notion_2026-10-06/0910_데일리_스크럼_피드백__요약__a2616fed.md",
+      "last_edited_time": "2026-09-10T14:42:07.909000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "507d3e4618c8a46560e7de262aec9228fc82474d9a085e50fa9176f337bb6007",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d7fef49-d8d5-80fe-b74e-d29b8a399700",
+      "file": "docs/evidence/raw/notion_2026-10-06/0911_데일리_스크럼_피드백__8a399700.md",
+      "last_edited_time": "2026-09-13T23:02:00.074000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "ddfef7b01224293b046b6e91a2dbe87b234d1d1a8d84541e8bdf04d0f4a71afb",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3d8fef49-d8d5-8033-8f1d-fed2eb7fba6b",
+      "file": "docs/evidence/raw/notion_2026-10-06/0914_데일리_스크럼_준비__eb7fba6b.md",
+      "last_edited_time": "2026-09-14T14:30:38.597000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "dce045890862f47c46b160341252de2e621d5ac34f8d0de1ccf00249042198e9",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dafef49-d8d5-8003-88ec-dda0b58a870e",
+      "file": "docs/evidence/raw/notion_2026-10-06/0911_데일리_스크럼_피드백__요약__b58a870e.md",
+      "last_edited_time": "2026-09-14T10:19:17.165000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "6852b1666556426919fb21bd0570f96663d600039eb6b545eda3933c839207cc",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dafef49-d8d5-80a4-a929-ff5464518b5e",
+      "file": "docs/evidence/raw/notion_2026-10-06/0911_데일리_스크럼_피드백__원문__64518b5e.md",
+      "last_edited_time": "2026-09-13T22:58:47.040000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "9b36502ed573516f7205e3d6a74f5bc3e420f17a9e29fe0172047efef31ef020",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-800a-ae86-d91d88f407ec",
+      "file": "docs/evidence/raw/notion_2026-10-06/0914_데일리_스크럼_피드백__88f407ec.md",
+      "last_edited_time": "2026-09-14T15:14:35.148000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "cc7fa182cd33195ee44e3d92edc33e612d26d76c0a20580469c99f04d75f1f1f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-804a-9189-c3b0e443cd3a",
+      "file": "docs/evidence/raw/notion_2026-10-06/0914_데일리_스크럼_피드백__요약__e443cd3a.md",
+      "last_edited_time": "2026-09-14T16:09:56.579000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "6b2e23ff74503a1de78fe4c703b1ebe7695e335e4301025b31a723c5da4b3081",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-8091-91cf-f230a2a5685a",
+      "file": "docs/evidence/raw/notion_2026-10-06/0915_데일리_스크럼_준비__a2a5685a.md",
+      "last_edited_time": "2026-09-15T09:28:04.670000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "cbf7aa5c3a2aebdc55a229339b8d55ab953d23a624956fbdae4e7ea14317cb3b",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-80e8-b336-fab22cb16167",
+      "file": "docs/evidence/raw/notion_2026-10-06/0914_데일리_스크럼_피드백__원본__2cb16167.md",
+      "last_edited_time": "2026-09-14T20:04:18.368000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "124b6b5f4bcc2fbed7f3a0f2bd24591304418a98682351fb5c794de838685507",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dbfef49-d8d5-80fa-9a64-cde03fa5f8f9",
+      "file": "docs/evidence/raw/notion_2026-10-06/화면별_데이터__3fa5f8f9.md",
+      "last_edited_time": "2026-09-15T14:34:12.621000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "cfa0198b7d1431663eaccea5fa6aa6fb7e19f560a7d9c4c24abec71c346058ea",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-8010-be77-cfba6b09775a",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_피드백__6b09775a.md",
+      "last_edited_time": "2026-09-21T10:18:58.964000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "24b2665ff72c83df65f8ad70264492ac14ebabacb9adf5de037434cc6b497e18",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-8023-9c32-cadb9839d445",
+      "file": "docs/evidence/raw/notion_2026-10-06/0915_데일리_스크럼_피드백__9839d445.md",
+      "last_edited_time": "2026-09-15T16:05:48.308000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "306dfd5759b799e8cb6c0d2c8bc085a6c1ea93f8de20fdd8714660bc2a4ff1f8",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-8045-9170-cd4522c63c14",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_준비__22c63c14.md",
+      "last_edited_time": "2026-09-16T16:29:42.075000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "d8b7b294712643d041eaf55e6af0e2b502043b88a056a7201244404761945d02",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-80d4-bf0a-d7f4c8e2632a",
+      "file": "docs/evidence/raw/notion_2026-10-06/0915_데일리_스크럼_피드백__요약__c8e2632a.md",
+      "last_edited_time": "2026-09-15T16:06:55.157000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "5d9aa75b787c66c22affcc76207c1c7caf05438dcd64d75507cb828ca90648e6",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dcfef49-d8d5-80da-949e-ff7e2656a805",
+      "file": "docs/evidence/raw/notion_2026-10-06/0915_데일리_스크럼_피드백__원본__2656a805.md",
+      "last_edited_time": "2026-09-15T16:05:42.529000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "833c308a4f4bc3f48eab61581083c6b164b472369eee7befa9e2844263dba31a",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-805a-b090-fd1b4d19fa02",
+      "file": "docs/evidence/raw/notion_2026-10-06/중간_발표_준비_-_자료조사__4d19fa02.md",
+      "last_edited_time": "2026-09-17T17:25:52.891000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "baec6ca4349d1be3422eff9780f192578043a88360fd7ef6a525a70a7dcf3b97",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-806e-ab6d-e6e0a00da9d0",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_피드백__요약__a00da9d0.md",
+      "last_edited_time": "2026-09-16T16:33:39.520000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "6d6b8a47f190c3560b6be90ca13f363afed2e235ddca424012c7c8f9878ba8bb",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-807b-8c0a-d46083993ba9",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_준비__(untitled)__83993ba9.md",
+      "last_edited_time": "2026-09-16T10:35:48.092000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "60340359bb3f8b3ce770aeafcfa0542dd1e742cff90d81df7011a43980cc610f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-8088-a533-cb657fe792f4",
+      "file": "docs/evidence/raw/notion_2026-10-06/0917_데일리_스크럼_준비__7fe792f4.md",
+      "last_edited_time": "2026-09-17T11:19:03.683000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "e0238d6c29ce19adad210f423acbadbb2c26e0976f37cb189b764266b2db8288",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-809a-a527-c8009a09ba3b",
+      "file": "docs/evidence/raw/notion_2026-10-06/서비스목표,_페르소나,_페이포인트,_벤치마킹_-_정세빈__9a09ba3b.md",
+      "last_edited_time": "2026-09-17T13:31:00.693000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "104bb362d51af1ca6e54c16ccf22d2a88f62602287be97fd2f97aeaf4f48c59a",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-80d4-837e-ee11e402a771",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_준비__(untitled)__e402a771.md",
+      "last_edited_time": "2026-09-16T10:35:48.092000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "d52548fed8a02b79cd19f30c8bd481c3a9f1d210505789d59b69faa91cdb6531",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-80ea-973e-d9c15e5feb7c",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_준비__(untitled)__5e5feb7c.md",
+      "last_edited_time": "2026-09-16T10:35:48.092000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "c79a59ab4f481e6a894e77b1c994990e645cb670446abcc4e2a15c78d7ffc2bb",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ddfef49-d8d5-80f3-aa32-ec67b2fd4f7f",
+      "file": "docs/evidence/raw/notion_2026-10-06/0916_데일리_스크럼_피드백__원본__b2fd4f7f.md",
+      "last_edited_time": "2026-09-16T16:18:00.138000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "86be50afb7ff3cc9ec3dc172b37a58e17cd30ed754e38f2cf34409276661daeb",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-801d-be72-d2bd917ac045",
+      "file": "docs/evidence/raw/notion_2026-10-06/뉴스_긍_부정_평가__917ac045.md",
+      "last_edited_time": "2026-09-17T14:30:04.433000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "508623ef3352af1365e86c5e2ba265146b0a02efbf251b48800862523401ecaa",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-8046-9c94-d746f56c4047",
+      "file": "docs/evidence/raw/notion_2026-10-06/0917_데일리_스크럼_피드백__요약__f56c4047.md",
+      "last_edited_time": "2026-09-17T16:43:54.720000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "ddb28ff6e1aa9781e0860177a21e2ae334702d8ef5c894a5d37f56de29daa310",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-8047-aab4-c5d18d63c6bc",
+      "file": "docs/evidence/raw/notion_2026-10-06/0918_매니저님_PPT_피드백__8d63c6bc.md",
+      "last_edited_time": "2026-09-18T15:05:37.811000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "d1704e69bece2498b5c52adbc639a9769fcb17697415426b72dcc2bc3bc98b7b",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-804a-a2ce-eb79f8b86be7",
+      "file": "docs/evidence/raw/notion_2026-10-06/0917_데일리_스크럼_피드백__원본__f8b86be7.md",
+      "last_edited_time": "2026-09-17T16:32:35.091000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "bfd87d58095a6a6527cf9dc0ef82390573e38ccdea70e3027ad1cabb6c87d3ac",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-8057-a0dd-deeb139826c0",
+      "file": "docs/evidence/raw/notion_2026-10-06/프로젝트_개요__139826c0.md",
+      "last_edited_time": "2026-09-17T17:37:10.622000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "03fe01e8d776aa5ffa00b34294370c32e0e16456ab531a9c75cd79830ed052f1",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-805b-b850-fd5b0a2d7c60",
+      "file": "docs/evidence/raw/notion_2026-10-06/0917_데일리_스크럼_피드백__0a2d7c60.md",
+      "last_edited_time": "2026-09-17T16:32:34.395000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "c9f2975c050fb755f1edf8fe62ec831d5c19520e5a214e2e00c4e918aae1ab71",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3defef49-d8d5-80ac-8711-f6191bf93995",
+      "file": "docs/evidence/raw/notion_2026-10-06/홍정현__1bf93995.md",
+      "last_edited_time": "2026-09-17T11:19:11.202000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "5160d39571abb312ca4595cf4a34300a82e6b2ed93679b538ca728842f8bccdc",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-801d-8a71-d0d03cdced09",
+      "file": "docs/evidence/raw/notion_2026-10-06/0918_매니저님_PPT_피드백__요약__3cdced09.md",
+      "last_edited_time": "2026-09-18T14:44:04.102000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "fa0ad09042f14a5a8273120d4acdb04fa8a6b2bbf53194941ec66b5914b9e879",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-8020-8e9a-d7955673e153",
+      "file": "docs/evidence/raw/notion_2026-10-06/ppt_예상질문__5673e153.md",
+      "last_edited_time": "2026-09-19T11:05:06.332000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "a8f8ed7ffa6f82809430f0833f33d6128cb0f838c1a98e222b9cc606e0f490f7",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-8025-9893-d94cc712dc90",
+      "file": "docs/evidence/raw/notion_2026-10-06/ppt_페이지별_대본_내용__c712dc90.md",
+      "last_edited_time": "2026-09-18T16:51:15.180000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "af6b351d9e6b864fd0b914fe3c85bada8c1d219f47de24e58879ecc05e79aaf1",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-804b-a40f-cbdcac4396e3",
+      "file": "docs/evidence/raw/notion_2026-10-06/PoC__ac4396e3.md",
+      "last_edited_time": "2026-09-18T15:41:06.231000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "9ea80ba35bc98f70dfd01b3857ded696252729ba7fa892c3f8a08e50ddb0c3fa",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-808b-bac7-d8d82cf9e235",
+      "file": "docs/evidence/raw/notion_2026-10-06/0918_강사님_PPT_피드백__2cf9e235.md",
+      "last_edited_time": "2026-09-19T11:16:21.460000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "b5a629f5b3ac651da6d3da775e4dc82c43943c48203d6f9d65f80137769cbb80",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80c0-bf53-eedfd8d8b74d",
+      "file": "docs/evidence/raw/notion_2026-10-06/0918_강사님_PPT_피드백__요약__d8d8b74d.md",
+      "last_edited_time": "2026-09-18T18:13:30.456000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "093cea2643fdb4a2bc502c8592e36bf010a3f53d5f73c846e2e8aab6646cbe3b",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80c8-be19-e69b9664f947",
+      "file": "docs/evidence/raw/notion_2026-10-06/ppt_페이지별_대본_내용__주차별ㅣ__9664f947.md",
+      "last_edited_time": "2026-09-18T15:10:52.848000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "4b83376c737516075fc553a8b59268611e6469ca21b91cbe47337ee9b57d4088",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80e3-bd8f-c8468860e432",
+      "file": "docs/evidence/raw/notion_2026-10-06/0918_매니저님_PPT_피드백__원본__8860e432.md",
+      "last_edited_time": "2026-09-18T14:38:42.237000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "058298ae323f8404bd0e5b3bf1dac3fabc64282568296db9309a65bcc09c3732",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3dffef49-d8d5-80ff-89bd-f33d967f3b87",
+      "file": "docs/evidence/raw/notion_2026-10-06/0918_강사님_PPT_피드백__원본__967f3b87.md",
+      "last_edited_time": "2026-09-18T16:56:23.319000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "2eaf2da637f7335ce73788dab8cc66d37c078d2ef7dfc717f5659849d49bcb41",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-8059-a7f2-e0f78ab3f839",
+      "file": "docs/evidence/raw/notion_2026-10-06/0919_멘토링__8ab3f839.md",
+      "last_edited_time": "2026-09-21T14:54:50.127000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "7ff1705334ae3d82e9261114424d69aa9cd152e1be5d9c03ec6dd80ad25b217f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-8071-a410-de2b9360e50d",
+      "file": "docs/evidence/raw/notion_2026-10-06/0921_발표_멘토링_피드백__9360e50d.md",
+      "last_edited_time": "2026-09-22T09:30:18.431000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "271d24f0d2e068b5e7518b66ff5dd53e13c4ff831e30139a6f0b6ad5a5289ba9",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-808c-b0aa-f058b0e7a919",
+      "file": "docs/evidence/raw/notion_2026-10-06/0919_중간발표_피드백__b0e7a919.md",
+      "last_edited_time": "2026-09-21T09:27:01.775000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "fde0edb8c42ea2619b9b0d47a289106891ad1b4227af4f87a06dd23cdfa1d4a6",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e0fef49-d8d5-80c1-9ae0-f4a1ba95f9bf",
+      "file": "docs/evidence/raw/notion_2026-10-06/기능_구체화__ba95f9bf.md",
+      "last_edited_time": "2026-09-28T23:24:57.279000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "d5b8d9c72ffd752f387afc574b67af6f92db55bb3f348e346778332f9b38e148",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-8010-b482-c3916515e6fa",
+      "file": "docs/evidence/raw/notion_2026-10-06/0921_발표_멘토링_피드백__원문__6515e6fa.md",
+      "last_edited_time": "2026-09-22T09:30:14.040000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "31fbd1de838d4294cce849b2343458ea62305e601a041a94a70b2a95f416d0f5",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-80d7-bb46-e40d5636eb05",
+      "file": "docs/evidence/raw/notion_2026-10-06/사용자_여정(사용자_이용_시나리오)__5636eb05.md",
+      "last_edited_time": "2026-09-30T14:33:51.730000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "f606564e30349a75624326e973a0df5c3e1b26b406f6ea93935017a8527f44ec",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-80eb-aca3-d044ae402c85",
+      "file": "docs/evidence/raw/notion_2026-10-06/추후_해야할_목록__ae402c85.md",
+      "last_edited_time": "2026-09-28T19:47:41.955000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "c706c6a5db6e97cae09b80d13aa516da6a8a2139456a3655565d0692e1a6d0a0",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e3fef49-d8d5-80f7-9640-c00dda076853",
+      "file": "docs/evidence/raw/notion_2026-10-06/출퇴근_브리핑_결정해야할_사항__da076853.md",
+      "last_edited_time": "2026-09-22T17:09:13.489000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "73cdea5439f9dccc5beba389d22ad1b2b7d4334ca92bb1489323ee6ab21db6aa",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3e9fef49-d8d5-80f5-9abf-f85aeb19fc00",
+      "file": "docs/evidence/raw/notion_2026-10-06/시퀀스_다이어그램__eb19fc00.md",
+      "last_edited_time": "2026-10-02T16:53:41.289000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "ea6f598d20e26c7c79e0f1fce1848d85449f025e08d191a9337797c5375d7700",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3eafef49-d8d5-801d-86c5-ff81b34c8d8d",
+      "file": "docs/evidence/raw/notion_2026-10-06/0929_데일리_스크럼_피드백__b34c8d8d.md",
+      "last_edited_time": "2026-09-29T16:11:25.697000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "f0de5f88bde214996ee51f55b2fe0247d0330ca17ffdb16badab6d5d6f15405b",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3eafef49-d8d5-8049-b42e-c17826447660",
+      "file": "docs/evidence/raw/notion_2026-10-06/0929_데일리_스크럼_피드백__요약__26447660.md",
+      "last_edited_time": "2026-09-29T16:10:58.475000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "e49fb2a94a4c12975d16ea3fcdde14dc7969aad7fffefe2c61dcf9fc07e36019",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ebfef49-d8d5-80d9-8cad-dbe89796de4d",
+      "file": "docs/evidence/raw/notion_2026-10-06/0930_데일리_스크럼_피드백__9796de4d.md",
+      "last_edited_time": "2026-10-01T15:41:39.905000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "2a17b32851f9e99d4db1092050b6e1a44f2cd867db48e2c976bd61bd48f58e60",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-8031-929f-efaec1d5684e",
+      "file": "docs/evidence/raw/notion_2026-10-06/기능명세서_예시__c1d5684e.md",
+      "last_edited_time": "2026-10-01T14:55:33.500000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "76304ffd28232c9fb464874ad543a05e0d1cfab698f22a7a2f4f40d7123f505f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-805f-8d50-e3ecd4c594fa",
+      "file": "docs/evidence/raw/notion_2026-10-06/1001_데일리_스크럼_준비__d4c594fa.md",
+      "last_edited_time": "2026-10-02T11:22:54.805000+09:00",
+      "last_edited_by_ref": "8857e28c-f27a-4485-8bc5-31f1c4f48d20",
+      "sha256": "1bff5cfec7b545699c7dac0c6780ae7fca320a74a0e277e571f219d04bb22983",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3ecfef49-d8d5-8064-b672-de8323d5478b",
+      "file": "docs/evidence/raw/notion_2026-10-06/1001_데일리_스크럼_피드백__23d5478b.md",
+      "last_edited_time": "2026-10-01T16:15:00.682000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "3496c9720263bd536c6ba886a01056dd9d7efbd6f0ad55e980b04b590c2509e1",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-8044-a94e-d2ffce938765",
+      "file": "docs/evidence/raw/notion_2026-10-06/시퀀스_다이어그램_최종__ce938765.md",
+      "last_edited_time": "2026-10-02T16:53:21.230000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "f6ba8a54d84d32949d132837f8aa37df7829e70b5a57fc86482fad9dcf5ab308",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-8047-86f5-f6f3f5f4059f",
+      "file": "docs/evidence/raw/notion_2026-10-06/1002_데일리_스크럼_피드백__f5f4059f.md",
+      "last_edited_time": "2026-10-02T14:36:37.015000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "b7e924a1f82fd15f68b9f6a868235f35d5284d0fd234977dd175d364ab77185c",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80ae-81fe-d64373c38c4c",
+      "file": "docs/evidence/raw/notion_2026-10-06/1002_데일리_스크럼_준비__73c38c4c.md",
+      "last_edited_time": "2026-10-02T17:40:07.539000+09:00",
+      "last_edited_by_ref": "b667f61a-48f2-4100-a9a3-e36ce11582fc",
+      "sha256": "3915a8f880c8dee42b7b1047c69beeebd405cb6d744e6de8a74b9f8773eba149",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "3edfef49-d8d5-80c5-8c43-c30b18ce9cbb",
+      "file": "docs/evidence/raw/notion_2026-10-06/역할_배정__18ce9cbb.md",
+      "last_edited_time": "2026-10-06T10:07:06.887000+09:00",
+      "last_edited_by_ref": "364d872b-594c-814a-bf67-0002b64b4c7e",
+      "sha256": "3e24b2741ff9b960cec256214e786b3abf2fd8b8aacc29c5211d1c7fec78f613",
+      "serialization": "fresh visible block Markdown"
+    },
+    {
+      "notion_id": "3f1fef49-d8d5-808b-b6ea-f975a38ca7c9",
+      "file": "docs/evidence/raw/notion_2026-10-06/10월_6일_데일리스크럼_준비__a38ca7c9.md",
+      "last_edited_time": "2026-10-06T10:47:52.988000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "4a41ebe08126f95d348635c64b01e09a7bd7766b6a34b15609e14b1d1a6fc833",
+      "serialization": "fresh visible block Markdown"
+    },
+    {
+      "notion_id": "496fef49-d8d5-83a5-bc0f-81b4182e9158",
+      "file": "docs/evidence/raw/notion_2026-10-06/멘토님_Q&A_내용_올려요._(오전_타임_기준)__182e9158.md",
+      "last_edited_time": "2026-08-28T16:13:06.701000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "e6da7ef993231abe64d8893f7351b4ecc24569446819bf6af51e5851b2d1ecf0",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "4cafef49-d8d5-836a-b548-01b5a7707842",
+      "file": "docs/evidence/raw/notion_2026-10-06/나혜빈__a7707842.md",
+      "last_edited_time": "2026-08-28T16:13:07.698000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "e87575902d83162ae6c0566dec09e60f658cecd518e6f2354aabc01c4f43c3ec",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "57cfef49-d8d5-8375-a3ba-0180f671ed3a",
+      "file": "docs/evidence/raw/notion_2026-10-06/최종산출물_마감__f671ed3a.md",
+      "last_edited_time": "2026-08-28T17:38:07.960000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "720c93a8015c3cd0313e77aab9fc867c0c0c64efe8a538c339b6f150c35a2f50",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "5b9fef49-d8d5-8368-af4c-01594cebd022",
+      "file": "docs/evidence/raw/notion_2026-10-06/Github_링크__4cebd022.md",
+      "last_edited_time": "2026-08-28T16:21:02.104000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "288a3ebdc924dab6cec6102481315a98e49642d515f4e174a4dbf78ed847c245",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "5cbfef49-d8d5-8391-922a-01fa8fd4c360",
+      "file": "docs/evidence/raw/notion_2026-10-06/멘토링_DAY1__8fd4c360.md",
+      "last_edited_time": "2026-09-07T22:49:06.805000+09:00",
+      "last_edited_by_ref": "891b2370-38db-42bd-808f-bce8bd517a3a",
+      "sha256": "d658490ec3d22ddb3fa9d8b1e356272666e48d58044527b65a70906deb72907b",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "5e4fef49-d8d5-8323-90a5-01ca7743eb58",
+      "file": "docs/evidence/raw/notion_2026-10-06/블로그_링크__7743eb58.md",
+      "last_edited_time": "2026-08-28T16:20:59.210000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "6cf7d0d20cdf3be2863c66ab4748e7c153467077b252300e5693fbd45c0e500d",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "746fef49-d8d5-822f-8313-014462456db7",
+      "file": "docs/evidence/raw/notion_2026-10-06/나영은__62456db7.md",
+      "last_edited_time": "2026-08-28T16:13:05.918000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "b37a1d897eebc357976972757cae29849082c4dead365d355583a7a3d8b0d28f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "7dbfef49-d8d5-8213-ba69-01492f5dd85b",
+      "file": "docs/evidence/raw/notion_2026-10-06/최종프로젝트_발표회_및_수료식__2f5dd85b.md",
+      "last_edited_time": "2026-08-28T17:38:28.822000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "849681bdabc071cd7a4833284b5b1403b1cda16eeef8df30a35d533de6352b3f",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "8d1fef49-d8d5-823e-9864-01ba55c5bb02",
+      "file": "docs/evidence/raw/notion_2026-10-06/멘토링_DAY4__55c5bb02.md",
+      "last_edited_time": "2026-09-08T13:09:47.752000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "6ee79302d0f314cd3799db14fcd950a9a2647b6774c493c4679086158ba90312",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "8eafef49-d8d5-83d8-ad86-016ccb3e589e",
+      "file": "docs/evidence/raw/notion_2026-10-06/은종혁__cb3e589e.md",
+      "last_edited_time": "2026-08-28T16:13:07.871000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "874862245d4f1f951d06cfd217f2ff8c0458f5b08b86056ac44377eb0b74d823",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "a07fef49-d8d5-83e6-a435-815be16b7b85",
+      "file": "docs/evidence/raw/notion_2026-10-06/멘토링_DAY3_중간발표__e16b7b85.md",
+      "last_edited_time": "2026-09-08T13:09:50.391000+09:00",
+      "last_edited_by_ref": "2cb278b0-7883-45c6-a191-db20c528cc0e",
+      "sha256": "9b2da2d16f9325fe1042abac61e02d051b61605157fbc2a26ba10b6b925b2219",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "a5afef49-d8d5-8288-b2ee-81cbb9ebc18c",
+      "file": "docs/evidence/raw/notion_2026-10-06/[멘토링_내용_정리(오전)]__b9ebc18c.md",
+      "last_edited_time": "2026-08-28T16:13:02.809000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "67097259b0c223ce736e2e329078c3bca8f65cfef9b04d99b1637a31d3067863",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "a78fef49-d8d5-8335-b8c8-8160c53798ca",
+      "file": "docs/evidence/raw/notion_2026-10-06/멘토링_DAY5__c53798ca.md",
+      "last_edited_time": "2026-08-28T17:37:30.898000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "de8aebd0ace7f159395a5c05f82887839a954d5ed1b59c3ca47ec1da428e796c",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "ab3fef49-d8d5-83bf-be9f-019179e13231",
+      "file": "docs/evidence/raw/notion_2026-10-06/고민균__79e13231.md",
+      "last_edited_time": "2026-08-28T16:13:07.565000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "5e39420a9aea3e0e42810ba6f5b44ec7025c51f0abb14fe2df917c42f41e2514",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "c0cfef49-d8d5-8328-953c-8111aba32544",
+      "file": "docs/evidence/raw/notion_2026-10-06/하지혁__aba32544.md",
+      "last_edited_time": "2026-08-28T16:13:05.719000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "00f233fc3efafaca095ebbb0641183207978423d3598b75c107fe41acd509fa0",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "cc1fef49-d8d5-8390-9792-01cbb85f16de",
+      "file": "docs/evidence/raw/notion_2026-10-06/조보름__b85f16de.md",
+      "last_edited_time": "2026-08-28T16:13:06.059000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "6c45d339e2ce4478eda251593a78d383ca30842585f437512affcadb79120df4",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "d1afef49-d8d5-8302-b995-01b778ceda26",
+      "file": "docs/evidence/raw/notion_2026-10-06/멘토링_DAY2__78ceda26.md",
+      "last_edited_time": "2026-08-28T17:36:57.505000+09:00",
+      "last_edited_by_ref": "325d872b-594c-819b-af9e-00024096ebba",
+      "sha256": "d7d77131597881f0eef2937b724b314d08b1a37dcd6cab99055054a92348b59e",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "d89fef49-d8d5-8325-bc57-81867f86c370",
+      "file": "docs/evidence/raw/notion_2026-10-06/자기소개__7f86c370.md",
+      "last_edited_time": "2026-08-28T16:20:55.245000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "688d769f6b8cf15637ef466a0f5a354b6fefc4e236720b21a3320602a3f00acb",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    },
+    {
+      "notion_id": "ee6fef49-d8d5-8285-8aa0-81150cfe9ae9",
+      "file": "docs/evidence/raw/notion_2026-10-06/이준혁__0cfe9ae9.md",
+      "last_edited_time": "2026-08-28T16:13:07.409000+09:00",
+      "last_edited_by_ref": "92c56baf-8210-4a28-bcda-460ea0e6838c",
+      "sha256": "e71620be55380a10ccbd20256cccc2de8368eb6b880b3f254970544c3b0cab71",
+      "serialization": "unchanged baseline Markdown; fresh block metadata has no post-baseline edits"
+    }
+  ],
+  "limitations": [
+    "요청 수는 requests 호출 수이며 리다이렉트의 개별 홉은 별도 집계하지 않았다.",
+    "루트 응답의 상위 공개 페이지 skeleton 2개를 해석 중 하위 블록까지 일괄 조회한 요청도 요청 로그에 포함한다. 보존·분석 범위는 대상 루트의 121페이지뿐이다.",
+    "CRDT tombstone·수정 이력의 삭제된 텍스트와 URL은 현재 가시 본문이 아니므로 보존하지 않았다.",
+    "그림·첨부 원본은 이번 작업에서 새로 내려받지 않았다.",
+    "원본 편집자 opaque ID만 반환되어 실명은 확인하지 않았다.",
+    "117개 비변경 페이지는 새로 조회한 하위 블록의 편집 시각이 10-03 이후가 아님을 대조한 뒤 기존 마크다운 바이트를 재사용했다."
+  ]
+}

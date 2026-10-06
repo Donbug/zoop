@@ -15,7 +15,7 @@
   "stateImages": [
     "docs/design/v6/search-explicit-390-light.png"
   ],
-  "note": "3개 상한 없이 실제 4개를 선택했어요.",
+  "note": "3개 상한을 두지 않는 것을 실제 4개 선택으로 확인했어요.",
   "markers": [
     {
       "number": 1,

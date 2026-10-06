@@ -9,6 +9,7 @@ from ..dataset import ARTICLE_LINKS, COMPANY_LINKS, CompanyRec, Dataset, IssueRe
 from ..deps import OptionalPrincipal, State
 from ..errors import ApiError, not_found
 from ..market_data import Source
+from ..company_history import as_of_dataset, company_neighborhood
 from ..graph import edge_detail, select_graph
 from ..summaries import role_display
 from ..schemas import (
@@ -94,6 +95,7 @@ def get_graph(
     ),
     limit: int = Query(default=500, ge=1, le=1000, description="Maximum node count; newest events first."),
     round_id: RoundQuery = None,
+    as_of: str | None = Query(default=None, alias="asOf"),
 ) -> GraphResponse:
     """Approved issue-company graph. ``companyId`` re-centres either mode on that company.
 
@@ -112,6 +114,9 @@ def get_graph(
     if round_id is not None and mode == "personal":
         raise ApiError(422, "round_all_only", "회차 기준 그래프는 전체 지도만 볼 수 있습니다.")
     ds = state.dataset(round_id)
+    if as_of:
+        selected_time = _Range._bound(as_of, "asOf", end_of_day=True)
+        ds = as_of_dataset(ds, selected_time)
     if company_id is not None:
         _require_company(ds, company_id)
     holding_ids = user_holding_ids(ds, user) if user else []
@@ -155,8 +160,14 @@ def get_graph(
 
 
 @router.get("/graph/edges/{id}", response_model=EdgeDetail)
-def get_edge(edge_id: Annotated[str, Path(alias="id")], state: State, round_id: RoundQuery = None) -> EdgeDetail:
-    return edge_detail(state.dataset(round_id), edge_id)
+def get_edge(
+    edge_id: Annotated[str, Path(alias="id")], state: State, round_id: RoundQuery = None,
+    as_of: str | None = Query(default=None, alias="asOf"),
+) -> EdgeDetail:
+    ds = state.dataset(round_id)
+    if as_of:
+        ds = as_of_dataset(ds, _Range._bound(as_of, "asOf", end_of_day=True))
+    return edge_detail(ds, edge_id)
 
 
 # --------------------------------------------------------------------------- companies
@@ -225,9 +236,12 @@ def _issue_refs(ds: Dataset, company_id: str, relation_type: str) -> list[Compan
 
 @router.get("/companies/{id}", response_model=CompanyDetail)
 def get_company(
-    company_id: Annotated[str, Path(alias="id")], state: State, principal: OptionalPrincipal, round_id: RoundQuery = None
+    company_id: Annotated[str, Path(alias="id")], state: State, principal: OptionalPrincipal, round_id: RoundQuery = None,
+    as_of: str | None = Query(default=None, alias="asOf"),
 ) -> CompanyDetail:
     ds = state.dataset(round_id)
+    if as_of:
+        ds = as_of_dataset(ds, _Range._bound(as_of, "asOf", end_of_day=True))
     _require_company(ds, company_id)
     company = ds.companies[company_id]
     user = principal.user if principal else None
@@ -351,12 +365,36 @@ class _Range:
         return moment <= self.end.astimezone(_KST).date()
 
 
+@router.get("/companies/{id}/graph", response_model=GraphResponse)
+def get_company_graph(
+    company_id: Annotated[str, Path(alias="id")], state: State, principal: OptionalPrincipal,
+    as_of: str = Query(alias="asOf", min_length=1), depth: int = Query(default=1, ge=1, le=2),
+) -> GraphResponse:
+    selected_time = _Range._bound(as_of, "asOf", end_of_day=True)
+    ds = as_of_dataset(state.provider.get(), selected_time)
+    _require_company(ds, company_id)
+    user = principal.user if principal else None
+    graph = select_graph(
+        ds, focus=[company_id], depth=2, limit=1000,
+        holding_ids=user_holding_ids(ds, user) if user else [],
+        watch_ids=list(user.watchlist_ids) if user else [],
+    )
+    graph = company_neighborhood(graph, company_id, depth)
+    return GraphResponse(
+        nodes=graph.nodes, edges=graph.edges,
+        metadata=GraphMetadata(
+            **meta(ds).model_dump(), mode="all", truncated=graph.truncated,
+            empty_reason="no_related_issues" if not graph.edges else None,
+            focus_company_ids=[company_id], depth=depth, limit=1000,
+        ),
+    )
+
 
 @router.get("/companies/{id}/prices", response_model=PriceResponse)
 def get_prices(
     company_id: Annotated[str, Path(alias="id")],
     state: State,
-    period: Literal["1d", "1m", "1y"] = "1m",
+    period: Literal["1d", "1w", "1m", "1y"] = "1m",
     from_: RangeFrom = None,
     to: RangeTo = None,
 ) -> PriceSeries | PriceSeriesUnavailable:
@@ -368,13 +406,13 @@ def get_prices(
     range without any session (a holiday ``1d``) is ``no_data``."""
     _require_company(state.provider.get(), company_id)
     window = _Range.parse(from_, to)
-    result = state.market.series(company_id, period)
+    result = state.market.series(company_id, period, start=window.start, end=window.end)
     if result.series is None or result.source is None:
         return PriceSeriesUnavailable(
             company_id=company_id, period=period, reason_code=result.code, reason=result.reason
         )
     series = result.series
-    daily = series.interval == "1d"
+    daily = series.interval in ("1d", "1wk")
     bars = [b for b in series.bars if window.contains(b.time, day_only=daily)]
     if not bars:
         return PriceSeriesUnavailable(
@@ -405,19 +443,28 @@ def _source_out(source: Source) -> QuoteSourceOut:
 
 
 @router.get("/companies/{id}/documents", response_model=CompanyDocumentsResponse)
-def get_company_documents(company_id: Annotated[str, Path(alias="id")], state: State) -> CompanyDocumentsResponse:
+def get_company_documents(
+    company_id: Annotated[str, Path(alias="id")], state: State, from_: RangeFrom = None, to: RangeTo = None,
+    round_id: RoundQuery = None,
+) -> CompanyDocumentsResponse:
     """Distinct source articles behind this company's approved events, newest publication first.
 
     Each article lists the events it supports and the stored evidence quotes it contributed, so the
     source and quote stay visible even when the original link is missing or unreachable.
     """
-    ds = state.provider.get()
+    ds = state.dataset(round_id)
+    window = _Range.parse(from_, to)
+    if window.end:
+        ds = as_of_dataset(ds, window.end)
     _require_company(ds, company_id)
     docs: dict[str, CompanyDocument] = {}
     for issue in sort_recent(ds.issues_of_company(company_id)):
         for article_id in issue.article_ids:
             rec = ds.article_for(article_id)
             if rec is None:
+                continue
+            published = _reported(rec.published_at)
+            if window.bounded and (published is None or not window.contains(published)):
                 continue
             doc = docs.get(article_id)
             if doc is None:
@@ -430,6 +477,8 @@ def get_company_documents(company_id: Annotated[str, Path(alias="id")], state: S
                     synthetic=rec.synthetic,
                     events=[],
                     quotes=[],
+                    sentiment=state.admin.sentiment.frozen_document(round_id, rec.id, company_id) if round_id
+                    else state.admin.sentiment.document(ds, rec.id, company_id),
                 )
             doc.events.append(
                 DocumentEventRef(
@@ -458,6 +507,7 @@ def list_events(
     company_id: str | None = Query(default=None, alias="companyId"),
     from_: RangeFrom = None,
     to: RangeTo = None,
+    depth: int = Query(default=1, ge=1, le=2),
 ) -> EventListResponse:
     """Approved issues, newest event first.
 
@@ -471,9 +521,14 @@ def list_events(
     """
     ds = state.provider.get()
     window = _Range.parse(from_, to)
+    if window.end:
+        ds = as_of_dataset(ds, window.end)
     if company_id is not None:
         _require_company(ds, company_id)
         issues = ds.issues_of_company(company_id)
+        if depth == 2:
+            graph = company_neighborhood(select_graph(ds, focus=[company_id], depth=2, limit=1000), company_id, depth)
+            issues = [ds.issues[node.id] for node in graph.nodes if node.kind == "issue"]
     else:
         issues = list(ds.issues.values())
     scope = sort_recent(issues)
@@ -539,8 +594,13 @@ def _reported_sort_key(value: str | None) -> float:
 
 
 @router.get("/events/{id}", response_model=EventDetail)
-def get_event(issue_id: Annotated[str, Path(alias="id")], state: State, round_id: RoundQuery = None) -> EventDetail:
+def get_event(
+    issue_id: Annotated[str, Path(alias="id")], state: State, round_id: RoundQuery = None,
+    as_of: str | None = Query(default=None, alias="asOf"),
+) -> EventDetail:
     ds = state.dataset(round_id)
+    if as_of:
+        ds = as_of_dataset(ds, _Range._bound(as_of, "asOf", end_of_day=True))
     issue = ds.issues.get(issue_id)
     if issue is None:
         raise not_found("event_not_found", "사건을 찾을 수 없습니다.")
@@ -566,6 +626,8 @@ def get_event(issue_id: Annotated[str, Path(alias="id")], state: State, round_id
             or (r.relation_type == "FOLLOWS" and r.source == issue.id and r.target in ds.issues)
         )
         article_link = r.relation_type in ARTICLE_LINKS and r.target == issue.id
+        if as_of and graph_visible and edge_id(r.relation_type, r.source, r.target) not in ds.edges:
+            continue
         if not (graph_visible or article_link):
             continue
         relations.append(
@@ -641,12 +703,26 @@ def get_event(issue_id: Annotated[str, Path(alias="id")], state: State, round_id
 
 
 @router.get("/evidence/{id}", response_model=EvidenceResponse)
-def get_evidence(evidence_id: Annotated[str, Path(alias="id")], state: State, round_id: RoundQuery = None) -> EvidenceResponse:
+def get_evidence(
+    evidence_id: Annotated[str, Path(alias="id")], state: State, round_id: RoundQuery = None,
+    company_id: str | None = Query(default=None, alias="companyId"),
+) -> EvidenceResponse:
     ds = state.dataset(round_id)
     ev = ds.evidence.get(evidence_id)
     if ev is None:
         raise not_found("evidence_not_found", "근거를 찾을 수 없습니다.")
     article = ds.article_for(ev.article_id, ev.article_version)
+    sentiment = None
+    if company_id is not None:
+        _require_company(ds, company_id)
+        connected = any(ev.article_id in i.article_ids for i in ds.issues_of_company(company_id)
+                        if i.id in ds.evidence_issues.get(ev.id, ()))
+        if not connected:
+            raise ApiError(422, "sentiment_context_mismatch", "이 근거와 연결된 기업이 아닙니다.")
+        if round_id is not None:
+            sentiment = state.admin.sentiment.frozen_document(round_id, ev.article_id, company_id)
+        elif article is not None and ds.article_for(ev.article_id).version == ev.article_version:
+            sentiment = state.admin.sentiment.document(ds, ev.article_id, company_id)
     return EvidenceResponse(
         id=ev.id,
         quote=ev.quote,
@@ -666,4 +742,5 @@ def get_evidence(evidence_id: Annotated[str, Path(alias="id")], state: State, ro
         quote_verified=ev.quote_verified,
         event_ids=list(ds.evidence_issues.get(ev.id, ())),
         metadata=meta(ds),
+        sentiment=sentiment,
     )

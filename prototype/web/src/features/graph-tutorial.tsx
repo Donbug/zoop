@@ -43,15 +43,15 @@ const STEPS: TutorialStep[] = [
   {
     title: "기업이나 사건 고르기",
     body: "기업(동그라미)이나 사건 노드를 눌러 보세요. 무엇과 연결됐는지 상세가 열려요.",
-    keyboard: "키보드로는 [목록] 보기에서 기업·사건 행을 Tab으로 골라 Enter를 누르세요.",
-    targets: [{ selector: "[data-graph-canvas]" }, { selector: 'button[aria-label="목록으로 보기"]' }],
+    keyboard: "키보드로는 [조작 도움말]을 열고 기업·사건 버튼을 Tab으로 골라 Enter를 누르세요.",
+    targets: [{ selector: "[data-graph-canvas]" }, { selector: 'button[aria-label="조작 도움말"]' }],
     sheetHint: "다른 기업·사건을 고르려면 이 창을 닫아요.",
     onMap: true,
   },
   {
     title: "영향 경로 보기",
     body: "기업을 고른 뒤 상세의 [직접 이슈]에서 사건을 눌러 보세요. 기업과 그 사건이 어떻게 이어졌는지 단계별 근거와 함께 보여요. 기업 사이 점선(사건 공유)을 눌러도 두 기업의 관계가 열려요.",
-    keyboard: "키보드로는 [목록] 보기에서 기업을 고른 뒤 상세의 [직접 이슈] 사건 제목으로 Tab해 Enter를 누르세요.",
+    keyboard: "키보드로는 [조작 도움말]에서 기업을 고른 뒤 상세의 [직접 이슈] 사건 제목으로 Tab해 Enter를 누르세요.",
     targets: [{ selector: 'section[aria-label="직접 이슈"]' }, { selector: 'section[aria-label="관련 기업"]' }, { selector: "[data-graph-canvas]" }],
     sheetHint: "기업 상세의 [직접 이슈]에서 사건을 눌러 보세요.",
     onMap: false,

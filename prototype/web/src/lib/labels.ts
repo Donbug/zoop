@@ -4,6 +4,16 @@ export type RelationType = Schemas["GraphEdge"]["relationType"];
 export type DatasetKind = Schemas["Metadata"]["datasetKind"];
 export type TimePrecision = Schemas["EventSummary"]["timePrecision"];
 
+export type Sentiment = Schemas["DocumentSentiment"]["label"];
+
+/** 기사·기업 판정의 표기. 주가 등락·확률을 뜻하지 않는다. */
+export const sentimentLabel: Record<Sentiment, string> = {
+  positive: "긍정",
+  negative: "부정",
+  mixed: "혼재",
+  undetermined: "판단 보류",
+};
+
 /** 시스템 용어 → 쉬운 말 (design-direction §7). 화면에는 항상 오른쪽 값을 쓴다. */
 export const relationLabel: Record<RelationType, string> = {
   INVOLVES: "직접 관련",

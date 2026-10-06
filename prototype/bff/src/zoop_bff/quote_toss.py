@@ -258,26 +258,28 @@ class TossProvider:
         )
         return self._source(symbol), quote
 
-    def series(self, listing: Listing, period: Period) -> tuple[Source, Series]:
+    def series(self, listing: Listing, period: Period, *, start: datetime | None = None, end: datetime | None = None) -> tuple[Source, Series]:
         symbol = listing.code
-        if period == "1d":
-            session: list = []
-
-            def same_session(bar: Bar) -> bool:
-                if not session:
-                    session.append(bar.time.date())
-                return bar.time.date() == session[0]
-
-            bars = self.candles(symbol, "1m", keep=same_session, max_pages=3)
-            interval = "1m"
-        else:
-            start = period_start(period, self._now().date())
-            bars = [b for b in self._daily_year(symbol) if b.time.date() >= start]
-            interval = "1d"
+        if period in ("1d", "1w"):
+            raise QuoteUnavailable("no_data", "연결한 시세 출처는 5분·시간 간격 자료를 제공하지 않아요.")
+        cutoff = start.date() if start else period_start(period, self._now().date())
+        bars = self.candles(symbol, "1d", keep=lambda b: b.time.date() >= cutoff, max_pages=10)
+        bars = sorted((b for b in bars if end is None or b.time <= end), key=lambda b: b.time)
+        interval = "1d"
+        if period == "1y":
+            weeks: dict[tuple[int, int], list[Bar]] = {}
+            for bar in bars:
+                iso = bar.time.isocalendar()
+                weeks.setdefault((iso.year, iso.week), []).append(bar)
+            bars = [
+                Bar(group[-1].time, group[0].open, max(b.high for b in group), min(b.low for b in group),
+                    group[-1].close, sum(b.volume for b in group) if all(b.volume is not None for b in group) else None)
+                for group in weeks.values()
+            ]
+            interval = "1wk"
         if not bars:
             raise QuoteUnavailable("no_data", "이 기간의 시세가 없어요.")
-        info = self._info(symbol)
-        currency = info.get("currency")
+        currency = self._info(symbol).get("currency")
         if not isinstance(currency, str) or not currency:
             raise QuoteUnavailable("no_data", "토스증권 응답에 통화가 없어요.")
-        return self._source(symbol), Series(currency, interval, tuple(reversed(bars)))
+        return self._source(symbol), Series(currency, interval, tuple(bars))

@@ -80,6 +80,10 @@ interface GraphCanvasProps {
   hidden?: ReadonlySet<LegendKey>;
   /** 근거 창에서 `지도에서 보기`를 누른 인용(G4). */
   evidence?: EvidenceHighlight | null;
+  /** 외부 타임라인 버킷에 든 노드를 함께 강조한다. 지도의 기본 선택 동작은 유지한다. */
+  highlightedNodes?: ReadonlySet<string>;
+  /** 작은 상세 요약에는 지도 툴바용 여백을 비우지 않는다. 기본 지도는 기존 여백을 유지한다. */
+  compactFocus?: boolean;
   /** 두 기업 사이 경로(G6). 경로 요소만 선명하게 두고 카메라를 경로에 맞춘다. focus와 함께 주지 않는다. */
   path?: GraphPath | null;
   /** 사이드바 기업 선택: 그 노드를 가운데로 확대·이동한다(동작 줄이기면 즉시). */
@@ -109,6 +113,8 @@ export function GraphCanvas({
   hidden = NO_HIDDEN,
   evidence = null,
   path = null,
+  highlightedNodes,
+  compactFocus = false,
   centerOn = null,
   occludeRight = 0,
   sheetOver = false,
@@ -151,7 +157,7 @@ export function GraphCanvas({
   const elements = useMemo(() => toElements(nodes, edges, groupIsolated), [nodes, edges, groupIsolated, theme]);
   const bundleCount = elements.bundled.size;
   // 보기 상태(선택·포커스·필터·근거 강조)는 이벤트 처리기와 배치에서도 최신 값을 읽는다.
-  const viewState: ViewState = { selectionId: selection?.id ?? null, bundled: elements.bundled, focus, hidden, evidence, path };
+  const viewState: ViewState = { selectionId: selection?.id ?? null, bundled: elements.bundled, focus, hidden, evidence, path, highlightedNodes };
   const viewRef = useRef(viewState);
   viewRef.current = viewState;
   // 숨겨진 캔버스(목록 보기)에서는 배치를 미뤘다가, 보이게 되어 크기가 정해지면 실행한다.
@@ -254,9 +260,11 @@ export function GraphCanvas({
 
   /** 포커스 화면 여백: 위는 포커스 바(56 + 간격), 모바일은 좌우·아래를 좁혀 방사형 배치를 크게 보인다. 데스크톱은 상세 패널 자리를 비운다. */
   const focusInsets = (): Insets =>
-    motionRef.current.isMobile
-      ? { top: 80, right: 16, bottom: 16, left: 16 }
-      : { top: 80, right: FIT_PADDING + motionRef.current.occludeRight, bottom: FIT_PADDING, left: FIT_PADDING };
+    compactFocus ? { top: 16, right: 16, bottom: FIT_PADDING, left: 16 }
+      : motionRef.current.isMobile
+        ? { top: 80, right: 16, bottom: 16, left: 16 }
+        : { top: 80, right: FIT_PADDING + motionRef.current.occludeRight, bottom: FIT_PADDING, left: FIT_PADDING };
+  const focusOverhang: Insets = compactFocus ? { top: 36, right: 36, bottom: 56, left: 36 } : FOCUS_LABEL_OVERHANG;
 
   /** 전체 화면 맞춤 여백: 조작 도구가 있는 쪽(데스크톱 아래, 모바일 오른쪽)만 도구 폭(44 + 간격)을 비운다. 데스크톱은 상세 패널 자리도. */
   const fitInsets = (): Insets =>
@@ -283,7 +291,7 @@ export function GraphCanvas({
       return fitViewport(cy, route, insets);
     }
     const shown = shownElements(cy);
-    if (viewRef.current.focus) return fitViewport(cy, shown, focusInsets(), 1.4, FOCUS_LABEL_OVERHANG);
+    if (viewRef.current.focus) return fitViewport(cy, shown, focusInsets(), 1.4, focusOverhang);
     // 가장자리 묶음은 배율에 따라 모델 크기·간격이 바뀌므로 맞춤 대상에서 빼고 그쪽 화면 자리만 비워 둔다.
     const bundle = shown.filter((e) => e.id() === ISOLATED_BUNDLE_ID);
     if (bundle.empty()) return fitViewport(cy, shown, fitInsets());
@@ -296,7 +304,7 @@ export function GraphCanvas({
     const focusNow = viewRef.current.focus;
     if (!focusNow) return new Map() as Positions;
     const pad = focusInsets();
-    return focusPositions(cy, focusNow, positionsRef.current, { width: cy.width() - pad.left - pad.right, height: cy.height() - pad.top - pad.bottom });
+    return focusPositions(cy, focusNow, positionsRef.current, { width: cy.width() - pad.left - pad.right, height: cy.height() - pad.top - pad.bottom }, focusOverhang);
   };
 
   /** 노드를 목표 위치로 옮기고, 옮긴 배치에 맞춘 화면으로 카메라를 함께 옮긴다. 동작 줄이기에서는 즉시. */
@@ -471,7 +479,7 @@ export function GraphCanvas({
       pendingCenterRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectionKey, focusKey, hiddenKey, evidenceKey, pathKey, elements]);
+  }, [selectionKey, focusKey, hiddenKey, evidenceKey, pathKey, elements, highlightedNodes]);
 
   // 4-0) 숨겨져 있던 캔버스가 보이게 되면(목록 → 그래프) 그동안 미룬 카메라를 직접 고른 것과 같은 규칙으로 맞추고,
   // 지금 배율로 캡션을 다시 정리한다(숨김 중에는 크기가 0이라 정리하지 못해 이웃 캡션이 모두 남아 있다).

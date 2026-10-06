@@ -1,0 +1,375 @@
+{
+  "operationId": "getAdminSession",
+  "targetPath": "/api/v1/admin/auth/session",
+  "bffPath": "/api/admin/auth/session",
+  "targetOnly": {
+    "header.X-Request-ID": {
+      "type": "string"
+    },
+    "header.X-Request-ID:required": false,
+    "response:200:application/json.csrfToken": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.csrfToken:required": true,
+    "response:200:application/json.expiresAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:header:X-Request-ID": {
+      "type": "string"
+    },
+    "response:404": true,
+    "response:404:application/json": {
+      "type": "object"
+    },
+    "response:404:application/json.error": {
+      "type": "object"
+    },
+    "response:404:application/json.error.code": {
+      "type": "string",
+      "enum": [
+        "INVALID_REQUEST",
+        "INVALID_CREDENTIALS",
+        "AUTH_REQUIRED",
+        "MEMBER_REQUIRED",
+        "ACCESS_DENIED",
+        "MEMBER_BLOCKED",
+        "EMAIL_TAKEN",
+        "TERMS_REQUIRED",
+        "RESOURCE_NOT_FOUND",
+        "EVIDENCE_UNAVAILABLE",
+        "VERSION_UNAVAILABLE",
+        "REVISION_CONFLICT",
+        "IDEMPOTENCY_CONFLICT",
+        "JOB_IN_PROGRESS",
+        "JOB_NOT_RETRYABLE",
+        "ALREADY_PUBLISHED",
+        "VALIDATION_FAILED",
+        "SOCIAL_AUTH_CANCELLED",
+        "SOCIAL_AUTH_FAILED",
+        "INVALID_CURSOR",
+        "RATE_LIMITED",
+        "SOURCE_UNAVAILABLE",
+        "MODEL_UNAVAILABLE",
+        "AUDIT_UNAVAILABLE",
+        "MASKING_FAILED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "response:404:application/json.error.code:required": true,
+    "response:404:application/json.error.details": {
+      "type": "object"
+    },
+    "response:404:application/json.error.details.currentRevision": {
+      "type": "integer"
+    },
+    "response:404:application/json.error.details.currentRevision:required": false,
+    "response:404:application/json.error.details.fields": {
+      "type": "array"
+    },
+    "response:404:application/json.error.details.fields:required": false,
+    "response:404:application/json.error.details.fields[]": {
+      "type": "object"
+    },
+    "response:404:application/json.error.details.fields[].field": {
+      "type": "string"
+    },
+    "response:404:application/json.error.details.fields[].field:required": true,
+    "response:404:application/json.error.details.fields[].reason": {
+      "type": "string"
+    },
+    "response:404:application/json.error.details.fields[].reason:required": true,
+    "response:404:application/json.error.details.resourceId": {
+      "type": "string"
+    },
+    "response:404:application/json.error.details.resourceId:required": false,
+    "response:404:application/json.error.details:required": false,
+    "response:404:application/json.error.message": {
+      "type": "string"
+    },
+    "response:404:application/json.error.message:required": true,
+    "response:404:application/json.error.requestId": {
+      "type": "string"
+    },
+    "response:404:application/json.error.requestId:required": true,
+    "response:404:application/json.error.retryable": {
+      "type": "boolean"
+    },
+    "response:404:application/json.error.retryable:required": true,
+    "response:404:application/json.error:required": true,
+    "response:404:header:X-Request-ID": {
+      "type": "string"
+    },
+    "response:422": true,
+    "response:422:application/json": {
+      "type": "object"
+    },
+    "response:422:application/json.error": {
+      "type": "object"
+    },
+    "response:422:application/json.error.code": {
+      "type": "string",
+      "enum": [
+        "INVALID_REQUEST",
+        "INVALID_CREDENTIALS",
+        "AUTH_REQUIRED",
+        "MEMBER_REQUIRED",
+        "ACCESS_DENIED",
+        "MEMBER_BLOCKED",
+        "EMAIL_TAKEN",
+        "TERMS_REQUIRED",
+        "RESOURCE_NOT_FOUND",
+        "EVIDENCE_UNAVAILABLE",
+        "VERSION_UNAVAILABLE",
+        "REVISION_CONFLICT",
+        "IDEMPOTENCY_CONFLICT",
+        "JOB_IN_PROGRESS",
+        "JOB_NOT_RETRYABLE",
+        "ALREADY_PUBLISHED",
+        "VALIDATION_FAILED",
+        "SOCIAL_AUTH_CANCELLED",
+        "SOCIAL_AUTH_FAILED",
+        "INVALID_CURSOR",
+        "RATE_LIMITED",
+        "SOURCE_UNAVAILABLE",
+        "MODEL_UNAVAILABLE",
+        "AUDIT_UNAVAILABLE",
+        "MASKING_FAILED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "response:422:application/json.error.code:required": true,
+    "response:422:application/json.error.details": {
+      "type": "object"
+    },
+    "response:422:application/json.error.details.currentRevision": {
+      "type": "integer"
+    },
+    "response:422:application/json.error.details.currentRevision:required": false,
+    "response:422:application/json.error.details.fields": {
+      "type": "array"
+    },
+    "response:422:application/json.error.details.fields:required": false,
+    "response:422:application/json.error.details.fields[]": {
+      "type": "object"
+    },
+    "response:422:application/json.error.details.fields[].field": {
+      "type": "string"
+    },
+    "response:422:application/json.error.details.fields[].field:required": true,
+    "response:422:application/json.error.details.fields[].reason": {
+      "type": "string"
+    },
+    "response:422:application/json.error.details.fields[].reason:required": true,
+    "response:422:application/json.error.details.resourceId": {
+      "type": "string"
+    },
+    "response:422:application/json.error.details.resourceId:required": false,
+    "response:422:application/json.error.details:required": false,
+    "response:422:application/json.error.message": {
+      "type": "string"
+    },
+    "response:422:application/json.error.message:required": true,
+    "response:422:application/json.error.requestId": {
+      "type": "string"
+    },
+    "response:422:application/json.error.requestId:required": true,
+    "response:422:application/json.error.retryable": {
+      "type": "boolean"
+    },
+    "response:422:application/json.error.retryable:required": true,
+    "response:422:application/json.error:required": true,
+    "response:422:header:X-Request-ID": {
+      "type": "string"
+    },
+    "response:500": true,
+    "response:500:application/json": {
+      "type": "object"
+    },
+    "response:500:application/json.error": {
+      "type": "object"
+    },
+    "response:500:application/json.error.code": {
+      "type": "string",
+      "enum": [
+        "INVALID_REQUEST",
+        "INVALID_CREDENTIALS",
+        "AUTH_REQUIRED",
+        "MEMBER_REQUIRED",
+        "ACCESS_DENIED",
+        "MEMBER_BLOCKED",
+        "EMAIL_TAKEN",
+        "TERMS_REQUIRED",
+        "RESOURCE_NOT_FOUND",
+        "EVIDENCE_UNAVAILABLE",
+        "VERSION_UNAVAILABLE",
+        "REVISION_CONFLICT",
+        "IDEMPOTENCY_CONFLICT",
+        "JOB_IN_PROGRESS",
+        "JOB_NOT_RETRYABLE",
+        "ALREADY_PUBLISHED",
+        "VALIDATION_FAILED",
+        "SOCIAL_AUTH_CANCELLED",
+        "SOCIAL_AUTH_FAILED",
+        "INVALID_CURSOR",
+        "RATE_LIMITED",
+        "SOURCE_UNAVAILABLE",
+        "MODEL_UNAVAILABLE",
+        "AUDIT_UNAVAILABLE",
+        "MASKING_FAILED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "response:500:application/json.error.code:required": true,
+    "response:500:application/json.error.details": {
+      "type": "object"
+    },
+    "response:500:application/json.error.details.currentRevision": {
+      "type": "integer"
+    },
+    "response:500:application/json.error.details.currentRevision:required": false,
+    "response:500:application/json.error.details.fields": {
+      "type": "array"
+    },
+    "response:500:application/json.error.details.fields:required": false,
+    "response:500:application/json.error.details.fields[]": {
+      "type": "object"
+    },
+    "response:500:application/json.error.details.fields[].field": {
+      "type": "string"
+    },
+    "response:500:application/json.error.details.fields[].field:required": true,
+    "response:500:application/json.error.details.fields[].reason": {
+      "type": "string"
+    },
+    "response:500:application/json.error.details.fields[].reason:required": true,
+    "response:500:application/json.error.details.resourceId": {
+      "type": "string"
+    },
+    "response:500:application/json.error.details.resourceId:required": false,
+    "response:500:application/json.error.details:required": false,
+    "response:500:application/json.error.message": {
+      "type": "string"
+    },
+    "response:500:application/json.error.message:required": true,
+    "response:500:application/json.error.requestId": {
+      "type": "string"
+    },
+    "response:500:application/json.error.requestId:required": true,
+    "response:500:application/json.error.retryable": {
+      "type": "boolean"
+    },
+    "response:500:application/json.error.retryable:required": true,
+    "response:500:application/json.error:required": true,
+    "response:500:header:X-Request-ID": {
+      "type": "string"
+    },
+    "response:503": true,
+    "response:503:application/json": {
+      "type": "object"
+    },
+    "response:503:application/json.error": {
+      "type": "object"
+    },
+    "response:503:application/json.error.code": {
+      "type": "string",
+      "enum": [
+        "INVALID_REQUEST",
+        "INVALID_CREDENTIALS",
+        "AUTH_REQUIRED",
+        "MEMBER_REQUIRED",
+        "ACCESS_DENIED",
+        "MEMBER_BLOCKED",
+        "EMAIL_TAKEN",
+        "TERMS_REQUIRED",
+        "RESOURCE_NOT_FOUND",
+        "EVIDENCE_UNAVAILABLE",
+        "VERSION_UNAVAILABLE",
+        "REVISION_CONFLICT",
+        "IDEMPOTENCY_CONFLICT",
+        "JOB_IN_PROGRESS",
+        "JOB_NOT_RETRYABLE",
+        "ALREADY_PUBLISHED",
+        "VALIDATION_FAILED",
+        "SOCIAL_AUTH_CANCELLED",
+        "SOCIAL_AUTH_FAILED",
+        "INVALID_CURSOR",
+        "RATE_LIMITED",
+        "SOURCE_UNAVAILABLE",
+        "MODEL_UNAVAILABLE",
+        "AUDIT_UNAVAILABLE",
+        "MASKING_FAILED",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "response:503:application/json.error.code:required": true,
+    "response:503:application/json.error.details": {
+      "type": "object"
+    },
+    "response:503:application/json.error.details.currentRevision": {
+      "type": "integer"
+    },
+    "response:503:application/json.error.details.currentRevision:required": false,
+    "response:503:application/json.error.details.fields": {
+      "type": "array"
+    },
+    "response:503:application/json.error.details.fields:required": false,
+    "response:503:application/json.error.details.fields[]": {
+      "type": "object"
+    },
+    "response:503:application/json.error.details.fields[].field": {
+      "type": "string"
+    },
+    "response:503:application/json.error.details.fields[].field:required": true,
+    "response:503:application/json.error.details.fields[].reason": {
+      "type": "string"
+    },
+    "response:503:application/json.error.details.fields[].reason:required": true,
+    "response:503:application/json.error.details.resourceId": {
+      "type": "string"
+    },
+    "response:503:application/json.error.details.resourceId:required": false,
+    "response:503:application/json.error.details:required": false,
+    "response:503:application/json.error.message": {
+      "type": "string"
+    },
+    "response:503:application/json.error.message:required": true,
+    "response:503:application/json.error.requestId": {
+      "type": "string"
+    },
+    "response:503:application/json.error.requestId:required": true,
+    "response:503:application/json.error.retryable": {
+      "type": "boolean"
+    },
+    "response:503:application/json.error.retryable:required": true,
+    "response:503:application/json.error:required": true,
+    "response:503:header:X-Request-ID": {
+      "type": "string"
+    }
+  },
+  "bffOnly": {
+    "response:200:application/json.expiresAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.expiresAt<anyOf:1>": {
+      "type": "null"
+    }
+  },
+  "changed": {
+    "response:200:application/json.idleExpiresAt<anyOf:0>": {
+      "target": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "bff": {
+        "type": "string"
+      }
+    }
+  }
+}

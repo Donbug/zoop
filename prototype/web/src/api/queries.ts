@@ -133,6 +133,14 @@ export function useRecommendations(enabled = true) {
   });
 }
 
+/** 종목 메뉴(FS037): 검색어가 없으면 전체 카탈로그. 검색 컴포넌트와 같은 키를 공유한다. */
+export function useCompanyList(q: string) {
+  return useQuery({
+    queryKey: queryKeys.companies(q),
+    queryFn: ({ signal }) => api<Schemas["CompanyListResponse"]>("/api/companies", { query: { q }, signal }),
+  });
+}
+
 /** 종목 검색(FS011-01): 실행한 검색어마다 따로 조회한다. 빈 검색어는 요청하지 않고, 이전 검색어 결과를 이어 보이지 않는다. */
 export function useCompanySearch(q: string) {
   return useQuery({
@@ -142,22 +150,27 @@ export function useCompanySearch(q: string) {
   });
 }
 
-export function useCompany(id: string | undefined) {
+export function useCompany(id: string | undefined, asOfOverride?: string | null) {
   const round = useAsOfRound();
+  const [params] = useSearchParams();
+  const asOf = asOfOverride === undefined ? params.get("asOf") : asOfOverride;
   return useQuery({
-    queryKey: queryKeys.company(id ?? "", round),
-    queryFn: ({ signal }) => api<Schemas["CompanyDetail"]>(`/api/companies/${encodeURIComponent(id!)}`, { query: { round }, signal }),
+    queryKey: asOf ? [...queryKeys.company(id ?? "", round), asOf] : queryKeys.company(id ?? "", round),
+    queryFn: ({ signal }) => api<Schemas["CompanyDetail"]>(`/api/companies/${encodeURIComponent(id!)}`, { query: { round, asOf }, signal }),
     enabled: Boolean(id),
   });
 }
 
 /** 여러 기업을 한 번에 조회한다(사이드바 관심 종목 이름 표시용). */
-export function useCompanies(ids: string[]) {
+export function useCompanies(ids: string[], asOfOverride?: string | null) {
+  const round = useAsOfRound();
+  const [params] = useSearchParams();
+  const asOf = asOfOverride === undefined ? params.get("asOf") : asOfOverride;
   return useQueries({
     queries: ids.map((id) => ({
-      queryKey: queryKeys.company(id),
+      queryKey: asOf ? [...queryKeys.company(id, round), asOf] : queryKeys.company(id, round),
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        api<Schemas["CompanyDetail"]>(`/api/companies/${encodeURIComponent(id)}`, { signal }),
+        api<Schemas["CompanyDetail"]>(`/api/companies/${encodeURIComponent(id)}`, { query: { round, asOf }, signal }),
     })),
   });
 }
@@ -200,50 +213,66 @@ export function useCompanyPrices(id: string, range: DetailRange) {
  * round가 있으면 그 브리핑 회차를 발행할 당시의 그래프다(FS032, 전체 모드만).
  * 메인 지도의 모드 전환(FS019)은 이 옵션으로 대상 모드를 먼저 받아 두고, 성공한 뒤에만 모드를 바꾼다.
  */
-export function graphQuery(mode: GraphMode, round: string | null) {
+export function graphQuery(mode: GraphMode, round: string | null, asOf: string | null = null) {
   return {
-    queryKey: queryKeys.graph(mode, undefined, round),
-    queryFn: ({ signal }: { signal: AbortSignal }) => api<Schemas["GraphResponse"]>("/api/graph", { query: { mode, round }, signal }),
+    queryKey: asOf ? [...queryKeys.graph(mode, undefined, round), asOf] : queryKeys.graph(mode, undefined, round),
+    queryFn: ({ signal }: { signal: AbortSignal }) => api<Schemas["GraphResponse"]>("/api/graph", { query: { mode, round, asOf }, signal }),
   };
 }
 
 /** 키가 바뀌면(모드·회차) 이전 지도를 이어 쓰지 않는다. 다른 모드·회차의 데이터에 지금 이름이 붙지 않게 하기 위해서다. */
 export function useGraph(mode: GraphMode, enabled = true) {
   const round = useAsOfRound();
-  return useQuery({ ...graphQuery(mode, round), enabled });
+  const [params] = useSearchParams();
+  return useQuery({ ...graphQuery(mode, round, params.get("asOf")), enabled });
 }
 
 export function useEdge(id: string | undefined) {
   const round = useAsOfRound();
+  const [params] = useSearchParams();
+  const asOf = params.get("asOf");
   return useQuery({
-    queryKey: queryKeys.edge(id ?? "", round),
-    queryFn: ({ signal }) => api<Schemas["EdgeDetail"]>(`/api/graph/edges/${encodeURIComponent(id!)}`, { query: { round }, signal }),
+    queryKey: asOf ? [...queryKeys.edge(id ?? "", round), asOf] : queryKeys.edge(id ?? "", round),
+    queryFn: ({ signal }) => api<Schemas["EdgeDetail"]>(`/api/graph/edges/${encodeURIComponent(id!)}`, { query: { round, asOf }, signal }),
     enabled: Boolean(id),
   });
 }
 
 /** 기업 상세 타임라인: 차트와 같은 범위의 사건. 범위마다 따로 캐시해 늦게 온 이전 기간 응답이 지금 기간을 덮지 않는다(FS040). */
-export function useCompanyEvents(companyId: string, range: DetailRange) {
+export function useCompanyEvents(companyId: string, range: DetailRange, depth: 1 | 2 = 1) {
   return useQuery({
-    queryKey: queryKeys.companyEvents(companyId, range.from, range.to),
-    queryFn: ({ signal }) => api<Schemas["EventListResponse"]>("/api/events", { query: { companyId, from: range.from, to: range.to }, signal }),
+    queryKey: depth === 1 ? queryKeys.companyEvents(companyId, range.from, range.to) : [...queryKeys.companyEvents(companyId, range.from, range.to), depth],
+    queryFn: ({ signal }) => api<Schemas["EventListResponse"]>("/api/events", { query: { companyId, from: range.from, to: range.to, depth }, signal }),
+  });
+}
+
+/** 기업 중심 최대 2-hop. 지도의 현재 데이터 조회와 분리된 시점별 캐시. */
+export function useCompanyGraph(companyId: string, asOf: string, depth: 1 | 2) {
+  return useQuery({
+    queryKey: ["company-graph", companyId, asOf, depth],
+    queryFn: ({ signal }) => api<Schemas["GraphResponse"]>(`/api/companies/${encodeURIComponent(companyId)}/graph`, { query: { asOf, depth }, signal }),
   });
 }
 
 /** 기업 상세 문서 탭: 이 기업 사건들의 근거 기사(중복 없이, 최신 발행순). */
-export function useCompanyDocuments(companyId: string) {
+export function useCompanyDocuments(companyId: string, range?: DetailRange) {
+  const round = useAsOfRound();
+  const [params] = useSearchParams();
+  const asOf = range ? null : params.get("asOf");
   return useQuery({
-    queryKey: queryKeys.companyDocuments(companyId),
+    queryKey: [...queryKeys.companyDocuments(companyId), ...(range ? [range.from, range.to] : asOf ? [asOf] : []), ...(round ? [round] : [])],
     queryFn: ({ signal }) =>
-      api<Schemas["CompanyDocumentsResponse"]>(`/api/companies/${encodeURIComponent(companyId)}/documents`, { signal }),
+      api<Schemas["CompanyDocumentsResponse"]>(`/api/companies/${encodeURIComponent(companyId)}/documents`, { query: { from: range?.from, to: range?.to ?? asOf, round }, signal }),
   });
 }
 
 export function useEvent(id: string | undefined) {
   const round = useAsOfRound();
+  const [params] = useSearchParams();
+  const asOf = params.get("asOf");
   return useQuery({
-    queryKey: queryKeys.event(id ?? "", round),
-    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { query: { round }, signal }),
+    queryKey: asOf ? [...queryKeys.event(id ?? "", round), asOf] : queryKeys.event(id ?? "", round),
+    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { query: { round, asOf }, signal }),
     enabled: Boolean(id),
   });
 }
@@ -254,7 +283,7 @@ export function useEventInRange(id: string | null, rangeTo: string) {
   const round = useAsOfRound();
   return useQuery({
     queryKey: [...queryKeys.event(id ?? "", round), rangeTo] as const,
-    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { query: { round }, signal }),
+    queryFn: ({ signal }) => api<Schemas["EventDetail"]>(`/api/events/${encodeURIComponent(id!)}`, { query: { round, asOf: rangeTo }, signal }),
     enabled: Boolean(id),
   });
 }
@@ -271,13 +300,13 @@ export function useEventsByIds(ids: string[]) {
   });
 }
 
-export function useEvidenceItems(ids: string[]) {
+export function useEvidenceItems(ids: string[], companyId?: string) {
   const round = useAsOfRound();
   return useQueries({
     queries: ids.map((id) => ({
-      queryKey: queryKeys.evidence(id, round),
+      queryKey: companyId ? [...queryKeys.evidence(id, round), companyId] : queryKeys.evidence(id, round),
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        api<Schemas["EvidenceResponse"]>(`/api/evidence/${encodeURIComponent(id)}`, { query: { round }, signal }),
+        api<Schemas["EvidenceResponse"]>(`/api/evidence/${encodeURIComponent(id)}`, { query: { round, companyId }, signal }),
     })),
   });
 }

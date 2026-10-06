@@ -543,6 +543,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{id}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Company Graph */
+        get: operations["get_company_graph_api_companies__id__graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{id}/prices": {
         parameters: {
             query?: never;
@@ -1707,7 +1724,7 @@ export interface components {
              * Feature
              * @enum {string}
              */
-            feature: "chatbot" | "news-analysis" | "briefing";
+            feature: "chatbot" | "news-analysis" | "briefing" | "document-sentiment" | "briefing-outlook";
             /** Label */
             label: string;
             /** Engine */
@@ -1880,6 +1897,12 @@ export interface components {
             /** Createdat */
             createdAt: string;
         };
+        /** BriefingDocumentSentiment */
+        BriefingDocumentSentiment: {
+            /** Articleid */
+            articleId: string;
+            sentiment: components["schemas"]["DocumentSentiment"];
+        };
         /** BriefingEvaluationResponse */
         BriefingEvaluationResponse: {
             /**
@@ -1990,6 +2013,8 @@ export interface components {
             /** Evidenceids */
             evidenceIds: string[];
             summary: components["schemas"]["Unavailable"];
+            /** Documentsentiments */
+            documentSentiments: components["schemas"]["BriefingDocumentSentiment"][];
             /**
              * Reportedat
              * @description KST time of the newest article behind the issue (the time it entered the round's data window); only the date (YYYY-MM-DD) when the article carries no time. null on rounds published before it was stored.
@@ -2044,6 +2069,24 @@ export interface components {
             /** At */
             at: string | null;
         };
+        /** BriefingOutlook */
+        BriefingOutlook: {
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "positive" | "negative" | "mixed" | "undetermined";
+            /** Rationale */
+            rationale: string;
+            /** Issueids */
+            issueIds: string[];
+            /** Judgedat */
+            judgedAt: string;
+            /** Model */
+            model: string;
+            /** Promptversion */
+            promptVersion: string;
+        };
         /**
          * BriefingPayload
          * @description The immutable published original of a round (what users saw before any correction).
@@ -2074,6 +2117,7 @@ export interface components {
             ruleRevision: number | null;
             /** Items */
             items: components["schemas"]["BriefingItem"][];
+            outlook: components["schemas"]["BriefingOutlook"] | null;
             references: components["schemas"]["BriefingReferences"];
             /** Emptyreason */
             emptyReason: "no_issues_in_window" | null;
@@ -2124,6 +2168,7 @@ export interface components {
             graphVersion: string | null;
             /** Items */
             items: components["schemas"]["BriefingItem"][];
+            outlook: components["schemas"]["BriefingOutlook"] | null;
             /** @description No producer exists (prose summary), so always unavailable */
             marketSummary: components["schemas"]["Unavailable"];
             /**
@@ -2754,6 +2799,7 @@ export interface components {
              * @description Stored evidence quotes from this article for those events
              */
             quotes: components["schemas"]["DocumentQuote"][];
+            sentiment: components["schemas"]["DocumentSentiment"] | null;
         };
         /** CompanyDocumentsResponse */
         CompanyDocumentsResponse: {
@@ -3235,6 +3281,26 @@ export interface components {
             /** Quoteverified */
             quoteVerified: boolean | null;
         };
+        /** DocumentSentiment */
+        DocumentSentiment: {
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "positive" | "negative" | "mixed" | "undetermined";
+            /** Companyid */
+            companyId: string;
+            /** Rationale */
+            rationale: string;
+            /** Quotes */
+            quotes: string[];
+            /** Judgedat */
+            judgedAt: string;
+            /** Model */
+            model: string;
+            /** Promptversion */
+            promptVersion: string;
+        };
         /** EdgeDetail */
         EdgeDetail: {
             /** Id */
@@ -3464,6 +3530,7 @@ export interface components {
             /** Eventids */
             eventIds: string[];
             metadata: components["schemas"]["Metadata"];
+            sentiment: components["schemas"]["DocumentSentiment"] | null;
         };
         /** FeatureCost */
         FeatureCost: {
@@ -3489,6 +3556,16 @@ export interface components {
             inputTokens: number | null;
             /** Outputtokens */
             outputTokens: number | null;
+            /**
+             * Replaycalls
+             * @default 0
+             */
+            replayCalls: number;
+            /**
+             * Retries
+             * @default 0
+             */
+            retries: number;
         };
         /** FeedbackDay */
         FeedbackDay: {
@@ -4882,13 +4959,13 @@ export interface components {
              * Period
              * @enum {string}
              */
-            period: "1d" | "1m" | "1y";
+            period: "1d" | "1w" | "1m" | "1y";
             source: components["schemas"]["QuoteSourceOut"];
             /** Currency */
             currency: string;
             /**
              * Interval
-             * @description Bar size: `1m`/`5m` for the latest session (1d), `1d` otherwise.
+             * @description Bar size: 5m (1d), 1h (1w), 1d (1m), 1wk (1y).
              */
             interval: string;
             /**
@@ -4910,7 +4987,7 @@ export interface components {
              * Period
              * @enum {string}
              */
-            period: "1d" | "1m" | "1y";
+            period: "1d" | "1w" | "1m" | "1y";
             /**
              * Reasoncode
              * @enum {string}
@@ -7517,6 +7594,7 @@ export interface operations {
                 limit?: number;
                 /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
                 round?: string | null;
+                asOf?: string | null;
             };
             header?: never;
             path?: never;
@@ -7594,6 +7672,7 @@ export interface operations {
             query?: {
                 /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
                 round?: string | null;
+                asOf?: string | null;
             };
             header?: never;
             path: {
@@ -7750,6 +7829,7 @@ export interface operations {
             query?: {
                 /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
                 round?: string | null;
+                asOf?: string | null;
             };
             header?: never;
             path: {
@@ -7976,10 +8056,89 @@ export interface operations {
             };
         };
     };
+    get_company_graph_api_companies__id__graph_get: {
+        parameters: {
+            query: {
+                asOf: string;
+                depth?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphResponse"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description forbidden (guest session or foreign resource) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description validation error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description source_unavailable: the approved-issue source could not be read */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_prices_api_companies__id__prices_get: {
         parameters: {
             query?: {
-                period?: "1d" | "1m" | "1y";
+                period?: "1d" | "1w" | "1m" | "1y";
                 /** @description Range start, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
                 from?: string | null;
                 /** @description Range end, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
@@ -8060,7 +8219,14 @@ export interface operations {
     };
     get_company_documents_api_companies__id__documents_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Range start, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
+                from?: string | null;
+                /** @description Range end, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
+                to?: string | null;
+                /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
+                round?: string | null;
+            };
             header?: never;
             path: {
                 id: string;
@@ -8142,6 +8308,7 @@ export interface operations {
                 from?: string | null;
                 /** @description Range end, inclusive: KST date (YYYY-MM-DD, the whole day) or date-time (an offset-less value is read as KST) */
                 to?: string | null;
+                depth?: number;
             };
             header?: never;
             path?: never;
@@ -8219,6 +8386,7 @@ export interface operations {
             query?: {
                 /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
                 round?: string | null;
+                asOf?: string | null;
             };
             header?: never;
             path: {
@@ -8298,6 +8466,7 @@ export interface operations {
             query?: {
                 /** @description Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. */
                 round?: string | null;
+                companyId?: string | null;
             };
             header?: never;
             path: {

@@ -33,7 +33,7 @@ from .config import QuoteProviderMode
 if TYPE_CHECKING:
     from .quote_naver import Metrics, NaverMetricsProvider
 
-Period = Literal["1d", "1m", "1y"]
+Period = Literal["1d", "1w", "1m", "1y"]
 ProviderId = Literal["toss", "yahoo", "naver"]
 ProviderMode = QuoteProviderMode
 ReasonCode = Literal[
@@ -137,7 +137,7 @@ class QuoteProvider(Protocol):
 
     def quote(self, listing: Listing) -> tuple[Source, Quote]: ...
 
-    def series(self, listing: Listing, period: Period) -> tuple[Source, Series]: ...
+    def series(self, listing: Listing, period: Period, *, start: datetime | None = None, end: datetime | None = None) -> tuple[Source, Series]: ...
 
 
 # --------------------------------------------------------------------------- helpers
@@ -147,6 +147,8 @@ def period_start(period: Period, today: date) -> date:
     """Same rule as the timeline (web ``periodFrom``): 1 month / 1 year back, clamped to month end."""
     if period == "1d":
         return today
+    if period == "1w":
+        return today - timedelta(days=7)
     months = 1 if period == "1m" else 12
     index = today.year * 12 + (today.month - 1) - months
     year, month = divmod(index, 12)
@@ -254,7 +256,7 @@ class TtlCache:
 
 
 QUOTE_TTL = 30.0
-SERIES_TTL: dict[Period, float] = {"1d": 60.0, "1m": 30 * 60.0, "1y": 60 * 60.0}
+SERIES_TTL: dict[Period, float] = {"1d": 60.0, "1w": 300.0, "1m": 30 * 60.0, "1y": 60 * 60.0}
 REFERENCE_TTL = 12 * 60 * 60.0
 METRICS_TTL = 30 * 60.0
 
@@ -320,11 +322,12 @@ class MarketData:
             return QuoteResult(None, code=exc.code, reason=exc.reason)
         return QuoteResult(source, quote=quote)
 
-    def series(self, company_id: str, period: Period) -> QuoteResult:
+    def series(self, company_id: str, period: Period, *, start: datetime | None = None, end: datetime | None = None) -> QuoteResult:
         try:
             provider, listing = self.provider_for(company_id)
             source, series = self.cache.get_or_load(
-                (provider.id, "series", listing, period), SERIES_TTL[period], lambda: provider.series(listing, period)
+                (provider.id, "series", listing, period, start, end) if start or end else (provider.id, "series", listing, period), SERIES_TTL[period],
+                lambda: provider.series(listing, period, start=start, end=end) if start or end else provider.series(listing, period)
             )
         except QuoteUnavailable as exc:
             return QuoteResult(None, code=exc.code, reason=exc.reason)

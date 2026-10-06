@@ -9,6 +9,7 @@ from pydantic import Field, StrictBool, StrictInt
 from .schemas import (
     BriefingItem,
     BriefingMetadata,
+    BriefingOutlook,
     BriefingReferences,
     BriefingWindow,
     CamelModel,
@@ -611,6 +612,8 @@ class FeatureUsage(CamelModel):
     model_calls: int | None
     input_tokens: int | None
     output_tokens: int | None
+    replay_calls: int = 0
+    retries: int = 0
 
 
 class FeatureCost(CamelModel):
@@ -628,7 +631,7 @@ class RecentError(CamelModel):
 
 
 class AiFeature(CamelModel):
-    feature: Literal["chatbot", "news-analysis", "briefing"]
+    feature: Literal["chatbot", "news-analysis", "briefing", "document-sentiment", "briefing-outlook"]
     label: str
     engine: str
     model_backed: bool
@@ -748,6 +751,7 @@ class BriefingPayload(CamelModel):
         description="Publication-rule log revision at publication; null for rounds published before it was recorded",
     )
     items: list[BriefingItem]
+    outlook: BriefingOutlook | None = None
     references: BriefingReferences
     empty_reason: Literal["no_issues_in_window"] | None
     selected_from: int

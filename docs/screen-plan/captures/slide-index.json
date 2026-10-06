@@ -2,8 +2,8 @@
   {
     "page": 1,
     "id": "COVER",
-    "title": "줍 화면계획서 v2.0",
-    "route": "프로토타입 기준 · 2026-10-03"
+    "title": "줍 화면계획서 v2.1",
+    "route": "프로토타입 기준 · 2026-10-06"
   },
   {
     "page": 2,
@@ -13,380 +13,452 @@
   },
   {
     "page": 3,
+    "id": "HISTORY-21",
+    "title": "변경 이력 · v2.0 → v2.1",
+    "route": ""
+  },
+  {
+    "page": 4,
     "id": "GUIDE",
     "title": "읽는 법",
     "route": ""
   },
   {
-    "page": 4,
+    "page": 5,
     "id": "MAP-01",
     "title": "화면 목록·라우트·명세",
     "route": ""
   },
   {
-    "page": 5,
+    "page": 6,
     "id": "MAP-02",
     "title": "화면 목록·라우트·명세",
     "route": ""
   },
   {
-    "page": 6,
+    "page": 7,
     "id": "MAP-03",
     "title": "화면 목록·라우트·명세",
     "route": ""
   },
   {
-    "page": 7,
+    "page": 8,
     "id": "MAP-04",
     "title": "화면 목록·라우트·명세",
     "route": ""
   },
   {
-    "page": 8,
+    "page": 9,
     "id": "MAP-05",
     "title": "화면 목록·라우트·명세",
     "route": ""
   },
   {
-    "page": 9,
+    "page": 10,
+    "id": "MAP-06",
+    "title": "화면 목록·라우트·명세",
+    "route": ""
+  },
+  {
+    "page": 11,
     "id": "FLOW",
     "title": "첫 진입 → 첫 근거 확인",
     "route": "현재 그래프 기본 보기 기준. 과거 문서의 2클릭 수치를 그대로 승계하지 않아요."
   },
   {
-    "page": 10,
+    "page": 12,
     "id": "SEMANTICS",
     "title": "색과 아이콘의 뜻",
     "route": ""
   },
   {
-    "page": 11,
+    "page": 13,
     "id": "STATE-01",
     "title": "공통 상태 규칙",
     "route": ""
   },
   {
-    "page": 12,
+    "page": 14,
     "id": "M-RULE-01",
     "title": "모바일 전환 규칙",
     "route": ""
   },
   {
-    "page": 13,
+    "page": 15,
     "id": "AUTHORITY",
     "title": "비회원·회원·관리자 권한",
     "route": ""
   },
   {
-    "page": 14,
+    "page": 16,
     "id": "D-AUT-01",
     "title": "시작·이메일 로그인",
     "route": "/login"
   },
   {
-    "page": 15,
+    "page": 17,
     "id": "D-AUT-02",
     "title": "이메일 회원가입",
     "route": "/signup"
   },
   {
-    "page": 16,
+    "page": 18,
     "id": "D-AUT-03",
     "title": "개발용 모의 소셜 제공자",
     "route": "/mock-idp"
   },
   {
-    "page": 17,
+    "page": 19,
     "id": "D-ONB-01",
     "title": "투자 여부 선택",
     "route": "/onboarding"
   },
   {
-    "page": 18,
+    "page": 20,
     "id": "D-ONB-02",
     "title": "가상 계좌 연결",
     "route": "/onboarding"
   },
   {
-    "page": 19,
+    "page": 21,
     "id": "D-WAT-01",
     "title": "관심 종목 선택",
     "route": "/onboarding"
   },
   {
-    "page": 20,
+    "page": 22,
     "id": "D-WAT-01b",
     "title": "관심 종목 4개 선택",
     "route": "/onboarding"
   },
   {
-    "page": 21,
+    "page": 23,
     "id": "D-GRP-01",
     "title": "시장 전체 지도",
     "route": "/?mode=all"
   },
   {
-    "page": 22,
+    "page": 24,
     "id": "D-GRP-01b",
     "title": "내 종목 지도·범위 필터",
     "route": "/?mode=personal"
   },
   {
-    "page": 23,
+    "page": 25,
     "id": "D-GRP-T",
     "title": "지도 튜토리얼 1/5",
     "route": "/?mode=all&tour=1"
   },
   {
-    "page": 24,
+    "page": 26,
     "id": "D-GRP-T2",
     "title": "지도 튜토리얼 2/5",
     "route": "/?mode=all&tour=1"
   },
   {
-    "page": 25,
+    "page": 27,
     "id": "D-GRP-T3",
     "title": "지도 튜토리얼 3/5",
     "route": "/?mode=all&tour=1"
   },
   {
-    "page": 26,
+    "page": 28,
     "id": "D-GRP-T4",
     "title": "지도 튜토리얼 4/5",
     "route": "/?mode=all&tour=1"
   },
   {
-    "page": 27,
+    "page": 29,
     "id": "D-GRP-T5",
     "title": "지도 튜토리얼 5/5",
     "route": "/?mode=all&tour=1"
   },
   {
-    "page": 28,
+    "page": 30,
     "id": "D-GRP-02",
     "title": "사건 패널",
     "route": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57"
   },
   {
-    "page": 29,
+    "page": 31,
     "id": "D-GRP-03",
-    "title": "기업 패널",
+    "title": "기업 패널·시세·1개월 추이",
     "route": "/?mode=all&select=node%3AKRX%3A005930"
   },
   {
-    "page": 30,
+    "page": 32,
     "id": "D-GRP-04",
     "title": "연결선 상세",
     "route": "/?mode=all&select=edge%3Aedge-f53400022fc7c812"
   },
   {
-    "page": 31,
+    "page": 33,
     "id": "D-GRP-05",
     "title": "근거 문서 창",
     "route": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d"
   },
   {
-    "page": 32,
+    "page": 34,
     "id": "D-GRP-06",
     "title": "기업에서 여는 영향 경로",
     "route": "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d"
   },
   {
-    "page": 33,
+    "page": 35,
     "id": "D-GRP-07",
     "title": "포커스·두 기업 사이 경로",
     "route": "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA"
   },
   {
-    "page": 34,
+    "page": 36,
     "id": "D-GRP-07b",
     "title": "선택 기업 포커스",
     "route": "/?mode=all&select=node%3AKRX%3A005930&focus=KRX%3A005930&hops=1"
   },
   {
-    "page": 35,
-    "id": "D-COM-01",
-    "title": "기업 상세·시세·모의 보유",
-    "route": "/companies/KRX%3A005930"
-  },
-  {
-    "page": 36,
-    "id": "D-COM-01b",
-    "title": "차트·사건 타임라인·인과관계 고지",
-    "route": "/companies/KRX%3A005930?tab=events"
-  },
-  {
     "page": 37,
-    "id": "D-COM-02",
-    "title": "사건 타임라인·문서 탭",
-    "route": "/companies/KRX%3A005930?tab=documents"
+    "id": "D-STK-01",
+    "title": "종목 메뉴·검색·관심",
+    "route": "/companies?q=%EC%82%BC%EC%84%B1"
   },
   {
     "page": 38,
+    "id": "D-COM-01",
+    "title": "기업 상세·시세·모의 보유",
+    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z"
+  },
+  {
+    "page": 39,
+    "id": "D-COM-01b",
+    "title": "차트·시간 버킷·인과관계 고지",
+    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=events"
+  },
+  {
+    "page": 40,
+    "id": "D-COM-02",
+    "title": "사건 타임라인·문서 탭",
+    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=documents"
+  },
+  {
+    "page": 41,
+    "id": "D-COM-03",
+    "title": "기업 상세·좌측 기업 전환",
+    "route": "/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events"
+  },
+  {
+    "page": 42,
+    "id": "D-COM-04",
+    "title": "기업 중심 관계 그래프",
+    "route": "/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events"
+  },
+  {
+    "page": 43,
+    "id": "D-COM-05",
+    "title": "타임라인 버킷·차트·그래프 연동",
+    "route": "/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events"
+  },
+  {
+    "page": 44,
+    "id": "D-COM-06",
+    "title": "차트 시점 선택·asOf 변경",
+    "route": "/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events"
+  },
+  {
+    "page": 45,
     "id": "D-MY-01",
     "title": "내 종목 관리",
     "route": "/me/stocks"
   },
   {
-    "page": 39,
+    "page": 46,
     "id": "D-BRF-01",
     "title": "출근 브리핑",
     "route": "/briefing?date=2026-09-17&edition=morning"
   },
   {
-    "page": 40,
+    "page": 47,
     "id": "D-BRF-02",
     "title": "퇴근 브리핑·회차 비교",
     "route": "/briefing?date=2026-09-17&edition=evening"
   },
   {
-    "page": 41,
+    "page": 48,
     "id": "D-BRF-04",
     "title": "회차 기준 지도",
     "route": "/?round=brf-2026-09-17-evening"
   },
   {
-    "page": 42,
+    "page": 49,
     "id": "D-AI-01",
     "title": "AI 질문·대상 연결",
     "route": "/?mode=all&select=node%3AKRX%3A005930"
   },
   {
-    "page": 43,
+    "page": 50,
     "id": "D-AI-01b",
     "title": "AI 되묻기",
     "route": "/?mode=all&select=node%3AKRX%3A005930"
   },
   {
-    "page": 44,
+    "page": 51,
     "id": "D-AI-02",
     "title": "AI 작업 복구·오류 구분",
     "route": "/?mode=all&select=node%3AKRX%3A005930"
   },
   {
-    "page": 45,
+    "page": 52,
     "id": "D-AI-02b",
     "title": "AI 대화 조회 오류·다시 확인",
     "route": "/?mode=all&select=node%3AKRX%3A005930"
   },
   {
-    "page": 46,
+    "page": 53,
     "id": "M-GRP-01",
     "title": "지도·바텀시트",
     "route": "/?mode=all"
   },
   {
-    "page": 47,
+    "page": 54,
+    "id": "M-STK-01",
+    "title": "종목 메뉴·기업 상세 이동",
+    "route": "/companies?q=%EC%82%BC%EC%84%B1"
+  },
+  {
+    "page": 55,
     "id": "M-BRF-01",
     "title": "퇴근 브리핑·아침 이후 변경",
     "route": "/briefing?date=2026-09-17&edition=morning"
   },
   {
-    "page": 48,
+    "page": 56,
     "id": "M-AI-01",
     "title": "하단 AI 탭",
     "route": "/?mode=all"
   },
   {
-    "page": 49,
+    "page": 57,
     "id": "M-COM-01",
     "title": "기업 상세·문서 전환",
-    "route": "/companies/KRX%3A005930"
+    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A46%3A24.749Z"
   },
   {
-    "page": 50,
+    "page": 58,
+    "id": "M-COM-02",
+    "title": "모바일 기업 전환 시트",
+    "route": "/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events"
+  },
+  {
+    "page": 59,
+    "id": "D-SEN-01",
+    "title": "긍부정 표시 규칙·디자인시스템 예시",
+    "route": "/design-system#c-price"
+  },
+  {
+    "page": 60,
+    "id": "D-SEN-02",
+    "title": "회차 판단·디자인시스템 예시",
+    "route": "/design-system#c-briefing"
+  },
+  {
+    "page": 61,
     "id": "A-ADM-05c",
     "title": "관리자 로그인",
     "route": "/admin/login"
   },
   {
-    "page": 51,
+    "page": 62,
     "id": "A-ADM-01",
     "title": "운영 대시보드",
     "route": "/admin"
   },
   {
-    "page": 52,
+    "page": 63,
     "id": "A-ADM-02",
     "title": "통계·AI 품질",
     "route": "/admin/stats"
   },
   {
-    "page": 53,
+    "page": 64,
     "id": "A-ADM-02b",
     "title": "선호도·대화록",
     "route": "/admin/feedback"
   },
   {
-    "page": 54,
+    "page": 65,
     "id": "A-ADM-03",
     "title": "그래프 관제·검수",
     "route": "/admin/pipeline"
   },
   {
-    "page": 55,
+    "page": 66,
     "id": "A-ADM-04",
     "title": "AI·브리핑 운영",
     "route": "/admin/briefings"
   },
   {
-    "page": 56,
+    "page": 67,
     "id": "A-ADM-04b",
     "title": "AI 사용량·오류",
     "route": "/admin/ai"
   },
   {
-    "page": 57,
+    "page": 68,
     "id": "A-ADM-05",
     "title": "회원·접근 관리",
     "route": "/admin/members"
   },
   {
-    "page": 58,
+    "page": 69,
     "id": "A-ADM-05b",
     "title": "관리자 감사 로그",
     "route": "/admin/audit"
   },
   {
-    "page": 59,
+    "page": 70,
     "id": "APP-EVIDENCE",
     "title": "근거·원문 접근 상태 매트릭스",
     "route": ""
   },
   {
-    "page": 60,
+    "page": 71,
     "id": "APP-ID",
-    "title": "팀 v1.7 ↔ v2.0 화면 ID 대응",
+    "title": "팀 v1.7 ↔ v2.1 화면 ID 대응",
     "route": ""
   },
   {
-    "page": 61,
+    "page": 72,
     "id": "APP-VERDICT-01",
     "title": "팀 v1.7 판정표 · 채택",
     "route": ""
   },
   {
-    "page": 62,
+    "page": 73,
     "id": "APP-VERDICT-02",
     "title": "팀 v1.7 판정표 · 불채택",
     "route": ""
   },
   {
-    "page": 63,
+    "page": 74,
     "id": "APP-POLICY-01",
     "title": "팀 확인 필요 · 관리자와 운영",
     "route": ""
   },
   {
-    "page": 64,
+    "page": 75,
     "id": "APP-POLICY-02",
     "title": "팀 확인 필요 · 10-03 명세 충돌",
     "route": ""
   },
   {
-    "page": 65,
+    "page": 76,
     "id": "APP-LIMIT",
     "title": "근거 버전·남은 한계",
+    "route": ""
+  },
+  {
+    "page": 77,
+    "id": "APP-DOCS",
+    "title": "문서 체계 · 화면에서 구현 추적까지",
     "route": ""
   }
 ]

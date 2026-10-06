@@ -42,7 +42,7 @@ from .market_data import (
 
 DELAY_NOTE = "비공식 공개 차트 자료예요. 지연된 시세일 수 있어요."
 NOT_LISTED = "야후 파이낸스에서 이 종목을 찾지 못했어요."
-_RANGES: dict[Period, tuple[str, str]] = {"1d": ("1d", "5m"), "1m": ("1mo", "1d"), "1y": ("1y", "1d")}
+_RANGES: dict[Period, tuple[str, str]] = {"1d": ("1d", "5m"), "1w": ("1mo", "1h"), "1m": ("1mo", "1d"), "1y": ("1y", "1wk")}
 
 
 class YahooProvider:
@@ -85,16 +85,21 @@ class YahooProvider:
     def _source(self, symbol: str) -> Source:
         return Source("yahoo", "Yahoo Finance", False, DELAY_NOTE, symbol, f"https://finance.yahoo.com/quote/{symbol}")
 
-    def _chart(self, listing: Listing, period: Period) -> tuple[str, dict[str, Any]]:
+    def _chart(self, listing: Listing, period: Period, start: datetime | None = None, end: datetime | None = None) -> tuple[str, dict[str, Any]]:
         range_, interval = _RANGES[period]
+        params = {"range": range_, "interval": interval}
+        if start and end:
+            params = {"period1": int(start.timestamp()), "period2": int(end.timestamp()) + 1, "interval": interval}
         with self._lock:
             known = self._resolved.get(listing)
         for symbol in [known] if known else self._candidates(listing):
             response = request_json(
-                self._client, "GET", f"/v8/finance/chart/{symbol}", params={"range": range_, "interval": interval}
+                self._client, "GET", f"/v8/finance/chart/{symbol}", params=params
             )
             if response.status_code == 404:
                 continue
+            if response.status_code in (400, 422):
+                raise QuoteUnavailable("no_data", "출처에 이 기간의 시세가 없어요. 장중 자료는 제공 기간이 제한돼요.")
             if not response.is_success:
                 raise QuoteUnavailable("temporary_failure", TEMPORARY)
             body = json_body(response)
@@ -127,6 +132,18 @@ class YahooProvider:
             )
         return bars
 
+    def _candles(self, result: dict[str, Any], period: Period) -> list[Bar]:
+        bars = self._bars(result)
+        # A trailing flat, zero-volume quote sample is not a traded candle.
+        while bars and bars[-1].volume == 0 and bars[-1].open == bars[-1].high == bars[-1].low == bars[-1].close:
+            bars.pop()
+        if period == "1d":
+            bars = [bar for bar in bars if bar.time.second == 0 and bar.time.minute % 5 == 0]
+        elif period == "1w" and bars:
+            phase = next((bar.time.minute for bar in bars if bar.time.second == 0), None)
+            bars = [bar for bar in bars if bar.time.second == 0 and bar.time.minute == phase]
+        return bars
+
     def quote(self, listing: Listing) -> tuple[Source, Quote]:
         symbol, result = self._chart(listing, "1d")
         meta = result.get("meta") or {}
@@ -149,18 +166,18 @@ class YahooProvider:
             derived=("change", "changeRate") if previous_close is not None else (),
         )
         source = self._source(symbol)
-        bars = self._bars(result)
+        bars = self._candles(result, "1d")
         if bars:  # the same response is today's intraday chart; spare a second request
             self._cache.put(("yahoo", "series", listing, "1d"), SERIES_TTL["1d"], (source, Series(currency, "5m", tuple(bars))))
         return source, quote
 
-    def series(self, listing: Listing, period: Period) -> tuple[Source, Series]:
-        symbol, result = self._chart(listing, period)
+    def series(self, listing: Listing, period: Period, *, start: datetime | None = None, end: datetime | None = None) -> tuple[Source, Series]:
+        symbol, result = self._chart(listing, period, start, end)
         currency = (result.get("meta") or {}).get("currency")
-        bars = self._bars(result)
-        if period != "1d":
-            start = period_start(period, self._now().date())
-            bars = [b for b in bars if b.time.date() >= start]
+        bars = self._candles(result, period)
+        if period != "1d" and start is None:
+            cutoff = period_start(period, self._now().date())
+            bars = [b for b in bars if b.time.date() >= cutoff]
         if not bars or not isinstance(currency, str):
             raise QuoteUnavailable("no_data", "이 기간의 시세가 없어요.")
         return self._source(symbol), Series(currency, _RANGES[period][1], tuple(bars))

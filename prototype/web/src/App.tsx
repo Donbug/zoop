@@ -10,6 +10,7 @@ import { clearPersonalCache, queryKeys } from "@/api/queries";
 import { AppLayout, RedirectIfSignedIn, RequireOnboarding, RequireSession } from "@/features/app-shell";
 import { BriefingPage } from "@/pages/briefing-page";
 import { CompanyPage } from "@/pages/company-page";
+import { CompaniesPage } from "@/pages/companies-page";
 import { DesignSystemPage } from "@/pages/design-system-page";
 import { LoginPage } from "@/pages/login-page";
 import { MainPage } from "@/pages/main-page";
@@ -99,6 +100,7 @@ const router = createBrowserRouter([
         element: <RequireSession />,
         children: [
           { path: "/", element: <MainPage /> }, // UI-03 + UI-04/05 패널 + UI-09/10 창
+          { path: "/companies", element: <CompaniesPage /> }, // FS037 종목 목록·검색
           { path: "/companies/:id", element: <CompanyPage /> }, // UI-06 (+UI-07 통합)
           { path: "/briefing", element: <BriefingPage /> }, // UI-08
           { path: "/me/stocks", element: <MyStocksPage /> }, // 내 종목 (v2 §5.8)

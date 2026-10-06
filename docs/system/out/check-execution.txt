@@ -1,0 +1,289 @@
+생성: 명세 97, 목표 API 84, 화면/설명 슬라이드 65
+xlsx 데이터 행: 추적표 620, 화면→기능→API 1160, 기능→WBS→구현 상태 1064, API 목록 84, 오류 코드 26, 경고 283
+검사 목록: BFF_CACHED_OBSERVATION 1, BFF_FIELD_DIFFERENCE 81, BFF_PATH_DIFFERENCE 81, CONTRACT_UNDECIDED 4, MALFORMED_SPEC_ID 2, MULTIPLE_SPEC_DEFINITIONS 17, PROTOTYPE_ONLY_API 3, REQUIREMENT_TITLE_REVIEW 25, SPEC_DETAIL_MISSING 1, SPEC_NOT_IN_INDEX 3, TARGET_ONLY_API 3, TEAM_DECISION_REQUIRED 38, WBS_RAW_ID_REVIEW 9, WBS_TITLE_REVIEW 15
+[warning] SPEC_NOT_IN_INDEX FS???: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+[warning] MALFORMED_SPEC_ID FS???: 명세 ID 형식 오류. 번호를 추정하거나 고치지 않는다.
+[warning] SPEC_NOT_IN_INDEX FS0??: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+[warning] MALFORMED_SPEC_ID FS0??: 명세 ID 형식 오류. 번호를 추정하거나 고치지 않는다.
+[warning] SPEC_NOT_IN_INDEX FS050: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS017: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS018: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS019: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS020: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS021: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS022: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS023: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS024: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS025: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS026: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS027: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] SPEC_DETAIL_MISSING FS042: 목차 ID에 대응하는 상세 정의가 없다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS045: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS046: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS047: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS048: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS049: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] MULTIPLE_SPEC_DEFINITIONS FS051: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+[warning] TEAM_DECISION_REQUIRED listTerms: 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다.
+[warning] TEAM_DECISION_REQUIRED signUp: 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다.
+[warning] TEAM_DECISION_REQUIRED logIn: 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다.
+[warning] TEAM_DECISION_REQUIRED listSocialProviders: 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED authorizeSocialLogin: 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED completeSocialLogin: 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getGraph: 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다.
+[warning] TEAM_DECISION_REQUIRED listCompanyDocuments: 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED getEvent: 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED getEvidence: 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED getBriefing: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED listBriefingRounds: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getBriefingGraphBasis: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED createConversation: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다.
+[warning] TEAM_DECISION_REQUIRED getConversation: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getCurrentConversation: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED submitQuestion: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. / 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED getQuestionJob: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다.
+[warning] TEAM_DECISION_REQUIRED retryQuestionJob: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED cancelQuestionJob: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다.
+[warning] TEAM_DECISION_REQUIRED getAdminSession: 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED logInAdmin: 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED logOutAdmin: 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED listAnalysisCandidates: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getAnalysisCandidate: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED decideAnalysisCandidate: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED setPublicationRule: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED publishGraphVersion: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED activateGraphVersion: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED createAnalysisJob: 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED reprocessBriefingRound: 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다.
+[warning] TEAM_DECISION_REQUIRED appendBriefingCorrection: 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED listMaskedTranscripts: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getMaskedTranscript: 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getCompanyFinancials: 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getCompanyIssueImpact: 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getPersonalizedBriefing: 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다.
+[warning] TEAM_DECISION_REQUIRED getCompanyGraphAsOf: WBS FS040-01은 현재 명세 목차에 없는 원본 ID다. FS040 연결은 시점별 조회 의미의 수동 연결이며 원문 번호 정정을 뜻하지 않는다. / 날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다.
+[warning] REQUIREMENT_TITLE_REVIEW FS011-01: 명세 '관심종목 검색' ↔ 요구사항 11 '관심종목 검색과 추천 조회'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS011-02: 명세 '추천 종목·산업·테마 조회' ↔ 요구사항 11 '관심종목 검색과 추천 조회'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS022: 명세 '기업 패널에서 이슈 영향 경로 확인' ↔ 요구사항 22 '이슈와 기업의 영향 경로 확인(기업 노드 클릭)'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS023: 명세 '기업 간 관계 확인(기업 간 간선 클릭)' ↔ 요구사항 23 '기업 간 관계 확인(기업 간 간선 클릭) '. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS035: 명세 '브리핑 회차 저장 및 이력 보존' ↔ 요구사항 35 '브리핑 이력 보존'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS035: 명세 '브리핑 회차 저장 및 이력 보존' ↔ 요구사항 69 '브리핑 정보 저장'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS044: 명세 '기업 상세와 관계 그래프 이동·상태 복원' ↔ 요구사항 44 '상세 화면 상태와 이동'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS050-01: 명세 'AI 답변 근거·원문 확인' ↔ 요구사항 50 '답변 근거와 그래프 탐색'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS050-02: 명세 'AI 답변 관련 그래프 탐색' ↔ 요구사항 50 '답변 근거와 그래프 탐색'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS052-01: 명세 '같은 대화에서 후속 질문 전송' ↔ 요구사항 52 '대화와 내부 패널 유지'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS052-02: 명세 'AI 내부 패널 닫기·재열기와 대화 유지' ↔ 요구사항 52 '대화와 내부 패널 유지'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS065: 명세 '기업 및 사용자 통계 조사 및 확인' ↔ 요구사항 77 '기업 및 사용자 통계 조사와 확인'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS066-01: 명세 'AI 답변·뉴스 요약·브리핑 평가 등록' ↔ 요구사항 37 '좋아요/싫어요 만족도 조사'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS066-01: 명세 'AI 답변·뉴스 요약·브리핑 평가 등록' ↔ 요구사항 78 'AI 대화록, 뉴스 요약, 브리핑 등 수집 및 선호도 확인'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS066-02: 명세 'AI 기능별 선호도 조회' ↔ 요구사항 78 'AI 대화록, 뉴스 요약, 브리핑 등 수집 및 선호도 확인'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS066-03: 명세 '마스킹된 AI 대화록 조회' ↔ 요구사항 78 'AI 대화록, 뉴스 요약, 브리핑 등 수집 및 선호도 확인'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS067-01: 명세 '이슈 분석·공개 반영 상태 조회' ↔ 요구사항 79 'AI 기반 이슈 판단의 진행 상태, 이슈 각각의 통과/보류/폐기 상태 등 확인 및 보류된 이슈의 검수 후 허용/거부 선택'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS067-02: 명세 '보류 이슈 검수 및 허용·거부' ↔ 요구사항 79 'AI 기반 이슈 판단의 진행 상태, 이슈 각각의 통과/보류/폐기 상태 등 확인 및 보류된 이슈의 검수 후 허용/거부 선택'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS067-03: 명세 '실패한 이슈 분석·반영 작업 재시도' ↔ 요구사항 79 'AI 기반 이슈 판단의 진행 상태, 이슈 각각의 통과/보류/폐기 상태 등 확인 및 보류된 이슈의 검수 후 허용/거부 선택'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS069-01: 명세 '회원 활동 조회' ↔ 요구사항 81 '회원 관리'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS069-02: 명세 '회원 차단·차단 해제' ↔ 요구사항 81 '회원 관리'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS070-01: 명세 '브리핑 회차별 생성·검증·발행 상태 조회' ↔ 요구사항 82 '회차별 생성·검증·발행 상태 조회'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS070-02: 명세 '미발행 브리핑 회차 재처리' ↔ 요구사항 82 '회차별 생성·검증·발행 상태 조회'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS071-01: 명세 '발행 브리핑 정정 등록' ↔ 요구사항 83 '발행 브리핑 정정 관리'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] REQUIREMENT_TITLE_REVIEW FS071-02: 명세 '발행 브리핑 제공 중단' ↔ 요구사항 83 '발행 브리핑 정정 관리'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
+[warning] CONTRACT_UNDECIDED NFS007: 측정 부하·데이터 규모·표본·성능 목표값이 미정이다. 계약 검증 WBS에 연결하고 서버 성능 수치를 만들어내지 않는다.
+[warning] CONTRACT_UNDECIDED FS???: 브리핑 목록·검색 상세의 잘못된 원본 ID다. 팀 정정 전 명세 번호를 추정하거나 부여하지 않는다. 기존 회차/목록 API 연결과 구분한다.
+[warning] CONTRACT_UNDECIDED FS0??: 재무 상세 행의 잘못된 원본 ID다. FS042로 추정 치환하지 않는다. 목표 재무 API는 목차 FS042에 연결했다.
+[warning] CONTRACT_UNDECIDED FS050: AI v2 새 대화 정의와 기존 FS050-01/-02 의미가 다르다. 채택/이전 선언 없이 같은 번호로 통합하지 않는다.
+[warning] WBS_RAW_ID_REVIEW 6.3.4: 원본 WBS의 FS011는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_RAW_ID_REVIEW 6.4.4: 원본 WBS의 FS057는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_TITLE_REVIEW 6.5.6: 원본 [FS022] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.6.3: 원본 [FS040] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_RAW_ID_REVIEW 6.6.3: 원본 WBS의 FS040-01는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_TITLE_REVIEW 6.6.4: 원본 [FS041] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.6.7: 원본 [FS044] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.7.8: 원본 [FS035] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.7.10: 원본 [FS037] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.1: 원본 [FS045] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.2: 원본 [FS046] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.3: 원본 [FS047] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.4: 원본 [FS048] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.5: 원본 [FS049] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.6: 원본 [FS050] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.7: 원본 [FS051] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_RAW_ID_REVIEW 6.8.8: 원본 WBS의 FS052는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_TITLE_REVIEW 6.8.8: 원본 [FS051] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_TITLE_REVIEW 6.8.9: 원본 [FS051] 업무명과 현재 명세 제목이 다르다. 원문 ID를 자동 치환하지 않는다.
+[warning] WBS_RAW_ID_REVIEW 6.9.2: 원본 WBS의 FS066는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_RAW_ID_REVIEW 6.9.3: 원본 WBS의 FS067는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_RAW_ID_REVIEW 6.9.5: 원본 WBS의 FS069는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_RAW_ID_REVIEW 6.9.6: 원본 WBS의 FS070는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] WBS_RAW_ID_REVIEW 6.9.7: 원본 WBS의 FS071는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.
+[warning] BFF_CACHED_OBSERVATION BFF: 현재 서버를 조회하지 않고 out/bff-openapi.json의 마지막 관측본과 비교했다. 최종 통합은 --bff-url로 다시 실행한다.
+[difference] BFF_PATH_DIFFERENCE getMemberSession: 목표 /api/v1/auth/session ↔ BFF /api/auth/session
+[difference] BFF_FIELD_DIFFERENCE getMemberSession: 목표만 102 · BFF만 50 · 형식/필수/권한 변경 7
+[difference] BFF_PATH_DIFFERENCE listTerms: 목표 /api/v1/auth/terms ↔ BFF /api/auth/terms
+[difference] BFF_FIELD_DIFFERENCE listTerms: 목표만 90 · BFF만 39 · 형식/필수/권한 변경 6
+[difference] BFF_PATH_DIFFERENCE signUp: 목표 /api/v1/auth/signup ↔ BFF /api/auth/signup
+[difference] BFF_FIELD_DIFFERENCE signUp: 목표만 152 · BFF만 41 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE logIn: 목표 /api/v1/auth/login ↔ BFF /api/auth/login
+[difference] BFF_FIELD_DIFFERENCE logIn: 목표만 180 · BFF만 23 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE startGuestSession: 목표 /api/v1/auth/guest ↔ BFF /api/auth/guest
+[difference] BFF_FIELD_DIFFERENCE startGuestSession: 목표만 146 · BFF만 41 · 형식/필수/권한 변경 9
+[difference] BFF_PATH_DIFFERENCE logOut: 목표 /api/v1/auth/logout ↔ BFF /api/auth/logout
+[difference] BFF_FIELD_DIFFERENCE logOut: 목표만 124 · BFF만 30 · 형식/필수/권한 변경 8
+[difference] BFF_PATH_DIFFERENCE setTutorialState: 목표 /api/v1/auth/tutorial ↔ BFF /api/auth/tutorial
+[difference] BFF_FIELD_DIFFERENCE setTutorialState: 목표만 182 · BFF만 23 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE listSocialProviders: 목표 /api/v1/auth/social/providers ↔ BFF /api/auth/social/providers
+[difference] BFF_FIELD_DIFFERENCE listSocialProviders: 목표만 131 · BFF만 34 · 형식/필수/권한 변경 8
+[difference] BFF_PATH_DIFFERENCE authorizeSocialLogin: 목표 /api/v1/auth/social/{provider}/authorize ↔ BFF /api/auth/social/{provider}/authorize
+[difference] BFF_FIELD_DIFFERENCE authorizeSocialLogin: 목표만 124 · BFF만 30 · 형식/필수/권한 변경 8
+[difference] BFF_PATH_DIFFERENCE completeSocialLogin: 목표 /api/v1/auth/social/{provider}/callback ↔ BFF /api/auth/social/{provider}/callback
+[difference] BFF_FIELD_DIFFERENCE completeSocialLogin: 목표만 124 · BFF만 30 · 형식/필수/권한 변경 8
+[difference] BFF_PATH_DIFFERENCE getMySettings: 목표 /api/v1/me/settings ↔ BFF /api/me/settings
+[difference] BFF_FIELD_DIFFERENCE getMySettings: 목표만 132 · BFF만 32 · 형식/필수/권한 변경 12
+[difference] BFF_PATH_DIFFERENCE updateMySettings: 목표 /api/v1/me/settings ↔ BFF /api/me/settings
+[difference] BFF_FIELD_DIFFERENCE updateMySettings: 목표만 178 · BFF만 23 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE setWatchlistCompany: 목표 /api/v1/me/watchlist/{id} ↔ BFF /api/me/watchlist/{id}
+[difference] BFF_FIELD_DIFFERENCE setWatchlistCompany: 목표만 178 · BFF만 23 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE listRecommendations: 목표 /api/v1/me/recommendations ↔ BFF /api/me/recommendations
+[difference] BFF_FIELD_DIFFERENCE listRecommendations: 목표만 158 · BFF만 32 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE listVirtualAccountProfiles: 목표 /api/v1/portfolio/mock-portfolios ↔ BFF /api/portfolio/mock-portfolios
+[difference] BFF_FIELD_DIFFERENCE listVirtualAccountProfiles: 목표만 138 · BFF만 32 · 형식/필수/권한 변경 12
+[difference] BFF_PATH_DIFFERENCE getVirtualAccountProfile: 목표 /api/v1/portfolio/mock-portfolios/{id} ↔ BFF /api/portfolio/mock-portfolios/{id}
+[difference] BFF_FIELD_DIFFERENCE getVirtualAccountProfile: 목표만 132 · BFF만 32 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE connectVirtualAccount: 목표 /api/v1/portfolio/connections ↔ BFF /api/portfolio/connections
+[difference] BFF_FIELD_DIFFERENCE connectVirtualAccount: 목표만 180 · BFF만 23 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE getMyPortfolio: 목표 /api/v1/portfolio ↔ BFF /api/portfolio
+[difference] BFF_FIELD_DIFFERENCE getMyPortfolio: 목표만 132 · BFF만 32 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE disconnectVirtualAccount: 목표 /api/v1/portfolio/connections/{id} ↔ BFF /api/portfolio/connections/{id}
+[difference] BFF_FIELD_DIFFERENCE disconnectVirtualAccount: 목표만 160 · BFF만 12 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE getGraph: 목표 /api/v1/graph ↔ BFF /api/graph
+[difference] BFF_FIELD_DIFFERENCE getGraph: 목표만 158 · BFF만 27 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE getCompanyRelation: 목표 /api/v1/graph/edges/{id} ↔ BFF /api/graph/edges/{id}
+[difference] BFF_FIELD_DIFFERENCE getCompanyRelation: 목표만 119 · BFF만 41 · 형식/필수/권한 변경 10
+[difference] BFF_PATH_DIFFERENCE searchCompanies: 목표 /api/v1/companies ↔ BFF /api/companies
+[difference] BFF_FIELD_DIFFERENCE searchCompanies: 목표만 108 · BFF만 50 · 형식/필수/권한 변경 7
+[difference] BFF_PATH_DIFFERENCE getCompany: 목표 /api/v1/companies/{id} ↔ BFF /api/companies/{id}
+[difference] BFF_FIELD_DIFFERENCE getCompany: 목표만 117 · BFF만 55 · 형식/필수/권한 변경 9
+[difference] BFF_PATH_DIFFERENCE getCompanyQuote: 목표 /api/v1/companies/{id}/quote ↔ BFF /api/companies/{id}/quote
+[difference] BFF_FIELD_DIFFERENCE getCompanyQuote: 목표만 84 · BFF만 39 · 형식/필수/권한 변경 7
+[difference] BFF_PATH_DIFFERENCE getCompanyMetrics: 목표 /api/v1/companies/{id}/metrics ↔ BFF /api/companies/{id}/metrics
+[difference] BFF_FIELD_DIFFERENCE getCompanyMetrics: 목표만 84 · BFF만 39 · 형식/필수/권한 변경 7
+[difference] BFF_PATH_DIFFERENCE getCompanyPrices: 목표 /api/v1/companies/{id}/prices ↔ BFF /api/companies/{id}/prices
+[difference] BFF_FIELD_DIFFERENCE getCompanyPrices: 목표만 84 · BFF만 39 · 형식/필수/권한 변경 10
+[difference] BFF_PATH_DIFFERENCE listCompanyDocuments: 목표 /api/v1/companies/{id}/documents ↔ BFF /api/companies/{id}/documents
+[difference] BFF_FIELD_DIFFERENCE listCompanyDocuments: 목표만 114 · BFF만 56 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE listEvents: 목표 /api/v1/events ↔ BFF /api/events
+[difference] BFF_FIELD_DIFFERENCE listEvents: 목표만 92 · BFF만 48 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE getEvent: 목표 /api/v1/events/{id} ↔ BFF /api/events/{id}
+[difference] BFF_FIELD_DIFFERENCE getEvent: 목표만 134 · BFF만 52 · 형식/필수/권한 변경 10
+[difference] BFF_PATH_DIFFERENCE getEvidence: 목표 /api/v1/evidence/{id} ↔ BFF /api/evidence/{id}
+[difference] BFF_FIELD_DIFFERENCE getEvidence: 목표만 121 · BFF만 47 · 형식/필수/권한 변경 11
+[difference] BFF_PATH_DIFFERENCE getBriefing: 목표 /api/v1/briefings ↔ BFF /api/briefings
+[difference] BFF_FIELD_DIFFERENCE getBriefing: 목표만 128 · BFF만 60 · 형식/필수/권한 변경 23
+[difference] BFF_PATH_DIFFERENCE listBriefingRounds: 목표 /api/v1/briefings/rounds ↔ BFF /api/briefings/rounds
+[difference] BFF_FIELD_DIFFERENCE listBriefingRounds: 목표만 84 · BFF만 39 · 형식/필수/권한 변경 9
+[difference] BFF_PATH_DIFFERENCE getBriefingGraphBasis: 목표 /api/v1/briefings/{id}/graph ↔ BFF /api/briefings/{id}/graph
+[difference] BFF_FIELD_DIFFERENCE getBriefingGraphBasis: 목표만 97 · BFF만 30 · 형식/필수/권한 변경 11
+[difference] BFF_PATH_DIFFERENCE createConversation: 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id}
+[difference] BFF_FIELD_DIFFERENCE createConversation: 목표만 161 · BFF만 12 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE getConversation: 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id}
+[difference] BFF_FIELD_DIFFERENCE getConversation: 목표만 136 · BFF만 32 · 형식/필수/권한 변경 19
+[difference] BFF_PATH_DIFFERENCE getCurrentConversation: 목표 /api/v1/chat/sessions/current ↔ BFF /api/chat/sessions/current
+[difference] BFF_FIELD_DIFFERENCE getCurrentConversation: 목표만 136 · BFF만 32 · 형식/필수/권한 변경 19
+[difference] BFF_PATH_DIFFERENCE submitQuestion: 목표 /api/v1/chat/sessions/{id}/jobs ↔ BFF /api/chat/sessions/{id}/jobs
+[difference] BFF_FIELD_DIFFERENCE submitQuestion: 목표만 211 · BFF만 34 · 형식/필수/권한 변경 30
+[difference] BFF_PATH_DIFFERENCE getQuestionJob: 목표 /api/v1/chat/jobs/{job_id} ↔ BFF /api/chat/jobs/{job_id}
+[difference] BFF_FIELD_DIFFERENCE getQuestionJob: 목표만 153 · BFF만 23 · 형식/필수/권한 변경 20
+[difference] BFF_PATH_DIFFERENCE retryQuestionJob: 목표 /api/v1/chat/jobs/{job_id}/retry ↔ BFF /api/chat/jobs/{job_id}/retry
+[difference] BFF_FIELD_DIFFERENCE retryQuestionJob: 목표만 207 · BFF만 34 · 형식/필수/권한 변경 27
+[difference] BFF_PATH_DIFFERENCE cancelQuestionJob: 목표 /api/v1/chat/jobs/{job_id}/cancel ↔ BFF /api/chat/jobs/{job_id}/cancel
+[difference] BFF_FIELD_DIFFERENCE cancelQuestionJob: 목표만 184 · BFF만 23 · 형식/필수/권한 변경 20
+[difference] BFF_PATH_DIFFERENCE getAdminSession: 목표 /api/v1/admin/auth/session ↔ BFF /api/admin/auth/session
+[difference] BFF_FIELD_DIFFERENCE getAdminSession: 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1
+[difference] BFF_PATH_DIFFERENCE logInAdmin: 목표 /api/v1/admin/auth/login ↔ BFF /api/admin/auth/login
+[difference] BFF_FIELD_DIFFERENCE logInAdmin: 목표만 197 · BFF만 6 · 형식/필수/권한 변경 7
+[difference] BFF_PATH_DIFFERENCE logOutAdmin: 목표 /api/v1/admin/auth/logout ↔ BFF /api/admin/auth/logout
+[difference] BFF_FIELD_DIFFERENCE logOutAdmin: 목표만 160 · BFF만 0 · 형식/필수/권한 변경 0
+[difference] BFF_PATH_DIFFERENCE getAdminDashboard: 목표 /api/v1/admin/dashboard ↔ BFF /api/admin/dashboard
+[difference] BFF_FIELD_DIFFERENCE getAdminDashboard: 목표만 114 · BFF만 59 · 형식/필수/권한 변경 36
+[difference] BFF_PATH_DIFFERENCE listAuditRecords: 목표 /api/v1/admin/audit-log ↔ BFF /api/admin/audit-log
+[difference] BFF_FIELD_DIFFERENCE listAuditRecords: 목표만 115 · BFF만 23 · 형식/필수/권한 변경 16
+[difference] BFF_PATH_DIFFERENCE getPipelineOverview: 목표 /api/v1/admin/pipeline/overview ↔ BFF /api/admin/pipeline/overview
+[difference] BFF_FIELD_DIFFERENCE getPipelineOverview: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 17
+[difference] BFF_PATH_DIFFERENCE listAnalysisCandidates: 목표 /api/v1/admin/pipeline/candidates ↔ BFF /api/admin/pipeline/candidates
+[difference] BFF_FIELD_DIFFERENCE listAnalysisCandidates: 목표만 115 · BFF만 23 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE getAnalysisCandidate: 목표 /api/v1/admin/pipeline/candidates/{candidate_id} ↔ BFF /api/admin/pipeline/candidates/{candidate_id}
+[difference] BFF_FIELD_DIFFERENCE getAnalysisCandidate: 목표만 115 · BFF만 30 · 형식/필수/권한 변경 16
+[difference] BFF_PATH_DIFFERENCE decideAnalysisCandidate: 목표 /api/v1/admin/pipeline/candidates/{candidate_id}/decision ↔ BFF /api/admin/pipeline/candidates/{candidate_id}/decision
+[difference] BFF_FIELD_DIFFERENCE decideAnalysisCandidate: 목표만 172 · BFF만 38 · 형식/필수/권한 변경 17
+[difference] BFF_PATH_DIFFERENCE listPublicationRules: 목표 /api/v1/admin/pipeline/rules ↔ BFF /api/admin/pipeline/rules
+[difference] BFF_FIELD_DIFFERENCE listPublicationRules: 목표만 120 · BFF만 21 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE setPublicationRule: 목표 /api/v1/admin/pipeline/rules/{rule_id} ↔ BFF /api/admin/pipeline/rules/{rule_id}
+[difference] BFF_FIELD_DIFFERENCE setPublicationRule: 목표만 160 · BFF만 12 · 형식/필수/권한 변경 17
+[difference] BFF_PATH_DIFFERENCE listGraphVersions: 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions
+[difference] BFF_FIELD_DIFFERENCE listGraphVersions: 목표만 120 · BFF만 23 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE publishGraphVersion: 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions
+[difference] BFF_FIELD_DIFFERENCE publishGraphVersion: 목표만 162 · BFF만 14 · 형식/필수/권한 변경 16
+[difference] BFF_PATH_DIFFERENCE activateGraphVersion: 목표 /api/v1/admin/graph/versions/{version_id}/activate ↔ BFF /api/admin/graph/versions/{version_id}/activate
+[difference] BFF_FIELD_DIFFERENCE activateGraphVersion: 목표만 162 · BFF만 12 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE listAnalysisJobs: 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs
+[difference] BFF_FIELD_DIFFERENCE listAnalysisJobs: 목표만 118 · BFF만 92 · 형식/필수/권한 변경 24
+[difference] BFF_PATH_DIFFERENCE createAnalysisJob: 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs
+[difference] BFF_FIELD_DIFFERENCE createAnalysisJob: 목표만 167 · BFF만 39 · 형식/필수/권한 변경 21
+[difference] BFF_PATH_DIFFERENCE getAnalysisJob: 목표 /api/v1/admin/jobs/{job_id} ↔ BFF /api/admin/jobs/{job_id}
+[difference] BFF_FIELD_DIFFERENCE getAnalysisJob: 목표만 114 · BFF만 39 · 형식/필수/권한 변경 18
+[difference] BFF_PATH_DIFFERENCE retryAnalysisJob: 목표 /api/v1/admin/jobs/{job_id}/retry ↔ BFF /api/admin/jobs/{job_id}/retry
+[difference] BFF_FIELD_DIFFERENCE retryAnalysisJob: 목표만 162 · BFF만 36 · 형식/필수/권한 변경 21
+[difference] BFF_PATH_DIFFERENCE cancelAnalysisJob: 목표 /api/v1/admin/jobs/{job_id}/cancel ↔ BFF /api/admin/jobs/{job_id}/cancel
+[difference] BFF_FIELD_DIFFERENCE cancelAnalysisJob: 목표만 162 · BFF만 30 · 형식/필수/권한 변경 21
+[difference] BFF_PATH_DIFFERENCE getAiUsage: 목표 /api/v1/admin/ai-usage ↔ BFF /api/admin/ai-usage
+[difference] BFF_FIELD_DIFFERENCE getAiUsage: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE listAdminBriefingRounds: 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings
+[difference] BFF_FIELD_DIFFERENCE listAdminBriefingRounds: 목표만 120 · BFF만 21 · 형식/필수/권한 변경 17
+[difference] BFF_PATH_DIFFERENCE getAdminBriefingRound: 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id}
+[difference] BFF_FIELD_DIFFERENCE getAdminBriefingRound: 목표만 147 · BFF만 37 · 형식/필수/권한 변경 31
+[difference] BFF_PATH_DIFFERENCE reprocessBriefingRound: 목표 /api/v1/admin/briefings/{round_id}/reprocess ↔ BFF /api/admin/briefings/{round_id}/reprocess
+[difference] BFF_FIELD_DIFFERENCE reprocessBriefingRound: 목표만 162 · BFF만 12 · 형식/필수/권한 변경 19
+[difference] BFF_PATH_DIFFERENCE appendBriefingCorrection: 목표 /api/v1/admin/briefings/{round_id}/corrections ↔ BFF /api/admin/briefings/{round_id}/corrections
+[difference] BFF_FIELD_DIFFERENCE appendBriefingCorrection: 목표만 162 · BFF만 12 · 형식/필수/권한 변경 18
+[difference] BFF_PATH_DIFFERENCE setBriefingSuspension: 목표 /api/v1/admin/briefings/{round_id}/suspension ↔ BFF /api/admin/briefings/{round_id}/suspension
+[difference] BFF_FIELD_DIFFERENCE setBriefingSuspension: 목표만 162 · BFF만 12 · 형식/필수/권한 변경 19
+[difference] BFF_PATH_DIFFERENCE recordInteractionEvents: 목표 /api/v1/telemetry ↔ BFF /api/telemetry
+[difference] BFF_FIELD_DIFFERENCE recordInteractionEvents: 목표만 161 · BFF만 13 · 형식/필수/권한 변경 16
+[difference] BFF_PATH_DIFFERENCE getMyFeedback: 목표 /api/v1/feedback ↔ BFF /api/feedback
+[difference] BFF_FIELD_DIFFERENCE getMyFeedback: 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12
+[difference] BFF_PATH_DIFFERENCE setFeedback: 목표 /api/v1/feedback ↔ BFF /api/feedback
+[difference] BFF_FIELD_DIFFERENCE setFeedback: 목표만 160 · BFF만 12 · 형식/필수/권한 변경 16
+[difference] BFF_PATH_DIFFERENCE getInsightsOverview: 목표 /api/v1/admin/insights/overview ↔ BFF /api/admin/insights/overview
+[difference] BFF_FIELD_DIFFERENCE getInsightsOverview: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 12
+[difference] BFF_PATH_DIFFERENCE getInsightsSummary: 목표 /api/v1/admin/insights/summary ↔ BFF /api/admin/insights/summary
+[difference] BFF_FIELD_DIFFERENCE getInsightsSummary: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE listCompanyInsights: 목표 /api/v1/admin/insights/companies ↔ BFF /api/admin/insights/companies
+[difference] BFF_FIELD_DIFFERENCE listCompanyInsights: 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12
+[difference] BFF_PATH_DIFFERENCE getCompanyInsights: 목표 /api/v1/admin/insights/companies/{company_id} ↔ BFF /api/admin/insights/companies/{company_id}
+[difference] BFF_FIELD_DIFFERENCE getCompanyInsights: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE getFeedbackSummary: 목표 /api/v1/admin/feedback/summary ↔ BFF /api/admin/feedback/summary
+[difference] BFF_FIELD_DIFFERENCE getFeedbackSummary: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE listDislikedResults: 목표 /api/v1/admin/feedback/dislikes ↔ BFF /api/admin/feedback/dislikes
+[difference] BFF_FIELD_DIFFERENCE listDislikedResults: 목표만 115 · BFF만 23 · 형식/필수/권한 변경 12
+[difference] BFF_PATH_DIFFERENCE listMaskedTranscripts: 목표 /api/v1/admin/transcripts ↔ BFF /api/admin/transcripts
+[difference] BFF_FIELD_DIFFERENCE listMaskedTranscripts: 목표만 117 · BFF만 23 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE getMaskedTranscript: 목표 /api/v1/admin/transcripts/{session_id} ↔ BFF /api/admin/transcripts/{session_id}
+[difference] BFF_FIELD_DIFFERENCE getMaskedTranscript: 목표만 116 · BFF만 21 · 형식/필수/권한 변경 13
+[difference] BFF_PATH_DIFFERENCE listMembers: 목표 /api/v1/admin/members ↔ BFF /api/admin/members
+[difference] BFF_FIELD_DIFFERENCE listMembers: 목표만 115 · BFF만 23 · 형식/필수/권한 변경 15
+[difference] BFF_PATH_DIFFERENCE getMemberActivity: 목표 /api/v1/admin/members/{member_id} ↔ BFF /api/admin/members/{member_id}
+[difference] BFF_FIELD_DIFFERENCE getMemberActivity: 목표만 114 · BFF만 21 · 형식/필수/권한 변경 14
+[difference] BFF_PATH_DIFFERENCE blockMember: 목표 /api/v1/admin/members/{member_id}/block ↔ BFF /api/admin/members/{member_id}/block
+[difference] BFF_FIELD_DIFFERENCE blockMember: 목표만 162 · BFF만 12 · 형식/필수/권한 변경 17
+[difference] BFF_PATH_DIFFERENCE unblockMember: 목표 /api/v1/admin/members/{member_id}/unblock ↔ BFF /api/admin/members/{member_id}/unblock
+[difference] BFF_FIELD_DIFFERENCE unblockMember: 목표만 162 · BFF만 12 · 형식/필수/권한 변경 17
+[difference] TARGET_ONLY_API getCompanyFinancials: GET /api/v1/companies/{id}/financials: 직접 대응 BFF 없음
+[difference] TARGET_ONLY_API getCompanyIssueImpact: GET /api/v1/companies/{id}/issues/{issueId}/impact: 직접 대응 BFF 없음
+[difference] TARGET_ONLY_API getPersonalizedBriefing: GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음
+[difference] BFF_PATH_DIFFERENCE getCompanyGraphAsOf: 목표 /api/v1/companies/{id}/graph ↔ BFF /api/companies/{id}/graph
+[difference] BFF_FIELD_DIFFERENCE getCompanyGraphAsOf: 목표만 121 · BFF만 41 · 형식/필수/권한 변경 11
+[difference] PROTOTYPE_ONLY_API health_api_health_get: GET /api/health: 프로토타입 상태 점검 경로다. 정식 readiness/liveness 계약은 배포 설계에서 별도 확정한다.
+[difference] PROTOTYPE_ONLY_API mock_idp_consent_api_auth_social_mock_idp_consent_post: POST /api/auth/social/mock/idp/consent: 개발용 모의 IdP 동의 흐름은 정식 인증 계약에서 제외한다.
+[difference] PROTOTYPE_ONLY_API get_evaluations_api_briefings__id__evaluations_get: GET /api/briefings/{id}/evaluations: 프로토타입에서도 미제공인 가격/예측 평가 자리다. 투자 예측을 목표 계약에 넣지 않는다.
+검사 종료: 283건. 전체 필드 차이·출처는 docs/system/out/에 보존했다.
+
+Observed exit code: 1

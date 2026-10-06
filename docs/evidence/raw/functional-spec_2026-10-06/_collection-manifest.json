@@ -1,0 +1,30 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs",
+  "export_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs/export?format=xlsx",
+  "collected_at_kst": "2026-10-06T11:04:53.323800+09:00",
+  "auth": "none",
+  "xlsx": "zoop-functional-spec_2026-10-06.xlsx",
+  "sha256": "c005e9ec9963f797ea8e64c28818720212ec44a5de3da1aa00fb66622d88df2d",
+  "baseline_date": "2026-10-03",
+  "baseline_sha256": "b48f1a7fc73e10f75a1c52ec199125c5b14afa069c2f87fb31aac88f384f7c0e",
+  "data_only": true,
+  "sheets": {
+    "명세 목차": "00-명세-목차.csv",
+    "회원가입·로그인": "01-회원가입-로그인.csv",
+    "온보딩·튜토리얼": "02-온보딩-튜토리얼.csv",
+    "메인 그래프": "03-메인-그래프.csv",
+    "메인그래프 v2": "04-메인그래프-v2.csv",
+    "출퇴근 브리핑": "05-출퇴근-브리핑.csv",
+    "기업 상세·타임라인": "06-기업-상세-타임라인.csv",
+    "AI 챗봇": "07-AI-챗봇.csv",
+    "AI 챗봇 v2": "08-AI-챗봇-v2.csv",
+    "데이터 관리": "09-데이터-관리.csv",
+    "외부 연동": "10-외부-연동.csv",
+    "AI 평가·관리자": "11-AI-평가-관리자.csv",
+    "비기능 상세": "12-비기능-상세.csv",
+    "변경 내역": "13-변경-내역.csv",
+    "제안·확인 사항": "14-제안-확인-사항.csv"
+  },
+  "csv_encoding": "utf-8-sig",
+  "changed_cells": 12
+}

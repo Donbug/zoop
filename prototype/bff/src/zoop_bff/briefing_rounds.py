@@ -55,6 +55,7 @@ from .schemas import (
     SinceMorning,
     Unavailable,
 )
+from .sentiment import SentimentService, outlook_input
 from .statedb import StateDb, dumps, utc_iso
 from .views import SUMMARY_UNAVAILABLE, company_links, meta, mock_meta, source_support_out
 
@@ -175,6 +176,7 @@ class BriefingService:
         usage: UsageService,
         provider: DataProvider,
         indicators: MarketIndicators,
+        sentiment: SentimentService | None = None,
     ):
         self._db = db
         self._clock = clock
@@ -182,6 +184,7 @@ class BriefingService:
         self._usage = usage
         self._provider = provider
         self._indicators = indicators
+        self._sentiment = sentiment or SentimentService(db, clock, usage)
         self._gen = threading.Lock()
 
     # ---------------------------------------------------------------- storage
@@ -355,6 +358,20 @@ class BriefingService:
             created_at=c["created_at"],
             admin_email=c["admin_email"],
         )
+
+    def sentiment_preview(self, rid: str) -> dict[str, Any]:
+        """Selection only: no state changes, market reads or model calls (CLI dry-run)."""
+        parsed = parse_round_id(rid)
+        if parsed is None:
+            raise ValueError("invalid briefing round id")
+        row = self._get(rid)
+        now = self._clock.now()
+        reason = self._blocked(*parsed, row, now)
+        if reason:
+            return {"id": rid, "eligible": False, "items": (row.payload or {}).get("items", []) if row else [], "reason": reason}
+        window = self._window(*parsed, row, now)
+        items, _ = self._select(self._provider.get(), window)
+        return {"id": rid, "eligible": True, "items": items, "reason": None}
 
     # ---------------------------------------------------------------- generation
     def reprocess(self, rid: str, admin: Actor, reason: str) -> RoundOut:
@@ -602,6 +619,8 @@ class BriefingService:
     ) -> dict[str, Any]:
         graph_version, revision, (_, rule_revision) = stamp  # type: ignore[misc]
         companies = list(dict.fromkeys(c["id"] for item in items for c in item["companies"]))
+        self._sentiment.freeze_documents(ds, items)
+        outlook = self._sentiment.judge_outlook(outlook_input(rid, _kst(scheduled_at(day, edition)), items, market.model_dump(by_alias=True, mode="json")))
         evidence = list(dict.fromkeys(e for item in items for e in item["evidenceIds"]))
         metadata = BriefingMetadata(
             **meta(ds, GENERATED_BY).model_dump(),
@@ -619,6 +638,7 @@ class BriefingService:
             "reviewRevision": revision,
             "ruleRevision": rule_revision,
             "items": items,
+            "outlook": outlook.model_dump(by_alias=True, mode="json") if outlook else None,
             "references": {"eventIds": [i["eventId"] for i in items], "evidenceIds": evidence, "companyIds": companies},
             "emptyReason": None if items else "no_issues_in_window",
             "selectedFrom": selected_from,
@@ -840,6 +860,7 @@ class BriefingService:
         )
         shown["market_variables"] = self._stored_market(payload)
         shown["since_morning"] = self._since_morning(day, edition, payload)
+        shown["outlook"] = payload.get("outlook")
         return BriefingResponse(
             status="published",
             items=[BriefingItem.model_validate(i) for i in payload["items"]],

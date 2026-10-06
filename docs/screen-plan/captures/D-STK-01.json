@@ -1,0 +1,105 @@
+{
+  "id": "D-STK-01",
+  "title": "종목 메뉴·검색·관심",
+  "route": "/companies?q=%EC%82%BC%EC%84%B1",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "fs": "FS037·FS027",
+  "requirements": "27",
+  "entry": "헤더 종목 → 삼성 검색",
+  "states": "전체·내 종목 · 검색·결과 없음 · 관심 변경 · 조회 실패",
+  "capturedState": "기본",
+  "stateSource": "pages/companies-page.tsx",
+  "stateImages": [],
+  "note": "지도 목록 보기를 대체하는 독립 메뉴예요. 비회원도 시장 전체 목록을 볼 수 있어요.",
+  "markers": [
+    {
+      "number": 1,
+      "selector": {
+        "role": "link",
+        "name": "삼성전자 기업 상세",
+        "regex": false
+      },
+      "box": {
+        "x": 232,
+        "y": 636.5,
+        "width": 872,
+        "height": 69.5
+      },
+      "result": "선택 기업의 상세 화면으로 이동해요.",
+      "destination": "D-COM-01",
+      "mode": "primary"
+    },
+    {
+      "number": 2,
+      "selector": {
+        "role": "searchbox",
+        "name": "기업명·영문명·티커 검색"
+      },
+      "box": {
+        "x": 232,
+        "y": 164.5,
+        "width": 883.765625,
+        "height": 44
+      },
+      "result": "기업명·티커를 입력해요",
+      "destination": "D-STK-01",
+      "mode": "input"
+    },
+    {
+      "number": 3,
+      "selector": {
+        "role": "button",
+        "name": "^삼성전자 관심 종목",
+        "regex": true
+      },
+      "box": {
+        "x": 1164,
+        "y": 649.25,
+        "width": 44,
+        "height": 44
+      },
+      "result": "삼성전자 관심을 등록·해제해요",
+      "destination": "D-STK-01",
+      "mode": "watch"
+    }
+  ],
+  "image": "D-STK-01.png",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n종목\n기업명·영문명·티커 검색\n검색\n시장 전체\n내 종목\n\n5개 종목\n\n삼\n삼성SDI\n006400 · 승인 사건 6건\n보유\n567,000원\n▲ +7.18%\n상승\n삼\n삼성물산\n028260 · 승인 사건 2건\n341,500원\n▼ -1.30%\n하락\n삼\n삼성에스디에스\n018260 · 승인 사건 2건\n219,000원\n▼ -0.23%\n하락\n삼\n삼성전기\n009150 · 승인 사건 1건\n1,664,000원\n▲ +5.25%\n상승\n삼성전자\n005930 · 승인 사건 27건\n보유\n271,500원\n▼ -1.63%\n하락",
+  "clickEvidence": [
+    {
+      "selector": {
+        "role": "link",
+        "name": "삼성전자 기업 상세"
+      },
+      "before": "/companies?q=%EC%82%BC%EC%84%B1",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A16.938Z",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n\n삼성전자\n\n005930\n\n기업 검색\n검색\n보유 기업\nNVIDIA\n$238.90\n▲ +2.12%\n상승\n삼성전자\n271,500원\n▼ -1.63%\n하락\n삼\n삼성SDI\n567,000원\n▲ +7.18%\n상승\n관심 기업\nNVIDIA\n$238.90\n▲ +2.12%\n상승\n최근 본 기업\n삼성전자\n271,500원\n▼ -1.63%\n하락\n연결된 기업\nA\nASML\n$1,859.86\n▼ -0.40%\n하락\n삼\n삼성물산\n341,500원\n▼ -1.30%\n하락\n삼\n삼성에스디에스\n219,000원\n▼ -0.23%\n하락\n삼\n삼성SDI\n567,000원\n▲ +7.18%\n상승\nNVIDIA\n$238.90\n▲ +2.12%\n상승\n현대자동차\n348,750원\n▲ +0.65%\n상승\nNAVER\n192,300원\n▲ +0.05%\n상승\nS\nSK텔레콤\n87,900원\n▼ -0.57%\n하락\nK\nKT\n51,500원\n▼ -0.77%\n하락\n관계 그래프 보기\n삼성전자\n005930\n보유\n시세\n\n271,500원\n\n전일 대비\n▼ -4,500원 (-1.63%)\n하락\n\n전일 대비 · 기준 2026-10-06 12:21 KST · Yahoo Finance · 지연 가능\n거래량\n658.8만주\n당일 저가 ~ 고가\n271,000원 ~ 279,000원\n52주 저가 ~ 고가\n89,750원 ~ 374,500원\n주요 지표\n주요 지표 · 네이버 증권 · 기준 2026-10-06 12:39 KST\n시가총액\n1,588조 7,262억\nPER\n12.19배\n(2026.06. 기준)\nEPS\n22,292원\n(2026.06. 기준)\nPBR\n3.16배\n(2026.06. 기준)\nBPS\n86,052원\n(2026.06. 기준)\n배당수익률\n0.61%\n(2025.12. 기준)\n주당배당금\n1,668원\n(2025.12. 기준)\n외국인 소진율\n46.41%\n가상 계좌 보유\n보유 수량\n20주\n평균 매입가\n60,000원\n평가 금액\n5,430,000원\n자산 비중\n계산 불가\n평가 손익\n▲ +4,230,000원 (+352.50%)\n상승\n\n모의 정보 기준 2026-10-01 20:33 KST · 평가 계산 2026-10-06 12:41 KST\n\n자산 비중: 보유 종목의 시세 통화가 서로 달라요. 환율로 바꾸지 않아 합계와 비중을 계산하지 않았어요.\n\n사건\n문서\n기업 정보\n사건 타임라인\n1일\n1주\n1개월\n1년\n전체\n직접 관련\n구조적 관련\n최신 시점\n\n기준 2026-10-06 12:41 KST · 일 버킷\n\n1개월 주가. 처음 9월 7일 270,000원, 마지막 10월 6일 271,500원. 최고 285,500원(9월 23일), 최저 248,500원(9월 15일). 사건이 있었던 날 4곳을 표시했어요.\n\n1개월 · 처음 시세 대비\n▲ +1,500원 (+0.56%)\n상승\n285,500원\n248,500원\n9월 7일\n10월 6일\nYahoo Finance · 일별 종가\n마지막 시세 2026-10-06 09:00 KST\n\n차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지는 않아요.\n\n표로 보기\n\n1개월 · 사건 17건\n\n2026-09-29\n사건 1건\n근거 문서\n1\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n\nHelix Digital Infrastructure\n\n2026-09-17\n사건 1건\n근거 문서\n1\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n\n그란츠 포레스트 파크 개발사업 (필리핀 세부)\n\n2026-09-11\n사건 1건\n근거 문서\n1\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n\n갤럭시 Z 폴드8과 민음사가 함께하는 북토크\n\n2026-09-08\n사건 1건\n근거 문서\n1\n최대주주등소유주식변동신고서\n발생 시점 미상\n사건 13건\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n\n본 정보는 참고용이며 투자 권유가 아니에요.\n\n관계 그래프\n지도에서 보기\n\n기준 2026-10-06 12:41 KST\n\n1단계\n2단계\n기업\n10\n사건\n27\n직접 관련\n40\n사건 공유\n17\n\n관계 목록 · 키보드로 선택하기\n사건\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\nA\nASML\n사건\n삼성 6개사, 美 AI 인프라 기업 ‘헬릭스’에 10억 달러 투자\n삼\n삼성물산\n삼\n삼성에스디에스\n삼\n삼성SDI\nNVIDIA\n사건\n삼성전자, 필리핀 복합단지 개발사업에 통합 운영 솔루션 공급 협력\n사건\n[영상] 요즘 사람들의 책 읽기, 민음사와 함께 한 갤럭시 Z 폴드8 북토크 현장\n사건\n최대주주등소유주식변동신고서\n사건\n삼성전자, 8월 7일 갤럭시 워치 공식 출시\n사건\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n사건\n삼성전자, 7월 28일 갤럭시 워치 사전 판매 시작\n사건\nAI Summit Stage Gathering of Global Tech Leaders at the Midway in San Francisco\n현대자동차\nNAVER\n사건\n삼성전자, ‘갤럭시 워치 울트라2·워치9’ 공개\n사건\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\nS\nSK텔레콤\n사건\nSamsung, SK Telecom, and Hana Financial Group Build Korea’s First Private 5G Smart Office in the Financial Sector\n사건\nSamsung Provides AI-Native NIS Solution for SK Telecom’s Project\n사건\nSamsung to Support KT’s Quadruped Welding Robot Use Case with NIS and CognitiV NOS\nK\nKT\n사건\nSamsung Signs AI RAN Project Contracts with KT and SK Telecom Under Korea’s Hyper AI Network Initiative\n사건\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n사건\n삼성전자, 가전 테크세미나 개최…지역 맞춤형 AI 가전 선봬\n사건\n삼성전자, ‘2026 기후산업국제박람회’서 일상부터 산업까지 맞춤형 에너지 솔루션 선보여\n사건\n삼성전자, 상업용 시스템에어컨 세척 프로모션 진행\n사건\n삼성전자, ASML과 차세대 반도체 제조 협력 확대\n사건\n최대주주등소유주식변동신고서\n사건\n최대주주등소유주식변동신고서\n사건\n삼성전자, ‘갤럭시 Z 폴드8 울트라·폴드8·플립8’, ‘갤럭시 워치 울트라2·워치9’ 사전 판매 시작\n사건\n삼성전자, 갤럭시 워치 건강 관리 기능 추가\n사건\n삼성전자·삼성SDS, 구미에 휴머노이드 양산·AI 데이터센터 투자 계획\n사건\n삼성, 미래 성장 위해 호남에 425조원 투자\n사건\n삼성, 미래 성장 위해 2,655조원 투자",
+      "number": 1
+    },
+    {
+      "selector": {
+        "role": "searchbox",
+        "name": "기업명·영문명·티커 검색"
+      },
+      "url": "/companies?q=%EC%82%BC%EC%84%B1",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n종목\n기업명·영문명·티커 검색\n검색\n시장 전체\n내 종목\n\n5개 종목\n\n삼\n삼성SDI\n006400 · 승인 사건 6건\n보유\n567,000원\n▲ +7.18%\n상승\n삼\n삼성물산\n028260 · 승인 사건 2건\n341,500원\n▼ -1.30%\n하락\n삼\n삼성에스디에스\n018260 · 승인 사건 2건\n219,000원\n▼ -0.23%\n하락\n삼\n삼성전기\n009150 · 승인 사건 1건\n1,664,000원\n▲ +5.25%\n상승\n삼성전자\n005930 · 승인 사건 27건\n보유\n271,500원\n▼ -1.63%\n하락",
+      "inputType": "search",
+      "inputWasEntered": true,
+      "number": 2
+    },
+    {
+      "selector": {
+        "role": "button",
+        "name": "^삼성전자 관심 종목",
+        "regex": true
+      },
+      "before": "/companies?q=%EC%82%BC%EC%84%B1",
+      "url": "/companies?q=%EC%82%BC%EC%84%B1",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n종목\n기업명·영문명·티커 검색\n검색\n시장 전체\n내 종목\n\n5개 종목\n\n삼\n삼성SDI\n006400 · 승인 사건 6건\n보유\n567,000원\n▲ +7.18%\n상승\n삼\n삼성물산\n028260 · 승인 사건 2건\n341,500원\n▼ -1.30%\n하락\n삼\n삼성에스디에스\n018260 · 승인 사건 2건\n219,000원\n▼ -0.23%\n하락\n삼\n삼성전기\n009150 · 승인 사건 1건\n1,664,000원\n▲ +5.25%\n상승\n삼성전자\n005930 · 승인 사건 27건\n보유\n관심\n271,500원\n▼ -1.63%\n하락",
+      "number": 3
+    }
+  ]
+}

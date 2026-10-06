@@ -15,7 +15,7 @@ function holdWholeScreen(bff: FakeBff, c: TestCompany) {
     company: bff.hold("GET", endpoint.company(c)),
     quote: bff.hold("GET", endpoint.quote(c)),
     metrics: bff.hold("GET", endpoint.metrics(c)),
-    prices: bff.hold("GET", endpoint.prices(c)),
+    prices: bff.hold("GET", endpoint.prices(c), pricesInPeriod("1m")),
     events: bff.hold("GET", endpoint.events, eventsOf(c, "1m")),
   };
 }
@@ -66,7 +66,7 @@ describe("기업 A에서 B로 빠르게 바꿀 때", () => {
       // B는 개요만 바로 오고, 시세·지표·차트·사건은 늦게 온다.
       quote: b.hold("GET", endpoint.quote(BETA)),
       metrics: b.hold("GET", endpoint.metrics(BETA)),
-      prices: b.hold("GET", endpoint.prices(BETA)),
+      prices: b.hold("GET", endpoint.prices(BETA), pricesInPeriod("1m")),
       events: b.hold("GET", endpoint.events, eventsOf(BETA, "1m")),
     }));
     await waitFor(() => expect(readCompanyScreen()).toEqual(shown(ALPHA, "1m")));

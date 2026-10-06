@@ -6,7 +6,7 @@
 //  - 실패하면 검색어를 그대로 두고 이 영역에서만 다시 시도한다. 추천 영역과는 독립이다.
 //  - 행을 누르면 편집 중인 목록에만 반영한다. 저장은 각 화면의 저장 기능이 한다.
 // 결과 행은 ListRow 버튼(aria-pressed=고른 상태). 행 안에 다른 버튼을 두지 않는다.
-import { Check, Plus, Search } from "lucide-react";
+import { ArrowRight, Check, Plus, Search } from "lucide-react";
 import { useState, type FormEvent, type Ref } from "react";
 import type { Schemas } from "@/api/client";
 import { useCompanySearch } from "@/api/queries";
@@ -23,9 +23,11 @@ interface CompanySearchProps {
   label?: string;
   disabled?: boolean;
   inputRef?: Ref<HTMLInputElement>;
+  /** 상세 안에서 기업을 전환하는 행에는 추가 대신 이동 아이콘을 쓴다. */
+  navigation?: boolean;
 }
 
-export function CompanySearch({ selectedIds, onToggle, label = "종목 검색", disabled, inputRef }: CompanySearchProps) {
+export function CompanySearch({ selectedIds, onToggle, label = "종목 검색", disabled, inputRef, navigation = false }: CompanySearchProps) {
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [emptyHint, setEmptyHint] = useState(false);
@@ -113,7 +115,7 @@ export function CompanySearch({ selectedIds, onToggle, label = "종목 검색", 
                           picked ? (
                             <Check className="size-5 text-brand-primary" aria-hidden="true" />
                           ) : (
-                            <Plus className="size-5 text-text-primary" aria-hidden="true" />
+                            navigation ? <ArrowRight className="size-5 text-text-primary" aria-hidden="true" /> : <Plus className="size-5 text-text-primary" aria-hidden="true" />
                           )
                         }
                       />

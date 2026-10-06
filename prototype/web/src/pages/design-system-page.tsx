@@ -28,6 +28,7 @@ import type { Schemas } from "@/api/client";
 import { ApiError } from "@/api/client";
 import { AiBadge, AiDisclosure, AiNotice } from "@/components/domain/ai";
 import { BriefingCard } from "@/components/domain/briefing-card";
+import { BriefingOutlook, briefingIssueId } from "@/components/domain/briefing-outlook";
 import { CompanyHeader } from "@/components/domain/company-header";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { EventRow, IconCount } from "@/components/domain/event-row";
@@ -1074,7 +1075,7 @@ export function DesignSystemPage() {
           <Demo
             id="c-price"
             name="PriceChange · SentimentLabel"
-            when="등락은 색, 부호, ▲▼를 함께 써요. 기업 상세 시세·차트·평가 손익은 금액과 등락률을 같이(받은 통화 그대로), 값이 없으면 아무것도 그리지 않아요. 감성 4분류는 나중을 위한 규격이고, 확률 수치는 쓰지 않아요. 아래 숫자는 예시예요."
+            when="등락은 색, 부호, ▲▼를 함께 써요. 금액과 등락률은 받은 통화 그대로 쓰고, 값이 없으면 아무것도 그리지 않아요. 기사 판정은 중성 글자와 아이콘으로 구분하고 누르면 근거를 열어요. 아래 숫자와 판정은 예시예요."
             code={"<PriceChange change={quote.change} changePercent={quote.changeRate * 100} currency={quote.currency} />"}
           >
             <StateRow label="등락률">
@@ -1088,11 +1089,18 @@ export function DesignSystemPage() {
               <PriceChange change={5250} changePercent={1.96} currency="KRW" />
               <PriceChange change={-13.61} changePercent={-1.84} currency="USD" />
             </StateRow>
-            <StateRow label="감성">
-              <SentimentLabel value="positive" />
-              <SentimentLabel value="negative" />
-              <SentimentLabel value="mixed" />
-              <SentimentLabel value="undetermined" />
+            <StateRow label="판정 예시">
+              {(["positive", "negative", "mixed", "undetermined"] as const).map((label) => (
+                <SentimentLabel key={label} judgement={{
+                  label,
+                  companyId: "example-company",
+                  rationale: "예시: 기사에 나온 기업의 실적과 비용 요인을 함께 살폈어요.",
+                  quotes: ["예시전자는 매출이 늘었지만 비용 부담도 커졌다고 밝혔어요."],
+                  judgedAt: "2026-10-06T07:40:00+09:00",
+                  model: "예시 모델",
+                  promptVersion: "예시 프롬프트",
+                }} accessibleName="예시" />
+              ))}
             </StateRow>
           </Demo>
 
@@ -1137,7 +1145,15 @@ export function DesignSystemPage() {
               publishedAt="2026-09-29 07:41 KST"
               dataAsOf="2026-09-29 07:40 KST"
               totalEvidence={2}
-              summary={<EventRow title="예시: 예시전자 2분기 실적 발표" eventTime="2026-07-10" timePrecision="day" evidenceCount={2} headingLevel="h3" divider={false} />}
+              outlook={<BriefingOutlook outlook={{
+                label: "mixed",
+                rationale: "예시: 매출 증가와 비용 부담이 함께 보도됐어요. 이 회차의 기사에는 긍정·부정 요인이 함께 있어요.",
+                issueIds: ["example-earnings"],
+                judgedAt: "2026-09-29T07:41:00+09:00",
+                model: "예시 모델",
+                promptVersion: "예시 프롬프트",
+              }} issues={[{ eventId: "example-earnings", title: "예시전자 2분기 실적 발표", rank: 1 }]} />}
+              summary={<div id={briefingIssueId("example-earnings")} tabIndex={-1} className="scroll-mt-20 target:bg-surface-selected"><EventRow title="예시: 예시전자 2분기 실적 발표" eventTime="2026-07-10" timePrecision="day" evidenceCount={2} headingLevel="h3" divider={false} /></div>}
               relations={<p className="text-base text-text-secondary">브리핑 사건과 기업을 잇는 작은 지도가 들어가요.</p>}
             />
           </Demo>

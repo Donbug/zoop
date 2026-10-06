@@ -16,7 +16,6 @@ export interface GraphEntry {
   camera?: GraphCamera;
   /** 범례로 끈 항목(LegendKey) */
   hidden?: string[];
-  view?: "graph" | "list";
 }
 
 /** 메인 화면에 `navigate(entry.url, { state: { graphRestore: entry } })`로 넘기는 state 모양 */

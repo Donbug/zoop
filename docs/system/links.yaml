@@ -1,0 +1,542 @@
+schemaVersion: 1
+policy: "이 파일은 사람이 편집한다. import_sources.py는 이 파일과 openapi.yaml을 변경하지 않는다. 존재하는 ID만 연결하며 원본 ID 오류를 별칭으로 고치지 않는다. API 연결의 정본은 openapi.yaml의 x-zoop이고 중복 목록을 두지 않는다."
+apiContract: "docs/api/openapi.yaml"
+featureDecisions:
+  "FS???":
+    apiDisposition: "계약 미정"
+    reason: "브리핑 목록·검색 상세의 잘못된 원본 ID다. 팀 정정 전 명세 번호를 추정하거나 부여하지 않는다. 기존 회차/목록 API 연결과 구분한다."
+  "FS0??":
+    apiDisposition: "계약 미정"
+    reason: "재무 상세 행의 잘못된 원본 ID다. FS042로 추정 치환하지 않는다. 목표 재무 API는 목차 FS042에 연결했다."
+  FS050:
+    apiDisposition: "계약 미정"
+    reason: "AI v2 새 대화 정의와 기존 FS050-01/-02 의미가 다르다. 채택/이전 선언 없이 같은 번호로 통합하지 않는다."
+  NFS010:
+    apiDisposition: "API 불필요"
+    reason: "브라우저·해상도·모바일 지원은 클라이언트/배포 검증 계약이다. 서버 동작 수치가 정해지면 관련 작업에 연결한다."
+    screenIds:
+      - "M-RULE-01"
+      - "M-GRP-01"
+      - "M-COM-01"
+  NFS011:
+    apiDisposition: "API 불필요"
+    reason: "키보드·스크린리더·대비 등 화면 접근성은 화면 구현과 점검표의 책임이다."
+    screenIds:
+      - "STATE-01"
+      - "M-RULE-01"
+  NFS007:
+    apiDisposition: "계약 미정"
+    reason: "측정 부하·데이터 규모·표본·성능 목표값이 미정이다. 계약 검증 WBS에 연결하고 서버 성능 수치를 만들어내지 않는다."
+    wbsIds:
+      - "6.10.4"
+  FS044:
+    apiDisposition: "기존 API로 지원"
+    reason: "카메라·선택·탭·스크롤 복원은 클라이언트 상태다. 기업/그래프 API가 필요한 조회 조건과 버전을 제공하며 복원 전용 서버 API는 만들지 않는다."
+    screenIds:
+      - "D-COM-03"
+      - "D-COM-04"
+      - "D-COM-05"
+      - "D-COM-06"
+      - "M-COM-02"
+  FS021:
+    apiDisposition: "기존 API로 지원"
+    reason: "D-SEN-01은 디자인시스템의 판정 예시이며 실제 모델 호출이나 데모 판정값이 아니다. 문서×기업의 nullable 판정은 기존 문서/근거 API 계약으로 연결하고 예시 전용 API는 만들지 않는다."
+    screenIds:
+      - "D-SEN-01"
+  FS030:
+    apiDisposition: "기존 API로 지원"
+    reason: "D-SEN-02는 디자인시스템의 회차 판단 예시다. 데모 발행본에는 outlook 값이 없으며 기존 브리핑 API가 발행 시 고정할 판단과 근거 이슈를 제공하는 목표 계약이다."
+    screenIds:
+      - "D-SEN-02"
+wbsConnections:
+  -
+    wbsId: "6.3.4"
+    specIds:
+      - "FS011-01"
+      - "FS011-02"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.4.4"
+    specIds:
+      - "FS035"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.6"
+    specIds:
+      - "FS037"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.7.10"
+    specIds:
+      - "FS066-01"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.7.8"
+    specIds:
+      - "FS035"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.8.5"
+    specIds:
+      - "FS050-01"
+      - "FS050-02"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.8.6"
+    specIds:
+      - "FS052-01"
+      - "FS051"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.8.7"
+    specIds:
+      - "FS051"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.8.8"
+    specIds:
+      - "FS052-02"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.9.2"
+    specIds:
+      - "FS066-01"
+      - "FS066-02"
+      - "FS066-03"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.9.3"
+    specIds:
+      - "FS067-01"
+      - "FS067-02"
+      - "FS067-03"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.9.5"
+    specIds:
+      - "FS069-01"
+      - "FS069-02"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.9.6"
+    specIds:
+      - "FS070-01"
+      - "FS070-02"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  -
+    wbsId: "6.9.7"
+    specIds:
+      - "FS071-01"
+      - "FS071-02"
+    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+implementationLocations:
+  -
+    specId: "FS001"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS002"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS003"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS004"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS005"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS006"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS007"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS015"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS016"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS061"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/auth.py:29"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS008"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS009"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS010"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS011-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS012"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS013"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS027"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS039"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS054"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS062"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/me.py:39"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS011-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS014"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS017"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS018"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS019"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS020"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS021"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS022"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS023"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS024"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS026"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS037"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS038"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS040"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS041"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS043"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS044"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS055"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS056"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS063"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/market.py:66"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS028"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS029"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS030"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS031"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS032"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS033"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS034"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS035"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/briefings.py:15"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS025"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS045"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS046"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS047"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS048"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS049"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS050-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS050-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS051"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS052-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS052-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS053"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS060"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS064"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS065"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS066-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS066-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS066-03"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS067-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS067-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS067-03"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS068"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS069-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS069-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS070-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS070-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS071-01"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS071-02"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS072"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+  -
+    specId: "FS073"
+    codeLocations:
+      - "prototype/bff/src/zoop_bff/app.py:88"
+    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
+prototypeOnly:
+  -
+    method: "POST"
+    path: "/api/auth/social/mock/idp/consent"
+    reason: "개발용 모의 IdP 동의 흐름은 정식 인증 계약에서 제외한다."
+  -
+    method: "GET"
+    path: "/api/health"
+    reason: "프로토타입 상태 점검 경로다. 정식 readiness/liveness 계약은 배포 설계에서 별도 확정한다."
+  -
+    method: "GET"
+    path: "/api/briefings/{id}/evaluations"
+    reason: "프로토타입에서도 미제공인 가격/예측 평가 자리다. 투자 예측을 목표 계약에 넣지 않는다."
+knownDifferences:
+  -
+    id: "PROTOTYPE_STORAGE"
+    reason: "스냅샷 파일·SQLite 상태 디렉터리·데모 재생 스크립트·PoC 샌드박스 명령은 구현 환경 차이이며 정식 API 필드가 아니다."
+  -
+    id: "AUTH_PROPOSAL"
+    reason: "정식 서버의 쿠키 세션·CSRF·/api/v1·오류 코드·불투명 커서는 이 목표 계약의 제안이다. 사용자 데이터 보안·멱등성은 NFS 요구이며 세부 운영값은 팀 확인 필요다."

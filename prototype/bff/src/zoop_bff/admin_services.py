@@ -23,6 +23,7 @@ from .market_data import TtlCache
 from .quote_yahoo import YahooProvider
 from .review import ReviewStore
 from .sources import DataProvider, PublishedSource
+from .sentiment import SentimentService
 from .statedb import StateDb
 
 log = logging.getLogger("zoop_bff.admin")
@@ -45,6 +46,7 @@ class AdminServices:
     jobs: JobRunner
     briefings: BriefingService
     briefing_graphs: BriefingGraphs
+    sentiment: SentimentService
 
 
 class BriefingScheduler:
@@ -100,13 +102,14 @@ def build_admin_services(
     neo4j = neo4j or Neo4jReader(settings.admin_neo4j_uri, settings.admin_neo4j_user, settings.admin_neo4j_password)
     pipeline = PipelineService(ledger=ledger, neo4j=neo4j, reviews=reviews, graphs=graphs, audit=audit, clock=clock)
     usage = UsageService(db, clock, ledger)
+    sentiment = SentimentService(db, clock, usage)
     jobs = JobRunner(
         settings=settings, db=db, clock=clock, audit=audit, pipeline=pipeline, sandbox=sandbox, launcher=launcher
     )
     if market is None and settings.quote_provider in ("auto", "yahoo"):
         market = YahooProvider(base_url=settings.yahoo_base_url, timeout=settings.quote_timeout_seconds, cache=TtlCache())
     briefings = BriefingService(
-        db=db, clock=clock, audit=audit, usage=usage, provider=provider, indicators=MarketIndicators(market)
+        db=db, clock=clock, audit=audit, usage=usage, provider=provider, indicators=MarketIndicators(market), sentiment=sentiment
     )
     jobs.recover()  # settle what the previous process left running (requirement 59)
     briefings.recover()
@@ -129,4 +132,5 @@ def build_admin_services(
         jobs=jobs,
         briefings=briefings,
         briefing_graphs=BriefingGraphs(briefings, provider, reviews),
+        sentiment=sentiment,
     )

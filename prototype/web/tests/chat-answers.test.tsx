@@ -12,7 +12,7 @@ import type { Schemas } from "@/api/client";
 
 const SUBMIT = "/api/chat/sessions/:sid/jobs";
 const JOB = "/api/chat/jobs/:id";
-const EVENT_PAGE = pageOf(ALPHA, "?event=ev-alpha-1m");
+const EVENT_PAGE = pageOf(ALPHA, "?issue=ev-alpha-1m");
 
 const Q1 = "이 사건은 언제 알려졌나요?";
 const Q2 = "함께 언급된 기업은 어디인가요?";

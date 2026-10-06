@@ -4,9 +4,10 @@ import { FileText } from "lucide-react";
 import { useCompanyDocuments } from "@/api/queries";
 import { DocumentItem, documentRelationLabel } from "@/components/domain/document-item";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
+import type { DetailRange } from "@/lib/company-timeline";
 
-export function CompanyDocuments({ companyId }: { companyId: string }) {
-  const documents = useCompanyDocuments(companyId);
+export function CompanyDocuments({ companyId, range }: { companyId: string; range?: DetailRange }) {
+  const documents = useCompanyDocuments(companyId, range);
 
   if (documents.isPending) return <SkeletonRows count={3} label="근거 문서를 불러오고 있어요" />;
   if (documents.isError) return <ErrorState error={documents.error} title="근거 문서를 불러오지 못했어요" onRetry={() => void documents.refetch()} />;
@@ -29,6 +30,8 @@ export function CompanyDocuments({ companyId }: { companyId: string }) {
               url={doc.url}
               publishedAt={doc.publishedAt}
               quotes={doc.quotes.map((q) => ({ id: q.evidenceId, quote: q.quote, quoteVerified: q.quoteVerified }))}
+              sentiment={doc.sentiment}
+              sentimentName={doc.title ?? "근거 문서"}
               relation={
                 <ul className="flex flex-col">
                   {(["REPORTS", "PROVIDES_BACKGROUND", null] as const).map((type) => {

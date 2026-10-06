@@ -1,0 +1,185 @@
+# 줍 연결 문서
+
+이 문서는 생성물이다. 변경은 catalog.yaml 가져오기, links.yaml 또는 docs/api/openapi.yaml 편집으로 한다.
+
+[API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)
+
+## 화면
+
+- [COVER · 줍 화면계획서 v2.1](screen-COVER.md) — 1쪽
+- [HISTORY · 변경 이력·v1.7 대비](screen-HISTORY.md) — 2쪽
+- [HISTORY-21 · 변경 이력 · v2.0 → v2.1](screen-HISTORY-21.md) — 3쪽
+- [GUIDE · 읽는 법](screen-GUIDE.md) — 4쪽
+- [MAP-01 · 화면 목록·라우트·명세](screen-MAP-01.md) — 5쪽
+- [MAP-02 · 화면 목록·라우트·명세](screen-MAP-02.md) — 6쪽
+- [MAP-03 · 화면 목록·라우트·명세](screen-MAP-03.md) — 7쪽
+- [MAP-04 · 화면 목록·라우트·명세](screen-MAP-04.md) — 8쪽
+- [MAP-05 · 화면 목록·라우트·명세](screen-MAP-05.md) — 9쪽
+- [MAP-06 · 화면 목록·라우트·명세](screen-MAP-06.md) — 10쪽
+- [FLOW · 첫 진입 → 첫 근거 확인](screen-FLOW.md) — 11쪽
+- [SEMANTICS · 색과 아이콘의 뜻](screen-SEMANTICS.md) — 12쪽
+- [STATE-01 · 공통 상태 규칙](screen-STATE-01.md) — 13쪽
+- [M-RULE-01 · 모바일 전환 규칙](screen-M-RULE-01.md) — 14쪽
+- [AUTHORITY · 비회원·회원·관리자 권한](screen-AUTHORITY.md) — 15쪽
+- [D-AUT-01 · 시작·이메일 로그인](screen-D-AUT-01.md) — 16쪽
+- [D-AUT-02 · 이메일 회원가입](screen-D-AUT-02.md) — 17쪽
+- [D-AUT-03 · 개발용 모의 소셜 제공자](screen-D-AUT-03.md) — 18쪽
+- [D-ONB-01 · 투자 여부 선택](screen-D-ONB-01.md) — 19쪽
+- [D-ONB-02 · 가상 계좌 연결](screen-D-ONB-02.md) — 20쪽
+- [D-WAT-01 · 관심 종목 선택](screen-D-WAT-01.md) — 21쪽
+- [D-WAT-01b · 관심 종목 4개 선택](screen-D-WAT-01b.md) — 22쪽
+- [D-GRP-01 · 시장 전체 지도](screen-D-GRP-01.md) — 23쪽
+- [D-GRP-01b · 내 종목 지도·범위 필터](screen-D-GRP-01b.md) — 24쪽
+- [D-GRP-T · 지도 튜토리얼 1/5](screen-D-GRP-T.md) — 25쪽
+- [D-GRP-T2 · 지도 튜토리얼 2/5](screen-D-GRP-T2.md) — 26쪽
+- [D-GRP-T3 · 지도 튜토리얼 3/5](screen-D-GRP-T3.md) — 27쪽
+- [D-GRP-T4 · 지도 튜토리얼 4/5](screen-D-GRP-T4.md) — 28쪽
+- [D-GRP-T5 · 지도 튜토리얼 5/5](screen-D-GRP-T5.md) — 29쪽
+- [D-GRP-02 · 사건 패널](screen-D-GRP-02.md) — 30쪽
+- [D-GRP-03 · 기업 패널·시세·1개월 추이](screen-D-GRP-03.md) — 31쪽
+- [D-GRP-04 · 연결선 상세](screen-D-GRP-04.md) — 32쪽
+- [D-GRP-05 · 근거 문서 창](screen-D-GRP-05.md) — 33쪽
+- [D-GRP-06 · 기업에서 여는 영향 경로](screen-D-GRP-06.md) — 34쪽
+- [D-GRP-07 · 포커스·두 기업 사이 경로](screen-D-GRP-07.md) — 35쪽
+- [D-GRP-07b · 선택 기업 포커스](screen-D-GRP-07b.md) — 36쪽
+- [D-STK-01 · 종목 메뉴·검색·관심](screen-D-STK-01.md) — 37쪽
+- [D-COM-01 · 기업 상세·시세·모의 보유](screen-D-COM-01.md) — 38쪽
+- [D-COM-01b · 차트·시간 버킷·인과관계 고지](screen-D-COM-01b.md) — 39쪽
+- [D-COM-02 · 사건 타임라인·문서 탭](screen-D-COM-02.md) — 40쪽
+- [D-COM-03 · 기업 상세·좌측 기업 전환](screen-D-COM-03.md) — 41쪽
+- [D-COM-04 · 기업 중심 관계 그래프](screen-D-COM-04.md) — 42쪽
+- [D-COM-05 · 타임라인 버킷·차트·그래프 연동](screen-D-COM-05.md) — 43쪽
+- [D-COM-06 · 차트 시점 선택·asOf 변경](screen-D-COM-06.md) — 44쪽
+- [D-MY-01 · 내 종목 관리](screen-D-MY-01.md) — 45쪽
+- [D-BRF-01 · 출근 브리핑](screen-D-BRF-01.md) — 46쪽
+- [D-BRF-02 · 퇴근 브리핑·회차 비교](screen-D-BRF-02.md) — 47쪽
+- [D-BRF-04 · 회차 기준 지도](screen-D-BRF-04.md) — 48쪽
+- [D-AI-01 · AI 질문·대상 연결](screen-D-AI-01.md) — 49쪽
+- [D-AI-01b · AI 되묻기](screen-D-AI-01b.md) — 50쪽
+- [D-AI-02 · AI 작업 복구·오류 구분](screen-D-AI-02.md) — 51쪽
+- [D-AI-02b · AI 대화 조회 오류·다시 확인](screen-D-AI-02b.md) — 52쪽
+- [M-GRP-01 · 지도·바텀시트](screen-M-GRP-01.md) — 53쪽
+- [M-STK-01 · 종목 메뉴·기업 상세 이동](screen-M-STK-01.md) — 54쪽
+- [M-BRF-01 · 퇴근 브리핑·아침 이후 변경](screen-M-BRF-01.md) — 55쪽
+- [M-AI-01 · 하단 AI 탭](screen-M-AI-01.md) — 56쪽
+- [M-COM-01 · 기업 상세·문서 전환](screen-M-COM-01.md) — 57쪽
+- [M-COM-02 · 모바일 기업 전환 시트](screen-M-COM-02.md) — 58쪽
+- [D-SEN-01 · 긍부정 표시 규칙·디자인시스템 예시](screen-D-SEN-01.md) — 59쪽
+- [D-SEN-02 · 회차 판단·디자인시스템 예시](screen-D-SEN-02.md) — 60쪽
+- [A-ADM-05c · 관리자 로그인](screen-A-ADM-05c.md) — 61쪽
+- [A-ADM-01 · 운영 대시보드](screen-A-ADM-01.md) — 62쪽
+- [A-ADM-02 · 통계·AI 품질](screen-A-ADM-02.md) — 63쪽
+- [A-ADM-02b · 선호도·대화록](screen-A-ADM-02b.md) — 64쪽
+- [A-ADM-03 · 그래프 관제·검수](screen-A-ADM-03.md) — 65쪽
+- [A-ADM-04 · AI·브리핑 운영](screen-A-ADM-04.md) — 66쪽
+- [A-ADM-04b · AI 사용량·오류](screen-A-ADM-04b.md) — 67쪽
+- [A-ADM-05 · 회원·접근 관리](screen-A-ADM-05.md) — 68쪽
+- [A-ADM-05b · 관리자 감사 로그](screen-A-ADM-05b.md) — 69쪽
+- [APP-EVIDENCE · 근거·원문 접근 상태 매트릭스](screen-APP-EVIDENCE.md) — 70쪽
+- [APP-ID · 팀 v1.7 ↔ v2.1 화면 ID 대응](screen-APP-ID.md) — 71쪽
+- [APP-VERDICT-01 · 팀 v1.7 판정표 · 채택](screen-APP-VERDICT-01.md) — 72쪽
+- [APP-VERDICT-02 · 팀 v1.7 판정표 · 불채택](screen-APP-VERDICT-02.md) — 73쪽
+- [APP-POLICY-01 · 팀 확인 필요 · 관리자와 운영](screen-APP-POLICY-01.md) — 74쪽
+- [APP-POLICY-02 · 팀 확인 필요 · 10-03 명세 충돌](screen-APP-POLICY-02.md) — 75쪽
+- [APP-LIMIT · 근거 버전·남은 한계](screen-APP-LIMIT.md) — 76쪽
+- [APP-DOCS · 문서 체계 · 화면에서 구현 추적까지](screen-APP-DOCS.md) — 77쪽
+
+## 기능·비기능
+
+- [FS001 · 서비스 시작 방식 선택](feature-FS001.md) — P1
+- [FS002 · 이메일 로그인](feature-FS002.md) — P1
+- [FS003 · 이메일 회원가입](feature-FS003.md) — P1
+- [FS004 · 소셜 로그인과 회원가입](feature-FS004.md) — P1
+- [FS005 · 비회원 시작](feature-FS005.md) — P1
+- [FS006 · 로그인 후 화면 이동](feature-FS006.md) — P1
+- [FS007 · 로그아웃](feature-FS007.md) — P1
+- [FS008 · 투자 여부 선택](feature-FS008.md) — P1
+- [FS009 · 가상계좌 프로필 연결](feature-FS009.md) — P1
+- [FS010 · 가상계좌 연결 재시도와 건너뛰기](feature-FS010.md) — P1
+- [FS011-01 · 관심종목 검색](feature-FS011-01.md) — P1
+- [FS011-02 · 추천 종목·산업·테마 조회](feature-FS011-02.md) — P1
+- [FS012 · 초기 관심종목 선택](feature-FS012.md) — P1
+- [FS013 · 초기 설정 저장](feature-FS013.md) — P1
+- [FS014 · 초기 관계 그래프 제공](feature-FS014.md) — P1
+- [FS015 · 관계 그래프 튜토리얼](feature-FS015.md) — P1
+- [FS016 · 튜토리얼 완료와 건너뛰기](feature-FS016.md) — P1
+- [FS017 · 개인화 관계 그래프](feature-FS017.md) — P1
+- [FS018 · 전체 관계 그래프](feature-FS018.md) — P1
+- [FS019 · 그래프 모드 전환](feature-FS019.md) — P1
+- [FS020 · 기업 노드 정보](feature-FS020.md) — P1
+- [FS021 · 이슈 노드 정보](feature-FS021.md) — P1
+- [FS022 · 기업 패널에서 이슈 영향 경로 확인](feature-FS022.md) — P1
+- [FS023 · 기업 간 관계 확인(기업 간 간선 클릭)](feature-FS023.md) — P1
+- [FS024 · 관계 근거 확인](feature-FS024.md) — P1
+- [FS025 · 선택한 노드로 AI 질문](feature-FS025.md) — P1
+- [FS026 · 사이드바 기업 선택](feature-FS026.md) — P1
+- [FS027 · 관심 종목 수정](feature-FS027.md) — P1
+- [FS028 · 출근 브리핑 생성](feature-FS028.md) — P1
+- [FS029 · 퇴근 브리핑 생성](feature-FS029.md) — P1
+- [FS030 · 핵심 이슈 선정 및 제공](feature-FS030.md) — P1
+- [FS031 · 시장 변수 제공](feature-FS031.md) — P1
+- [FS032 · 관계 그래프 조회](feature-FS032.md) — P1
+- [FS033 · 공통 브리핑 조회](feature-FS033.md) — P2
+- [FS034 · 중복 발행 방지](feature-FS034.md) — P1
+- [FS035 · 브리핑 회차 저장 및 이력 보존](feature-FS035.md) — P1
+- [FS036 · 개인화 브리핑 조회](feature-FS036.md) — P2
+- [FS037 · 종목 목록·검색 및 상세 진입](feature-FS037.md) — P1
+- [FS038 · 기업 상세 조회](feature-FS038.md) — P1
+- [FS039 · 가상 보유 정보 표시](feature-FS039.md) — P1
+- [FS040 · 차트와 타임라인 기간 조회](feature-FS040.md) — P1
+- [FS041 · 동일 날짜 사건 구분](feature-FS041.md) — P1
+- [FS042 · 재무와 실적 조회](feature-FS042.md) — P1
+- [FS043 · 뉴스와 공시 조회](feature-FS043.md) — P1
+- [FS044 · 기업 상세와 관계 그래프 이동·상태 복원](feature-FS044.md) — P1
+- [FS045 · AI 질문 진입과 전송](feature-FS045.md) — P1
+- [FS046 · AI 권한과 중복 작업 통제](feature-FS046.md) — P1
+- [FS047 · 질문 해석과 되묻기](feature-FS047.md) — P1
+- [FS048 · 개인화 조건과 근거 확보](feature-FS048.md) — P1
+- [FS049 · 답변 검증과 제공](feature-FS049.md) — P1
+- [FS050-01 · AI 답변 근거·원문 확인](feature-FS050-01.md) — P1
+- [FS050-02 · AI 답변 관련 그래프 탐색](feature-FS050-02.md) — P1
+- [FS051 · 새 대화 시작](feature-FS051.md) — P1
+- [FS052-01 · 같은 대화에서 후속 질문 전송](feature-FS052-01.md) — P1
+- [FS052-02 · AI 내부 패널 닫기·재열기와 대화 유지](feature-FS052-02.md) — P1
+- [FS053 · AI 결과 회수와 재시도](feature-FS053.md) — P1
+- [FS054 · 사용자와 모의 보유](feature-FS054.md) — P1
+- [FS055 · 관계와 근거 연결](feature-FS055.md) — P1
+- [FS056 · 사건과 문서 구분](feature-FS056.md) — P1
+- [FS058 · 신규 경제뉴스 정기 수집 및 이슈 분석](feature-FS058.md) — P1
+- [FS059 · 분석 결과 저장 및 조회 반영](feature-FS059.md) — P1
+- [FS060 · 대화와 질문 기록](feature-FS060.md) — P1
+- [FS061 · 소셜 인증 연동](feature-FS061.md) — P1
+- [FS062 · 가상계좌 데이터 연동](feature-FS062.md) — P1
+- [FS063 · 뉴스와 시장 데이터 연동](feature-FS063.md) — P1
+- [FS064 · AI 분석 연동](feature-FS064.md) — P1
+- [FS065 · 기업 및 사용자 통계 조사 및 확인](feature-FS065.md) — P2
+- [FS066-01 · AI 답변·뉴스 요약·브리핑 평가 등록](feature-FS066-01.md) — FS037: 미기재 / FS066: P2
+- [FS066-02 · AI 기능별 선호도 조회](feature-FS066-02.md) — P2
+- [FS066-03 · 마스킹된 AI 대화록 조회](feature-FS066-03.md) — P2
+- [FS067-01 · 이슈 분석·공개 반영 상태 조회](feature-FS067-01.md) — P1
+- [FS067-02 · 보류 이슈 검수 및 허용·거부](feature-FS067-02.md) — P1
+- [FS067-03 · 실패한 이슈 분석·반영 작업 재시도](feature-FS067-03.md) — P1
+- [FS068 · AI 사용량·비용·오류 통계](feature-FS068.md) — P1
+- [FS069-01 · 회원 활동 조회](feature-FS069-01.md) — P2
+- [FS069-02 · 회원 차단·차단 해제](feature-FS069-02.md) — P2
+- [FS070-01 · 브리핑 회차별 생성·검증·발행 상태 조회](feature-FS070-01.md) — P1
+- [FS070-02 · 미발행 브리핑 회차 재처리](feature-FS070-02.md) — P1
+- [FS071-01 · 발행 브리핑 정정 등록](feature-FS071-01.md) — P1
+- [FS071-02 · 발행 브리핑 제공 중단](feature-FS071-02.md) — P1
+- [FS072 · 대시보드](feature-FS072.md) — P1
+- [FS073 · 관리자 로그인(SSO, ID/PW)](feature-FS073.md) — P1
+- [NFS001 · 접근 통제](feature-NFS001.md) — P1
+- [NFS002 · 응답과 화면 정합성](feature-NFS002.md) — P1
+- [NFS003 · 작업 일관성과 복구](feature-NFS003.md) — P1
+- [NFS004 · 부분 실패 내성](feature-NFS004.md) — P1
+- [NFS005 · 근거와 해석의 품질](feature-NFS005.md) — P1
+- [NFS006 · 모델 전달 데이터 최소화](feature-NFS006.md) — P1
+- [NFS007 · 성능 측정 기준](feature-NFS007.md) — P2
+- [NFS008 · 운영 추적](feature-NFS008.md) — P1
+- [NFS009 · 중단 작업 복구](feature-NFS009.md) — P1
+- [NFS010 · 지원 환경](feature-NFS010.md) — P1
+- [NFS011 · 웹 접근성](feature-NFS011.md) — P2
+- [NFS012 · 정기 갱신 반영 시간 보장](feature-NFS012.md) — P1
+- [FS??? · 브리핑 리뷰](feature-FS~3f~3f~3f.md) — P2
+- [FS0?? · 시점 기반 관계 그래프 조회](feature-FS0~3f~3f.md) — P1
+- [FS050 · 새 대화와 후속 질문](feature-FS050.md) — P1

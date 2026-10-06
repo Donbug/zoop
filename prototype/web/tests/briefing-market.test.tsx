@@ -75,6 +75,7 @@ function briefing(patch: Partial<Briefing>): Briefing {
     dataAsOf: "2026-09-17T18:10:00+09:00",
     graphVersion: "v1",
     items: [],
+    outlook: null,
     marketSummary: { status: "unavailable", reason: "시장 요약 생산자가 없습니다." },
     marketVariables: { status: "available", referenceAt: "2026-09-17T18:10:00+09:00", rateCutoffAt: "2026-09-17T18:05:00+09:00", collectedAt: "2026-09-17T09:11:30+00:00", indicators: [kospi, rate] },
     sinceMorning: null,

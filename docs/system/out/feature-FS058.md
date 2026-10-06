@@ -1,0 +1,30 @@
+# FS058 · 신규 경제뉴스 정기 수집 및 이슈 분석
+
+[전체 목록](index.md) · [검사 결과](warnings.md)
+
+| 항목 | 원본/연결 |
+| --- | --- |
+| 우선순위·상태 | P1 · 팀 검토 전 |
+| 요구사항 번호 | 70 |
+| API 대응 | 연결됨 |
+| 사유 |  |
+| 프로토타입 문서 판정 | 부분 |
+| 코드 위치(실행 증거 아님) |  |
+
+## 원본과 의미
+
+[docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv:69 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv)
+
+- [docs/evidence/raw/functional-spec_2026-10-06/09-데이터-관리.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/09-데이터-관리.csv) — 신규 경제뉴스 정기 수집 및 이슈 분석: 분석시스템은 한국 시간 매시 05분과 35분에 신규 경제뉴스 수집을 시작한다. 공급원의 등록·수정 정보 등으로 신규·지연 등록·수정 문서를 확인하고 동일 내용의 중복을 제외한다. 발견 가능한 범위는 실제 공급원의 지원과 검증된 조회 방식에 따른다. 뉴스·공시 같은 문서에서 개별 사건을 추출하고 관련 이슈에 연결하거나 신규 이슈를 만든 뒤 기업·영향 경로·근거를 분석한다. 이슈는 관련 사건을 연결해 관리하는 분석 주제이며 사건 하나부터 구성할 수 있다. 핵심 이슈는 이슈 중 중요하게 선정해 보여 주는 대상이며 별도의 사건 유형이 아니다. 자동 검증을 통과한 결과만 공개 대상으로 지정한다.
+
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:60 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+
+## 화면·목표 API
+
+[A-ADM-03](screen-A-ADM-03.md)
+
+| 작업 | 메서드·목표 경로 | WBS | 권한 |
+| --- | --- | --- | --- |
+| [getPipelineOverview](../../api/out/zoop-api-spec.md#getpipelineoverview) | GET /api/v1/admin/pipeline/overview | 6.1.2, 6.10.1, 6.4.5, 6.4.6, 6.4.10, 6.9.3 | 관리자(작업별 권한) |
+| [listAnalysisJobs](../../api/out/zoop-api-spec.md#listanalysisjobs) | GET /api/v1/admin/jobs | 6.1.2, 6.10.1, 6.4.5, 6.9.3 | 관리자(작업별 권한) |
+| [createAnalysisJob](../../api/out/zoop-api-spec.md#createanalysisjob) | POST /api/v1/admin/jobs | 6.1.2, 6.10.1, 6.4.5, 6.4.6, 6.4.10, 6.4.11 | 관리자(작업별 권한) |

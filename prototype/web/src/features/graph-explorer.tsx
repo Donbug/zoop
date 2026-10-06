@@ -1,29 +1,25 @@
-// 지도(그래프 또는 목록) + 상세. 메인 화면이 쓴다.
+// 관계 지도 + 상세. 종목 목록은 독립 /companies 메뉴에서 제공한다.
 // - 데스크톱: 지도가 가로 전체를 쓰고, 상세 패널은 고른 대상이 있을 때만 캔버스 오른쪽 위에 겹쳐 연다.
 //   캔버스 크기는 패널과 관계없이 그대로이고(배치·카메라가 흔들리지 않음), 맞춤·선택 카메라는 패널에 덮이지 않은 영역을 쓴다.
-//   목록 보기에서는 패널이 목록 옆에 자리를 차지한다.
-// - 모바일: 그래프가 기본(끌기·핀치·탭), 목록은 전환. 상세는 바텀시트(처음 절반, 위로 끌면 크게)
-// - 범례는 Neo4j식 라벨 칩(종류 + 개수). 데스크톱은 도구 막대와 같은 줄, 모바일은 캔버스 위 한 줄. 칩을 누르면 그 종류를 숨기거나 보인다(G5).
-// - 그래프에서는 연결 없는 사건을 묶음 하나로 모은다(G1). 목록 보기는 모든 사건을 그대로 보여준다.
+// - 모바일: 지도(끌기·핀치·탭) + 상세 바텀시트(처음 절반, 위로 끌면 크게).
+// - 범례는 Neo4j식 라벨 칩(종류 + 개수). 데스크톱은 도구 막대와 같은 줄, 모바일은 캔버스 위 한 줄.
+// - 연결 없는 사건을 묶음 하나로 모은다(G1).
 // - 포커스 모드(G2): 상세의 [이 노드 중심으로 보기] → 그래프 위 FocusBar. 상태는 부모가 주소에 둔다.
 // - 경로 모드(G6): 기업 상세의 [다른 기업과의 연결 보기] → 그래프 위 PathBar + 상세에 단계 목록. 포커스와 함께 두지 않는다.
 // - 영향 경로(FS022): 기업 상세의 관련 이슈 → 상세에 단계별 연결·근거, 지도에 그 경로와 함께 연결된 기업을 강조.
 // - 지도에서 연 근거 창의 [지도에서 보기]를 누르면 그 근거의 연결선을 강조한다(G4).
-import { CircleHelp, List, LoaderCircle, MousePointerClick, Network, X } from "lucide-react";
+import { CircleHelp, LoaderCircle, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import type { Schemas } from "@/api/client";
-import { useEventsByIds } from "@/api/queries";
 import { FocusBar } from "@/components/domain/focus-bar";
 import { GraphCanvas, type CenterRequest, type GraphSelection } from "@/components/domain/graph-canvas";
 import type { Viewport } from "@/components/domain/graph-layout";
 import { GraphLegend } from "@/components/domain/graph-legend";
 import { PathBar } from "@/components/domain/path-bar";
-import { RelationList } from "@/components/domain/relation-list";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Popover } from "@/components/ui/popover";
-import { Segmented } from "@/components/ui/segmented";
 import { shortestPath } from "@/lib/graph-path";
 import { ISOLATED_BUNDLE_ID, isolatedBundleLabel, isolatedIssues, type GraphFocus, type LegendKey } from "@/lib/graph-view";
 import { impactPath } from "@/lib/impact-path";
@@ -34,8 +30,6 @@ import { NodeDetail, selectionTitle } from "./node-panel";
 import { useOverlays, type EvidenceRequest } from "./overlays";
 import { PathDetail } from "./path-panel";
 
-export type ExplorerView = "graph" | "list";
-
 /** 데스크톱 상세 패널 폭(px). 그래프 보기에서는 캔버스 오른쪽을 이만큼 덮는다. */
 const PANEL_WIDTH = 380;
 
@@ -45,8 +39,6 @@ interface GraphExplorerProps {
   mapName: string;
   selection: GraphSelection | null;
   onSelectionChange: (selection: GraphSelection | null) => void;
-  view: ExplorerView;
-  onViewChange: (view: ExplorerView) => void;
   /** 지도를 다시 받아오는 중이면 그 안내(예: "내 종목 지도를 불러오고 있어요"). 지금 지도는 그대로 보인다. */
   loadingLabel?: string;
   toolbar?: ReactNode;
@@ -81,8 +73,6 @@ export function GraphExplorer({
   mapName,
   selection,
   onSelectionChange,
-  view,
-  onViewChange,
   loadingLabel,
   toolbar,
   legendMarks = true,
@@ -137,16 +127,11 @@ export function GraphExplorer({
     isolated.length > 0 ? `${isolatedBundleLabel(isolated.length)}은 묶음 하나로 모았어요.` : "",
     route && pathFrom && pathTo ? `${pathFrom.label}에서 ${pathTo.label}까지 ${route.edgeIds.length}단계 경로를 강조했어요.` : "",
     impacted?.route && impactCompany && impactIssue ? `${impactCompany.label}과 사건 ${impactIssue.label}의 영향 경로를 강조했어요.` : "",
-    "같은 내용을 목록 보기에서 확인할 수 있어요.",
   ].filter(Boolean).join(" ");
 
   // 포커스는 연결이 있는 노드만(묶음에 들어간 사건이나 지금 지도에 없는 노드면 무시). 경로 모드면 포커스를 두지 않는다.
   const focusNode = focus && !pathKey && !impactKey ? graph.nodes.find((n) => n.id === focus.id && !isolated.some((i) => i.id === n.id)) : undefined;
   const validFocus = focus && focusNode ? focus : null;
-
-  // 목록의 사건 행마다 [근거 N건]을 바로 열 수 있도록 사건 상세(근거 id)를 불러온다. 전체 연결 지도는 사건이 많으므로 목록을 볼 때만.
-  const events = useEventsByIds(view === "list" ? issueIds : []);
-  const evidenceByIssue = new Map(events.flatMap((q) => (q.data ? [[q.data.id, q.data.evidenceIds] as const] : [])));
 
   // 선택이 가리키는 요소가 지금 데이터에 없으면(모드 전환 등) 상세를 열지 않는다.
   const validSelection =
@@ -162,7 +147,7 @@ export function GraphExplorer({
 
   // 그래프 보기에서 연 근거 창은 인용을 지도에서 강조할 수 있다(사건 id는 해당 연결선이 없을 때 대신 강조).
   const showEvidence = (request: EvidenceRequest) => {
-    openEvidence(view === "graph" ? { ...request, map: { issueId: request.eventId } } : request);
+    openEvidence({ ...request, map: { issueId: request.eventId } });
   };
 
   // 상세에서 포커스로 들어가면 새로 나타난 포커스 바로 키보드 포커스를 옮긴다(데스크톱).
@@ -213,18 +198,7 @@ export function GraphExplorer({
   };
   const exitImpact = () => onImpactChange?.(null);
 
-  const close = () => {
-    const previous = validSelection;
-    onSelectionChange(null);
-    // 목록에서 고른 경우 원래 항목으로 포커스를 되돌린다.
-    if (previous && !isMobile) {
-      requestAnimationFrame(() => {
-        // 기업 행은 행 자체가 버튼이고, 사건 행은 행(li) 안의 첫 버튼(제목)이 복귀 대상이다.
-        const row = document.querySelector<HTMLElement>(`[data-selection-id="${CSS.escape(previous.id)}"]`);
-        (row?.matches("button, a") ? row : row?.querySelector<HTMLElement>("button"))?.focus();
-      });
-    }
-  };
+  const close = () => onSelectionChange(null);
 
   const detail = validSelection && (
     <NodeDetail
@@ -235,9 +209,9 @@ export function GraphExplorer({
       onShowEvidence={showEvidence}
       linkState={linkState}
       isolated={isolated}
-      onFocusNode={onFocusChange && view === "graph" ? enterFocus : undefined}
+      onFocusNode={onFocusChange ? enterFocus : undefined}
       focusId={validFocus?.id ?? null}
-      onPathTo={onPathChange && view === "graph" ? (from, to) => onPathChange([from, to]) : undefined}
+      onPathTo={onPathChange ? (from, to) => onPathChange([from, to]) : undefined}
       onImpact={onImpactChange ? (companyId, issueId) => onImpactChange([companyId, issueId]) : undefined}
     />
   );
@@ -272,18 +246,7 @@ export function GraphExplorer({
         : null;
   const pathSheetOpen = Boolean(pathDetail) && (!route || stepsOpenKey === pathKey);
   // 그래프 보기의 데스크톱 상세 패널은 캔버스 위에 겹친다.
-  const panelOverCanvas = !isMobile && view === "graph" && panel !== null;
-  const viewSwitch = (
-    <Segmented
-      aria-label="보기 방식"
-      value={view}
-      onValueChange={onViewChange}
-      options={[
-        { value: "graph", label: <><Network aria-hidden="true" /><span className="max-md:sr-only">그래프</span></>, ariaLabel: "그래프로 보기" },
-        { value: "list", label: <><List aria-hidden="true" /><span className="max-md:sr-only">목록</span></>, ariaLabel: "목록으로 보기" },
-      ]}
-    />
-  );
+  const panelOverCanvas = !isMobile && panel !== null;
   const legend = <GraphLegend nodes={graph.nodes} edges={graph.edges} hidden={hidden} onToggle={toggleLegend} marks={legendMarks} className="min-w-0 flex-1" />;
   // 범례와 한 줄이라 범례를 밀어내지 않도록 보이는 것은 아이콘, 글자는 화면 읽기 프로그램과 툴팁에 준다.
   const loadingMark = loadingLabel && (
@@ -323,17 +286,15 @@ export function GraphExplorer({
       }}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 md:gap-3">
-        {/* 데스크톱: 도구 막대·범례·보기 전환을 한 줄에 둬 캔버스 높이를 늘린다. 범례와 보기 전환은 한 묶음이라, 도구 막대 옆이
-            (범례 20rem + 보기 전환)보다 좁으면 범례를 여러 줄로 쪼개거나 보기 전환만 따로 떨어뜨리지 않고 묶음째 다음 줄로 내린다. */}
+        {/* 도구 막대와 범례를 한 줄에 두고, 공간이 좁으면 범례 묶음만 다음 줄로 내린다. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="min-w-0 max-md:w-full">{toolbar}</div>
           {!isMobile && (
-            <div className="flex min-w-0 flex-1 basis-[34rem] items-center gap-x-3">
-              {view === "graph" ? legend : <div className="flex-1" />}
+            <div className="flex min-w-0 flex-1 basis-[27rem] items-center gap-x-3">
+              {legend}
               {loadingMark}
               <div className="ml-auto flex items-center gap-1">
-                {viewSwitch}
-                <KeyboardHelp />
+                <KeyboardHelp nodes={graph.nodes} onSelect={onSelectionChange} />
               </div>
             </div>
           )}
@@ -343,13 +304,12 @@ export function GraphExplorer({
         )}
         {isMobile && (
           <div className="flex min-w-0 items-center gap-2">
-            {view === "graph" ? legend : <div className="flex-1" />}
+            {legend}
             {loadingMark}
-            {viewSwitch}
+            <KeyboardHelp nodes={graph.nodes} onSelect={onSelectionChange} />
           </div>
         )}
-        {/* 그래프는 목록 보기 중에도 숨겨 둔 채 유지한다(확대 배율·위치 보존). 보이게 되면 크기를 다시 재서 맞춘다. */}
-        <div className={cn("relative flex min-h-0 flex-1 flex-col", view !== "graph" && "hidden")} aria-busy={Boolean(loadingLabel) || undefined}>
+        <div className="relative flex min-h-0 flex-1 flex-col" aria-busy={Boolean(loadingLabel) || undefined}>
           <GraphCanvas
             nodes={graph.nodes}
             edges={graph.edges}
@@ -401,19 +361,6 @@ export function GraphExplorer({
             </aside>
           )}
         </div>
-        {view === "list" && (
-          <RelationList
-            nodes={graph.nodes}
-            edges={graph.edges}
-            selection={validSelection}
-            onSelect={onSelectionChange}
-            label={`${mapName}의 기업과 사건 목록`}
-            evidenceByIssue={evidenceByIssue}
-            onShowEvidence={(issue) => showEvidence({ title: issue.title, evidenceIds: issue.evidenceIds })}
-            linkState={linkState}
-            className="relative -mx-4 min-h-0 flex-1 md:mx-0"
-          />
-        )}
       </div>
 
       {isMobile ? (
@@ -434,26 +381,18 @@ export function GraphExplorer({
           {sheetTop}
           <div className="-mx-4 -mt-1">{panel?.body}</div>
         </BottomSheet>
-      ) : (
-        view === "list" && (
-          <aside aria-label="상세" className="ml-4 flex shrink-0 flex-col border-l border-border-subtle" style={{ width: PANEL_WIDTH }}>
-            {panelView ?? (
-              <p className="flex items-center gap-2 px-4 pt-4 text-base text-text-secondary">
-                <MousePointerClick className="size-5 shrink-0" aria-hidden="true" />
-                기업이나 사건을 골라 주세요.
-              </p>
-            )}
-          </aside>
-        )
-      )}
+      ) : null}
     </div>
   );
 }
 
-function KeyboardHelp() {
+function KeyboardHelp({ nodes, onSelect }: { nodes: Schemas["GraphNode"][]; onSelect: (selection: GraphSelection) => void }) {
+  const [open, setOpen] = useState(false);
   return (
     <Popover
       label="조작 도움말"
+      open={open}
+      onOpenChange={setOpen}
       trigger={
         <Button variant="ghost" size="icon" aria-label="조작 도움말">
           <CircleHelp aria-hidden="true" />
@@ -471,10 +410,22 @@ function KeyboardHelp() {
         <dt className="font-medium text-text-primary">끌기</dt>
         <dd>노드 옮기기, 빈 곳은 화면 이동</dd>
         <dt className="font-medium text-text-primary">Tab</dt>
-        <dd>목록 보기의 기업·사건으로 이동</dd>
+        <dd>도움말 안의 기업·사건 버튼으로 이동</dd>
         <dt className="font-medium text-text-primary">Esc</dt>
         <dd>선택 해제</dd>
       </dl>
+      <div className="max-h-64 overflow-y-auto border-t border-border-subtle">
+        {(["company", "issue"] as const).map((kind) => (
+          <section key={kind} aria-label={kind === "company" ? "지도 기업 선택" : "지도 사건 선택"}>
+            <h3 className="py-2 font-semibold">{kind === "company" ? "기업" : "사건"}</h3>
+            {nodes.filter((node) => node.kind === kind).map((node) => (
+              <Button key={node.id} variant="ghost" className="h-auto min-h-11 w-full justify-start whitespace-normal text-left" onClick={() => { setOpen(false); onSelect({ kind: "node", id: node.id }); }}>
+                {node.label}
+              </Button>
+            ))}
+          </section>
+        ))}
+      </div>
     </Popover>
   );
 }

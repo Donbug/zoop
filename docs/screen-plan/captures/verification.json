@@ -1,37 +1,54 @@
 {
-  "pdfPages": 65,
-  "pptxSlides": 65,
-  "captureGroups": 45,
-  "numberedControls": 159,
+  "pdfPages": 77,
+  "pptxSlides": 77,
+  "captureGroups": 54,
+  "numberedControls": 186,
   "densityById": {
     "D-AUT-01": 5,
     "D-AUT-02": 5,
     "D-AUT-03": 4,
     "D-ONB-01": 3,
     "D-ONB-02": 3,
-    "D-WAT-01b": 3,
     "D-WAT-01": 3,
+    "D-WAT-01b": 3,
+    "D-GRP-01": 4,
+    "D-GRP-01b": 3,
     "D-GRP-T": 3,
     "D-GRP-T2": 3,
     "D-GRP-T3": 3,
     "D-GRP-T4": 3,
     "D-GRP-T5": 3,
-    "D-GRP-01": 4,
-    "D-GRP-03": 6,
-    "D-GRP-06": 4,
-    "D-GRP-05": 4,
     "D-GRP-02": 3,
-    "D-GRP-07b": 3,
-    "D-GRP-07": 4,
+    "D-GRP-03": 3,
     "D-GRP-04": 3,
+    "D-GRP-05": 4,
+    "D-GRP-06": 4,
+    "D-GRP-07": 4,
+    "D-GRP-07b": 3,
+    "D-STK-01": 3,
     "D-COM-01": 3,
+    "D-COM-01b": 3,
     "D-COM-02": 3,
-    "D-COM-01b": 4,
+    "D-COM-03": 3,
+    "D-COM-04": 3,
+    "D-COM-05": 3,
+    "D-COM-06": 3,
     "D-MY-01": 4,
+    "D-BRF-01": 4,
+    "D-BRF-02": 4,
+    "D-BRF-04": 3,
     "D-AI-01": 4,
     "D-AI-01b": 3,
     "D-AI-02": 3,
     "D-AI-02b": 3,
+    "M-GRP-01": 6,
+    "M-STK-01": 3,
+    "M-BRF-01": 4,
+    "M-AI-01": 3,
+    "M-COM-01": 3,
+    "M-COM-02": 6,
+    "D-SEN-01": 4,
+    "D-SEN-02": 3,
     "A-ADM-05c": 3,
     "A-ADM-01": 4,
     "A-ADM-02": 3,
@@ -40,278 +57,312 @@
     "A-ADM-04": 3,
     "A-ADM-04b": 4,
     "A-ADM-05": 3,
-    "A-ADM-05b": 3,
-    "D-GRP-01b": 3,
-    "D-BRF-01": 4,
-    "D-BRF-02": 4,
-    "D-BRF-04": 3,
-    "M-GRP-01": 6,
-    "M-COM-01": 3,
-    "M-AI-01": 3,
-    "M-BRF-01": 4
+    "A-ADM-05b": 3
   },
-  "confirmedNavigationReferences": 14,
-  "annotationBoxesAndCirclesMatch": 159,
-  "outsideTargetCircleGeometry": true,
-  "requestedFlowOrder": true,
+  "confirmedNavigationReferences": 9,
+  "annotationBoxesAndCirclesMatch": 186,
   "textOutsidePage": [],
   "possibleTextOverlaps": [],
   "fontFallbackSpanIntersections": [
     {
-      "page": 1,
-      "first": "기능명세 v1.2 10-01 고정본 + 10-03 채택 항목( 0.3)",
+      "page": 3,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  doc-delta-2026-10-06.md 2.2 · design-direction.md 5.3· 5.10",
       "second": "§",
       "intersection": [
-        466.4129943847656,
-        316.9565124511719,
-        476.3273620605469,
-        340.9022216796875
+        302.4280090332031,
+        612.7574462890625,
+        306.6826171875,
+        623.033447265625
       ]
     },
     {
       "page": 3,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  captures/*.json clickEvidence · spec-v1.2-gap.md 0.3",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  doc-delta-2026-10-06.md 2.2 · design-direction.md 5.3· 5.10",
       "second": "§",
       "intersection": [
-        392.05999755859375,
+        409.027587890625,
         612.7574462890625,
-        396.3146057128906,
+        413.2821960449219,
+        623.033447265625
+      ]
+    },
+    {
+      "page": 3,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  doc-delta-2026-10-06.md 2.2 · design-direction.md 5.3· 5.10",
+      "second": "§",
+      "intersection": [
+        430.42681884765625,
+        612.7574462890625,
+        434.6814270019531,
         623.033447265625
       ]
     },
     {
       "page": 4,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  captures/*.json clickEvidence · spec-v1.2-gap.md 0.3",
       "second": "§",
       "intersection": [
-        314.16400146484375,
+        389.82000732421875,
         612.7574462890625,
-        318.4186096191406,
-        623.033447265625
-      ]
-    },
-    {
-      "page": 4,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
-      "second": "§",
-      "intersection": [
-        328.0094909667969,
-        612.7574462890625,
-        332.26409912109375,
+        394.0746154785156,
         623.033447265625
       ]
     },
     {
       "page": 5,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        314.16400146484375,
+        311.92401123046875,
         612.7574462890625,
-        318.4186096191406,
+        316.1786193847656,
         623.033447265625
       ]
     },
     {
       "page": 5,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        328.0094909667969,
+        325.7695007324219,
         612.7574462890625,
-        332.26409912109375,
+        330.02410888671875,
         623.033447265625
       ]
     },
     {
       "page": 6,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        314.16400146484375,
+        311.92401123046875,
         612.7574462890625,
-        318.4186096191406,
+        316.1786193847656,
         623.033447265625
       ]
     },
     {
       "page": 6,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        328.0094909667969,
+        325.7695007324219,
         612.7574462890625,
-        332.26409912109375,
+        330.02410888671875,
         623.033447265625
       ]
     },
     {
       "page": 7,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        314.16400146484375,
+        311.92401123046875,
         612.7574462890625,
-        318.4186096191406,
+        316.1786193847656,
         623.033447265625
       ]
     },
     {
       "page": 7,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        328.0094909667969,
+        325.7695007324219,
         612.7574462890625,
-        332.26409912109375,
+        330.02410888671875,
         623.033447265625
       ]
     },
     {
       "page": 8,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        314.16400146484375,
+        311.92401123046875,
         612.7574462890625,
-        318.4186096191406,
+        316.1786193847656,
         623.033447265625
       ]
     },
     {
       "page": 8,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        328.0094909667969,
+        325.7695007324219,
         612.7574462890625,
-        332.26409912109375,
+        330.02410888671875,
         623.033447265625
       ]
     },
     {
       "page": 9,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 5.2· 6.1· 6.4",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        274.6199951171875,
+        311.92401123046875,
         612.7574462890625,
-        278.8746032714844,
+        316.1786193847656,
         623.033447265625
       ]
     },
     {
       "page": 9,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 5.2· 6.1· 6.4",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        295.875,
+        325.7695007324219,
         612.7574462890625,
-        300.1296081542969,
-        623.033447265625
-      ]
-    },
-    {
-      "page": 9,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 5.2· 6.1· 6.4",
-      "second": "§",
-      "intersection": [
-        315.4804382324219,
-        612.7574462890625,
-        319.73504638671875,
+        330.02410888671875,
         623.033447265625
       ]
     },
     {
       "page": 10,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  tokens.json v3.0.0 · design-direction.md 4.6",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
       "second": "§",
       "intersection": [
-        354.81298828125,
+        311.92401123046875,
         612.7574462890625,
-        359.0675964355469,
+        316.1786193847656,
+        623.033447265625
+      ]
+    },
+    {
+      "page": 10,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  App.tsx · design-direction.md 5· 6.3 · spec-v1.2-gap.md",
+      "second": "§",
+      "intersection": [
+        325.7695007324219,
+        612.7574462890625,
+        330.02410888671875,
         623.033447265625
       ]
     },
     {
       "page": 11,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  spec-v1.2-gap.md 0.2· 0.3 · design-direction.md 5.5",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 5.2· 6.1· 6.4",
       "second": "§",
       "intersection": [
-        269.20599365234375,
+        272.3810119628906,
         612.7574462890625,
-        273.4606018066406,
+        276.6356201171875,
         623.033447265625
       ]
     },
     {
       "page": 11,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  spec-v1.2-gap.md 0.2· 0.3 · design-direction.md 5.5",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 5.2· 6.1· 6.4",
       "second": "§",
       "intersection": [
-        290.80352783203125,
+        293.6360168457031,
         612.7574462890625,
-        295.0581359863281,
+        297.890625,
         623.033447265625
       ]
     },
     {
       "page": 11,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  spec-v1.2-gap.md 0.2· 0.3 · design-direction.md 5.5",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 5.2· 6.1· 6.4",
       "second": "§",
       "intersection": [
-        398.1152038574219,
+        313.241455078125,
         612.7574462890625,
-        402.36981201171875,
+        317.4960632324219,
         623.033447265625
       ]
     },
     {
       "page": 12,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 3.2· 4.4· 4.8 · M-* ",
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  tokens.json v3.0.0 · design-direction.md 4.6",
       "second": "§",
       "intersection": [
-        274.6199951171875,
+        352.572998046875,
         612.7574462890625,
-        278.8746032714844,
+        356.8276062011719,
         623.033447265625
       ]
     },
     {
-      "page": 12,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 3.2· 4.4· 4.8 · M-* ",
+      "page": 13,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  spec-v1.2-gap.md 0.2· 0.3 · design-direction.md 5.5",
       "second": "§",
       "intersection": [
-        295.79388427734375,
+        266.9670104980469,
         612.7574462890625,
-        300.0484924316406,
+        271.22161865234375,
         623.033447265625
       ]
     },
     {
-      "page": 12,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 3.2· 4.4· 4.8 · M-* ",
+      "page": 13,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  spec-v1.2-gap.md 0.2· 0.3 · design-direction.md 5.5",
       "second": "§",
       "intersection": [
-        317.8150939941406,
+        288.5645446777344,
         612.7574462890625,
-        322.0697021484375,
+        292.81915283203125,
         623.033447265625
       ]
     },
     {
-      "page": 59,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  design-direction.md 5.5. ",
+      "page": 13,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  spec-v1.2-gap.md 0.2· 0.3 · design-direction.md 5.5",
       "second": "§",
       "intersection": [
-        274.6199951171875,
+        395.876220703125,
         612.7574462890625,
-        278.8746032714844,
+        400.1308288574219,
         623.033447265625
       ]
     },
     {
-      "page": 62,
+      "page": 14,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 4.8· 5.3· 5.10 · M-*",
+      "second": "§",
+      "intersection": [
+        272.3810119628906,
+        612.7574462890625,
+        276.6356201171875,
+        623.033447265625
+      ]
+    },
+    {
+      "page": 14,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 4.8· 5.3· 5.10 · M-*",
+      "second": "§",
+      "intersection": [
+        294.08673095703125,
+        612.7574462890625,
+        298.3413391113281,
+        623.033447265625
+      ]
+    },
+    {
+      "page": 14,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 4.8· 5.3· 5.10 · M-*",
+      "second": "§",
+      "intersection": [
+        315.51300048828125,
+        612.7574462890625,
+        319.7676086425781,
+        623.033447265625
+      ]
+    },
+    {
+      "page": 70,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  design-direction.md 5.5.",
+      "second": "§",
+      "intersection": [
+        272.3810119628906,
+        612.7574462890625,
+        276.6356201171875,
+        623.033447265625
+      ]
+    },
+    {
+      "page": 73,
       "first": "이슈기업",
       "second": "–",
       "intersection": [
@@ -322,7 +373,7 @@
       ]
     },
     {
-      "page": 62,
+      "page": 73,
       "first": "FS022·D03. 사건기업 선 클릭 제거",
       "second": "–",
       "intersection": [
@@ -333,41 +384,41 @@
       ]
     },
     {
-      "page": 63,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  progress-2026-10-02.md 1. ",
+      "page": 74,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  progress-2026-10-02.md 1.",
       "second": "§",
       "intersection": [
-        299.36700439453125,
+        297.12799072265625,
         612.7574462890625,
-        303.6216125488281,
+        301.3825988769531,
         623.033447265625
       ]
     },
     {
-      "page": 64,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  spec-wbs-delta-2026-10-03.md 6 · notion-delta-2026-10-03.md 7",
+      "page": 75,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  spec-wbs-delta-2026-10-03.md 6 · notion-delta-2026-10-03.md 7",
       "second": "§",
       "intersection": [
-        329.2439880371094,
+        327.0050048828125,
         612.7574462890625,
-        333.49859619140625,
+        331.2596130371094,
         623.033447265625
       ]
     },
     {
-      "page": 64,
-      "first": "줍 화면계획서 v2.0 · 프로토타입 기준  |  spec-wbs-delta-2026-10-03.md 6 · notion-delta-2026-10-03.md 7",
+      "page": 75,
+      "first": "줍 화면계획서 v2.1 · 프로토타입 기준  |  spec-wbs-delta-2026-10-03.md 6 · notion-delta-2026-10-03.md 7",
       "second": "§",
       "intersection": [
-        468.636474609375,
+        466.39752197265625,
         612.7574462890625,
-        472.8910827636719,
+        470.6521301269531,
         623.033447265625
       ]
     },
     {
-      "page": 64,
-      "first": "사건기업 간선 클릭 제거 ",
+      "page": 75,
+      "first": "사건기업 간선 클릭 제거",
       "second": "–",
       "intersection": [
         631.1619873046875,
@@ -377,49 +428,47 @@
       ]
     },
     {
-      "page": 65,
-      "first": "10-03 반영: spec-v1.2-gap.md 0.3",
+      "page": 76,
+      "first": "변경 대응: doc-delta-2026-10-06.md 2.2",
       "second": "§",
       "intersection": [
-        298.7430114746094,
-        198.8310089111328,
-        307.239013671875,
-        219.3509979248047
+        351.5530090332031,
+        259.208984375,
+        360.04901123046875,
+        279.72900390625
       ]
     }
   ],
-  "embeddedFonts": {
-    "BAAAAA+SUIT-Bold": true,
-    "CAAAAA+SUIT-Regular": true,
-    "DAAAAA+SUIT-Regular": true,
-    "EAAAAA+SUIT-Bold": true,
-    "FAAAAA+SUIT-Bold": true,
-    "GAAAAA+SUIT-Regular": true,
-    "HAAAAA+LinuxLibertineG": true,
-    "IAAAAA+SUIT-Bold": true,
-    "JAAAAA+SUIT-Regular": true,
-    "KAAAAA+SUIT-Bold": true,
-    "LAAAAA+SUIT-Regular": true,
-    "MAAAAA+SUIT-Bold": true,
-    "NAAAAA+SUIT-Regular": true,
-    "OAAAAA+SUIT-Regular": true,
-    "PAAAAA+SUIT-Bold": true,
-    "QAAAAA+SUIT-Bold": true,
-    "RAAAAA+SUIT-Regular": true,
-    "SAAAAA+SUIT-Regular": true,
-    "TAAAAA+SUIT-Regular": true,
-    "UAAAAA+SUIT-Bold": true,
-    "VAAAAA+SUIT-Bold": true,
-    "WAAAAA+SUIT-Regular": true,
-    "XAAAAA+AppleGothic": true
+  "allFontsEmbedded": true,
+  "visualReview": {
+    "status": "passed",
+    "pagesReviewed": 77,
+    "contactSheets": 13,
+    "detailPages": [39, 67],
+    "deckTextClipping": 0,
+    "deckTextOverlap": 0,
+    "numberPositionErrors": 0,
+    "scope": "최종 PDF 전 페이지의 연락판과 차트 번호·관리자 사용량 개별 렌더를 검토했다. 원본 웹 화면의 자연스러운 스크롤·말줄임과 프로토타입 지도 라벨 겹침은 덱 조판 오류와 구분한다."
   },
-  "pdfRatio": "16:9",
-  "targetedRecapture": {
-    "ids": [
-      "D-WAT-01",
-      "D-WAT-01b"
-    ],
-    "nonTargetCaptureFilesUnchanged": 94,
-    "correctedHoldingGuideObserved": true
-  }
+  "cleanup": {
+    "ports8824And5194": "lsof 수신 프로세스 없음(exit 1, 출력 없음)",
+    "containers": "zoop-poc-postgres-1 / zoop-poc-neo4j-1 / zoop-poc-neo4j-real2 모두 exited"
+  },
+  "systemBuild": {
+    "generatedSlides": 77,
+    "targetApis": 84,
+    "hardErrors": 0,
+    "warnings": 115,
+    "differences": 168,
+    "checkExitCode": 1,
+    "checkExitReason": "build.py --check는 warning/difference만 있어도 1을 반환한다. error 심각도 항목은 없다.",
+    "openApiSpecValidator": "docs/api/openapi.yaml: OK"
+  },
+  "prototypeBugs": [
+    {
+      "description": "직접 삼성전자 노드를 선택한 확대 지도에도 사건 라벨이 겹친다. AI 창을 열면 배경 지도에도 겹침이 유지된다.",
+      "evidence": ["D-GRP-03.png", "D-AI-01.png", "rendered/page-31.png", "rendered/page-49.png"],
+      "prototypeChanged": false
+    }
+  ]
 }

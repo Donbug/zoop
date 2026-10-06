@@ -1,27 +1,12 @@
-// UI-06 기업 상세(요구 35–41, 명세 v1.2 FS038·FS040·FS041·FS044). 개요(머리글)·시세·지표·가상 보유·차트·사건·문서를 각자 독립 요청으로
-// 화면을 열 때 함께 조회하고(탭에 가려진 차트·문서도 미리 조회한다) 준비되는 대로 그린다. 한 영역이 실패하면 그 영역만 오류와
-// [다시 시도]를 보이고, 자료 없음은 빈 안내, 권한 없음(비회원의 보유)은 영역을 숨긴다. 기업이 바뀌면 화면 상태를 통째로 새로 만든다(key).
-// 시세(현재가·지표)는 개요와 따로 조회하고, 주가 차트는 사건 탭에서 타임라인과 같은 범위로 함께 바뀐다.
-// 주소 상태: ?tab=events|documents|info, ?period=1d|1m|1y(기본 1m), ?event=<사건>, ?open=<펼친 날짜 묶음>.
-//  - 탭·기간은 이력에 쌓고(push, 뒤로 가기로 되돌림), 사건 선택·묶음 펼침은 바꿔 쓴다(replace).
-// 기간 전환(FS040·D04): 조회 범위는 KST 조회 시각을 공통 종료 시각으로 새로 잡는다(lib/company-timeline detailRange).
-//  - 바꾸는 즉시 이전 사건 상세와 강조를 거두되 선택 사건 id는 주소에 잠정으로 남긴다.
-//  - 새 사건 목록이 성공하면 그 사건이 있으면 새 범위로 상세를 다시 조회해 선택을 유지하고, 없으면 선택을 풀고 알린다.
-//  - 목록 조회가 실패하면 선택을 풀지 않는다(사건 없음으로 판정하지 않는다). 목록 [다시 시도]가 성공한 뒤 판단한다.
-// 그래프 왕복(FS044·D06):
-//  - [그래프로 돌아가기]는 이 상세에 들어온 그래프 상태(주소·카메라·범례, lib/graph-entry)로 간다. 그래프에서 들어오지 않았으면
-//    (직접 주소·내 종목·브리핑) 전체 관계 그래프를 연다. 브라우저 뒤로 가기는 실제 이력을 따르며 이 화면이 막지 않는다.
-//  - [지도에서 보기]는 시장 전체 지도에 ?select=node:<사건>&focus=<사건>&hops=1 로 사건과 연결 기업을 강조하고,
-//    지도 쪽 복귀 링크(state.returnTo)와 브라우저 뒤로 가기 모두 이 주소로 돌아온다. 스크롤 위치는 떠날 때 저장해 내용이
-//    준비되면 되돌린다. 돌아오면 범위를 새로 잡아 다시 조회하고 선택 사건은 위 규칙으로 유지·해제한다.
-//  - 보관하는 상태: 기업(경로)·차트 기간·선택 사건·탭·스크롤. 재무 기간은 재무 기능이 없어 두지 않는다.
-//  - 상세를 떠나면 진행 중인 상세 조회를 취소해, 떠나기 전 응답이 돌아온 뒤의 새 조회를 덮지 않게 한다.
+// FS038–044: 기업 전환은 period/asOf/tab을 유지하고 issue/bucket/open을 해제한다.
+// 차트·타임라인·관계 그래프는 주소에 고정한 동일 공개 기준 시점을 독립 조회한다.
+// 탭·기간·시점은 push, 사건·버킷 선택은 replace. 진입 지도·복귀 스크롤 계약은 유지한다.
 import { Building2, FileText, Map as MapIcon, Network, Zap } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, type Schemas } from "@/api/client";
-import { queryKeys, useCompany, useCompanyDocuments, useCompanyEvents, useCompanyPrices, useEventInRange } from "@/api/queries";
+import { queryKeys, useCompany, useCompanyDocuments, useCompanyEvents, useCompanyGraph, useCompanyPrices, useEventInRange } from "@/api/queries";
 import { CompanyHeader } from "@/components/domain/company-header";
 import { DisclaimerNote } from "@/components/domain/status-labels";
 import { Button } from "@/components/ui/button";
@@ -33,9 +18,11 @@ import { CompanyHolding } from "@/features/company-holding";
 import { CompanyMetrics } from "@/features/company-metrics";
 import { CompanyQuote } from "@/features/company-quote";
 import { CompanyTimeline } from "@/features/company-timeline";
+import { CompanyGraph } from "@/features/company-graph";
+import { CompanySwitcher } from "@/features/company-switcher";
 import { useOverlays, useScreenChatTargets } from "@/features/overlays";
-import { detailRange, parsePeriod, type Period } from "@/lib/company-timeline";
-import { FULL_GRAPH_URL, isGraphUrl, readGraphEntry, type GraphEntry, type GraphRestoreState } from "@/lib/graph-entry";
+import { companySwitchUrl, detailRange, eventEndDate, exchangeZone, groupEvents, parseAsOf, parsePeriod, widerPeriodFor, type Period } from "@/lib/company-timeline";
+import { isGraphUrl, readGraphEntry, type GraphEntry, type GraphRestoreState } from "@/lib/graph-entry";
 import { formatEventTime } from "@/lib/labels";
 
 type Tab = "events" | "documents" | "info";
@@ -80,24 +67,28 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   const tabParam = params.get("tab");
   const tab: Tab = tabParam === "documents" || tabParam === "info" ? tabParam : "events";
   const period = parsePeriod(params.get("period"));
-  const selectedId = params.get("event");
+  const selectedId = params.get("issue");
   const openGroups = new Set((params.get("open") ?? "").split(",").filter(Boolean));
 
-  // 조회 범위: 처음 그릴 때와 기간이 바뀔 때마다 그 시각을 공통 종료 시각으로 새로 잡는다(뒤로 가기로 기간이 바뀌어도 같다).
-  const [range, setRange] = useState(() => detailRange(period));
-  if (range.period !== period) setRange(detailRange(period));
+  const [initialAsOf] = useState(() => new Date());
+  const asOfParam = params.get("asOf");
+  const asOf = parseAsOf(asOfParam) ?? initialAsOf;
+  const range = detailRange(period, asOf, exchangeZone(companyId));
+  const hops = params.get("hops") === "2" ? 2 : 1;
+  const selectedBucket = params.get("bucket");
+  const graph = useCompanyGraph(companyId, range.to, hops);
 
-  const company = useCompany(companyId);
+  const company = useCompany(companyId, range.to);
   // 하단 [AI] 탭으로 질문 창을 열면 이 기업을 질문 대상으로 넘긴다(기업 정보를 받기 전에는 넘기지 않는다).
   useScreenChatTargets(company.data ? [{ id: companyId, kind: "company", label: company.data.name }] : []);
-  const events = useCompanyEvents(companyId, range);
+  const events = useCompanyEvents(companyId, range, hops);
   // 선택 사건은 새 목록에서 확인된 뒤에만 상세를 조회하고 강조한다. 그 전까지 주소의 id는 잠정 보관이다.
   const listed = events.isSuccess && selectedId !== null && [...events.data.items, ...events.data.unknownTimeItems].some((e) => e.id === selectedId);
   const confirmedId = listed ? selectedId : null;
   const selectedEvent = useEventInRange(confirmedId, range.to);
   // 탭 안 영역(차트·문서)도 탭을 열기 전에 요청을 시작한다. 같은 키라 탭의 컴포넌트는 이 결과를 그대로 쓴다.
   useCompanyPrices(companyId, range);
-  useCompanyDocuments(companyId);
+  useCompanyDocuments(companyId, range);
 
   // 진입 그래프: 지도에서 들어왔으면 그 상태를 이 이력 항목에 묶어 둔다(뒤로 가기로 돌아와도 같은 진입 그래프).
   const entryKey = location.key;
@@ -113,7 +104,7 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   }, [graphEntry, entryKey]);
   const backToGraph = () => {
     if (graphEntry) navigate(graphEntry.url, { state: { graphRestore: graphEntry } satisfies GraphRestoreState });
-    else navigate(FULL_GRAPH_URL);
+    else navigate(`/?mode=all&focus=${encodeURIComponent(companyId)}&hops=1&asOf=${encodeURIComponent(range.to)}`);
   };
 
   // 상세를 떠나면 진행 중인 이 기업 조회를 취소한다(FS044: 이탈 전 응답이 복귀 후 화면에 반영되지 않게).
@@ -143,15 +134,31 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
       },
       { replace, state: location.state, preventScrollReset: true },
     );
+  useEffect(() => {
+    if (parseAsOf(asOfParam)) return;
+    update(p => p.set("asOf", initialAsOf.toISOString()), true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asOfParam, initialAsOf]);
+  const switchCompany = (id: string) => navigate(companySwitchUrl(id, params), { state: { ...locationState, graphEntry } });
+  const setAsOf = (time: string) => update(p => {
+    p.set("asOf", new Date(time).toISOString());
+    p.delete("open");
+    p.delete("bucket");
+  }, false);
   const setTab = (next: Tab) => update((p) => p.set("tab", next), false);
   const setPeriod = (next: Period) => {
     if (next === period) return;
     update((p) => {
       p.set("period", next);
       p.delete("open");
+      p.delete("bucket");
     }, false);
   };
-  const selectEvent = (eventId: string | null) => update((p) => (eventId ? p.set("event", eventId) : p.delete("event")), true);
+  const selectEvent = (eventId: string | null) => update(p => {
+    if (eventId) p.set("issue", eventId); else p.delete("issue");
+    const bucket = groupEvents(events.data?.items ?? [], [], period, range.timeZone).find(group => group.items.some(event => event.id === eventId));
+    if (bucket) p.set("bucket", bucket.key); else p.delete("bucket");
+  }, true);
   // 날짜 선택(FS041): 묶음을 펼치면 날짜를 고른 것이라 이전 선택(상세·차트 강조)을 거둔다. 접을 때는 그 묶음 안의 선택만 푼다.
   const toggleGroup = (key: string, eventIds: string[], expand: boolean) =>
     update((p) => {
@@ -160,15 +167,41 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
       else open.delete(key);
       if (open.size > 0) p.set("open", [...open].join(","));
       else p.delete("open");
-      if (expand || (selectedId !== null && eventIds.includes(selectedId))) p.delete("event");
+      if (expand) {
+        p.set("bucket", key);
+        if (eventIds.length === 1) p.set("issue", eventIds[0]!);
+        else if (!selectedId || !eventIds.includes(selectedId)) p.delete("issue");
+      } else if (selectedId && eventIds.includes(selectedId)) {
+        p.delete("issue");
+        p.delete("bucket");
+      }
     }, true);
   // 차트에서 날짜를 고르면 묶음을 펼치고, 그 날짜 사건이 1건이면 자동 선택(상세 조회), 여러 건이면 선택을 비워 카드에서 고르게 한다.
   const pickDate = (keys: string[], eventIds: string[]) =>
     update((p) => {
       p.set("open", [...new Set([...openGroups, ...keys])].join(","));
-      if (eventIds.length === 1) p.set("event", eventIds[0]!);
-      else p.delete("event");
+      p.set("bucket", keys[0]!);
+      if (eventIds.length === 1) p.set("issue", eventIds[0]!);
+      else if (!selectedId || !eventIds.includes(selectedId)) p.delete("issue");
     }, true);
+  const highlightedIds = useMemo(() => {
+    const groups = events.data ? groupEvents(events.data.items, [], period, range.timeZone) : [];
+    return new Set(confirmedId ? [confirmedId] : selectedId ? [] : groups.filter(group => group.key === selectedBucket).flatMap(group => group.items.map(event => event.id)));
+  }, [events.data, period, range.timeZone, confirmedId, selectedId, selectedBucket]);
+  const pickGraphIssue = (id: string) => {
+    const node = graph.data?.nodes.find(node => node.id === id);
+    const date = eventEndDate(node?.eventTime);
+    const wider: Period | null = !date ? (period !== "1y" ? "1y" : null) : date < range.from.slice(0, 10) ? widerPeriodFor(date, period, range.today) : null;
+    update(p => {
+      p.set("tab", "events");
+      p.set("issue", id);
+      if (wider) {
+        p.set("period", wider);
+        p.delete("open");
+      }
+      p.delete("bucket");
+    }, true);
+  };
 
   // 선택 사건 판정: 새 목록이 성공했는데 없으면(기간 밖) 또는 상세가 404이면 선택을 풀고 알린다. 목록 실패는 판정하지 않는다.
   const outOfRange = selectedId !== null && events.isSuccess && !listed;
@@ -245,7 +278,7 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   const companyName = company.data?.name ?? companyId;
   const showOnMap = (event: Schemas["EventDetail"]) => {
     const returnTo: CompanyReturn = { path: url, label: companyName, state: { from: from ?? "/", restoreScroll: true, graphEntry } };
-    navigate(`/?mode=all&select=${encodeURIComponent(`node:${event.id}`)}&focus=${encodeURIComponent(event.id)}&hops=1`, { state: { returnTo } });
+    navigate(`/?mode=all&select=${encodeURIComponent(`node:${event.id}`)}&focus=${encodeURIComponent(companyId)}&hops=2&asOf=${encodeURIComponent(range.to)}`, { state: { returnTo } });
   };
   const ask = (event: Schemas["EventDetail"]) =>
     openChat({
@@ -264,7 +297,13 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
     });
 
   return (
-    <Page onBackToGraph={backToGraph} hasEntry={graphEntry !== null}>
+    <Page onBackToGraph={backToGraph} hasEntry={graphEntry !== null}
+      switcher={<CompanySwitcher companyId={companyId} company={company.data} asOf={range.to} connectedIds={graph.data?.nodes.filter(node => node.kind === "company").map(node => node.id) ?? []} onSwitch={switchCompany} />}
+      graph={<CompanyGraph companyId={companyId} graph={graph} asOf={range.to} hops={hops} onHops={hops => update(p => p.set("hops", String(hops)), false)} selectedId={confirmedId} highlightedIds={highlightedIds} onIssue={pickGraphIssue} onCompany={switchCompany} onMap={() => {
+        const returnTo: CompanyReturn = { path: url, label: companyName, state: { from: from ?? "/", restoreScroll: true, graphEntry } };
+        navigate(`/?mode=all&focus=${encodeURIComponent(companyId)}&hops=${hops}&asOf=${encodeURIComponent(range.to)}${confirmedId ? `&select=${encodeURIComponent(`node:${confirmedId}`)}` : ""}`, { state: { returnTo } });
+      }} />}
+    >
       {company.isPending && <SkeletonLines lines={2} label="기업 정보를 불러오고 있어요" />}
       {company.isError && <ErrorState compact error={company.error} title="기업 정보를 불러오지 못했어요" onRetry={() => void company.refetch()} />}
       {company.data && (
@@ -315,10 +354,14 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
             onShowOnMap={showOnMap}
             onAsk={ask}
             onPickDate={pickDate}
+            selectedBucket={selectedBucket}
+            onAsOfChange={setAsOf}
+            onLatest={() => setAsOf(new Date().toISOString())}
+            onCompany={switchCompany}
           />
         </TabsContent>
         <TabsContent value="documents">
-          <CompanyDocuments companyId={companyId} />
+          <CompanyDocuments companyId={companyId} range={range} />
         </TabsContent>
         <TabsContent value="info">
           {company.isPending && <SkeletonLines lines={3} label="기업 정보를 불러오고 있어요" />}
@@ -330,15 +373,20 @@ function CompanyDetailScreen({ companyId }: { companyId: string }) {
   );
 }
 
-function Page({ onBackToGraph, hasEntry, children }: { onBackToGraph: () => void; hasEntry: boolean; children: React.ReactNode }) {
+function Page({ onBackToGraph, hasEntry, children, switcher, graph }: { onBackToGraph: () => void; hasEntry: boolean; children: React.ReactNode; switcher?: React.ReactNode; graph?: React.ReactNode }) {
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4 md:px-6 md:py-6">
-      <Button variant="ghost" size="sm" className="-ml-3 w-fit" onClick={onBackToGraph}>
-        <Network aria-hidden="true" />
-        {hasEntry ? "그래프로 돌아가기" : "관계 그래프 보기"}
-      </Button>
-      {children}
-      <DisclaimerNote className="pt-2" />
+    <div className="mx-auto w-full max-w-[1800px] px-4 py-4 md:px-6 md:py-6">
+      <div className={switcher ? "grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-[272px_minmax(0,1fr)]" : "grid min-w-0 grid-cols-1 items-start gap-6"}>
+        {switcher}
+        <div className="grid min-w-0 grid-cols-1 items-start gap-6 min-[1400px]:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div data-company-detail-body className="flex min-w-0 flex-col gap-4">
+            <Button variant="ghost" size="sm" className="-ml-3 w-fit" onClick={onBackToGraph}><Network aria-hidden="true" />{hasEntry ? "그래프로 돌아가기" : "관계 그래프 보기"}</Button>
+            {children}
+            <DisclaimerNote className="pt-2" />
+          </div>
+          <div className="min-w-0 min-[1400px]:sticky min-[1400px]:top-20">{graph}</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -37,7 +37,7 @@ from .routers import (
 DESCRIPTION = (
     "줍(Zoop) 프로토타입 BFF. InvestMate PoC의 승인 이슈(inspect())를 요구사항명세서 v0.2 §8 경로로 제공한다. "
     "사용자에게 보이는 그래프는 활성 게시 버전과 관리자 검수 기록이다(`/api/admin/*`은 관리자 전용). "
-    "요약·감성은 `unavailable`, 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)의 값을 출처·기준 시각과 함께 주고 "
+    "요약은 `unavailable`, 문서·회차 판정은 저장된 검증 결과만 제공하며 없으면 null, 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)의 값을 출처·기준 시각과 함께 주고 "
     "없으면 사유와 함께 `unavailable`, 인증·계좌·관심종목·AI 예시 답변은 BFF mock이며 `metadata`로 출처를 표시한다."
 )
 

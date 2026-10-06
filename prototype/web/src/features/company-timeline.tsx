@@ -1,18 +1,11 @@
-// 기업 상세 사건 탭(요구 37·38·40·41, 명세 v1.2 FS040·D05).
-//  - 기간(1일·1개월·1년, 기본 1개월)은 발생 시각 기준이며, 범위는 KST 조회 시각까지다(종료 시각 뒤 예정 사건은 없다).
-//    발생 날짜를 모르는 사건은 보도 시각이 범위 안인 것만 맨 아래 '발생 시점 미상' 묶음에 따로 둔다.
-//  - 같은 날짜의 사건이 여럿이면 날짜 묶음에 사건 수를 적고, 누르면 사건별 카드를 펼친다(사건을 합치지 않는다).
-//  - 날짜 선택(FS041): 묶음을 펼치거나 차트의 사건 표시를 누르면 이전 상세·강조를 먼저 거둔다. 그 날짜(들)의 사건이 1건이면 바로 선택해
-//    상세를 조회하고, 여러 건이면 카드를 펼쳐 두고 사용자가 고를 때까지 상세를 정하지 않는다.
-//  - 사건 카드를 고르면 그 자리에서 상세가 열린다: 영향 경로(이 기업 ↔ 사건 ↔ 다른 기업 목록), 근거 문서, [지도에서 보기].
-//  - 기간·선택·펼친 묶음은 페이지가 주소로 관리한다. 이 파일은 받은 값을 그리고 바뀔 값을 알린다.
-//  - 주가 차트(company-price-chart)를 기간 도구 아래에 같은 기간·같은 거르기로 그리고, 선택한 사건의 발생 날짜를 차트에서 강조한다.
+// FS040/FS041: 차트와 같은 공개 기준 시점·거래소 시간대의 기간별 버킷.
+// 버킷 1건은 자동 선택, 복수는 각각 펼쳐 고르고 기존 같은 버킷 선택은 유지한다.
+// 선택 사건의 근거·실제 연결 경로를 보여 주며 공개 시각과 발생 시각을 구분한다.
 import { CalendarClock, ChevronDown, Clock, FileText, Map as MapIcon, MessageCircleQuestion, Newspaper, Route, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import type { Schemas } from "@/api/client";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { useCompanies, useEvidenceItems } from "@/api/queries";
+import { useCompanies, useCompanyPrices, useEvidenceItems } from "@/api/queries";
 import { ApprovalNote, RoleUnconfirmed } from "@/components/domain/approval-note";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { DocumentItem, documentRelationLabel } from "@/components/domain/document-item";
@@ -26,6 +19,8 @@ import { Segmented } from "@/components/ui/segmented";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
   eventEndDate,
+  detailRange,
+  resolutionLabel,
   groupEvents,
   kstDate,
   periodLabel,
@@ -67,6 +62,10 @@ interface TimelineProps {
   onAsk: (event: Schemas["EventDetail"]) => void;
   /** 날짜 선택(차트 사건 표시): 묶음들을 펼치고, 그 날짜 사건이 1건이면 그 사건을 고른다. */
   onPickDate: (keys: string[], eventIds: string[]) => void;
+  selectedBucket: string | null;
+  onAsOfChange: (time: string) => void;
+  onLatest: () => void;
+  onCompany: (id: string) => void;
 }
 
 export function CompanyTimeline(props: TimelineProps) {
@@ -74,6 +73,14 @@ export function CompanyTimeline(props: TimelineProps) {
   const { period, today } = range;
   const [filter, setFilter] = useState<Filter>("all");
   const [focusGroup, setFocusGroup] = useState<string | null>(null);
+  const dayPrices = useCompanyPrices(props.companyId, detailRange("1d", new Date(range.to), range.timeZone));
+  const weekPrices = useCompanyPrices(props.companyId, detailRange("1w", new Date(range.to), range.timeZone));
+  const support = { "1d": dayPrices, "1w": weekPrices };
+  const availablePeriods = periodOptions.map(option => {
+    const query = option.value === "1d" || option.value === "1w" ? support[option.value] : null;
+    const unavailable = query?.data?.status === "unavailable" ? query.data : null;
+    return { ...option, disabled: Boolean(unavailable && unavailable.reasonCode !== "temporary_failure"), disabledReason: unavailable?.reason };
+  });
 
   const relationOf = new Map<string, RelationType>([
     ...(company?.structuralIssues ?? []).map((i) => [i.issueId, "STRUCTURALLY_RELATED_TO"] as const),
@@ -81,24 +88,25 @@ export function CompanyTimeline(props: TimelineProps) {
   ]);
 
   const toolbar = (
-    <div className="flex flex-col gap-2 md:flex-row md:items-center">
+    <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
       <div className="flex items-center gap-1">
-        <Segmented aria-label="조회 기간" value={period} onValueChange={onPeriodChange} options={periodOptions} fill className="min-w-0 flex-1 md:w-60 md:flex-none" />
+        <Segmented aria-label="조회 기간" value={period} onValueChange={onPeriodChange} options={availablePeriods} fill className="min-w-0 flex-1 md:w-72 md:flex-none" />
         <IconHint icon={Clock} label="기간 기준">
-          <p>지금(한국 시간)부터 거슬러 {periodLabel[period]} 안에 일어난 사건이에요. 1일은 오늘 0시부터예요.</p>
-          <p>일어난 날짜를 확인하지 못한 사건은 기사가 이 기간에 보도된 것만 ‘발생 시점 미상’에 따로 모았어요. 보도 시각은 일어난 때가 아니에요.</p>
+          <p>거래소 시간대를 기준으로 {periodLabel[period]}을 조회해요. 가격과 사건은 {resolutionLabel[period]} 버킷으로 묶고, 거래가 없는 구간의 시세는 만들지 않아요.</p>
+          <p>선택한 기준 시점에 공개된 문서와 검증 관계만 보여 드려요. 발생 시각을 확인하지 못한 사건은 따로 모아요.</p>
           {events.data && <p>자료 기준 {formatKst(events.data.metadata.asOf)}</p>}
         </IconHint>
       </div>
       {company && (
         <Segmented aria-label="관계로 거르기" value={filter} onValueChange={setFilter} options={filterOptions} fill className="md:w-auto md:flex-none" />
       )}
+      <Button variant="ghost" size="sm" onClick={props.onLatest}>최신 시점</Button>
     </div>
   );
 
   // 차트 표시용 날짜 묶음: 타임라인과 같은 거르기를 거친, 발생 시각이 있는 사건만.
   const keepRelation = (e: Schemas["EventSummary"]) => filter === "all" || relationOf.get(e.id) === filter;
-  const chartGroups = events.data ? groupEvents(events.data.items.filter(keepRelation), []) : [];
+  const chartGroups = events.data ? groupEvents(events.data.items.filter(keepRelation), [], period, range.timeZone) : [];
 
   let body;
   if (events.isPending) body = <SkeletonRows count={3} label="사건 목록을 불러오고 있어요" />;
@@ -106,7 +114,7 @@ export function CompanyTimeline(props: TimelineProps) {
   else {
     const items = events.data.items.filter(keepRelation);
     const undated = events.data.unknownTimeItems.filter(keepRelation);
-    const groups = groupEvents(items, undated);
+    const groups = groupEvents(items, undated, period, range.timeZone);
     const hasMixedRelations = new Set([...items, ...undated].map((e) => relationOf.get(e.id))).size > 1;
     const total = items.length + undated.length;
 
@@ -132,7 +140,7 @@ export function CompanyTimeline(props: TimelineProps) {
           <ol aria-label={`${company?.name ?? "이 기업"} 사건 타임라인`}>
             {groups.map((group) => {
               const multi = group.items.length > 1;
-              const expanded = !multi || openGroups.has(group.key) || groups.length === 1 || group.items.some((e) => e.id === props.selectedId);
+              const expanded = !multi || openGroups.has(group.key) || group.items.some((e) => e.id === props.selectedId);
               const listId = `group-${group.key}`;
               return (
                 <li
@@ -141,7 +149,7 @@ export function CompanyTimeline(props: TimelineProps) {
                   tabIndex={-1}
                   className="grid scroll-mt-16 grid-cols-1 gap-x-3 border-b border-border-subtle last:border-b-0 md:grid-cols-[8rem_minmax(0,1fr)]"
                 >
-                  <div className="flex items-center gap-1 px-3 pt-3 text-sm text-text-secondary tabular-nums md:items-start md:px-0 md:pt-4">
+                  <div className={cn("flex items-center gap-1 px-3 pt-3 text-sm text-text-secondary tabular-nums md:items-start md:px-0 md:pt-4", props.selectedBucket === group.key && "font-semibold text-text-primary")}>
                     {group.unknown ? (
                       <>
                         <span>{group.label}</span>
@@ -154,6 +162,7 @@ export function CompanyTimeline(props: TimelineProps) {
                     )}
                   </div>
                   <div className="min-w-0">
+                    {!group.unknown && !multi && <Button variant="ghost" size="sm" aria-label={`${group.label} 버킷 사건 1건 선택`} aria-pressed={props.selectedBucket === group.key} onClick={() => props.onPickDate([group.key], group.items.map(e => e.id))}><Zap aria-hidden="true" />사건 1건</Button>}
                     {multi && (
                       <button
                         type="button"
@@ -195,13 +204,13 @@ export function CompanyTimeline(props: TimelineProps) {
     }
   }
 
-  // 차트 위 사건 표시: 날짜를 고르고(1건이면 선택, 여러 건이면 펼침) 그 묶음이 그려진 뒤 그 묶음으로 옮겨 포커스한다.
+  // 버킷의 사건 수를 그대로 전달한다. 복수 사건은 현재 선택이 그 버킷에 있으면 유지한다.
   const pickGroups = (keys: string[]) => {
     const picked = chartGroups.filter((g) => keys.includes(g.key)).flatMap((g) => g.items.map((e) => e.id));
     setFocusGroup(keys[0]!);
     props.onPickDate(keys, picked);
   };
-  const selectedKey = chartGroups.find((g) => g.items.some((e) => e.id === props.selectedId))?.key ?? null;
+  const selectedKey = chartGroups.find((g) => g.items.some((e) => e.id === props.selectedId))?.key ?? props.selectedBucket;
   useEffect(() => {
     if (!focusGroup || !openGroups.has(focusGroup)) return;
     const target = document.querySelector<HTMLElement>(`[data-group-key="${CSS.escape(focusGroup)}"]`);
@@ -216,7 +225,9 @@ export function CompanyTimeline(props: TimelineProps) {
     <div className="flex flex-col gap-3 pt-2">
       <h2 className="sr-only">사건 타임라인</h2>
       {toolbar}
-      <CompanyPriceChart companyId={props.companyId} range={range} groups={chartGroups} onPick={pickGroups} selectedKey={selectedKey} />
+      <p className="text-sm text-text-secondary tabular-nums" aria-live="polite">기준 <time dateTime={range.to}>{formatKst(range.to)}</time> · {resolutionLabel[period]} 버킷</p>
+      {availablePeriods.filter(option => option.disabled).map(option => <p key={option.value} className="text-sm text-text-secondary">{option.label}: {option.disabledReason}</p>)}
+      <CompanyPriceChart companyId={props.companyId} range={range} groups={chartGroups} onPick={pickGroups} selectedKey={selectedKey} onAsOfChange={props.onAsOfChange} />
       {body}
     </div>
   );
@@ -298,14 +309,16 @@ function EventDetailPanel({
   companyId,
   company,
   selectedEvent,
+  range,
   summary,
   onShowOnMap,
   onAsk,
-}: Pick<TimelineProps, "companyId" | "company" | "selectedEvent" | "onShowOnMap" | "onAsk"> & { id: string; summary: Schemas["EventSummary"] }) {
+  onCompany,
+}: Pick<TimelineProps, "companyId" | "company" | "selectedEvent" | "range" | "onShowOnMap" | "onAsk" | "onCompany"> & { id: string; summary: Schemas["EventSummary"] }) {
   const event = selectedEvent.data;
   const companyIds = event ? event.companies.map((c) => c.id) : [];
-  const marks = useCompanies(companyIds);
-  const evidence = useEvidenceItems(event?.evidenceIds ?? []);
+  const marks = useCompanies(companyIds, range.to);
+  const evidence = useEvidenceItems(event?.evidenceIds ?? [], event?.companies.some(company => company.id === companyId) ? companyId : undefined);
 
   if (selectedEvent.isPending) return <div id={id}><SkeletonLines lines={3} label="사건 상세를 불러오고 있어요" /></div>;
   if (selectedEvent.isError || !event)
@@ -337,9 +350,9 @@ function EventDetailPanel({
     const name = isSelf ? (
       <span className="font-semibold text-text-primary">{c.name}</span>
     ) : (
-      <Link to={`/companies/${encodeURIComponent(c.id)}`} className="font-medium text-text-primary underline underline-offset-4">
+      <button type="button" onClick={() => onCompany(c.id)} className="min-h-11 font-medium text-text-primary underline underline-offset-4">
         {c.name}
-      </Link>
+      </button>
     );
     return (
       <li key={c.id} className="relative flex items-start gap-3 py-2 before:absolute before:top-0 before:bottom-0 before:left-3 before:w-px before:bg-border-subtle first:before:top-1/2 last:before:bottom-1/2">
@@ -373,9 +386,9 @@ function EventDetailPanel({
       <section aria-labelledby={`${id}-path`} className="flex flex-col gap-1">
         <h4 id={`${id}-path`} className="flex items-center gap-2 text-base font-semibold text-text-primary">
           <Route className="size-4 text-text-secondary" aria-hidden="true" />
-          영향 경로
+          {self ? "영향 경로" : "사건 연결 기업"}
         </h4>
-        <ol aria-label={`${selfName}에서 사건을 거쳐 이어지는 기업`}>
+        <ol aria-label={self ? `${selfName}에서 사건을 거쳐 이어지는 기업` : "선택 사건에 연결된 기업"}>
           {self && pathRow(self, true)}
           <li className="relative flex items-start gap-3 py-2 before:absolute before:top-0 before:bottom-0 before:left-3 before:w-px before:bg-border-subtle last:before:bottom-1/2">
             <span className="relative flex size-6 shrink-0 items-center justify-center rounded-full bg-graph-node-issue text-graph-node-glyph">
@@ -416,6 +429,8 @@ function EventDetailPanel({
                   publishedAt={a.publishedAt}
                   relation={a.relationType ? documentRelationLabel[a.relationType] : undefined}
                   quotes={quotesByArticle.get(a.id)}
+                  sentiment={evidence.find(query => query.data?.articleId === a.id)?.data?.sentiment}
+                  sentimentName={`${selfName} · ${a.title ?? "근거 문서"}`}
                 />
               </li>
             ))}

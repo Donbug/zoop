@@ -7,9 +7,10 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import type { Schemas } from "@/api/client";
 import { useBriefing, useBriefingRounds } from "@/api/queries";
 import { BriefingCard } from "@/components/domain/briefing-card";
+import { BriefingOutlook, briefingIssueId } from "@/components/domain/briefing-outlook";
 import { EventRow, IconCount } from "@/components/domain/event-row";
 import { FeedbackButtons } from "@/components/domain/feedback-buttons";
-import { DisclaimerNote } from "@/components/domain/status-labels";
+import { DisclaimerNote, SentimentLabel } from "@/components/domain/status-labels";
 import { MarketIndicatorsSection } from "@/features/briefing-market";
 import { SinceMorningSection } from "@/features/briefing-since-morning";
 import { Button } from "@/components/ui/button";
@@ -162,7 +163,7 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
               {briefing.items.map((item) => {
                 const corrections = briefing.corrections.filter((c) => c.eventId === item.eventId);
                 return (
-                  <li key={item.eventId} className="flex flex-col gap-2 border-b border-border-subtle pb-4 last:border-b-0">
+                  <li key={item.eventId} id={briefingIssueId(item.eventId)} tabIndex={-1} className="flex scroll-mt-20 flex-col gap-2 border-b border-border-subtle pb-4 last:border-b-0 target:bg-surface-selected">
                     <EventRow
                       headingLevel="h4"
                       title={`${item.rank}. ${item.title}`}
@@ -182,6 +183,19 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
                     <p className="text-sm text-text-secondary">
                       <span className="font-medium">선정 이유</span> {item.reason}
                     </p>
+                    {item.documentSentiments?.length > 0 && (
+                      <ul className="flex flex-col gap-2" aria-label="관련 기업 문서 판정">
+                        {item.documentSentiments.map(({ articleId, sentiment }) => {
+                          const company = item.companies.find((c) => c.id === sentiment.companyId);
+                          return (
+                            <li key={`${articleId}/${sentiment.companyId}`} className="flex flex-wrap items-center gap-x-2">
+                              {company && <span className="text-sm text-text-secondary">{company.name}</span>}
+                              <SentimentLabel judgement={sentiment} accessibleName={`${company?.name ?? "관련 기업"} · 핵심 이슈 ${item.rank}`} />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                       <Button variant="link" size="sm" asChild>
                         <Link to={roundGraphPath(briefing.id, item.eventId)} onClick={() => openIssue(item.eventId)}>
@@ -221,6 +235,7 @@ function BriefingView({ briefing }: { briefing: Briefing }) {
       generatedAt={briefing.generatedAt ? formatKst(briefing.generatedAt) : null}
       dataAsOf={briefing.dataAsOf ? formatKst(briefing.dataAsOf) : null}
       notice={<RoundNotice briefing={briefing} />}
+      outlook={published && briefing.outlook ? <BriefingOutlook outlook={briefing.outlook} issues={briefing.items} /> : null}
       corrections={
         roundCorrections.length > 0 && (
           <div className="flex flex-col gap-2">

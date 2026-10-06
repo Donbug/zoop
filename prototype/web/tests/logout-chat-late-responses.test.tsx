@@ -9,7 +9,7 @@ import { ALPHA, disconnectedPortfolio, memberSession, OTHER_MEMBER_NAME, watchSe
 import { pageOf } from "./support/routes";
 import { askQuestion, chatText, logIn, logOut, openChat, showsEmptyConversation } from "./support/screens";
 
-const EVENT_PAGE = pageOf(ALPHA, "?event=ev-alpha-1m");
+const EVENT_PAGE = pageOf(ALPHA, "?issue=ev-alpha-1m");
 const QUESTION = "이 사건은 언제 알려졌나요?";
 const ANSWER = "서버가 저장한 답변";
 

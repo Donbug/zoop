@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS ai_events (
   code TEXT, message TEXT
 );
 CREATE INDEX IF NOT EXISTS ai_feature_at ON ai_events(feature, at);
+-- Sentiment results are immutable cache entries, including rejected responses (never exposed).
+CREATE TABLE IF NOT EXISTS sentiment_results (
+  input_hash TEXT PRIMARY KEY, feature TEXT NOT NULL, target_id TEXT NOT NULL,
+  company_id TEXT, model TEXT NOT NULL, prompt_version TEXT NOT NULL, judged_at TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('accepted','failed')),
+  result TEXT, failure_code TEXT
+);
+CREATE TABLE IF NOT EXISTS sentiment_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, input_hash TEXT NOT NULL,
+  event_id INTEGER NOT NULL REFERENCES ai_events(id), replay INTEGER NOT NULL, retry INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sentiment_target ON sentiment_results(feature,target_id,company_id);
 -- user behaviour events (telemetry.py), chat transcripts (chat.py) and votes (feedback.py).
 -- No real name, e-mail or IP is stored: ``subject`` is a member id or a keyed hash of a guest session id.
 CREATE TABLE IF NOT EXISTS telemetry_events (

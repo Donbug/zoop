@@ -1,4 +1,4 @@
-// UI-03 메인 지도: 데스크톱은 [내 종목 목록 | 지도 | 상세], 모바일은 그래프 기본 + 목록 전환 + 상세 시트.
+// UI-03 메인 지도: 데스크톱은 [내 종목 목록 | 지도 | 상세], 모바일은 지도 + 상세 시트. 종목 목록은 /companies.
 // 모드는 전체(시장 전체) / 개인화(내 종목: 보유 + 관심) 두 가지(요구 17–19). 주소를 주지 않으면 회원 중 보유·관심이
 // 있으면 개인화, 아니면 전체로 연다(요구 6·14).
 // 모드·선택·포커스·경로·영향 경로는 주소(?mode=&select=&focus=&hops=&path=&impact=)에 담는다. 모드 전환과 포커스·경로·영향 경로
@@ -10,7 +10,7 @@
 // 비회원이 잠긴 개인화 모드를 고르면(또는 그 주소로 오면) 시장 전체 지도를 그대로 두고 로그인 안내를 띄운다(FS019, 요구 51).
 // 사이드바에서 지도에 있는 기업을 고르면 그 노드를 선택하고 카메라를 그 기업 중심으로 확대·이동한다.
 // 데스크톱 사이드바(내 종목)는 도구 막대의 [내 종목]으로 접고 펼친다(넓은 화면은 펼침이 기본, 고른 값은 기억). 접으면 지도가 그 폭을 쓴다.
-// 지도 복귀(FS044): 떠날 때 주소·카메라·범례 필터·보기를 저장한다(기업 상세 [그래프로 복귀]용 진입 그래프 + 이 이력 항목).
+// 지도 복귀(FS044): 떠날 때 주소·카메라·범례 필터를 저장한다(기업 상세 [그래프로 복귀]용 진입 그래프 + 이 이력 항목).
 // 돌아오면 [그래프로 복귀]가 넘긴 state.graphRestore, 없으면 브라우저 뒤로 가기로 돌아온 이력 항목의 저장값으로 복원한다.
 // 튜토리얼(요구 15·16): 튜토리얼을 마치지 않은 회원·비회원, 또는 계정 메뉴의 [튜토리얼 다시 보기](?tour=1)에서
 // 지도 위 단계형 안내를 띄운다. 데스크톱은 왼쪽 목록 자리, 모바일은 지도 위(문서 흐름 안)에 놓는다.
@@ -30,10 +30,10 @@ import type { Viewport } from "@/components/domain/graph-layout";
 import { GraphModeSwitch, MarkRing, PersonalFilterSwitch } from "@/components/domain/graph-legend";
 import { WatchToggle } from "@/components/domain/watch-toggle";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorState, LoadingBlock, Skeleton, SkeletonLines, SkeletonRows } from "@/components/ui/feedback";
+import { EmptyState, ErrorState, LoadingBlock, Skeleton, SkeletonLines } from "@/components/ui/feedback";
 import { ListRow } from "@/components/ui/list-row";
 import { SectionHeader } from "@/components/ui/section-header";
-import { GraphExplorer, type ExplorerView } from "@/features/graph-explorer";
+import { GraphExplorer } from "@/features/graph-explorer";
 import { GraphTutorialPanel, GraphTutorialSheetBar, useGraphTutorial } from "@/features/graph-tutorial";
 import { BriefingGraphBasisBar, BriefingGraphGate } from "@/features/briefing-graph-basis";
 import { parsePathParam } from "@/lib/graph-path";
@@ -81,7 +81,6 @@ export function MainPage() {
   const location = useLocation();
   // 지도 복귀(FS044): [그래프로 복귀]가 넘긴 상태 > 이 이력 항목에 저장한 상태 > 없음(화면 맞춤)
   const [restore] = useState(() => (location.state as Partial<GraphRestoreState> | null)?.graphRestore ?? readHistoryEntry(location.key));
-  const [view, setView] = useState<ExplorerView>(restore?.view ?? "graph");
   const [hidden, setHidden] = useState<ReadonlySet<LegendKey>>(() => new Set((restore?.hidden ?? []) as LegendKey[]));
   const cameraRef = useRef<Viewport | null>(restore?.camera ?? null);
   // 캔버스가 다음 배치에서 쓸 카메라: 처음엔 지도 복귀(FS044) 값, 모드가 바뀌면 그 모드에 보관한 값(FS019)
@@ -95,12 +94,12 @@ export function MainPage() {
   const [returnTo] = useState(() => (location.state as { returnTo?: CompanyReturn } | null)?.returnTo ?? null);
 
   // 떠날 때(언마운트) 마지막 상태를 저장한다. 렌더마다 최신 값을 ref에 둔다.
-  const leaveRef = useRef({ url: "", key: "", view, hidden });
-  leaveRef.current = { url: location.pathname + location.search, key: location.key, view, hidden };
+  const leaveRef = useRef({ url: "", key: "", hidden });
+  leaveRef.current = { url: location.pathname + location.search, key: location.key, hidden };
   useEffect(
     () => () => {
-      const { url, key, view: lastView, hidden: lastHidden } = leaveRef.current;
-      const entry: GraphEntry = { url, camera: cameraRef.current ?? undefined, hidden: [...lastHidden], view: lastView };
+      const { url, key, hidden: lastHidden } = leaveRef.current;
+      const entry: GraphEntry = { url, camera: cameraRef.current ?? undefined, hidden: [...lastHidden] };
       saveGraphEntry(entry);
       try {
         sessionStorage.setItem(historyKey(key), JSON.stringify(entry));
@@ -119,6 +118,22 @@ export function MainPage() {
       // 기억하지 못해도 이번 화면에서는 바뀐다.
     }
   };
+
+  // 옛 목록 주소는 독립 종목 메뉴로 옮기고 지도 전용 파라미터는 가져가지 않는다.
+  useEffect(() => {
+    if (!params.has("view")) return;
+    if (params.get("view") === "list") {
+      const next = new URLSearchParams();
+      if (params.get("mode") === "personal") next.set("mode", "personal");
+      navigate(`/companies${next.size ? `?${next}` : ""}`, { replace: true });
+    } else {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("view");
+        return next;
+      }, { replace: true });
+    }
+  }, [params, navigate, setParams]);
 
   // FS032: ?round=<브리핑 회차 id>면 그 회차를 발행할 당시의 전체 지도다. 개인화·튜토리얼·내 종목 목록은 현재 자료라 쓰지 않는다.
   const round = params.get("round");
@@ -318,7 +333,7 @@ export function MainPage() {
       return;
     }
     setSwitching({ mode: next, error: null });
-    queryClient.fetchQuery({ ...graphQuery(next, null), staleTime: 30_000 }).then(
+    queryClient.fetchQuery({ ...graphQuery(next, null, params.get("asOf")), staleTime: 30_000 }).then(
       (data) => {
         if (seq === switchSeqRef.current) applyMode(next, data);
       },
@@ -526,8 +541,6 @@ export function MainPage() {
         {toolbar}
         {graph.isError ? (
           <ErrorState error={graph.error} title="지도를 불러오지 못했어요" onRetry={() => void graph.refetch()} />
-        ) : view === "list" ? (
-          <SkeletonRows count={4} label="지도를 불러오고 있어요" />
         ) : (
           <LoadingBlock label="지도를 불러오고 있어요" className="flex min-h-[360px] flex-1">
             <Skeleton className="flex-1 rounded-none" />
@@ -573,8 +586,6 @@ export function MainPage() {
         mapName={`${shownName} 지도`}
         selection={selection}
         onSelectionChange={setSelection}
-        view={view}
-        onViewChange={setView}
         focus={focus}
         onFocusChange={setFocus}
         path={path}

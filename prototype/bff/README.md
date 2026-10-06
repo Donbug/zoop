@@ -4,7 +4,7 @@ InvestMate PoC([`Donbug/investmate-poc`](https://github.com/Donbug/investmate-po
 
 - PoC는 **읽기 전용**이다. 비공개 저장소의 고정 커밋을 git 의존성으로 설치한다(`pyproject.toml`의 `[tool.uv.sources]`, 조직 구성원은 `gh auth setup-git` 필요). 이 서버는 PoC DB에 `inspect(None)`과 몇 개의 SELECT만 실행한다. PoC 원장을 바꾸는 일은 BFF가 아니라 관리자 작업이 띄우는 PoC CLI(샌드박스)만 한다.
 - **사용자가 보는 그래프 = 활성 게시 버전(불변 스냅샷) + 관리자 검수 기록**이다. 사용자 API는 PoC DB를 직접 읽지 않는다(`ZOOP_SOURCE=live`는 폐지). 관리자가 원장에서 새 버전을 게시해야 사용자 화면이 바뀐다. 관리자 API는 아래 "관리자 API·운영".
-- PoC에 없는 데이터(요약·감성)는 지어내지 않고 `{"status":"unavailable","reason":...}`로 응답한다. 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)에서 받아 출처·기준 시각과 함께 주고, 없으면 사유와 함께 `unavailable`이다. 인증·계좌·관심종목·브리핑 편성·AI 예시 답변은 BFF mock/규칙이며 응답 `metadata.generatedBy`로 표시한다.
+- PoC에 없는 요약은 지어내지 않고 `{"status":"unavailable","reason":...}`로 응답한다. 문서×기업·브리핑 회차 판정은 검증된 저장값만 제공하며 없으면 `sentiment:null`·`outlook:null`이다. HTTP/스케줄러는 모델을 호출하지 않고, 명시적 [판정 스크립트·설계](../../docs/design/sentiment.md)에서만 실행한다(현재 데모에는 판정값 없음). 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)에서 받아 출처·기준 시각과 함께 주고, 없으면 사유와 함께 `unavailable`이다. 인증·계좌·관심종목·브리핑 편성·AI 예시 답변은 BFF mock/규칙이며 응답 `metadata.generatedBy`로 표시한다.
 - `HOLD`/`REJECT`는 관리자가 허용하기 전에는 어떤 사용자 응답에도 나오지 않는다(`inspect().issues`만 사용, `candidates`는 모순 검사에만 사용). 예외는 **켜져 있는 자동 검수 규칙 R1@2가 다루는 HOLD 후보**(보류 사유가 역할 문구뿐인 후보, 아래 "관제·검수·그래프 버전")뿐이다. 관리자가 허용한 HOLD는 사건 상세의 `approval`(`관리자 승인`), 규칙이 게시한 사건은 `approval`(`자동 검수 규칙`)로 표시된다.
 - 소스 장애는 빈 결과로 위장하지 않고 `503 {"error":{"code":"source_unavailable",...}}`로 응답한다.
 
@@ -89,16 +89,17 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | POST | `/api/portfolio/connections` `{mockPortfolioId}` | 201. 같은 프로필 재전송은 기존 연결 200(중복 연결 없음). 미지 ID 404 `mock_portfolio_not_found`, 다른 프로필이 연결돼 있으면 409 `already_connected`. 계좌 식별·예수금·보유를 연결 시점에 회원 기록에 고정 |
 | GET | `/api/portfolio` | FS039·FS054. `connection{accountId,cash}`, 보유별 모의 수량·평균 매입가(`avgPriceCurrency`, 모르면 `null`)와 `quote`(계산 시점에 읽은 시세·통화·시세 시각, 없으면 unavailable+사유), `marketValue`(수량 × 시세, 시세 통화, 시세 없으면 `null`), `weight`(평가금액 ÷ 현금 뺀 주식 평가금액 합계). `mockAsOf`(모의 정보 기준 시점: 프로필 `asOf`, 없으면 연결 시각)와 `valuation.calculatedAt`(계산 기준 시점)을 나눠 준다. 주가가 하나라도 없음(`missing_price`)·시세 통화가 섞임(`mixed_currency`, 환율 없음)·합계 0(`zero_total`)이면 모든 `weight`가 `null`이고 `valuation.weightUnavailableCode/Reason`에 사유(0으로 채우지 않음). 연결이 없으면 `valuation:null` |
 | DELETE | `/api/portfolio/connections/{id}` | 204 |
-| GET | `/api/graph?mode=all|personal&companyId=&depth=1..6&limit=` | 아래 "그래프". `depth`를 생략하면 중심에서 닿는 연결 요소 전체 |
+| GET | `/api/graph?mode=all|personal&companyId=&depth=1..6&limit=&asOf=` | 아래 "그래프". `depth` 생략은 중심에서 닿는 연결 요소 전체, optional `asOf`는 공개 문서·관계 유효 시점으로 보수적 필터 |
 | GET | `/api/graph/edges/{id}` | 방향·유형·역할·`summary`·assertionStatus·근거 ID·basis·검증 상태. 파생 간선은 `via` 이슈와 직접 관계가 아니라는 설명 |
 | GET | `/api/companies?q=` | **명세 추가 제안.** 관심종목 검색(FS011-01). `q`(앞뒤 공백 제거, 대소문자 무시)는 코드 정확 일치(티커·id·시장 접두어 뺀 id) → 이름 정확 일치(이름·별칭) → 부분 일치 순, 동률은 이름·id 순. **개수 제한 없음.** `q`가 없으면 지원 종목 전체(이름순). 항목에 `brandColor`·`logoUrl` |
 | GET | `/api/companies/{id}` | `directIssues`(INVOLVES 역방향, `role`), `structuralIssues`(`basis`), `brandColor`·`logoUrl`, `summary` unavailable, `holding`/`watch`(회원만, 아니면 `null`). 시세는 늦거나 실패해도 개요를 막지 않도록 `/quote`로 따로 준다 |
 | GET | `/api/companies/{id}/quote` | 현재가·통화·기준 시각(`asOf`)·전일 종가·전일 대비(`change`, `changeRate` 비율)·당일 고저·거래량·52주 고저·시가총액(받거나 계산할 수 있을 때만)·`derived`(BFF 계산 항목)와 `source`(공급자·이름·공식 여부·`delayNote`·종목 기호·확인 URL). 없으면 `unavailable`+`reasonCode`. 아래 "시세" |
-| GET | `/api/companies/{id}/prices?period=1d|1m|1y&from=&to=` | 주가 차트 `points[]`(`time`·OHLC·`volume`, 오래된 순)·`interval`·`currency`·`source`. `from`/`to`(타임라인과 같은 공통 범위)를 주면 그 안의 봉만(분봉은 시각, 일봉은 KST 날짜로). 휴장 구간은 비워 두고 가격을 채우지 않으며, 범위 안에 거래가 없으면 `unavailable`+`no_data`. 없으면 `unavailable`+`reasonCode` |
+| GET | `/api/companies/{id}/prices?period=1d|1w|1m|1y&from=&to=` | 동일 기간 주가 차트 `points[]`(ISO 거래소 시각·OHLC·volume, 오래된 순)·interval·currency·source. 해상도 5분/시간/일/주. Yahoo는 기간 경계로 역사 조회하고 출처 응답을 다시 필터링한다. 거래 없는 구간은 no_data이며 가격을 채우지 않는다 |
 | GET | `/api/companies/{id}/metrics` | 주요 지표 `items[]`(`code`·`label`·`value` 출처 표기 그대로·`basis` 기준 기간)와 `source`·`asOf`(지표 출처 시각). 시세와 출처가 다르다. 없으면 `unavailable`+`reasonCode`. 아래 "주요 지표" |
-| GET | `/api/companies/{id}/documents` | 기업 상세 문서 탭. 이 기업 승인 사건들의 근거 기사를 **중복 없이 최신 발행순**(발행 시각 미상은 뒤)으로. 문서마다 `events[]`(사건 id·제목·`relationType` REPORTS/PROVIDES_BACKGROUND)와 저장한 인용 `quotes[]`(근거 id·인용·`quoteVerified`). `url`이 없으면 `null` 그대로 |
-| GET | `/api/events?companyId=&from=&to=` | 사건 목록(최신 사건순). 항목 `reportedAt` = 기사 발행 시각 중 가장 늦은 것(사건 시각으로 쓰지 않음). 아래 "시간" |
-| GET | `/api/events/{id}` | mentions·articles·relations·companies·sourceSupport·fieldDecisions·evidenceIds·follows(이전/다음)·`summary` unavailable |
+| GET | `/api/companies/{id}/graph?asOf=&depth=1|2` | 상세 전용 GraphResponse. 필수 공개 기준 시점, 기본 실제 간선 1-hop·최대 2-hop. 중심 기업은 관계가 없어도 유지. 공개 시각 없는 문서·근거 없는 간선은 과거 화면에 포함하지 않음. 역사 버전 복원 한계는 design-direction §5.10 |
+| GET | `/api/companies/{id}/documents?from=&to=&round=` | 기업 승인 사건 근거 기사를 문서 ID로 중복 제거·발행순(동률 ID순) 조회. optional 기간은 문서 발행 기준. events·저장 quotes·nullable sentiment(문서×기업). round는 발행본의 고정 판정만 읽음. 원문 미제공은 null |
+| GET | `/api/events?companyId=&from=&to=&depth=1|2` | 사건 목록(최신 사건순). 기본 직접 사건이며 depth=2는 동일 회사 2-hop 그래프의 사건 범위로 넓힌다. to 이전에 공개된 문서로 확보된 사건만 반환. reportedAt은 최신 기사 공개 시각이며 발생 시각과 구분. 시점 미상은 unknownTimeItems |
+| GET | `/api/events/{id}?asOf=` | mentions·articles·relations·companies·sourceSupport·fieldDecisions·evidenceIds·follows·summary. optional asOf 이전에 공개되지 않은 사건은 404 |
 | GET | `/api/evidence/{id}` | `{quote,start,end,articleId,articleVersion,article,quoteVerified,eventIds}` |
 | GET | `/api/briefings?date=&edition=morning|evening` | 발행된 출퇴근 브리핑 회차(모두에게 동일). 아래 "브리핑" |
 | GET | `/api/briefings/rounds?limit=` | 열 수 있는(발행·제공 중단) 회차 목록 — 날짜·구분 선택용 |
@@ -219,7 +220,8 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 | PoC + 카탈로그 | 기업 이름·티커·별칭, 표시용 `brandColor`·`logoUrl`(카탈로그에 있을 때만) | PoC `settings.json` companies < snapshot `zoop.companies` < 승인 언급의 participants 이름 < 기업 ID(이 순서로 덮어씀). 같은 `company_id`는 뒤 항목이 레코드째 덮어쓴다(필드 병합 없음) |
 | BFF 파생 | 기업–기업 `SHARES_ISSUE`, 근거 ID, `quoteVerified`, 시간 정밀도, 간선 ID, 정렬 | 승인 데이터에서 계산 |
 | **시세 공급자** | 현재가·전일 대비·지표(`/quote`), 주가 차트(`/prices`) | 토스증권 Open API 또는 Yahoo Finance 공개 차트(아래 "시세"). 출처·기준 시각·지연 여부를 응답에 담고, BFF 계산값은 `quote.derived`에 적는다 |
-| **unavailable** | 사건·기업 요약(`summary`), 감성, 브리핑 예측 평가 | 생산자 없음 |
+| **unavailable** | 사건·기업 요약(`summary`), 브리핑 예측 평가 | 생산자 없음 |
+| **검증된 판정 저장값** | 문서×기업 `sentiment`, 발행 회차 `outlook`·핵심 이슈 `documentSentiments` | 명시적 스크립트로 별도 판정·검증·저장. 미실행/실패는 null 또는 [], 데모에는 값 없음 |
 | **BFF mock/규칙** | 인증·세션, 설정, 가상 계좌(`mockPortfolios`: 계좌 식별·예수금·보유. 기본 `mock-basic`은 계좌 `MOCK-0001`, 예수금 3,000,000원, 평균 매입가는 상장 시장 통화로 정의), 보유 평가금액·비중(시세 공급자 값으로 계산), 관심종목, 브리핑 편성, AI 예시 답변 | `metadata.generatedBy` |
 
 ## 시세 (요구 35·36·37·72)
@@ -233,7 +235,7 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 
 - **무키 출처 선택 이유:** 키 없이 KRX·미국·도쿄 상장 14사를 한 형식으로 받고, 한 요청에 현재가·전일 종가·지표·당일 분봉이 함께 온다. 시가총액·PER 등은 Yahoo 차트 응답에 없어 아래 "주요 지표"(네이버 증권)에서 따로 받는다.
 - **종목 매핑:** 카탈로그 id만 쓴다(새 카탈로그 키 없음). `KRX:<6자리>` → 토스 `005930`, 야후 `005930.KS`(없으면 `.KQ`), `NASDAQ|NYSE|AMEX:<티커>` → 토스 티커, 야후 티커(`.`→`-`), `TSE:<4자리>` → 야후 `6702.T`(토스 미지원). 그 밖의 접두는 `unsupported_symbol`.
-- **기간:** `/prices?period=1d`는 가장 최근 거래일의 분봉(토스 1분, 야후 5분), `1m`·`1y`는 사건 타임라인과 같은 시작일(오늘 KST에서 1개월·1년 전, 말일 보정)부터의 일봉. 기업 상세는 `from`/`to`로 타임라인과 같은 범위(1일은 오늘 0시부터)를 보내므로 휴장일의 1일 차트는 `no_data`다. 시각은 거래소 오프셋을 붙인 ISO 8601. [팀 확인 필요: 실제 시세 공급사의 시간 단위·휴장 구간·기준 시각 제공 방식(FS040 확인 필요 사항)]
+- **기간:** 1일 5분/1주 시간/1개월 일/1년 주봉이다. Yahoo에는 실제 `period1/period2`와 `5m/1h/1d/1wk`를 요청하고 출처 반환 시각을 다시 검증한다. 토스의 1분/일봉 계약에는 5분·시간 조회가 없어 1일/1주는 미제공으로 반환하고, 1년은 실제 일봉을 ISO 주 OHLC로 집계한다. 거래소 현지 당일 경계는 화면이 from으로 전달한다. 실제 장중 지원은 각 종목·선택 구간의 응답으로 판정하며 Yahoo 직접 확인은 2026-10-06 HTTP429라 거래소 전체 지원을 확정하지 않았다.
 - **캐시·시간 초과:** 현재가 30초, 분봉 60초, 일봉 30~60분, 종목 정보 12시간(프로세스 메모리). 일시 장애는 캐시하지 않아 [다시 시도]가 실제로 다시 묻는다. 요청 시간 초과 `ZOOP_QUOTE_TIMEOUT_SECONDS`(기본 5초), 시간 초과·5xx는 한 번만 재시도, 429는 재시도하지 않는다.
 - **비밀값:** 토스 키는 환경변수로만 받고 `Settings`/클라이언트 `repr`, 응답, 로그에 남기지 않는다.
 
@@ -388,6 +390,8 @@ diff -qr "$SRC/src" "$DST/src"                        # 차이 없음이어야 �
 ### AI 사용량·비용 (요구 77)
 
 `GET /api/admin/ai-usage?window=24h|7d|30d|all`. 챗봇·브리핑은 규칙 기반이라 `modelBacked:false`·모델 호출 0회로 표기하되 요청·실패·처리 시간은 실측한다(클라이언트 오류 4xx는 AI 요청으로 세지 않음). 뉴스 분석은 기간 안의 관리자 재처리 작업 합계이고, `window=all`은 원장 `investmate.runs`의 과거 실행(엄격 600회·완화 400회 등)을 읽는다. 원장을 못 읽으면 `docs/evidence/poc-backend.md` §8·§9.2 기록 값을 `source:"document"`로 제공하며 문서가 말하지 않는 값은 `null`이다.
+
+기업별 문서 판정(`document-sentiment`)·회차 판정(`briefing-outlook`)은 별도 기능 행이다. `requests/succeeded/failed`는 재시도를 포함한 시도 수이며 `usage.modelCalls`는 live 시도, `replayCalls`는 고정 응답 시도, `retries`는 최초 이후 시도다. 성공/실패 캐시 조회·권한 차단·핵심 이슈 0개는 세지 않는다. 공급자가 반환한 토큰만 합산하며 단가가 미정이어서 비용을 산출하지 않는다. 실행·저장·팀 확인 사항은 [감성 설계](../../docs/design/sentiment.md)를 참조한다.
 
 ### 브리핑 운영 (요구 79·80)
 

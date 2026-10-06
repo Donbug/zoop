@@ -150,7 +150,7 @@ function ellipsePoints(rx: number, ry: number, fractions: number[], startAngle: 
  * 각 링 안의 순서는 원래 배치에서 중심을 기준으로 본 방향 순서라 전체 지도의 방향 감각이 유지된다.
  * 범례로 숨긴 노드도 자리를 받는다(필터는 재배치하지 않는다).
  */
-export function focusPositions(cy: Core, focus: { id: string; hops: number }, base: Positions, area: { width: number; height: number }): Positions {
+export function focusPositions(cy: Core, focus: { id: string; hops: number }, base: Positions, area: { width: number; height: number }, labelOverhang: Insets = FOCUS_LABEL_OVERHANG): Positions {
   const result: Positions = new Map();
   const root = cy.getElementById(focus.id);
   const center = base.get(focus.id);
@@ -162,8 +162,8 @@ export function focusPositions(cy: Core, focus: { id: string; hops: number }, ba
   if (rings.length === 0) return result;
 
   // 화면 영역 비율로 타원 모양을 정한다. 좁은 화면(모바일)에서는 세로로 긴 타원이 되어 좌우 캡션 열이 서로 겹치지 않는다.
-  const innerW = area.width - FOCUS_LABEL_OVERHANG.left - FOCUS_LABEL_OVERHANG.right;
-  const innerH = area.height - FOCUS_LABEL_OVERHANG.top - FOCUS_LABEL_OVERHANG.bottom;
+  const innerW = area.width - labelOverhang.left - labelOverhang.right;
+  const innerH = area.height - labelOverhang.top - labelOverhang.bottom;
   const aspect = Math.max(innerH, 1) / Math.max(innerW, 1);
   const angleOf = (node: NodeSingular) => {
     const p = base.get(node.id()) ?? node.position();

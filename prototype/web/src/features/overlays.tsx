@@ -27,6 +27,8 @@ export interface EvidenceRequest {
   evidenceIds?: string[];
   /** 근거 id를 모를 때 사건 id를 주면 사건 상세에서 근거 목록을 가져온다. */
   eventId?: string;
+  /** 문서 판정은 이 기업 맥락으로만 읽는다. 기업이 정해지지 않은 사건·연결선에서는 null. */
+  companyId?: string;
   /** 지도에서 열었을 때: 인용을 지도에서 강조할 수 있다. issueId는 해당 간선이 없을 때 대신 강조할 사건. */
   map?: { issueId?: string };
   /** 기준 관계를 검증한 시각(있을 때만). 없으면 근거 응답의 자료 기준 시각을 관계 확인 시점으로 보인다. */
@@ -144,7 +146,7 @@ function EvidenceSheet({
   const needsEvent = !request.evidenceIds && Boolean(request.eventId);
   const event = useEvent(needsEvent ? request.eventId : undefined);
   const ids = request.evidenceIds ?? event.data?.evidenceIds ?? [];
-  const items = useEvidenceItems(ids);
+  const items = useEvidenceItems(ids, request.companyId);
   const loaded = items.flatMap((q) => (q.data ? [q.data] : []));
   // 받을 수 없는 근거(404 삭제·비공개, 403 권한 없음)는 다시 시도할 대상이 아니다. 일시 장애만 오류로 보이고 그것만 다시 시도한다.
   const failed = items.filter((q) => q.isError && !isEvidenceGone(q.error));

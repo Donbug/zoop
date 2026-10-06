@@ -1,0 +1,18 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k",
+  "export_url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k/export?format=xlsx",
+  "collected_at_kst": "2026-10-06T11:05:01.936256+09:00",
+  "auth": "none",
+  "xlsx": "zoop-requirements_2026-10-06.xlsx",
+  "sha256": "cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18",
+  "baseline_date": "2026-10-01",
+  "baseline_sha256": "807687b03236e647dff7b1fc8d43f50b3f72af7842c31d273cdf49a6e931ba02",
+  "data_only": true,
+  "sheets": {
+    "요구사항 정의서": "1-요구사항-정의서.csv",
+    "검증 기준": "2-검증-기준.csv",
+    "정책 결정": "3-정책-결정.csv"
+  },
+  "csv_encoding": "utf-8-sig",
+  "changed_cells": 330
+}

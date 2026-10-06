@@ -1,0 +1,11 @@
+{
+  "result": "passed",
+  "command": "/tmp/zoop-docrefresh-env/bin/python docs/evidence/raw/functional-spec_2026-10-06/_verify_csv.py",
+  "python": "3.13.14",
+  "openpyxl": "3.1.5",
+  "files": 18,
+  "cells": 45088,
+  "scope": ["functional-spec_2026-10-06", "requirements-sheet_2026-10-06"],
+  "method": "Reload preserved xlsx with data_only=True; independently index each worksheet.cell(row,column); compare CSV row/column counts and every serialized cell including empty cells and rows.",
+  "product_checks": "not run: source collection assignment only"
+}

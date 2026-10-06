@@ -11,12 +11,18 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | [spec-v1.2-gap.md](spec-v1.2-gap.md) | 기능·비기능명세서 v1.2 93개 명세와 현재 프로토타입 대조: 판정표, 명세와 반대로 동작하는 11건, 팀 결정·데이터가 막는 항목 |
 | [spec-wbs-delta-2026-10-03.md](spec-wbs-delta-2026-10-03.md) | 10-03 갱신 명세(15시트, v2 시트 2개)·WBS v0.2와 10-01 고정본의 차이, 팀 결정 6개 반영 여부, WBS 전수 작업표, 현재 구현과의 충돌·중복 |
 | [notion-delta-2026-10-03.md](notion-delta-2026-10-03.md) | Notion 10-03 재수집(120페이지)과 9/29 대비 변경: 9/30·10/1·10/2 회의 결정, AI v1.3, 역할안, 문서 간 충돌 |
+| [doc-delta-2026-10-06.md](doc-delta-2026-10-06.md) | 팀 문서 10-06 재수집: 명세 12셀 머리글 정리, 요구 번호·승인 상태 변경 전수표, WBS 내용 동일, Notion 121페이지·역할안 이동/API 경계 메모, 감성 언급 전수 인덱스·진행 보고의 결정 8개 답변 여부·현재 구현 충돌 |
 | [screen-plan-v1.7-review.md](screen-plan-v1.7-review.md) | 팀 화면계획서 v1.7·Figma 평가: 채택·불채택과 근거, 우리 프로토타입 약점(머리 정정 포함) |
+| [시스템 연결 체계](../system/README.md) | 화면·FS/NFS·요구사항·WBS·프로토타입 판정·목표 API의 ID 연결 원본과 팀용 xlsx·마크다운 생성/검사 절차 |
 | `raw/` | 원본 변환본: Notion export(112페이지), 명세서·WBS 변환, 플로우 SVG |
 | `raw/functional-spec_2026-10-01/` | **기능 정본(2026-10-01 20:41 KST 고정본).** 팀 확정 「줍 기능·비기능명세서 — 상세형 v1.2」 원본 xlsx(sha256 `a7f52731…`)와 시트별 CSV 13개(목차, 영역 9개, 비기능, 변경 내역, 제안·확인 사항 D01–D12). 기능 81개·비기능 12개, 명세마다 상세 항목 11개. 출처: `docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs`. |
 | `raw/requirements-sheet_2026-10-01/` | 이전 작업용 정본(2026-10-01 11:04 KST). 요구사항 정의서 v0.1(82행)·검증 기준·정책 결정. v1.2 명세의 「원본 요구사항 ID」가 이 정의서 계열 번호를 잇는다(번호는 v1.2 목차 기준). 출처: `docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k`. |
 | `raw/functional-spec_2026-10-03/` | 갱신 명세 고정본(2026-10-03 14:19 KST 수집). 원본 `zoop-functional-spec_2026-10-03.xlsx`와 계산값 기준 시트별 CSV 15개. 기존 시트와 `메인그래프 v2`·`AI 챗봇 v2`가 함께 있으며 기준 채택 여부는 별도 판단한다. 출처: `https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs`. sha256: `b48f1a7fc73e10f75a1c52ec199125c5b14afa069c2f87fb31aac88f384f7c0e`. |
 | `raw/wbs_2026-10-03/` | 새 WBS v0.2 고정본(2026-10-03 14:19 KST 수집, 문서 최종 수정일 10-02). 원본 `zoop-wbs_2026-10-03.xlsx`와 계산값 기준 CSV 3개(표지·변경이력, 프로젝트 WBS, 개발 일정 요약). 출처: `https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c`. sha256: `e613b38d1adef34c5cbd4ee80cdae2d7df39f25f1957e01632e4180e74c28258`. |
+| `raw/functional-spec_2026-10-06/` | 명세 재고정(2026-10-06 11:04:53 KST). 원본 `zoop-functional-spec_2026-10-06.xlsx`와 계산값 기준 CSV 15개. 기업 상세 시점 그래프 머리글의 복사된 FS041 12셀 제거 외 내용 동일. [출처](https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs). sha256: `c005e9ec9963f797ea8e64c28818720212ec44a5de3da1aa00fb66622d88df2d`. 독립 셀 검증 스크립트·결과 포함(명세/요구 합계 18 CSV·45,088셀 passed). |
+| `raw/requirements-sheet_2026-10-06/` | 요구사항 재고정(2026-10-06 11:05:01 KST). 원본 `zoop-requirements_2026-10-06.xlsx`와 계산값 기준 CSV 3개. 요구 82→85레코드, 신규 26·27·37, 번호 재배정·상태 변경. 검증 기준/정책 결정 내용 동일. [출처](https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k). sha256: `cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18`. |
+| `raw/notion_2026-10-06/` | [Notion 공개 루트](https://www.notion.so/3cafef49d8d580cb9a25e53f97ec3f90) 재고정(2026-10-06 11:05:06–11:14:42 KST). 121페이지, 빈 회의록 1개 추가, 역할/휴지통 본문 2개 변경·삭제 0. 최종 비밀번호 가림본 `_record-map.json` sha256: `07dfad10d5b7412210c96823c12c184e505b468aab9ea01dd5ae814a5e227759`. 페이지별 sha256·편집 시각·175회 요청 기록 포함(시트 GET 3회 포함, 최종 HTTP 200 모두; 429 없음). 3기/4기 첨부·강의 캘린더 제외. |
+| WBS 10-06 재확인 → `raw/wbs_2026-10-03/` 유지 | 2026-10-06 11:04:57 KST 재수집. **변경 없음(내용 동일)**: 3시트 모든 계산값·셀 범위·담당·일정 동일. 새 폴더 없음. 재수집 xlsx 응답 sha256: `a48831fd7ac90c5f0774569c20204f6ea6534a1d6ef378147ee206a7e4b0fcd0`(컨테이너 바이트만 달라 10-03 원본 유지). [출처](https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c). |
 
 ## 증거 범위와 제외
 

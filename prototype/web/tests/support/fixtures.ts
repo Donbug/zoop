@@ -45,10 +45,11 @@ export const ALPHA: TestCompany = {
   per: "12.35",
   events: {
     "1d": [{ id: "ev-alpha-1d", title: "알파전자 신공장 착공 발표", eventTime: "2026-10-02" }],
+    "1w": [{ id: "ev-alpha-1w", title: "알파전자 주간 공시", eventTime: "2026-09-29" }],
     "1m": [{ id: "ev-alpha-1m", title: "알파전자 장비 공급 계약 체결", eventTime: "2026-09-20" }],
     "1y": [{ id: "ev-alpha-1y", title: "알파전자 해외 법인 설립", eventTime: "2026-03-10" }],
   },
-  closes: { "1d": [70_800, 71_400], "1m": [69_900, 70_200], "1y": [64_100, 64_800] },
+  closes: { "1d": [70_800, 71_400], "1w": [70_700, 71_000], "1m": [69_900, 70_200], "1y": [64_100, 64_800] },
 };
 
 export const BETA: TestCompany = {
@@ -59,10 +60,11 @@ export const BETA: TestCompany = {
   per: "8.10",
   events: {
     "1d": [{ id: "ev-beta-1d", title: "베타화학 오늘의 공시", eventTime: "2026-10-02" }],
+    "1w": [{ id: "ev-beta-1w", title: "베타화학 주간 공시", eventTime: "2026-09-29" }],
     "1m": [{ id: "ev-beta-1m", title: "베타화학 배터리 소재 증설", eventTime: "2026-09-21" }],
     "1y": [{ id: "ev-beta-1y", title: "베타화학 연간 생산 목표 상향", eventTime: "2026-02-14" }],
   },
-  closes: { "1d": [204_000, 205_600], "1m": [198_000, 203_300], "1y": [150_000, 199_900] },
+  closes: { "1d": [204_000, 205_600], "1w": [204_000, 205_000], "1m": [198_000, 203_300], "1y": [150_000, 199_900] },
 };
 
 export const MEMBER_NAME = "시험회원";
@@ -137,7 +139,7 @@ export const pricesOf = (c: TestCompany, period: Period): Schemas["PriceSeries"]
   period,
   source,
   currency: "KRW",
-  interval: period === "1d" ? "5m" : "1d",
+  interval: period === "1d" ? "5m" : period === "1w" ? "1h" : period === "1y" ? "1wk" : "1d",
   points: c.closes[period].map((close, i) => ({
     time: period === "1d" ? `2026-10-02T09:${String(i * 5).padStart(2, "0")}:00+09:00` : `2026-09-${String(20 + i).padStart(2, "0")}T00:00:00+09:00`,
     open: close,
@@ -152,6 +154,7 @@ export const pricesOf = (c: TestCompany, period: Period): Schemas["PriceSeries"]
 export function periodOfRange(from: string, to: string): Period {
   const days = (Date.parse(to) - Date.parse(from)) / 86_400_000;
   if (days < 1) return "1d";
+  if (days <= 8) return "1w";
   return days <= 32 ? "1m" : "1y";
 }
 
@@ -380,6 +383,7 @@ export class World {
       return c ? json(pricesOf(c, request.query.get("period") as Period)) : notFound();
     });
     bff.on("GET", "/api/companies/:id/documents", json({ items: [], metadata }));
+    bff.on("GET", "/api/companies/:id/graph", () => json(graphOf("all")));
     bff.on("GET", "/api/events", (request) => {
       const c = this.#company(request.query.get("companyId") ?? "");
       if (!c) return notFound();

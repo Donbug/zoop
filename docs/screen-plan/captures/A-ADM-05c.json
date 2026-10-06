@@ -7,7 +7,7 @@
     "height": 900
   },
   "fs": "FS073·NFS001",
-  "requirements": "51·82",
+  "requirements": "54·85",
   "entry": "관리자 세션이 없는 /admin 진입",
   "states": "입력 누락 · 인증·권한 실패 · 세션 만료",
   "capturedState": "기본",

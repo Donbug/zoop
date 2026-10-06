@@ -2,7 +2,7 @@
 //  - 금액은 받은 통화 그대로 적는다(환산하지 않음). 원화·엔화는 소수점 없이, 그 밖은 소수 2~4자리.
 //  - 등락 글자 표기는 components/domain/status-labels의 PriceChange(색 + 부호 + ▲/▼ + 상승/하락/보합)가 맡는다.
 //  - 사건 표시는 일·시각까지 확인된 사건만 둔다. 월·연 정밀도 사건은 하루에 놓을 수 없어 표시하지 않는다.
-import type { EventGroup } from "./company-timeline";
+import type { EventGroup, Period } from "./company-timeline";
 import { kstDate } from "./company-timeline";
 
 const unit: Record<string, string> = { KRW: "원", USD: "달러", JPY: "엔" };
@@ -56,7 +56,7 @@ const MERGE_DISTANCE = 0.06;
 
 /** 날짜 묶음을 차트 가로 위치에 놓는다. 일봉은 사건 날짜의 거래일(휴장일이면 4일 안의 다음 거래일),
  *  분봉(최근 거래일 하루)은 시각을 아는 사건만 그 시각에, 날짜만 아는 사건은 그 거래일 시작에 둔다. 가까운 표시는 합친다. */
-export function placeMarkers(times: string[], intraday: boolean, groups: EventGroup[]): ChartMarker[] {
+export function placeMarkers(times: string[], intraday: boolean, groups: EventGroup[], period: Period = "1m"): ChartMarker[] {
   const n = times.length;
   if (n === 0) return [];
   const barDates = times.map((t) => t.slice(0, 10));
@@ -65,14 +65,17 @@ export function placeMarkers(times: string[], intraday: boolean, groups: EventGr
   for (const group of groups) {
     const first = group.items[0];
     if (group.unknown || !first?.eventTime || (first.timePrecision !== "day" && first.timePrecision !== "datetime")) continue;
-    const date = kstDate(first.eventTime);
+    const date = period === "1y" && group.start ? group.start.slice(0, 10) : kstDate(first.eventTime);
     if (!date) continue;
     let index = -1;
     if (intraday) {
       const ms = first.timePrecision === "datetime" ? Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(first.eventTime) ? first.eventTime : `${first.eventTime}+09:00`) : NaN;
+      if (first.timePrecision !== "datetime") continue;
       if (!Number.isNaN(ms) && ms >= barMs[0]! && ms <= barMs[n - 1]!) {
         index = barMs.reduce((best, t, i) => (Math.abs(t - ms) < Math.abs(barMs[best]! - ms) ? i : best), 0);
-      } else if (first.timePrecision === "day" && date === barDates[0]) index = 0;
+      }
+    } else if (period === "1y") {
+      index = barDates.reduce((best, value, i) => Math.abs(Date.parse(value) - Date.parse(date)) < Math.abs(Date.parse(barDates[best]!) - Date.parse(date)) ? i : best, 0);
     } else if (date >= barDates[0]!) {
       const found = barDates.findIndex((d) => d >= date);
       if (found >= 0 && (Date.parse(barDates[found]!) - Date.parse(date)) / 86_400_000 <= 4) index = found;

@@ -74,7 +74,9 @@ export function AdminAiPage() {
                   <Th className="text-right">실패</Th>
                   <Th className="text-right">평균 처리</Th>
                   <Th className="text-right">p95</Th>
-                  <Th className="text-right">모델 호출</Th>
+                  <Th className="text-right">실제 모델 호출</Th>
+                  <Th className="text-right">재생(호출 아님)</Th>
+                  <Th className="text-right">재시도</Th>
                   <Th className="text-right">입력 토큰</Th>
                   <Th className="text-right">출력 토큰</Th>
                   <Th>비용</Th>
@@ -101,6 +103,8 @@ export function AdminAiPage() {
                     <Td className="text-right">{formatDurationMs(f.latencyMs?.avg)}</Td>
                     <Td className="text-right">{formatDurationMs(f.latencyMs?.p95)}</Td>
                     <Td className="text-right">{formatCount(f.usage?.modelCalls)}</Td>
+                    <Td className="text-right">{formatCount(f.usage?.replayCalls)}</Td>
+                    <Td className="text-right">{formatCount(f.usage?.retries)}</Td>
                     <Td className="text-right">{formatCount(f.usage?.inputTokens)}</Td>
                     <Td className="text-right">{formatCount(f.usage?.outputTokens)}</Td>
                     <Td className="whitespace-nowrap">

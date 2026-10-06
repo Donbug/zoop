@@ -1,6 +1,6 @@
 // FS041 차트의 사건 날짜 선택 — 날짜를 고르면 이전 선택(상세·차트 강조)은 정리되고,
 // 그 날짜의 사건이 한 건이면 상세까지 열리며, 여러 건이면 카드를 펼쳐 사용자가 고르게 한다.
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import { openApp } from "./support/app";
 import { ALPHA, type TestCompany } from "./support/fixtures";
@@ -15,7 +15,7 @@ const PATENT = { id: "ev-alpha-patent", title: "알파전자 특허 소송 제�
 const alpha: TestCompany = { ...ALPHA, events: { ...ALPHA.events, "1m": [PATENT, SUPPLY, DELIVERY] } };
 
 const open = () => openApp(pageOf(alpha), (_, world) => world.companies.set(alpha.id, alpha));
-const selectedEventParam = () => new URLSearchParams(window.location.search).get("event");
+const selectedEventParam = () => new URLSearchParams(window.location.search).get("issue");
 
 describe("차트에서 사건이 있었던 날짜를 고를 때", () => {
   test("그 날짜의 사건이 한 건이면 바로 선택되어 상세가 열리고, 그 날짜 표시가 강조된다", async () => {
@@ -38,14 +38,15 @@ describe("차트에서 사건이 있었던 날짜를 고를 때", () => {
 
     await user.click(await screen.findByRole("button", { name: /^9월 20일 사건 2건/ }));
 
-    expect(await screen.findByRole("button", { name: SUPPLY.title })).toBeTruthy();
-    expect(screen.getByRole("button", { name: DELIVERY.title })).toBeTruthy();
+    const timeline = screen.getByRole("list", { name: /사건 타임라인/ });
+    expect(await within(timeline).findByRole("button", { name: SUPPLY.title })).toBeTruthy();
+    expect(within(timeline).getByRole("button", { name: DELIVERY.title })).toBeTruthy();
     expect(selectedEventParam()).toBeNull();
     expect(eventDetailShown()).toBe(false);
-    expect(isHighlighted(dateMarker("9월 20일"))).toBe(false);
+    expect(isHighlighted(dateMarker("9월 20일"))).toBe(true);
     expect(bff.calls("GET", "/api/events/:id")).toEqual([]);
 
-    await user.click(screen.getByRole("button", { name: DELIVERY.title }));
+    await user.click(within(timeline).getByRole("button", { name: DELIVERY.title }));
     await waitFor(() => expect(eventDetailShown()).toBe(true));
     expect(openedEventTitles([PATENT.title, SUPPLY.title, DELIVERY.title])).toEqual([DELIVERY.title]);
     expect(isHighlighted(dateMarker("9월 20일"))).toBe(true);
@@ -63,6 +64,17 @@ describe("차트에서 사건이 있었던 날짜를 고를 때", () => {
     expect(selectedEventParam()).toBeNull();
     expect(openedEventTitles([PATENT.title, SUPPLY.title, DELIVERY.title])).toEqual([]);
     expect(isHighlighted(dateMarker("9월 21일"))).toBe(false);
-    expect(isHighlighted(dateMarker("9월 20일"))).toBe(false);
+    expect(isHighlighted(dateMarker("9월 20일"))).toBe(true);
+  });
+  test("같은 복수 사건 버킷을 다시 고르면 사용자가 고른 카드를 유지한다", async () => {
+    const { user } = await open();
+    const timeline = await screen.findByRole("list", { name: /사건 타임라인/ });
+    await user.click(await screen.findByRole("button", { name: /^9월 20일 사건 2건/ }));
+    await user.click(within(timeline).getByRole("button", { name: DELIVERY.title }));
+    await waitFor(() => expect(eventDetailShown()).toBe(true));
+    await user.click(dateMarker("9월 20일"));
+    expect(selectedEventParam()).toBe(DELIVERY.id);
+    expect(openedEventTitles([PATENT.title, SUPPLY.title, DELIVERY.title])).toEqual([DELIVERY.title]);
+    expect(isHighlighted(dateMarker("9월 20일"))).toBe(true);
   });
 });

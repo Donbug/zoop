@@ -7,7 +7,7 @@
     "height": 900
   },
   "fs": "FS017·FS019·FS026",
-  "requirements": "17·19",
+  "requirements": "17·19·26",
   "entry": "회원 → 내 종목 모드",
   "states": "전체·보유·관심 범위 · 기준 종목 0개 · 관계 0건 · 조회 실패",
   "capturedState": "기본",
@@ -70,7 +70,7 @@
     }
   ],
   "image": "D-GRP-01b.png",
-  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n23\n사건\n89\n직접 관련\n122\n후속 사건\n1\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n23\n사건\n89\n직접 관련\n122\n후속 사건\n1\n사건 공유\n38\n\n흐름 순으로 정렬",
   "clickEvidence": [
     {
       "selector": {
@@ -79,7 +79,7 @@
       },
       "before": "/?mode=personal",
       "url": "/?mode=personal",
-      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n19\n사건\n77\n직접 관련\n106\n후속 사건\n1\n사건 공유\n28\n그래프\n목록\n\n흐름 순으로 정렬",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n19\n사건\n77\n직접 관련\n106\n후속 사건\n1\n사건 공유\n28\n\n흐름 순으로 정렬",
       "number": 1
     },
     {
@@ -90,7 +90,7 @@
       },
       "before": "/?mode=personal",
       "url": "/?mode=personal",
-      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n14\n사건\n46\n직접 관련\n65\n후속 사건\n1\n사건 공유\n20\n그래프\n목록\n\n흐름 순으로 정렬",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n내 종목 지도\n내 종목\n시장 전체\n내 종목\n전체\n보유\n3\n관심\n1\n기업\n14\n사건\n46\n직접 관련\n65\n후속 사건\n1\n사건 공유\n20\n\n흐름 순으로 정렬",
       "number": 2
     },
     {
@@ -100,7 +100,7 @@
       },
       "before": "/?mode=personal",
       "url": "/?mode=all",
-      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n\n흐름 순으로 정렬",
       "number": 3
     }
   ]

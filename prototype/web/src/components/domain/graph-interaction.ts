@@ -24,6 +24,8 @@ export interface ViewState {
   evidence: EvidenceHighlight | null;
   /** 두 기업 사이 경로(G6). 포커스와 함께 오지 않는다(부모가 보장). */
   path: GraphPath | null;
+  /** 상세 타임라인에서 고른 버킷의 복수 사건. 선택이 없을 때만 강조한다. */
+  highlightedNodes?: ReadonlySet<string>;
 }
 
 const VIEW_CLASSES = "focused focus-root dimmed emph faded labelled quiet hover focus-hidden filter-hidden path";
@@ -129,6 +131,9 @@ export function applyViewState(cy: Core, state: ViewState): Collection {
     if (state.selectionId) {
       const selected = elementFor(cy, state.selectionId, state.bundled);
       if (selected.nonempty() && isShown(selected)) mark(selected);
+    } else if (state.highlightedNodes?.size) {
+      const found = cy.nodes().filter((node) => state.highlightedNodes!.has(node.id()) && isShown(node));
+      if (found.nonempty()) mark(found);
     }
   });
   return target;

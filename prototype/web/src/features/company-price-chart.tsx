@@ -1,12 +1,6 @@
-// 기업 상세 주가 차트(요구 37, FS040). 사건 타임라인과 같은 범위(공통 KST 종료 시각·달력 시작)로 조회하고, 사건 날짜 위치에 표시를 둔다.
-//  - 휴장일에는 시세가 없다. 점은 실제 거래 시각의 시세만 찍고 빈 날을 채우는 가격을 만들지 않는다(선은 이웃한 거래 시각끼리 잇는다).
-//  - 차트 라이브러리 없이 SVG 한 줄(종가)로 그린다. 선 색은 기간 첫 종가 대비 마지막 종가의 상승·하락이며,
-//    같은 내용을 위 줄에 부호·화살표·글자로도 적는다(색만으로 구분하지 않음).
-//  - 사건 표시는 '이 날 사건이 있었다'만 뜻한다. 주가 움직임의 원인이라고 말하지 않는다. 누르면 그 날짜를 고른다(FS041: 사건이 1건이면
-//    그 사건을 바로 열고, 여러 건이면 카드를 펼쳐 고르게 한다). 선택한 사건의 발생 날짜는 실선·채운 표시로 강조한다(날짜 미상 사건은 강조 없음).
-//    차트를 그릴 때는 출처 줄 아래에 '시점이 겹쳐도 인과관계가 아님' 고지를 한 번 둔다(팀 화면계획서 슬라이드 19). 차트가 없으면 고지도 없다.
-//  - 키보드·스크린리더: 차트는 요약 문장으로 읽히고, [표로 보기]에 시각별 종가·거래량 표가 있다. 사건 표시는 버튼이다.
-//  - 일시 장애는 이 영역만 [다시 시도], 자료 없음은 한 줄, 미연결·미지원 종목은 시세 영역이 이미 사유를 말하므로 그리지 않는다.
+// FS040/FS041: 동일 기간의 실제 거래 바와 사건 버킷 표식. 휴장 시세를 채우지 않는다.
+// 표식 선택은 버킷/사건 강조, 실제 바 선택은 공개 기준 asOf 변경이다.
+// 클릭·화살표/Enter·시세 표 버튼으로 시점을 고를 수 있고 인과를 단정하지 않는다.
 import { Table, Zap } from "lucide-react";
 import { useId, useState } from "react";
 import { ApiError } from "@/api/client";
@@ -18,6 +12,7 @@ import { formatCompact, formatPrice, placeMarkers, pointLabel, toneOf, type Tone
 import { cn } from "@/lib/utils";
 import { DisclaimerNote, PriceChange } from "@/components/domain/status-labels";
 import { QuoteSourceHint, UnavailableLine } from "./company-quote";
+import { formatKst } from "@/lib/labels";
 
 const W = 1000;
 const H = 200;
@@ -34,9 +29,10 @@ interface Props {
   onPick: (keys: string[]) => void;
   /** 선택한 사건이 든 날짜 묶음 키(발생 날짜를 아는 사건만). 그 위치를 강조한다. */
   selectedKey: string | null;
+  onAsOfChange?: (time: string) => void;
 }
 
-export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKey }: Props) {
+export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKey, onAsOfChange }: Props) {
   const prices = useCompanyPrices(companyId, range);
   const period = range.period;
   const [hover, setHover] = useState<number | null>(null);
@@ -58,7 +54,7 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
   }
 
   const { points, currency, source } = data;
-  const intraday = data.interval !== "1d";
+  const intraday = data.interval === "5m" || data.interval === "1h";
   const n = points.length;
   const closes = points.map((p) => p.close);
   const min = Math.min(...closes);
@@ -76,10 +72,11 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
     points.map((p) => p.time),
     intraday,
     groups,
+    period,
   );
   const label = (i: number) => pointLabel(points[i]!.time, intraday);
   const sessionDate = pointLabel(first.time, false);
-  const scope = intraday ? `최근 거래일(${sessionDate})` : periodLabel[period];
+  const scope = period === "1d" ? `당일(${sessionDate})` : periodLabel[period];
   const summary =
     `${scope} 주가. 처음 ${label(0)} ${formatPrice(first.close, currency)}, 마지막 ${label(n - 1)} ${formatPrice(last.close, currency)}. ` +
     `최고 ${formatPrice(max, currency)}(${label(maxAt)}), 최저 ${formatPrice(min, currency)}(${label(minAt)}).` +
@@ -96,9 +93,9 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
         {summary}
       </p>
       <div className="flex min-h-7 flex-wrap items-center gap-x-2 text-sm text-text-secondary tabular-nums" aria-hidden="true">
-        {hover !== null ? (
+        {hover !== null && points[hover] ? (
           <span>
-            {intraday ? `${sessionDate} ${label(hover)}` : label(hover)} · <span className="font-semibold text-text-primary">{formatPrice(points[hover]!.close, currency)}</span>
+            {intraday ? `${pointLabel(points[hover]!.time, false)} ${label(hover)}` : label(hover)} · <span className="font-semibold text-text-primary">{formatPrice(points[hover]!.close, currency)}</span>
           </span>
         ) : (
           <>
@@ -109,6 +106,28 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
       </div>
       <div
         className="relative h-40 touch-pan-y md:h-48"
+        role={onAsOfChange ? "slider" : undefined}
+        tabIndex={onAsOfChange ? 0 : undefined}
+        aria-label={onAsOfChange ? "차트 기준 시점. 화살표로 이동하고 Enter로 선택해요" : undefined}
+        aria-valuemin={onAsOfChange ? 0 : undefined}
+        aria-valuemax={onAsOfChange ? n - 1 : undefined}
+        aria-valuenow={onAsOfChange ? Math.min(hover ?? n - 1, n - 1) : undefined}
+        aria-valuetext={onAsOfChange ? `${label(Math.min(hover ?? n - 1, n - 1))} ${formatPrice(points[Math.min(hover ?? n - 1, n - 1)]!.close, currency)}` : undefined}
+        onKeyDown={(event) => {
+          const index = Math.min(hover ?? n - 1, n - 1);
+          if (["ArrowLeft", "ArrowDown", "ArrowRight", "ArrowUp", "Home", "End", "Enter", " "].includes(event.key)) event.preventDefault();
+          if (event.key === "ArrowLeft" || event.key === "ArrowDown") setHover(Math.max(0, index - 1));
+          else if (event.key === "ArrowRight" || event.key === "ArrowUp") setHover(Math.min(n - 1, index + 1));
+          else if (event.key === "Home") setHover(0);
+          else if (event.key === "End") setHover(n - 1);
+          else if (event.key === "Enter" || event.key === " ") onAsOfChange?.(points[index]!.time);
+        }}
+        onClick={(event) => {
+          if (!onAsOfChange) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+          onAsOfChange(points[Math.round(fraction * (n - 1))]!.time);
+        }}
         onPointerMove={(e) => pick(e.clientX, e.currentTarget.getBoundingClientRect())}
         onPointerDown={(e) => pick(e.clientX, e.currentTarget.getBoundingClientRect())}
         onPointerLeave={() => setHover(null)}
@@ -130,7 +149,7 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
             );
           })}
           <path d={line} fill="none" strokeWidth={2} strokeLinejoin="round" className={strokeClass[tone]} vectorEffect="non-scaling-stroke" />
-          {hover !== null && (
+          {hover !== null && hover < n && (
             <line x1={xOf(hover)} x2={xOf(hover)} y1={0} y2={H} className="stroke-text-tertiary" vectorEffect="non-scaling-stroke" />
           )}
         </svg>
@@ -142,7 +161,7 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
         </span>
       </div>
       {markers.length > 0 && (
-        <div className="relative h-11" role="group" aria-label="사건이 있었던 날">
+        <div className="relative h-11" role="group" aria-label="사건이 있었던 시간 버킷">
           {markers.map((m) => {
             const when = m.dates.length > 1 ? `${pointLabel(m.dates.at(-1)!, false)}~${pointLabel(m.dates[0]!, false)}` : pointLabel(m.dates[0]!, false);
             const text = `${when} 사건 ${m.count}건`;
@@ -174,9 +193,10 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
       </div>
       <figcaption className="flex flex-wrap items-center gap-x-1 text-sm text-text-secondary">
         <span>
-          {source.name} · {intraday ? `${data.interval === "1m" ? "1분" : "5분"} 간격` : "일별 종가"}
+          {source.name} · {data.interval === "5m" ? "5분 간격" : data.interval === "1h" ? "시간 간격" : data.interval === "1wk" ? "주별 종가" : "일별 종가"}
         </span>
         <QuoteSourceHint source={source} />
+        <span className="tabular-nums">마지막 시세 <time dateTime={last.time}>{formatKst(last.time)}</time></span>
       </figcaption>
       {/* 사건 표시와 같은 화면에 그리므로 시점 겹침을 인과로 읽지 않게 한 번 알린다(차트를 그릴 때만). */}
       <DisclaimerNote>{chartCausalityText}</DisclaimerNote>
@@ -205,7 +225,7 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
               {points
                 .map((p, i) => (
                   <tr key={p.time}>
-                    <td className="py-1.5 pr-3">{label(i)}</td>
+                    <td className="py-1.5 pr-3">{onAsOfChange ? <button type="button" className="min-h-11 text-brand-primary underline underline-offset-4" onClick={() => onAsOfChange(p.time)} aria-label={`${pointLabel(p.time, false)} ${intraday ? label(i) : ""} 기준 시점 선택`}>{label(i)}</button> : label(i)}</td>
                     <td className="py-1.5 pr-3 text-right">{formatPrice(p.close, currency)}</td>
                     <td className={cn("py-1.5 text-right", p.volume == null && "text-text-tertiary")}>{p.volume != null ? formatCompact(p.volume) : "–"}</td>
                   </tr>

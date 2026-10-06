@@ -15,7 +15,7 @@
   "stateImages": [
     "docs/design/v5/graph-personal-empty-1440-light.png"
   ],
-  "note": "영향 방향 값은 생산자가 없어 표시하지 않아요.",
+  "note": "데모에는 실제 모델 판정값이 없어 표시하지 않아요.",
   "markers": [
     {
       "number": 1,
@@ -68,7 +68,7 @@
     }
   ],
   "image": "D-GRP-02.png",
-  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST",
+  "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST",
   "clickEvidence": [
     {
       "selector": {
@@ -77,7 +77,7 @@
       },
       "before": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
       "url": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
-      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST\n근거 문서\n\nJensen Huang appears at Salesforce Dreamforce\n\n관계 확인 시점\n2026-10-01 20:21 KST\n\nNVIDIA official blog (blogs.nvidia.com)\n·\n발행 2026-09-16 07:24 KST\n\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\n\n“NVIDIA founder and CEO Jensen Huang brought to Salesforce Dreamforce Tuesday, joining CEO Marc Benioff onstage in an appearance”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nNVIDIA official blog (blogs.nvidia.com)\n·\n발행 2026-09-16 07:24 KST\n\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\n\n“He walked into the crowd — threading through the audience at Moscone Center, mic in hand, with Benioff alongside.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST\n근거 문서\n\nJensen Huang appears at Salesforce Dreamforce\n\n관계 확인 시점\n2026-10-01 20:21 KST\n\nNVIDIA official blog (blogs.nvidia.com)\n·\n발행 2026-09-16 07:24 KST\n\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\n\n“NVIDIA founder and CEO Jensen Huang brought to Salesforce Dreamforce Tuesday, joining CEO Marc Benioff onstage in an appearance”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기\n\nNVIDIA official blog (blogs.nvidia.com)\n·\n발행 2026-09-16 07:24 KST\n\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\n\n“He walked into the crowd — threading through the audience at Moscone Center, mic in hand, with Benioff alongside.”\n원문 기사 보기\n(새 창에서 열림)\n지도에서 보기",
       "number": 1
     },
     {
@@ -87,7 +87,7 @@
       },
       "before": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
       "url": "/?mode=all",
-      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\n흐름 순으로 정렬",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n\n흐름 순으로 정렬",
       "number": 2
     },
     {
@@ -97,7 +97,7 @@
       },
       "before": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
       "url": "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57",
-      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n그래프\n목록\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n질문에 연결할 대상\nJensen Huang appears at Salesforce Dreamforce\n근거 2건\n\n내 질문:\n그 기업은 언제?\n\n연결한 대상: 없음\n\n‘그 기업’만으로는 어느 대상인지 알 수 없어요. 그래프에서 기업이나 사건을 고르거나 기업 이름을 알려 주세요.\n\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
+      "visibleText": "본문으로 건너뛰기\n줍\nZoop\n지도\n종목\n브리핑\n내 종목\n데모 사용자님\n시장 전체 지도\n내 종목\n시장 전체\n내 종목\n기업\n26\n사건\n138\n보유\n3\n관심\n1\n직접 관련\n130\n후속 사건\n2\n사건 공유\n38\n\nJensen Huang appears at Salesforce Dreamforce 선택됨\n\n흐름 순으로 정렬\nJensen Huang appears at Salesforce Dreamforce\n\n발생 시각 미상\n\n근거 2건 보기\n이 노드 중심으로 보기\nAI에게 묻기\n직접 관련 기업 1곳\nS\nSalesforce\n주최자\n보도 기사 1건\n‘Now We Can Know Everything and Do Anything,’ Jensen Huang Says at Dreamforce\nNVIDIA official blog (blogs.nvidia.com) · 2026-09-16 07:24 KST\nAI에게 묻기\n\n질문 대상: 없음\n\n새 대화\n질문에 연결할 대상\nJensen Huang appears at Salesforce Dreamforce\n근거 2건\n\n내 질문:\nNVIDIA 최근 사건 알려줘\n\n연결한 대상: 없음\n\n선택한 NVIDIA에 연결된 근거 문장이에요.\n\n적용 기업:\nNVIDIA\n적용 사건:\n46건\n적용 기간:\n2026-09-02 ~ 2026-10-02 (최근)\n\n근거 문서 3건\n\nNVIDIA official blog (blogs.nvidia.com) · NVIDIA Vera Rubin NVL72 Delivers Leading Performance in MLPerf Inference v6.1 Debut · 2026-09-16\n\n“In its first MLPerf Inference preview submission, NVIDIA Vera Rubin NVL72 delivers up to 3.7x better throughput than GB300 NVL72.”\n\n원문 보기\n(새 창에서 열림)\n\nNVIDIA official blog (blogs.nvidia.com) · NVIDIA Vera Rubin NVL72 Delivers Leading Performance in MLPerf Inference v6.1 Debut · 2026-09-16\n\n“NVIDIA submitted Vera Rubin NVL72 preview results on two of the most demanding benchmarks in the MLPerf Inference v6.1 suite: DeepSeek-R1 and Qwen3-VL.”\n\n원문 보기\n(새 창에서 열림)\n\nNVIDIA official blog (blogs.nvidia.com) · NVIDIA Vera Rubin NVL72 Delivers Leading Performance in MLPerf Inference v6.1 Debut · 2026-09-16\n\n“Vera Rubin NVL72 delivers up to 3.7x higher throughput than GB300 NVL72 on Qwen3-VL across offline, server and interactive scenarios, using vLLM with the NVIDIA Dynamo open source inference framework.”\n\n원문 보기\n(새 창에서 열림)\n근거 문서 열기\nNVIDIA\n지도에서 보기\nNVIDIA Vera Rubin NVL…\n지도에서 보기\nNVIDIA Vera Rubin NVL…\n지도에서 보기\n질문\n보내기\n\n연결한 대상이 없어요. 질문에 기업 이름을 적거나 위에서 대상을 골라 주세요.\n\nAI가 생성한 예시 답변이며 투자 권유가 아니에요.",
       "number": 3
     }
   ]

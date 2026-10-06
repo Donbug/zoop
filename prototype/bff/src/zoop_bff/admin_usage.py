@@ -108,17 +108,22 @@ class UsageService:
     # ---- recording (chatbot, briefing)
     def record(
         self,
-        feature: Literal["chatbot", "briefing"],
+        feature: Literal["chatbot", "briefing", "document-sentiment", "briefing-outlook"],
         ok: bool,
         duration_ms: float,
         *,
         code: str | None = None,
         message: str | None = None,
-    ) -> None:
-        self._db.execute(
-            "INSERT INTO ai_events(at,feature,ok,duration_ms,code,message) VALUES (?,?,?,?,?,?)",
-            (utc_iso(self._clock.now()), feature, int(ok), duration_ms, code, (message or "")[:300] or None),
+        model_calls: int = 0,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+    ) -> int:
+        cursor = self._db.execute(
+            "INSERT INTO ai_events(at,feature,ok,duration_ms,code,message,model_calls,input_tokens,output_tokens) VALUES (?,?,?,?,?,?,?,?,?)",
+            (utc_iso(self._clock.now()), feature, int(ok), duration_ms, code, (message or "")[:300] or None,
+             model_calls, input_tokens, output_tokens),
         )
+        return int(cursor.lastrowid)
 
     @contextmanager
     def measure(self, feature: Literal["chatbot", "briefing"]) -> Iterator[None]:
@@ -162,6 +167,28 @@ class UsageService:
             source="measured",
             recent_errors=[RecentError(at=r["at"], code=r["code"], message=r["message"]) for r in reversed(failed[-5:])],
             note=note,
+        )
+
+    def _sentiment_feature(self, feature: Literal["document-sentiment", "briefing-outlook"], label: str, since: datetime | None) -> AiFeature:
+        rows = self._events(feature, since)
+        failed = [r for r in rows if not r["ok"]]
+        replay = retries = 0
+        for row in rows:
+            attempt = self._db.one("SELECT replay,retry FROM sentiment_attempts WHERE event_id=?", (row["id"],))
+            if attempt:
+                replay += int(attempt["replay"])
+                retries += int(attempt["retry"])
+        return AiFeature(
+            feature=feature, label=label, engine="OpenAI 호환 · 명시적 스크립트 실행만", model_backed=True,
+            requests=len(rows), succeeded=len(rows) - len(failed), failed=len(failed),
+            latency_ms=_latency([float(r["duration_ms"]) for r in rows]),
+            usage=FeatureUsage(model_calls=sum(int(r["model_calls"]) for r in rows),
+                               input_tokens=sum(int(r["input_tokens"]) for r in rows),
+                               output_tokens=sum(int(r["output_tokens"]) for r in rows), replay_calls=replay, retries=retries),
+            cost=FeatureCost(status="unavailable", actual=None, estimated=None, currency=None,
+                             reason="모델 단가·예산이 미정입니다. 고정 응답 재생은 유료 호출에 포함하지 않습니다."),
+            source="measured", recent_errors=[RecentError(at=r["at"], code=r["code"], message=r["message"]) for r in reversed(failed[-5:])],
+            note="문서×기업 판정과 회차 판정을 분리합니다. 요청은 실제 시도마다 세며 재시도·실패도 포함합니다. 같은 입력의 캐시 조회는 세지 않습니다.",
         )
 
     def past_runs(self, admin_job_runs: list[PastRun]) -> list[PastRun]:
@@ -290,7 +317,9 @@ class UsageService:
         return AiUsageResponse(
             as_of=utc_iso(now),
             window=window,
-            features=[chatbot, news, briefing],
+            features=[chatbot, news, briefing,
+                      self._sentiment_feature("document-sentiment", "기업별 문서 판정", since),
+                      self._sentiment_feature("briefing-outlook", "브리핑 회차 판정", since)],
             past_runs=runs,
             cost=cost,
         )
