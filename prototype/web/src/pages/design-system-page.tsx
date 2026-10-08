@@ -33,6 +33,7 @@ import { CompanyHeader } from "@/components/domain/company-header";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { EventRow, IconCount } from "@/components/domain/event-row";
 import { DocumentItem, documentRelationLabel } from "@/components/domain/document-item";
+import { DocumentAnalysis } from "@/components/domain/document-analysis";
 import { EvidenceList, VerificationBadge } from "@/components/domain/evidence";
 import { GraphCanvas, type GraphSelection } from "@/components/domain/graph-canvas";
 import { FocusBar } from "@/components/domain/focus-bar";
@@ -358,14 +359,82 @@ const exampleEvidence = [
     quote: "예시전자는 2분기 메모리 실적을 7월 10일 발표했다.",
     quoteVerified: true,
     article: { title: "예시전자, 2분기 실적 발표", publisher: "예시일보", url: null, publishedAt: "2026-07-10T00:20:00Z", synthetic: true },
+    sentiment: null,
+    documentSummary: null, analysisStatus: null, analysisProvenance: null, documentVersion: null, resultVersion: null,
   },
   {
     id: "ex-2",
     quote: "예시전자는 4월 11일 예시공장 가동을 중단했다.",
     quoteVerified: null,
     article: { title: "예시공장 가동 중단", publisher: "예시경제", url: null, publishedAt: null, synthetic: true },
+    sentiment: null,
+    documentSummary: null, analysisStatus: null, analysisProvenance: null, documentVersion: null, resultVersion: null,
   },
-] satisfies Pick<Schemas["EvidenceResponse"], "id" | "quote" | "quoteVerified" | "article">[];
+] satisfies Pick<Schemas["EvidenceResponse"], "id" | "quote" | "quoteVerified" | "article" | "sentiment" | "documentSummary" | "analysisStatus" | "analysisProvenance" | "documentVersion" | "resultVersion">[];
+
+const analysisExampleSummary: Schemas["AnalysisSummary"] = {
+  schemaVersion: "zoop-ai-s1-1", artifactId: "ds-summary-1", documentId: "ds-document-1", documentVersion: "ds-document-v1", resultVersion: "ds-summary-v1",
+  text: "예시전자는 공급 계약을 체결했어요.",
+  claims: [
+    { claimId: "ds-fact", text: "예시전자는 공급 계약을 체결했어요.", assertionKind: "fact", evidenceIds: ["ds-citation-1"] },
+    { claimId: "ds-interpretation", text: "공급 확대는 예시전자의 매출 기회가 될 수 있어요.", assertionKind: "interpretation", evidenceIds: ["ds-citation-1"] },
+    { claimId: "ds-limitation", text: "계약 금액과 이익률은 제시되지 않았어요.", assertionKind: "limitation", evidenceIds: ["ds-citation-1"] },
+  ],
+  citations: [{
+    evidenceId: "ds-citation-1", documentId: "ds-document-1", documentVersion: "ds-document-v1", textArtifactId: "ds-text-1",
+    offsetUnit: "unicode_code_point", start: 0, end: 18, quote: "예시전자는 공급 계약을 체결했다.", inputKind: "body", rawLocatorIds: ["ds-raw-1"],
+  }],
+  limitations: ["계약 금액과 이익률은 제시되지 않았어요."], producedAt: "2026-10-08T07:40:00+09:00",
+  provenance: { sourceKind: "synthetic", executionMode: "replay", recordingKind: "authored-test" },
+};
+const analysisExampleSentiment: Schemas["DocumentSentiment"] = {
+  companyId: "ds-company", label: "positive", rationale: "예시: 공급 계약으로 매출 기회가 생겼어요.", quotes: [analysisExampleSummary.citations[0]!.quote],
+  judgedAt: analysisExampleSummary.producedAt, model: "예시 모델", promptVersion: "예시 프롬프트",
+};
+const analysisExampleStates: Record<string, { label: string; summary: Schemas["AnalysisSummary"] | null; sentiment: Schemas["DocumentSentiment"] | null; status: "available" | "not_requested" | "pending" | "failed" | "withheld"; note?: string }> = {
+  both: { label: "요약·판정 있음", summary: analysisExampleSummary, sentiment: analysisExampleSentiment, status: "available" },
+  summary: { label: "요약만 있음", summary: analysisExampleSummary, sentiment: null, status: "available" },
+  sentiment: { label: "판정만 있음", summary: null, sentiment: analysisExampleSentiment, status: "available" },
+  not_requested: { label: "미요청 · null", summary: null, sentiment: null, status: "not_requested", note: "null은 판정 결과가 없는 상태예요. 분석 표시 자체를 그리지 않아요." },
+  pending: { label: "처리 중 · null", summary: null, sentiment: null, status: "pending", note: "저장된 유효한 결과가 없어서 분석 표시를 그리지 않아요. 판단 보류로 바꾸지 않아요." },
+  failed: { label: "실패", summary: null, sentiment: null, status: "failed" },
+  withheld: { label: "제공 중단", summary: null, sentiment: null, status: "withheld" },
+  undetermined: { label: "판단 보류 · 유효한 판정", summary: null, sentiment: { ...analysisExampleSentiment, label: "undetermined", rationale: "예시: 방향을 판단할 근거가 부족해요." }, status: "available", note: "판단 보류는 평가한 결과예요. 결과가 없는 null과 달라요." },
+};
+
+function DocumentAnalysisExamples() {
+  const [state, setState] = useState("both");
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const example = analysisExampleStates[state]!;
+  const analysis = {
+    documentSummary: example.summary, sentiment: example.sentiment, analysisProvenance: analysisExampleSummary.provenance,
+    documentVersion: analysisExampleSummary.documentVersion, resultVersion: example.summary?.resultVersion ?? null,
+    analysisStatus: {
+      summary: { status: example.status === "available" && !example.summary ? "not_requested" as const : example.status, reason: null },
+      sentiment: { status: example.status === "available" && !example.sentiment ? "not_requested" as const : example.status, reason: null },
+    },
+  };
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <Select label="문서 분석 상태 예시" value={state} onValueChange={setState} options={Object.entries(analysisExampleStates).map(([value, item]) => ({ value, label: item.label }))} />
+      <div className="flex min-w-0 flex-col gap-2">
+        <p className="text-sm text-text-secondary">예시일보 · 가상 문서</p>
+        <h4 className="text-base font-semibold text-text-primary">예시전자 공급 계약</h4>
+        <DocumentAnalysis analysis={analysis} synthetic name="예시전자 · 가상 공급 계약" onShowEvidence={() => setEvidenceOpen(true)} />
+        {example.note && <p className="text-sm text-text-secondary">{example.note}</p>}
+      </div>
+      <Sheet open={evidenceOpen} onOpenChange={setEvidenceOpen} title="가상 문서 요약 근거" description="상태 설명용 합성 예시예요. 서버나 모델을 호출하지 않아요." closeLabel="예시 근거 창 닫기">
+        <EvidenceList items={[{
+          id: "ds-citation-1", quote: analysisExampleSummary.citations[0]!.quote, quoteVerified: true,
+          article: { title: "예시전자 공급 계약", publisher: "예시일보", url: null, publishedAt: analysisExampleSummary.producedAt, synthetic: true },
+          sentiment: analysisExampleSentiment, documentSummary: analysisExampleSummary, analysisProvenance: analysisExampleSummary.provenance,
+          analysisStatus: { summary: { status: "available", reason: null }, sentiment: { status: "available", reason: null } },
+          documentVersion: analysisExampleSummary.documentVersion, resultVersion: analysisExampleSummary.resultVersion,
+        }]} />
+      </Sheet>
+    </div>
+  );
+}
 
 function exampleNode(id: string, kind: "company" | "issue", label: string, extra: Partial<Schemas["GraphNode"]> = {}): Schemas["GraphNode"] {
   return { id, kind, label, isFocus: false, holding: false, watch: false, brandColor: null, logoUrl: null, eventTime: null, timePrecision: null, action: null, target: null, evidenceCount: kind === "issue" ? 1 : null, ...extra };
@@ -751,7 +820,7 @@ export function DesignSystemPage() {
             <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
               <Input label="기본" placeholder="예시전자" hint="기업 이름이나 종목 코드를 입력해요" />
               <Input label="검색" variant="search" value={search} onChange={(e) => setSearch(e.target.value)} onClear={() => setSearch("")} />
-              <Input label="오류" defaultValue="" error="관심 종목을 1개 이상 골라 주세요." />
+              <Input label="이메일 오류" defaultValue="example" error="올바른 이메일 주소를 입력해 주세요." />
               <Input label="비활성" disabled placeholder="입력할 수 없어요" />
             </div>
           </Demo>
@@ -1102,6 +1171,15 @@ export function DesignSystemPage() {
                 }} accessibleName="예시" />
               ))}
             </StateRow>
+          </Demo>
+
+          <Demo
+            id="c-document-analysis"
+            name="DocumentAnalysis · S1 문서 분석 상태"
+            when="기업 문서 탭과 근거 창에서 사용하는 실제 컴포넌트예요. 아래 가상 문서와 authored replay 표본은 상태 설명용이며 실제 분석 실행 증거가 아니에요. Figma 전면 스타일 전환은 아직 적용하지 않았어요."
+            code={'<DocumentAnalysis analysis={document} synthetic={document.synthetic} name={companyAndDocument} onShowEvidence={openEvidence} />'}
+          >
+            <DocumentAnalysisExamples />
           </Demo>
 
           <Demo id="c-disclaimer" name="DisclaimerNote" when="투자 권유가 아니라는 고지예요. 브리핑과 기업 상세 맨 아래에 13px 한 줄로 둬요. 이 페이지의 고지도 여기 하나예요." code={"<DisclaimerNote />"}>

@@ -29,6 +29,8 @@ export interface EvidenceRequest {
   eventId?: string;
   /** 문서 판정은 이 기업 맥락으로만 읽는다. 기업이 정해지지 않은 사건·연결선에서는 null. */
   companyId?: string;
+  /** 요약에서 연 인용은 클릭 당시의 불변 문서·분석 버전과 일치해야 한다. */
+  analysisRef?: { documentId: string; documentVersion: string; resultVersion: string };
   /** 지도에서 열었을 때: 인용을 지도에서 강조할 수 있다. issueId는 해당 간선이 없을 때 대신 강조할 사건. */
   map?: { issueId?: string };
   /** 기준 관계를 검증한 시각(있을 때만). 없으면 근거 응답의 자료 기준 시각을 관계 확인 시점으로 보인다. */
@@ -147,10 +149,15 @@ function EvidenceSheet({
   const event = useEvent(needsEvent ? request.eventId : undefined);
   const ids = request.evidenceIds ?? event.data?.evidenceIds ?? [];
   const items = useEvidenceItems(ids, request.companyId);
-  const loaded = items.flatMap((q) => (q.data ? [q.data] : []));
+  const received = items.flatMap((q) => (q.data ? [q.data] : []));
+  const loaded = received.filter((item) => !request.analysisRef || (
+    item.articleId === request.analysisRef.documentId
+    && item.documentVersion === request.analysisRef.documentVersion
+    && item.documentSummary?.resultVersion === request.analysisRef.resultVersion
+  ));
   // 받을 수 없는 근거(404 삭제·비공개, 403 권한 없음)는 다시 시도할 대상이 아니다. 일시 장애만 오류로 보이고 그것만 다시 시도한다.
   const failed = items.filter((q) => q.isError && !isEvidenceGone(q.error));
-  const gone = items.filter((q) => q.isError && isEvidenceGone(q.error)).length;
+  const gone = items.filter((q) => q.isError && isEvidenceGone(q.error)).length + received.length - loaded.length;
   const loading = (needsEvent && event.isPending) || items.some((q) => q.isPending);
 
   let body: ReactNode;

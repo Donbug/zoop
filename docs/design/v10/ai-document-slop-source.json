@@ -1,0 +1,1570 @@
+{
+  "version": 0,
+  "tool": {
+    "name": "slop_lint",
+    "version": "0.2.0"
+  },
+  "target": {
+    "source": "/Users/asqi/zoop/prototype/web/src"
+  },
+  "summary": {
+    "blocking": 19,
+    "total": 73,
+    "skipped": 32
+  },
+  "findings": [
+    {
+      "rule_id": "system.font-outside-contract",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "observed": "no contract families: give a plan with tokens.type.roles or a fonts lock",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "system.literal-color",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/overlay-parts.tsx:7"
+      },
+      "observed": "literal color rgb(0_0_0/0.4) outside the token files (bg-[rgb(0_0_0/0.4)]); 1 use",
+      "consequence": "Literal colors outside semantic tokens drift into near-duplicate grays and accents",
+      "fix": "Use the semantic token for the role, or add a token when the value repeats with a real role",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/overlay-parts.tsx:7"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.literal-color",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/overlay-parts.tsx:7"
+      },
+      "observed": "literal color rgb(0_0_0/0.6) outside the token files (bg-[rgb(0_0_0/0.6)]); 1 use",
+      "consequence": "Literal colors outside semantic tokens drift into near-duplicate grays and accents",
+      "fix": "Use the semantic token for the role, or add a token when the value repeats with a real role",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/overlay-parts.tsx:7"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/pages/briefings.tsx:81"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/pages/briefings.tsx:81"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/pipeline/candidates.tsx:182"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/pipeline/candidates.tsx:182"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/pipeline/jobs.tsx:134"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/pipeline/jobs.tsx:134"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/domain/event-row.tsx:91"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/domain/event-row.tsx:91"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/domain/graph-canvas.tsx:570"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/domain/graph-canvas.tsx:570"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/domain/graph-canvas.tsx:667"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/domain/graph-canvas.tsx:667"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/domain/graph-legend.tsx:35"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/domain/graph-legend.tsx:35"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/bottom-sheet.tsx:121"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/bottom-sheet.tsx:121"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/bottom-tab-bar.tsx:58"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/bottom-tab-bar.tsx:58"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/input.tsx:48"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/input.tsx:48"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/list-row.tsx:77"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/list-row.tsx:77"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-graph.tsx:34"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-graph.tsx:34"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-price-chart.tsx:171"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-price-chart.tsx:171"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-price-chart.tsx:228"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-price-chart.tsx:228"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-timeline.tsx:167"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-timeline.tsx:167"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-timeline.tsx:291"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-timeline.tsx:291"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-timeline.tsx:353"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-timeline.tsx:353"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "system.bypassed-primitive",
+      "class": "contract",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "pages/onboarding-page.tsx:107"
+      },
+      "observed": "raw <button> while the project has a Button primitive (@/components/ui/button)",
+      "consequence": "A component that bypasses the adopted primitives or theme API behaves and styles its states differently from its peers",
+      "fix": "Build on the adopted primitive and theme API; extend the primitive when it lacks a needed state",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "pages/onboarding-page.tsx:107"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "component.emoji-icons",
+      "class": "default",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/pipeline/candidates.tsx:86"
+      },
+      "observed": "lead not confirmed at render: '→' in admin/pipeline/candidates.tsx (icon slots); 3 matches",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "admin/pipeline/candidates.tsx:86",
+          "admin/pipeline/candidates.tsx:104",
+          "admin/pipeline/candidates.tsx:381"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "component.emoji-icons",
+      "class": "default",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/pipeline/jobs.tsx:349"
+      },
+      "observed": "lead not confirmed at render: '→' in admin/pipeline/jobs.tsx (icon slots); 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "admin/pipeline/jobs.tsx:349"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "component.emoji-icons",
+      "class": "default",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/pipeline/versions.tsx:112"
+      },
+      "observed": "lead not confirmed at render: '→' in admin/pipeline/versions.tsx (icon slots); 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "admin/pipeline/versions.tsx:112"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "component.emoji-icons",
+      "class": "default",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/graph-explorer.tsx:245"
+      },
+      "observed": "lead not confirmed at render: '↔' in features/graph-explorer.tsx (icon slots); 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "features/graph-explorer.tsx:245"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "component.emoji-icons",
+      "class": "default",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/node-panel.tsx:449"
+      },
+      "observed": "lead not confirmed at render: '→' in features/node-panel.tsx (icon slots); 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "features/node-panel.tsx:449"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "motion.pulse-without-status",
+      "class": "default",
+      "severity": {
+        "create": "gate",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/feedback.tsx:12"
+      },
+      "observed": "lead not confirmed at render: 'animate-pulse' in components/ui/feedback.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/ui/feedback.tsx:12"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/domain/focus-bar.tsx:31"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in components/domain/focus-bar.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/domain/focus-bar.tsx:31"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/domain/path-bar.tsx:32"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in components/domain/path-bar.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/domain/path-bar.tsx:32"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/bottom-sheet.tsx:116"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in components/ui/bottom-sheet.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/ui/bottom-sheet.tsx:116"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/dialog.tsx:36"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in components/ui/dialog.tsx; 2 matches",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/ui/dialog.tsx:36",
+          "components/ui/dialog.tsx:70"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/select.tsx:52"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in components/ui/select.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/ui/select.tsx:52"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/toast.tsx:64"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in components/ui/toast.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "components/ui/toast.tsx:64"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/app-shell.tsx:69"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in features/app-shell.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "features/app-shell.tsx:69"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/graph-explorer.tsx:261"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in features/graph-explorer.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "features/graph-explorer.tsx:261"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.focus-outline-removed",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/graph-tutorial.tsx:276"
+      },
+      "observed": "lead not confirmed at behavior: 'outline-none' in features/graph-tutorial.tsx; 1 match",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified",
+        "refs": [
+          "features/graph-tutorial.tsx:276"
+        ]
+      },
+      "status": "skipped",
+      "skip_cause": "layer"
+    },
+    {
+      "rule_id": "code.clickable-non-interactive",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/ui.tsx:82"
+      },
+      "observed": "<tr> has a onClick handler without an interactive role, tabindex, or a key handler",
+      "consequence": "A clickable div or span lacks the name, role, state, and keyboard behavior of a real control",
+      "fix": "Use a native button or link",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/ui.tsx:82"
+        ]
+      },
+      "blocking": true,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.clickable-non-interactive",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "1 clickable element not judged, their attributes come from spread props: features/company-price-chart.tsx:107",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/format.ts:3"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/format.ts:3"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/format.ts:14"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/format.ts:14"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/format.ts:35"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/format.ts:35"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "admin/insights-ui.tsx:23"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "admin/insights-ui.tsx:23"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/company-holding.tsx:16"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/company-holding.tsx:16"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/briefing-market.ts:8"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/briefing-market.ts:8"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/briefing-market.ts:20"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/briefing-market.ts:20"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/company-timeline.ts:20"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'en-CA'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/company-timeline.ts:20"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/company-timeline.ts:42"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'en-GB'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/company-timeline.ts:42"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/company-timeline.ts:75"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'en-GB'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/company-timeline.ts:75"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/holding.ts:7"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/holding.ts:7"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/labels.ts:150"
+      },
+      "observed": "DateTimeFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/labels.ts:150"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/market.ts:12"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/market.ts:12"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/market.ts:13"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/market.ts:13"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "lib/market.ts:24"
+      },
+      "observed": "NumberFormat hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "lib/market.ts:24"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "pages/my-stocks-page.tsx:168"
+      },
+      "observed": "toLocaleString hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "pages/my-stocks-page.tsx:168"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.locale-time-rendering",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "pages/onboarding-page.tsx:205"
+      },
+      "observed": "toLocaleString hard-codes the locale 'ko-KR'",
+      "consequence": "Hard-coded dates, numbers, or locale strings go stale or wrong by locale, and time-dependent output differs between server and client",
+      "fix": "Format with locale-aware APIs, stabilize the initial value, then update safely on the client",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "pages/onboarding-page.tsx:205"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.continuous-value-in-state",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "components/ui/bottom-sheet.tsx:134"
+      },
+      "observed": "setDragY() runs in the onPointerMove handler of <button>: a continuous value stored in component state",
+      "consequence": "Continuous pointer or scroll values stored in component state cause re-render loops and stutter",
+      "fix": "Use motion values, refs, CSS, or platform APIs for continuous values",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "components/ui/bottom-sheet.tsx:134"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.continuous-value-in-state",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/graph-tutorial.tsx:145"
+      },
+      "observed": "setDone() runs in a wheel listener: a continuous value stored in component state",
+      "consequence": "Continuous pointer or scroll values stored in component state cause re-render loops and stutter",
+      "fix": "Use motion values, refs, CSS, or platform APIs for continuous values",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/graph-tutorial.tsx:145"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.continuous-value-in-state",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "location": {
+        "file": "features/graph-tutorial.tsx:147"
+      },
+      "observed": "setDone() runs in a pointermove listener: a continuous value stored in component state",
+      "consequence": "Continuous pointer or scroll values stored in component state cause re-render loops and stutter",
+      "fix": "Use motion values, refs, CSS, or platform APIs for continuous values",
+      "evidence": {
+        "type": "source",
+        "refs": [
+          "features/graph-tutorial.tsx:147"
+        ]
+      },
+      "blocking": false,
+      "status": "open"
+    },
+    {
+      "rule_id": "code.animation-package-mismatch",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "observed": "no package.json under the source tree, so the installed packages are unknown",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.no-provenance",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.license-unknown",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.license-unresearched",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.license-hint-only",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.use-outside-license",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P0"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.license-expired",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P0"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.attribution-missing",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.notice-missing",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.reserved-font-name",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.unverified-mark",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P0"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.generated-as-evidence",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P0"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.generated-from-reference",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.generated-unreviewed",
+      "class": "quality",
+      "severity": {
+        "create": "warn",
+        "review": "P2"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    },
+    {
+      "rule_id": "rights.release-missing",
+      "class": "requirement",
+      "severity": {
+        "create": "gate",
+        "review": "P1"
+      },
+      "layer": "source",
+      "observed": "no asset ledger given",
+      "blocking": false,
+      "evidence": {
+        "type": "not-verified"
+      },
+      "status": "skipped",
+      "skip_cause": "input"
+    }
+  ],
+  "scope": {
+    "layers": [
+      "source"
+    ]
+  }
+}

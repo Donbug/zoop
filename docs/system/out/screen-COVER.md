@@ -2,7 +2,7 @@
 
 [전체 목록](index.md) · [검사 결과](warnings.md)
 
-- 라우트: `프로토타입 기준 · 2026-10-06`
+- 라우트: `프로토타입 기준 · 2026-10-08 정합화 · 기존 77쪽/ID 유지`
 - 화면계획서 캡처 쪽수: **1**
 - 원본: [docs/screen-plan/captures/slide-index.json:1 (slide-page)](../../../docs/screen-plan/captures/slide-index.json)
 

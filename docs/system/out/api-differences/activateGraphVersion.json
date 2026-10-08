@@ -504,10 +504,6 @@
         "type": "string"
       }
     },
-    "response:401:application/json.error.details:required": {
-      "target": false,
-      "bff": true
-    },
     "response:403:application/json.error.code": {
       "target": {
         "type": "string",
@@ -543,10 +539,6 @@
       "bff": {
         "type": "string"
       }
-    },
-    "response:403:application/json.error.details:required": {
-      "target": false,
-      "bff": true
     },
     "response:404:application/json.error.code": {
       "target": {
@@ -584,10 +576,6 @@
         "type": "string"
       }
     },
-    "response:404:application/json.error.details:required": {
-      "target": false,
-      "bff": true
-    },
     "response:409:application/json.error.code": {
       "target": {
         "type": "string",
@@ -623,10 +611,6 @@
       "bff": {
         "type": "string"
       }
-    },
-    "response:409:application/json.error.details:required": {
-      "target": false,
-      "bff": true
     },
     "response:422:application/json.error.code": {
       "target": {
@@ -664,10 +648,6 @@
         "type": "string"
       }
     },
-    "response:422:application/json.error.details:required": {
-      "target": false,
-      "bff": true
-    },
     "response:503:application/json.error.code": {
       "target": {
         "type": "string",
@@ -703,10 +683,6 @@
       "bff": {
         "type": "string"
       }
-    },
-    "response:503:application/json.error.details:required": {
-      "target": false,
-      "bff": true
     },
     "security": {
       "target": [

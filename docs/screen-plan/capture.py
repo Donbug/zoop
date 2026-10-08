@@ -10,13 +10,25 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--url', default='http://plan.localhost:5194')
 parser.add_argument('--manage-servers', action='store_true')
 parser.add_argument('--with-admin-containers', action='store_true')
-parser.add_argument('--slides', nargs='+', choices=['D-WAT-01','D-WAT-01b'], help='이 관심 종목 묶음만 다시 캡처하고 기존 manifest를 갱신한다')
+parser.add_argument('--slides', nargs='+', choices=[s['id'] for s in json.loads((OUT/'manifest.json').read_text()) if not s['id'].startswith('A-')], help='지정 일반 화면만 다시 캡처하고 나머지 이미지와 metadata를 보존한다')
+parser.add_argument('--state-source', type=Path, default=ROOT/'prototype/bff/var', help='읽기 전용 원본 상태. 부분 캡처에서는 발행 회차도 그대로 복사한다')
 args = parser.parse_args()
 slides = []
 processes = []
 started_containers=[]
 DETAILS=json.loads((OUT/'screen-details.json').read_text())
 click_history=[]
+previous_manifest=json.loads((OUT/'manifest.json').read_text())
+previous_records={s['id']:s for s in previous_manifest}
+if args.slides:
+    for s in previous_manifest:
+        if s.get('pair'):
+            previous_records[s['id']+'-before']=s
+            previous_records[s['id']+'-after']=json.loads((OUT/s['pair'].replace('.png','.json')).read_text())
+old_history=json.loads((OUT/'interaction-history.json').read_text()) if args.slides else []
+api_calls=[]
+tracked_contexts=set()
+isolated_state=None
 
 
 def ready(url):
@@ -30,16 +42,23 @@ def ready(url):
 
 
 def start_servers():
-    source = Path('/tmp/zoop-state-plan')
-    target = Path('/tmp/zoop-state-plan-market')
-    # 재현 실행에서는 지난 실행의 격리 디렉터리만 비운다. 공유 var는 읽기만 한다.
-    for path in (source, target):
-        if path.exists():
-            shutil.rmtree(path)
-    shutil.copytree(ROOT / 'prototype/bff/var', source)
-    env = os.environ | {'ZOOP_SNAPSHOT_PATH': str(ROOT/'prototype/bff/fixtures/poc-real-inspect.json'), 'ZOOP_COMPANY_CATALOG': str(ROOT/'prototype/bff/fixtures/poc-real-companies.json')}
-    subprocess.run(['uv','run','python','scripts/rebuild_demo_briefings.py','--source',str(source),'--target',str(target),'--from','2026-09-16'],cwd=ROOT/'prototype/bff',env=env,check=True)
-    processes.append(subprocess.Popen(['uv','run','uvicorn','zoop_bff.main:app','--host','127.0.0.1','--port','8824'],cwd=ROOT/'prototype/bff',env=env | {'ZOOP_STATE_DIR':str(target)}, start_new_session=True))
+    global isolated_state
+    import sqlite3, tempfile
+    target = Path(tempfile.mkdtemp(prefix='zoop-screen-plan-'))
+    isolated_state=target
+    # SQLite backup API는 WAL을 포함한 일관된 읽기 사본을 만든다. 원본은 수정하지 않는다.
+    shutil.copytree(args.state_source/'graph', target/'graph')
+    with sqlite3.connect(f'file:{args.state_source/"zoop-admin.sqlite3"}?mode=ro', uri=True) as source_db:
+        with sqlite3.connect(target/'zoop-admin.sqlite3') as target_db:
+            source_db.backup(target_db)
+    env = os.environ | {'UV_OFFLINE':'1', 'ZOOP_SNAPSHOT_PATH': str(ROOT/'prototype/bff/fixtures/poc-real-inspect.json'), 'ZOOP_COMPANY_CATALOG': str(ROOT/'prototype/bff/fixtures/poc-real-companies.json'), 'ZOOP_BRIEFING_SCHEDULER':'off'}
+    if not args.slides:
+        # 전체 캡처의 기존 시연 회차 재생성 경로는 유지한다. 부분 캡처에서는 실행하지 않는다.
+        rebuilt=target/'replayed'
+        subprocess.run(['uv','run','--offline','python','scripts/rebuild_demo_briefings.py','--source',str(target),'--target',str(rebuilt),'--from','2026-09-16'],cwd=ROOT/'prototype/bff',env=env,check=True)
+        target=rebuilt
+    # 부분 캡처는 기존 발행본을 재생성하지 않는다. 모델 실행이나 관리자 작업도 없다.
+    processes.append(subprocess.Popen(['uv','run','--offline','uvicorn','zoop_bff.main:app','--host','127.0.0.1','--port','8824'],cwd=ROOT/'prototype/bff',env=env | {'ZOOP_STATE_DIR':str(target)}, start_new_session=True))
     # pnpm dev의 predev 토큰 생성(소스 쓰기)을 피하고 동일 Vite 서버를 직접 띄운다.
     processes.append(subprocess.Popen(['pnpm','exec','vite','--host','127.0.0.1','--port','5194','--strictPort'],cwd=ROOT/'prototype/web',env=os.environ | {'ZOOP_BFF_URL':'http://127.0.0.1:8824'}, start_new_session=True))
     ready('http://127.0.0.1:8824/api/health')
@@ -50,7 +69,12 @@ def settle(page):
     page.wait_for_load_state('networkidle')
     page.evaluate('document.fonts.ready')
     page.mouse.move(1,1)
-    # 캔버스 배치·카메라 애니메이션이 끝나도록 두 프레임 이상 기다린다.
+    page.wait_for_function("""()=>[...document.querySelectorAll('[data-graph-canvas]')].every(e=>{
+        let f=e[Object.getOwnPropertyNames(e).find(k=>k.startsWith('__reactFiber$'))],cy=e._cyreg?.cy;
+        while(f&&!cy){let h=f.memoizedState;while(h){const v=h.memoizedState?.current;if(v&&typeof v.nodes==='function'&&typeof v.zoom==='function'){cy=v;break;}h=h.next;}f=f.return;}
+        return cy&&!cy.animated()&&!cy.nodes().some(n=>n.animated());
+    })""",timeout=30000)
+    # 그래프·노드 애니메이션 종료 후 LOD idle 140ms보다 길게 기다린다.
     page.wait_for_timeout(750)
 
 
@@ -102,6 +126,9 @@ def click(page, role, name, exact=True):
 
 
 def goto(page, route):
+    if page.context not in tracked_contexts:
+        tracked_contexts.add(page.context)
+        page.context.on('request',lambda request: api_calls.append({'method':request.method,'path':urllib.parse.urlsplit(request.url).path}) if '/api/' in urllib.parse.urlsplit(request.url).path else None)
     page.goto(args.url+route)
     settle(page)
 
@@ -114,6 +141,7 @@ REQ={**{f'FS{n:03}':n for n in range(1,28)}, 'FS011-01':11,'FS011-02':11,
      'FS066-01':78,'FS066-02':78,'FS066-03':78,'FS067-01':79,'FS067-02':79,'FS067-03':79,'FS068':80,'FS069-01':81,'FS069-02':81,
      'FS070-01':82,'FS070-02':82,'FS071-01':83,'FS071-02':83,'FS072':84,'FS073':85,
      **{f'NFS{n:03}':n+53 for n in range(1,13)}}
+REQ['FS042']=41  # 10-08 시점 관계 그래프. 구 FS042 재무 ID 충돌은 문서에 별도 보존한다.
 
 def control_locator(page, control):
     if control['role']=='css': return page.locator(control['name']).first
@@ -196,6 +224,11 @@ def state_details(sid):
     return base
 
 def snap(page, sid, title, fs, entry, states='기본', checks=None, note='', suffix=''):
+    if args.slides and sid not in args.slides:
+        # 이전 화면은 쓰지 않지만 다음 화면 진입에 필요한 실제 주 조작은 유지한다.
+        for role,name,_,_ in checks or []:
+            observed_click(page,loc(page,role,name,not isinstance(name,re.Pattern)),{'role':role,'name':name.pattern if isinstance(name,re.Pattern) else name})
+        return previous_records[sid+suffix].copy()
     req='·'.join(str(n) for n in sorted({REQ[k] for k in fs.split('·') if k in REQ}))
     settle(page)
     key=sid+suffix
@@ -222,7 +255,10 @@ def snap(page, sid, title, fs, entry, states='기본', checks=None, note='', suf
             if not uncovered: raise RuntimeError(f'번호 대상이 다른 요소에 가림: {key}: {action}')
         markers.append({'number':offset+len(markers)+1,'selector':{k:action[k] for k in ('role','name','regex') if k in action},'box':b,'result':action['result'],'destination':action['destination'],'mode':action['mode']})
     state=state_details(sid)
-    page.screenshot(path=str(OUT/f'{key}.png'),full_page=False)
+    image_path=OUT/f'{key}.png'
+    image_bytes=page.screenshot(full_page=False)
+    if not image_path.exists() or image_path.read_bytes()!=image_bytes:
+        image_path.write_bytes(image_bytes)
     route=page.url.removeprefix(args.url)
     if '/mock-idp' in route: route='/mock-idp'
     visible=page.locator('body').inner_text()
@@ -372,16 +408,16 @@ def run(browser):
     snap(page,'D-COM-03','기업 상세·좌측 기업 전환','FS038·FS044','기업 상세의 기업 전환 사이드바',checks=[('css','aside[aria-label="기업 전환"] ul[aria-label="보유 기업"] li:nth-child(1) button','기업을 바꾸고 기간·기준 시점·탭은 유지해요.','D-COM-03')],note='검색·보유·관심·최근·연결 기업. 기업 전환 시 사건·버킷 선택은 해제해요.')
     assert '/companies/NASDAQ%3ANVDA' in page.url and 'asOf=2026-09-30' in page.url
     goto(page,detail_route)
-    snap(page,'D-COM-04','기업 중심 관계 그래프','FS038·FS040·FS044','기업 상세 오른쪽 관계 그래프',checks=[('button','지도에서 보기','같은 기업·기준 시점의 지도로 이동해요.','D-GRP-01')],note='공개 기준 asOf 이전의 검증 관계만 보여요. 1단계·2단계를 선택해요.')
+    snap(page,'D-COM-04','기업 중심 관계 그래프','FS038·FS040·FS042·FS044','기업 상세 오른쪽 관계 그래프',checks=[('button','지도에서 보기','같은 기업·기준 시점의 지도로 이동해요.','D-GRP-01')],note='FS0??를 FS042 시점 기반 관계 그래프로 정리했어요. 기존 FS042 재무와 ID 충돌은 남아 있어요. asOf 이전 공개 관계만 표시해요.')
     goto(page,detail_route)
     marker=page.get_by_role('group',name='사건이 있었던 시간 버킷').get_by_role('button').first
     marker.wait_for(); marker.scroll_into_view_if_needed(); settle(page)
     marker_name=marker.get_attribute('aria-label')
-    snap(page,'D-COM-05','타임라인 버킷·차트·그래프 연동','FS040·FS041·FS044','차트의 사건 수 표식 선택',checks=[('button',marker_name,'해당 버킷의 사건을 펼치고 차트·관계 그래프에 강조해요.','D-COM-05')],note='복수 사건은 한 사건으로 합치지 않아요. 사건 선택은 issue 주소로 복원해요.')
+    snap(page,'D-COM-05','타임라인 버킷·차트·그래프 연동','FS040·FS041·FS042·FS044','차트의 사건 수 표식 선택',checks=[('button',marker_name,'해당 버킷의 사건을 펼치고 차트·관계 그래프에 강조해요.','D-COM-05')],note='FS042는 시점 관계 조회예요. 기존 재무 ID와 충돌은 별도 확인해요. 복수 사건은 합치지 않으며 issue 주소로 복원해요.')
     goto(page,detail_route)
     slider=page.get_by_role('slider',name='차트 기준 시점. 화살표로 이동하고 Enter로 선택해요')
     slider.scroll_into_view_if_needed(); settle(page)
-    snap(page,'D-COM-06','차트 시점 선택·asOf 변경','FS040·FS041·FS044','실제 거래 바를 눌러 공개 기준 시점 변경',checks=[('slider','차트 기준 시점. 화살표로 이동하고 Enter로 선택해요','누른 거래 바의 시각으로 asOf를 바꾸고 관계·사건을 다시 조회해요.','D-COM-06')],note='주소의 period·asOf·tab·issue로 재진입 상태를 복원해요. 최신 시점으로 돌아갈 수 있어요.')
+    snap(page,'D-COM-06','차트 시점 선택·asOf 변경','FS040·FS041·FS042·FS044','실제 거래 바를 눌러 공개 기준 시점 변경',checks=[('slider','차트 기준 시점. 화살표로 이동하고 Enter로 선택해요','누른 거래 바의 시각으로 asOf를 바꾸고 관계·사건을 다시 조회해요.','D-COM-06')],note='FS042는 시점 관계 조회예요. 기존 재무 ID와 충돌은 별도 확인해요. period·asOf·tab·issue로 복원하며 최신 시점으로 돌아가요.')
     goto(page,'/design-system#c-price')
     page.locator('#c-price').scroll_into_view_if_needed(); settle(page)
     snap(page,'D-SEN-01','긍부정 표시 규칙·디자인시스템 예시','FS021','디자인시스템의 판정 예시',note='디자인시스템 예시만 캡처했어요. 실제 모델 호출 전이며 데모 기사에는 판정값이 없어요. 중성 글자·아이콘·AI 판정으로 구분하고 주가 등락색·확률을 쓰지 않아요.')
@@ -412,25 +448,26 @@ def run(browser):
     snap(page,'D-AI-02b','AI 대화 조회 오류·다시 확인','FS053·NFS003','대화 조회 응답을 503으로 재현',states='일시 조회 오류(재현)',checks=[('button','다시 시도','기존 대화를 다시 조회하고 저장한 결과를 회수해요.','D-AI-02')],note='조회 요청만 일시 차단했어요. 새 질문 생성이나 작업 재실행은 하지 않아요.')
     expect(page.get_by_text('이전 대화를 확인하지 못했어요',exact=True)).not_to_be_visible()
     # 관리자: 컨테이너 의존 화면도 실패 상태를 사실대로 남긴다.
-    goto(page,'/admin/login')
-    page.get_by_label('관리자 이메일',exact=True).fill('admin@zoop.local')
-    page.get_by_label('비밀번호',exact=True).fill('zoop-admin')
-    snap(page,'A-ADM-05c','관리자 로그인','FS073·NFS001','관리자 세션이 없는 /admin 진입',checks=[('button','관리자 로그인','관리자 세션을 만들고 운영 대시보드로 들어가요.','A-ADM-01')])
-    admin=[
-        ('A-ADM-01','운영 대시보드','/admin','FS072','이슈 관제'),
-        ('A-ADM-02','통계·AI 품질','/admin/stats','FS065','선호도'),
-        ('A-ADM-02b','선호도·대화록','/admin/feedback','FS066-02·FS066-03','이슈 관제'),
-        ('A-ADM-03','그래프 관제·검수','/admin/pipeline','FS067-01·FS067-02·FS067-03','AI 운영'),
-        ('A-ADM-04','AI·브리핑 운영','/admin/briefings','FS070-01·FS070-02·FS071-01·FS071-02','AI 운영'),
-        ('A-ADM-04b','AI 사용량·오류','/admin/ai','FS068','회원 관리'),
-        ('A-ADM-05','회원·접근 관리','/admin/members','FS069-01·FS069-02·FS073','감사 로그'),
-        ('A-ADM-05b','관리자 감사 로그','/admin/audit','NFS008','대시보드'),
-    ]
-    for sid,title,route,fs,nav in admin:
-        goto(page,route)
-        destinations={'이슈 관제':'A-ADM-03','선호도':'A-ADM-02b','AI 운영':'A-ADM-04b','회원 관리':'A-ADM-05','감사 로그':'A-ADM-05b','대시보드':'A-ADM-01'}
-        note='문서×기업 판정(document-sentiment)·회차 판단(briefing-outlook)의 사용량 행이 있어요. 실제 모델 호출 전이며 데모 판정값은 없어요.' if sid=='A-ADM-04b' else '팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.'
-        snap(page, sid, title, fs, '관리자 로그인 후 전용 메뉴',checks=[('link',nav,'관리자 메뉴의 해당 운영 화면을 열어요.',destinations[nav])],note=note)
+    if not args.slides:
+        goto(page,'/admin/login')
+        page.get_by_label('관리자 이메일',exact=True).fill('admin@zoop.local')
+        page.get_by_label('비밀번호',exact=True).fill('zoop-admin')
+        snap(page,'A-ADM-05c','관리자 로그인','FS073·NFS001','관리자 세션이 없는 /admin 진입',checks=[('button','관리자 로그인','관리자 세션을 만들고 운영 대시보드로 들어가요.','A-ADM-01')])
+        admin=[
+            ('A-ADM-01','운영 대시보드','/admin','FS072','이슈 관제'),
+            ('A-ADM-02','통계·AI 품질','/admin/stats','FS065','선호도'),
+            ('A-ADM-02b','선호도·대화록','/admin/feedback','FS066-02·FS066-03','이슈 관제'),
+            ('A-ADM-03','그래프 관제·검수','/admin/pipeline','FS067-01·FS067-02·FS067-03','AI 운영'),
+            ('A-ADM-04','AI·브리핑 운영','/admin/briefings','FS070-01·FS070-02·FS071-01·FS071-02','AI 운영'),
+            ('A-ADM-04b','AI 사용량·오류','/admin/ai','FS068','회원 관리'),
+            ('A-ADM-05','회원·접근 관리','/admin/members','FS069-01·FS069-02·FS073','감사 로그'),
+            ('A-ADM-05b','관리자 감사 로그','/admin/audit','NFS008','대시보드'),
+        ]
+        for sid,title,route,fs,nav in admin:
+            goto(page,route)
+            destinations={'이슈 관제':'A-ADM-03','선호도':'A-ADM-02b','AI 운영':'A-ADM-04b','회원 관리':'A-ADM-05','감사 로그':'A-ADM-05b','대시보드':'A-ADM-01'}
+            note='문서×기업 판정(document-sentiment)·회차 판단(briefing-outlook)의 사용량 행이 있어요. 실제 모델 호출 전이며 데모 판정값은 없어요.' if sid=='A-ADM-04b' else '팀 v1.7 42쪽의 최종 5개 묶음 기준. 검수·차단·정정 실행은 이번 문서에서 실행하지 않았어요.'
+            snap(page, sid, title, fs, '관리자 로그인 후 전용 메뉴',checks=[('link',nav,'관리자 메뉴의 해당 운영 화면을 열어요.',destinations[nav])],note=note)
     # 변경 중인 필터·브리핑을 마지막에 캡처한다.
     goto(page,'/?mode=personal')
     snap(page, 'D-GRP-01b', '내 종목 지도·범위 필터', 'FS017·FS019·FS026', '회원 → 내 종목 모드',checks=[('radio',re.compile('^보유 종목'),'보유 기준 기업과 연결 사건 범위로 좁혀요.','D-GRP-01b')],note='전체·보유·관심은 내 종목 모드 안의 필터예요. 깊이 1단계는 프로토타입 가정이에요.')
@@ -494,9 +531,11 @@ def run(browser):
     goto(g,'/briefing?date=2026-09-17&edition=evening')
     briefing_text=g.locator('body').inner_text(); assert '퇴근 브리핑' in briefing_text
     goto(g,'/admin'); assert '/admin/login' in g.url
-    (OUT/'auth-proof.json').write_text(json.dumps({'guestPersonal':personal_text,'guestAI':ai_text,'guestStocks':stocks_text,'guestCatalog':guest_catalog_text,'guestCompany':guest_company_text,'guestBriefing':briefing_text,'adminRedirect':g.url,'guestSendButtonCount':0},ensure_ascii=False,indent=2))
+    if not args.slides:
+        (OUT/'auth-proof.json').write_text(json.dumps({'guestPersonal':personal_text,'guestAI':ai_text,'guestStocks':stocks_text,'guestCatalog':guest_catalog_text,'guestCompany':guest_company_text,'guestBriefing':briefing_text,'adminRedirect':g.url,'guestSendButtonCount':0},ensure_ascii=False,indent=2))
     guest.close()
     # 기존 이동 참조도 이번 실행의 실제 클릭 이력으로만 확정한다.
+    if args.slides: slides[:]=[s for s in slides if s['id'] in args.slides]
     records=list(slides)
     records.extend(json.loads((OUT/s['pair'].replace('.png','.json')).read_text()) for s in slides if s.get('pair'))
     for record in records:
@@ -507,10 +546,14 @@ def run(browser):
             assert matches, (record['id'],selector,'실제 클릭 참조 없음')
             evidence['verifiedInteraction']=matches[0]
         (OUT/record['image'].replace('.png','.json')).write_text(json.dumps(record,ensure_ascii=False,indent=2))
-    (OUT/'interaction-history.json').write_text(json.dumps(click_history,ensure_ascii=False,indent=2))
-    for name in ('failure.png','failure.json','targeted-capture.json'):
+    (OUT/'interaction-history.json').write_text(json.dumps(old_history+click_history,ensure_ascii=False,indent=2))
+    for name in ('failure.png','failure.json'):
         (OUT/name).unlink(missing_ok=True)
-    (OUT/'manifest.json').write_text(json.dumps(slides,ensure_ascii=False,indent=2))
+    updated={s['id']:s for s in slides}
+    merged=[updated.get(s['id'],s) for s in previous_manifest] if args.slides else slides
+    (OUT/'manifest.json').write_text(json.dumps(merged,ensure_ascii=False,indent=2))
+    if args.slides:
+        (OUT/'targeted-capture.json').write_text(json.dumps({'revision':'v2.1 · 10-08 정합화','selected':args.slides,'updated':list(updated),'otherCapturesUnchanged':True,'stateSource':str(args.state_source),'scheduler':'off','modelCalls':0,'adminOperations':0,'apiCalls':api_calls},ensure_ascii=False,indent=2))
     print('DONE',len(slides),'slides',flush=True)
 
 try:
@@ -524,7 +567,7 @@ try:
         executable=Path.home()/'Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
         browser=p.chromium.launch(executable_path=str(executable))
         try:
-            run_watchlist_only(browser) if args.slides else run(browser)
+            run_watchlist_only(browser) if args.slides and set(args.slides)<= {'D-WAT-01','D-WAT-01b'} else run(browser)
         except Exception as error:
             import traceback
             traceback.print_exc()
@@ -543,3 +586,4 @@ finally:
         process.wait(timeout=20)
     if started_containers:
         subprocess.run(['docker','stop',*started_containers],check=True)
+    if isolated_state is not None: shutil.rmtree(isolated_state)

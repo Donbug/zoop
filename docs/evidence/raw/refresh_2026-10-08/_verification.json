@@ -1,0 +1,23 @@
+{
+  "verified_at_kst": "2026-10-08T03:04:10.163459+09:00",
+  "xlsx_csv": {
+    "command": "/tmp/zoop-docrefresh-env/bin/python docs/evidence/raw/refresh_2026-10-08/_verify_csv.py",
+    "observed_result": "passed",
+    "csv_files": 21,
+    "cells": 147668
+  },
+  "notion_reference_hashes": {
+    "observed_result": "passed",
+    "page_paths": 116,
+    "unresolved_blocks": 0,
+    "collections_complete": true
+  },
+  "network": {
+    "observed_result": "passed",
+    "requests": 63,
+    "http_200": 63,
+    "http_429": 0,
+    "retries": 0
+  },
+  "scope": "source export verification only; project tests/build/lint, PoC and model execution not run"
+}

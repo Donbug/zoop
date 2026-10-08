@@ -1,0 +1,426 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "deviceScaleFactor": 1.25
+  },
+  "method": "Per-frame public permalink navigation; Figma auto-fit selected node, real browser PNG screenshot; canvas includes Figma chrome and may clip oversized groups.",
+  "captures": [
+    {
+      "name": "D-WAT-01 · 관심 종목 선택",
+      "node": "619-1615",
+      "page": "01 · 회원가입·로그인·온보딩",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1615",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1615.png",
+      "capturedAt": "2026-10-07T17:59:06.789Z"
+    },
+    {
+      "name": "D-ONB-02 · 가상 계좌 연결",
+      "node": "619-1509",
+      "page": "01 · 회원가입·로그인·온보딩",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1509",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1509.png",
+      "capturedAt": "2026-10-07T17:59:10.061Z"
+    },
+    {
+      "name": "D-ONB-01 · 투자 여부 선택",
+      "node": "619-1429",
+      "page": "01 · 회원가입·로그인·온보딩",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1429",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1429.png",
+      "capturedAt": "2026-10-07T17:59:13.366Z"
+    },
+    {
+      "name": "D-AUT-02 · 이메일 회원가입",
+      "node": "619-1208",
+      "page": "01 · 회원가입·로그인·온보딩",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1208",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1208.png",
+      "capturedAt": "2026-10-07T17:59:16.644Z"
+    },
+    {
+      "name": "D-AUT-01 · 시작·이메일 로그인",
+      "node": "619-1080",
+      "page": "01 · 회원가입·로그인·온보딩",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1080",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1080.png",
+      "capturedAt": "2026-10-07T17:59:19.762Z"
+    },
+    {
+      "name": "D-GRP-T5 · 지도 튜토리얼 5/5 — AI 질문",
+      "node": "619-5682",
+      "page": "02 · 지도 튜토리얼",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-5682",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-5682.png",
+      "capturedAt": "2026-10-07T17:59:22.971Z"
+    },
+    {
+      "name": "D-GRP-T4 · 지도 튜토리얼 4/5 — 상세·근거",
+      "node": "619-5095",
+      "page": "02 · 지도 튜토리얼",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-5095",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-5095.png",
+      "capturedAt": "2026-10-07T17:59:26.041Z"
+    },
+    {
+      "name": "D-GRP-T3 · 지도 튜토리얼 3/5 — 영향 경로",
+      "node": "619-4508",
+      "page": "02 · 지도 튜토리얼",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-4508",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-4508.png",
+      "capturedAt": "2026-10-07T17:59:29.623Z"
+    },
+    {
+      "name": "D-GRP-T2 · 지도 튜토리얼 2/5 — 기업·사건 선택",
+      "node": "619-3920",
+      "page": "02 · 지도 튜토리얼",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-3920",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-3920.png",
+      "capturedAt": "2026-10-07T17:59:33.127Z"
+    },
+    {
+      "name": "D-GRP-T · 지도 튜토리얼 1/5 — 지도 움직이기",
+      "node": "619-3337",
+      "page": "02 · 지도 튜토리얼",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-3337",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-3337.png",
+      "capturedAt": "2026-10-07T17:59:36.925Z"
+    },
+    {
+      "name": "D-BRF-04 · 회차 기준 지도",
+      "node": "619-10871",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-10871",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-10871.png",
+      "capturedAt": "2026-10-07T17:59:40.572Z"
+    },
+    {
+      "name": "D-GRP-07b · 선택 기업 포커스",
+      "node": "619-10306",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-10306",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-10306.png",
+      "capturedAt": "2026-10-07T17:59:43.992Z"
+    },
+    {
+      "name": "D-GRP-07 · 두 기업 사이 경로",
+      "node": "619-9575",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-9575",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-9575.png",
+      "capturedAt": "2026-10-07T17:59:47.821Z"
+    },
+    {
+      "name": "D-GRP-06 · 기업에서 여는 영향 경로",
+      "node": "619-8880",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-8880",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-8880.png",
+      "capturedAt": "2026-10-07T17:59:51.663Z"
+    },
+    {
+      "name": "D-GRP-05 · 근거 문서 창",
+      "node": "619-8225",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-8225",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-8225.png",
+      "capturedAt": "2026-10-07T17:59:54.684Z"
+    },
+    {
+      "name": "D-GRP-04 · 연결선 상세",
+      "node": "619-7557",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-7557",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-7557.png",
+      "capturedAt": "2026-10-07T17:59:58.924Z"
+    },
+    {
+      "name": "D-GRP-03 · 기업 패널·시세·1개월 추이",
+      "node": "619-6729",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-6729",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-6729.png",
+      "capturedAt": "2026-10-07T18:00:02.694Z"
+    },
+    {
+      "name": "D-GRP-02 · 사건 패널",
+      "node": "619-6269",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-6269",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-6269.png",
+      "capturedAt": "2026-10-07T18:00:06.648Z"
+    },
+    {
+      "name": "D-GRP-01 · 시장 전체 지도 — 확대 상태",
+      "node": "619-2769",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-2769",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-2769.png",
+      "capturedAt": "2026-10-07T18:00:10.438Z"
+    },
+    {
+      "name": "D-GRP-01b · 내 종목 지도·범위 필터",
+      "node": "619-2374",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-2374",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-2374.png",
+      "capturedAt": "2026-10-07T18:00:14.180Z"
+    },
+    {
+      "name": "D-GRP-01 · 시장 전체 지도",
+      "node": "619-1819",
+      "page": "03 · 지도·관계·근거",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1819",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1819.png",
+      "capturedAt": "2026-10-07T18:00:17.874Z"
+    },
+    {
+      "name": "종목 탐색",
+      "node": "692-2",
+      "page": "03.5. 종목 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=692-2",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-692-2.png",
+      "capturedAt": "2026-10-07T18:00:21.375Z"
+    },
+    {
+      "name": "문서 탭",
+      "node": "663-14180",
+      "page": "04 · 기업 상세·시점 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=663-14180",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-663-14180.png",
+      "capturedAt": "2026-10-07T18:00:24.549Z"
+    },
+    {
+      "name": "기업 정보 탭",
+      "node": "663-13515",
+      "page": "04 · 기업 상세·시점 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=663-13515",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-663-13515.png",
+      "capturedAt": "2026-10-07T18:00:28.325Z"
+    },
+    {
+      "name": "버킷·차트·그래프 연동, 주가 그래프 시점 선택",
+      "node": "658-8442",
+      "page": "04 · 기업 상세·시점 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=658-8442",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-658-8442.png",
+      "capturedAt": "2026-10-07T18:00:31.827Z"
+    },
+    {
+      "name": "Frame",
+      "node": "658-7834",
+      "page": "04 · 기업 상세·시점 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=658-7834",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-658-7834.png",
+      "capturedAt": "2026-10-07T18:00:35.595Z"
+    },
+    {
+      "name": "각 화면 페이지 생성",
+      "node": "637-6212",
+      "page": "04 · 기업 상세·시점 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=637-6212",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-637-6212.png",
+      "capturedAt": "2026-10-07T18:00:39.327Z"
+    },
+    {
+      "name": "각 화면 페이지 생성",
+      "node": "637-2222",
+      "page": "04 · 기업 상세·시점 탐색",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=637-2222",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-637-2222.png",
+      "capturedAt": "2026-10-07T18:01:16.294Z"
+    },
+    {
+      "name": "각 화면 페이지 생성",
+      "node": "730-278",
+      "page": "05 · 출퇴근 브리핑",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=730-278",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-730-278.png",
+      "capturedAt": "2026-10-07T18:01:20.079Z"
+    },
+    {
+      "name": "D-BRF-02 · 퇴근 브리핑·회차 비교",
+      "node": "620-1278",
+      "page": "05 · 출퇴근 브리핑",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-1278",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-1278.png",
+      "capturedAt": "2026-10-07T18:01:23.411Z"
+    },
+    {
+      "name": "D-BRF-01 · 출근 브리핑",
+      "node": "620-948",
+      "page": "05 · 출퇴근 브리핑",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-948",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-948.png",
+      "capturedAt": "2026-10-07T18:01:27.586Z"
+    },
+    {
+      "name": "D-AI-02b · 대화 조회 오류 — 상태 확인 필요",
+      "node": "620-4859",
+      "page": "06 · AI 질문·대화 상태",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-4859",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-4859.png",
+      "capturedAt": "2026-10-07T18:01:31.857Z"
+    },
+    {
+      "name": "D-AI-02 · AI 작업 복구·대화 회수",
+      "node": "620-4314",
+      "page": "06 · AI 질문·대화 상태",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-4314",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-4314.png",
+      "capturedAt": "2026-10-07T18:01:35.377Z"
+    },
+    {
+      "name": "D-AI-01b · AI 되묻기",
+      "node": "620-3770",
+      "page": "06 · AI 질문·대화 상태",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-3770",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-3770.png",
+      "capturedAt": "2026-10-07T18:01:38.652Z"
+    },
+    {
+      "name": "D-AI-01 · AI 질문·대상 연결",
+      "node": "620-1593",
+      "page": "06 · AI 질문·대화 상태",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-1593",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-1593.png",
+      "capturedAt": "2026-10-07T18:01:42.998Z"
+    },
+    {
+      "name": "D-SEN-02 · 회차 판단 — 예시 전용",
+      "node": "620-5691",
+      "page": "07 · 디자인시스템 예시",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-5691",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-5691.png",
+      "capturedAt": "2026-10-07T18:01:46.798Z"
+    },
+    {
+      "name": "D-SEN-01 · 긍부정 표시 규칙 — 예시 전용",
+      "node": "620-5405",
+      "page": "07 · 디자인시스템 예시",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-5405",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-5405.png",
+      "capturedAt": "2026-10-07T18:01:50.403Z"
+    },
+    {
+      "name": "M-COM-02 · 모바일 기업 전환 시트",
+      "node": "620-7653",
+      "page": "08 · 모바일 화면·전환",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-7653",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-7653.png",
+      "capturedAt": "2026-10-07T18:02:07.650Z"
+    },
+    {
+      "name": "M-COM-01 · 기업 상세·문서 전환",
+      "node": "620-7454",
+      "page": "08 · 모바일 화면·전환",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-7454",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-7454.png",
+      "capturedAt": "2026-10-07T18:02:11.023Z"
+    },
+    {
+      "name": "M-AI-01 · 하단 AI 탭·질문 창",
+      "node": "620-6944",
+      "page": "08 · 모바일 화면·전환",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-6944",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-6944.png",
+      "capturedAt": "2026-10-07T18:02:14.781Z"
+    },
+    {
+      "name": "M-BRF-01 · 퇴근 브리핑·아침 이후 변경",
+      "node": "620-6670",
+      "page": "08 · 모바일 화면·전환",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-6670",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-6670.png",
+      "capturedAt": "2026-10-07T18:02:18.238Z"
+    },
+    {
+      "name": "M-STK-01 · 종목 메뉴·기업 상세 이동",
+      "node": "620-6428",
+      "page": "08 · 모바일 화면·전환",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-6428",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-6428.png",
+      "capturedAt": "2026-10-07T18:02:21.562Z"
+    },
+    {
+      "name": "M-GRP-01 · 지도·기업 바텀시트",
+      "node": "620-5928",
+      "page": "08 · 모바일 화면·전환",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-5928",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-5928.png",
+      "capturedAt": "2026-10-07T18:02:24.897Z"
+    },
+    {
+      "name": "A-ADM-05b · 관리자 감사 로그",
+      "node": "620-10924",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-10924",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-10924.png",
+      "capturedAt": "2026-10-07T18:02:28.256Z"
+    },
+    {
+      "name": "A-ADM-05 · 회원·접근 관리",
+      "node": "620-10650",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-10650",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-10650.png",
+      "capturedAt": "2026-10-07T18:02:31.963Z"
+    },
+    {
+      "name": "A-ADM-04b · AI 사용량·오류",
+      "node": "620-10181",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-10181",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-10181.png",
+      "capturedAt": "2026-10-07T18:02:35.435Z"
+    },
+    {
+      "name": "A-ADM-04 · AI·브리핑 운영",
+      "node": "620-9769",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-9769",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-9769.png",
+      "capturedAt": "2026-10-07T18:02:39.274Z"
+    },
+    {
+      "name": "A-ADM-03 · 그래프 관제·검수",
+      "node": "620-9307",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-9307",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-9307.png",
+      "capturedAt": "2026-10-07T18:02:42.363Z"
+    },
+    {
+      "name": "A-ADM-02b · 선호도·대화록",
+      "node": "620-8960",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8960",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8960.png",
+      "capturedAt": "2026-10-07T18:02:45.648Z"
+    },
+    {
+      "name": "A-ADM-02 · 이용 통계·AI 품질",
+      "node": "620-8616",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8616",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8616.png",
+      "capturedAt": "2026-10-07T18:02:49.110Z"
+    },
+    {
+      "name": "A-ADM-01 · 운영 대시보드",
+      "node": "620-8166",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8166",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8166.png",
+      "capturedAt": "2026-10-07T18:02:52.441Z"
+    },
+    {
+      "name": "A-ADM-05c · 관리자 로그인",
+      "node": "620-8120",
+      "page": "09 · 관리자 운영",
+      "url": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8120",
+      "path": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8120.png",
+      "capturedAt": "2026-10-07T18:02:55.897Z"
+    }
+  ]
+}

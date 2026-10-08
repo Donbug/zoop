@@ -2,9 +2,11 @@
 // 인용과 출처는 저장해 둔 값이라 원문 사이트에 닿지 못해도 그대로 보인다. 원문 링크가 없으면 정해진 안내 문구를 둔다.
 import { ExternalLink, Link2Off } from "lucide-react";
 import type { ReactNode } from "react";
+import type { Schemas } from "@/api/client";
 import { formatKst } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { VerificationBadge } from "./evidence";
+import { DocumentAnalysis } from "./document-analysis";
 import { SentimentLabel, type SentimentJudgement } from "./status-labels";
 
 export interface DocumentQuoteItem {
@@ -33,9 +35,12 @@ interface DocumentItemProps {
   className?: string;
   sentiment?: SentimentJudgement | null;
   sentimentName?: string;
+  analysis?: Pick<Schemas["CompanyDocument"], "documentSummary" | "analysisStatus" | "analysisProvenance" | "sentiment" | "documentVersion" | "resultVersion">;
+  synthetic?: boolean;
+  onShowEvidence?: (summary: Schemas["AnalysisSummary"], evidenceIds: string[]) => void;
 }
 
-export function DocumentItem({ title, publisher, url, publishedAt, relation, quotes = [], headingLevel: Heading = "h3", className, sentiment, sentimentName }: DocumentItemProps) {
+export function DocumentItem({ title, publisher, url, publishedAt, relation, quotes = [], headingLevel: Heading = "h3", className, sentiment, sentimentName, analysis, synthetic = false, onShowEvidence }: DocumentItemProps) {
   return (
     <article className={cn("flex flex-col gap-2", className)}>
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
@@ -49,7 +54,9 @@ export function DocumentItem({ title, publisher, url, publishedAt, relation, quo
         </span>
       </p>
       <Heading className="text-base leading-snug font-medium text-text-primary">{title ?? "제목 없는 문서"}</Heading>
-      <SentimentLabel judgement={sentiment} accessibleName={sentimentName ?? title ?? "문서"} />
+      {analysis ? (
+        <DocumentAnalysis analysis={analysis} synthetic={synthetic} name={sentimentName ?? title ?? "문서"} onShowEvidence={onShowEvidence} />
+      ) : <SentimentLabel judgement={sentiment} accessibleName={sentimentName ?? title ?? "문서"} />}
       {relation && <div className="text-sm text-text-secondary">{relation}</div>}
       {quotes.map((q) => (
         <div key={q.id} className="flex items-start gap-2">

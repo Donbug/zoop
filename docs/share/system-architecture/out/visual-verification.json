@@ -1,0 +1,73 @@
+{
+  "pdfPages": 3,
+  "remoteNetworkRequests": 0,
+  "manifestAssets": 26,
+  "missingAssets": 0,
+  "fonts": [
+    "Type3 embedded glyph programs"
+  ],
+  "replacementGlyphs": 0,
+  "metricsMethod": "Unicode SVG text characters including spaces; excludes raster screenshot text; areas are summed SVG image/text bounding rectangles, not ink or usability scores",
+  "pages": [
+    {
+      "id": "01-system",
+      "baselineVisibleTextCharacters": 916,
+      "visibleTextCharacters": 438,
+      "baselineCharactersWithoutWhitespace": 743,
+      "charactersWithoutWhitespace": 347,
+      "textRatioWithoutWhitespace": 0.467,
+      "primaryRoles": 12,
+      "supportRoles": 1,
+      "nodeCount": 13,
+      "edgeCount": 13,
+      "textOutsidePage": [],
+      "textOverlaps": [],
+      "imageTextOverlaps": [],
+      "embeddedImages": 19,
+      "screenImages": 1,
+      "imageAreaFraction": 0.099033125,
+      "textBoxAreaFraction": 0.093879931640625,
+      "nonEmbeddedImages": 0
+    },
+    {
+      "id": "02-frontend",
+      "baselineVisibleTextCharacters": 798,
+      "visibleTextCharacters": 345,
+      "baselineCharactersWithoutWhitespace": 655,
+      "charactersWithoutWhitespace": 278,
+      "textRatioWithoutWhitespace": 0.4244,
+      "primaryRoles": 10,
+      "supportRoles": 0,
+      "nodeCount": 10,
+      "edgeCount": 12,
+      "textOutsidePage": [],
+      "textOverlaps": [],
+      "imageTextOverlaps": [],
+      "embeddedImages": 14,
+      "screenImages": 4,
+      "imageAreaFraction": 0.161969375,
+      "textBoxAreaFraction": 0.08036318359375,
+      "nonEmbeddedImages": 0
+    },
+    {
+      "id": "03-backend",
+      "baselineVisibleTextCharacters": 963,
+      "visibleTextCharacters": 494,
+      "baselineCharactersWithoutWhitespace": 791,
+      "charactersWithoutWhitespace": 397,
+      "textRatioWithoutWhitespace": 0.5019,
+      "primaryRoles": 12,
+      "supportRoles": 3,
+      "nodeCount": 15,
+      "edgeCount": 19,
+      "textOutsidePage": [],
+      "textOverlaps": [],
+      "imageTextOverlaps": [],
+      "embeddedImages": 21,
+      "screenImages": 0,
+      "imageAreaFraction": 0.069481875,
+      "textBoxAreaFraction": 0.106381943359375,
+      "nonEmbeddedImages": 0
+    }
+  ]
+}

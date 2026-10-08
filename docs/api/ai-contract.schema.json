@@ -1,0 +1,1218 @@
+{
+  "$defs": {
+    "AnalysisArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "zoop-ai-s1-1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "artifactId": {
+          "title": "Artifactid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "document-summary",
+            "document-sentiment",
+            "semantic-verification",
+            "briefing-outlook"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resultVersion": {
+          "title": "Resultversion",
+          "type": "string"
+        },
+        "jobId": {
+          "title": "Jobid",
+          "type": "string"
+        },
+        "attemptId": {
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "inputDigest": {
+          "title": "Inputdigest",
+          "type": "string"
+        },
+        "sourceRefs": {
+          "items": {
+            "$ref": "#/$defs/Document"
+          },
+          "title": "Sourcerefs",
+          "type": "array"
+        },
+        "dependencyRefs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencyrefs",
+          "type": "array"
+        },
+        "modelConfigRevision": {
+          "title": "Modelconfigrevision",
+          "type": "string"
+        },
+        "promptVersion": {
+          "title": "Promptversion",
+          "type": "string"
+        },
+        "policyVersion": {
+          "title": "Policyversion",
+          "type": "string"
+        },
+        "producedAt": {
+          "title": "Producedat",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "companyId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Companyid"
+        },
+        "grantId": {
+          "title": "Grantid",
+          "type": "string"
+        },
+        "grantRevision": {
+          "title": "Grantrevision",
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "validation": {
+          "$ref": "#/$defs/Validation"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SummaryAnswer"
+            },
+            {
+              "$ref": "#/$defs/SentimentAnswer"
+            },
+            {
+              "$ref": "#/$defs/VerificationAnswer"
+            },
+            {
+              "$ref": "#/$defs/OutlookAnswer"
+            }
+          ],
+          "title": "Result"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "artifactId",
+        "kind",
+        "resultVersion",
+        "jobId",
+        "attemptId",
+        "inputDigest",
+        "sourceRefs",
+        "dependencyRefs",
+        "modelConfigRevision",
+        "promptVersion",
+        "policyVersion",
+        "producedAt",
+        "provenance",
+        "companyId",
+        "grantId",
+        "grantRevision",
+        "claims",
+        "validation",
+        "result"
+      ],
+      "title": "AnalysisArtifact",
+      "type": "object"
+    },
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "claimId": {
+          "minLength": 1,
+          "title": "Claimid",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "assertionKind": {
+          "enum": [
+            "fact",
+            "interpretation",
+            "limitation"
+          ],
+          "title": "Assertionkind",
+          "type": "string"
+        },
+        "evidenceIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidenceids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claimId",
+        "text",
+        "assertionKind",
+        "evidenceIds"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "ClaimVerdict": {
+      "additionalProperties": false,
+      "properties": {
+        "claimId": {
+          "title": "Claimid",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "supported",
+            "contradicted",
+            "insufficient"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claimId",
+        "decision",
+        "reason"
+      ],
+      "title": "ClaimVerdict",
+      "type": "object"
+    },
+    "Company": {
+      "additionalProperties": false,
+      "properties": {
+        "companyId": {
+          "minLength": 1,
+          "title": "Companyid",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "companyId",
+        "name"
+      ],
+      "title": "Company",
+      "type": "object"
+    },
+    "Document": {
+      "additionalProperties": false,
+      "properties": {
+        "documentId": {
+          "minLength": 1,
+          "title": "Documentid",
+          "type": "string"
+        },
+        "documentVersion": {
+          "minLength": 1,
+          "title": "Documentversion",
+          "type": "string"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "textArtifactId": {
+          "minLength": 1,
+          "title": "Textartifactid",
+          "type": "string"
+        },
+        "inputKind": {
+          "enum": [
+            "body",
+            "summary"
+          ],
+          "title": "Inputkind",
+          "type": "string"
+        },
+        "cleanerVersion": {
+          "minLength": 1,
+          "title": "Cleanerversion",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "sourceHash": {
+          "minLength": 1,
+          "title": "Sourcehash",
+          "type": "string"
+        },
+        "rawLocators": {
+          "items": {
+            "$ref": "#/$defs/RawLocator"
+          },
+          "minItems": 1,
+          "title": "Rawlocators",
+          "type": "array"
+        }
+      },
+      "required": [
+        "documentId",
+        "documentVersion",
+        "sourceId",
+        "textArtifactId",
+        "inputKind",
+        "cleanerVersion",
+        "text",
+        "sourceHash",
+        "rawLocators"
+      ],
+      "title": "Document",
+      "type": "object"
+    },
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "evidenceId": {
+          "minLength": 1,
+          "title": "Evidenceid",
+          "type": "string"
+        },
+        "documentId": {
+          "minLength": 1,
+          "title": "Documentid",
+          "type": "string"
+        },
+        "documentVersion": {
+          "minLength": 1,
+          "title": "Documentversion",
+          "type": "string"
+        },
+        "textArtifactId": {
+          "minLength": 1,
+          "title": "Textartifactid",
+          "type": "string"
+        },
+        "offsetUnit": {
+          "const": "unicode_code_point",
+          "title": "Offsetunit",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "quote": {
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "inputKind": {
+          "enum": [
+            "body",
+            "summary"
+          ],
+          "title": "Inputkind",
+          "type": "string"
+        },
+        "rawLocatorIds": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Rawlocatorids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evidenceId",
+        "documentId",
+        "documentVersion",
+        "textArtifactId",
+        "offsetUnit",
+        "start",
+        "end",
+        "quote",
+        "inputKind",
+        "rawLocatorIds"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "enum": [
+                "document-summary",
+                "document-sentiment",
+                "semantic-verification",
+                "briefing-outlook"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stage"
+        }
+      },
+      "required": [
+        "code",
+        "stage"
+      ],
+      "title": "Failure",
+      "type": "object"
+    },
+    "JobInput": {
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/Document"
+        },
+        "company": {
+          "$ref": "#/$defs/Company"
+        },
+        "grantId": {
+          "title": "Grantid",
+          "type": "string"
+        },
+        "grantRevision": {
+          "title": "Grantrevision",
+          "type": "string"
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SummaryAnswer"
+            },
+            {
+              "$ref": "#/$defs/SentimentAnswer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Candidate"
+        }
+      },
+      "required": [
+        "document",
+        "company",
+        "grantId",
+        "grantRevision",
+        "candidate"
+      ],
+      "title": "JobInput",
+      "type": "object"
+    },
+    "JobResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "zoop-ai-s1-1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "jobId": {
+          "title": "Jobid",
+          "type": "string"
+        },
+        "inputDigest": {
+          "title": "Inputdigest",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "reconciling",
+            "persisting",
+            "ready",
+            "failed",
+            "cancelled"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "attemptId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Attemptid"
+        },
+        "artifactIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifactids",
+          "type": "array"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/AnalysisArtifact"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resumeMode": {
+          "enum": [
+            "none",
+            "validate_only",
+            "save_only",
+            "unsent_only",
+            "reconcile_only"
+          ],
+          "title": "Resumemode",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "grant": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceGrant"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input": {
+          "$ref": "#/$defs/Submit"
+        },
+        "calls": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Calls",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "inputDigest",
+        "state",
+        "phase",
+        "attemptId",
+        "artifactIds",
+        "artifacts",
+        "failure",
+        "resumeMode",
+        "usage",
+        "grant",
+        "input",
+        "calls"
+      ],
+      "title": "JobResult",
+      "type": "object"
+    },
+    "OutlookAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "positive",
+            "negative",
+            "mixed",
+            "undetermined"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "issueIds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Issueids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "rationale",
+        "issueIds"
+      ],
+      "title": "OutlookAnswer",
+      "type": "object"
+    },
+    "OutlookInput": {
+      "additionalProperties": false,
+      "properties": {
+        "roundId": {
+          "minLength": 1,
+          "title": "Roundid",
+          "type": "string"
+        },
+        "scheduledAt": {
+          "title": "Scheduledat",
+          "type": "string"
+        },
+        "graphVersion": {
+          "title": "Graphversion",
+          "type": "string"
+        },
+        "reviewRevision": {
+          "title": "Reviewrevision",
+          "type": "integer"
+        },
+        "ruleRevision": {
+          "title": "Rulerevision",
+          "type": "integer"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/OutlookIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "documentSentiments": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Documentsentiments",
+          "type": "array"
+        },
+        "marketVariables": {
+          "additionalProperties": true,
+          "title": "Marketvariables",
+          "type": "object"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "grantId": {
+          "title": "Grantid",
+          "type": "string"
+        },
+        "grantRevision": {
+          "title": "Grantrevision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "roundId",
+        "scheduledAt",
+        "graphVersion",
+        "reviewRevision",
+        "ruleRevision",
+        "issues",
+        "documentSentiments",
+        "marketVariables",
+        "sourceId",
+        "grantId",
+        "grantRevision"
+      ],
+      "title": "OutlookInput",
+      "type": "object"
+    },
+    "OutlookIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "eventId": {
+          "minLength": 1,
+          "title": "Eventid",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "eventTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Eventtime"
+        },
+        "companies": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Companies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "eventId",
+        "title",
+        "eventTime",
+        "companies"
+      ],
+      "title": "OutlookIssue",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceKind": {
+          "enum": [
+            "synthetic",
+            "actual"
+          ],
+          "title": "Sourcekind",
+          "type": "string"
+        },
+        "executionMode": {
+          "enum": [
+            "replay",
+            "live"
+          ],
+          "title": "Executionmode",
+          "type": "string"
+        },
+        "recordingKind": {
+          "enum": [
+            "authored-test",
+            "provider"
+          ],
+          "title": "Recordingkind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceKind",
+        "executionMode",
+        "recordingKind"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "RawLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "locatorId": {
+          "minLength": 1,
+          "title": "Locatorid",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locatorId",
+        "start",
+        "end"
+      ],
+      "title": "RawLocator",
+      "type": "object"
+    },
+    "SentimentAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "positive",
+            "negative",
+            "mixed",
+            "undetermined"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "minItems": 1,
+          "title": "Claims",
+          "type": "array"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "rationale",
+        "claims",
+        "citations",
+        "limitations"
+      ],
+      "title": "SentimentAnswer",
+      "type": "object"
+    },
+    "SourceGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "grantId": {
+          "minLength": 1,
+          "title": "Grantid",
+          "type": "string"
+        },
+        "revision": {
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "rights": {
+          "enum": [
+            "known",
+            "unknown",
+            "denied"
+          ],
+          "title": "Rights",
+          "type": "string"
+        },
+        "allowedOperations": {
+          "items": {
+            "enum": [
+              "read",
+              "store",
+              "model-send",
+              "quote-display"
+            ],
+            "type": "string"
+          },
+          "title": "Allowedoperations",
+          "type": "array"
+        },
+        "recipients": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recipients",
+          "type": "array"
+        },
+        "purposes": {
+          "items": {
+            "enum": [
+              "document-summary",
+              "document-sentiment",
+              "semantic-verification",
+              "briefing-outlook"
+            ],
+            "type": "string"
+          },
+          "title": "Purposes",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expiresAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expiresat"
+        }
+      },
+      "required": [
+        "grantId",
+        "revision",
+        "sourceId",
+        "enabled",
+        "rights",
+        "allowedOperations",
+        "recipients",
+        "purposes",
+        "evidence",
+        "expiresAt"
+      ],
+      "title": "SourceGrant",
+      "type": "object"
+    },
+    "Submit": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "zoop-ai-s1-1",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "jobId": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.-]+$",
+          "title": "Jobid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "document-summary",
+            "document-sentiment",
+            "semantic-verification",
+            "briefing-outlook"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JobInput"
+            },
+            {
+              "$ref": "#/$defs/OutlookInput"
+            }
+          ],
+          "title": "Input"
+        },
+        "mode": {
+          "enum": [
+            "replay",
+            "live"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "kind",
+        "input",
+        "mode",
+        "provenance"
+      ],
+      "title": "Submit",
+      "type": "object"
+    },
+    "SummaryAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "minItems": 1,
+          "title": "Claims",
+          "type": "array"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "claims",
+        "citations",
+        "limitations"
+      ],
+      "title": "SummaryAnswer",
+      "type": "object"
+    },
+    "Usage": {
+      "additionalProperties": false,
+      "properties": {
+        "providerAttempts": {
+          "title": "Providerattempts",
+          "type": "integer"
+        },
+        "replayCalls": {
+          "title": "Replaycalls",
+          "type": "integer"
+        },
+        "inputTokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Inputtokens"
+        },
+        "outputTokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outputtokens"
+        },
+        "cachedTokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cachedtokens"
+        },
+        "reasoningTokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reasoningtokens"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost"
+        }
+      },
+      "required": [
+        "providerAttempts",
+        "replayCalls",
+        "inputTokens",
+        "outputTokens",
+        "cachedTokens",
+        "reasoningTokens",
+        "cost"
+      ],
+      "title": "Usage",
+      "type": "object"
+    },
+    "Validation": {
+      "additionalProperties": false,
+      "properties": {
+        "exact": {
+          "title": "Exact",
+          "type": "boolean"
+        },
+        "semantic": {
+          "anyOf": [
+            {
+              "enum": [
+                "supported",
+                "hold",
+                "reject"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Semantic"
+        },
+        "eligible": {
+          "title": "Eligible",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "exact",
+        "semantic",
+        "eligible",
+        "reason"
+      ],
+      "title": "Validation",
+      "type": "object"
+    },
+    "VerificationAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/ClaimVerdict"
+          },
+          "minItems": 1,
+          "title": "Claims",
+          "type": "array"
+        },
+        "prohibitedAdvice": {
+          "title": "Prohibitedadvice",
+          "type": "boolean"
+        },
+        "unsupportedCausality": {
+          "title": "Unsupportedcausality",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "claims",
+        "prohibitedAdvice",
+        "unsupportedCausality"
+      ],
+      "title": "VerificationAnswer",
+      "type": "object"
+    },
+    "AnalysisJob": {
+      "$ref": "#/$defs/Submit"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/Submit"
+    },
+    {
+      "$ref": "#/$defs/JobResult"
+    },
+    {
+      "$ref": "#/$defs/AnalysisArtifact"
+    },
+    {
+      "$ref": "#/$defs/SourceGrant"
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zoop.local/contracts/ai-s1-1.schema.json",
+  "title": "Zoop S1 AI process contract"
+}

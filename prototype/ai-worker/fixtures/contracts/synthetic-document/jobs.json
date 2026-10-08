@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "zoop-ai-s1-1",
+  "jobs": [
+    {
+      "schemaVersion": "zoop-ai-s1-1",
+      "jobId": "synthetic-SYNTH-A-document-summary",
+      "kind": "document-summary",
+      "input": {
+        "document": {
+          "documentId": "doc-synthetic-s1",
+          "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "sourceId": "authored-synthetic",
+          "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "inputKind": "body",
+          "cleanerVersion": "synthetic-identity-1",
+          "text": "🚀 합성 알파의 매출이 늘었다. 합성 베타의 비용이 늘었다.",
+          "sourceHash": "5fae8474f64dceae744f30e943a81d248a53e6b355d8fc18cd00b6ebb8b66548",
+          "rawLocators": [
+            {
+              "locatorId": "raw-synthetic-s1",
+              "start": 0,
+              "end": 33
+            }
+          ]
+        },
+        "company": {
+          "companyId": "SYNTH-A",
+          "name": "합성 알파"
+        },
+        "grantId": "grant-synthetic-s1",
+        "grantRevision": "grant-synthetic-s1-1",
+        "candidate": null
+      },
+      "mode": "replay",
+      "provenance": {
+        "sourceKind": "synthetic",
+        "executionMode": "replay",
+        "recordingKind": "authored-test"
+      }
+    },
+    {
+      "schemaVersion": "zoop-ai-s1-1",
+      "jobId": "synthetic-SYNTH-A-document-sentiment",
+      "kind": "document-sentiment",
+      "input": {
+        "document": {
+          "documentId": "doc-synthetic-s1",
+          "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "sourceId": "authored-synthetic",
+          "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "inputKind": "body",
+          "cleanerVersion": "synthetic-identity-1",
+          "text": "🚀 합성 알파의 매출이 늘었다. 합성 베타의 비용이 늘었다.",
+          "sourceHash": "5fae8474f64dceae744f30e943a81d248a53e6b355d8fc18cd00b6ebb8b66548",
+          "rawLocators": [
+            {
+              "locatorId": "raw-synthetic-s1",
+              "start": 0,
+              "end": 33
+            }
+          ]
+        },
+        "company": {
+          "companyId": "SYNTH-A",
+          "name": "합성 알파"
+        },
+        "grantId": "grant-synthetic-s1",
+        "grantRevision": "grant-synthetic-s1-1",
+        "candidate": null
+      },
+      "mode": "replay",
+      "provenance": {
+        "sourceKind": "synthetic",
+        "executionMode": "replay",
+        "recordingKind": "authored-test"
+      }
+    },
+    {
+      "schemaVersion": "zoop-ai-s1-1",
+      "jobId": "synthetic-SYNTH-B-document-summary",
+      "kind": "document-summary",
+      "input": {
+        "document": {
+          "documentId": "doc-synthetic-s1",
+          "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "sourceId": "authored-synthetic",
+          "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "inputKind": "body",
+          "cleanerVersion": "synthetic-identity-1",
+          "text": "🚀 합성 알파의 매출이 늘었다. 합성 베타의 비용이 늘었다.",
+          "sourceHash": "5fae8474f64dceae744f30e943a81d248a53e6b355d8fc18cd00b6ebb8b66548",
+          "rawLocators": [
+            {
+              "locatorId": "raw-synthetic-s1",
+              "start": 0,
+              "end": 33
+            }
+          ]
+        },
+        "company": {
+          "companyId": "SYNTH-B",
+          "name": "합성 베타"
+        },
+        "grantId": "grant-synthetic-s1",
+        "grantRevision": "grant-synthetic-s1-1",
+        "candidate": null
+      },
+      "mode": "replay",
+      "provenance": {
+        "sourceKind": "synthetic",
+        "executionMode": "replay",
+        "recordingKind": "authored-test"
+      }
+    },
+    {
+      "schemaVersion": "zoop-ai-s1-1",
+      "jobId": "synthetic-SYNTH-B-document-sentiment",
+      "kind": "document-sentiment",
+      "input": {
+        "document": {
+          "documentId": "doc-synthetic-s1",
+          "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "sourceId": "authored-synthetic",
+          "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "inputKind": "body",
+          "cleanerVersion": "synthetic-identity-1",
+          "text": "🚀 합성 알파의 매출이 늘었다. 합성 베타의 비용이 늘었다.",
+          "sourceHash": "5fae8474f64dceae744f30e943a81d248a53e6b355d8fc18cd00b6ebb8b66548",
+          "rawLocators": [
+            {
+              "locatorId": "raw-synthetic-s1",
+              "start": 0,
+              "end": 33
+            }
+          ]
+        },
+        "company": {
+          "companyId": "SYNTH-B",
+          "name": "합성 베타"
+        },
+        "grantId": "grant-synthetic-s1",
+        "grantRevision": "grant-synthetic-s1-1",
+        "candidate": null
+      },
+      "mode": "replay",
+      "provenance": {
+        "sourceKind": "synthetic",
+        "executionMode": "replay",
+        "recordingKind": "authored-test"
+      }
+    }
+  ]
+}

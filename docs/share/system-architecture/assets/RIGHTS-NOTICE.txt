@@ -1,0 +1,12 @@
+Technology marks are used solely to identify the current implementation. No affiliation, endorsement, sponsorship or approval is implied. Copyright permission is not a trademark transfer.
+
+React artwork: official create-react-app fixture, MIT; see REACT-LICENSE.txt.
+FastAPI artwork: official FastAPI docs icon, MIT; see FASTAPI-LICENSE.txt.
+Python two-snakes device: PSF encourages use to identify implementation in Python; https://www.python.org/community/logos/ (read 2026-10-08). Device unchanged, proportional scaling only. Python is a PSF trademark; not a general license to derived marks.
+SQLite banner: official SQLite documentation, https://sqlite.org/images/sqlite370_banner.svg. SQLite documentation is dedicated to the public domain: https://sqlite.org/copyright.html (read 2026-10-08). No claim of trademark transfer.
+PostgreSQL and Neo4j: names only with generic licensed role icons; no downloaded logo is shipped because reuse conditions were not clear for this composition. https://www.postgresql.org/about/policies/trademarks/ ; https://neo4j.com/brand/
+Lucide: extracted installed lucide-react v1.48.0 geometry. Full ISC plus Feather-derived MIT notice in LUCIDE-LICENSE.txt.
+SUIT: unchanged WOFF2; full SIL OFL 1.1 notice in ../SUIT-LICENSE.txt.
+Project screen captures: user-authorized crops only, no UI repainting. Synthetic replay remains synthetic. Raster screenshots contain their original UI text and marks.
+
+Simple Icons was consulted only as a locator; no Simple Icons artwork is bundled. Its CC0 does not establish rights for every brand icon or waive trademarks (https://github.com/simple-icons/simple-icons/blob/develop/DISCLAIMER.md).

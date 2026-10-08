@@ -45,6 +45,7 @@ class Unavailable(CamelModel):
 
 
 class ErrorBody(CamelModel):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=False)
     code: str
     message: str
     details: dict[str, Any] | None = None
@@ -598,6 +599,56 @@ class BriefingDocumentSentiment(CamelModel):
     sentiment: DocumentSentiment
 
 
+class AnalysisProvenance(CamelModel):
+    source_kind: Literal["synthetic", "actual"]
+    execution_mode: Literal["replay", "live"]
+    recording_kind: Literal["authored-test", "provider"]
+
+
+class AnalysisCitation(CamelModel):
+    evidence_id: str
+    document_id: str
+    document_version: str
+    text_artifact_id: str
+    offset_unit: Literal["unicode_code_point"]
+    start: int
+    end: int
+    quote: str
+    input_kind: Literal["body", "summary"]
+    raw_locator_ids: list[str]
+
+
+class AnalysisClaim(CamelModel):
+    claim_id: str
+    text: str
+    assertion_kind: Literal["fact", "interpretation", "limitation"]
+    evidence_ids: list[str]
+
+
+class AnalysisSummary(CamelModel):
+    schema_version: Literal["zoop-ai-s1-1"]
+    artifact_id: str
+    document_id: str
+    document_version: str
+    result_version: str
+    text: str
+    claims: list[AnalysisClaim]
+    citations: list[AnalysisCitation]
+    limitations: list[str]
+    produced_at: str
+    provenance: AnalysisProvenance
+
+
+class AnalysisStageStatus(CamelModel):
+    status: Literal["not_requested", "pending", "failed", "withheld", "available"]
+    reason: str | None = None
+
+
+class DocumentAnalysisStatus(CamelModel):
+    summary: AnalysisStageStatus
+    sentiment: AnalysisStageStatus
+
+
 class DocumentEventRef(CamelModel):
     event_id: str
     title: str
@@ -620,6 +671,11 @@ class CompanyDocument(CamelModel):
     events: list[DocumentEventRef] = Field(description="This company's approved events the article supports")
     quotes: list[DocumentQuote] = Field(description="Stored evidence quotes from this article for those events")
     sentiment: DocumentSentiment | None = None
+    document_version: str | None = None
+    document_summary: AnalysisSummary | None = None
+    analysis_status: DocumentAnalysisStatus | None = None
+    analysis_provenance: AnalysisProvenance | None = None
+    result_version: str | None = None
 
 
 class CompanyDocumentsResponse(CamelModel):
@@ -804,6 +860,11 @@ class EvidenceResponse(CamelModel):
     event_ids: list[str]
     metadata: Metadata
     sentiment: DocumentSentiment | None = None
+    document_version: str | None = None
+    document_summary: AnalysisSummary | None = None
+    analysis_status: DocumentAnalysisStatus | None = None
+    analysis_provenance: AnalysisProvenance | None = None
+    result_version: str | None = None
 
 
 # ---- briefings

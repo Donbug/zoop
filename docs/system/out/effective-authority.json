@@ -1,0 +1,1620 @@
+{
+  "authority": {
+    "decisionId": "user-2026-10-08-day",
+    "source": "docs/share/day-work-2026-10-08.md",
+    "authority": "사용자 결정(팀 합의 요구의 현재 해석)",
+    "rawPolicy": "원문 상태·우선순위·scopeClass·WBS 충돌은 보존한다. 유효 기준을 원문 승인 상태로 덮어쓰지 않는다.",
+    "implementationScope": {
+      "appliesTo": "all-specs-and-wbs",
+      "status": "팀합의요구/설계대상",
+      "includeRawProposalIds": [
+        "FS074",
+        "FS075",
+        "FS076",
+        "FS077",
+        "FS078",
+        "FS079",
+        "FS080",
+        "FS081"
+      ],
+      "implementationComplete": false,
+      "paidExecutionApproved": false
+    },
+    "prototype": {
+      "permission": "전권 범위·끝까지 완성",
+      "productionAdoption": "담당자 선택"
+    },
+    "schedule": {
+      "authority": "WBS",
+      "notion": "outdated",
+      "internalConflicts": "정정 요청으로 수집"
+    },
+    "design": {
+      "current": "기존 UI 코드",
+      "target": "Figma(폰트 제외 최종)",
+      "font": "SUIT 유지",
+      "sequence": "기능 먼저·디자인 후"
+    },
+    "migration": {
+      "stackFrozen": false,
+      "backendCandidate": "Java/Spring(유력 후보)",
+      "frontendReuseRequired": false,
+      "backendReuseRequired": false
+    },
+    "ai": {
+      "sequence": "설계 먼저",
+      "additionalApiResearch": true,
+      "liveBudget": "미정",
+      "modelConfiguration": ".env",
+      "executionApproval": "별도"
+    }
+  },
+  "valid": true,
+  "sourceSha256": "57a0e9c7f0c4e5731582100ad815e1d20665d30e812aeebdbb5479f46223d730",
+  "specs": {
+    "FS001": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 10,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS002": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 11,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS003": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 12,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS004": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 13,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS005": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 14,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS006": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 15,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS007": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 16,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS008": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 17,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS009": {
+      "raw": {
+        "status": "보류",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 18,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS010": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 19,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS011-01": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 20,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS011-02": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 21,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS012": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 22,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS013": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 23,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS014": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 24,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS015": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 25,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS016": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 26,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS017": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 27,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS018": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 28,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS019": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 29,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS020": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 30,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS021": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 31,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS022": {
+      "raw": {
+        "status": "검토 중",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 32,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS023": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 33,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS024": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 34,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS025": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 35,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS026": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 36,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS027": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 37,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS028": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 38,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS029": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 39,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS030": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 40,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS031": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 41,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS032": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 42,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS033": {
+      "raw": {
+        "status": "확정",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 43,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS034": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 44,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS035": {
+      "raw": {
+        "status": "FS035: 미기재\nFS057: 팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 45,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS036": {
+      "raw": {
+        "status": "검토 중",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 46,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS037": {
+      "raw": {
+        "status": "",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 47,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS038": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 48,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS039": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 49,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS040": {
+      "raw": {
+        "status": "검토 중",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 50,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS041": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 51,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS042": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 52,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS043": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 53,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS044": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 54,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS045": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 55,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS046": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 56,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS047": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 57,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS048": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 58,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS049": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 59,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS050-01": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 60,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS050-02": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 61,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS051": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 62,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS052-01": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 63,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS052-02": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 64,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS053": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 65,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS054": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 66,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS055": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 67,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS056": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 68,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS058": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 69,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS059": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 70,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS060": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 71,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS061": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 72,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS062": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 73,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS063": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 74,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS064": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 75,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS065": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 76,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS066-01": {
+      "raw": {
+        "status": "FS037: 미기재 / FS066: 미기재",
+        "priority": "FS037: 미기재 / FS066: P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 77,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS066-02": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 78,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS066-03": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 79,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS067-01": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 80,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS067-02": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 81,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS067-03": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 82,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS068": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 83,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS069-01": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 84,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS069-02": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 85,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS070-01": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 86,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS070-02": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 87,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS071-01": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 88,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS071-02": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 89,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS072": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 90,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS073": {
+      "raw": {
+        "status": "미기재",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 91,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS001": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 92,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS002": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 93,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS003": {
+      "raw": {
+        "status": "확정",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 94,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS004": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 95,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS005": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 96,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS006": {
+      "raw": {
+        "status": "팀 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 97,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS007": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 98,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS008": {
+      "raw": {
+        "status": "보완 제안 · 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 99,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS009": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 100,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS010": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 101,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS011": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 102,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "NFS012": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 103,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS074": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 104,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS075": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 105,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS076": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 106,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS077": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 107,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS078": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 108,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS079": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 109,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS080": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 110,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS081": {
+      "raw": {
+        "status": "추가 제안 · 검토 전",
+        "priority": "미정",
+        "scopeClass": "proposal",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "row": 111,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS???": {
+      "raw": {
+        "status": "목차 없음",
+        "priority": "P2",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv",
+          "row": 134,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    },
+    "FS050": {
+      "raw": {
+        "status": "목차 없음",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv",
+          "row": 79,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "팀합의요구/설계대상",
+      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationEvidence": "문서 판정 없음"
+    }
+  },
+  "wbsImplementationScope": {
+    "status": "팀합의요구/설계대상",
+    "count": 173
+  }
+}

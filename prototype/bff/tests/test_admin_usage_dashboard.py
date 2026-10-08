@@ -156,7 +156,7 @@ def test_dashboard_summarises_every_area(admin):
     assert body["candidates"] == {"allow": 4, "hold": 1, "reject": 0, "inactive": 0, "holdPendingReview": 0}
     assert body["jobs"]["failed24h"] == 1 and body["jobs"]["running"] == 0 and body["jobs"]["recent"][0]["status"] == "failed"
     assert body["members"] == {"registered": 1, "activeMemberSessions": 1, "activeGuestSessions": 1, "source": "bff-mock"}
-    assert [f["feature"] for f in body["ai"]["features"]] == ["chatbot", "news-analysis", "briefing", "document-sentiment", "briefing-outlook"]
+    assert [f["feature"] for f in body["ai"]["features"]] == ["chatbot", "news-analysis", "briefing", "document-sentiment", "briefing-outlook", "document-summary", "semantic-verification"]
     assert body["briefings"]["latest"][0]["id"] == "brf-2026-09-17-morning"
     assert body["briefings"]["latest"][0]["status"] == "missing" and body["briefings"]["delayedOrFailed"] == 1
     assert body["audit"]["last24h"] >= 3

@@ -1,0 +1,1623 @@
+{
+  "date": "2026-10-08",
+  "schema": "visual-flow-2",
+  "pages": [
+    {
+      "id": "01-system",
+      "title": "전체 시스템 구성도",
+      "description": "사용자는 React 화면에서 FastAPI BFF가 제공하는 게시 자료와 앱 저장 결과를 읽습니다. 별도 PoC 원장은 관리자 검수 후 게시하며, 별도 AI worker의 작업 결과는 현재 권리와 공개 정책 검증 후 앱에 반영합니다. 합성 재현이며 실모델 실행 승인은 별도입니다.",
+      "zones": [
+        {
+          "x": 40,
+          "y": 125,
+          "w": 1500,
+          "h": 430,
+          "title": "공개 자료 읽기",
+          "status": "current"
+        },
+        {
+          "x": 40,
+          "y": 575,
+          "w": 1500,
+          "h": 340,
+          "title": "별도 생산 · 검수",
+          "status": "separate"
+        },
+        {
+          "x": 1070,
+          "y": 22,
+          "w": 470,
+          "h": 78,
+          "title": "본개발 목표 · 미구현",
+          "status": "target"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "screen",
+          "x": 60,
+          "y": 200,
+          "w": 370,
+          "h": 290,
+          "title": "사용자 화면",
+          "tech": "React · 기존 게시본 예시",
+          "image": "screen-graph.png",
+          "miniLogo": "react.svg"
+        },
+        {
+          "id": "bff",
+          "x": 500,
+          "y": 215,
+          "w": 180,
+          "h": 165,
+          "title": "화면용 서버",
+          "tech": "FastAPI · /api",
+          "logo": "fastapi.svg"
+        },
+        {
+          "id": "snapshot",
+          "x": 810,
+          "y": 200,
+          "w": 220,
+          "h": 180,
+          "title": "게시된 자료",
+          "tech": "고정 JSON",
+          "icon": "archive"
+        },
+        {
+          "id": "appdb",
+          "x": 1190,
+          "y": 200,
+          "w": 250,
+          "h": 180,
+          "title": "앱 저장소",
+          "tech": "세션 · 검수 · 회차",
+          "icon": "database",
+          "miniLogo": "sqlite.svg"
+        },
+        {
+          "id": "market",
+          "x": 1270,
+          "y": 390,
+          "w": 220,
+          "h": 130,
+          "title": "외부 시장 자료",
+          "tech": "설정 시 연결",
+          "icon": "chart-no-axes-combined",
+          "iconSize": 60,
+          "titleOffset": 86
+        },
+        {
+          "id": "raw",
+          "x": 55,
+          "y": 675,
+          "w": 150,
+          "h": 150,
+          "title": "뉴스·공시 원문",
+          "tech": "",
+          "icon": "file-text",
+          "iconSize": 72,
+          "titleOffset": 105,
+          "titleSize": 22
+        },
+        {
+          "id": "poc",
+          "x": 245,
+          "y": 675,
+          "w": 160,
+          "h": 160,
+          "title": "뉴스 분석·검증",
+          "tech": "PoC · 승인 후",
+          "icon": "terminal",
+          "miniLogo": "python.svg",
+          "iconSize": 72,
+          "titleOffset": 105,
+          "titleSize": 22
+        },
+        {
+          "id": "ledger",
+          "x": 440,
+          "y": 675,
+          "w": 210,
+          "h": 160,
+          "title": "분석 원장·진단",
+          "tech": "PostgreSQL / Neo4j",
+          "icon": "network",
+          "iconSize": 72,
+          "titleOffset": 105,
+          "titleSize": 22
+        },
+        {
+          "id": "publish",
+          "x": 690,
+          "y": 650,
+          "w": 180,
+          "h": 190,
+          "title": "관리자 검수·공개",
+          "tech": "",
+          "icon": "shield-check",
+          "titleSize": 22
+        },
+        {
+          "id": "input",
+          "x": 900,
+          "y": 650,
+          "w": 175,
+          "h": 190,
+          "title": "고정 입력",
+          "tech": "문서 · 기업 · 회차",
+          "icon": "file-text"
+        },
+        {
+          "id": "worker",
+          "x": 1090,
+          "y": 650,
+          "w": 185,
+          "h": 200,
+          "title": "AI 생산 worker",
+          "tech": "요약 / 기업별 판정",
+          "badge": "별도 의미 검증 · outlook",
+          "logo": "python.svg",
+          "techSize": 18,
+          "titleSize": 23
+        },
+        {
+          "id": "gate",
+          "x": 1330,
+          "y": 650,
+          "w": 185,
+          "h": 205,
+          "title": "권리·결과 검증",
+          "tech": "현재 권리 → 반영",
+          "kind": "gate",
+          "icon": "shield-check",
+          "titleSize": 22
+        },
+        {
+          "id": "workerdb",
+          "x": 1090,
+          "y": 850,
+          "w": 190,
+          "h": 55,
+          "title": "자체 SQLite",
+          "tech": "",
+          "icon": "database",
+          "iconSize": 26,
+          "titleOffset": 50,
+          "titleSize": 19,
+          "role": "support"
+        }
+      ],
+      "edges": [
+        {
+          "a": "screen",
+          "b": "bff",
+          "points": [
+            [
+              430,
+              330
+            ],
+            [
+              500,
+              330
+            ]
+          ],
+          "label": "요청·응답",
+          "lx": 465,
+          "ly": 315,
+          "status": "current",
+          "both": true
+        },
+        {
+          "a": "snapshot",
+          "b": "bff",
+          "points": [
+            [
+              810,
+              253
+            ],
+            [
+              680,
+              253
+            ]
+          ],
+          "label": "그래프·근거",
+          "lx": 745,
+          "ly": 238,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "appdb",
+          "b": "bff",
+          "points": [
+            [
+              1315,
+              380
+            ],
+            [
+              1190,
+              380
+            ],
+            [
+              1190,
+              535
+            ],
+            [
+              590,
+              535
+            ],
+            [
+              590,
+              382
+            ]
+          ],
+          "label": "세션·저장 결과",
+          "lx": 845,
+          "ly": 522,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "market",
+          "b": "bff",
+          "points": [
+            [
+              1490,
+              440
+            ],
+            [
+              1540,
+              440
+            ],
+            [
+              1540,
+              182
+            ],
+            [
+              590,
+              182
+            ],
+            [
+              590,
+              212
+            ]
+          ],
+          "label": "시장 값",
+          "lx": 1120,
+          "ly": 174,
+          "status": "approval",
+          "both": false
+        },
+        {
+          "a": "raw",
+          "b": "poc",
+          "points": [
+            [
+              205,
+              724
+            ],
+            [
+              245,
+              724
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "approval",
+          "both": false
+        },
+        {
+          "a": "poc",
+          "b": "ledger",
+          "points": [
+            [
+              405,
+              724
+            ],
+            [
+              440,
+              724
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "approval",
+          "both": false
+        },
+        {
+          "a": "ledger",
+          "b": "publish",
+          "points": [
+            [
+              650,
+              724
+            ],
+            [
+              690,
+              724
+            ]
+          ],
+          "label": "관리자 조회",
+          "lx": 670,
+          "ly": 705,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "publish",
+          "b": "snapshot",
+          "points": [
+            [
+              780,
+              650
+            ],
+            [
+              780,
+              580
+            ],
+            [
+              920,
+              580
+            ],
+            [
+              920,
+              383
+            ]
+          ],
+          "label": "새 게시 버전",
+          "lx": 920,
+          "ly": 560,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "input",
+          "b": "worker",
+          "points": [
+            [
+              1075,
+              703
+            ],
+            [
+              1090,
+              703
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "worker",
+          "b": "gate",
+          "points": [
+            [
+              1275,
+              703
+            ],
+            [
+              1330,
+              703
+            ]
+          ],
+          "label": "결과·영수증",
+          "lx": 1302,
+          "ly": 685,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "gate",
+          "b": "appdb",
+          "points": [
+            [
+              1515,
+              730
+            ],
+            [
+              1520,
+              730
+            ],
+            [
+              1520,
+              285
+            ],
+            [
+              1440,
+              285
+            ]
+          ],
+          "label": "검증 후 반영",
+          "lx": 1465,
+          "ly": 570,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "input",
+          "b": "gate",
+          "points": [
+            [
+              980,
+              840
+            ],
+            [
+              980,
+              879
+            ],
+            [
+              1422,
+              879
+            ],
+            [
+              1422,
+              855
+            ]
+          ],
+          "label": "현재 권리",
+          "lx": 1030,
+          "ly": 866,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "worker",
+          "b": "workerdb",
+          "points": [
+            [
+              1182,
+              842
+            ],
+            [
+              1182,
+              849
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        }
+      ],
+      "captions": [
+        [
+          "/api/v1 · Java/Spring 후보 · 배포 미정",
+          1094,
+          86,
+          18
+        ],
+        [
+          "합성 재현 · 실모델 미실행 / 별도 승인",
+          900,
+          619,
+          19
+        ],
+        [
+          "일반 AI 질문: 규칙 기반",
+          60,
+          530,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "02-frontend",
+      "title": "프론트엔드 구성도",
+      "description": "기업·기간·시점 선택은 화면 이동과 URL·공용 상태, TanStack Query의 조회 조건, HTTP 요청으로 전달됩니다. 같은 조건의 캐시 자료가 차트·관계·근거 화면을 채웁니다. 근거 사진은 합성 재현 예시이고 일반 질문은 규칙 기반이며 사용자 GET은 worker를 실행하지 않습니다.",
+      "zones": [
+        {
+          "x": 40,
+          "y": 125,
+          "w": 1500,
+          "h": 310,
+          "title": "선택 → 조회 요청",
+          "status": "current"
+        },
+        {
+          "x": 40,
+          "y": 605,
+          "w": 1500,
+          "h": 310,
+          "title": "같은 조건으로 표시",
+          "status": "current"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "selection",
+          "x": 60,
+          "y": 190,
+          "w": 380,
+          "h": 220,
+          "title": "기업·기간·시점 선택",
+          "tech": "React · 실제 화면 일부",
+          "image": "screen-selection.png",
+          "miniLogo": "react.svg"
+        },
+        {
+          "id": "routing",
+          "x": 485,
+          "y": 195,
+          "w": 205,
+          "h": 175,
+          "title": "화면 이동·접근 확인",
+          "tech": "",
+          "icon": "route",
+          "titleSize": 22
+        },
+        {
+          "id": "condition",
+          "x": 740,
+          "y": 195,
+          "w": 180,
+          "h": 180,
+          "title": "선택 조건 공유",
+          "tech": "URL · 공용 상태",
+          "icon": "workflow",
+          "titleSize": 23
+        },
+        {
+          "id": "cache",
+          "x": 970,
+          "y": 195,
+          "w": 180,
+          "h": 180,
+          "title": "조회 결과 재사용",
+          "tech": "TanStack Query",
+          "icon": "layers",
+          "titleSize": 23
+        },
+        {
+          "id": "request",
+          "x": 1240,
+          "y": 195,
+          "w": 190,
+          "h": 180,
+          "title": "서버 요청 통일",
+          "tech": "fetch · cookie",
+          "icon": "send"
+        },
+        {
+          "id": "bff",
+          "x": 1260,
+          "y": 430,
+          "w": 190,
+          "h": 165,
+          "title": "화면용 서버",
+          "tech": "FastAPI · /api",
+          "logo": "fastapi.svg",
+          "iconSize": 70,
+          "titleOffset": 100
+        },
+        {
+          "id": "chart",
+          "x": 60,
+          "y": 650,
+          "w": 440,
+          "h": 255,
+          "title": "차트·사건 변화",
+          "tech": "기존 게시본 · 인과관계 아님",
+          "image": "screen-chart.png"
+        },
+        {
+          "id": "graph",
+          "x": 545,
+          "y": 650,
+          "w": 320,
+          "h": 255,
+          "title": "관계 그래프",
+          "tech": "Cytoscape · 같은 기업 예시",
+          "image": "screen-relation.png"
+        },
+        {
+          "id": "evidence",
+          "x": 925,
+          "y": 650,
+          "w": 345,
+          "h": 255,
+          "title": "근거·저장 문서 분석",
+          "tech": "합성 재현 예시 · 생성 호출 없음",
+          "image": "screen-evidence.png"
+        },
+        {
+          "id": "question",
+          "x": 1350,
+          "y": 710,
+          "w": 150,
+          "h": 155,
+          "title": "일반 AI 질문",
+          "tech": "규칙 기반",
+          "icon": "message-square",
+          "iconSize": 65,
+          "titleOffset": 95,
+          "titleSize": 22
+        }
+      ],
+      "edges": [
+        {
+          "a": "selection",
+          "b": "routing",
+          "points": [
+            [
+              440,
+              290
+            ],
+            [
+              485,
+              290
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "routing",
+          "b": "condition",
+          "points": [
+            [
+              690,
+              245
+            ],
+            [
+              740,
+              245
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "condition",
+          "b": "cache",
+          "points": [
+            [
+              920,
+              245
+            ],
+            [
+              970,
+              245
+            ]
+          ],
+          "label": "조건",
+          "lx": 945,
+          "ly": 230,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "cache",
+          "b": "request",
+          "points": [
+            [
+              1150,
+              245
+            ],
+            [
+              1240,
+              245
+            ]
+          ],
+          "label": "조회 요청",
+          "lx": 1195,
+          "ly": 230,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "request",
+          "b": "bff",
+          "points": [
+            [
+              1335,
+              380
+            ],
+            [
+              1335,
+              426
+            ]
+          ],
+          "label": "HTTP",
+          "lx": 1380,
+          "ly": 403,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "bff",
+          "b": "cache",
+          "points": [
+            [
+              1260,
+              485
+            ],
+            [
+              1060,
+              485
+            ],
+            [
+              1060,
+              382
+            ]
+          ],
+          "label": "응답 자료",
+          "lx": 1160,
+          "ly": 469,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "cache",
+          "b": "chart",
+          "points": [
+            [
+              1010,
+              380
+            ],
+            [
+              1010,
+              530
+            ],
+            [
+              280,
+              530
+            ],
+            [
+              280,
+              648
+            ]
+          ],
+          "label": "시세·사건",
+          "lx": 575,
+          "ly": 515,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "cache",
+          "b": "graph",
+          "points": [
+            [
+              1030,
+              380
+            ],
+            [
+              1030,
+              552
+            ],
+            [
+              705,
+              552
+            ],
+            [
+              705,
+              648
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "cache",
+          "b": "evidence",
+          "points": [
+            [
+              1120,
+              380
+            ],
+            [
+              1120,
+              635
+            ],
+            [
+              1095,
+              635
+            ],
+            [
+              1095,
+              648
+            ]
+          ],
+          "label": "저장 자료",
+          "lx": 1170,
+          "ly": 610,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "condition",
+          "b": "evidence",
+          "points": [
+            [
+              830,
+              382
+            ],
+            [
+              830,
+              578
+            ],
+            [
+              900,
+              578
+            ],
+            [
+              900,
+              690
+            ],
+            [
+              925,
+              690
+            ]
+          ],
+          "label": "근거 선택",
+          "lx": 895,
+          "ly": 567,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "graph",
+          "b": "condition",
+          "points": [
+            [
+              865,
+              825
+            ],
+            [
+              885,
+              825
+            ],
+            [
+              885,
+              405
+            ],
+            [
+              830,
+              405
+            ],
+            [
+              830,
+              382
+            ]
+          ],
+          "label": "사건·시점",
+          "lx": 950,
+          "ly": 417,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "question",
+          "b": "bff",
+          "points": [
+            [
+              1425,
+              710
+            ],
+            [
+              1425,
+              600
+            ]
+          ],
+          "label": "질문",
+          "lx": 1465,
+          "ly": 645,
+          "status": "current",
+          "both": false
+        }
+      ],
+      "captions": [
+        [
+          "화면 예시이며 클릭 전후 비교가 아닙니다.",
+          60,
+          460,
+          19
+        ]
+      ]
+    },
+    {
+      "id": "03-backend",
+      "title": "백엔드 구성도",
+      "description": "현재 FastAPI BFF는 세션·공개 기준을 확인해 고정 게시본과 앱 SQLite를 조회합니다. 관리자 PoC 원장·게시와 브리핑 회차는 별도 명령입니다. JSON CLI로 전달한 worker 작업은 자체 SQLite를 사용하며, 결과·영수증은 현재 권리와 문서 의미 또는 기존 outlook 참조 정책을 검증한 후 앱에 반영됩니다. DB 공유 쓰기는 없습니다.",
+      "zones": [
+        {
+          "x": 40,
+          "y": 125,
+          "w": 1500,
+          "h": 535,
+          "title": "현재 BFF · FastAPI",
+          "status": "current"
+        },
+        {
+          "x": 830,
+          "y": 715,
+          "w": 710,
+          "h": 200,
+          "title": "별도 실행",
+          "status": "separate"
+        },
+        {
+          "x": 1070,
+          "y": 22,
+          "w": 470,
+          "h": 78,
+          "title": "본개발 목표 · 미구현",
+          "status": "target"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "entry",
+          "x": 60,
+          "y": 190,
+          "w": 170,
+          "h": 165,
+          "title": "요청 입구",
+          "tech": "/api",
+          "logo": "fastapi.svg"
+        },
+        {
+          "id": "guard",
+          "x": 290,
+          "y": 190,
+          "w": 230,
+          "h": 170,
+          "title": "접근·자료 기준 확인",
+          "tech": "",
+          "icon": "shield-check",
+          "titleSize": 22
+        },
+        {
+          "id": "read",
+          "x": 595,
+          "y": 190,
+          "w": 185,
+          "h": 170,
+          "title": "게시 자료 조회",
+          "tech": "",
+          "icon": "file-text"
+        },
+        {
+          "id": "snapshot",
+          "x": 845,
+          "y": 190,
+          "w": 210,
+          "h": 180,
+          "title": "게시 그래프·근거",
+          "tech": "고정 JSON",
+          "icon": "archive",
+          "titleSize": 23
+        },
+        {
+          "id": "appdb",
+          "x": 1260,
+          "y": 190,
+          "w": 235,
+          "h": 180,
+          "title": "앱 저장소",
+          "tech": "세션 · 검수 · 회차",
+          "icon": "database",
+          "miniLogo": "sqlite.svg"
+        },
+        {
+          "id": "admin",
+          "x": 60,
+          "y": 445,
+          "w": 230,
+          "h": 170,
+          "title": "관리자 작업·게시",
+          "tech": "",
+          "icon": "shield-check"
+        },
+        {
+          "id": "ledger",
+          "x": 335,
+          "y": 445,
+          "w": 235,
+          "h": 170,
+          "title": "관리자 원장·진단",
+          "tech": "PostgreSQL / Neo4j",
+          "icon": "network"
+        },
+        {
+          "id": "round",
+          "x": 600,
+          "y": 445,
+          "w": 210,
+          "h": 170,
+          "title": "브리핑 회차",
+          "tech": "발행 후 고정",
+          "icon": "clock"
+        },
+        {
+          "id": "transport",
+          "x": 875,
+          "y": 445,
+          "w": 210,
+          "h": 190,
+          "title": "별도 작업 전달",
+          "tech": "JSON CLI",
+          "icon": "terminal"
+        },
+        {
+          "id": "gate",
+          "x": 1220,
+          "y": 445,
+          "w": 285,
+          "h": 190,
+          "title": "권리·공개 검증",
+          "tech": "문서: 별도 의미 검증",
+          "badge": "기존 outlook: 참조 검증",
+          "kind": "gate",
+          "icon": "shield-check"
+        },
+        {
+          "id": "worker",
+          "x": 855,
+          "y": 760,
+          "w": 245,
+          "h": 140,
+          "title": "AI 생산 worker",
+          "tech": "요약 / 기업별 판정 · outlook",
+          "logo": "python.svg",
+          "iconSize": 64,
+          "titleOffset": 90,
+          "techSize": 18
+        },
+        {
+          "id": "workerdb",
+          "x": 1210,
+          "y": 760,
+          "w": 285,
+          "h": 140,
+          "title": "worker 저장소",
+          "tech": "SQLite · 영수증 · 불변 결과",
+          "icon": "database",
+          "miniLogo": "sqlite.svg",
+          "iconSize": 64,
+          "titleOffset": 90
+        },
+        {
+          "id": "poc",
+          "x": 80,
+          "y": 690,
+          "w": 210,
+          "h": 125,
+          "title": "뉴스 분석·검증",
+          "tech": "PoC · 승인 후",
+          "icon": "terminal",
+          "miniLogo": "python.svg",
+          "iconSize": 50,
+          "titleOffset": 76,
+          "role": "support"
+        },
+        {
+          "id": "market",
+          "x": 345,
+          "y": 740,
+          "w": 220,
+          "h": 130,
+          "title": "외부 시장 자료",
+          "tech": "설정 시 연결",
+          "icon": "chart-no-axes-combined",
+          "iconSize": 50,
+          "titleOffset": 76,
+          "role": "support"
+        },
+        {
+          "id": "grant",
+          "x": 1130,
+          "y": 350,
+          "w": 215,
+          "h": 75,
+          "title": "현재 권리",
+          "tech": "서버 관리 목록",
+          "icon": "lock-keyhole",
+          "iconSize": 32,
+          "titleOffset": 58,
+          "titleSize": 20,
+          "techSize": 18,
+          "role": "support"
+        }
+      ],
+      "edges": [
+        {
+          "a": "entry",
+          "b": "guard",
+          "points": [
+            [
+              230,
+              238
+            ],
+            [
+              290,
+              238
+            ]
+          ],
+          "label": "요청·쿠키",
+          "lx": 260,
+          "ly": 222,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "guard",
+          "b": "read",
+          "points": [
+            [
+              520,
+              238
+            ],
+            [
+              595,
+              238
+            ]
+          ],
+          "label": "공개 범위",
+          "lx": 557,
+          "ly": 221,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "snapshot",
+          "b": "read",
+          "points": [
+            [
+              845,
+              238
+            ],
+            [
+              780,
+              238
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "appdb",
+          "b": "guard",
+          "points": [
+            [
+              1377,
+              190
+            ],
+            [
+              1377,
+              172
+            ],
+            [
+              405,
+              172
+            ],
+            [
+              405,
+              187
+            ]
+          ],
+          "label": "세션·저장 결과",
+          "lx": 1050,
+          "ly": 164,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "guard",
+          "b": "admin",
+          "points": [
+            [
+              355,
+              365
+            ],
+            [
+              355,
+              405
+            ],
+            [
+              175,
+              405
+            ],
+            [
+              175,
+              443
+            ]
+          ],
+          "label": "관리자 권한",
+          "lx": 230,
+          "ly": 393,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "ledger",
+          "b": "admin",
+          "points": [
+            [
+              335,
+              492
+            ],
+            [
+              290,
+              492
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "admin",
+          "b": "snapshot",
+          "points": [
+            [
+              175,
+              615
+            ],
+            [
+              175,
+              650
+            ],
+            [
+              840,
+              650
+            ],
+            [
+              840,
+              390
+            ],
+            [
+              950,
+              390
+            ],
+            [
+              950,
+              373
+            ]
+          ],
+          "label": "검수 후 새 버전",
+          "lx": 730,
+          "ly": 636,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "guard",
+          "b": "round",
+          "points": [
+            [
+              465,
+              365
+            ],
+            [
+              465,
+              420
+            ],
+            [
+              705,
+              420
+            ],
+            [
+              705,
+              443
+            ]
+          ],
+          "label": "회차",
+          "lx": 585,
+          "ly": 408,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "appdb",
+          "b": "round",
+          "points": [
+            [
+              1377,
+              375
+            ],
+            [
+              1377,
+              395
+            ],
+            [
+              1530,
+              395
+            ],
+            [
+              1530,
+              670
+            ],
+            [
+              760,
+              670
+            ],
+            [
+              760,
+              616
+            ]
+          ],
+          "label": "회차 저장·조회",
+          "lx": 1350,
+          "ly": 696,
+          "status": "current",
+          "both": true
+        },
+        {
+          "a": "poc",
+          "b": "ledger",
+          "points": [
+            [
+              185,
+              690
+            ],
+            [
+              185,
+              675
+            ],
+            [
+              452,
+              675
+            ],
+            [
+              452,
+              616
+            ]
+          ],
+          "label": "승인 후 분석",
+          "lx": 360,
+          "ly": 704,
+          "status": "approval",
+          "both": false
+        },
+        {
+          "a": "market",
+          "b": "round",
+          "points": [
+            [
+              455,
+              740
+            ],
+            [
+              455,
+              710
+            ],
+            [
+              705,
+              710
+            ],
+            [
+              705,
+              616
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "approval",
+          "both": false
+        },
+        {
+          "a": "admin",
+          "b": "transport",
+          "points": [
+            [
+              290,
+              555
+            ],
+            [
+              310,
+              555
+            ],
+            [
+              310,
+              625
+            ],
+            [
+              850,
+              625
+            ],
+            [
+              850,
+              580
+            ],
+            [
+              875,
+              580
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "round",
+          "b": "transport",
+          "points": [
+            [
+              810,
+              492
+            ],
+            [
+              875,
+              492
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "transport",
+          "b": "worker",
+          "points": [
+            [
+              960,
+              637
+            ],
+            [
+              960,
+              758
+            ]
+          ],
+          "label": "작업",
+          "lx": 927,
+          "ly": 697,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "worker",
+          "b": "transport",
+          "points": [
+            [
+              1000,
+              758
+            ],
+            [
+              1000,
+              637
+            ]
+          ],
+          "label": "결과·영수증",
+          "lx": 1045,
+          "ly": 697,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "worker",
+          "b": "workerdb",
+          "points": [
+            [
+              1100,
+              805
+            ],
+            [
+              1210,
+              805
+            ]
+          ],
+          "label": "자체 저장",
+          "lx": 1155,
+          "ly": 789,
+          "status": "current",
+          "both": true
+        },
+        {
+          "a": "transport",
+          "b": "gate",
+          "points": [
+            [
+              1085,
+              492
+            ],
+            [
+              1220,
+              492
+            ]
+          ],
+          "label": "결과 확인",
+          "lx": 1152,
+          "ly": 476,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "grant",
+          "b": "gate",
+          "points": [
+            [
+              1320,
+              426
+            ],
+            [
+              1360,
+              426
+            ],
+            [
+              1360,
+              442
+            ]
+          ],
+          "label": "",
+          "lx": 0,
+          "ly": 0,
+          "status": "current",
+          "both": false
+        },
+        {
+          "a": "gate",
+          "b": "appdb",
+          "points": [
+            [
+              1505,
+              522
+            ],
+            [
+              1520,
+              522
+            ],
+            [
+              1520,
+              285
+            ],
+            [
+              1495,
+              285
+            ]
+          ],
+          "label": "검증 후 반영",
+          "lx": 1460,
+          "ly": 417,
+          "status": "current",
+          "both": false
+        }
+      ],
+      "captions": [
+        [
+          "/api/v1 · Java/Spring 후보 · 배포 미정",
+          1094,
+          86,
+          18
+        ],
+        [
+          "사용자 조회는 저장 결과만 읽습니다.",
+          60,
+          885,
+          19
+        ],
+        [
+          "실모델 미실행 · 별도 승인",
+          1220,
+          747,
+          18
+        ]
+      ]
+    }
+  ]
+}

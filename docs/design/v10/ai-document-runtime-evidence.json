@@ -1,0 +1,85 @@
+{
+  "scope": "S1 document summary and document-by-company sentiment consumer only; S2–S7 and all FS074–081 are not claimed complete",
+  "changedUi": [
+    "prototype/web/src/components/domain/document-analysis.tsx",
+    "prototype/web/src/components/domain/document-item.tsx",
+    "prototype/web/src/components/domain/evidence.tsx",
+    "prototype/web/src/features/company-documents.tsx",
+    "prototype/web/src/features/overlays.tsx",
+    "prototype/web/src/pages/design-system-page.tsx",
+    "prototype/web/src/components/README.md"
+  ],
+  "authorization": {
+    "externalModelRequests": 0,
+    "newDependencies": 0,
+    "originalPocWrites": 0,
+    "actualDatasetWrites": 0,
+    "envFilesOrKeysRead": false,
+    "gitStageCommitPush": false,
+    "syntheticWorkerState": "/tmp/zoop-ai-doc-surface-worker",
+    "syntheticBffState": "/tmp/zoop-ai-doc-surface-synthetic",
+    "actualReadBffState": "/tmp/zoop-ai-doc-surface-real"
+  },
+  "actualReadBaseline": {
+    "input": "prototype/bff/fixtures/poc-real-inspect.json with poc-real-companies.json in a separate new BFF state",
+    "command": "ZOOP_STATE_DIR=/tmp/zoop-ai-doc-surface-real ZOOP_SNAPSHOT_PATH=<repo>/prototype/bff/fixtures/poc-real-inspect.json ZOOP_COMPANY_CATALOG=<repo>/prototype/bff/fixtures/poc-real-companies.json ZOOP_BRIEFING_SCHEDULER=false ZOOP_QUOTE_PROVIDER=off ZOOP_METRICS_PROVIDER=off uv run --offline --no-sync uvicorn zoop_bff.main:app --port 8872",
+    "observed": "GET NVIDIA documents returned 19 documents with every sentiment null; period-scoped rendered document tab showed 6 current documents with neither AI summary nor fake judgement. Demo login and onboarding succeeded. Actual snapshot was not edited.",
+    "screenshots": ["ai-document-actual-null-1440-light.png", "ai-document-actual-null-390-dark.png"]
+  },
+  "workerReplayIntegration": {
+    "inputs": "prototype/ai-worker/fixtures/contracts/synthetic-document/{snapshot,jobs,replay,grants}.json",
+    "workerCommand": "PYTHONPATH=<repo>/prototype/ai-worker/src <repo>/prototype/bff/.venv/bin/python -m zoop_ai.cli submit|run --state-dir /tmp/zoop-ai-doc-surface-worker --grants <fixture>/grants.json --replay <fixture>/replay.json; submit stdin is each jobs.json.jobs[]; run stdin is {schemaVersion:zoop-ai-s1-1,jobId:<same id>}",
+    "importCommand": "ZOOP_SNAPSHOT_PATH=<fixture>/snapshot.json ZOOP_BRIEFING_SCHEDULER=false ZOOP_QUOTE_PROVIDER=off ZOOP_METRICS_PROVIDER=off .venv/bin/python scripts/document_analysis.py import --state-dir /tmp/zoop-ai-doc-surface-synthetic --worker-state /tmp/zoop-ai-doc-surface-worker --job-id synthetic-SYNTH-A-document-summary --job-id synthetic-SYNTH-A-document-sentiment --job-id synthetic-SYNTH-B-document-summary --job-id synthetic-SYNTH-B-document-sentiment",
+    "observed": "All four real CLI jobs ready; all four BFF imports available. Same doc-synthetic-s1 is positive for SYNTH-A and negative for SYNTH-B. Summary claims render with citation buttons. Existing evidence sheet receives companyId and preserves documentVersion plus summary resultVersion. Exact emoji/Korean quote was rendered.",
+    "usageBeforeAndAfterDocumentEvidenceChatReads": {"equal": true, "providerAttempts": 0, "replayCalls": 8},
+    "browserBase": "http://127.0.0.1:5242 with real BFF http://127.0.0.1:8872; scheduler, quote and metrics providers disabled",
+    "screenshots": [
+      "ai-document-company-a-1440-light.png", "ai-document-company-a-1440-dark.png",
+      "ai-document-company-a-390-light.png", "ai-document-company-a-390-dark.png",
+      "ai-document-company-b-390-dark.png",
+      "ai-document-evidence-1440-light.png", "ai-document-evidence-1440-dark.png",
+      "ai-document-evidence-390-light.png", "ai-document-evidence-390-dark.png"
+    ]
+  },
+  "accessGateDistinction": {
+    "analysisOnlyWithheld": "Web tests and design-system state examples preserve public document title/publisher while hiding analysis text and judgement. Failed, pending, not_requested, available and undetermined are independently covered; null is never converted to undetermined.",
+    "fullDocumentCurrentDeny": "Real import-only CLI deny --document-id doc-synthetic-s1 --reason synthetic-surface-visibility-test in synthetic BFF state. Subsequent company documents GET returned items=[]; known direct citation ev-3c9c9fc488309f0050b90623 returned 404. Rendered tab showed the normal empty document state. This is document/source access withdrawal, not an analysis-only withheld row.",
+    "screenshot": "ai-document-current-deny-empty-390-light.png"
+  },
+  "browserInteraction": {
+    "keyboard": "Focused summary citation button; Enter opened the real evidence dialog; Escape/close dismissed it and focus returned to the originating summary citation button. Existing member AI drawer opened and GET /api/chat/sessions/current returned 200; no question was submitted.",
+    "overflow": "Settled document/evidence/design-system surfaces at 1440 and 390 had scrollWidth equal to viewport width. A transient resize sample preceded layout settlement and is not recorded as a stable pass.",
+    "screenshots": "Finite CSS entrance animations were allowed to finish before final product captures. Desktop evidence sheet final rectangle was left 960, right 1440, width 480 CSS px.",
+    "browserToolLimit": "Initial Tern screenshot showed only a header despite rendered DOM; reported to tool QA and used actual Chromium thereafter. Chromium screenshot/animation waits occasionally timed out; final files were captured after finite entrance animations settled, excluding infinite DS skeleton animations."
+  },
+  "designSystem": {
+    "route": "/design-system#c-document-analysis",
+    "observed": "Uses real DocumentAnalysis, SentimentLabel, EvidenceList and Sheet with clearly synthetic static examples. State selector includes summary only, judgement only, both, failed, withheld, pending, not_requested null and valid undetermined. Evidence opens locally without API or worker calls. Invalid 1+ watchlist example replaced with an email-format error. Current SUIT/tokens remain; final Figma-wide style cutover is not implemented.",
+    "screenshots": ["ai-document-design-system-1440-light.png", "ai-document-design-system-1440-dark.png", "ai-document-design-system-390-light.png", "ai-document-design-system-390-dark.png"]
+  },
+  "verification": {
+    "typecheck": "pnpm typecheck passed after adopting generated schemaVersion zoop-ai-s1-1 and required nullable fixture fields. First run exposed those contract mismatches and was corrected.",
+    "webTests": "One full pnpm test run: 19 files / 104 tests passed, 1 new DS test failed because it acted on the public route before member-shell readiness. Narrow corrected DS test then passed 1/1 after waiting for the account-menu state. No production repair was needed; temporary probes were removed. A second full suite was intentionally not run.",
+    "newCoverage": "11 document-analysis tests passed in the full run; DS state/evidence test passed in the narrow corrected run. Includes two-company opposite labels, exact evidence context, null/pending, failed/withheld protected text, synthetic replay exclusion on actual articles, version mismatch, repeated-document summary deduplication, source-summary citation wording, valid undetermined and late A→B document/evidence responses.",
+    "build": "pnpm build passed; Vite retained its existing large-chunk warning (index JS about 1.56 MB, gzip about 480 KB).",
+    "cachedSlop": "Existing local Lazuli slop_lint 0.2.0 source review executed once: 73 total, 19 blocking, 32 skipped. All reported file locations were outside the changed S1/DS source files; no location in the changed scope was reported. This is not a repository-wide clean/slop-release claim. No render extract, font lock or asset ledger was supplied to that source-only scan."
+  },
+  "gate2LimitationFollowup": {
+    "policy": "New backend gate-2 requires every summary limitation sentence to map to a validated assertionKind=limitation claim. The older initial observations above remain historical; product and DS available-result images below were refreshed against gate-2.",
+    "change": "DocumentAnalysis renders each mapped limitation claim once; the separate limitations[] rendering was removed, so orphan limitation strings cannot become an independent public fallback. Static DS and test examples now contain mapped limitation claims.",
+    "regression": "Added a content-independent invariant test: the fixture's limitation claim text appears exactly once and a deliberately orphan limitations[] entry is absent. No fixed wording is treated as the requirement.",
+    "replayCommand": "prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py --worker-state /tmp/zoop-ai-doc-surface-gate2-worker --bff-state /tmp/zoop-ai-doc-surface-gate2-bff",
+    "importAuthorization": "Updated replay helper imports with document_analysis.py import --grants <fixture>/grants.json (server-owned current registry required). Earlier initial importCommand lacked this later-added flag and is not the current invocation.",
+    "observed": "Four real worker CLI jobs ready; four granted BFF imports available. SYNTH-A positive and SYNTH-B negative remain correctly scoped. API summary had one limitation claim and one matching limitations[] entry; document and evidence DOM counts were one at 1440 and 390. Provider attempts remained 0 and replay calls remained 8 after all GET/read interactions.",
+    "verification": "pnpm exec vitest run tests/document-analysis.test.tsx tests/document-analysis-design-system.test.tsx: 2 files / 13 tests passed. pnpm typecheck and pnpm build passed. Existing Vite large-chunk warning remains. No additional full suite or slop run was performed by this worker.",
+    "captureRefresh": "13 affected available-result images refreshed in place: company A 1440/390 light/dark (4), company B 390 dark (1), evidence 1440/390 light/dark (4), DS 1440/390 light/dark (4). Actual-null and current-deny-empty captures were intentionally unchanged.",
+    "cleanup": "Gate-2 BFF 8872, frontend 5242 and owned Chromium handle are closed after observation. Original dataset/Poc changes, live model requests, new dependencies and Git operations remain zero."
+  },
+  "mainFinalVerification": {
+    "webTests": {"command": "pnpm test", "filesPassed": 20, "testsPassed": 106, "failed": 0},
+    "scope": "Final integrated run includes the gate-2 limitation invariant and corrected design-system readiness test. Earlier failed/intermediate observations are preserved above.",
+    "contracts": "Final standard JSON Schema 2020-12 plus format checking passed for 16 portable fixture records; worker schema/fixture, BFF-generated web types and token generation drift checks passed.",
+    "liveModelExecution": "Not performed"
+  },
+  "remainingScope": ["No paid live model execution or production model/budget configuration was authorized or tested.", "Source rights and real provider HTTP transport verification are owned by the backend assignment; these frontend results prove replay integration, not live-model quality.", "Final Figma visual cutover and S2–S7 remain subsequent work."]
+}

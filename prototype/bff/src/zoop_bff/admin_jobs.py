@@ -81,6 +81,7 @@ class LaunchSpec:
     env: dict[str, str]
     stdout: Path
     stderr: Path
+    stdin: Path | None = None
 
 
 class Process(Protocol):
@@ -112,15 +113,20 @@ class _PopenProcess:
 def popen_launcher(spec: LaunchSpec) -> Process:
     spec.stdout.parent.mkdir(parents=True, exist_ok=True)
     with spec.stdout.open("wb") as out, spec.stderr.open("wb") as err:
-        popen = subprocess.Popen(
-            spec.argv,
-            cwd=spec.cwd,
-            env=spec.env,
-            stdin=subprocess.DEVNULL,
-            stdout=out,
-            stderr=err,
-            start_new_session=True,
-        )
+        incoming = spec.stdin.open("rb") if spec.stdin else None
+        try:
+            popen = subprocess.Popen(
+                spec.argv,
+                cwd=spec.cwd,
+                env=spec.env,
+                stdin=incoming if incoming is not None else subprocess.DEVNULL,
+                stdout=out,
+                stderr=err,
+                start_new_session=True,
+            )
+        finally:
+            if incoming is not None:
+                incoming.close()
     return _PopenProcess(popen)
 
 

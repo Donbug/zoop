@@ -87,13 +87,47 @@ CREATE TABLE IF NOT EXISTS sentiment_results (
   input_hash TEXT PRIMARY KEY, feature TEXT NOT NULL, target_id TEXT NOT NULL,
   company_id TEXT, model TEXT NOT NULL, prompt_version TEXT NOT NULL, judged_at TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('accepted','failed')),
-  result TEXT, failure_code TEXT
+  result TEXT, failure_code TEXT, reasoning_effort TEXT
 );
 CREATE TABLE IF NOT EXISTS sentiment_attempts (
   id INTEGER PRIMARY KEY AUTOINCREMENT, input_hash TEXT NOT NULL,
   event_id INTEGER NOT NULL REFERENCES ai_events(id), replay INTEGER NOT NULL, retry INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sentiment_target ON sentiment_results(feature,target_id,company_id);
+-- S1 imports own only verified document artifacts; raw provider receipts remain worker-private.
+CREATE TABLE IF NOT EXISTS document_analysis (
+  artifact_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, input_digest TEXT NOT NULL,
+  kind TEXT NOT NULL, document_id TEXT NOT NULL, document_version TEXT NOT NULL,
+  source_hash TEXT NOT NULL, company_id TEXT NOT NULL, grant_id TEXT NOT NULL,
+  grant_revision TEXT NOT NULL, imported_at TEXT NOT NULL, payload TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS document_analysis_jobs (
+  job_id TEXT PRIMARY KEY, input_digest TEXT NOT NULL, kind TEXT NOT NULL,
+  document_id TEXT NOT NULL, document_version TEXT NOT NULL, company_id TEXT NOT NULL,
+  status TEXT NOT NULL, reason TEXT, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS document_analysis_grants (
+  grant_id TEXT PRIMARY KEY, revision TEXT NOT NULL, payload TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS document_analysis_visibility (
+  document_id TEXT PRIMARY KEY, denied INTEGER NOT NULL, reason TEXT NOT NULL, revision INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS document_analysis_calls (
+  attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, stage TEXT NOT NULL,
+  mode TEXT NOT NULL, state TEXT NOT NULL, at TEXT NOT NULL, payload TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS document_analysis_immutable_update BEFORE UPDATE ON document_analysis
+BEGIN SELECT RAISE(ABORT,'immutable document analysis'); END;
+CREATE TRIGGER IF NOT EXISTS document_analysis_immutable_delete BEFORE DELETE ON document_analysis
+BEGIN SELECT RAISE(ABORT,'immutable document analysis'); END;
+CREATE TABLE IF NOT EXISTS briefing_outlook_results (
+  artifact_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, input_digest TEXT NOT NULL,
+  round_id TEXT NOT NULL, imported_at TEXT NOT NULL, payload TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS briefing_outlook_immutable_update BEFORE UPDATE ON briefing_outlook_results
+BEGIN SELECT RAISE(ABORT,'immutable briefing outlook'); END;
+CREATE TRIGGER IF NOT EXISTS briefing_outlook_immutable_delete BEFORE DELETE ON briefing_outlook_results
+BEGIN SELECT RAISE(ABORT,'immutable briefing outlook'); END;
 -- user behaviour events (telemetry.py), chat transcripts (chat.py) and votes (feedback.py).
 -- No real name, e-mail or IP is stored: ``subject`` is a member id or a keyed hash of a guest session id.
 CREATE TABLE IF NOT EXISTS telemetry_events (

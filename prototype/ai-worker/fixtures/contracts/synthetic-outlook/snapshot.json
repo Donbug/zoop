@@ -1,0 +1,145 @@
+{
+  "issues": [
+    {
+      "issue_id": "event-synthetic-s1",
+      "articles": [
+        {
+          "article_id": "doc-synthetic-s1",
+          "url": "https://synthetic.invalid/document-s1",
+          "title": "[합성] 두 기업의 상반된 사업 변화",
+          "body": "🚀 합성 알파의 매출이 늘었다. 합성 베타의 비용이 늘었다.",
+          "publisher": "SYNTHETIC—not real news",
+          "published_at": "2026-10-08T00:00:00+00:00",
+          "collected_at": "2026-10-08T00:00:00+00:00",
+          "language": "ko",
+          "input_kind": "body",
+          "origin_id": null,
+          "withdrawn": false,
+          "allow_model_send": false,
+          "synthetic": true
+        }
+      ],
+      "mentions": [
+        {
+          "mention_id": "mention-synthetic-s1",
+          "article_id": "doc-synthetic-s1",
+          "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+          "title": "두 기업의 사업 변화",
+          "event_time": "2026-10-08",
+          "participants": [
+            {
+              "company_id": "SYNTH-A",
+              "name": "합성 알파",
+              "role": "참여자"
+            },
+            {
+              "company_id": "SYNTH-B",
+              "name": "합성 베타",
+              "role": "참여자"
+            }
+          ],
+          "action": "실적 발표",
+          "evidence": [
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 0,
+              "end": 17,
+              "quote": "🚀 합성 알파의 매출이 늘었다."
+            },
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 18,
+              "end": 33,
+              "quote": "합성 베타의 비용이 늘었다."
+            }
+          ]
+        }
+      ],
+      "relations": [
+        {
+          "relation_id": "rel-doc-s1",
+          "source": "doc-synthetic-s1",
+          "target": "event-synthetic-s1",
+          "relation_type": "REPORTS",
+          "evidence": [
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 0,
+              "end": 17,
+              "quote": "🚀 합성 알파의 매출이 늘었다."
+            },
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 18,
+              "end": 33,
+              "quote": "합성 베타의 비용이 늘었다."
+            }
+          ]
+        },
+        {
+          "relation_id": "rel-SYNTH-A",
+          "source": "event-synthetic-s1",
+          "target": "SYNTH-A",
+          "relation_type": "INVOLVES",
+          "evidence": [
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 0,
+              "end": 17,
+              "quote": "🚀 합성 알파의 매출이 늘었다."
+            },
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 18,
+              "end": 33,
+              "quote": "합성 베타의 비용이 늘었다."
+            }
+          ]
+        },
+        {
+          "relation_id": "rel-SYNTH-B",
+          "source": "event-synthetic-s1",
+          "target": "SYNTH-B",
+          "relation_type": "INVOLVES",
+          "evidence": [
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 0,
+              "end": 17,
+              "quote": "🚀 합성 알파의 매출이 늘었다."
+            },
+            {
+              "article_id": "doc-synthetic-s1",
+              "article_version": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+              "start": 18,
+              "end": 33,
+              "quote": "합성 베타의 비용이 늘었다."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "zoop": {
+    "companies": [
+      {
+        "company_id": "SYNTH-A",
+        "name": "합성 알파"
+      },
+      {
+        "company_id": "SYNTH-B",
+        "name": "합성 베타"
+      }
+    ],
+    "source_label": "S1 authored synthetic contract",
+    "as_of": "2026-10-08T00:00:00+00:00"
+  }
+}

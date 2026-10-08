@@ -4,7 +4,11 @@
 
 | 항목 | 원본/연결 |
 | --- | --- |
-| 우선순위·상태 | P1 · 추가 제안 · 검토 전 |
+| 원본 우선순위·상태 | P1 · 추가 제안 · 검토 전 |
+| 원문 범위 분류 | existing |
+| 유효 구현 범위 | 팀합의요구/설계대상 |
+| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
 | 요구사항 번호 | 62 |
 | API 대응 | 연결됨 |
 | 사유 |  |
@@ -13,11 +17,16 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv:100 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:100 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-06/12-비기능-상세.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/12-비기능-상세.csv) — 중단 작업 복구: 작업이 중단되면 기존 작업 상태를 확인한 뒤 허용된 복구만 수행해야 한다. 복구로 AI 답변이나 브리핑이 중복 생성·발행되어서는 안 된다. 복구할 수 없으면 실패 사유와 가능한 다음 조치를 안내하며, 재실행이 금지된 작업에 재실행을 안내하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv) — 중단 작업 복구: 작업이 중단되면 기존 작업 상태를 확인한 뒤 허용된 복구만 수행해야 한다. 복구로 AI 답변이나 브리핑이 중복 생성·발행되어서는 안 된다. 복구할 수 없으면 실패 사유와 가능한 다음 조치를 안내하며, 재실행이 금지된 작업에 재실행을 안내하지 않는다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:289 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:303 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+
+## WBS 편집 연결
+
+| WBS | 역할 | 현재 업무 | 연결 근거 |
+| --- | --- | --- | --- |
 
 ## 화면·목표 API
 

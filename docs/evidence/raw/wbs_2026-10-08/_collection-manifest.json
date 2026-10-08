@@ -1,0 +1,40 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c",
+  "export_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/export?format=xlsx",
+  "collected_at_kst": "2026-10-08T02:52:01.826152+09:00",
+  "auth": "none",
+  "baseline": "wbs_2026-10-03",
+  "baseline_xlsx_sha256": "e613b38d1adef34c5cbd4ee80cdae2d7df39f25f1957e01632e4180e74c28258",
+  "response_sha256": "d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320",
+  "http_status": 200,
+  "data_only": true,
+  "csv_encoding": "utf-8-sig",
+  "content_identical": false,
+  "sheet_ranges": {
+    "표지·변경이력": {
+      "rows": 36,
+      "columns": 7
+    },
+    "프로젝트 WBS": {
+      "rows": 1021,
+      "columns": 100
+    },
+    "개발 일정 요약": {
+      "rows": 30,
+      "columns": 6
+    }
+  },
+  "xlsx": "zoop-wbs_2026-10-08.xlsx",
+  "sha256": "d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320",
+  "sheets": {
+    "표지·변경이력": "00-표지-변경이력.csv",
+    "프로젝트 WBS": "01-프로젝트-WBS.csv",
+    "개발 일정 요약": "02-개발-일정-요약.csv"
+  },
+  "files": {
+    "zoop-wbs_2026-10-08.xlsx": "d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320",
+    "00-표지-변경이력.csv": "2e77b9c5f9a797278bba1fd0a799dad88558e03acf918dddb1ece001bb4b678d",
+    "01-프로젝트-WBS.csv": "07b539cae41bbe50c23270a5e20456c00913cf26146327e0aefd80624037e3a5",
+    "02-개발-일정-요약.csv": "f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3"
+  }
+}

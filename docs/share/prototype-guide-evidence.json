@@ -1,0 +1,284 @@
+{
+  "observedOn": "2026-10-08",
+  "scope": "isolated manual command smoke; synthetic snapshot; not full acceptance verification",
+  "stateDir": "/tmp/zoop-manual-day-20261008",
+  "bff": "http://127.0.0.1:8874",
+  "web": "http://127.0.0.1:5244",
+  "configuration": {
+    "environment": "env -i; no .env loaded",
+    "snapshot": "prototype/bff/fixtures/poc-synthetic-inspect.json",
+    "scheduler": "off",
+    "quoteProvider": "off",
+    "metricsProvider": "off",
+    "liveAiEnabled": false,
+    "globalModelCallBudget": 0,
+    "sourceGrantRegistry": "not supplied; no analysis submission",
+    "companyCatalog": "prototype/bff/fixtures/poc-synthetic-companies.json"
+  },
+  "versions": {
+    "node": "v26.10.0",
+    "pnpm": "11.9.0",
+    "python": "3.12.13",
+    "vite": "8.3.1"
+  },
+  "helpChecks": [
+    {
+      "command": "prototype/bff/.venv/bin/python -m uvicorn --help",
+      "exit": 0
+    },
+    {
+      "command": "PYTHONPATH=prototype/ai-worker/src prototype/bff/.venv/bin/python -m zoop_ai.cli --help",
+      "exit": 0,
+      "commands": [
+        "submit",
+        "run",
+        "get",
+        "resume",
+        "cancel"
+      ]
+    },
+    {
+      "command": "PYTHONPATH=prototype/bff/src prototype/bff/.venv/bin/python prototype/bff/scripts/document_analysis.py --help",
+      "exit": 0,
+      "commands": [
+        "import",
+        "deny"
+      ]
+    },
+    {
+      "command": "prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py --help",
+      "exit": 0,
+      "flags": [
+        "--worker-state",
+        "--bff-state"
+      ]
+    },
+    {
+      "command": "pnpm --dir prototype/web exec vite --help",
+      "exit": 0
+    },
+    {
+      "command": "prototype/bff/.venv/bin/python docs/share/export_prototype_guide.py --help",
+      "exit": 0
+    },
+    {
+      "command": "PYTHONPATH=prototype/bff/src prototype/bff/.venv/bin/python prototype/bff/scripts/judge_outlook.py --help",
+      "exit": 0
+    },
+    {
+      "command": "prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixture.py --help",
+      "exit": 0
+    }
+  ],
+  "httpReads": [
+    {
+      "path": "/api/health",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "datasetKind": "synthetic-preview",
+        "sourceMode": "snapshot",
+        "connected": true,
+        "graphVersion": "v1",
+        "counts": {
+          "issues": 3,
+          "companies": 1,
+          "approvedEdges": 2,
+          "evidence": 4
+        },
+        "warnings": [],
+        "sourceErrors": []
+      }
+    },
+    {
+      "path": "/api/graph?mode=all",
+      "status": 200,
+      "nodes": 4,
+      "edges": 2
+    },
+    {
+      "path": "/api/companies",
+      "status": 200,
+      "items": 1,
+      "companyId": "SYNTH-ALPHA"
+    }
+  ],
+  "ui": {
+    "guest": "start screen -> guest confirmation -> market graph and tutorial -> company document tab",
+    "member": "demo seed login -> not investing -> zero watchlist -> same company document tab",
+    "companyRoute": "/companies/SYNTH-ALPHA?period=1y&asOf=2026-09-29T08%3A57%3A06%2B00%3A00&tab=documents",
+    "observed": [
+      "3 source documents",
+      "SYNTHETIC—not real news",
+      "quote and metrics disconnected",
+      "snapshot asOf and relation section",
+      "member account name after login"
+    ],
+    "visualEvidence": "prototype-guide-member.webp",
+    "visualBackend": "dedicated installed Chrome; initial Tern screenshot was blank and was not used as evidence"
+  },
+  "cleanup": {
+    "ownedBffStopped": true,
+    "ownedWebStopped": true,
+    "ownedBrowserHandlesClosed": true
+  },
+  "notExercised": [
+    "S1 generation/import in this manual state",
+    "ordinary chat submission",
+    "briefing generation",
+    "external provider",
+    "market HTTP",
+    "new source collection",
+    "PoC ledger",
+    "Neo4j",
+    "admin publishing",
+    "real account",
+    "production OAuth",
+    "cloud",
+    "private dependency installation",
+    "tests/build/lint"
+  ],
+  "preserved": [
+    "shared prototype/bff/var",
+    "shared ports 8787/5173",
+    "read-only original PoC"
+  ],
+  "documentExport": {
+    "guidePdfPages": 14,
+    "architecturePdfPages": 3,
+    "guidePageImages": "prototype-guide-pages/01.png–14.png",
+    "architectureImages": "system-architecture/out/01-system.png,02-frontend.png,03-backend.png",
+    "directVisualInspection": "10 changed guide pages plus all 3 regenerated architecture pages inspected; latest accepted-review text changed only 01/14 and both inspected; unchanged 04–07 match previously inspected page hashes",
+    "guideHtmlExternalAssets": [],
+    "fontLoadedGate": "passed; embedded GuideSUIT face loaded",
+    "fontLicence": "SUIT OFL copied in HTML and retained beside diagrams",
+    "generator": "docs/share/export_prototype_guide.py",
+    "tools": "existing Pandoc 3.12 + cached Playwright/PyMuPDF + installed Chrome; no dependency/browser install",
+    "localLinkChecks": [
+      {
+        "source": "docs/share/prototype-guide.md",
+        "localLinks": 48,
+        "missing": []
+      },
+      {
+        "source": "docs/share/system-architecture/README.md",
+        "localLinks": 26,
+        "missing": []
+      },
+      {
+        "source": "prototype/README.md",
+        "localLinks": 21,
+        "missing": []
+      }
+    ],
+    "pdfLinkChecks": [
+      {
+        "file": "prototype-guide.pdf",
+        "pages": 14,
+        "attachmentLinks": 49,
+        "absoluteLinks": [],
+        "missingTargets": [],
+        "replacementCharacter": false
+      },
+      {
+        "file": "system-architecture/out/system-architecture.pdf",
+        "pages": 3,
+        "attachmentLinks": 0,
+        "absoluteLinks": [],
+        "missingTargets": [],
+        "replacementCharacter": false
+      }
+    ],
+    "externalLinks": "not fetched; private dependency and external provider authorization remain separate"
+  },
+  "repoLocalCatalogProof": {
+    "provenance": "Read only .companies from the public synthetic settings JSON; no model/env/key fields copied; original PoC unchanged",
+    "originalCheckoutPathRequired": false,
+    "privateInstalledPocPackageStillRequired": true,
+    "requestsReadOnce": [
+      {
+        "path": "/api/health",
+        "status": 200,
+        "statusValue": "ok",
+        "datasetKind": "synthetic-preview",
+        "graphVersion": "v1",
+        "counts": {
+          "issues": 3,
+          "companies": 1,
+          "approvedEdges": 2,
+          "evidence": 4
+        },
+        "warnings": [],
+        "sourceErrors": []
+      },
+      {
+        "path": "/api/companies",
+        "status": 200,
+        "companies": [
+          {
+            "id": "SYNTH-ALPHA",
+            "name": "합성 알파전자",
+            "issueCount": 2
+          }
+        ]
+      },
+      {
+        "path": "/api/graph?mode=all",
+        "status": 200,
+        "nodes": 4,
+        "edges": 2
+      },
+      {
+        "path": "/api/companies/SYNTH-ALPHA/documents?from=2025-09-29T17%3A57%3A06%2B09%3A00&to=2026-09-29T08%3A57%3A06Z",
+        "status": 200,
+        "documents": 3,
+        "documentIds": [
+          "synthetic-multi",
+          "synthetic-q2",
+          "synthetic-repeat"
+        ]
+      }
+    ],
+    "ownedProofServerStopped": true,
+    "stateDir": "/tmp/zoop-manual-day-20261008"
+  },
+  "peerOutlookEvidence": {
+    "source": "docs/design/ai-system.md:139-152",
+    "classification": "backend-reported actual CLI and BFF observations, inspected source and final completion message; not rerun by manual writer",
+    "finalSourceNotified": true,
+    "nonempty": {
+      "issues": 1,
+      "status": "published",
+      "label": "undetermined",
+      "workerReady": 1,
+      "replayCalls": 1,
+      "providerAttempts": 0
+    },
+    "immutableRepeat": "same outlook; workerJobs=[]",
+    "emptyRound": "published; issues=0; outlook=null; workerJobs=[]",
+    "actualBffGet": "8871 /api/briefings?date=2026-10-08&edition=evening returns same outlook",
+    "validationPolicy": "legacy-outlook-exact-1; semantic=null; not equal to document semantic verification",
+    "initialFailure": "wrong-state replay_input_mismatch; preserved as a failure, final success uses fresh separate states",
+    "acceptanceSource": "prototype/bff/tests/test_outlook_worker.py"
+  },
+  "completion": "Requested bounded gate-2/CLI/evidence refresh complete; no whole-security or operational approval claim; original repo-local catalog proof and shutdown records preserved.",
+  "publicationContractRefresh": {
+    "policy": "zoop-document-gate-2",
+    "currentGrantAuthority": "server-owned full snapshot registered separately from artifact import; missing grants fail closed; opaque revisions are not sorted",
+    "importCli": "document_analysis.py import requires --grants <complete registry.json>; current --help inspected",
+    "limitations": "ordered 1:1 with limitation claims; all claims verified; text/rationale use non-limitation claims only",
+    "oldPolicy": "gate-1 raw retained; document_policy_outdated withheld; new gate-2 job required",
+    "recovery": "standalone HOLD/REJECT save_only reuses own artifact without provider recall",
+    "peerLocalVerification": "AiPublicationFix/current ai-system: worker 42/BFF 310 plus 16 contract records and actual document/outlook replay helpers; manual writer did not rerun suites",
+    "independentReview": "AiExecutionReview final source-only review reports 7 resolved, findings=[]; scope excludes concurrent UI, S2–7 and whole authority audit",
+    "surfaceFollowup": "docs/design/v10/ai-document-runtime-evidence.json gate2LimitationFollowup; same public DTO; actual granted replay imports and 1440/390 limitation once; 13 images updated in place",
+    "notSecurityApproval": true
+  },
+  "terminologyRefresh": {
+    "scope": "User-facing artifact import prose only: 가져오기 / 검증 후 반영",
+    "unchanged": "CLI import, import_job and JSON/code identifiers; authorizations, support and verification numbers unchanged",
+    "exports": "guide 14 pages and architecture 3 pages regenerated with the same existing tools",
+    "visualCheck": "Changed guide 09/10/14 and changed system/backend label lines directly inspected; Korean labels clear and no new clipping/overlap observed",
+    "extraExecution": "No additional app tests, network calls or product captures"
+  }
+}

@@ -1,8 +1,8 @@
 # 줍 정식 서버 목표 API 명세서
 
-생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 공통 API 계약·오류 응답 규격**, **6.10.1 API·스키마 계약 통합 점검**의 산출물이다. 프로토타입 API의 현재 동작과 정식 구현 목표는 구분한다.
+생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 API 명세 최종 검토·구현 기준 확정**, **6.11.1 API·스키마 계약 통합 점검**에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 정식 구현 완료가 아니다. 전체 명세/WBS(FS074~081 포함)의 현재 범위는 팀합의요구/설계대상이며 원문 승인 표기·구현 증거·유료 실행 승인은 별개다. 프로토타입 관측과 구현 목표를 구분한다.
 
-[추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [BFF 차이](../../system/out/api-differences.md)
+[현재 사용자 결정](../../share/day-work-2026-10-08.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)
 
 ## 공통 규칙
 
@@ -56,7 +56,15 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 
 ### approvalBoundary
 
-이 계약은 정식 서버의 구현 목표 초안이다. FS/NFS와 공유 긍부정 계약의 확정 사항을 반영하되 다중 정의·운영 수치·정식 배포 인증 선택은 x-zoop.teamQuestions와 추적표에 남긴다. BFF 동작을 목표 계약의 확정 근거로 삼지 않는다.
+명세/WBS의 모든 내용은 현재 사용자 결정에 따라 팀합의요구/설계대상이며 FS074~081도 포함한다. 원문의 검토 전 표기는 갱신되지 않은 상태로 보존한다. 요구 범위 포함과 구현 완료·유료 모델 실행 승인·본개발 채택은 별개다. API 공통 규칙은 기존 잠정 채택/시연 기준이고 원본 충돌·운영 수치·정식 배포 인증 선택은 teamQuestions와 추적표에 보존한다.
+
+### modelConfiguration
+
+LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결정과 실제 모델/공급자 선택·실행 승인은 구분하며 예산은 추후 결정이다. 판정 CLI의 ZOOP_SENTIMENT_MODEL/ZOOP_SENTIMENT_REASONING_EFFORT와 외부 PoC의 미지원 추론 전송 경계를 구분한다. 공개 API에서 비밀 설정값을 반환하지 않는다.
+
+### conflictPermission
+
+프로토타입은 전권 범위로 끝까지 완성하며 본개발 채택은 담당자가 선택한다. 원본 충돌은 근거 있는 작업자 안과 정정 요청을 남겨 팀이 정정한다. 확정 일정은 WBS이고 Notion 일정은 오래된 자료다. 원문 날짜·우선순위·승인 상태를 덮어쓰지 않는다.
 
 ## 오류 코드
 
@@ -193,7 +201,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
 | FS/NFS | [FS001](../../system/out/feature-FS001.md) · [FS006](../../system/out/feature-FS006.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) · [D-ONB-01](../../system/out/screen-D-ONB-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.1, 6.2.6 |
+| WBS | 6.1.2, 6.11.1, 6.2.4, 6.2.6, 6.2.7 |
 | 프로토타입 대응 | /api/auth/session |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -219,7 +227,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
 | FS/NFS | [FS003](../../system/out/feature-FS003.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-02](../../system/out/screen-D-AUT-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.3 |
+| WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/terms |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
@@ -247,7 +255,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, EMAIL_TAKEN, TERMS_REQUIRED |
 | FS/NFS | [FS003](../../system/out/feature-FS003.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-AUT-02](../../system/out/screen-D-AUT-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.3 |
+| WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/signup |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
@@ -275,7 +283,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, INVALID_CREDENTIALS, MEMBER_BLOCKED |
 | FS/NFS | [FS002](../../system/out/feature-FS002.md) · [FS006](../../system/out/feature-FS006.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.2, 6.2.6 |
+| WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.4, 6.2.6, 6.2.7 |
 | 프로토타입 대응 | /api/auth/login |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
@@ -303,7 +311,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS005](../../system/out/feature-FS005.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) · [M-GRP-01](../../system/out/screen-M-GRP-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.5 |
+| WBS | 6.1.2, 6.11.1, 6.2.3, 6.2.6 |
 | 프로토타입 대응 | /api/auth/guest |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -329,7 +337,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS007](../../system/out/feature-FS007.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-MY-01](../../system/out/screen-D-MY-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.7 |
+| WBS | 6.1.2, 6.11.1, 6.2.5 |
 | 프로토타입 대응 | /api/auth/logout |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -355,7 +363,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS015](../../system/out/feature-FS015.md) · [FS016](../../system/out/feature-FS016.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-GRP-T](../../system/out/screen-D-GRP-T.md) · [D-GRP-T2](../../system/out/screen-D-GRP-T2.md) · [D-GRP-T3](../../system/out/screen-D-GRP-T3.md) · [D-GRP-T4](../../system/out/screen-D-GRP-T4.md) · [D-GRP-T5](../../system/out/screen-D-GRP-T5.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.8, 6.3.9 |
+| WBS | 6.1.2, 6.11.1, 6.3.7, 6.3.10 |
 | 프로토타입 대응 | /api/auth/tutorial |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -384,7 +392,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
 | FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.4, 6.4.8 |
+| WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/providers |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
@@ -412,7 +420,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
 | FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.4, 6.4.8 |
+| WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/{provider}/authorize |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
@@ -440,7 +448,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
 | FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.2.4, 6.4.8 |
+| WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/{provider}/callback |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
@@ -470,7 +478,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS008](../../system/out/feature-FS008.md) · [FS012](../../system/out/feature-FS012.md) · [FS013](../../system/out/feature-FS013.md) · [FS054](../../system/out/feature-FS054.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-ONB-01](../../system/out/screen-D-ONB-01.md) · [D-WAT-01](../../system/out/screen-D-WAT-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.1, 6.3.5, 6.3.6, 6.4.1 |
+| WBS | 6.1.2, 6.11.1, 6.3.1, 6.3.4, 6.3.5, 6.3.8, 6.4.1, 6.4.3, 6.4.5, 6.4.6 |
 | 프로토타입 대응 | /api/me/settings |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -496,7 +504,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS008](../../system/out/feature-FS008.md) · [FS010](../../system/out/feature-FS010.md) · [FS012](../../system/out/feature-FS012.md) · [FS013](../../system/out/feature-FS013.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-ONB-01](../../system/out/screen-D-ONB-01.md) · [D-ONB-02](../../system/out/screen-D-ONB-02.md) · [D-WAT-01](../../system/out/screen-D-WAT-01.md) · [D-WAT-01b](../../system/out/screen-D-WAT-01b.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.1, 6.3.3, 6.3.5, 6.3.6 |
+| WBS | 6.1.2, 6.11.1, 6.3.1, 6.3.2, 6.3.4, 6.3.5, 6.3.8, 6.3.9, 6.4.5 |
 | 프로토타입 대응 | /api/me/settings |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -525,7 +533,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS027](../../system/out/feature-FS027.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-MY-01](../../system/out/screen-D-MY-01.md) · [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-STK-01](../../system/out/screen-D-STK-01.md) · [M-STK-01](../../system/out/screen-M-STK-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.11 |
+| WBS | 6.1.2, 6.11.1, 6.4.1, 6.4.2, 6.4.6, 6.4.7, 6.6.12, 6.6.23 |
 | 프로토타입 대응 | /api/me/watchlist/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -555,7 +563,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS011-02](../../system/out/feature-FS011-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-WAT-01](../../system/out/screen-D-WAT-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.4 |
+| WBS | 6.1.2, 6.11.1, 6.3.3, 6.4.5 |
 | 프로토타입 대응 | /api/me/recommendations |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -583,7 +591,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS009](../../system/out/feature-FS009.md) · [FS062](../../system/out/feature-FS062.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-ONB-02](../../system/out/screen-D-ONB-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.2, 6.4.9 |
+| WBS | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 |
 | 프로토타입 대응 | /api/portfolio/mock-portfolios |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -611,7 +619,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS009](../../system/out/feature-FS009.md) · [FS062](../../system/out/feature-FS062.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-ONB-02](../../system/out/screen-D-ONB-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.2, 6.4.9 |
+| WBS | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 |
 | 프로토타입 대응 | /api/portfolio/mock-portfolios/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -638,7 +646,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS009](../../system/out/feature-FS009.md) · [FS010](../../system/out/feature-FS010.md) · [FS062](../../system/out/feature-FS062.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-ONB-02](../../system/out/screen-D-ONB-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.2, 6.3.3, 6.4.9 |
+| WBS | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 |
 | 프로토타입 대응 | /api/portfolio/connections |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -668,7 +676,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS039](../../system/out/feature-FS039.md) · [FS054](../../system/out/feature-FS054.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01](../../system/out/screen-D-COM-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.6.2, 6.4.1 |
+| WBS | 6.1.2, 6.11.1, 6.4.1, 6.4.3, 6.4.6, 6.7.8 |
 | 프로토타입 대응 | /api/portfolio |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -694,7 +702,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS009](../../system/out/feature-FS009.md) · [FS062](../../system/out/feature-FS062.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-MY-01](../../system/out/screen-D-MY-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.2, 6.4.9 |
+| WBS | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 |
 | 프로토타입 대응 | /api/portfolio/connections/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -722,7 +730,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS014](../../system/out/feature-FS014.md) · [FS017](../../system/out/feature-FS017.md) · [FS018](../../system/out/feature-FS018.md) · [FS019](../../system/out/feature-FS019.md) · [FS026](../../system/out/feature-FS026.md) · [FS032](../../system/out/feature-FS032.md) · [FS040](../../system/out/feature-FS040.md) · [FS044](../../system/out/feature-FS044.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-01](../../system/out/screen-D-GRP-01.md) · [D-GRP-01b](../../system/out/screen-D-GRP-01b.md) · [D-GRP-07](../../system/out/screen-D-GRP-07.md) · [D-GRP-07b](../../system/out/screen-D-GRP-07b.md) · [D-BRF-04](../../system/out/screen-D-BRF-04.md) · [M-GRP-01](../../system/out/screen-M-GRP-01.md) · [D-COM-04](../../system/out/screen-D-COM-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.7, 6.5.1, 6.5.2, 6.5.3, 6.5.10, 6.7.5, 6.6.3, 6.6.7, 6.4.2 |
+| WBS | 6.1.2, 6.11.1, 6.3.6, 6.4.7, 6.6.1, 6.6.2, 6.6.3, 6.6.11, 6.6.21, 6.6.23, 6.7.3, 6.7.7, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.8.5, 6.8.14, 6.5.1 |
 | 프로토타입 대응 | /api/graph |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF의 개인화 범위 필터는 화면 처리다. 목표는 personalFilter·asOf·graphVersion과 검증된 국내/국제 속성을 서버에서 제공한다. |
 | 팀 확인 필요 | 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
@@ -755,7 +763,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE |
 | FS/NFS | [FS023](../../system/out/feature-FS023.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-04](../../system/out/screen-D-GRP-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.7, 6.5.8, 6.4.2 |
+| WBS | 6.1.2, 6.11.1, 6.6.8, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
 | 프로토타입 대응 | /api/graph/edges/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -785,7 +793,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
 | FS/NFS | [FS011-01](../../system/out/feature-FS011-01.md) · [FS026](../../system/out/feature-FS026.md) · [FS037](../../system/out/feature-FS037.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-WAT-01](../../system/out/screen-D-WAT-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-STK-01](../../system/out/screen-D-STK-01.md) · [M-STK-01](../../system/out/screen-M-STK-01.md) · [D-COM-03](../../system/out/screen-D-COM-03.md) · [M-COM-02](../../system/out/screen-M-COM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.3.4, 6.5.10, 6.6 |
+| WBS | 6.1.2, 6.11.1, 6.3.3, 6.4.5, 6.4.7, 6.6.11, 6.6.21, 6.6.23, 6.7.1 |
 | 프로토타입 대응 | /api/companies |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -816,7 +824,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
 | FS/NFS | [FS020](../../system/out/feature-FS020.md) · [FS038](../../system/out/feature-FS038.md) · [FS044](../../system/out/feature-FS044.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-03](../../system/out/screen-D-COM-03.md) · [D-COM-04](../../system/out/screen-D-COM-04.md) · [M-COM-02](../../system/out/screen-M-COM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.4, 6.6.1, 6.6.7 |
+| WBS | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.6.26, 6.7.2, 6.7.7, 6.7.8, 6.7.10, 6.7.11, 6.7.12 |
 | 프로토타입 대응 | /api/companies/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -846,7 +854,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
 | FS/NFS | [FS020](../../system/out/feature-FS020.md) · [FS038](../../system/out/feature-FS038.md) · [FS063](../../system/out/feature-FS063.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-STK-01](../../system/out/screen-D-STK-01.md) · [M-STK-01](../../system/out/screen-M-STK-01.md) · [D-COM-03](../../system/out/screen-D-COM-03.md) · [M-COM-02](../../system/out/screen-M-COM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.4, 6.6.1, 6.4.10 |
+| WBS | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.6.26, 6.7.2, 6.7.8, 6.7.10, 6.7.11, 6.5.6 |
 | 프로토타입 대응 | /api/companies/{id}/quote |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -873,9 +881,9 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 요청 본문 | 없음 |
 | 응답 | 200: [CompanyMetrics](#schema-companymetrics) / [CompanyMetricsUnavailable](#schema-companymetricsunavailable), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
-| FS/NFS | [FS020](../../system/out/feature-FS020.md) · [FS042](../../system/out/feature-FS042.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| FS/NFS | [FS020](../../system/out/feature-FS020.md) · [FS038](../../system/out/feature-FS038.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.4, 6.6.5 |
+| WBS | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.7.2, 6.7.10 |
 | 프로토타입 대응 | /api/companies/{id}/metrics |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -904,7 +912,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
 | FS/NFS | [FS038](../../system/out/feature-FS038.md) · [FS040](../../system/out/feature-FS040.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01b](../../system/out/screen-D-COM-01b.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-05](../../system/out/screen-D-COM-05.md) · [D-COM-06](../../system/out/screen-D-COM-06.md) |
-| WBS | 6.1.2, 6.10.1, 6.6.1, 6.6.3 |
+| WBS | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.8, 6.7.10, 6.7.11, 6.7.12 |
 | 프로토타입 대응 | /api/companies/{id}/prices |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -936,10 +944,10 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
 | FS/NFS | [FS021](../../system/out/feature-FS021.md) · [FS043](../../system/out/feature-FS043.md) · [FS056](../../system/out/feature-FS056.md) · [FS063](../../system/out/feature-FS063.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-SEN-01](../../system/out/screen-D-SEN-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.5, 6.6.6, 6.4.3, 6.4.10, 6.4.11 |
+| WBS | 6.1.2, 6.11.1, 6.6.5, 6.6.22, 6.7.6, 6.7.9, 6.5.2, 6.5.6, 6.5.7 |
 | 프로토타입 대응 | /api/companies/{id}/documents |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| 팀 확인 필요 | 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -971,7 +979,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
 | FS/NFS | [FS040](../../system/out/feature-FS040.md) · [FS041](../../system/out/feature-FS041.md) · [FS056](../../system/out/feature-FS056.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01b](../../system/out/screen-D-COM-01b.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-05](../../system/out/screen-D-COM-05.md) · [D-COM-06](../../system/out/screen-D-COM-06.md) |
-| WBS | 6.1.2, 6.10.1, 6.6.3, 6.6.4, 6.4.3 |
+| WBS | 6.1.2, 6.11.1, 6.7.3, 6.7.4, 6.7.8, 6.7.11, 6.7.12, 6.5.2 |
 | 프로토타입 대응 | /api/events |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1005,10 +1013,10 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE |
 | FS/NFS | [FS021](../../system/out/feature-FS021.md) · [FS041](../../system/out/feature-FS041.md) · [FS056](../../system/out/feature-FS056.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-02](../../system/out/screen-D-GRP-02.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) · [D-COM-05](../../system/out/screen-D-COM-05.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.5, 6.6.4, 6.4.3 |
+| WBS | 6.1.2, 6.11.1, 6.6.5, 6.6.22, 6.7.4, 6.7.8, 6.7.12, 6.5.2 |
 | 프로토타입 대응 | /api/events/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| 팀 확인 필요 | 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -1035,10 +1043,10 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE |
 | FS/NFS | [FS024](../../system/out/feature-FS024.md) · [FS043](../../system/out/feature-FS043.md) · [FS050-01](../../system/out/feature-FS050-01.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-05](../../system/out/screen-D-GRP-05.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) · [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-SEN-01](../../system/out/screen-D-SEN-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.8, 6.6.6, 6.8.5, 6.4.2 |
+| WBS | 6.1.2, 6.11.1, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.7.6, 6.7.9, 6.9.5, 6.9.14, 6.5.1 |
 | 프로토타입 대응 | /api/evidence/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| 팀 확인 필요 | 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -1066,10 +1074,10 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
 | FS/NFS | [FS028](../../system/out/feature-FS028.md) · [FS029](../../system/out/feature-FS029.md) · [FS030](../../system/out/feature-FS030.md) · [FS031](../../system/out/feature-FS031.md) · [FS033](../../system/out/feature-FS033.md) · [FS034](../../system/out/feature-FS034.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) · [D-SEN-02](../../system/out/screen-D-SEN-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.1, 6.7.2, 6.7.3, 6.7.4, 6.7.6, 6.7.7, 6.7.8, 6.4.4 |
+| WBS | 6.1.2, 6.11.1, 6.8.1, 6.8.2, 6.8.3, 6.8.4, 6.8.6, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.5.3 |
 | 프로토타입 대응 | /api/briefings |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -1094,7 +1102,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
 | FS/NFS | [FS033](../../system/out/feature-FS033.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.6, 6.7.8, 6.4.4 |
+| WBS | 6.1.2, 6.11.1, 6.8.6, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.5.3 |
 | 프로토타입 대응 | /api/briefings/rounds |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
@@ -1122,7 +1130,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE |
 | FS/NFS | [FS032](../../system/out/feature-FS032.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-BRF-04](../../system/out/screen-D-BRF-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.5, 6.7.8, 6.4.4 |
+| WBS | 6.1.2, 6.11.1, 6.8.5, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.8.14, 6.5.3 |
 | 프로토타입 대응 | /api/briefings/{id}/graph |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
@@ -1149,7 +1157,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS051](../../system/out/feature-FS051.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.8.6, 6.8.7, 6.4.7 |
+| WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
@@ -1177,7 +1185,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS052-01](../../system/out/feature-FS052-01.md) · [FS052-02](../../system/out/feature-FS052-02.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-AI-02b](../../system/out/screen-D-AI-02b.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.8.6, 6.8.8, 6.4.7 |
+| WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
@@ -1204,7 +1212,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS052-02](../../system/out/feature-FS052-02.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02b](../../system/out/screen-D-AI-02b.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.8.8, 6.4.7 |
+| WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/current |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
@@ -1230,10 +1238,10 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
 | FS/NFS | [FS025](../../system/out/feature-FS025.md) · [FS045](../../system/out/feature-FS045.md) · [FS046](../../system/out/feature-FS046.md) · [FS047](../../system/out/feature-FS047.md) · [FS048](../../system/out/feature-FS048.md) · [FS049](../../system/out/feature-FS049.md) · [FS050-02](../../system/out/feature-FS050-02.md) · [FS052-01](../../system/out/feature-FS052-01.md) · [FS060](../../system/out/feature-FS060.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-AI-01b](../../system/out/screen-D-AI-01b.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.9, 6.8.1, 6.8.2, 6.8.3, 6.8.4, 6.8.5, 6.8.6, 6.4.7, 6.4.11 |
+| WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다., 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -1261,7 +1269,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
 | FS/NFS | [FS046](../../system/out/feature-FS046.md) · [FS049](../../system/out/feature-FS049.md) · [FS050-01](../../system/out/feature-FS050-01.md) · [FS050-02](../../system/out/feature-FS050-02.md) · [FS053](../../system/out/feature-FS053.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.8.2, 6.8.5, 6.8.9 |
+| WBS | 6.1.2, 6.11.1, 6.9.4, 6.9.5, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
@@ -1288,7 +1296,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
 | FS/NFS | [FS053](../../system/out/feature-FS053.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.8.9 |
+| WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/retry |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
@@ -1317,7 +1325,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
 | FS/NFS | [FS046](../../system/out/feature-FS046.md) · [FS053](../../system/out/feature-FS053.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.8.2, 6.8.9 |
+| WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/cancel |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
@@ -1346,7 +1354,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
 | FS/NFS | [FS073](../../system/out/feature-FS073.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-05c](../../system/out/screen-A-ADM-05c.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.9 |
+| WBS | 6.1.2, 6.11.1, 6.10.1, 6.10.13 |
 | 프로토타입 대응 | /api/admin/auth/session |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
@@ -1372,7 +1380,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, INVALID_CREDENTIALS, MEMBER_BLOCKED |
 | FS/NFS | [FS073](../../system/out/feature-FS073.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-05c](../../system/out/screen-A-ADM-05c.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.9 |
+| WBS | 6.1.2, 6.11.1, 6.10.1, 6.10.13 |
 | 프로토타입 대응 | /api/admin/auth/login |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
@@ -1400,7 +1408,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS073](../../system/out/feature-FS073.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-05c](../../system/out/screen-A-ADM-05c.md) · [A-ADM-01](../../system/out/screen-A-ADM-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.9 |
+| WBS | 6.1.2, 6.11.1, 6.10.1, 6.10.13 |
 | 프로토타입 대응 | /api/admin/auth/logout |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
@@ -1426,7 +1434,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS072](../../system/out/feature-FS072.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-01](../../system/out/screen-A-ADM-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.8 |
+| WBS | 6.1.2, 6.11.1, 6.10.2, 6.10.14 |
 | 프로토타입 대응 | /api/admin/dashboard |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1452,7 +1460,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS072](../../system/out/feature-FS072.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-05b](../../system/out/screen-A-ADM-05b.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.8 |
+| WBS | 6.1.2, 6.11.1, 6.10.12, 6.10.18 |
 | 프로토타입 대응 | /api/admin/audit-log |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1484,7 +1492,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS059](../../system/out/feature-FS059.md) · [FS063](../../system/out/feature-FS063.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.5, 6.4.6, 6.4.10, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4, 6.5.5, 6.5.6 |
 | 프로토타입 대응 | /api/admin/pipeline/overview |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1510,7 +1518,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS067-01](../../system/out/feature-FS067-01.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -1544,7 +1552,7 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS067-01](../../system/out/feature-FS067-01.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -1571,7 +1579,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, VALIDATION_FAILED, AUDIT_UNAVAILABLE |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.6, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id}/decision |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF allow 처리와 목표의 재검증 접수·expectedRevision·비공개 유지 규칙을 대조한다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -1602,7 +1610,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.6, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1630,7 +1638,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.6, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/rules/{rule_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -1660,7 +1668,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.6, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/graph/versions |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1688,7 +1696,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.6, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/graph/versions |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -1718,7 +1726,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.6, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/graph/versions/{version_id}/activate |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -1749,7 +1757,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.5, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16, 6.5.4 |
 | 프로토타입 대응 | /api/admin/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1778,10 +1786,10 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS058](../../system/out/feature-FS058.md) · [FS059](../../system/out/feature-FS059.md) · [FS063](../../system/out/feature-FS063.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.4.5, 6.4.6, 6.4.10, 6.4.11 |
+| WBS | 6.1.2, 6.11.1, 6.5.4, 6.5.5, 6.5.6, 6.5.7 |
 | 프로토타입 대응 | /api/admin/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
-| 팀 확인 필요 | 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -1808,7 +1816,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS067-01](../../system/out/feature-FS067-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.6, 6.10.16 |
 | 프로토타입 대응 | /api/admin/jobs/{job_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1835,7 +1843,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS067-03](../../system/out/feature-FS067-03.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/jobs/{job_id}/retry |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1866,7 +1874,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS067-03](../../system/out/feature-FS067-03.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS012](../../system/out/feature-NFS012.md) |
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.3 |
+| WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16 |
 | 프로토타입 대응 | /api/admin/jobs/{job_id}/cancel |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1897,7 +1905,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS068](../../system/out/feature-FS068.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-04b](../../system/out/screen-A-ADM-04b.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.4 |
+| WBS | 6.1.2, 6.11.1, 6.10.8, 6.10.17 |
 | 프로토타입 대응 | /api/admin/ai-usage |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1924,7 +1932,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS070-01](../../system/out/feature-FS070-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-04](../../system/out/screen-A-ADM-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.6 |
+| WBS | 6.1.2, 6.11.1, 6.10.9, 6.10.17 |
 | 프로토타입 대응 | /api/admin/briefings |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1954,7 +1962,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS070-01](../../system/out/feature-FS070-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-04](../../system/out/screen-A-ADM-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.6 |
+| WBS | 6.1.2, 6.11.1, 6.10.9, 6.10.17 |
 | 프로토타입 대응 | /api/admin/briefings/{round_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -1981,10 +1989,10 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, ALREADY_PUBLISHED, AUDIT_UNAVAILABLE |
 | FS/NFS | [FS028](../../system/out/feature-FS028.md) · [FS029](../../system/out/feature-FS029.md) · [FS034](../../system/out/feature-FS034.md) · [FS070-02](../../system/out/feature-FS070-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-04](../../system/out/screen-A-ADM-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.1, 6.7.2, 6.7.7, 6.9.6 |
+| WBS | 6.1.2, 6.11.1, 6.8.1, 6.8.2, 6.8.8, 6.8.11, 6.8.12, 6.10.9, 6.10.17 |
 | 프로토타입 대응 | /api/admin/briefings/{round_id}/reprocess |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| 팀 확인 필요 | 긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -2012,7 +2020,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, ALREADY_PUBLISHED, AUDIT_UNAVAILABLE |
 | FS/NFS | [FS035](../../system/out/feature-FS035.md) · [FS071-01](../../system/out/feature-FS071-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-04](../../system/out/screen-A-ADM-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.8, 6.4.4, 6.9.7 |
+| WBS | 6.1.2, 6.11.1, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.10.10, 6.10.17, 6.5.3 |
 | 프로토타입 대응 | /api/admin/briefings/{round_id}/corrections |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
@@ -2043,7 +2051,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, ALREADY_PUBLISHED, AUDIT_UNAVAILABLE |
 | FS/NFS | [FS071-02](../../system/out/feature-FS071-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-04](../../system/out/screen-A-ADM-04.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.7 |
+| WBS | 6.1.2, 6.11.1, 6.10.10, 6.10.17 |
 | 프로토타입 대응 | /api/admin/briefings/{round_id}/suspension |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2074,7 +2082,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS065](../../system/out/feature-FS065.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [M-GRP-01](../../system/out/screen-M-GRP-01.md) · [D-GRP-01](../../system/out/screen-D-GRP-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.1 |
+| WBS | 6.1.2, 6.11.1, 6.10.4, 6.10.15 |
 | 프로토타입 대응 | /api/telemetry |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2104,7 +2112,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS066-01](../../system/out/feature-FS066-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.10, 6.9.2 |
+| WBS | 6.1.2, 6.11.1, 6.8.10, 6.8.14, 6.10.5 |
 | 프로토타입 대응 | /api/feedback |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2134,7 +2142,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS066-01](../../system/out/feature-FS066-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.10, 6.9.2 |
+| WBS | 6.1.2, 6.11.1, 6.8.10, 6.8.14, 6.10.5 |
 | 프로토타입 대응 | /api/feedback |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2163,7 +2171,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS065](../../system/out/feature-FS065.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02](../../system/out/screen-A-ADM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.1 |
+| WBS | 6.1.2, 6.11.1, 6.10.4, 6.10.15 |
 | 프로토타입 대응 | /api/admin/insights/overview |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2189,7 +2197,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS065](../../system/out/feature-FS065.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02](../../system/out/screen-A-ADM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.1 |
+| WBS | 6.1.2, 6.11.1, 6.10.4, 6.10.15 |
 | 프로토타입 대응 | /api/admin/insights/summary |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2216,7 +2224,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS065](../../system/out/feature-FS065.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02](../../system/out/screen-A-ADM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.1 |
+| WBS | 6.1.2, 6.11.1, 6.10.4, 6.10.15 |
 | 프로토타입 대응 | /api/admin/insights/companies |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2245,7 +2253,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS065](../../system/out/feature-FS065.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02](../../system/out/screen-A-ADM-02.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.1 |
+| WBS | 6.1.2, 6.11.1, 6.10.4, 6.10.15 |
 | 프로토타입 대응 | /api/admin/insights/companies/{company_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2273,7 +2281,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS066-02](../../system/out/feature-FS066-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02b](../../system/out/screen-A-ADM-02b.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.2 |
+| WBS | 6.1.2, 6.11.1, 6.10.5, 6.10.15 |
 | 프로토타입 대응 | /api/admin/feedback/summary |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2302,7 +2310,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS066-02](../../system/out/feature-FS066-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02b](../../system/out/screen-A-ADM-02b.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.2 |
+| WBS | 6.1.2, 6.11.1, 6.10.5, 6.10.15 |
 | 프로토타입 대응 | /api/admin/feedback/dislikes |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2333,7 +2341,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, AUDIT_UNAVAILABLE, MASKING_FAILED, INVALID_CURSOR |
 | FS/NFS | [FS066-03](../../system/out/feature-FS066-03.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02b](../../system/out/screen-A-ADM-02b.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.2 |
+| WBS | 6.1.2, 6.11.1, 6.10.11, 6.10.15 |
 | 프로토타입 대응 | /api/admin/transcripts |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., BFF에 별도 열람 권한·purpose 필수·기록 실패 차단 계약이 부족하다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -2363,7 +2371,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, AUDIT_UNAVAILABLE, MASKING_FAILED |
 | FS/NFS | [FS066-03](../../system/out/feature-FS066-03.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-02b](../../system/out/screen-A-ADM-02b.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.2 |
+| WBS | 6.1.2, 6.11.1, 6.10.11, 6.10.15 |
 | 프로토타입 대응 | /api/admin/transcripts/{session_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF에 별도 열람 권한·purpose 필수·기록 실패 차단 계약이 부족하다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
@@ -2391,7 +2399,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS069-01](../../system/out/feature-FS069-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-05](../../system/out/screen-A-ADM-05.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.5 |
+| WBS | 6.1.2, 6.11.1, 6.10.3, 6.10.18 |
 | 프로토타입 대응 | /api/admin/members |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2421,7 +2429,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
 | FS/NFS | [FS069-01](../../system/out/feature-FS069-01.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [A-ADM-05](../../system/out/screen-A-ADM-05.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.5 |
+| WBS | 6.1.2, 6.11.1, 6.10.3, 6.10.18 |
 | 프로토타입 대응 | /api/admin/members/{member_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2448,7 +2456,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS069-02](../../system/out/feature-FS069-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-05](../../system/out/screen-A-ADM-05.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.5 |
+| WBS | 6.1.2, 6.11.1, 6.10.3, 6.10.18 |
 | 프로토타입 대응 | /api/admin/members/{member_id}/block |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2479,7 +2487,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS069-02](../../system/out/feature-FS069-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-05](../../system/out/screen-A-ADM-05.md) |
-| WBS | 6.1.2, 6.10.1, 6.9.5 |
+| WBS | 6.1.2, 6.11.1, 6.10.3, 6.10.18 |
 | 프로토타입 대응 | /api/admin/members/{member_id}/unblock |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -2510,10 +2518,12 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
 | FS/NFS | [FS042](../../system/out/feature-FS042.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.6.5 |
+| WBS | 6.1.2, 6.11.1 |
 | 프로토타입 대응 | 없음 |
 | 목표와 차이 | 직접 대응 API 없음. 재무는 기업 지표와 구분한다. |
-| 팀 확인 필요 | 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다. |
+| 팀 확인 필요 | 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다., 현재 WBS 6.7.5는 시점 관계 그래프다. 옛 6.6.5 재무 의미를 그 번호로 이행하지 않는다. 재무 유지/분리 ID·담당/일정은 팀 최종 결정 대상이며 API는 기존 목표만 보존한다. |
+
+명세 의미 구분: FS042: 목차·요구42의 기존 재무/실적 의미를 보존한 목표다. 새 상세 FS042 시점 그래프와 다르며 현재 WBS에 대응 재무 업무가 없어 공통 계약검토만 연결한다. 폐기·구현·배정 완료가 아니다.
 
 ### 요청 필드
 
@@ -2538,7 +2548,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
 | FS/NFS | [FS022](../../system/out/feature-FS022.md) · [FS024](../../system/out/feature-FS024.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-06](../../system/out/screen-D-GRP-06.md) · [D-GRP-05](../../system/out/screen-D-GRP-05.md) |
-| WBS | 6.1.2, 6.10.1, 6.5.6, 6.5.8, 6.4.2 |
+| WBS | 6.1.2, 6.11.1, 6.6.6, 6.6.7, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.5.1 |
 | 프로토타입 대응 | 없음 |
 | 목표와 차이 | 직접 대응 API 없음. 기업 패널/공개 회차의 현재 UI 동작은 목표 seam의 구현을 뜻하지 않는다. |
 | 팀 확인 필요 | 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다. |
@@ -2568,7 +2578,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
 | FS/NFS | [FS036](../../system/out/feature-FS036.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
-| WBS | 6.1.2, 6.10.1, 6.7.9 |
+| WBS | 6.1.2, 6.11.1, 6.8.9, 6.8.14 |
 | 프로토타입 대응 | 없음 |
 | 목표와 차이 | 직접 대응 API 없음. 기업 패널/공개 회차의 현재 UI 동작은 목표 seam의 구현을 뜻하지 않는다. |
 | 팀 확인 필요 | 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다. |
@@ -2593,12 +2603,14 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 요청 본문 | 없음 |
 | 응답 | 200: [GraphResponse](#schema-graphresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
-| FS/NFS | [FS038](../../system/out/feature-FS038.md) · [FS040](../../system/out/feature-FS040.md) · [FS041](../../system/out/feature-FS041.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| FS/NFS | [FS038](../../system/out/feature-FS038.md) · [FS040](../../system/out/feature-FS040.md) · [FS041](../../system/out/feature-FS041.md) · [FS042](../../system/out/feature-FS042.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01b](../../system/out/screen-D-COM-01b.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-04](../../system/out/screen-D-COM-04.md) · [D-COM-05](../../system/out/screen-D-COM-05.md) · [D-COM-06](../../system/out/screen-D-COM-06.md) |
-| WBS | 6.1.2, 6.6.3, 6.6.4, 6.4.2, 6.10.1 |
+| WBS | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.4, 6.7.5, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.5.1 |
 | 프로토타입 대응 | /api/companies/{id}/graph |
 | 목표와 차이 | /api → /api/v1 경로 버전 및 공통 오류·요청 ID 적용., BFF는 현재 저장된 승인 자료를 문서 공개 시각으로 거른다. 목표는 asOf와 실제 사용한 불변 공개 버전을 함께 고정한다. |
-| 팀 확인 필요 | WBS FS040-01은 현재 명세 목차에 없는 원본 ID다. FS040 연결은 시점별 조회 의미의 수동 연결이며 원문 번호 정정을 뜻하지 않는다., 날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다. |
+| 팀 확인 필요 | 10-08 상세 FS042는 FS0?? 시점 관계 그래프를 승계했지만 목차/요구42의 기존 재무·실적 의미와 충돌한다. 재무 폐기 선언 없이 시점 그래프 의미로 연결하며 의미별 승인 범위는 팀 최종 확인이 필요하다., 날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다. |
+
+명세 의미 구분: FS042: 기업 상세 77/79행의 FS0??→FS042 ID 승계. 시점 관계 그래프 의미이며 기존 재무/실적 공급을 뜻하지 않는다.
 
 ### 요청 필드
 
@@ -3481,6 +3493,11 @@ The selection frozen when the question was first received.
 | events | 필수 | [DocumentEventRef](#schema-documenteventref)[] | This company's approved events the article supports |
 | quotes | 필수 | [DocumentQuote](#schema-documentquote)[] | Stored evidence quotes from this article for those events |
 | sentiment | 필수 | [DocumentSentiment](#schema-documentsentiment) / null |  |
+| documentVersion | 선택 | string, null |  |
+| documentSummary | 선택 | [DocumentAnalysisSummary](#schema-documentanalysissummary) / null |  |
+| analysisStatus | 선택 | [DocumentAnalysisStatus](#schema-documentanalysisstatus) / null |  |
+| analysisProvenance | 선택 | [AnalysisProvenance](#schema-analysisprovenance) / null |  |
+| resultVersion | 선택 | string, null | 요약이 있으면 요약 버전, 요약 없이 판정만 있으면 판정 버전. 미공개는 null. |
 | kind | 필수 | string {news, disclosure} |  |
 
 <a id="schema-companydocumentsresponse"></a>
@@ -4127,6 +4144,11 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | eventIds | 필수 | string[] |  |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 | sentiment | 필수 | [DocumentSentiment](#schema-documentsentiment) / null |  |
+| documentVersion | 선택 | string, null |  |
+| documentSummary | 선택 | [DocumentAnalysisSummary](#schema-documentanalysissummary) / null |  |
+| analysisStatus | 선택 | [DocumentAnalysisStatus](#schema-documentanalysisstatus) / null |  |
+| analysisProvenance | 선택 | [AnalysisProvenance](#schema-analysisprovenance) / null |  |
+| resultVersion | 선택 | string, null |  |
 
 <a id="schema-featurecost"></a>
 
@@ -6157,6 +6179,92 @@ string {positive, negative, mixed, undetermined}
 | judgedAt | 필수 | string (date-time) |  |
 | model | 필수 | string |  |
 | promptVersion | 필수 | string |  |
+
+<a id="schema-analysisprovenance"></a>
+
+### AnalysisProvenance
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| sourceKind | 필수 | string {synthetic, actual} |  |
+| executionMode | 필수 | string {replay, live} |  |
+| recordingKind | 필수 | string {authored-test, provider} |  |
+
+<a id="schema-analysiscitation"></a>
+
+### AnalysisCitation
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evidenceId | 필수 | string |  |
+| documentId | 필수 | string |  |
+| documentVersion | 필수 | string |  |
+| textArtifactId | 필수 | string |  |
+| offsetUnit | 필수 | string |  |
+| start | 필수 | integer |  |
+| end | 필수 | integer | Exclusive Unicode code point offset, not JavaScript/Java UTF-16. |
+| quote | 필수 | string |  |
+| inputKind | 필수 | string {body, summary} |  |
+| rawLocatorIds | 필수 | string[] |  |
+
+<a id="schema-analysisclaim"></a>
+
+### AnalysisClaim
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| claimId | 필수 | string |  |
+| text | 필수 | string |  |
+| assertionKind | 필수 | string {fact, interpretation, limitation} |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-analysisstagestatus"></a>
+
+### AnalysisStageStatus
+
+undetermined는 유효한 판정 label. null 판정의 실패/미요청/보류를 별도 status로 구분.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {not_requested, pending, failed, withheld, available} |  |
+| reason | 필수 | string, null |  |
+
+<a id="schema-documentanalysisstatus"></a>
+
+### DocumentAnalysisStatus
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| summary | 필수 | [AnalysisStageStatus](#schema-analysisstagestatus) |  |
+| sentiment | 필수 | [AnalysisStageStatus](#schema-analysisstagestatus) |  |
+
+<a id="schema-documentanalysissummary"></a>
+
+### DocumentAnalysisSummary
+
+S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 앱이 수입한 후만 제공. GET은 모델 호출 0. 현재 버전·철회·grant gate 실패는 null.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string |  |
+| artifactId | 필수 | string |  |
+| documentId | 필수 | string |  |
+| documentVersion | 필수 | string |  |
+| resultVersion | 필수 | string |  |
+| text | 필수 | string |  |
+| claims | 필수 | [AnalysisClaim](#schema-analysisclaim)[] |  |
+| citations | 필수 | [AnalysisCitation](#schema-analysiscitation)[] |  |
+| limitations | 필수 | string[] |  |
+| producedAt | 필수 | string (date-time) |  |
+| provenance | 필수 | [AnalysisProvenance](#schema-analysisprovenance) |  |
 
 <a id="schema-analysissummary"></a>
 

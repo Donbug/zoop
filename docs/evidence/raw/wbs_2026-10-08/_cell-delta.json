@@ -1,0 +1,8269 @@
+[
+  {
+    "sheet": "표지·변경이력",
+    "row": 19,
+    "column": 2,
+    "before": "",
+    "after": "v0.2 추가"
+  },
+  {
+    "sheet": "표지·변경이력",
+    "row": 19,
+    "column": 3,
+    "before": "",
+    "after": "2026-10-06 00:00:00"
+  },
+  {
+    "sheet": "표지·변경이력",
+    "row": 19,
+    "column": 4,
+    "before": "",
+    "after": "요청 반영"
+  },
+  {
+    "sheet": "표지·변경이력",
+    "row": 19,
+    "column": 5,
+    "before": "",
+    "after": "FS074~FS081 / WBS 6.5.13~6.5.20 추가. AI·백엔드 B 역할과 기존 6.4 연계 명시. 기존 일정·담당 유지, 신규 일정·가중치 미산정. 메인 그래프 집계 범위 확장 및 영향 조회/분석 경계 명시."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 5,
+    "column": 3,
+    "before": "2026.08.29 ~ 2026.11.06",
+    "after": "2026.08.29 ~ 2026.11.05"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 27,
+    "column": 8,
+    "before": "2026-10-06 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 28,
+    "column": 6,
+    "before": "김도현, 안재현, 박주형, 윤서진",
+    "after": "김도현, 박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 28,
+    "column": 8,
+    "before": "2026-10-06 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 30,
+    "column": 8,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 30,
+    "column": 9,
+    "before": "0.1",
+    "after": "0.05"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 31,
+    "column": 8,
+    "before": "2026-10-06 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 31,
+    "column": 9,
+    "before": "0.04",
+    "after": "0.02"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 32,
+    "column": 8,
+    "before": "2026-10-06 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 32,
+    "column": 9,
+    "before": "0.03",
+    "after": "0.015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 33,
+    "column": 6,
+    "before": "미정",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 33,
+    "column": 8,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-10 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 33,
+    "column": 9,
+    "before": "0.03",
+    "after": "0.015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 34,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 34,
+    "column": 8,
+    "before": "2026-11-06 00:00:00",
+    "after": "2026-11-27 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 34,
+    "column": 9,
+    "before": "0.45",
+    "after": "0.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 35,
+    "column": 8,
+    "before": "2026-10-11 00:00:00",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 35,
+    "column": 9,
+    "before": "0.03",
+    "after": "0.02"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 36,
+    "column": 3,
+    "before": "        개발 환경·브랜치·CI 기준 구성",
+    "after": "        개발 환경·브랜치·코드 규칙 구성"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 36,
+    "column": 5,
+    "before": "개발 환경·CI 파이프라인",
+    "after": "Git, 디렉터리, 실행 환경 통일"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 36,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 36,
+    "column": 9,
+    "before": "0.0075",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 37,
+    "column": 3,
+    "before": "        공통 API 계약·오류 응답 규격 확정",
+    "after": "        API 명세 최종 검토·구현 기준 확정"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 37,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 37,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-06 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 37,
+    "column": 9,
+    "before": "0.0075",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 38,
+    "column": 3,
+    "before": "        DB 스키마·마이그레이션·초기 데이터 구성",
+    "after": "        DB 스키마·마이그레이션 구성"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 38,
+    "column": 5,
+    "before": "스키마·마이그레이션",
+    "after": "개발 환경·CI 파이프라인"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 38,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 38,
+    "column": 9,
+    "before": "0.0075",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 39,
+    "column": 3,
+    "before": "        Mock 데이터·테스트 픽스처 구성",
+    "after": "        Graph DB 적재·조회 스키마 확정"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 39,
+    "column": 5,
+    "before": "Mock API·테스트 데이터",
+    "after": "스키마·마이그레이션"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 39,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 39,
+    "column": 7,
+    "before": "2026-10-09 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 39,
+    "column": 8,
+    "before": "2026-10-11 00:00:00",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 39,
+    "column": 9,
+    "before": "0.0075",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 2,
+    "before": "6.2",
+    "after": "6.1.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 3,
+    "before": "    회원가입·로그인",
+    "after": "        인증·공통 보안 모듈 기반 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 4,
+    "before": "",
+    "after": "공통기반"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 5,
+    "before": "공통 API·인증 구조",
+    "after": "Session, CSRF, 권한 검사 등"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 7,
+    "before": "2026-10-08 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 8,
+    "before": "2026-10-15 00:00:00",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 9,
+    "before": "0.02",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 40,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 2,
+    "before": "6.2.1",
+    "after": "6.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 3,
+    "before": "        [FS001] 서비스 시작 방식 선택",
+    "after": "    회원가입·로그인"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 4,
+    "before": "P1",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 5,
+    "before": "FS001 구현·단위테스트",
+    "after": "공통 API·인증 구조"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 7,
+    "before": "2026-10-08 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 8,
+    "before": "2026-10-09 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 9,
+    "before": "0.002",
+    "after": "0.015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 10,
+    "before": "0.0",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 2,
+    "before": "6.2.2",
+    "after": "6.2.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 3,
+    "before": "        [FS002] 이메일 로그인",
+    "after": "        (BE) 이메일 로그인/회원가입 API 개발 "
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 5,
+    "before": "FS002 구현·단위테스트",
+    "after": "FS002 · FS003 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 7,
+    "before": "2026-10-08 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 8,
+    "before": "2026-10-12 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 42,
+    "column": 9,
+    "before": "0.003",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 2,
+    "before": "6.2.3",
+    "after": "6.2.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 3,
+    "before": "        [FS003] 이메일 회원가입",
+    "after": "        (BE) 소셜 로그인·회원가입 및 기존 계정 연결 처리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 5,
+    "before": "FS003 구현·단위테스트",
+    "after": "FS004 · FS061 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 7,
+    "before": "2026-10-09 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 8,
+    "before": "2026-10-13 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 43,
+    "column": 9,
+    "before": "0.003",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 44,
+    "column": 2,
+    "before": "6.2.4",
+    "after": "6.2.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 44,
+    "column": 3,
+    "before": "        [FS004] 소셜 로그인과 회원가입",
+    "after": "        (BE) 비회원 접근 및 권한 처리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 44,
+    "column": 5,
+    "before": "FS004 구현·단위테스트",
+    "after": "FS005 · NFS001 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 44,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 44,
+    "column": 7,
+    "before": "2026-10-12 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 44,
+    "column": 9,
+    "before": "0.0035",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 2,
+    "before": "6.2.5",
+    "after": "6.2.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 3,
+    "before": "        [FS005] 비회원 시작",
+    "after": "        (BE) 로그인 상태 및 초기 진입 경로 처리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 5,
+    "before": "FS005 구현·단위테스트",
+    "after": "FS001 · FS006 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 7,
+    "before": "2026-10-12 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 8,
+    "before": "2026-10-13 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 45,
+    "column": 9,
+    "before": "0.002",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 46,
+    "column": 2,
+    "before": "6.2.6",
+    "after": "6.2.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 46,
+    "column": 3,
+    "before": "        [FS006] 로그인 후 화면 이동",
+    "after": "        (BE) 로그아웃 및 세션 무효화"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 46,
+    "column": 5,
+    "before": "FS006 구현·단위테스트",
+    "after": "FS007 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 46,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 46,
+    "column": 7,
+    "before": "2026-10-14 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 46,
+    "column": 9,
+    "before": "0.003",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 47,
+    "column": 2,
+    "before": "6.2.7",
+    "after": "6.2.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 47,
+    "column": 3,
+    "before": "        [FS007] 로그아웃",
+    "after": "        (FE) D-AUT-01 로그인 화면 구현 및 인증 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 47,
+    "column": 5,
+    "before": "FS007 구현·단위테스트",
+    "after": "FS001 · FS002 · FS005 · FS006"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 47,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 47,
+    "column": 7,
+    "before": "2026-10-14 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 47,
+    "column": 9,
+    "before": "0.0035",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 2,
+    "before": "6.3",
+    "after": "6.2.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 3,
+    "before": "    온보딩·튜토리얼",
+    "after": "        (FE) D-AUT-02 회원가입 화면 구현 및 가입 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 5,
+    "before": "회원 상태·가상계좌·관심종목 API",
+    "after": "FS003 · FS006"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 9,
+    "before": "0.03",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 48,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 2,
+    "before": "6.3.1",
+    "after": "6.2.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 3,
+    "before": "        [FS008] 투자 여부 선택",
+    "after": "        인증 기능 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 5,
+    "before": "FS008 구현·단위테스트",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 6,
+    "before": "",
+    "after": "임현, 박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 7,
+    "before": "2026-10-13 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 8,
+    "before": "2026-10-14 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 49,
+    "column": 9,
+    "before": "0.0025",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 2,
+    "before": "6.3.2",
+    "after": "6.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 3,
+    "before": "        [FS009] 가상계좌 프로필 연결",
+    "after": "    온보딩·튜토리얼"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 4,
+    "before": "P1",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 5,
+    "before": "FS009 구현·단위테스트",
+    "after": "회원 상태·가상계좌·관심종목 API"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 7,
+    "before": "2026-10-13 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 9,
+    "before": "0.0055",
+    "after": "0.025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 50,
+    "column": 10,
+    "before": "0.0",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 2,
+    "before": "6.3.3",
+    "after": "6.3.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 3,
+    "before": "        [FS010] 가상계좌 연결 재시도와 건너뛰기",
+    "after": "        (BE) 투자 여부 및 초기 설정 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 5,
+    "before": "FS010 구현·단위테스트",
+    "after": "FS008 · FS013 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 7,
+    "before": "2026-10-15 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 51,
+    "column": 9,
+    "before": "0.0025",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 2,
+    "before": "6.3.4",
+    "after": "6.3.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 3,
+    "before": "        [FS011] 관심종목 검색과 추천 조회",
+    "after": "        (BE) 가상계좌 프로필 연동 기능 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 5,
+    "before": "FS011 구현·단위테스트",
+    "after": "FS009 · FS010 · FS062 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 7,
+    "before": "2026-10-13 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 52,
+    "column": 9,
+    "before": "0.0045",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 2,
+    "before": "6.3.5",
+    "after": "6.3.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 3,
+    "before": "        [FS012] 초기 관심종목 선택",
+    "after": "        (BE) 관심종목 검색 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 5,
+    "before": "FS012 구현·단위테스트",
+    "after": "FS011-01 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 7,
+    "before": "2026-10-15 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 8,
+    "before": "2026-10-19 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 53,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 54,
+    "column": 2,
+    "before": "6.3.6",
+    "after": "6.3.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 54,
+    "column": 3,
+    "before": "        [FS013] 초기 설정 저장",
+    "after": "        (BE) 초기 관심종목 등록 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 54,
+    "column": 5,
+    "before": "FS013 구현·단위테스트",
+    "after": "FS012 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 54,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 54,
+    "column": 7,
+    "before": "2026-10-19 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 54,
+    "column": 8,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 2,
+    "before": "6.3.7",
+    "after": "6.3.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 3,
+    "before": "        [FS014] 초기 관계 그래프 제공",
+    "after": "        (BE) 초기 설정 저장"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 5,
+    "before": "FS014 구현·단위테스트",
+    "after": "FS013 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 7,
+    "before": "2026-10-19 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 8,
+    "before": "2026-10-21 00:00:00",
+    "after": "2026-10-17 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 55,
+    "column": 9,
+    "before": "0.0035",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 2,
+    "before": "6.3.8",
+    "after": "6.3.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 3,
+    "before": "        [FS015] 관계 그래프 튜토리얼",
+    "after": "        (BE) 초기 개인화 관계그래프 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 5,
+    "before": "FS015 구현·단위테스트",
+    "after": "FS014 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 8,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-17 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 56,
+    "column": 9,
+    "before": "0.002",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 57,
+    "column": 2,
+    "before": "6.3.9",
+    "after": "6.3.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 57,
+    "column": 3,
+    "before": "        [FS016] 튜토리얼 완료와 건너뛰기",
+    "after": "        (BE) 그래프 튜토리얼 및 완료 상태 처리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 57,
+    "column": 5,
+    "before": "FS016 구현·단위테스트",
+    "after": "FS015 · FS016 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 57,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 57,
+    "column": 7,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-17 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 57,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-18 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 2,
+    "before": "6.4",
+    "after": "6.3.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 3,
+    "before": "    데이터 관리·외부 연동",
+    "after": "        (FE) D-ONB-01 투자 여부 선택 화면 및 설정 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 5,
+    "before": "스키마·수집 정책·AI 분석 계약",
+    "after": "FS008"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 9,
+    "before": "0.11",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 58,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 2,
+    "before": "6.4.1",
+    "after": "6.3.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 3,
+    "before": "        [FS054] 사용자와 모의 보유",
+    "after": "        (FE) D-ONB-02 가상계좌 연결 화면 및 프로필 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 5,
+    "before": "FS054 구현·단위테스트",
+    "after": "FS009 · FS010 · FS062"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 8,
+    "before": "2026-10-10 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 59,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 2,
+    "before": "6.4.2",
+    "after": "6.3.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 3,
+    "before": "        [FS055] 관계와 근거 연결",
+    "after": "        (FE) D-GRP-T2~T5 관계 그래프 튜토리얼 및 완료 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 5,
+    "before": "FS055 구현·단위테스트",
+    "after": "FS015 · FS016"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 60,
+    "column": 9,
+    "before": "0.012",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 2,
+    "before": "6.4.3",
+    "after": "6.3.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 3,
+    "before": "        [FS056] 사건과 문서 구분",
+    "after": "        온보딩 전체 흐름 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 5,
+    "before": "FS056 구현·단위테스트",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 6,
+    "before": "",
+    "after": "박주형, 김도현, 정세빈, 임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-18 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 8,
+    "before": "2026-10-14 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 61,
+    "column": 9,
+    "before": "0.008",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 2,
+    "before": "6.4.4",
+    "after": "6.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 3,
+    "before": "        [FS057] 브리핑 정보 저장",
+    "after": "    내 종목 관리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 4,
+    "before": "P1",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 5,
+    "before": "FS057 구현·단위테스트",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 7,
+    "before": "2026-10-13 00:00:00",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 10,
+    "before": "0.0",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 2,
+    "before": "6.4.5",
+    "after": "6.4.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 3,
+    "before": "        [FS058] 신규 경제뉴스 정기 수집 및 이슈 분석",
+    "after": "        (BE) 내 관심종목 목록 조회 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 5,
+    "before": "FS058 구현·단위테스트",
+    "after": "FS054 · FS027 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 8,
+    "before": "2026-10-21 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 63,
+    "column": 9,
+    "before": "0.025",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 2,
+    "before": "6.4.6",
+    "after": "6.4.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 3,
+    "before": "        [FS059] 분석 결과 저장 및 조회 반영",
+    "after": "        (BE) 관심종목 추가·삭제 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 5,
+    "before": "FS059 구현·단위테스트",
+    "after": "FS027 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 7,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 64,
+    "column": 9,
+    "before": "0.013",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 65,
+    "column": 2,
+    "before": "6.4.7",
+    "after": "6.4.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 65,
+    "column": 3,
+    "before": "        [FS060] 대화와 질문 기록",
+    "after": "        (BE) 모의 보유종목 조회 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 65,
+    "column": 5,
+    "before": "FS060 구현·단위테스트",
+    "after": "FS039 · FS054 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 65,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 65,
+    "column": 7,
+    "before": "2026-10-19 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 65,
+    "column": 8,
+    "before": "2026-10-21 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 2,
+    "before": "6.4.8",
+    "after": "6.4.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 3,
+    "before": "        [FS061] 소셜 인증 연동",
+    "after": "        (BE) 모의계좌 연결 상태·해제 기능 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 5,
+    "before": "FS061 구현·단위테스트",
+    "after": "FS009 · FS062 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 7,
+    "before": "2026-10-12 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 8,
+    "before": "2026-10-15 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 66,
+    "column": 9,
+    "before": "0.007",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 2,
+    "before": "6.4.9",
+    "after": "6.4.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 3,
+    "before": "        [FS062] 가상계좌 데이터 연동",
+    "after": "        (FE) D-WAT-01b 초기 관심종목 선택 화면 및 검색·등록 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 5,
+    "before": "FS062 구현·단위테스트",
+    "after": "FS012"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 7,
+    "before": "2026-10-09 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 67,
+    "column": 9,
+    "before": "0.007",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 2,
+    "before": "6.4.10",
+    "after": "6.4.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 3,
+    "before": "        [FS063] 뉴스와 시장 데이터 연동",
+    "after": "        (FE) D-MY-01 내 종목 관리 화면 및 종목·가상계좌 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 5,
+    "before": "FS063 구현·단위테스트",
+    "after": "FS027 · FS054 · FS062"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 7,
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 8,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 68,
+    "column": 9,
+    "before": "0.016",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 2,
+    "before": "6.4.11",
+    "after": "6.4.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 3,
+    "before": "        [FS064] AI 분석 연동",
+    "after": "        (FE) D-STK-01 종목 검색·사이드바 및 관심종목 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 5,
+    "before": "FS064 구현·단위테스트",
+    "after": "FS037 · FS027"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 7,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 69,
+    "column": 9,
+    "before": "0.008",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 2,
+    "before": "6.5",
+    "after": "6.4.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 3,
+    "before": "    메인 그래프",
+    "after": "        내 종목 관리 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 5,
+    "before": "검증된 관계 데이터·GraphDB 조회 API",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 6,
+    "before": "",
+    "after": "임현, 박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 9,
+    "before": "0.09",
+    "after": "0.003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 70,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 2,
+    "before": "6.5.1",
+    "after": "6.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 3,
+    "before": "        [FS017] 개인화 관계 그래프",
+    "after": "    데이터 관리·외부 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 4,
+    "before": "P1",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 5,
+    "before": "FS017 구현·단위테스트",
+    "after": "스키마·수집 정책·AI 분석 계약"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 8,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 9,
+    "before": "0.016",
+    "after": "0.065"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 71,
+    "column": 10,
+    "before": "0.0",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 2,
+    "before": "6.5.2",
+    "after": "6.5.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 3,
+    "before": "        [FS018] 전체 관계 그래프",
+    "after": "        (BE) 관계와 근거 연결"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 5,
+    "before": "FS018 구현·단위테스트",
+    "after": "FS055 구현·단위테스트 유지. 관계·근거 계약은 FS078~FS080 공통 사용."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 8,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 72,
+    "column": 9,
+    "before": "0.011",
+    "after": "0.01"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 2,
+    "before": "6.5.3",
+    "after": "6.5.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 3,
+    "before": "        [FS019] 그래프 모드 전환",
+    "after": "        (BE) 이슈와 근거 문서를 구분 관리 "
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 5,
+    "before": "FS019 구현·단위테스트",
+    "after": "FS056 구현·단위테스트 유지. 문서·사건 구분/동일성은 FS075~FS077로 상세화."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 7,
+    "before": "2026-10-26 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 8,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 73,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.0065"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 2,
+    "before": "6.5.4",
+    "after": "6.5.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 3,
+    "before": "        [FS020] 기업 노드 정보",
+    "after": "        (BE) 브리핑 정보 저장(분석 결과와 생성 재료 제공)"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 5,
+    "before": "FS020 구현·단위테스트",
+    "after": "FS057 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 7,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 8,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 74,
+    "column": 9,
+    "before": "0.007",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 2,
+    "before": "6.5.5",
+    "after": "6.5.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 3,
+    "before": "        [FS021] 이슈 노드 정보",
+    "after": "        (BE) 신규 경제뉴스 정기 수집 및 이슈 분석"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 5,
+    "before": "FS021 구현·단위테스트",
+    "after": "FS058 회차·분석 총괄 유지. FS074~FS079·FS081은 상세 단계이며 별도 중복 구현·공수 합산 금지."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 7,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 8,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 75,
+    "column": 9,
+    "before": "0.007",
+    "after": "0.011"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 2,
+    "before": "6.5.6",
+    "after": "6.5.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 3,
+    "before": "        [FS022] 이슈와 기업의 영향 경로 확인(기업 노드 클릭)",
+    "after": "        (BE) 분석 결과 저장 및 조회 반영"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 5,
+    "before": "FS022 구현·단위테스트",
+    "after": "FS059 AI 결과·공통 공개 계약 유지. 정세빈의 GraphDB 저장·조회 반영/복구는 FS080~FS081과 연계."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 7,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 8,
+    "before": "2026-10-31 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 76,
+    "column": 9,
+    "before": "0.012",
+    "after": "0.011"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 2,
+    "before": "6.5.7",
+    "after": "6.5.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 3,
+    "before": "        [FS023] 기업 간 관계 확인(기업 간 간선 클릭)",
+    "after": "        (BE) 뉴스와 시장 데이터 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 5,
+    "before": "FS023 구현·단위테스트",
+    "after": "FS063 공급원 연동 유지. FS074 수집은 기존 어댑터를 재사용."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 7,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-07 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 8,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 77,
+    "column": 9,
+    "before": "0.008",
+    "after": "0.01"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 2,
+    "before": "6.5.8",
+    "after": "6.5.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 3,
+    "before": "        [FS024] 관계 근거 확인",
+    "after": "        (BE) AI 분석 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 5,
+    "before": "FS024 구현·단위테스트",
+    "after": "FS064 AI 호출·검증 계약 유지. FS076~FS079는 같은 호출 계약 사용."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 7,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 8,
+    "before": "2026-10-31 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 78,
+    "column": 9,
+    "before": "0.009",
+    "after": "0.0065"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 2,
+    "before": "6.5.9",
+    "after": "6.5.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 3,
+    "before": "        [FS025] 선택한 노드로 AI 질문",
+    "after": "        데이터 관리·외부 연동 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 5,
+    "before": "FS025 구현·단위테스트",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 7,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 79,
+    "column": 9,
+    "before": "0.006",
+    "after": "0.0065"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 2,
+    "before": "6.5.10",
+    "after": "6.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 3,
+    "before": "        [FS026] 사이드바 기업 선택",
+    "after": "    메인 그래프"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 4,
+    "before": "P1",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 5,
+    "before": "FS026 구현·단위테스트",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.16"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 80,
+    "column": 10,
+    "before": "0.0",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 2,
+    "before": "6.5.11",
+    "after": "6.6.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 3,
+    "before": "        [FS027] 관심 종목 수정",
+    "after": "        (BE) 개인화 관계 그래프 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 5,
+    "before": "FS027 구현·단위테스트",
+    "after": "FS017 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 7,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 8,
+    "before": "2026-10-26 00:00:00",
+    "after": "2026-10-17 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 81,
+    "column": 9,
+    "before": "0.004",
+    "after": "0.014"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 2,
+    "before": "6.6",
+    "after": "6.6.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 3,
+    "before": "    기업 상세·타임라인",
+    "after": "       (BE)  전체 관계 그래프 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 5,
+    "before": "기업·시장·근거 조회 API",
+    "after": "FS018 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 7,
+    "before": "2026-10-21 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 9,
+    "before": "0.04",
+    "after": "0.01"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 82,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 2,
+    "before": "6.6.1",
+    "after": "6.6.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 3,
+    "before": "        [FS038] 기업 상세 조회",
+    "after": "       (BE) 그래프 모드 전환 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 5,
+    "before": "FS038 구현·단위테스트",
+    "after": "FS019 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 7,
+    "before": "2026-10-21 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 8,
+    "before": "2026-10-26 00:00:00",
+    "after": "2026-10-17 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 83,
+    "column": 9,
+    "before": "0.006",
+    "after": "0.005"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 2,
+    "before": "6.6.2",
+    "after": "6.6.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 3,
+    "before": "        [FS039] 가상 보유 정보 표시",
+    "after": "        (BE) 기업 노드 정보 API 구현 기본 정보·시세·주요 지표 조회 및 미제공 구분"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 5,
+    "before": "FS039 구현·단위테스트",
+    "after": "FS020 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 7,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 8,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 84,
+    "column": 9,
+    "before": "0.003",
+    "after": "0.007"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 2,
+    "before": "6.6.3",
+    "after": "6.6.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 3,
+    "before": "        [FS040·FS040-01] 차트·타임라인·시점 기반 관계 그래프 조회",
+    "after": "        (BE) 이슈 노드 정보 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 5,
+    "before": "FS040·FS040-01 구현·단위테스트",
+    "after": "FS021 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 7,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 85,
+    "column": 9,
+    "before": "0.014",
+    "after": "0.007"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 2,
+    "before": "6.6.4",
+    "after": "6.6.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 3,
+    "before": "        [FS041] 동일 시점 이슈 구분",
+    "after": "        (BE) 기업별 이슈 영향 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 5,
+    "before": "FS041 구현·단위테스트",
+    "after": "FS022 영향 결과 조회·표시 구현·단위테스트. 영향 생성·근거 검증은 AI의 FS079 제공 결과 사용."
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 7,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 8,
+    "before": "2026-10-31 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 86,
+    "column": 9,
+    "before": "0.0025",
+    "after": "0.008"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 2,
+    "before": "6.6.5",
+    "after": "6.6.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 3,
+    "before": "        [FS042] 재무와 실적 조회",
+    "after": "        (BE) 기업·이슈 영향 경로 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 5,
+    "before": "FS042 구현·단위테스트",
+    "after": "FS022 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 7,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 8,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 87,
+    "column": 9,
+    "before": "0.0045",
+    "after": "0.011"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 2,
+    "before": "6.6.6",
+    "after": "6.6.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 3,
+    "before": "        [FS043] 뉴스와 공시 조회",
+    "after": "        (BE) 기업 간 관계 상세 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 5,
+    "before": "FS043 구현·단위테스트",
+    "after": "FS023 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 7,
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 8,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 88,
+    "column": 9,
+    "before": "0.006",
+    "after": "0.008"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 2,
+    "before": "6.6.7",
+    "after": "6.6.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 3,
+    "before": "        [FS044] 상세 화면 상태와 이동",
+    "after": "        (BE) 관계 근거 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 5,
+    "before": "FS044 구현·단위테스트",
+    "after": "FS024 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 7,
+    "before": "2026-10-31 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 89,
+    "column": 9,
+    "before": "0.004",
+    "after": "0.009"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 2,
+    "before": "6.7",
+    "after": "6.6.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 3,
+    "before": "    출퇴근 브리핑",
+    "after": "        (BE) 선택 노드 AI 질문 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 5,
+    "before": "이슈 선정·시장 데이터·관계 그래프",
+    "after": "FS025 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 7,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 9,
+    "before": "0.04",
+    "after": "0.006"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 90,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 2,
+    "before": "6.7.1",
+    "after": "6.6.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 3,
+    "before": "        [FS028] 출근 브리핑 생성",
+    "after": "        (BE) 사이드바 기업 목록·검색 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 5,
+    "before": "FS028 구현·단위테스트",
+    "after": "FS026 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 7,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 8,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 91,
+    "column": 9,
+    "before": "0.0065",
+    "after": "0.005"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 2,
+    "before": "6.7.2",
+    "after": "6.6.12"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 3,
+    "before": "        [FS029] 퇴근 브리핑 생성",
+    "after": "        (BE) 관심 종목 수정 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 5,
+    "before": "FS029 구현·단위테스트",
+    "after": "FS027 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 7,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 8,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 9,
+    "before": "0.0065",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 2,
+    "before": "6.7.3",
+    "after": "6.6.13"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 3,
+    "before": "        [FS030] 핵심 이슈 선정 및 제공",
+    "after": "        (BE) 뉴스·공시 수집 및 수집 회차 관리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 5,
+    "before": "FS030 구현·단위테스트",
+    "after": "FS074 수집 회차·문서 계약·수집 시험\nFS058/FS063 재사용\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 7,
+    "before": "2026-10-16 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 93,
+    "column": 9,
+    "before": "0.008",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 2,
+    "before": "6.7.4",
+    "after": "6.6.14"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 3,
+    "before": "        [FS031] 시장 변수 제공",
+    "after": "        (BE) 원천 문서 정제·중복 제거 및 버전 관리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 5,
+    "before": "FS031 구현·단위테스트",
+    "after": "FS075 정제·중복/수정 판정·원문 위치 시험\n선행 FS074 / FS056·FS058 연계"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 8,
+    "before": "2026-10-23 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 94,
+    "column": 9,
+    "before": "0.004",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 2,
+    "before": "6.7.5",
+    "after": "6.6.15"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 3,
+    "before": "        [FS032] 관계 그래프 조회",
+    "after": "        (BE) AI 사건·이슈 추출 및 이슈 후보 생성"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 5,
+    "before": "FS032 구현·단위테스트",
+    "after": "FS076 사건·이슈 후보·근거·추출 시험\n선행 FS075 / FS058·FS064 연계\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 7,
+    "before": "2026-10-26 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 8,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 95,
+    "column": 9,
+    "before": "0.0055",
+    "after": "0.0075"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 2,
+    "before": "6.7.6",
+    "after": "6.6.16"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 3,
+    "before": "        [FS033] 공통 브리핑 조회",
+    "after": "        (BE) 기업·이슈 Entity Linking 및 동일성 판정"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 5,
+    "before": "FS033 구현·단위테스트",
+    "after": "FS077 정규 ID 매핑·동일성/오병합 시험\n선행 FS076 / FS056·FS058 연계\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 7,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 96,
+    "column": 9,
+    "before": "0.0035",
+    "after": "0.0055"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 2,
+    "before": "6.7.7",
+    "after": "6.6.17"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 3,
+    "before": "        [FS034] 중복 발행 방지",
+    "after": "        (BE) 기업–이슈·기업–기업 관계 추출"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 5,
+    "before": "FS034 구현·단위테스트",
+    "after": "FS078 관계 유형·방향·경로 추출 시험\n선행 FS077 / FS055·FS058 연계\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 7,
+    "before": "2026-10-26 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 8,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 97,
+    "column": 9,
+    "before": "0.0035",
+    "after": "0.0075"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 2,
+    "before": "6.7.8",
+    "after": "6.6.18"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 3,
+    "before": "        [FS035] 브리핑 이력 보존",
+    "after": "        (BE) 영향 방향·근거 검증 및 공개 적격 판정"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 5,
+    "before": "FS035 구현·단위테스트",
+    "after": "FS079 영향·근거·공개 검증 시험\n선행 FS078 / FS022는 조회·표시\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 7,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 8,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 98,
+    "column": 9,
+    "before": "0.0025",
+    "after": "0.0065"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 2,
+    "before": "6.7.9",
+    "after": "6.6.19"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 3,
+    "before": "        [FS036] 개인화 브리핑 조회",
+    "after": "        (BE) GraphDB 노드·간선 upsert 및 공개 버전 반영"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 4,
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 5,
+    "before": "FS036 구현·단위테스트",
+    "after": "FS080 멱등 upsert·트랜잭션·공개 버전 시험\n선행 FS079 / FS055·FS059 연계\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 7,
+    "before": "",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 99,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 2,
+    "before": "6.7.10",
+    "after": "6.6.20"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 3,
+    "before": "        [FS037] 좋아요/싫어요 등록",
+    "after": "        (BE) 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 4,
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 5,
+    "before": "FS037 구현·단위테스트",
+    "after": "FS081 증분 갱신·비활성화·복구 시험\n선행 FS080 / FS058·FS059·FS067-03 연계\n"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 7,
+    "before": "",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 100,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 2,
+    "before": "6.8",
+    "after": "6.6.21"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 3,
+    "before": "    AI 챗봇",
+    "after": "        (FE) D-GRP-01·01b 전체·개인화 관계 그래프 화면 및 조회 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 5,
+    "before": "질의 분기 거버넌스·그래프/근거 조회",
+    "after": "FS017 · FS018 · FS019 · FS026"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 7,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 8,
+    "before": "2026-11-05 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 9,
+    "before": "0.04",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 101,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 2,
+    "before": "6.8.1",
+    "after": "6.6.22"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 3,
+    "before": "        [FS045] AI 질문 진입·맥락 전달",
+    "after": "        (FE) D-GRP-02 이슈 노드 상세 패널 및 이슈 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 5,
+    "before": "FS045 구현·단위테스트",
+    "after": "FS021 · FS024"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 7,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 8,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 102,
+    "column": 9,
+    "before": "0.0055",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 2,
+    "before": "6.8.2",
+    "after": "6.6.23"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 3,
+    "before": "        [FS046] 질문 대상·기간 해석·되묻기",
+    "after": "        (FE) D-GRP-03 기업 노드 상세 패널 및 기업 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 5,
+    "before": "FS046 구현·단위테스트",
+    "after": "FS020 · FS026 · FS027"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 7,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 8,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 103,
+    "column": 9,
+    "before": "0.0045",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 2,
+    "before": "6.8.3",
+    "after": "6.6.24"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 3,
+    "before": "        [FS047] 근거·관계 그래프 맥락 조회",
+    "after": "        (FE) D-GRP-04 간선 상세 패널 및 관계 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 5,
+    "before": "FS047 구현·단위테스트",
+    "after": "FS023 · FS024"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 7,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 104,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 2,
+    "before": "6.8.4",
+    "after": "6.6.25"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 3,
+    "before": "        [FS048] 근거 기반 답변 생성·안전 검증",
+    "after": "        (FE) D-GRP-05 근거 상세 창 및 근거 문서 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 5,
+    "before": "FS048 구현·단위테스트",
+    "after": "FS024"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 7,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 105,
+    "column": 9,
+    "before": "0.0075",
+    "after": "0.003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 2,
+    "before": "6.8.5",
+    "after": "6.6.26"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 3,
+    "before": "        [FS049] 답변 근거·관련 그래프 탐색",
+    "after": "        (FE) D-GRP-06·07b 영향 경로·포커스 그래프 및 경로 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 5,
+    "before": "FS049 구현·단위테스트",
+    "after": "FS020 · FS022 · FS024"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 7,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 8,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 106,
+    "column": 9,
+    "before": "0.007",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 2,
+    "before": "6.8.6",
+    "after": "6.6.27"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 3,
+    "before": "        [FS050] 새 대화·후속 질문",
+    "after": "        메인 그래프 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 5,
+    "before": "FS050 구현·단위테스트",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 6,
+    "before": "",
+    "after": "정세빈, 윤서진, 김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 7,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 8,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 107,
+    "column": 9,
+    "before": "0.006",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 2,
+    "before": "6.8.7",
+    "after": "6.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 3,
+    "before": "        [FS051] 패널 상태 유지·결과 재조회",
+    "after": "    기업 상세·타임라인"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 4,
+    "before": "P1",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 5,
+    "before": "FS051 구현·단위테스트",
+    "after": "기업·시장·근거 조회 API"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 7,
+    "before": "2026-11-03 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 8,
+    "before": "2026-11-05 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 9,
+    "before": "0.0045",
+    "after": "0.035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 108,
+    "column": 10,
+    "before": "0.0",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 2,
+    "before": "6.8.8",
+    "after": "6.7.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 3,
+    "before": "        [FS052] 대화와 내부 패널 유지",
+    "after": "        (BE) 종목 목록·검색 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 5,
+    "before": "FS051 내부 처리",
+    "after": "FS037 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 109,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 2,
+    "before": "6.8.9",
+    "after": "6.7.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 3,
+    "before": "        [FS053] AI 결과 회수와 재시도",
+    "after": "        (BE) 기업 상세 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 5,
+    "before": "FS051 내부 처리",
+    "after": "FS038 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-14 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 110,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 2,
+    "before": "6.9",
+    "after": "6.7.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 3,
+    "before": "    관리자",
+    "after": "        (BE) 차트·타임라인 기간 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 5,
+    "before": "운영 데이터·권한·검토 워크플로",
+    "after": "FS040 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 8,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 9,
+    "before": "0.01",
+    "after": "0.0055"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 111,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 2,
+    "before": "6.9.1",
+    "after": "6.7.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 3,
+    "before": "        [FS065] 기업 및 사용자 통계 조사 및 확인",
+    "after": "        (BE) 동일 시점 이슈 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 4,
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 5,
+    "before": "FS065 구현·단위테스트",
+    "after": "FS041 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 112,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 2,
+    "before": "6.9.2",
+    "after": "6.7.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 3,
+    "before": "        [FS066] AI 대화록·뉴스 요약·브리핑 선호도 확인",
+    "after": "        (BE) 시점 기반 관계 그래프 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 4,
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 5,
+    "before": "FS066 구현·단위테스트",
+    "after": "FS042 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 113,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 114,
+    "column": 2,
+    "before": "6.9.3",
+    "after": "6.7.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 114,
+    "column": 3,
+    "before": "        [FS067] AI 이슈 상태 확인 및 보류 이슈 검수",
+    "after": "        (BE) 뉴스·공시 조회 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 114,
+    "column": 5,
+    "before": "FS067 구현·단위테스트",
+    "after": "FS043 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 114,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 114,
+    "column": 7,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-10-17 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 114,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 2,
+    "before": "6.9.4",
+    "after": "6.7.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 3,
+    "before": "        [FS068] AI 사용량·비용·오류 통계",
+    "after": "        (BE) 기업 상세·관계 그래프 이동 API 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 5,
+    "before": "FS068 구현·단위테스트",
+    "after": "FS044 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 7,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 115,
+    "column": 9,
+    "before": "0.0015",
+    "after": "0.003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 2,
+    "before": "6.9.5",
+    "after": "6.7.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 3,
+    "before": "        [FS069] 회원 관리",
+    "after": "        (FE) D-COM-01·01b 기업 상세·차트 화면 및 기업·시세 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 4,
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 5,
+    "before": "FS069 구현·단위테스트",
+    "after": "FS038 · FS039 · FS040 · FS041 · FS044"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 116,
+    "column": 9,
+    "before": "0.0",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 2,
+    "before": "6.9.6",
+    "after": "6.7.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 3,
+    "before": "        [FS070] 회차별 생성·검증·발행 상태 조회",
+    "after": "        (FE) D-COM-02 기업 문서 탭 및 뉴스·공시 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 5,
+    "before": "FS070 구현·단위테스트",
+    "after": "FS040 · FS041 · FS043"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 7,
+    "before": "2026-10-29 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 8,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 117,
+    "column": 9,
+    "before": "0.002",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 2,
+    "before": "6.9.7",
+    "after": "6.7.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 3,
+    "before": "        [FS071] 발행 브리핑 정정 관리",
+    "after": "        (FE) D-COM-03 기업 정보 탭 및 기업 기준정보 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 5,
+    "before": "FS071 구현·단위테스트",
+    "after": "FS038 · FS044"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 7,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 8,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 118,
+    "column": 9,
+    "before": "0.0015",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 2,
+    "before": "6.9.8",
+    "after": "6.7.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 3,
+    "before": "        [FS072] 대시보드",
+    "after": "        (FE) D-COM-04 기업 중심 관계 그래프 및 시점 조회 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 5,
+    "before": "FS072 구현·단위테스트",
+    "after": "FS038 · FS040 · FS044"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 7,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 8,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 119,
+    "column": 9,
+    "before": "0.001",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 120,
+    "column": 2,
+    "before": "6.9.9",
+    "after": "6.7.12"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 120,
+    "column": 3,
+    "before": "        [FS073] 관리자 로그인(SSO, ID/PW)",
+    "after": "        (FE) D-COM-05·06 사건 타임라인·차트·그래프 선택 동기화"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 120,
+    "column": 5,
+    "before": "FS073 구현·단위테스트",
+    "after": "FS040 · FS041 · FS044"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 120,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 120,
+    "column": 7,
+    "before": "2026-10-19 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 120,
+    "column": 9,
+    "before": "0.0005",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 2,
+    "before": "6.10",
+    "after": "6.7.13"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 3,
+    "before": "    통합 검증·배포·발표",
+    "after": "        기업 상세·타임라인 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 5,
+    "before": "각 영역 기능 완료",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 6,
+    "before": "",
+    "after": "정세빈, 박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 8,
+    "before": "2026-11-06 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 9,
+    "before": "0.04",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 121,
+    "column": 10,
+    "before": "0",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 2,
+    "before": "6.10.1",
+    "after": "6.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 3,
+    "before": "        API·스키마 계약 통합 점검",
+    "after": "    출퇴근 브리핑"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 4,
+    "before": "통합검증",
+    "after": ""
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 5,
+    "before": "계약 점검 결과",
+    "after": "이슈 선정·시장 데이터·관계 그래프"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 7,
+    "before": "2026-10-20 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 8,
+    "before": "2026-10-27 00:00:00",
+    "after": "2026-11-06 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 9,
+    "before": "0.006",
+    "after": "0.03"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 122,
+    "column": 10,
+    "before": "0.0",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 2,
+    "before": "6.10.2",
+    "after": "6.8.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 3,
+    "before": "        기능 통합 및 E2E 시나리오 검증",
+    "after": "        (BE) 출근 브리핑 생성"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 4,
+    "before": "통합검증",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 5,
+    "before": "E2E 테스트 결과",
+    "after": "FS028 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 7,
+    "before": "2026-10-30 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 8,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-29 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 123,
+    "column": 9,
+    "before": "0.01",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 2,
+    "before": "6.10.3",
+    "after": "6.8.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 3,
+    "before": "        AI·GraphDB 결과 품질 및 회귀 검증",
+    "after": "        (BE) 퇴근 브리핑 생성"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 4,
+    "before": "통합검증",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 5,
+    "before": "품질·회귀 검증 결과",
+    "after": "FS029 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 7,
+    "before": "2026-11-03 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 8,
+    "before": "2026-11-05 00:00:00",
+    "after": "2026-10-29 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 124,
+    "column": 9,
+    "before": "0.01",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 2,
+    "before": "6.10.4",
+    "after": "6.8.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 3,
+    "before": "        보안·성능 점검",
+    "after": "        (BE) 핵심 이슈 선정 및 제공"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 4,
+    "before": "품질검증",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 5,
+    "before": "비기능 점검 결과",
+    "after": "FS030 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 7,
+    "before": "2026-11-04 00:00:00",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 125,
+    "column": 8,
+    "before": "2026-11-05 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 2,
+    "before": "6.10.5",
+    "after": "6.8.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 3,
+    "before": "        결함 수정·배포",
+    "after": "        (BE) 주요 시장 지표 제공"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 4,
+    "before": "배포",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 5,
+    "before": "배포본·인수 결과",
+    "after": "FS031 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 7,
+    "before": "2026-11-05 00:00:00",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 8,
+    "before": "2026-11-06 00:00:00",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 126,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 2,
+    "before": "6.10.6",
+    "after": "6.8.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 3,
+    "before": "        시연 영상 및 발표 PPT 제작",
+    "after": "        (BE) 브리핑 관계 그래프 조회"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 4,
+    "before": "발표준비",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 5,
+    "before": "",
+    "after": "FS032 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 7,
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-26 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 8,
+    "before": "2026-11-06 00:00:00",
+    "after": "2026-10-30 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 127,
+    "column": 9,
+    "before": "0.005",
+    "after": "0.003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 2,
+    "before": "",
+    "after": "6.8.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 공통 브리핑 조회"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 5,
+    "before": "",
+    "after": "FS033 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-29 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 8,
+    "before": "",
+    "after": "2026-11-02 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 128,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 2,
+    "before": "",
+    "after": "6.8.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 2,
+    "before": "",
+    "after": "6.8.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 브리핑 이력 보존(회차·발행본·스냅샷 저장 및 조회)"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 5,
+    "before": "",
+    "after": "FS035 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-28 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-30 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 2,
+    "before": "",
+    "after": "6.8.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 개인화 브리핑 조회"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 5,
+    "before": "",
+    "after": "FS036 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 9,
+    "before": "",
+    "after": "0.001"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 131,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 2,
+    "before": "",
+    "after": "6.8.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 좋아요/싫어요 등록"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 5,
+    "before": "",
+    "after": "FS066-01 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 9,
+    "before": "",
+    "after": "0.001"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 132,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 2,
+    "before": "",
+    "after": "6.8.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-BRF-01 출근 브리핑 화면 및 브리핑 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 5,
+    "before": "",
+    "after": "FS028 · FS030 · FS031 · FS033 · FS035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 133,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 2,
+    "before": "",
+    "after": "6.8.12"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-BRF-02 퇴근 브리핑 화면 및 브리핑 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 5,
+    "before": "",
+    "after": "FS029 · FS030 · FS031 · FS033 · FS035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 134,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 2,
+    "before": "",
+    "after": "6.8.13"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-BRF-04 브리핑 회차·이력 화면 및 조회 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 5,
+    "before": "",
+    "after": "FS032 · FS035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 135,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 2,
+    "before": "",
+    "after": "6.8.14"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 5,
+    "before": "",
+    "after": "FS032 · FS036 · FS037"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-15 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 2,
+    "before": "",
+    "after": "6.8.15"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 3,
+    "before": "",
+    "after": "        출퇴근 브리핑 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 5,
+    "before": "",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 6,
+    "before": "",
+    "after": "홍정현, 박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 7,
+    "before": "",
+    "after": "2026-11-02 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 8,
+    "before": "",
+    "after": "2026-11-06 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 137,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 2,
+    "before": "",
+    "after": "6.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 3,
+    "before": "",
+    "after": "    AI 챗봇"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 5,
+    "before": "",
+    "after": "질의 분기 거버넌스·그래프/근거 조회"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 9,
+    "before": "",
+    "after": "0.05"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 138,
+    "column": 10,
+    "before": "",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 2,
+    "before": "",
+    "after": "6.9.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) AI 질문 진입·맥락 전달"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 5,
+    "before": "",
+    "after": "FS025 · FS045 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 139,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 2,
+    "before": "",
+    "after": "6.9.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 질문 대상·기간 해석·되묻기"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 5,
+    "before": "",
+    "after": "FS047 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 9,
+    "before": "",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 2,
+    "before": "",
+    "after": "6.9.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 근거·관계 그래프 맥락 조회"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 5,
+    "before": "",
+    "after": "FS048 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 9,
+    "before": "",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 2,
+    "before": "",
+    "after": "6.9.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 근거 기반 답변 생성·안전 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 5,
+    "before": "",
+    "after": "FS049 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 9,
+    "before": "",
+    "after": "0.006"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 2,
+    "before": "",
+    "after": "6.9.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 답변 근거·관련 그래프 탐색"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 5,
+    "before": "",
+    "after": "FS050-01 · FS050-02 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-08 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 2,
+    "before": "",
+    "after": "6.9.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 새 대화·후속 질문"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 5,
+    "before": "",
+    "after": "FS051 · FS052-01 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 9,
+    "before": "",
+    "after": "0.003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 2,
+    "before": "",
+    "after": "6.9.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 패널 상태 유지·결과 재조회"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 5,
+    "before": "",
+    "after": "FS052-02 · FS053 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 2,
+    "before": "",
+    "after": "6.9.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 대화와 내부 패널 유지"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 5,
+    "before": "",
+    "after": "FS052-02 내부 처리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 2,
+    "before": "",
+    "after": "6.9.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) AI 결과 회수와 재시도"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 5,
+    "before": "",
+    "after": "FS053 내부 처리"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 2,
+    "before": "",
+    "after": "6.9.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 대화와 질문 기록"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 5,
+    "before": "",
+    "after": "FS060 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 9,
+    "before": "",
+    "after": "0.003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 148,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 2,
+    "before": "",
+    "after": "6.9.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-AI-01 AI 챗봇 기본 화면 및 세션 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 5,
+    "before": "",
+    "after": "FS025 · FS045 · FS047 · FS048"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 149,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 2,
+    "before": "",
+    "after": "6.9.12"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-AI-01b 기업·이슈·간선 선택 맥락 질문 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 5,
+    "before": "",
+    "after": "FS047"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 9,
+    "before": "",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 150,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 2,
+    "before": "",
+    "after": "6.9.13"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-AI-02 AI 비동기 작업 상태·결과·재시도 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 5,
+    "before": "",
+    "after": "FS046 · FS049 · FS051 · FS052-02 · FS053 · NFS003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 151,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 2,
+    "before": "",
+    "after": "6.9.14"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) D-AI-02b 대화 이력·후속 질문·답변 재조회 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 5,
+    "before": "",
+    "after": "FS053 · NFS003"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 9,
+    "before": "",
+    "after": "0.0035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 152,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 2,
+    "before": "",
+    "after": "6.9.15"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 3,
+    "before": "",
+    "after": "        AI 챗봇 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 5,
+    "before": "",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-28 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 153,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 2,
+    "before": "",
+    "after": "6.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 3,
+    "before": "",
+    "after": "    관리자"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 5,
+    "before": "",
+    "after": "운영 데이터·권한·검토 워크플로"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 9,
+    "before": "",
+    "after": "0.035"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 10,
+    "before": "",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 2,
+    "before": "",
+    "after": "6.10.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 관리자 인증·권한 관리 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 5,
+    "before": "",
+    "after": "FS073 · NFS001 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 155,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 2,
+    "before": "",
+    "after": "6.10.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 관리자 대시보드 통합 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 5,
+    "before": "",
+    "after": "FS072 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 9,
+    "before": "",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 156,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 2,
+    "before": "",
+    "after": "6.10.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 회원 활동 조회·차단 관리 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 5,
+    "before": "",
+    "after": "FS069-01 · FS069-02 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 157,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 2,
+    "before": "",
+    "after": "6.10.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 사용자·기업 통계 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 5,
+    "before": "",
+    "after": "FS065 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 9,
+    "before": "",
+    "after": "0.0012"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 158,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 2,
+    "before": "",
+    "after": "6.10.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) AI 결과 평가·선호도 통계 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 5,
+    "before": "",
+    "after": "FS066-01 · FS066-02 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 9,
+    "before": "",
+    "after": "0.0012"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 2,
+    "before": "",
+    "after": "6.10.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 관계추출·이슈 분석 상태 조회 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 5,
+    "before": "",
+    "after": "FS067-01 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 160,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 2,
+    "before": "",
+    "after": "6.10.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 보류 이슈 검수·분석 재처리 기능 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 5,
+    "before": "",
+    "after": "FS067-02 · FS067-03 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 6,
+    "before": "",
+    "after": "정세빈"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 9,
+    "before": "",
+    "after": "0.0025"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 161,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 2,
+    "before": "",
+    "after": "6.10.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) AI 사용량·비용·오류 조회 기능 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 5,
+    "before": "",
+    "after": "FS068 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 6,
+    "before": "",
+    "after": "안재현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 162,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 2,
+    "before": "",
+    "after": "6.10.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 브리핑 회차·발행 상태 관리 API 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 5,
+    "before": "",
+    "after": "FS070-01 · FS070-02 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 163,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 2,
+    "before": "",
+    "after": "6.10.10"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 브리핑 정정·제공 중단 기능 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 5,
+    "before": "",
+    "after": "FS071-01 · FS071-02 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 6,
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 164,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 2,
+    "before": "",
+    "after": "6.10.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 관리자 대화록 마스킹 조회 기능 개발"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 5,
+    "before": "",
+    "after": "FS066-03 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 165,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 2,
+    "before": "",
+    "after": "6.10.12"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 3,
+    "before": "",
+    "after": "        (BE) 관리자 주요 작업 감사기록 저장·조회 구현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 5,
+    "before": "",
+    "after": "FS072 · NFS008 구현·단위테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 6,
+    "before": "",
+    "after": "임현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 166,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 2,
+    "before": "",
+    "after": "6.10.13"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) A-ADM-05c 관리자 로그인·권한 화면 및 인증 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 5,
+    "before": "",
+    "after": "FS073 · NFS001"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 167,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 2,
+    "before": "",
+    "after": "6.10.14"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) A-ADM-01 운영 대시보드 및 통합 현황 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 5,
+    "before": "",
+    "after": "FS072"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 168,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 2,
+    "before": "",
+    "after": "6.10.15"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) A-ADM-02·02b 통계·피드백 화면 및 평가 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 5,
+    "before": "",
+    "after": "FS065 · FS066-02 · FS066-03"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 9,
+    "before": "",
+    "after": "0.0018"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 169,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 2,
+    "before": "",
+    "after": "6.10.16"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) A-ADM-03 그래프 파이프라인·검수 화면 및 재처리 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 5,
+    "before": "",
+    "after": "FS067-01 · FS067-02 · FS067-03"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 9,
+    "before": "",
+    "after": "0.0022"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 170,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 2,
+    "before": "",
+    "after": "6.10.17"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) A-ADM-04·04b 브리핑·AI 사용량 운영 화면 및 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 5,
+    "before": "",
+    "after": "FS070-01 · FS070-02 · FS071-01 · FS071-02 · FS068"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 171,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 2,
+    "before": "",
+    "after": "6.10.18"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 3,
+    "before": "",
+    "after": "        (FE) A-ADM-05·05b 회원·감사 로그 화면 및 관리 API 연동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 4,
+    "before": "",
+    "after": "P2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 5,
+    "before": "",
+    "after": "FS069-01 · FS069-02 · FS073 · NFS008"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 6,
+    "before": "",
+    "after": "박주형"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-16 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 9,
+    "before": "",
+    "after": "0.002"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 172,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 2,
+    "before": "",
+    "after": "6.10.19"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 3,
+    "before": "",
+    "after": "        관리자 권한·운영 기능 통합 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 4,
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 5,
+    "before": "",
+    "after": "테스트 통과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-22 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-24 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 9,
+    "before": "",
+    "after": "0.0015"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 173,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 2,
+    "before": "",
+    "after": "6.11"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 3,
+    "before": "",
+    "after": "    통합 검증·배포·발표"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 5,
+    "before": "",
+    "after": "각 영역 기능 완료"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 8,
+    "before": "",
+    "after": "2026-11-27 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 9,
+    "before": "",
+    "after": "0.04"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 10,
+    "before": "",
+    "after": "0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 2,
+    "before": "",
+    "after": "6.11.1"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 3,
+    "before": "",
+    "after": "        API·스키마 계약 통합 점검"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 5,
+    "before": "",
+    "after": "계약 점검 결과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 175,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 2,
+    "before": "",
+    "after": "6.11.2"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 3,
+    "before": "",
+    "after": "        개발·테스트 환경 통합 및 DB 마이그레이션 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 5,
+    "before": "",
+    "after": "서버/DB/GraphDB/AI 모두 테스트 환경 정상 기동"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 6,
+    "before": "",
+    "after": "안재현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 176,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 2,
+    "before": "",
+    "after": "6.11.3"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 3,
+    "before": "",
+    "after": "        핵심 사용자 시나리오 E2E 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 5,
+    "before": "",
+    "after": "주요 사용자 흐름 정상 완료"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 6,
+    "before": "",
+    "after": "안재현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 9,
+    "before": "",
+    "after": "0.0055"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 177,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 2,
+    "before": "",
+    "after": "6.11.4"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 3,
+    "before": "",
+    "after": "        데이터·GraphDB·근거 정합성 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 5,
+    "before": "",
+    "after": "그래프·근거·버전·기업/사건 연결 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 6,
+    "before": "",
+    "after": "윤서진"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-27 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 178,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 2,
+    "before": "",
+    "after": "6.11.5"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 3,
+    "before": "",
+    "after": "        AI 챗봇·브리핑 결과 및 복구 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 5,
+    "before": "",
+    "after": "질문·브리핑·재시도·오류 상태 정상"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 6,
+    "before": "",
+    "after": "김도현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 8,
+    "before": "",
+    "after": "2026-11-27 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 2,
+    "before": "",
+    "after": "6.11.6"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 3,
+    "before": "",
+    "after": "        성능·장애·예외 처리 검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 5,
+    "before": "",
+    "after": "비기능 점검 결과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 6,
+    "before": "",
+    "after": "안재현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 9,
+    "before": "",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 180,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 2,
+    "before": "",
+    "after": "6.11.7"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 3,
+    "before": "",
+    "after": "        결함 수정 및 회귀 테스트"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 4,
+    "before": "",
+    "after": "통합검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 5,
+    "before": "",
+    "after": "Critical/Major 결함 해결 및 재검증"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-25 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 8,
+    "before": "",
+    "after": "2026-11-02 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 9,
+    "before": "",
+    "after": "0.0045"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 2,
+    "before": "",
+    "after": "6.11.8"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 3,
+    "before": "",
+    "after": "        운영 환경(Docker·CI/CD) 배포"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 4,
+    "before": "",
+    "after": "배포"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 5,
+    "before": "",
+    "after": "배포본·인수 결과"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 6,
+    "before": "",
+    "after": "안재현"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-19 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 8,
+    "before": "",
+    "after": "2026-10-23 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 9,
+    "before": "",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 182,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 2,
+    "before": "",
+    "after": "6.11.9"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 3,
+    "before": "",
+    "after": "        시연 영상 및 발표 PPT 제작"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 4,
+    "before": "",
+    "after": "발표준비"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 5,
+    "before": "",
+    "after": "영상·PPT·발표본"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 6,
+    "before": "",
+    "after": "팀원 전원"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 7,
+    "before": "",
+    "after": "2026-10-26 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 8,
+    "before": "",
+    "after": "2026-11-05 00:00:00"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 9,
+    "before": "",
+    "after": "0.004"
+  },
+  {
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 10,
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 8,
+    "column": 2,
+    "before": "11.0",
+    "after": "19.0"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 8,
+    "column": 3,
+    "before": "2026-10-15 00:00:00",
+    "after": "2026-09-21 00:00:00"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 8,
+    "column": 4,
+    "before": "2026-10-28 00:00:00",
+    "after": "2026-10-21 00:00:00"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 8,
+    "column": 5,
+    "before": "검증된 관계 데이터·GraphDB 조회 API",
+    "after": "FS074~FS081 분석·검증·GraphDB 반영 + 기존 조회 API"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 8,
+    "column": 6,
+    "before": "선행 API 완료와 동시에 병렬 착수",
+    "after": "기존 조회 11개 + 상세 8개. 신규 일정 산정 전; 6.4 연계 업무와 공수 중복 제거 후 확정."
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 29,
+    "column": 1,
+    "before": "",
+    "after": "6"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 29,
+    "column": 2,
+    "before": "",
+    "after": "파이프라인 추가"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 29,
+    "column": 3,
+    "before": "",
+    "after": "FS074~FS081을 6.5.13~6.5.20에 추가. AI는 수집·정제·추출·동일성·관계·영향 검증, 백엔드 B는 GraphDB 적재·갱신·복구 및 조회 연계 담당. 기존 6.4 수행인력은 유지한다."
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 30,
+    "column": 1,
+    "before": "",
+    "after": "7"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 30,
+    "column": 2,
+    "before": "",
+    "after": "일정·가중치"
+  },
+  {
+    "sheet": "개발 일정 요약",
+    "row": 30,
+    "column": 3,
+    "before": "",
+    "after": "신규 8개 행의 날짜는 미산정 공란, 가중치 0은 중복 공수 산정 방지용 임시값이다. 작업 없음·완료를 뜻하지 않으며 기존 총 진척률에는 아직 반영되지 않는다. 기존 6.4와 중복 범위를 분리하여 일정·가중치를 확정해야 한다. 기존 번호 충돌은 유지한다."
+  }
+]

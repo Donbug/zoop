@@ -678,10 +678,6 @@
         "type": "string"
       }
     },
-    "response:401:application/json.error.details:required": {
-      "target": false,
-      "bff": true
-    },
     "response:422:application/json.error.code": {
       "target": {
         "type": "string",
@@ -717,10 +713,6 @@
       "bff": {
         "type": "string"
       }
-    },
-    "response:422:application/json.error.details:required": {
-      "target": false,
-      "bff": true
     }
   }
 }

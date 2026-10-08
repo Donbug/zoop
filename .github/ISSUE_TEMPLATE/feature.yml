@@ -1,0 +1,60 @@
+name: Feature / 기능 변경
+description: 요구사항과 수용 기준을 연결하고 실제 데이터와 예시를 구분합니다.
+title: 'feat: '
+body:
+  - type: markdown
+    attributes:
+      value: '비밀 키, 개인정보, 실제 인증 헤더를 붙이지 마세요. 담당자와 labels는 등록 후 팀에서 지정합니다.'
+  - type: input
+    id: traceability
+    attributes:
+      label: FS / NFS / WBS / screen IDs
+      description: '관련 ID와 업무명을 함께 적으세요. 해당 사항이 없으면 사유를 적으세요.'
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and scope
+      description: '사용자가 겪는 문제, 변경 범위, 변경하지 않을 범위를 적으세요.'
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: '정상·실패·복구 조건에서 관측할 결과와 검증 명령/입력을 적으세요.'
+    validations:
+      required: true
+  - type: textarea
+    id: contracts
+    attributes:
+      label: Contract and affected apps
+      description: 'docs/api 목표 계약, web/BFF/AI consumer, 마이그레이션·호환성 영향을 적으세요.'
+    validations:
+      required: true
+  - type: dropdown
+    id: provenance
+    attributes:
+      label: Actual vs fixture
+      options:
+        - 'actual: 실제 출처이며 사용 권한을 확인해야 합니다.'
+        - 'fixture: 합성 데이터이며 실제 결과로 주장하지 않습니다.'
+        - 'mixed: 실제 출처와 합성 데이터를 항목별로 구분합니다.'
+        - 'none: 데이터를 사용하지 않습니다.'
+    validations:
+      required: true
+  - type: textarea
+    id: rights
+    attributes:
+      label: License, rights and privacy
+      description: '뉴스·문서·이미지·폰트·의존성의 출처와 권한, 개인정보·보존·모델 전송 경계를 적으세요. 없으면 해당 없음이라고 적으세요.'
+    validations:
+      required: true
+  - type: textarea
+    id: delivery
+    attributes:
+      label: Tests, reviewer and rollback
+      description: '테스트 계획, 필요한 리뷰 역할, 실패 시 되돌릴 방법을 적으세요. 실제 담당 handle은 팀 확인 뒤 지정합니다.'
+    validations:
+      required: true

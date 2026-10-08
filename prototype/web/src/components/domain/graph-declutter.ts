@@ -1,34 +1,35 @@
-// 노드 캡션 겹침 정리(R1·R2·R3). 화면에 보이는 캡션을 우선순위 순으로 놓아 보고, 이미 놓인 캡션이나 다른 기업 원과
-// 겹치면 숨긴다(.label-cull).
-// 우선순위: 선택·경로·포커스 중심(항상 보임) > 강조(선택의 이웃) 기업 > 보유·관심 기업 > 연결 수가 많은 기업 > 묶음 > 사건(연결·근거 순).
-// - 재배치·확대 없이 캡션만 숨긴다. 숨긴 노드도 원·배지·연결선은 그대로이고, 확대·호버·선택하면 캡션이 보인다.
-// - 카메라가 멈춘 뒤(graph-interaction의 화면 정지)와 보기 상태가 바뀐 뒤에만 계산한다(확대·이동 중에는 하지 않는다).
-import type { Core, NodeSingular } from "cytoscape";
+// 카메라 정지·선택·호버 뒤에만 실제로 그려지는 이름과 관계 요약을 화면 좌표로 정리한다.
+// 노드·연결·데이터는 남기고 선택 대상과 포커스 중심을 우선해 겹치는 낮은 순위 라벨만 숨긴다.
+import type { Core, SingularElementArgument } from "cytoscape";
 
-type Box = { x1: number; y1: number; x2: number; y2: number };
-type Entry = { id: string; box: Box };
+export type LabelBox = { x1: number; y1: number; x2: number; y2: number };
+type Entry = { id: string; box: LabelBox };
+export interface LabelCandidate extends Entry {
+  priority: number;
+  distance: number;
+  degree: number;
+  evidenceCount: number;
+}
 
-/** 캡션 사이 최소 간격(화면 px) */
+/** 화면 최소 간격. 배율에 따라 바뀌지 않는다. */
 const GAP = 2;
-/** 격자 칸 크기(화면 px) */
 const CELL = 96;
 
-function overlaps(a: Box, b: Box) {
+function overlaps(a: LabelBox, b: LabelBox) {
   return a.x1 < b.x2 + GAP && b.x1 < a.x2 + GAP && a.y1 < b.y2 + GAP && b.y1 < a.y2 + GAP;
 }
 
-/** 균일 격자: 같은 칸의 상자만 비교해 300노드에서도 모든 쌍을 비교하지 않는다. */
+/** 가까운 칸만 비교한다. 간격만큼 검색 범위도 넓혀 칸 경계의 충돌을 놓치지 않는다. */
 class BoxGrid {
   private cells = new Map<string, Entry[]>();
-  private keys(box: Box) {
+  private keys(box: LabelBox, gap = 0) {
     const keys: string[] = [];
-    for (let x = Math.floor(box.x1 / CELL); x <= Math.floor(box.x2 / CELL); x++)
-      for (let y = Math.floor(box.y1 / CELL); y <= Math.floor(box.y2 / CELL); y++) keys.push(`${x}:${y}`);
+    for (let x = Math.floor((box.x1 - gap) / CELL); x <= Math.floor((box.x2 + gap) / CELL); x++)
+      for (let y = Math.floor((box.y1 - gap) / CELL); y <= Math.floor((box.y2 + gap) / CELL); y++) keys.push(`${x}:${y}`);
     return keys;
   }
-  /** 다른 노드(except가 아닌)의 상자와 겹치는지 */
-  hits(box: Box, except: string) {
-    return this.keys(box).some((key) => this.cells.get(key)?.some((entry) => entry.id !== except && overlaps(box, entry.box)));
+  hits(box: LabelBox, except: string) {
+    return this.keys(box, GAP).some((key) => this.cells.get(key)?.some((entry) => entry.id !== except && overlaps(box, entry.box)));
   }
   add(entry: Entry) {
     for (const key of this.keys(entry.box)) {
@@ -39,86 +40,75 @@ class BoxGrid {
   }
 }
 
-/** 낮을수록 먼저 자리를 잡는다. 0은 겹쳐도 숨기지 않는다. */
-function rankOf(node: NodeSingular): number {
-  if (node.hasClass("focused") || node.hasClass("path") || node.hasClass("focus-root")) return 0;
-  const kind = node.data("kind") as string;
-  const emphasized = node.hasClass("emph");
-  if (kind === "company") return (emphasized ? 1 : 3) + (node.data("mark") ? 0 : 1);
-  if (kind === "bundle") return 5;
-  return emphasized ? 6 : 7;
-}
-
-/** 글자 폭 측정용 캔버스(한 번만 만든다). */
-let measureContext: CanvasRenderingContext2D | null = null;
-const widthCache = new Map<string, number>();
-
-function textWidth(text: string, font: string) {
-  const key = `${font}|${text}`;
-  let width = widthCache.get(key);
-  if (width === undefined) {
-    measureContext ??= document.createElement("canvas").getContext("2d");
-    if (!measureContext) return text.length * 8;
-    measureContext.font = font;
-    width = measureContext.measureText(text).width;
-    widthCache.set(key, width);
+/** 렌더러와 독립적인 결정적 선별. priority 0은 선택·호버·포커스 중심이므로 남긴다. */
+export function culledLabelIds(candidates: readonly LabelCandidate[], obstacles: readonly Entry[]): Set<string> {
+  const bodies = new BoxGrid();
+  obstacles.forEach((entry) => bodies.add(entry));
+  const placed = new BoxGrid();
+  const culled = new Set<string>();
+  const ranked = [...candidates].sort((a, b) =>
+    a.priority - b.priority || a.distance - b.distance || b.degree - a.degree || b.evidenceCount - a.evidenceCount ||
+    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  for (const entry of ranked) {
+    if (entry.priority > 0 && (placed.hits(entry.box, entry.id) || bodies.hits(entry.box, entry.id))) culled.add(entry.id);
+    else placed.add(entry);
   }
-  return width;
+  return culled;
 }
 
-/** 노드 아래 캡션의 모델 좌표 상자. Cytoscape의 캡션 위치 캐시는 다음 그리기 전까지 늦을 수 있어
- *  (방금 움직였거나 숨김을 푼 노드) 글꼴·여백 스타일로 직접 계산한다. text-valign: bottom 기준. */
-function captionBox(node: NodeSingular, text: string): Box {
-  const fontSize = Number.parseFloat(node.style("font-size"));
-  const font = `${node.style("font-weight")} ${fontSize}px ${node.style("font-family")}`;
-  const lineHeight = Number.parseFloat(node.style("line-height")) || 1.2;
-  const padding = Number.parseFloat(node.style("text-background-padding")) || 0;
-  const lines = text.split("\n");
-  const width = Math.max(...lines.map((line) => textWidth(line, font)));
-  const { x, y } = node.position();
-  const top = y + node.height() / 2 + Number.parseFloat(node.style("text-margin-y"));
-  return { x1: x - width / 2 - padding, x2: x + width / 2 + padding, y1: top - padding, y2: top + lines.length * fontSize * lineHeight + padding };
+function rankOf(element: SingularElementArgument): number {
+  if (element.hasClass("focused") || element.hasClass("hover") || element.hasClass("focus-root")) return 0;
+  if (element.isEdge()) return 7;
+  if (element.data("kind") === "company") return element.hasClass("emph") || element.hasClass("path") ? 1 : element.data("mark") ? 2 : 3;
+  if (element.data("kind") === "bundle") return 4;
+  return element.hasClass("emph") || element.hasClass("path") ? 5 : 6;
 }
 
 /**
- * 캡션 겹침을 정리하고 숨긴 캡션 수를 돌려준다. 숨김을 먼저 풀어 지금 보기 상태에서 캡션이 보일 노드를 고른 뒤
- * 겹치는 것만 다시 숨긴다(화면이 멈춘 뒤 한 번만 부른다).
+ * Cytoscape 라벨 전용 bounds에는 실제 줄바꿈·굵기·배경 여백·회전이 포함된다.
+ * 숨김 클래스를 풀고 한 번만 렌더 좌표를 갱신한 뒤 캐시된 bounds를 사용한다.
+ * 카메라·노드 위치는 변경하지 않아 선별 전후 화면 면적도 바뀌지 않는다.
  */
 export function declutterLabels(cy: Core): number {
-  if (cy.destroyed() || cy.width() <= 0) return 0;
-  cy.nodes(".label-cull").removeClass("label-cull");
+  if (cy.destroyed() || cy.width() <= 0 || cy.height() <= 0) return 0;
+  cy.elements(".label-cull").removeClass("label-cull");
+  // 런타임의 공개 useCache 옵션이 현재 Cytoscape 타입 정의에는 빠져 있다.
+  const refreshBounds = { useCache: false, includeOverlays: false };
+  cy.elements().boundingBox(refreshBounds);
   const zoom = cy.zoom();
   const pan = cy.pan();
   const width = cy.width();
   const height = cy.height();
-  const toScreen = (b: Box): Box => ({ x1: b.x1 * zoom + pan.x, y1: b.y1 * zoom + pan.y, x2: b.x2 * zoom + pan.x, y2: b.y2 * zoom + pan.y });
-  const onScreen = (b: Box) => b.x2 > 0 && b.x1 < width && b.y2 > 0 && b.y1 < height;
-
-  const candidates: { node: NodeSingular; rank: number; degree: number; label: Box }[] = [];
-  // 기업·묶음 원은 모든 캡션의 장애물이다(낮은 우선순위 캡션이 다른 기업 원을 덮지 않게).
-  const bodies = new BoxGrid();
-  cy.nodes().forEach((node) => {
-    if (!node.visible()) return;
-    if (node.data("kind") !== "issue") {
-      const body = toScreen(node.boundingBox({ includeLabels: false, includeOverlays: false }));
-      if (onScreen(body)) bodies.add({ id: node.id(), box: body });
+  const toScreen = (b: LabelBox): LabelBox => ({ x1: b.x1 * zoom + pan.x, y1: b.y1 * zoom + pan.y, x2: b.x2 * zoom + pan.x, y2: b.y2 * zoom + pan.y });
+  const onScreen = (b: LabelBox) => b.x2 > 0 && b.x1 < width && b.y2 > 0 && b.y1 < height;
+  const anchors = cy.nodes(".focused, .hover, .focus-root").map((node) => node.renderedPosition());
+  const candidates: LabelCandidate[] = [];
+  const bodies: Entry[] = [];
+  cy.elements().forEach((element) => {
+    if (!element.visible()) return;
+    if (element.isNode() && element.data("kind") !== "issue") {
+      const body = toScreen(element.boundingBox({ includeLabels: false, includeOverlays: false }));
+      if (onScreen(body)) bodies.push({ id: element.id(), box: body });
     }
-    const caption = node.style("label");
-    if (!caption || node.hasClass("dimmed") || node.hasClass("faded")) return;
-    const label = toScreen(captionBox(node, caption));
-    if (onScreen(label)) candidates.push({ node, rank: rankOf(node), degree: node.degree(false), label });
+    if (!element.style("label") || element.hasClass("dimmed") || element.hasClass("faded")) return;
+    const bounds = element.boundingBox({
+      includeNodes: false, includeEdges: false, includeLabels: true, includeOverlays: false, includeUnderlays: false,
+    });
+    if (bounds.w <= 0 || bounds.h <= 0) return;
+    const box = toScreen(bounds);
+    if (!onScreen(box)) return;
+    const x = (box.x1 + box.x2) / 2;
+    const y = (box.y1 + box.y2) / 2;
+    const distance = element.isNode() && element.data("kind") === "issue" && anchors.length
+      ? Math.min(...anchors.map((at) => (x - at.x) ** 2 + (y - at.y) ** 2)) : 0;
+    candidates.push({
+      id: element.id(), box, priority: rankOf(element), distance,
+      degree: element.isNode() ? element.degree(false) : 0,
+      evidenceCount: (element.data("evidenceCount") as number | undefined) ?? 0,
+    });
   });
-  candidates.sort(
-    (a, b) => a.rank - b.rank || b.degree - a.degree || ((b.node.data("evidenceCount") as number) ?? 0) - ((a.node.data("evidenceCount") as number) ?? 0),
-  );
-
-  const placed = new BoxGrid();
-  const culled: NodeSingular[] = [];
-  for (const { node, rank, label } of candidates) {
-    const id = node.id();
-    if (rank > 0 && (placed.hits(label, id) || bodies.hits(label, id))) culled.push(node);
-    else placed.add({ id, box: label });
-  }
-  if (culled.length > 0) cy.batch(() => culled.forEach((node) => node.addClass("label-cull")));
-  return culled.length;
+  const culled = culledLabelIds(candidates, bodies);
+  if (culled.size) cy.batch(() => culled.forEach((id) => cy.getElementById(id).addClass("label-cull")));
+  return culled.size;
 }

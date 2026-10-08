@@ -1,0 +1,310 @@
+{
+  "schemaVersion": "zoop-ai-s1-1",
+  "recordingKind": "authored-test",
+  "responses": [
+    {
+      "stage": "document-summary",
+      "inputDigest": "638c4c7e345a5d538a2216357ee1c0935811956c99405dac41e17d93847f07ab",
+      "response": {
+        "text": "🚀 합성 알파의 매출이 늘었다.\n합성 베타의 비용이 늘었다.",
+        "claims": [
+          {
+            "claimId": "claim-a",
+            "text": "🚀 합성 알파의 매출이 늘었다.",
+            "assertionKind": "fact",
+            "evidenceIds": [
+              "ev-3c9c9fc488309f0050b90623"
+            ]
+          },
+          {
+            "claimId": "claim-b",
+            "text": "합성 베타의 비용이 늘었다.",
+            "assertionKind": "fact",
+            "evidenceIds": [
+              "ev-0c4f8e78a9d4f32ffac42c93"
+            ]
+          },
+          {
+            "claimId": "claim-limitation",
+            "text": "합성 문서에 적힌 사업 변화만 요약합니다.",
+            "assertionKind": "limitation",
+            "evidenceIds": []
+          }
+        ],
+        "citations": [
+          {
+            "evidenceId": "ev-3c9c9fc488309f0050b90623",
+            "documentId": "doc-synthetic-s1",
+            "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "offsetUnit": "unicode_code_point",
+            "start": 0,
+            "end": 17,
+            "quote": "🚀 합성 알파의 매출이 늘었다.",
+            "inputKind": "body",
+            "rawLocatorIds": [
+              "raw-synthetic-s1"
+            ]
+          },
+          {
+            "evidenceId": "ev-0c4f8e78a9d4f32ffac42c93",
+            "documentId": "doc-synthetic-s1",
+            "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "offsetUnit": "unicode_code_point",
+            "start": 18,
+            "end": 33,
+            "quote": "합성 베타의 비용이 늘었다.",
+            "inputKind": "body",
+            "rawLocatorIds": [
+              "raw-synthetic-s1"
+            ]
+          }
+        ],
+        "limitations": [
+          "합성 문서에 적힌 사업 변화만 요약합니다."
+        ]
+      }
+    },
+    {
+      "stage": "semantic-verification",
+      "inputDigest": "eac9fb017452693a33392b095f102872796c89b5f3efa2ae434106e3cdb3f5c5",
+      "response": {
+        "claims": [
+          {
+            "claimId": "claim-a",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          },
+          {
+            "claimId": "claim-b",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          },
+          {
+            "claimId": "claim-limitation",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+      }
+    },
+    {
+      "stage": "document-sentiment",
+      "inputDigest": "525f368d6f2bcc1348c4f67718e9caa3549199ffc43071b9a34c91457dbf6231",
+      "response": {
+        "label": "positive",
+        "rationale": "합성 알파의 매출 증가가 확인됩니다.",
+        "claims": [
+          {
+            "claimId": "claim-direction",
+            "text": "합성 알파의 매출 증가가 확인됩니다.",
+            "assertionKind": "interpretation",
+            "evidenceIds": [
+              "ev-3c9c9fc488309f0050b90623"
+            ]
+          },
+          {
+            "claimId": "claim-limitation",
+            "text": "가격 전망이 아닌 사업 사실의 판정입니다.",
+            "assertionKind": "limitation",
+            "evidenceIds": []
+          }
+        ],
+        "citations": [
+          {
+            "evidenceId": "ev-3c9c9fc488309f0050b90623",
+            "documentId": "doc-synthetic-s1",
+            "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "offsetUnit": "unicode_code_point",
+            "start": 0,
+            "end": 17,
+            "quote": "🚀 합성 알파의 매출이 늘었다.",
+            "inputKind": "body",
+            "rawLocatorIds": [
+              "raw-synthetic-s1"
+            ]
+          }
+        ],
+        "limitations": [
+          "가격 전망이 아닌 사업 사실의 판정입니다."
+        ]
+      }
+    },
+    {
+      "stage": "semantic-verification",
+      "inputDigest": "1bf32a7ecf468c4710c6f8f8830481f87b8b359378a6c95388e72e6bfe4bffcc",
+      "response": {
+        "claims": [
+          {
+            "claimId": "claim-direction",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          },
+          {
+            "claimId": "claim-limitation",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+      }
+    },
+    {
+      "stage": "document-summary",
+      "inputDigest": "19db1d220ca47d2a77b3e0c6a8a94202ccfb68abc31b9c1b0076f1ef3c48888a",
+      "response": {
+        "text": "🚀 합성 알파의 매출이 늘었다.\n합성 베타의 비용이 늘었다.",
+        "claims": [
+          {
+            "claimId": "claim-a",
+            "text": "🚀 합성 알파의 매출이 늘었다.",
+            "assertionKind": "fact",
+            "evidenceIds": [
+              "ev-3c9c9fc488309f0050b90623"
+            ]
+          },
+          {
+            "claimId": "claim-b",
+            "text": "합성 베타의 비용이 늘었다.",
+            "assertionKind": "fact",
+            "evidenceIds": [
+              "ev-0c4f8e78a9d4f32ffac42c93"
+            ]
+          },
+          {
+            "claimId": "claim-limitation",
+            "text": "합성 문서에 적힌 사업 변화만 요약합니다.",
+            "assertionKind": "limitation",
+            "evidenceIds": []
+          }
+        ],
+        "citations": [
+          {
+            "evidenceId": "ev-3c9c9fc488309f0050b90623",
+            "documentId": "doc-synthetic-s1",
+            "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "offsetUnit": "unicode_code_point",
+            "start": 0,
+            "end": 17,
+            "quote": "🚀 합성 알파의 매출이 늘었다.",
+            "inputKind": "body",
+            "rawLocatorIds": [
+              "raw-synthetic-s1"
+            ]
+          },
+          {
+            "evidenceId": "ev-0c4f8e78a9d4f32ffac42c93",
+            "documentId": "doc-synthetic-s1",
+            "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "offsetUnit": "unicode_code_point",
+            "start": 18,
+            "end": 33,
+            "quote": "합성 베타의 비용이 늘었다.",
+            "inputKind": "body",
+            "rawLocatorIds": [
+              "raw-synthetic-s1"
+            ]
+          }
+        ],
+        "limitations": [
+          "합성 문서에 적힌 사업 변화만 요약합니다."
+        ]
+      }
+    },
+    {
+      "stage": "semantic-verification",
+      "inputDigest": "c10aa49b857bf4a3aee0f00e385dab71bae1662109f0761e2460a006577c41ca",
+      "response": {
+        "claims": [
+          {
+            "claimId": "claim-a",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          },
+          {
+            "claimId": "claim-b",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          },
+          {
+            "claimId": "claim-limitation",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+      }
+    },
+    {
+      "stage": "document-sentiment",
+      "inputDigest": "28e22db6c1c4e5ac4e9078582e0a183d548ae06149e62a3458abe8bce6d55615",
+      "response": {
+        "label": "negative",
+        "rationale": "합성 베타의 비용 증가가 확인됩니다.",
+        "claims": [
+          {
+            "claimId": "claim-direction",
+            "text": "합성 베타의 비용 증가가 확인됩니다.",
+            "assertionKind": "interpretation",
+            "evidenceIds": [
+              "ev-0c4f8e78a9d4f32ffac42c93"
+            ]
+          },
+          {
+            "claimId": "claim-limitation",
+            "text": "가격 전망이 아닌 사업 사실의 판정입니다.",
+            "assertionKind": "limitation",
+            "evidenceIds": []
+          }
+        ],
+        "citations": [
+          {
+            "evidenceId": "ev-0c4f8e78a9d4f32ffac42c93",
+            "documentId": "doc-synthetic-s1",
+            "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+            "offsetUnit": "unicode_code_point",
+            "start": 18,
+            "end": 33,
+            "quote": "합성 베타의 비용이 늘었다.",
+            "inputKind": "body",
+            "rawLocatorIds": [
+              "raw-synthetic-s1"
+            ]
+          }
+        ],
+        "limitations": [
+          "가격 전망이 아닌 사업 사실의 판정입니다."
+        ]
+      }
+    },
+    {
+      "stage": "semantic-verification",
+      "inputDigest": "961e1bc2fea8dae8a46f5875ce14d8dd94606308798e6dcfb1cbf9e1523f324a",
+      "response": {
+        "claims": [
+          {
+            "claimId": "claim-direction",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          },
+          {
+            "claimId": "claim-limitation",
+            "decision": "supported",
+            "reason": "합성 원문과 문맥이 주장을 뒷받침합니다."
+          }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+      }
+    }
+  ]
+}

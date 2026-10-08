@@ -1,0 +1,41 @@
+{
+  "localLinkChecks": 80,
+  "brokenLocalLinks": [],
+  "svgChecks": [
+    {
+      "id": "01-system",
+      "embeddedImages": 19,
+      "remoteImageRefs": [],
+      "pngSize": [
+        1600,
+        1000
+      ]
+    },
+    {
+      "id": "02-frontend",
+      "embeddedImages": 14,
+      "remoteImageRefs": [],
+      "pngSize": [
+        1600,
+        1000
+      ]
+    },
+    {
+      "id": "03-backend",
+      "embeddedImages": 21,
+      "remoteImageRefs": [],
+      "pngSize": [
+        1600,
+        1000
+      ]
+    }
+  ],
+  "hangulCoverage": {
+    "method": "Existing matching SUIT Variable TTF cmap checked for Hangul in every authored title/role/edge/zone/caption/legend. WOFF2 file remains unchanged; final PDF page PNGs directly opened. TTF was inspected without copying or conversion.",
+    "missingHangul": [],
+    "woff2Sha256": "aa894a204d5a6fbae259dac6868d350cbd373a390caee0313f92946af741df23"
+  },
+  "visualObservation": "Final 3 PDF page PNGs opened directly by maker and designer; prior logo/caption, market return-line, and worker-header collisions corrected. No new visual blockers reported. Static diagram observation only; application runtime not rerun.",
+  "guide": "Markdown/HTML/PDF source and existing diagram URLs unchanged; no full manual rewrite",
+  "authorization": "No app source/model/DB/env/state changes; no new packages; no git mutation"
+}

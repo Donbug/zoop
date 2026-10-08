@@ -1,226 +1,362 @@
-"""Sentiment acceptance: fixed responses only, no billable network calls."""
+"""S1 worker→application import→stored GET. All inputs are authored synthetic data."""
 from __future__ import annotations
 
+import copy
 import json
-import sqlite3
-import subprocess
-from datetime import datetime, timedelta, timezone
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
-import httpx
 import pytest
 
+from zoop_bff.ai_worker import AiWorkerClient, AnalysisImportError, _digest
 from zoop_bff.config import BFF_ROOT
-from zoop_bff.sentiment import (
-    CallLimitReached, ModelReply, OpenAICompatibleProvider, ProviderFailure, ReplayProvider,
-    SentimentService, document_input, document_pairs, outlook_input,
-)
+from zoop_bff.schemas import DocumentSentiment
+from zoop_bff.sentiment import document_input, input_hash
+from zoop_bff.statedb import dumps
 
-from .conftest import ALPHA_ISSUES, base_payload, with_companies
-
-KST = timezone(timedelta(hours=9))
-MORNING = "brf-2026-09-17-morning"
+FIXTURE = BFF_ROOT.parent / "ai-worker/fixtures/contracts/synthetic-document"
 
 
-def attach(kit, responses, *, max_calls=20, model="replay-sentiment"):
-    provider = ReplayProvider(responses, model=model)
-    service = kit.services.sentiment
-    service.provider = provider
-    service.max_calls = max_calls
-    return service, provider
+def fixture(name):
+    return json.loads((FIXTURE / (name + ".json")).read_text())
+
+def cloned_ready_result(result, suffix):
+    cloned = copy.deepcopy(result)
+    cloned["jobId"] = result["jobId"] + "-" + suffix
+    cloned["inputDigest"] = result["inputDigest"] + "-" + suffix
+    cloned["input"]["jobId"] = cloned["jobId"]
+    artifact_ids = {a["artifactId"]: a["artifactId"] + "-" + suffix for a in cloned["artifacts"]}
+    attempt_ids = {c["attemptId"]: c["attemptId"] + "-" + suffix for c in cloned["calls"]}
+    for call in cloned["calls"]:
+        call["attemptId"] = attempt_ids[call["attemptId"]]
+        call["inputDigest"] += "-" + suffix
+        call["config"]["model"] += "-" + suffix
+    for artifact in cloned["artifacts"]:
+        artifact["artifactId"] = artifact_ids[artifact["artifactId"]]
+        artifact["jobId"] = cloned["jobId"]
+        artifact["inputDigest"] = cloned["inputDigest"]
+        artifact["attemptId"] = attempt_ids[artifact["attemptId"]]
+        artifact["dependencyRefs"] = [artifact_ids.get(value, value) for value in artifact["dependencyRefs"]]
+        artifact["resultVersion"] += "-" + suffix
+        call = next(c for c in cloned["calls"] if c["attemptId"] == artifact["attemptId"])
+        artifact["modelConfigRevision"] = _digest(call["config"])
+    cloned["artifactIds"] = [artifact_ids[value] for value in cloned["artifactIds"]]
+    return cloned
+
+def register_current_grants(kit, grants=None):
+    current = grants or fixture("grants")["grants"]
+    kit.services.sentiment.analysis_store.replace_current_grants(current)
 
 
-def answer(ds, pair, **overrides):
-    payload = document_input(ds, *pair)
-    quote = payload["article"]["body"].split(". ")[0]
-    data = {"label": "undetermined", "rationale": "보도된 사실만으로 기업에 유리한지 확인하기 어렵습니다.", "quotes": [quote]}
-    data.update(overrides)
-    return ModelReply(json.dumps(data, ensure_ascii=False), 20, 10)
 
 
-@pytest.mark.parametrize("override,code", [
-    ({"quotes": ["원문에 없는 문장"]}, "quote_mismatch"),
-    ({"quotes": [" "]}, "quote_mismatch"),
-    ({"rationale": "지수가 상승할 것입니다."}, "prohibited_expression"),
-    ({"rationale": "매수를 추천합니다."}, "prohibited_expression"),
-    ({"rationale": "Buy this stock now."}, "prohibited_expression"),
-    ({"label": "positive", "probability": 0.9}, "response_schema_invalid"),
-    ({"quotes": []}, "response_schema_invalid"),
-])
-def test_invalid_response_is_discarded_and_public_field_is_null(admin, override, code):
-    ds = admin.services.provider.get()
-    pair = document_pairs(ds)[0]
-    service, provider = attach(admin, [answer(ds, pair, **override)])
-    assert service.judge_document(ds, *pair) is None
-    docs = admin.client.get(f"/api/companies/{pair[1]}/documents").json()["items"]
-    assert next(d for d in docs if d["id"] == pair[0])["sentiment"] is None
-    record = admin.services.db.one("SELECT status,result,failure_code FROM sentiment_results")
-    assert (record["status"], record["result"], record["failure_code"]) == ("failed", None, code)
-    assert service.judge_document(ds, *pair) is None and provider.calls == 1
+def populated(make_admin, tmp_path):
+    kit = make_admin(fixture("snapshot"))
+    register_current_grants(kit)
+    client = AiWorkerClient(state_dir=kit.state_dir, worker_state=tmp_path / "worker",
+                            grants=FIXTURE / "grants.json", replay=FIXTURE / "replay.json")
+    results = []
+    for request in fixture("jobs")["jobs"]:
+        queued = client.command("submit", request)
+        imported = kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), queued)
+        assert imported["status"] == "pending"
+        result = client.command("run", {"schemaVersion": "zoop-ai-s1-1", "jobId": request["jobId"]})
+        assert result["state"] == "ready", result
+        kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), result)
+        results.append(result)
+    return kit, client, results
 
 
-def test_valid_judgement_is_cached_persisted_and_only_shown_in_approved_company_context(make_admin):
-    admin = make_admin(with_companies(base_payload()))
-    ds = admin.services.provider.get()
-    pair = document_pairs(ds)[0]
-    service, provider = attach(admin, [answer(ds, pair)])
-    result = service.judge_document(ds, *pair)
-    assert result.company_id == pair[1] and result.quotes
-    assert result.prompt_version and result.model == "replay-sentiment" and result.judged_at
-    assert service.judge_document(ds, *pair) == result and provider.calls == 1
-    restarted = admin.restart()
-    docs = restarted.client.get(f"/api/companies/{pair[1]}/documents").json()["items"]
-    assert next(d for d in docs if d["id"] == pair[0])["sentiment"] == result.model_dump(by_alias=True)
-    ev = next(e for e in ds.evidence.values() if e.article_id == pair[0])
-    assert admin.client.get(f"/api/evidence/{ev.id}").json()["sentiment"] is None
-    assert admin.client.get(f"/api/evidence/{ev.id}", params={"companyId": pair[1]}).json()["sentiment"]["companyId"] == pair[1]
-    other = next(c for c in ds.companies if c != pair[1])
-    response = admin.client.get(f"/api/evidence/{ev.id}", params={"companyId": other})
-    assert response.status_code == 422 and response.json()["error"]["code"] == "sentiment_context_mismatch"
+def test_two_companies_opposite_judgements_and_exact_summary_citations_reach_both_gets(make_admin, tmp_path):
+    kit, client, results = populated(make_admin, tmp_path)
+    before = kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"]
+    for company_id, label in (("SYNTH-A", "positive"), ("SYNTH-B", "negative")):
+        docs = kit.client.get(f"/api/companies/{company_id}/documents")
+        assert docs.status_code == 200
+        doc = docs.json()["items"][0]
+        assert doc["sentiment"]["label"] == label and doc["sentiment"]["companyId"] == company_id
+        summary = doc["documentSummary"]
+        assert summary["text"] == "\n".join(c["text"] for c in summary["claims"] if c["assertionKind"] != "limitation")
+        assert doc["resultVersion"] == summary["resultVersion"] and doc["documentVersion"] == summary["documentVersion"]
+        assert doc["analysisStatus"]["summary"] == doc["analysisStatus"]["sentiment"] == {"status": "available", "reason": None}
+        assert summary["provenance"] == {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
+        for citation in summary["citations"]:
+            evidence = kit.client.get("/api/evidence/" + citation["evidenceId"], params={"companyId": company_id})
+            assert evidence.status_code == 200
+            data = evidence.json()
+            assert data["quote"] == citation["quote"] and data["start"] == citation["start"] and data["end"] == citation["end"]
+            assert data["documentSummary"]["resultVersion"] == summary["resultVersion"] and data["sentiment"]["label"] == label
+        assert kit.client.get("/api/evidence/" + summary["citations"][0]["evidenceId"]).json()["sentiment"] is None
+    restarted = kit.restart()
+    assert restarted.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]["documentSummary"] is not None
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"] == before == 8
+    kit.login()
+    features = kit.client.get("/api/admin/ai-usage?window=all").json()["features"]
+    for name, count in (("document-summary", 2), ("document-sentiment", 2), ("semantic-verification", 4)):
+        usage = next(f for f in features if f["feature"] == name)["usage"]
+        assert usage["modelCalls"] == 0 and usage["replayCalls"] == count
+        assert usage["inputTokens"] is None and usage["outputTokens"] is None
 
 
-def test_model_change_uses_a_different_input_hash(admin):
-    ds = admin.services.provider.get()
-    pair = document_pairs(ds)[0]
-    first, p1 = attach(admin, [answer(ds, pair)], model="model-one")
-    first.judge_document(ds, *pair)
-    second, p2 = attach(admin, [answer(ds, pair)], model="model-two")
-    second.judge_document(ds, *pair)
-    assert p1.calls == p2.calls == 1
-    assert admin.services.db.one("SELECT COUNT(*) AS n FROM sentiment_results")["n"] == 2
-
-
-def test_call_ceiling_includes_retries_and_caches_the_terminal_failure(admin):
-    ds = admin.services.provider.get()
-    first, second = document_pairs(ds)[:2]
-    service, provider = attach(admin, [ProviderFailure("timeout", transient=True), answer(ds, first)], max_calls=1)
-    assert service.judge_document(ds, *first) is None
-    assert service.judge_document(ds, *first) is None
-    with pytest.raises(CallLimitReached):
-        service.judge_document(ds, *second)
-    assert provider.calls == service.calls == 1
-    assert admin.services.db.one("SELECT COUNT(*) AS n FROM ai_events WHERE feature='document-sentiment'")["n"] == 1
-
-
-def test_usage_separates_replays_retries_failures_and_cache_reads(admin):
-    ds = admin.services.provider.get()
-    pair = document_pairs(ds)[0]
-    service, provider = attach(admin, [ProviderFailure("timeout", transient=True), answer(ds, pair)])
-    assert service.judge_document(ds, *pair) is not None
-    assert service.judge_document(ds, *pair) is not None
-    usage = admin.client.get("/api/admin/ai-usage", params={"window": "all"})
-    assert usage.status_code == 200
-    row = next(f for f in usage.json()["features"] if f["feature"] == "document-sentiment")
-    assert (row["requests"], row["succeeded"], row["failed"]) == (2, 1, 1)
-    assert row["usage"] == {"modelCalls": 0, "inputTokens": 20, "outputTokens": 10, "replayCalls": 2, "retries": 1}
-    assert provider.calls == 2
-
-
-def test_outlook_and_document_judgements_are_fixed_at_publication(admin):
-    ds = admin.services.provider.get()
-    pair = document_pairs(ds)[0]
-    reply = ModelReply(json.dumps({"label": "undetermined", "rationale": "이번 회차의 사실만으로 유불리를 확인하기 어렵습니다.", "issueIds": [ALPHA_ISSUES["q1"]]}))
-    service, provider = attach(admin, [answer(ds, pair), reply])
-    service.judge_document(ds, *pair)
-    admin.clock.travel_to(datetime(2026, 9, 17, 7, 45, tzinfo=KST))
-    assert admin.services.briefings.tick() == [MORNING]
-    before = admin.client.get("/api/briefings").json()
-    assert before["outlook"]["label"] == "undetermined"
-    assert any(i["documentSentiments"] for i in before["items"])
-    assert provider.calls == 2
-    admin.services.sentiment.provider = ReplayProvider([ModelReply("{}")], model="different-model")
-    frozen = admin.services.briefings.record(MORNING).payload
-    altered = outlook_input(MORNING, frozen["scheduledAt"], frozen["items"], {})
-    altered["issues"][0]["title"] = "발행 이후 바뀐 내용"
-    assert service.judge_outlook(altered).model_dump(by_alias=True) == before["outlook"]
-    assert service.provider.calls == 0
-    assert admin.client.get("/api/briefings").json() == before
-    assert admin.client.post(f"/api/admin/briefings/{MORNING}/reprocess", json={"reason": "재판정"}).status_code == 409
+def test_application_save_failure_repeat_import_does_not_call_or_charge(make_admin, tmp_path, monkeypatch):
+    kit, client, results = populated(make_admin, tmp_path)
+    result = results[0]
+    store = kit.services.sentiment.analysis_store
+    first = store.import_job(kit.services.provider.get(), client.get(result["jobId"]))
+    assert store.import_job(kit.services.provider.get(), client.get(result["jobId"])) == first
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"] == 4
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"] == 8
+    # Force a real BFF transaction rollback before the first import into an independent app state.
+    unimported = make_admin(fixture("snapshot"))
+    register_current_grants(unimported)
+    unimported.services.db.execute("CREATE TRIGGER synthetic_fail_import BEFORE INSERT ON document_analysis BEGIN SELECT RAISE(ABORT,'synthetic import failure'); END")
+    import sqlite3
     with pytest.raises(sqlite3.IntegrityError):
-        admin.services.db.execute("UPDATE briefing_rounds SET payload='{}' WHERE id=?", (MORNING,))
-    ev = next(e for e in ds.evidence.values() if e.article_id == pair[0])
-    value = admin.client.get(f"/api/evidence/{ev.id}", params={"companyId": pair[1], "round": MORNING}).json()["sentiment"]
-    assert value["model"] == "replay-sentiment"
-    outlook_usage = next(f for f in admin.services.usage.response("all", []).features if f.feature == "briefing-outlook")
-    assert outlook_usage.requests == 1 and outlook_usage.usage.replay_calls == 1
+        unimported.services.sentiment.analysis_store.import_job(unimported.services.provider.get(), result)
+    assert unimported.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"] == 0
+    unimported.services.db.execute("DROP TRIGGER synthetic_fail_import")
+    assert unimported.services.sentiment.analysis_store.import_job(unimported.services.provider.get(), client.get(result["jobId"]))["status"] == "available"
+    assert client.get(result["jobId"])["usage"] == result["usage"]
+
+def test_actual_cli_cache_hit_import_reuses_creator_receipts_without_duplicate_usage(make_admin, tmp_path):
+    kit, client, results = populated(make_admin, tmp_path)
+    original = results[0]
+    request = copy.deepcopy(fixture("jobs")["jobs"][0])
+    request["jobId"] = "synthetic-SYNTH-A-document-summary-cache-hit"
+    assert client.command("submit", request)["state"] == "queued"
+    cached = client.command("run", {"schemaVersion": "zoop-ai-s1-1", "jobId": request["jobId"]})
+    assert cached["state"] == "ready" and cached["phase"] == "artifact.cache_hit"
+    assert cached["artifactIds"] == original["artifactIds"] and cached["usage"]["replayCalls"] == 0
+    before_calls = kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"]
+    before_artifacts = kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"]
+    imported = kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), cached)
+    assert imported["status"] == "available" and imported["artifactId"] in original["artifactIds"]
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"] == before_calls
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"] == before_artifacts
+    assert kit.services.db.one("SELECT status FROM document_analysis_jobs WHERE job_id=?",
+                               (request["jobId"],))["status"] == "available"
+    expected = next(a["resultVersion"] for a in original["artifacts"] if a["kind"] == "document-summary")
+    assert kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]["resultVersion"] == expected
+    collision = copy.deepcopy(cached)
+    collision["calls"][0]["startedAt"] = "2030-01-01T00:00:00+00:00"
+    with pytest.raises(AnalysisImportError, match="attempt_identity_conflict"):
+        kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), collision)
+
+def test_worker_result_cannot_restore_a_revoked_server_grant(make_admin, tmp_path):
+    kit, _, results = populated(make_admin, tmp_path)
+    delayed_r1 = results[0]
+    revoked_r2 = {**fixture("grants")["grants"][0], "revision": "opaque-revoked-r2", "enabled": False}
+    register_current_grants(kit, [revoked_r2])
+    imported = kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), delayed_r1)
+    assert imported["artifactId"] is None
+    current = kit.services.db.one("SELECT revision,payload FROM document_analysis_grants WHERE grant_id=?",
+                                  (revoked_r2["grantId"],))
+    assert current["revision"] == revoked_r2["revision"] and not json.loads(current["payload"])["enabled"]
+    document = kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]
+    assert document["documentSummary"] is None and document["sentiment"] is None
+    assert document["analysisStatus"]["summary"]["status"] == "withheld"
+    evidence_id = next(a for a in delayed_r1["artifacts"] if a["kind"] == "document-summary")["result"]["citations"][0]["evidenceId"]
+    evidence = kit.client.get("/api/evidence/" + evidence_id, params={"companyId": "SYNTH-A"}).json()
+    assert evidence["documentSummary"] is None and evidence["sentiment"] is None
+    assert kit.services.db.one("SELECT revision FROM document_analysis_grants WHERE grant_id=?",
+                               (revoked_r2["grantId"],))["revision"] == revoked_r2["revision"]
 
 
-def test_empty_core_issues_and_http_default_never_call_a_provider(make_admin):
-    kit = make_admin()
-    service, provider = attach(kit, [ModelReply("{}")])
-    kit.clock.travel_to(datetime(2026, 9, 16, 7, 45, tzinfo=KST))
-    kit.services.briefings.tick()
-    empty = kit.client.get("/api/briefings").json()
-    assert empty["items"] == [] and empty["outlook"] is None and provider.calls == 0
-    ordinary = make_admin()
-    ordinary.clock.travel_to(datetime(2026, 9, 17, 7, 45, tzinfo=KST))
-    ordinary.services.briefings.tick()
-    assert ordinary.client.get("/api/briefings").json()["outlook"] is None
-    assert ordinary.services.db.one("SELECT COUNT(*) AS n FROM sentiment_attempts")["n"] == 0
+def test_same_old_job_reimport_does_not_replace_newer_public_result(make_admin, tmp_path):
+    kit, _, results = populated(make_admin, tmp_path)
+    old = results[0]
+    newer = cloned_ready_result(old, "newer")
+    kit.clock.travel_to(datetime(2030, 10, 8, 1, 0, tzinfo=timezone.utc))
+    kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), newer)
+    expected = next(a["resultVersion"] for a in newer["artifacts"] if a["kind"] == "document-summary")
+    assert kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]["resultVersion"] == expected
+    kit.clock.travel_to(datetime(2030, 10, 8, 2, 0, tzinfo=timezone.utc))
+    kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), old)
+    assert kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]["resultVersion"] == expected
+
+def test_historical_artifact_from_weaker_policy_is_preserved_but_withheld(make_admin, tmp_path):
+    kit, _, results = populated(make_admin, tmp_path)
+    historical = cloned_ready_result(results[0], "old-policy")
+    for call in historical["calls"]:
+        call["config"]["policyVersion"] = "zoop-document-gate-1"
+    for artifact in historical["artifacts"]:
+        artifact["policyVersion"] = "zoop-document-gate-1"
+        call = next(c for c in historical["calls"] if c["attemptId"] == artifact["attemptId"])
+        artifact["modelConfigRevision"] = _digest(call["config"])
+    summary = next(a for a in historical["artifacts"] if a["kind"] == "document-summary")
+    source = summary["sourceRefs"][0]
+    with kit.services.db.transaction() as c:
+        c.execute("INSERT INTO document_analysis_jobs VALUES (?,?,?,?,?,?,?,?,?)",
+                  (historical["jobId"], historical["inputDigest"], "document-summary", source["documentId"],
+                   source["documentVersion"], summary["companyId"], "available", None,
+                   "2030-10-08T03:00:00+00:00"))
+        for call in historical["calls"]:
+            c.execute("INSERT INTO document_analysis_calls VALUES (?,?,?,?,?,?,?)",
+                      (call["attemptId"], historical["jobId"], call["stage"], call["mode"],
+                       call["state"], call["startedAt"], dumps(call)))
+        c.execute("INSERT INTO document_analysis VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (summary["artifactId"], historical["jobId"], historical["inputDigest"], summary["kind"],
+                   source["documentId"], source["documentVersion"], source["sourceHash"], summary["companyId"],
+                   summary["grantId"], summary["grantRevision"], "2030-10-08T03:00:00+00:00", dumps(summary)))
+    before = kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"]
+    document = kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]
+    assert document["documentSummary"] is None
+    assert document["analysisStatus"]["summary"] == {"status": "withheld", "reason": "document_policy_outdated"}
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"] == before
 
 
-def test_outlook_invalid_issue_reference_is_discarded(admin):
+def test_received_attempt_import_advances_state_and_usage_without_duplicate_charge(make_admin, tmp_path):
+    _, _, results = populated(make_admin, tmp_path / "source")
+    ready = cloned_ready_result(results[0], "live-usage")
+    ready["input"]["mode"] = "live"
+    ready["input"]["provenance"] = {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"}
+    live_grant = {**fixture("grants")["grants"][0],
+                  "recipients": ["openai-compatible:synthetic-provider-revision"]}
+    ready["grant"] = live_grant
+    for index, call in enumerate(ready["calls"]):
+        call["mode"] = "live"
+        call["config"]["provider"] = "openai-compatible"
+        call["config"]["providerRevision"] = "synthetic-provider-revision"
+        call["usage"] = {"inputTokens": 11 + index * 2, "outputTokens": 7 - index * 2,
+                         "cachedTokens": 1, "reasoningTokens": 2}
+    for artifact in ready["artifacts"]:
+        artifact["provenance"] = ready["input"]["provenance"]
+        call = next(c for c in ready["calls"] if c["attemptId"] == artifact["attemptId"])
+        artifact["modelConfigRevision"] = _digest(call["config"])
+    received = copy.deepcopy(ready)
+    received["state"], received["phase"] = "persisting", "receivedreceipt.saved"
+    for call in received["calls"]:
+        call["state"] = "received"
+        call["usage"] = {key: None for key in ("inputTokens", "outputTokens", "cachedTokens", "reasoningTokens")}
+    target = make_admin(fixture("snapshot"))
+    register_current_grants(target, [live_grant])
+    store = target.services.sentiment.analysis_store
+    assert store.import_job(target.services.provider.get(), received)["status"] == "pending"
+    assert store.import_job(target.services.provider.get(), ready)["status"] == "available"
+    assert store.import_job(target.services.provider.get(), ready)["status"] == "available"
+    assert target.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"] == 2
+    target.login()
+    features = target.client.get("/api/admin/ai-usage?window=all").json()["features"]
+    summary = next(f for f in features if f["feature"] == "document-summary")
+    verify = next(f for f in features if f["feature"] == "semantic-verification")
+    assert (summary["succeeded"], summary["failed"], summary["usage"]["modelCalls"],
+            summary["usage"]["inputTokens"], summary["usage"]["outputTokens"]) == (1, 0, 1, 11, 7)
+    assert (verify["succeeded"], verify["failed"], verify["usage"]["modelCalls"],
+            verify["usage"]["inputTokens"], verify["usage"]["outputTokens"]) == (1, 0, 1, 13, 5)
+
+
+def test_import_rejects_raw_forgery_source_change_and_actual_replay(make_admin, tmp_path):
+    kit, _, results = populated(make_admin, tmp_path)
+    forged = copy.deepcopy(results[0])
+    summary = next(a for a in forged["artifacts"] if a["kind"] == "document-summary")
+    summary["result"]["citations"][0]["end"] += 1
+    with pytest.raises(AnalysisImportError, match="citation_current_evidence_mismatch"):
+        kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), forged)
+    invented = copy.deepcopy(results[0])
+    summary = next(a for a in invented["artifacts"] if a["kind"] == "document-summary")
+    summary["result"]["limitations"].append("원문에 없는 해외 공장을 폐쇄했습니다.")
+    with pytest.raises(AnalysisImportError, match="limitation_claim_coverage_invalid"):
+        kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), invented)
+    changed = fixture("snapshot")
+    changed["issues"][0]["articles"][0]["body"] += " 수정된 문서입니다."
+    changed_kit = make_admin(changed)
+    with pytest.raises(AnalysisImportError, match="document_version_or_hash_changed"):
+        changed_kit.services.sentiment.analysis_store.import_job(changed_kit.services.provider.get(), results[0])
+    actual = fixture("snapshot")
+    actual["issues"][0]["articles"][0]["synthetic"] = False
+    actual_kit = make_admin(actual)
+    with pytest.raises(AnalysisImportError, match="authored_replay_requires_synthetic"):
+        actual_kit.services.sentiment.analysis_store.import_job(actual_kit.services.provider.get(), results[0])
+
+
+def test_current_deny_blocks_direct_evidence_and_document_outputs_but_keeps_immutable_records(make_admin, tmp_path):
+    kit, _, _ = populated(make_admin, tmp_path)
+    docs = kit.client.get("/api/companies/SYNTH-A/documents").json()["items"]
+    document_id = docs[0]["id"]
+    citation_id = docs[0]["documentSummary"]["citations"][0]["evidenceId"]
+    before = kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"]
+    kit.services.sentiment.analysis_store.deny(document_id, "합성 문서의 공개가 철회되었습니다.")
+    assert kit.client.get("/api/evidence/" + citation_id, params={"companyId": "SYNTH-A"}).status_code == 404
+    assert kit.client.get("/api/companies/SYNTH-A/documents").json()["items"] == []
+    assert kit.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"] == before
+    assert kit.restart().client.get("/api/evidence/" + citation_id).status_code == 404
+
+
+def test_semantic_hold_and_failed_summary_do_not_hide_independent_valid_sentiment(make_admin, tmp_path):
+    sys.path.insert(0, str(BFF_ROOT.parent / "ai-worker/src"))
+    from zoop_ai.contracts import SourceGrant, Submit
+    from zoop_ai.provider import ReplayProvider, request_identity, stage_config
+    from zoop_ai.runner import Runner
+    from zoop_ai.store import Store
+    kit = make_admin(fixture("snapshot"))
+    register_current_grants(kit)
+    request = Submit.model_validate(fixture("jobs")["jobs"][0])
+    response = fixture("replay")["responses"][0]["response"]
+    response["claims"][0]["text"] = "원문에 없는 세계 최대라는 사실입니다."
+    response["text"] = "\n".join(c["text"] for c in response["claims"] if c["assertionKind"] != "limitation")
+    payload = {"schemaVersion": "zoop-ai-s1-1", "document": request.input.document.wire(), "company": request.input.company.wire(),
+               "grantRef": {"grantId": request.input.grant_id, "revision": request.input.grant_revision}}
+    verifier = {"claims": [{"claimId": c["claimId"], "decision": "insufficient", "reason": "원문이 이 사실을 지지하지 않습니다."} for c in response["claims"]], "prohibitedAdvice": False, "unsupportedCausality": False}
+    path = tmp_path / "hold-replay.json"
+    path.write_text(json.dumps({"schemaVersion": "zoop-ai-s1-1", "recordingKind": "authored-test", "responses": [
+        {"stage": stage, "inputDigest": request_identity(stage, data, stage_config(stage, "replay")), "response": answer}
+        for stage, data, answer in [(request.kind, payload, response), ("semantic-verification", {**payload, "candidate": response}, verifier)]]}, ensure_ascii=False))
+    store = Store(tmp_path / "held-worker")
+    store.register_grants([SourceGrant.model_validate(fixture("grants")["grants"][0])])
+    runner = Runner(store, ReplayProvider(path))
+    runner.submit(request)
+    kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), runner.run(request.job_id).wire())
+    doc = kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]
+    assert doc["documentSummary"] is None and doc["analysisStatus"]["summary"]["status"] == "withheld"
+    assert "세계 최대" not in json.dumps(doc, ensure_ascii=False)
+    # An independent valid sentiment job can still publish; summary HOLD is not a broad document deny.
+    sentiment = Submit.model_validate(fixture("jobs")["jobs"][1])
+    responses = fixture("replay")["responses"][2:4]
+    valid_path = tmp_path / "sentiment-replay.json"
+    valid_path.write_text(json.dumps({"schemaVersion": "zoop-ai-s1-1", "recordingKind": "authored-test", "responses": responses}, ensure_ascii=False))
+    runner.provider = ReplayProvider(valid_path)
+    runner.submit(sentiment)
+    kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), runner.run(sentiment.job_id).wire())
+    doc = kit.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]
+    assert doc["documentSummary"] is None and doc["sentiment"]["label"] == "positive"
+    store.close()
+
+
+def test_legacy_immutable_judgement_and_round_outlook_are_read_without_provider(admin):
     ds = admin.services.provider.get()
-    service, provider = attach(admin, [ModelReply(json.dumps({"label": "positive", "rationale": "사업 성과가 확인됩니다.", "issueIds": ["not-in-round"]}))])
-    payload = {"roundId": MORNING, "issues": [{"eventId": ALPHA_ISSUES["q1"]}]}
-    assert service.judge_outlook(payload) is None
-    assert provider.calls == 1
-    assert admin.services.db.one("SELECT failure_code FROM sentiment_results")["failure_code"] == "issue_reference_invalid"
+    company_id = next(iter(ds.companies))
+    article_id = ds.issues_of_company(company_id)[0].article_ids[0]
+    payload = document_input(ds, article_id, company_id)
+    legacy = DocumentSentiment(label="undetermined", company_id=company_id, rationale="과거 원문에서 방향이 충분하지 않습니다.",
+                               quotes=[payload["article"]["body"][:5]], judged_at="2026-10-01T00:00:00+00:00", model="historical-model", prompt_version="sentiment-2026-10-06-v1")
+    admin.services.db.execute("INSERT INTO sentiment_results VALUES (?,?,?,?,?,?,?,?,?,?,?)", (input_hash("document-sentiment", legacy.model, payload), "document-sentiment", article_id, company_id,
+                             legacy.model, legacy.prompt_version, legacy.judged_at, "accepted", dumps(legacy.model_dump(by_alias=True)), None, None))
+    doc = next(d for d in admin.client.get(f"/api/companies/{company_id}/documents").json()["items"] if d["id"] == article_id)
+    assert doc["sentiment"]["label"] == "undetermined" and doc["documentSummary"] is None
+    assert doc["analysisStatus"]["sentiment"]["reason"] == "legacy_immutable"
+    assert admin.services.db.one("SELECT COUNT(*) AS n FROM document_analysis_calls")["n"] == 0
+    assert not hasattr(admin.services.sentiment, "provider") and not hasattr(admin.services.sentiment, "judge_document")
 
 
-def test_openai_compatible_wire_uses_fixed_transport_and_records_model_usage(make_admin):
-    payload = base_payload()
-    for issue in payload["issues"]:
-        for article in issue["articles"]:
-            article["allow_model_send"] = True
-    kit = make_admin(payload)
-    ds = kit.services.provider.get()
-    pair = document_pairs(ds)[0]
-    fixed = answer(ds, pair)
-    requests = []
-
-    def respond(request):
-        requests.append(json.loads(request.content))
-        assert request.url.path == "/v1/chat/completions"
-        return httpx.Response(200, json={"choices": [{"message": {"content": fixed.content}}],
-                                        "usage": {"prompt_tokens": 51, "completion_tokens": 12}})
-
-    provider = OpenAICompatibleProvider(base_url="https://model.invalid/v1", api_key="test-only", model="fixed-transport", transport=httpx.MockTransport(respond))
-    service = SentimentService(kit.services.db, kit.clock, kit.services.usage, provider=provider, max_calls=1)
-    try:
-        assert service.judge_document(ds, *pair) is not None
-        assert service.judge_document(ds, *pair) is not None
-    finally:
-        provider.close()
-    assert len(requests) == 1
-    assert requests[0]["response_format"]["json_schema"]["strict"] is True
-    assert requests[0]["response_format"]["json_schema"]["schema"]["additionalProperties"] is False
-    feature = next(f for f in kit.services.usage.response("all", []).features if f.feature == "document-sentiment")
-    assert (feature.usage.model_calls, feature.usage.input_tokens, feature.usage.output_tokens, feature.usage.replay_calls) == (1, 51, 12, 0)
+@pytest.mark.parametrize("state,status", [("persisting", "pending"), ("cancelled", "failed")])
+def test_import_does_not_publish_an_artifact_before_ready_or_after_cancellation(make_admin, tmp_path, state, status):
+    _, _, results = populated(make_admin, tmp_path)
+    pending = copy.deepcopy(results[0])
+    pending["state"] = state
+    pending["phase"] = "artifact.validated" if state == "persisting" else "cancel.requested"
+    target = make_admin(fixture("snapshot"))
+    register_current_grants(target)
+    imported = target.services.sentiment.analysis_store.import_job(target.services.provider.get(), pending)
+    assert imported["status"] == status and imported["artifactId"] is None
+    doc = target.client.get("/api/companies/SYNTH-A/documents").json()["items"][0]
+    assert doc["documentSummary"] is None and doc["analysisStatus"]["summary"]["status"] == status
+    assert target.services.db.one("SELECT COUNT(*) AS n FROM document_analysis")["n"] == 0
 
 
-def test_live_adapter_respects_document_send_permission(admin):
-    ds = admin.services.provider.get()
-    pair = document_pairs(ds)[0]
-    requests = []
-    provider = OpenAICompatibleProvider(base_url="https://model.invalid/v1", api_key="test-only", model="fixed-transport",
-        transport=httpx.MockTransport(lambda req: requests.append(req)))
-    service = SentimentService(admin.services.db, admin.clock, admin.services.usage, provider=provider, max_calls=1)
-    try:
-        assert service.judge_document(ds, *pair) is None
-    finally:
-        provider.close()
-    assert requests == [] and service.calls == 0
-
-
-def test_cli_dry_run_reports_targets_without_changing_source_state(admin):
-    before = admin.services.db.query("SELECT * FROM ai_events")
-    env = {"ZOOP_STATE_DIR": str(admin.state_dir), "ZOOP_SNAPSHOT_PATH": str(admin.settings.snapshot_path),
-           "ZOOP_COMPANY_CATALOG": "", "ZOOP_QUOTE_PROVIDER": "off"}
-    import os
-    result = subprocess.run(["uv", "run", "python", "scripts/judge_sentiment.py", "--dry-run"],
-                            cwd=BFF_ROOT, env={**os.environ, **env}, capture_output=True, text=True, timeout=60)
-    assert result.returncode == 0, result.stderr
-    report = json.loads(result.stdout)
-    assert report["documentPairs"] == 3 and report["permissionBlockedPairs"] == 3
-    assert report["expectedCalls"] == 1 and report["rounds"] == 1
-    assert admin.services.db.query("SELECT * FROM ai_events") == before
+def test_import_requires_the_frozen_company_name_to_match_its_master_id(make_admin, tmp_path):
+    kit, _, results = populated(make_admin, tmp_path)
+    wrong_company = copy.deepcopy(results[0])
+    wrong_company["input"]["input"]["company"]["name"] = "합성 베타"
+    with pytest.raises(AnalysisImportError, match="company_context_mismatch"):
+        kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), wrong_company)

@@ -2,13 +2,15 @@
 
 이 문서는 생성물이다. 변경은 catalog.yaml 가져오기, links.yaml 또는 docs/api/openapi.yaml 편집으로 한다.
 
-[API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)
+[현재 사용자 결정](../../share/day-work-2026-10-08.md) · [유효 기준 JSON](effective-authority.json) · [전체 수용 기준](acceptance-matrix.md) · [원문 정정 요청](source-corrections.md) · [API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [WBS 내용 기반 이행](wbs-migration.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)
+
+전체 명세/WBS의 유효 구현 범위: **팀합의요구/설계대상**. 원문 상태는 아래에 별도로 보존하며 완료·실행 승인으로 해석하지 않는다.
 
 ## 화면
 
 - [COVER · 줍 화면계획서 v2.1](screen-COVER.md) — 1쪽
 - [HISTORY · 변경 이력·v1.7 대비](screen-HISTORY.md) — 2쪽
-- [HISTORY-21 · 변경 이력 · v2.0 → v2.1](screen-HISTORY-21.md) — 3쪽
+- [HISTORY-21 · 변경 이력 · v2.1 · 10-08 정합화](screen-HISTORY-21.md) — 3쪽
 - [GUIDE · 읽는 법](screen-GUIDE.md) — 4쪽
 - [MAP-01 · 화면 목록·라우트·명세](screen-MAP-01.md) — 5쪽
 - [MAP-02 · 화면 목록·라우트·명세](screen-MAP-02.md) — 6쪽
@@ -80,106 +82,116 @@
 - [APP-VERDICT-01 · 팀 v1.7 판정표 · 채택](screen-APP-VERDICT-01.md) — 72쪽
 - [APP-VERDICT-02 · 팀 v1.7 판정표 · 불채택](screen-APP-VERDICT-02.md) — 73쪽
 - [APP-POLICY-01 · 팀 확인 필요 · 관리자와 운영](screen-APP-POLICY-01.md) — 74쪽
-- [APP-POLICY-02 · 팀 확인 필요 · 10-03 명세 충돌](screen-APP-POLICY-02.md) — 75쪽
+- [APP-POLICY-02 · 결정 상태 · 10-08 정합화](screen-APP-POLICY-02.md) — 75쪽
 - [APP-LIMIT · 근거 버전·남은 한계](screen-APP-LIMIT.md) — 76쪽
 - [APP-DOCS · 문서 체계 · 화면에서 구현 추적까지](screen-APP-DOCS.md) — 77쪽
 
-## 기능·비기능
+## 기존 원문 분류의 기능·비기능(현재 설계대상)
 
-- [FS001 · 서비스 시작 방식 선택](feature-FS001.md) — P1
-- [FS002 · 이메일 로그인](feature-FS002.md) — P1
-- [FS003 · 이메일 회원가입](feature-FS003.md) — P1
-- [FS004 · 소셜 로그인과 회원가입](feature-FS004.md) — P1
-- [FS005 · 비회원 시작](feature-FS005.md) — P1
-- [FS006 · 로그인 후 화면 이동](feature-FS006.md) — P1
-- [FS007 · 로그아웃](feature-FS007.md) — P1
-- [FS008 · 투자 여부 선택](feature-FS008.md) — P1
-- [FS009 · 가상계좌 프로필 연결](feature-FS009.md) — P1
-- [FS010 · 가상계좌 연결 재시도와 건너뛰기](feature-FS010.md) — P1
-- [FS011-01 · 관심종목 검색](feature-FS011-01.md) — P1
-- [FS011-02 · 추천 종목·산업·테마 조회](feature-FS011-02.md) — P1
-- [FS012 · 초기 관심종목 선택](feature-FS012.md) — P1
-- [FS013 · 초기 설정 저장](feature-FS013.md) — P1
-- [FS014 · 초기 관계 그래프 제공](feature-FS014.md) — P1
-- [FS015 · 관계 그래프 튜토리얼](feature-FS015.md) — P1
-- [FS016 · 튜토리얼 완료와 건너뛰기](feature-FS016.md) — P1
-- [FS017 · 개인화 관계 그래프](feature-FS017.md) — P1
-- [FS018 · 전체 관계 그래프](feature-FS018.md) — P1
-- [FS019 · 그래프 모드 전환](feature-FS019.md) — P1
-- [FS020 · 기업 노드 정보](feature-FS020.md) — P1
-- [FS021 · 이슈 노드 정보](feature-FS021.md) — P1
-- [FS022 · 기업 패널에서 이슈 영향 경로 확인](feature-FS022.md) — P1
-- [FS023 · 기업 간 관계 확인(기업 간 간선 클릭)](feature-FS023.md) — P1
-- [FS024 · 관계 근거 확인](feature-FS024.md) — P1
-- [FS025 · 선택한 노드로 AI 질문](feature-FS025.md) — P1
-- [FS026 · 사이드바 기업 선택](feature-FS026.md) — P1
-- [FS027 · 관심 종목 수정](feature-FS027.md) — P1
-- [FS028 · 출근 브리핑 생성](feature-FS028.md) — P1
-- [FS029 · 퇴근 브리핑 생성](feature-FS029.md) — P1
-- [FS030 · 핵심 이슈 선정 및 제공](feature-FS030.md) — P1
-- [FS031 · 시장 변수 제공](feature-FS031.md) — P1
-- [FS032 · 관계 그래프 조회](feature-FS032.md) — P1
-- [FS033 · 공통 브리핑 조회](feature-FS033.md) — P2
-- [FS034 · 중복 발행 방지](feature-FS034.md) — P1
-- [FS035 · 브리핑 회차 저장 및 이력 보존](feature-FS035.md) — P1
-- [FS036 · 개인화 브리핑 조회](feature-FS036.md) — P2
-- [FS037 · 종목 목록·검색 및 상세 진입](feature-FS037.md) — P1
-- [FS038 · 기업 상세 조회](feature-FS038.md) — P1
-- [FS039 · 가상 보유 정보 표시](feature-FS039.md) — P1
-- [FS040 · 차트와 타임라인 기간 조회](feature-FS040.md) — P1
-- [FS041 · 동일 날짜 사건 구분](feature-FS041.md) — P1
-- [FS042 · 재무와 실적 조회](feature-FS042.md) — P1
-- [FS043 · 뉴스와 공시 조회](feature-FS043.md) — P1
-- [FS044 · 기업 상세와 관계 그래프 이동·상태 복원](feature-FS044.md) — P1
-- [FS045 · AI 질문 진입과 전송](feature-FS045.md) — P1
-- [FS046 · AI 권한과 중복 작업 통제](feature-FS046.md) — P1
-- [FS047 · 질문 해석과 되묻기](feature-FS047.md) — P1
-- [FS048 · 개인화 조건과 근거 확보](feature-FS048.md) — P1
-- [FS049 · 답변 검증과 제공](feature-FS049.md) — P1
-- [FS050-01 · AI 답변 근거·원문 확인](feature-FS050-01.md) — P1
-- [FS050-02 · AI 답변 관련 그래프 탐색](feature-FS050-02.md) — P1
-- [FS051 · 새 대화 시작](feature-FS051.md) — P1
-- [FS052-01 · 같은 대화에서 후속 질문 전송](feature-FS052-01.md) — P1
-- [FS052-02 · AI 내부 패널 닫기·재열기와 대화 유지](feature-FS052-02.md) — P1
-- [FS053 · AI 결과 회수와 재시도](feature-FS053.md) — P1
-- [FS054 · 사용자와 모의 보유](feature-FS054.md) — P1
-- [FS055 · 관계와 근거 연결](feature-FS055.md) — P1
-- [FS056 · 사건과 문서 구분](feature-FS056.md) — P1
-- [FS058 · 신규 경제뉴스 정기 수집 및 이슈 분석](feature-FS058.md) — P1
-- [FS059 · 분석 결과 저장 및 조회 반영](feature-FS059.md) — P1
-- [FS060 · 대화와 질문 기록](feature-FS060.md) — P1
-- [FS061 · 소셜 인증 연동](feature-FS061.md) — P1
-- [FS062 · 가상계좌 데이터 연동](feature-FS062.md) — P1
-- [FS063 · 뉴스와 시장 데이터 연동](feature-FS063.md) — P1
-- [FS064 · AI 분석 연동](feature-FS064.md) — P1
-- [FS065 · 기업 및 사용자 통계 조사 및 확인](feature-FS065.md) — P2
-- [FS066-01 · AI 답변·뉴스 요약·브리핑 평가 등록](feature-FS066-01.md) — FS037: 미기재 / FS066: P2
-- [FS066-02 · AI 기능별 선호도 조회](feature-FS066-02.md) — P2
-- [FS066-03 · 마스킹된 AI 대화록 조회](feature-FS066-03.md) — P2
-- [FS067-01 · 이슈 분석·공개 반영 상태 조회](feature-FS067-01.md) — P1
-- [FS067-02 · 보류 이슈 검수 및 허용·거부](feature-FS067-02.md) — P1
-- [FS067-03 · 실패한 이슈 분석·반영 작업 재시도](feature-FS067-03.md) — P1
-- [FS068 · AI 사용량·비용·오류 통계](feature-FS068.md) — P1
-- [FS069-01 · 회원 활동 조회](feature-FS069-01.md) — P2
-- [FS069-02 · 회원 차단·차단 해제](feature-FS069-02.md) — P2
-- [FS070-01 · 브리핑 회차별 생성·검증·발행 상태 조회](feature-FS070-01.md) — P1
-- [FS070-02 · 미발행 브리핑 회차 재처리](feature-FS070-02.md) — P1
-- [FS071-01 · 발행 브리핑 정정 등록](feature-FS071-01.md) — P1
-- [FS071-02 · 발행 브리핑 제공 중단](feature-FS071-02.md) — P1
-- [FS072 · 대시보드](feature-FS072.md) — P1
-- [FS073 · 관리자 로그인(SSO, ID/PW)](feature-FS073.md) — P1
-- [NFS001 · 접근 통제](feature-NFS001.md) — P1
-- [NFS002 · 응답과 화면 정합성](feature-NFS002.md) — P1
-- [NFS003 · 작업 일관성과 복구](feature-NFS003.md) — P1
-- [NFS004 · 부분 실패 내성](feature-NFS004.md) — P1
-- [NFS005 · 근거와 해석의 품질](feature-NFS005.md) — P1
-- [NFS006 · 모델 전달 데이터 최소화](feature-NFS006.md) — P1
-- [NFS007 · 성능 측정 기준](feature-NFS007.md) — P2
-- [NFS008 · 운영 추적](feature-NFS008.md) — P1
-- [NFS009 · 중단 작업 복구](feature-NFS009.md) — P1
-- [NFS010 · 지원 환경](feature-NFS010.md) — P1
-- [NFS011 · 웹 접근성](feature-NFS011.md) — P2
-- [NFS012 · 정기 갱신 반영 시간 보장](feature-NFS012.md) — P1
-- [FS??? · 브리핑 리뷰](feature-FS~3f~3f~3f.md) — P2
-- [FS0?? · 시점 기반 관계 그래프 조회](feature-FS0~3f~3f.md) — P1
-- [FS050 · 새 대화와 후속 질문](feature-FS050.md) — P1
+- [FS001 · 서비스 시작 방식 선택](feature-FS001.md) — 원문 우선순위 P1
+- [FS002 · 이메일 로그인](feature-FS002.md) — 원문 우선순위 P1
+- [FS003 · 이메일 회원가입](feature-FS003.md) — 원문 우선순위 P1
+- [FS004 · 소셜 로그인과 회원가입](feature-FS004.md) — 원문 우선순위 P1
+- [FS005 · 비회원 시작](feature-FS005.md) — 원문 우선순위 P1
+- [FS006 · 로그인 후 화면 이동](feature-FS006.md) — 원문 우선순위 P1
+- [FS007 · 로그아웃](feature-FS007.md) — 원문 우선순위 P1
+- [FS008 · 투자 여부 선택](feature-FS008.md) — 원문 우선순위 P1
+- [FS009 · 가상계좌 프로필 연결](feature-FS009.md) — 원문 우선순위 P1
+- [FS010 · 가상계좌 연결 재시도와 건너뛰기](feature-FS010.md) — 원문 우선순위 P1
+- [FS011-01 · 관심종목 검색](feature-FS011-01.md) — 원문 우선순위 P1
+- [FS011-02 · 추천 종목·산업·테마 조회](feature-FS011-02.md) — 원문 우선순위 P1
+- [FS012 · 초기 관심종목 선택](feature-FS012.md) — 원문 우선순위 P1
+- [FS013 · 초기 설정 저장](feature-FS013.md) — 원문 우선순위 P1
+- [FS014 · 초기 관계 그래프 제공](feature-FS014.md) — 원문 우선순위 P1
+- [FS015 · 관계 그래프 튜토리얼](feature-FS015.md) — 원문 우선순위 P1
+- [FS016 · 튜토리얼 완료와 건너뛰기](feature-FS016.md) — 원문 우선순위 P1
+- [FS017 · 개인화 관계 그래프](feature-FS017.md) — 원문 우선순위 P1
+- [FS018 · 전체 관계 그래프](feature-FS018.md) — 원문 우선순위 P1
+- [FS019 · 그래프 모드 전환](feature-FS019.md) — 원문 우선순위 P1
+- [FS020 · 기업 노드 정보](feature-FS020.md) — 원문 우선순위 P1
+- [FS021 · 이슈 노드 정보](feature-FS021.md) — 원문 우선순위 P1
+- [FS022 · 기업 패널에서 이슈 영향 경로 확인](feature-FS022.md) — 원문 우선순위 P1
+- [FS023 · 기업 간 관계 확인(기업 간 간선 클릭)](feature-FS023.md) — 원문 우선순위 P1
+- [FS024 · 관계 근거 확인](feature-FS024.md) — 원문 우선순위 P1
+- [FS025 · 선택한 노드로 AI 질문](feature-FS025.md) — 원문 우선순위 P1
+- [FS026 · 사이드바 기업 선택](feature-FS026.md) — 원문 우선순위 P1
+- [FS027 · 관심 종목 수정](feature-FS027.md) — 원문 우선순위 P1
+- [FS028 · 출근 브리핑 생성](feature-FS028.md) — 원문 우선순위 P1
+- [FS029 · 퇴근 브리핑 생성](feature-FS029.md) — 원문 우선순위 P1
+- [FS030 · 핵심 이슈 선정 및 제공](feature-FS030.md) — 원문 우선순위 P1
+- [FS031 · 시장 변수 제공](feature-FS031.md) — 원문 우선순위 P1
+- [FS032 · 관계 그래프 조회](feature-FS032.md) — 원문 우선순위 P1
+- [FS033 · 공통 브리핑 조회](feature-FS033.md) — 원문 우선순위 P2
+- [FS034 · 중복 발행 방지](feature-FS034.md) — 원문 우선순위 P1
+- [FS035 · 브리핑 회차 저장 및 이력 보존](feature-FS035.md) — 원문 우선순위 P1
+- [FS036 · 개인화 브리핑 조회](feature-FS036.md) — 원문 우선순위 P2
+- [FS037 · 종목 목록·검색 및 상세 진입](feature-FS037.md) — 원문 우선순위 P1
+- [FS038 · 기업 상세 조회](feature-FS038.md) — 원문 우선순위 P1
+- [FS039 · 가상 보유 정보 표시](feature-FS039.md) — 원문 우선순위 P1
+- [FS040 · 차트와 타임라인 기간 조회](feature-FS040.md) — 원문 우선순위 P1
+- [FS041 · 동일 날짜 사건 구분](feature-FS041.md) — 원문 우선순위 P1
+- [FS042 · 재무와 실적 조회](feature-FS042.md) — 원문 우선순위 P1
+- [FS043 · 뉴스와 공시 조회](feature-FS043.md) — 원문 우선순위 P1
+- [FS044 · 기업 상세와 관계 그래프 이동·상태 복원](feature-FS044.md) — 원문 우선순위 P1
+- [FS045 · AI 질문 진입과 전송](feature-FS045.md) — 원문 우선순위 P1
+- [FS046 · AI 권한과 중복 작업 통제](feature-FS046.md) — 원문 우선순위 P1
+- [FS047 · 질문 해석과 되묻기](feature-FS047.md) — 원문 우선순위 P1
+- [FS048 · 개인화 조건과 근거 확보](feature-FS048.md) — 원문 우선순위 P1
+- [FS049 · 답변 검증과 제공](feature-FS049.md) — 원문 우선순위 P1
+- [FS050-01 · AI 답변 근거·원문 확인](feature-FS050-01.md) — 원문 우선순위 P1
+- [FS050-02 · AI 답변 관련 그래프 탐색](feature-FS050-02.md) — 원문 우선순위 P1
+- [FS051 · 새 대화 시작](feature-FS051.md) — 원문 우선순위 P1
+- [FS052-01 · 같은 대화에서 후속 질문 전송](feature-FS052-01.md) — 원문 우선순위 P1
+- [FS052-02 · AI 내부 패널 닫기·재열기와 대화 유지](feature-FS052-02.md) — 원문 우선순위 P1
+- [FS053 · AI 결과 회수와 재시도](feature-FS053.md) — 원문 우선순위 P1
+- [FS054 · 사용자와 모의 보유](feature-FS054.md) — 원문 우선순위 P1
+- [FS055 · 관계와 근거 연결](feature-FS055.md) — 원문 우선순위 P1
+- [FS056 · 사건과 문서 구분](feature-FS056.md) — 원문 우선순위 P1
+- [FS058 · 신규 경제뉴스 정기 수집 및 이슈 분석](feature-FS058.md) — 원문 우선순위 P1
+- [FS059 · 분석 결과 저장 및 조회 반영](feature-FS059.md) — 원문 우선순위 P1
+- [FS060 · 대화와 질문 기록](feature-FS060.md) — 원문 우선순위 P1
+- [FS061 · 소셜 인증 연동](feature-FS061.md) — 원문 우선순위 P1
+- [FS062 · 가상계좌 데이터 연동](feature-FS062.md) — 원문 우선순위 P1
+- [FS063 · 뉴스와 시장 데이터 연동](feature-FS063.md) — 원문 우선순위 P1
+- [FS064 · AI 분석 연동](feature-FS064.md) — 원문 우선순위 P1
+- [FS065 · 기업 및 사용자 통계 조사 및 확인](feature-FS065.md) — 원문 우선순위 P2
+- [FS066-01 · AI 답변·뉴스 요약·브리핑 평가 등록](feature-FS066-01.md) — 원문 우선순위 FS037: 미기재 / FS066: P2
+- [FS066-02 · AI 기능별 선호도 조회](feature-FS066-02.md) — 원문 우선순위 P2
+- [FS066-03 · 마스킹된 AI 대화록 조회](feature-FS066-03.md) — 원문 우선순위 P2
+- [FS067-01 · 이슈 분석·공개 반영 상태 조회](feature-FS067-01.md) — 원문 우선순위 P1
+- [FS067-02 · 보류 이슈 검수 및 허용·거부](feature-FS067-02.md) — 원문 우선순위 P1
+- [FS067-03 · 실패한 이슈 분석·반영 작업 재시도](feature-FS067-03.md) — 원문 우선순위 P1
+- [FS068 · AI 사용량·비용·오류 통계](feature-FS068.md) — 원문 우선순위 P1
+- [FS069-01 · 회원 활동 조회](feature-FS069-01.md) — 원문 우선순위 P2
+- [FS069-02 · 회원 차단·차단 해제](feature-FS069-02.md) — 원문 우선순위 P2
+- [FS070-01 · 브리핑 회차별 생성·검증·발행 상태 조회](feature-FS070-01.md) — 원문 우선순위 P1
+- [FS070-02 · 미발행 브리핑 회차 재처리](feature-FS070-02.md) — 원문 우선순위 P1
+- [FS071-01 · 발행 브리핑 정정 등록](feature-FS071-01.md) — 원문 우선순위 P1
+- [FS071-02 · 발행 브리핑 제공 중단](feature-FS071-02.md) — 원문 우선순위 P1
+- [FS072 · 대시보드](feature-FS072.md) — 원문 우선순위 P1
+- [FS073 · 관리자 로그인(SSO, ID/PW)](feature-FS073.md) — 원문 우선순위 P1
+- [NFS001 · 접근 통제](feature-NFS001.md) — 원문 우선순위 P1
+- [NFS002 · 응답과 화면 정합성](feature-NFS002.md) — 원문 우선순위 P1
+- [NFS003 · 작업 일관성과 복구](feature-NFS003.md) — 원문 우선순위 P1
+- [NFS004 · 부분 실패 내성](feature-NFS004.md) — 원문 우선순위 P1
+- [NFS005 · 근거와 해석의 품질](feature-NFS005.md) — 원문 우선순위 P1
+- [NFS006 · 모델 전달 데이터 최소화](feature-NFS006.md) — 원문 우선순위 P1
+- [NFS007 · 성능 측정 기준](feature-NFS007.md) — 원문 우선순위 P2
+- [NFS008 · 운영 추적](feature-NFS008.md) — 원문 우선순위 P1
+- [NFS009 · 중단 작업 복구](feature-NFS009.md) — 원문 우선순위 P1
+- [NFS010 · 지원 환경](feature-NFS010.md) — 원문 우선순위 P1
+- [NFS011 · 웹 접근성](feature-NFS011.md) — 원문 우선순위 P2
+- [NFS012 · 정기 갱신 반영 시간 보장](feature-NFS012.md) — 원문 우선순위 P1
+- [FS??? · 브리핑 리뷰](feature-FS~3f~3f~3f.md) — 원문 우선순위 P2
+- [FS050 · 새 대화와 후속 질문](feature-FS050.md) — 원문 우선순위 P1
+
+## 원문 추가 제안 8개 · 현재 팀합의 설계대상
+
+- [FS074 · 뉴스·공시 수집 및 수집 회차 관리](feature-FS074.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS075 · 원천 문서 정제·중복 제거 및 버전 관리](feature-FS075.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS076 · AI 사건·이슈 추출 및 이슈 후보 생성](feature-FS076.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS077 · 기업·이슈 Entity Linking 및 동일성 판정](feature-FS077.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS078 · 기업–이슈·기업–기업 관계 추출](feature-FS078.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS079 · 영향 방향·근거 검증 및 공개 적격 판정](feature-FS079.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS080 · GraphDB 노드·간선 upsert 및 공개 버전 반영](feature-FS080.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상
+- [FS081 · 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구](feature-FS081.md) — 원문 미정 · 추가 제안 · 검토 전 / 유효 팀합의요구/설계대상

@@ -1724,7 +1724,7 @@ export interface components {
              * Feature
              * @enum {string}
              */
-            feature: "chatbot" | "news-analysis" | "briefing" | "document-sentiment" | "briefing-outlook";
+            feature: "chatbot" | "news-analysis" | "briefing" | "document-sentiment" | "briefing-outlook" | "document-summary" | "semantic-verification";
             /** Label */
             label: string;
             /** Engine */
@@ -1764,6 +1764,104 @@ export interface components {
             /** Pastruns */
             pastRuns: components["schemas"]["PastRun"][];
             cost: components["schemas"]["FeatureCost"];
+        };
+        /** AnalysisCitation */
+        AnalysisCitation: {
+            /** Evidenceid */
+            evidenceId: string;
+            /** Documentid */
+            documentId: string;
+            /** Documentversion */
+            documentVersion: string;
+            /** Textartifactid */
+            textArtifactId: string;
+            /**
+             * Offsetunit
+             * @constant
+             */
+            offsetUnit: "unicode_code_point";
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Quote */
+            quote: string;
+            /**
+             * Inputkind
+             * @enum {string}
+             */
+            inputKind: "body" | "summary";
+            /** Rawlocatorids */
+            rawLocatorIds: string[];
+        };
+        /** AnalysisClaim */
+        AnalysisClaim: {
+            /** Claimid */
+            claimId: string;
+            /** Text */
+            text: string;
+            /**
+             * Assertionkind
+             * @enum {string}
+             */
+            assertionKind: "fact" | "interpretation" | "limitation";
+            /** Evidenceids */
+            evidenceIds: string[];
+        };
+        /** AnalysisProvenance */
+        AnalysisProvenance: {
+            /**
+             * Sourcekind
+             * @enum {string}
+             */
+            sourceKind: "synthetic" | "actual";
+            /**
+             * Executionmode
+             * @enum {string}
+             */
+            executionMode: "replay" | "live";
+            /**
+             * Recordingkind
+             * @enum {string}
+             */
+            recordingKind: "authored-test" | "provider";
+        };
+        /** AnalysisStageStatus */
+        AnalysisStageStatus: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "not_requested" | "pending" | "failed" | "withheld" | "available";
+            /** Reason */
+            reason: string | null;
+        };
+        /** AnalysisSummary */
+        AnalysisSummary: {
+            /**
+             * Schemaversion
+             * @constant
+             */
+            schemaVersion: "zoop-ai-s1-1";
+            /** Artifactid */
+            artifactId: string;
+            /** Documentid */
+            documentId: string;
+            /** Documentversion */
+            documentVersion: string;
+            /** Resultversion */
+            resultVersion: string;
+            /** Text */
+            text: string;
+            /** Claims */
+            claims: components["schemas"]["AnalysisClaim"][];
+            /** Citations */
+            citations: components["schemas"]["AnalysisCitation"][];
+            /** Limitations */
+            limitations: string[];
+            /** Producedat */
+            producedAt: string;
+            provenance: components["schemas"]["AnalysisProvenance"];
         };
         /** ApprovalOut */
         ApprovalOut: {
@@ -2800,6 +2898,13 @@ export interface components {
              */
             quotes: components["schemas"]["DocumentQuote"][];
             sentiment: components["schemas"]["DocumentSentiment"] | null;
+            /** Documentversion */
+            documentVersion: string | null;
+            documentSummary: components["schemas"]["AnalysisSummary"] | null;
+            analysisStatus: components["schemas"]["DocumentAnalysisStatus"] | null;
+            analysisProvenance: components["schemas"]["AnalysisProvenance"] | null;
+            /** Resultversion */
+            resultVersion: string | null;
         };
         /** CompanyDocumentsResponse */
         CompanyDocumentsResponse: {
@@ -3263,6 +3368,11 @@ export interface components {
              */
             sessionId: string | null;
         };
+        /** DocumentAnalysisStatus */
+        DocumentAnalysisStatus: {
+            summary: components["schemas"]["AnalysisStageStatus"];
+            sentiment: components["schemas"]["AnalysisStageStatus"];
+        };
         /** DocumentEventRef */
         DocumentEventRef: {
             /** Eventid */
@@ -3359,7 +3469,7 @@ export interface components {
             /** Message */
             message: string;
             /** Details */
-            details: {
+            details?: {
                 [key: string]: unknown;
             } | null;
         };
@@ -3531,6 +3641,13 @@ export interface components {
             eventIds: string[];
             metadata: components["schemas"]["Metadata"];
             sentiment: components["schemas"]["DocumentSentiment"] | null;
+            /** Documentversion */
+            documentVersion: string | null;
+            documentSummary: components["schemas"]["AnalysisSummary"] | null;
+            analysisStatus: components["schemas"]["DocumentAnalysisStatus"] | null;
+            analysisProvenance: components["schemas"]["AnalysisProvenance"] | null;
+            /** Resultversion */
+            resultVersion: string | null;
         };
         /** FeatureCost */
         FeatureCost: {

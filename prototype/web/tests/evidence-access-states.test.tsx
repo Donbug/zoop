@@ -33,6 +33,7 @@ const quoteOf = (id: string): Schemas["EvidenceResponse"] => ({
   eventIds: [EVENT.id],
   metadata,
   sentiment: null,
+  documentSummary: null, analysisStatus: null, analysisProvenance: null, documentVersion: null, resultVersion: null,
 });
 
 /** 근거 id마다 응답(함수면 요청할 때마다 다시 정한다) */

@@ -631,7 +631,7 @@ class RecentError(CamelModel):
 
 
 class AiFeature(CamelModel):
-    feature: Literal["chatbot", "news-analysis", "briefing", "document-sentiment", "briefing-outlook"]
+    feature: Literal["chatbot", "news-analysis", "briefing", "document-sentiment", "briefing-outlook", "document-summary", "semantic-verification"]
     label: str
     engine: str
     model_backed: bool

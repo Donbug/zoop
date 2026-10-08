@@ -4,7 +4,7 @@ InvestMate PoC([`Donbug/investmate-poc`](https://github.com/Donbug/investmate-po
 
 - PoC는 **읽기 전용**이다. 비공개 저장소의 고정 커밋을 git 의존성으로 설치한다(`pyproject.toml`의 `[tool.uv.sources]`, 조직 구성원은 `gh auth setup-git` 필요). 이 서버는 PoC DB에 `inspect(None)`과 몇 개의 SELECT만 실행한다. PoC 원장을 바꾸는 일은 BFF가 아니라 관리자 작업이 띄우는 PoC CLI(샌드박스)만 한다.
 - **사용자가 보는 그래프 = 활성 게시 버전(불변 스냅샷) + 관리자 검수 기록**이다. 사용자 API는 PoC DB를 직접 읽지 않는다(`ZOOP_SOURCE=live`는 폐지). 관리자가 원장에서 새 버전을 게시해야 사용자 화면이 바뀐다. 관리자 API는 아래 "관리자 API·운영".
-- PoC에 없는 요약은 지어내지 않고 `{"status":"unavailable","reason":...}`로 응답한다. 문서×기업·브리핑 회차 판정은 검증된 저장값만 제공하며 없으면 `sentiment:null`·`outlook:null`이다. HTTP/스케줄러는 모델을 호출하지 않고, 명시적 [판정 스크립트·설계](../../docs/design/sentiment.md)에서만 실행한다(현재 데모에는 판정값 없음). 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)에서 받아 출처·기준 시각과 함께 주고, 없으면 사유와 함께 `unavailable`이다. 인증·계좌·관심종목·브리핑 편성·AI 예시 답변은 BFF mock/규칙이며 응답 `metadata.generatedBy`로 표시한다.
+- 문서 요약·문서×기업 판정은 S1 worker의 exact/별도 semantic 검증과 BFF 수입을 마친 저장값만 제공한다. 미요청·실패·보류는 `analysisStatus`와 nullable 결과로 구분한다. 기존 회차 outlook 생성은 같은 worker 경계로 보존하며 기존 exact 정책과 발행 고정을 유지한다. 기업·시장 요약은 S5 계획이다. 일반 HTTP GET은 모델 호출이 없다. [AI 실행 계약](../../docs/design/ai-system.md)은 S1과 S2–7 계획을 구분한다. 기존 시세 출처·시각과 인증·계좌·관심종목·AI 예시 답변의 mock/규칙 경계도 유지한다.
 - `HOLD`/`REJECT`는 관리자가 허용하기 전에는 어떤 사용자 응답에도 나오지 않는다(`inspect().issues`만 사용, `candidates`는 모순 검사에만 사용). 예외는 **켜져 있는 자동 검수 규칙 R1@2가 다루는 HOLD 후보**(보류 사유가 역할 문구뿐인 후보, 아래 "관제·검수·그래프 버전")뿐이다. 관리자가 허용한 HOLD는 사건 상세의 `approval`(`관리자 승인`), 규칙이 게시한 사건은 `approval`(`자동 검수 규칙`)로 표시된다.
 - 소스 장애는 빈 결과로 위장하지 않고 `503 {"error":{"code":"source_unavailable",...}}`로 응답한다.
 
@@ -21,9 +21,36 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
   uv run uvicorn zoop_bff.main:app --port 8787
 ```
 
-- OpenAPI: `http://127.0.0.1:8787/openapi.json` (Swagger UI `/docs`). 모든 JSON 필드는 camelCase, 응답 모델의 모든 필드는 `required`로 표시된다(값이 없으면 `null`).
+- OpenAPI: `http://127.0.0.1:8787/openapi.json` (Swagger UI `/docs`). JSON은 camelCase이며 응답 모델은 항상 직렬화되는 nullable 필드를 required로 표시한다. 오류의 `error.details`는 실제 handler와 같이 optional이다.
 - 세션은 **httpOnly 쿠키 `zoop_session`**(SameSite=Lax)이고, 회원·설정·관심종목·가상계좌 연결·튜토리얼 완료·투자 여부와 세션(토큰의 SHA-256만)은 상태 DB(`ZOOP_STATE_DIR/zoop-admin.sqlite3`, `accounts.py`)에 저장돼 **재시작 후에도 유지**된다. 세션 만료: 회원 14일, 비회원 1일(절대 만료).
 - 프런트엔드는 Vite proxy(`/api → 127.0.0.1:8787`)로 same-origin 호출을 권장한다. 직접 호출하면 CORS(`credentials`)가 `ZOOP_CORS_ORIGINS` 목록(기본 `localhost`/`127.0.0.1`의 5173·3000·4173)에 한해 열린다. 쿠키는 호스트 단위이므로 `localhost`와 `127.0.0.1`을 섞어 쓰지 않는다.
+
+### S1 문서 AI worker와 수입
+
+기존 BFF sentiment provider/client의 중복 live 분기는 제거하고 `prototype/ai-worker`로 이행했다. 새 문서 producer는 `document-summary`, `document-sentiment`, `semantic-verification`이며 기존 `briefing-outlook` 생산 능력도 보존한다. `submit/run/get/resume/cancel`은 stdin/stdout JSON을 주고받고 worker state는 앱 state와 분리한다. BFF는 worker DB를 직접 읽거나 쓰지 않는다. 문서 수입은 `scripts/document_analysis.py import`, source deny는 `deny`, 미발행 회차 생성은 `scripts/judge_outlook.py`가 담당한다.
+
+stage별 모델·effort와 명시적 live/budget gate는 [`.env.example`](.env.example)을 따른다. 옛 `ZOOP_SENTIMENT_*`의 문서 선택은 `ZOOP_AI_DOCUMENT_SENTIMENT_*`, 회차 선택은 `ZOOP_AI_BRIEFING_OUTLOOK_*`로 옮긴 뒤 옛 export를 제거한다. summary와 VERIFY는 별도 변수다. runtime alias나 모델 fallback은 없다. 실제 모델·운영 예산·단가는 미정이며 예시 파일은 live 승인이 아니다.
+
+저장된 raw provider reply/영수증은 worker-private이며 공개 DTO에는 경로·키·원문 저장 파일을 넣지 않는다. timeout/receipt 소실은 `reconciling`으로 남고 자동 재호출하지 않는다. receipt 보존 후 저장 실패와 앱 import 실패는 저장된 결과만 다시 가져온다. 같은 job/input과 동일 artifact 반복 수입은 산출물/시도/비용이나 최신 공개 순서를 바꾸지 않는다. 동일 attempt는 고정 identity를 확인한 뒤 상태와 누락 usage만 전진하며, cache hit delivery job과 원 artifact/call 생성 job을 구분한다. BFF의 현재 grant는 server-owned `--grants` snapshot으로 artifact 수입과 별도 갱신하며, worker 결과의 grant는 현재 권한을 발급하거나 철회를 되돌릴 수 없다. 현재 `zoop-document-gate-2`는 공개 limitations까지 claim/semantic coverage를 요구하고 이전 정책 산출물은 보존하되 공개하지 않는다. 미발행 outlook은 ready/cache 저장값도 import 직전에 현재 한국어 공백 정규화·영문 금지 규칙을 다시 통과해야 하며, 이미 발행된 불변 회차는 소급 수정하지 않는다.
+
+기존 환경만으로 저장 상태가 분리된 합성 문서 두 기업을 재현할 수 있다. 저장소 루트에서 다음을 실행한다. driver는 실제 CLI와 BFF import를 사용하고 모델/시장 네트워크 설정을 전달하지 않는다.
+
+```sh
+prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py \
+  --worker-state /tmp/zoop-ai-doc-worker-demo --bff-state /tmp/zoop-ai-doc-bff-demo
+```
+
+그 상태를 읽는 서버, 개별 CLI JSON, 인용·권한·철회 규칙과 전체 범위는 [AI 실행 계약](../../docs/design/ai-system.md)을 따른다. 기본 데모 GET은 기존 stored source 읽기를 유지하고 새 grant를 만들지 않는다. authored replay는 actual 문서에 수입할 수 없다. 기존 immutable sentiment/회차 payload는 형식과 의미를 유지하며 조회한다.
+
+기존 회차의 실제 생성·발행 고정·빈 회차 무호출 재현은 다음 명령을 사용한다. 문서와 별도인 합성 snapshot/state이며 원래 발행 권한·정책을 통과한다.
+
+```sh
+prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixture.py \
+  --worker-state /tmp/zoop-outlook-worker --bff-state /tmp/zoop-outlook-bff --empty-bff-state /tmp/zoop-outlook-empty
+```
+
+
+
 
 ### 환경변수
 

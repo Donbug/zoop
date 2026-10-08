@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zoop BFF",
-    "description": "줍(Zoop) 프로토타입 BFF. InvestMate PoC의 승인 이슈(inspect())를 요구사항명세서 v0.2 §8 경로로 제공한다. 사용자에게 보이는 그래프는 활성 게시 버전과 관리자 검수 기록이다(`/api/admin/*`은 관리자 전용). 요약은 `unavailable`, 문서·회차 판정은 저장된 검증 결과만 제공하며 없으면 null, 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)의 값을 출처·기준 시각과 함께 주고 없으면 사유와 함께 `unavailable`, 인증·계좌·관심종목·AI 예시 답변은 BFF mock이며 `metadata`로 출처를 표시한다.",
+    "description": "줍(Zoop) 프로토타입 BFF. InvestMate PoC의 승인 이슈(inspect())를 요구사항명세서 v0.2 §8 경로로 제공한다. 사용자에게 보이는 그래프는 활성 게시 버전과 관리자 검수 기록이다(`/api/admin/*`은 관리자 전용). 문서 요약·기업별 판정은 S1 worker의 인용·별도 의미 검증과 앱 수입을 마친 저장값만 제공한다. 기업·시장 요약은 `unavailable`이며 회차 판정은 기존 불변 저장값만 읽는다. 일반 GET은 모델을 호출하지 않는다. 시세는 설정한 공급자(토스증권 Open API 또는 무키 공개 출처)의 값을 출처·기준 시각과 함께 주고 없으면 사유와 함께 `unavailable`, 인증·계좌·관심종목·AI 예시 답변은 BFF mock이며 `metadata`로 출처를 표시한다.",
     "version": "0.1.0"
   },
   "paths": {
@@ -8855,7 +8855,9 @@
               "news-analysis",
               "briefing",
               "document-sentiment",
-              "briefing-outlook"
+              "briefing-outlook",
+              "document-summary",
+              "semantic-verification"
             ],
             "title": "Feature"
           },
@@ -8982,6 +8984,247 @@
           "cost"
         ],
         "title": "AiUsageResponse"
+      },
+      "AnalysisCitation": {
+        "properties": {
+          "evidenceId": {
+            "type": "string",
+            "title": "Evidenceid"
+          },
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "title": "Documentversion"
+          },
+          "textArtifactId": {
+            "type": "string",
+            "title": "Textartifactid"
+          },
+          "offsetUnit": {
+            "type": "string",
+            "const": "unicode_code_point",
+            "title": "Offsetunit"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "quote": {
+            "type": "string",
+            "title": "Quote"
+          },
+          "inputKind": {
+            "type": "string",
+            "enum": [
+              "body",
+              "summary"
+            ],
+            "title": "Inputkind"
+          },
+          "rawLocatorIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rawlocatorids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidenceId",
+          "documentId",
+          "documentVersion",
+          "textArtifactId",
+          "offsetUnit",
+          "start",
+          "end",
+          "quote",
+          "inputKind",
+          "rawLocatorIds"
+        ],
+        "title": "AnalysisCitation"
+      },
+      "AnalysisClaim": {
+        "properties": {
+          "claimId": {
+            "type": "string",
+            "title": "Claimid"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "assertionKind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "interpretation",
+              "limitation"
+            ],
+            "title": "Assertionkind"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidenceids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claimId",
+          "text",
+          "assertionKind",
+          "evidenceIds"
+        ],
+        "title": "AnalysisClaim"
+      },
+      "AnalysisProvenance": {
+        "properties": {
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "actual"
+            ],
+            "title": "Sourcekind"
+          },
+          "executionMode": {
+            "type": "string",
+            "enum": [
+              "replay",
+              "live"
+            ],
+            "title": "Executionmode"
+          },
+          "recordingKind": {
+            "type": "string",
+            "enum": [
+              "authored-test",
+              "provider"
+            ],
+            "title": "Recordingkind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceKind",
+          "executionMode",
+          "recordingKind"
+        ],
+        "title": "AnalysisProvenance"
+      },
+      "AnalysisStageStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_requested",
+              "pending",
+              "failed",
+              "withheld",
+              "available"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "AnalysisStageStatus"
+      },
+      "AnalysisSummary": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-s1-1",
+            "title": "Schemaversion"
+          },
+          "artifactId": {
+            "type": "string",
+            "title": "Artifactid"
+          },
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "title": "Documentversion"
+          },
+          "resultVersion": {
+            "type": "string",
+            "title": "Resultversion"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisClaim"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisCitation"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "producedAt": {
+            "type": "string",
+            "title": "Producedat"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/AnalysisProvenance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "artifactId",
+          "documentId",
+          "documentVersion",
+          "resultVersion",
+          "text",
+          "claims",
+          "citations",
+          "limitations",
+          "producedAt",
+          "provenance"
+        ],
+        "title": "AnalysisSummary"
       },
       "ApprovalOut": {
         "properties": {
@@ -12112,6 +12355,58 @@
                 "type": "null"
               }
             ]
+          },
+          "documentVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documentversion"
+          },
+          "documentSummary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysisStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentAnalysisStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysisProvenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resultVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resultversion"
           }
         },
         "type": "object",
@@ -12124,7 +12419,12 @@
           "synthetic",
           "events",
           "quotes",
-          "sentiment"
+          "sentiment",
+          "documentVersion",
+          "documentSummary",
+          "analysisStatus",
+          "analysisProvenance",
+          "resultVersion"
         ],
         "title": "CompanyDocument"
       },
@@ -13436,6 +13736,22 @@
         ],
         "title": "DislikeRow"
       },
+      "DocumentAnalysisStatus": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/AnalysisStageStatus"
+          },
+          "sentiment": {
+            "$ref": "#/components/schemas/AnalysisStageStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "sentiment"
+        ],
+        "title": "DocumentAnalysisStatus"
+      },
       "DocumentEventRef": {
         "properties": {
           "eventId": {
@@ -13737,8 +14053,7 @@
         "type": "object",
         "required": [
           "code",
-          "message",
-          "details"
+          "message"
         ],
         "title": "ErrorBody"
       },
@@ -14268,6 +14583,58 @@
                 "type": "null"
               }
             ]
+          },
+          "documentVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documentversion"
+          },
+          "documentSummary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysisStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentAnalysisStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysisProvenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resultVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resultversion"
           }
         },
         "type": "object",
@@ -14282,7 +14649,12 @@
           "quoteVerified",
           "eventIds",
           "metadata",
-          "sentiment"
+          "sentiment",
+          "documentVersion",
+          "documentSummary",
+          "analysisStatus",
+          "analysisProvenance",
+          "resultVersion"
         ],
         "title": "EvidenceResponse"
       },

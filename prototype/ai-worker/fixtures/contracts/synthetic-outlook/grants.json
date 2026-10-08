@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "zoop-ai-s1-1",
+  "grants": [
+    {
+      "grantId": "grant-synthetic-outlook",
+      "revision": "grant-synthetic-outlook-1",
+      "sourceId": "authored-synthetic-round",
+      "enabled": true,
+      "rights": "known",
+      "allowedOperations": [
+        "read",
+        "store",
+        "model-send",
+        "quote-display"
+      ],
+      "recipients": [
+        "authored-replay"
+      ],
+      "purposes": [
+        "briefing-outlook"
+      ],
+      "evidence": [
+        "Repository-authored synthetic round and market-unavailable inputs"
+      ],
+      "expiresAt": null
+    }
+  ]
+}

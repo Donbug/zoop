@@ -4,7 +4,11 @@
 
 | 항목 | 원본/연결 |
 | --- | --- |
-| 우선순위·상태 | P1 · 목차 없음 |
+| 원본 우선순위·상태 | P1 · 목차 없음 |
+| 원문 범위 분류 | existing |
+| 유효 구현 범위 | 팀합의요구/설계대상 |
+| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
 | 요구사항 번호 |  |
 | API 대응 | 계약 미정 |
 | 사유 | AI v2 새 대화 정의와 기존 FS050-01/-02 의미가 다르다. 채택/이전 선언 없이 같은 번호로 통합하지 않는다. |
@@ -13,9 +17,14 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-06/08-AI-챗봇-v2.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/08-AI-챗봇-v2.csv)
+[docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-06/08-AI-챗봇-v2.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/08-AI-챗봇-v2.csv) — 새 대화와 후속 질문: 사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에 새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.
+- [docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv) — 새 대화와 후속 질문: 사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에 새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.
+
+## WBS 편집 연결
+
+| WBS | 역할 | 현재 업무 | 연결 근거 |
+| --- | --- | --- | --- |
 
 ## 화면·목표 API
 

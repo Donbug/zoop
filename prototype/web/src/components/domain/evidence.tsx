@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { formatKst } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { DocumentAnalysis } from "./document-analysis";
 
 /** 근거(또는 그 근거를 담은 사건)가 지워졌거나 비공개·권한 없음이라 다시 시도해도 받을 수 없는 응답인지 */
 export function isEvidenceGone(error: unknown) {
@@ -27,7 +28,7 @@ export function UnavailableEvidenceNote({ count, className }: { count: number; c
   );
 }
 
-type Evidence = Pick<Schemas["EvidenceResponse"], "id" | "quote" | "quoteVerified" | "article">;
+type Evidence = Pick<Schemas["EvidenceResponse"], "id" | "quote" | "quoteVerified" | "article" | "documentSummary" | "analysisStatus" | "analysisProvenance" | "sentiment" | "documentVersion" | "resultVersion">;
 
 /** 인용 확인 상태. 확인됨은 중성 아이콘 하나, 대조가 필요할 때만 경고 배지. */
 export function VerificationBadge({ verified }: { verified: boolean | null }) {
@@ -51,8 +52,9 @@ export interface EvidenceMapLink {
   onToggle: (evidenceId: string) => void;
 }
 
-export function EvidenceQuote({ evidence, index, total, mapLink }: { evidence: Evidence; index?: number; total?: number; mapLink?: EvidenceMapLink }) {
+export function EvidenceQuote({ evidence, index, total, mapLink, showAnalysis = true }: { evidence: Evidence; index?: number; total?: number; mapLink?: EvidenceMapLink; showAnalysis?: boolean }) {
   const article = evidence.article;
+  const citation = evidence.documentSummary?.citations.find((item) => item.evidenceId === evidence.id);
   const position = index !== undefined ? `인용 문서 ${index + 1}/${total}` : "인용 문서";
   return (
     <article className="flex flex-col gap-2" aria-label={position}>
@@ -68,7 +70,9 @@ export function EvidenceQuote({ evidence, index, total, mapLink }: { evidence: E
         <VerificationBadge verified={evidence.quoteVerified} />
       </p>
       {article?.title && <p className="text-base font-medium text-text-primary">{article.title}</p>}
+      {citation?.inputKind === "summary" && <p className="text-sm text-text-secondary">제공된 요약에서 인용했어요. 기사 전문 인용은 아니에요.</p>}
       <blockquote className="bg-surface-sunken px-4 py-3 text-md leading-relaxed text-text-primary">“{evidence.quote}”</blockquote>
+      {showAnalysis && <DocumentAnalysis analysis={evidence} synthetic={article?.synthetic === true} name={`${evidence.sentiment?.companyId ? `${evidence.sentiment.companyId} · ` : ""}${article?.title ?? "근거 문서"}`} />}
       <div className="flex flex-wrap items-center gap-x-4">
         {article?.url ? (
           <a
@@ -105,13 +109,19 @@ export function EvidenceQuote({ evidence, index, total, mapLink }: { evidence: E
 }
 
 export function EvidenceList({ items, mapLink, className }: { items: Evidence[]; mapLink?: EvidenceMapLink; className?: string }) {
+  const shownArtifacts = new Set<string>();
   return (
     <ol className={cn("stagger flex flex-col divide-y divide-border-subtle", className)}>
-      {items.map((evidence, i) => (
-        <li key={evidence.id} className="py-4 first:pt-0 last:pb-0">
-          <EvidenceQuote evidence={evidence} index={i} total={items.length} mapLink={mapLink} />
-        </li>
-      ))}
+      {items.map((evidence, i) => {
+        const artifactId = evidence.documentSummary?.artifactId;
+        const showAnalysis = !artifactId || !shownArtifacts.has(artifactId);
+        if (artifactId) shownArtifacts.add(artifactId);
+        return (
+          <li key={evidence.id} className="py-4 first:pt-0 last:pb-0">
+            <EvidenceQuote evidence={evidence} index={i} total={items.length} mapLink={mapLink} showAnalysis={showAnalysis} />
+          </li>
+        );
+      })}
     </ol>
   );
 }

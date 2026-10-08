@@ -1,0 +1,23 @@
+flowchart LR
+  selection["기업·기간·시점 선택<br/>React · 실제 화면 일부"]
+  routing["화면 이동·접근 확인<br/>"]
+  condition["선택 조건 공유<br/>URL · 공용 상태"]
+  cache["조회 결과 재사용<br/>TanStack Query"]
+  request["서버 요청 통일<br/>fetch · cookie"]
+  bff["화면용 서버<br/>FastAPI · /api"]
+  chart["차트·사건 변화<br/>기존 게시본 · 인과관계 아님"]
+  graph["관계 그래프<br/>Cytoscape · 같은 기업 예시"]
+  evidence["근거·저장 문서 분석<br/>합성 재현 예시 · 생성 호출 없음"]
+  question["일반 AI 질문<br/>규칙 기반"]
+  selection -->|""| routing
+  routing -->|""| condition
+  condition -->|"조건"| cache
+  cache -->|"조회 요청"| request
+  request -->|"HTTP"| bff
+  bff -->|"응답 자료"| cache
+  cache -->|"시세·사건"| chart
+  cache -->|""| graph
+  cache -->|"저장 자료"| evidence
+  condition -->|"근거 선택"| evidence
+  graph -->|"사건·시점"| condition
+  question -->|"질문"| bff

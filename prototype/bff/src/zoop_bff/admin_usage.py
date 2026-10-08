@@ -9,6 +9,7 @@ Chatbot and briefing are rule based today: their requests, failures and latencie
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -169,7 +170,7 @@ class UsageService:
             note=note,
         )
 
-    def _sentiment_feature(self, feature: Literal["document-sentiment", "briefing-outlook"], label: str, since: datetime | None) -> AiFeature:
+    def _sentiment_feature(self, feature: Literal["document-sentiment", "briefing-outlook", "document-summary", "semantic-verification"], label: str, since: datetime | None) -> AiFeature:
         rows = self._events(feature, since)
         failed = [r for r in rows if not r["ok"]]
         replay = retries = 0
@@ -178,17 +179,28 @@ class UsageService:
             if attempt:
                 replay += int(attempt["replay"])
                 retries += int(attempt["retry"])
+        worker = self._db.query("SELECT payload FROM document_analysis_calls WHERE stage=? ORDER BY at,attempt_id", (feature,))
+        calls = [json.loads(r["payload"]) for r in worker]
+        if since:
+            calls = [c for c in calls if datetime.fromisoformat(c["startedAt"]) >= since]
+        worker_failed = [c for c in calls if c["state"] != "validated"]
+        def tokens(key: str, column: str) -> int | None:
+            reported = [(c.get("usage") or {}).get(key) for c in calls]
+            return None if any(v is None for v in reported) else sum(reported) + sum(int(r[column]) for r in rows)
         return AiFeature(
-            feature=feature, label=label, engine="OpenAI 호환 · 명시적 스크립트 실행만", model_backed=True,
-            requests=len(rows), succeeded=len(rows) - len(failed), failed=len(failed),
-            latency_ms=_latency([float(r["duration_ms"]) for r in rows]),
-            usage=FeatureUsage(model_calls=sum(int(r["model_calls"]) for r in rows),
-                               input_tokens=sum(int(r["input_tokens"]) for r in rows),
-                               output_tokens=sum(int(r["output_tokens"]) for r in rows), replay_calls=replay, retries=retries),
+            feature=feature, label=label, engine="S1 문서·기존 회차 판정 worker · 명시적 실행", model_backed=True,
+            requests=len(rows) + len(calls), succeeded=len(rows) - len(failed) + len(calls) - len(worker_failed),
+            failed=len(failed) + len(worker_failed),
+            latency_ms=_latency([float(r["duration_ms"]) for r in rows] + [c["durationMs"] for c in calls if c["durationMs"] is not None]),
+            usage=FeatureUsage(model_calls=sum(int(r["model_calls"]) for r in rows) + sum(c["mode"] == "live" for c in calls),
+                               input_tokens=tokens("inputTokens", "input_tokens"), output_tokens=tokens("outputTokens", "output_tokens"),
+                               replay_calls=replay + sum(c["mode"] == "replay" for c in calls), retries=retries),
             cost=FeatureCost(status="unavailable", actual=None, estimated=None, currency=None,
-                             reason="모델 단가·예산이 미정입니다. 고정 응답 재생은 유료 호출에 포함하지 않습니다."),
-            source="measured", recent_errors=[RecentError(at=r["at"], code=r["code"], message=r["message"]) for r in reversed(failed[-5:])],
-            note="문서×기업 판정과 회차 판정을 분리합니다. 요청은 실제 시도마다 세며 재시도·실패도 포함합니다. 같은 입력의 캐시 조회는 세지 않습니다.",
+                             reason="모델 단가·금액 예산은 미정입니다. 미보고 토큰과 비용은 null, 합성 재생은 유료 호출과 분리합니다."),
+            source="measured",
+            recent_errors=([RecentError(at=r["at"], code=r["code"], message=r["message"]) for r in reversed(failed[-5:])] +
+                           [RecentError(at=c["startedAt"], code=c["error"], message=c["error"]) for c in reversed(worker_failed[-5:])])[-5:],
+            note="조회와 동일 영수증 재수입은 시도를 추가하지 않습니다. 문서 생성·별도 의미 검증과 기존 회차 exact 정책을 구분합니다. 회사·시장 요약은 S5 계획입니다.",
         )
 
     def past_runs(self, admin_job_runs: list[PastRun]) -> list[PastRun]:
@@ -319,7 +331,9 @@ class UsageService:
             window=window,
             features=[chatbot, news, briefing,
                       self._sentiment_feature("document-sentiment", "기업별 문서 판정", since),
-                      self._sentiment_feature("briefing-outlook", "브리핑 회차 판정", since)],
+                      self._sentiment_feature("briefing-outlook", "브리핑 회차 판정", since),
+                      self._sentiment_feature("document-summary", "문서 요약", since),
+                      self._sentiment_feature("semantic-verification", "문서 의미 검증", since)],
             past_runs=runs,
             cost=cost,
         )

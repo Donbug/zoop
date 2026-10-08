@@ -5,9 +5,11 @@ import { useCompanyDocuments } from "@/api/queries";
 import { DocumentItem, documentRelationLabel } from "@/components/domain/document-item";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/feedback";
 import type { DetailRange } from "@/lib/company-timeline";
+import { useOverlays } from "./overlays";
 
 export function CompanyDocuments({ companyId, range }: { companyId: string; range?: DetailRange }) {
   const documents = useCompanyDocuments(companyId, range);
+  const { openEvidence } = useOverlays();
 
   if (documents.isPending) return <SkeletonRows count={3} label="근거 문서를 불러오고 있어요" />;
   if (documents.isError) return <ErrorState error={documents.error} title="근거 문서를 불러오지 못했어요" onRetry={() => void documents.refetch()} />;
@@ -31,7 +33,15 @@ export function CompanyDocuments({ companyId, range }: { companyId: string; rang
               publishedAt={doc.publishedAt}
               quotes={doc.quotes.map((q) => ({ id: q.evidenceId, quote: q.quote, quoteVerified: q.quoteVerified }))}
               sentiment={doc.sentiment}
-              sentimentName={doc.title ?? "근거 문서"}
+              sentimentName={`${companyId} · ${doc.title ?? "근거 문서"}`}
+              analysis={doc}
+              synthetic={doc.synthetic}
+              onShowEvidence={(summary, evidenceIds) => openEvidence({
+                title: doc.title ?? "문서 요약 근거",
+                companyId,
+                evidenceIds,
+                analysisRef: { documentId: summary.documentId, documentVersion: summary.documentVersion, resultVersion: summary.resultVersion },
+              })}
               relation={
                 <ul className="flex flex-col">
                   {(["REPORTS", "PROVIDES_BACKGROUND", null] as const).map((type) => {

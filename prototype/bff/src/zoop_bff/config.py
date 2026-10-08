@@ -86,6 +86,7 @@ DEFAULT_CORS_ORIGINS = (
 )
 
 
+
 @dataclass(frozen=True)
 class Settings:
     snapshot_path: Path = DEFAULT_SNAPSHOT_PATH

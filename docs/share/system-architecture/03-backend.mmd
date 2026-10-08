@@ -1,0 +1,35 @@
+flowchart LR
+  entry["요청 입구<br/>/api"]
+  guard["접근·자료 기준 확인<br/>"]
+  read["게시 자료 조회<br/>"]
+  snapshot["게시 그래프·근거<br/>고정 JSON"]
+  appdb["앱 저장소<br/>세션 · 검수 · 회차"]
+  admin["관리자 작업·게시<br/>"]
+  ledger["관리자 원장·진단<br/>PostgreSQL / Neo4j"]
+  round["브리핑 회차<br/>발행 후 고정"]
+  transport["별도 작업 전달<br/>JSON CLI"]
+  gate["권리·공개 검증<br/>문서: 별도 의미 검증"]
+  worker["AI 생산 worker<br/>요약 / 기업별 판정 · outlook"]
+  workerdb["worker 저장소<br/>SQLite · 영수증 · 불변 결과"]
+  poc["뉴스 분석·검증<br/>PoC · 승인 후"]
+  market["외부 시장 자료<br/>설정 시 연결"]
+  grant["현재 권리<br/>서버 관리 목록"]
+  entry -->|"요청·쿠키"| guard
+  guard -->|"공개 범위"| read
+  snapshot -->|""| read
+  appdb -->|"세션·저장 결과"| guard
+  guard -->|"관리자 권한"| admin
+  ledger -->|""| admin
+  admin -->|"검수 후 새 버전"| snapshot
+  guard -->|"회차"| round
+  appdb <-->|"회차 저장·조회"| round
+  poc -.->|"승인 후 분석"| ledger
+  market -.->|""| round
+  admin -->|""| transport
+  round -->|""| transport
+  transport -->|"작업"| worker
+  worker -->|"결과·영수증"| transport
+  worker <-->|"자체 저장"| workerdb
+  transport -->|"결과 확인"| gate
+  grant -->|""| gate
+  gate -->|"검증 후 반영"| appdb

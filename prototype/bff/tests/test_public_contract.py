@@ -157,3 +157,17 @@ def test_chat_answers_cite_only_real_evidence_and_ask_back_without_a_target(make
     assert asked_back["outcome"] == "clarification" and asked_back["sources"] == [] and asked_back["citations"] == []
     company_answer = _ask(client, ["SYNTH-ALPHA"], "이 종목 오를까요?")
     assert company_answer["outcome"] == "insufficient_evidence" and company_answer["sources"] == []
+
+
+def test_error_details_are_optional_and_real_404_422_match_schema(make_client):
+    from zoop_bff.schemas import ErrorResponse
+    client = make_client()
+    schema = client.get("/openapi.json").json()["components"]["schemas"]["ErrorBody"]
+    assert "details" not in schema["required"]
+    missing = client.get("/api/evidence/nonexistent")
+    invalid = client.get("/api/companies/SYNTH-ALPHA/prices?period=invalid")
+    assert missing.status_code == 404 and invalid.status_code == 422
+    assert "details" not in missing.json()["error"]
+    assert isinstance(invalid.json()["error"]["details"], dict)
+    assert ErrorResponse.model_validate(missing.json()).error.code == "evidence_not_found"
+    assert ErrorResponse.model_validate(invalid.json()).error.details is not None

@@ -1,4 +1,4 @@
-# APP-POLICY-02 · 팀 확인 필요 · 10-03 명세 충돌
+# APP-POLICY-02 · 결정 상태 · 10-08 정합화
 
 [전체 목록](index.md) · [검사 결과](warnings.md)
 

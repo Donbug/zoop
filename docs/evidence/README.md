@@ -1,6 +1,8 @@
-# 줍(Zoop) 증거 통합본 — 2026-09-29 기준
+# 줍(Zoop) 증거 통합본 — 최신 수집 2026-10-08
 
 LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI/UX·백엔드 연동·플로우 작업을 위한 근거 요약이다. 세부 주장과 출처(파일:줄)는 아래 상세 문서에 있다.
+
+현재 구현 범위·일정·디자인의 유효 기준은 [오늘 사용자 결정](../share/day-work-2026-10-08.md)이다. 원문의 오래된 `검토 전` 표기로 기능을 제외하지 않으며, WBS 일정을 우선하고 Figma를 폰트 제외 최종 디자인으로 따른다. 아래 고정본·과거 조사는 당시 원문과 관측을 보존한 기록이다.
 
 | 문서 | 내용 |
 |---|---|
@@ -12,6 +14,9 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | [spec-wbs-delta-2026-10-03.md](spec-wbs-delta-2026-10-03.md) | 10-03 갱신 명세(15시트, v2 시트 2개)·WBS v0.2와 10-01 고정본의 차이, 팀 결정 6개 반영 여부, WBS 전수 작업표, 현재 구현과의 충돌·중복 |
 | [notion-delta-2026-10-03.md](notion-delta-2026-10-03.md) | Notion 10-03 재수집(120페이지)과 9/29 대비 변경: 9/30·10/1·10/2 회의 결정, AI v1.3, 역할안, 문서 간 충돌 |
 | [doc-delta-2026-10-06.md](doc-delta-2026-10-06.md) | 팀 문서 10-06 재수집: 명세 12셀 머리글 정리, 요구 번호·승인 상태 변경 전수표, WBS 내용 동일, Notion 121페이지·역할안 이동/API 경계 메모, 감성 언급 전수 인덱스·진행 보고의 결정 8개 답변 여부·현재 구현 충돌 |
+| [doc-delta-2026-10-08.md](doc-delta-2026-10-08.md) | 최신 공개 원본: 명세 FS074~081 검토 전 제안 8개·FS042 ID 정리, WBS 117→173 작업 및 담당/기간·표지/본문 충돌, 요구 내용 동일, Notion 새 회의록 3개·역할 상세·클라우드 초안. 사용자 결정/작업자 가결정과 이번 주 마감 영향을 구분했다. |
+| [wireframe-delta-2026-10-08.md](wireframe-delta-2026-10-08.md) | 새 Figma 공개 프레임 52개와 화면계획서 v2.1의 1:1 대응. 정적 화면 확인과 실제 동작 검증을 분리하고 그래프 표현·기업 메타데이터·소셜 연동 차이를 정리했다. |
+| [external-api-candidates-2026-10-08.md](external-api-candidates-2026-10-08.md) | 국내외 기업 개황·재무·시세·뉴스·Google/Kakao 후보와 공식 문서·약관 비교. 어댑터 구현 가능 여부와 등록·저장·모델 전송·재배포 권한을 분리했다. |
 | [screen-plan-v1.7-review.md](screen-plan-v1.7-review.md) | 팀 화면계획서 v1.7·Figma 평가: 채택·불채택과 근거, 우리 프로토타입 약점(머리 정정 포함) |
 | [시스템 연결 체계](../system/README.md) | 화면·FS/NFS·요구사항·WBS·프로토타입 판정·목표 API의 ID 연결 원본과 팀용 xlsx·마크다운 생성/검사 절차 |
 | `raw/` | 원본 변환본: Notion export(112페이지), 명세서·WBS 변환, 플로우 SVG |
@@ -23,6 +28,12 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | `raw/requirements-sheet_2026-10-06/` | 요구사항 재고정(2026-10-06 11:05:01 KST). 원본 `zoop-requirements_2026-10-06.xlsx`와 계산값 기준 CSV 3개. 요구 82→85레코드, 신규 26·27·37, 번호 재배정·상태 변경. 검증 기준/정책 결정 내용 동일. [출처](https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k). sha256: `cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18`. |
 | `raw/notion_2026-10-06/` | [Notion 공개 루트](https://www.notion.so/3cafef49d8d580cb9a25e53f97ec3f90) 재고정(2026-10-06 11:05:06–11:14:42 KST). 121페이지, 빈 회의록 1개 추가, 역할/휴지통 본문 2개 변경·삭제 0. 최종 비밀번호 가림본 `_record-map.json` sha256: `07dfad10d5b7412210c96823c12c184e505b468aab9ea01dd5ae814a5e227759`. 페이지별 sha256·편집 시각·175회 요청 기록 포함(시트 GET 3회 포함, 최종 HTTP 200 모두; 429 없음). 3기/4기 첨부·강의 캘린더 제외. |
 | WBS 10-06 재확인 → `raw/wbs_2026-10-03/` 유지 | 2026-10-06 11:04:57 KST 재수집. **변경 없음(내용 동일)**: 3시트 모든 계산값·셀 범위·담당·일정 동일. 새 폴더 없음. 재수집 xlsx 응답 sha256: `a48831fd7ac90c5f0774569c20204f6ea6534a1d6ef378147ee206a7e4b0fcd0`(컨테이너 바이트만 달라 10-03 원본 유지). [출처](https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c). |
+| `raw/functional-spec_2026-10-08/` | 최신 수집본(2026-10-08 02:52:05 KST). XLSX와 계산값 CSV 15개, 전셀 차이 266개. FS074~081은 **추가 제안·검토 전**, 우선순위 미정이며 팀 승인으로 승격하지 않는다. FS0??→FS042 정리 포함. [출처](https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs). XLSX sha256 `ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175`. |
+| `raw/wbs_2026-10-08/` | 최신 WBS(2026-10-08 02:52:01 KST). **모든 탭 3개**의 XLSX/CSV, 173개 고유 작업 ID, 셀 차이 1,181개와 ID별 이전/현재 담당·기간·산출물. 표지/요약의 신규 6.5.13~20·미산정 안내와 본문의 6.6.13~20·P1·담당/기간 지정은 충돌로 보존했다. [출처](https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/edit?gid=136329476#gid=136329476). XLSX sha256 `d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320`. |
+| 요구 10-08 재확인 → `raw/requirements-sheet_2026-10-06/` 유지 | 2026-10-08 02:52:09 KST, HTTP200. 85개 요구와 모든 3탭의 계산값·순서·범위가 **내용 동일**하여 중복 고정본을 만들지 않았다. 재수집 응답 sha256 `22c4580c86672dfc3d9a8930e4dd6b95b1e82ac457236fd1feef5b65e7d16b5b`; 비교 기록은 `raw/refresh_2026-10-08/_source-recheck.json`. |
+| `raw/notion_2026-10-08/` | [공개 루트](https://www.notion.so/3cafef49d8d580cb9a25e53f97ec3f90) 02:52:43–02:57:22 KST 수집·변환. 프로젝트 116페이지, 회의록 64·일정 7항목, 새 회의록 3개. 106개 동일 본문은 이전 경로/sha256 참조, 변경·신규·가림 직렬화 10파일만 새 저장. 개인 자기소개 8페이지 미수집은 삭제가 아니다. 가시 블록 미회수 0, Notion 60요청 모두200, 429/재시도0. 첨부 바이너리·ClovaNote·3/4기·강의 캘린더·Figma 제외. |
+| `raw/refresh_2026-10-08/` | 원본 재확인/파일별 sha256/검증 요약. 독립 XLSX–CSV 셀 대조 **21 CSV·147,668셀 passed**(변경 WBS/명세와 내용 동일한 기존 요구 포함). 프로젝트 테스트·PoC·유료 모델 호출은 수행하지 않았다. |
+| `raw/wireframe_2026-10-08/` | [새 팀 Figma](https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/?node-id=620-617). 10개 페이지의 화면·그룹 52개 개별 확대 PNG와 설명 텍스트 57개, node permalink·수집시각·coverage를 보존했다. 로그인·토큰·외부 쓰기 없이 공개 열람했으며 기능 동작·숨은 상태는 확인하지 않았다. |
 
 ## 증거 범위와 제외
 
@@ -33,6 +44,8 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 ## 서비스 한 줄 정의 (현재)
 
 "내 종목과 시장의 사건이 왜 연결되는지, 무엇이 달라졌는지, 어떤 근거가 있는지를 보여주는 금융 지도." 매매 실행·주가 예측은 약속하지 않는다. 핵심 페르소나는 보유 종목은 있지만 공시·보고서를 읽을 시간이 부족하고 전문 용어에 부담을 느끼는 직장인 개인 투자자다(`notion-decisions.md` §2).
+
+아래의 서비스 방향·담당·원본 목록은 **09-29 당시의 조사 기록**이다. 현재 정책으로 적용하지 않는다. 최신 입력과 가결정은 [10-08 차이](doc-delta-2026-10-08.md), [새벽 작업 기준](../share/overnight-2026-10-08.md), [통합 체계](../system/README.md)에서 확인한다.
 
 ## 확정된 방향과 미정 사항
 

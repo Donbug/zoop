@@ -179,6 +179,8 @@ interface InteractionOptions {
   onLodChange: (lod: Lod) => void;
   /** 카메라가 멈췄을 때(LOD 갱신 뒤). 캡션 겹침 정리·카메라 기억에 쓴다. */
   onViewportIdle: () => void;
+  /** 호버·노드 끌기 뒤 현재 라벨을 정리한다. 카메라는 움직이거나 저장하지 않는다. */
+  onLabelsChange: () => void;
 }
 
 /** 이슈–기업 간선(직접 관련·구조적 관련)은 표시만 하고 누르기·선택 대상으로 쓰지 않는다(명세 FS022·D03).
@@ -208,11 +210,12 @@ export function bindInteractions(cy: Core, options: InteractionOptions) {
     const hood = node.closedNeighborhood().filter((e) => isShown(e));
     cy.batch(() => {
       hood.addClass("emph");
-      node.removeClass("label-cull");
+      node.removeClass("label-cull dimmed faded").addClass("hover");
       hood.edges().removeClass("quiet labelled");
       labelEdges(node);
       if (!options.hasEmphasis()) cy.elements().difference(hood).addClass("faded");
     });
+    options.onLabelsChange();
   });
   cy.on("mouseout", "node", () => {
     container.style.removeProperty("cursor");
@@ -221,7 +224,8 @@ export function bindInteractions(cy: Core, options: InteractionOptions) {
   // 표시 전용 간선도 호버하면 요약을 보이지만, 누를 수 없으므로 손가락 모양 커서를 쓰지 않는다.
   cy.on("mouseover", "edge", (event) => {
     if (!isDisplayOnlyEdge(event.target.data("relationType") as string)) container.style.setProperty("cursor", "pointer");
-    event.target.addClass("emph hover");
+    event.target.removeClass("label-cull dimmed faded").addClass("emph hover");
+    options.onLabelsChange();
   });
   cy.on("mouseout", "edge", () => {
     container.style.removeProperty("cursor");
@@ -230,6 +234,7 @@ export function bindInteractions(cy: Core, options: InteractionOptions) {
   cy.on("free", "node", (event) => {
     const node = event.target as NodeSingular;
     options.onNodeMoved(node.id(), { ...node.position() });
+    options.onLabelsChange();
   });
   // 배율 단계(LOD)는 카메라가 멈춘 뒤 한 번만 바꾼다. 움직이는 동안은 직전 화면 텍스처(textureOnViewport)가 쓰인다.
   let timer = 0;

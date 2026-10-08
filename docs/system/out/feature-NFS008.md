@@ -4,7 +4,11 @@
 
 | 항목 | 원본/연결 |
 | --- | --- |
-| 우선순위·상태 | P1 · 보완 제안 · 검토 전 |
+| 원본 우선순위·상태 | P1 · 보완 제안 · 검토 전 |
+| 원문 범위 분류 | existing |
+| 유효 구현 범위 | 팀합의요구/설계대상 |
+| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
 | 요구사항 번호 | 61 |
 | API 대응 | 연결됨 |
 | 사유 |  |
@@ -13,11 +17,18 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv:99 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:99 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-06/12-비기능-상세.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/12-비기능-상세.csv) — 운영 추적: 시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.
+- [docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv) — 운영 추적: 시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:288 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:302 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+
+## WBS 편집 연결
+
+| WBS | 역할 | 현재 업무 | 연결 근거 |
+| --- | --- | --- | --- |
+| 6.10.12 | BE | (BE) 관리자 주요 작업 감사기록 저장·조회 구현 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
+| 6.10.18 | FE | (FE) A-ADM-05·05b 회원·감사 로그 화면 및 관리 API 연동 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
 
 ## 화면·목표 API
 

@@ -1,0 +1,107 @@
+# 본개발 이식 가이드 · 스택 독립 실행 계약
+
+> 2026-10-08 작성. 프론트엔드와 백엔드 모두 변경 가능하며 Java/Spring은 유력 후보일 뿐 확정 스택이 아니다. 이 문서는 담당자의 채택 판단 자료이지 본개발 앱, 배포 완료 보고, 현재 기능의 수용 기준 통과 보고가 아니다. 새 의존성은 추가하지 않았다.
+
+## 1. 읽는 순서와 근거의 지위
+
+1. [현재 사용자 결정](../share/day-work-2026-10-08.md)을 읽는다. 프로토타입 전체 요구 구현 권한과 본개발 채택·유료 호출 승인은 별개다.
+2. [계약·표본·차이 인계](contract-handoff.md)에서 현재 `/api`, 목표 `/api/v1`, worker JSON을 구분한다.
+3. 아래 독립 선택축과 자산 분류를 선택한 뒤, 전환 수용 순서를 적용한다.
+
+| 참고 경로 | 실제로 확인한 자료와 지위 | 이식할 때의 용도 |
+|---|---|---|
+| [`prototype/README.md`](../../prototype/README.md), [`prototype/bff/README.md`](../../prototype/bff/README.md), [`프로토타입 설명서`](../share/prototype-guide.md) | 현재 실행/시연/개발 연동 안내. 최종 실행 README와 설명서는 문서 S1 및 기존 outlook 생성 이행을 반영한다. 설명서 담당의 합성 smoke와 backend 실행 인용은 구분한다. | 현행 앱 재현·조회/생산 분리·오류 복구. [HTML](../share/prototype-guide.html)/[PDF](../share/prototype-guide.pdf)는 팀 전달용이며 전체 수용 기준 통과를 대신하지 않는다. |
+| [`docs/system/out/bff-openapi.json`](../system/out/bff-openapi.json), [`bff-observation.json`](../system/out/bff-observation.json) | 저장된 실제 BFF OpenAPI 관측. 관측 시각 `2026-10-07T19:20:15.550609+00:00`; 이번에 서버를 다시 실행하지 않았다. | **현재 관측 기준선**. 새 S1 필드가 자동 포함된 것으로 보지 않는다. |
+| [`docs/api/openapi.yaml`](../api/openapi.yaml), [`docs/system/README.md`](../system/README.md) | 목표 OpenAPI 3.1과 잠정 API 공통 규칙. 구현 완료·팀 최종 승인이 아니다. | 목표 요청·응답·오류·FS/화면/WBS 연결의 정본. |
+| [`acceptance-matrix.md`](../system/out/acceptance-matrix.md), [`source-corrections.md`](../system/out/source-corrections.md) | 104 ID·121 상세 정의 및 원문 정정 요청. 현행 실행 검증은 미실행이다. | ID가 같아도 다른 상세 정의를 합치지 않고 수용 기준을 옮긴다. |
+| [`links.yaml`](../system/links.yaml), [`wbs-migration.md`](../system/out/wbs-migration.md) | 역할·제목·FS 의미를 대조한 WBS 편집 연결. 원문 번호/상태와 구분한다. | 새 담당 배정의 근거. 옛 `6.10.1`을 통합 점검으로 재사용하지 않는다. |
+| [`system-architecture/README.md`](../share/system-architecture/README.md) | 최종 S1 구조도. 사용자 조회·문서 worker·기존 outlook producer·별도 앱/worker 저장소를 구분한다. 그림의 구현 실선과 합성 실행 증거·유료 호출 승인도 분리한다. | React→BFF→공개 snapshot 및 JSON CLI 경계를 참고한다. 현재 실행 도식이지 본개발 스택·/api/v1·클라우드 배포 완료 도식이 아니다. |
+| [`external-api-candidates-2026-10-08.md`](../evidence/external-api-candidates-2026-10-08.md) | 공급원·권리·등록 조건 조사. 실제 공급자 연결 시험은 아니다. | 데이터 표시/보관/모델 전송 권한과 계약 종료 시 삭제 조건을 함께 이전한다. |
+| [`docs/design/tokens.json`](../design/tokens.json), [`prototype/web/DESIGN.md`](../../prototype/web/DESIGN.md), [`components/README.md`](../../prototype/web/src/components/README.md), [`docs/screen-plan/README.md`](../screen-plan/README.md) | 읽은 컴포넌트 규칙이 가리키는 토큰/디자인 원문과 77쪽 화면 관측 안내다. 최종 목표는 Figma(폰트 제외), SUIT 유지다. | 기존 화면을 최종 디자인으로 동결하지 않는다. 다른 FE도 상태·접근성·토큰·목표 디자인을 재현한다. |
+| [`wireframe-correspondence.md`](../screen-plan/wireframe-correspondence.md), [`wireframe_2026-10-08/coverage.json`](../evidence/raw/wireframe_2026-10-08/coverage.json) 및 프레임 PNG | 대응 부록의 raw node·화면 ID 연결을 읽었다. 원본 이미지를 이번에 재조사하거나 Figma 동작을 검증하지 않았다. 부록의 ‘1:1 개선안/검토 전 범위’ 해석은 현재 사용자 결정으로 대체됐다. | 10-08 고정 raw는 폰트 제외 최종 목표 디자인이다. 정적 배치를 구현/동작 완료나 수치의 사실성으로 승격하지 않는다. |
+| [`docs/design/ai-system.md`](../design/ai-system.md), [`docs/api/ai-contract.schema.json`](../api/ai-contract.schema.json), [문서 fixture](../../prototype/ai-worker/fixtures/contracts/synthetic-document/), [회차 fixture](../../prototype/ai-worker/fixtures/contracts/synthetic-outlook/) | 현재 S1 문서 세 stage와 기존 briefing-outlook 생성 능력을 보존한 worker 이행 자료다. source/표본 검사와 backend 실행 보고를 구분한다. S2–S7 전체 완료가 아니다. 팀 배포에는 이 저장소 자료를 사용한다. | 불변 산출물·현재 visibility·실행 receipt·회차 pin과 발행 고정을 보존한다. 확정 schema/fixture·worker lock·관측 범위는 [계약 인계](contract-handoff.md)를 우선한다. |
+
+## 2. 서로 독립인 세 가지 선택축
+
+React를 바꾼다고 BFF나 worker도 바꿀 필요는 없다. Spring을 선택해도 Python worker를 유지할 수 있고, worker 교체가 사용자 API 변경을 요구하지 않도록 계약을 고정한다. Angular/Vue/Svelte 중 어느 하나를 강제하지 않는다.
+
+| 축 | 현재 스택 유지 | 다른 스택으로 전환 | 동일하게 유지해야 하는 검증 |
+|---|---|---|---|
+| FE: React / 다른 웹 프레임워크 | 라우트·컴포넌트·조회 훅을 같은 라이브러리 조건에서 재사용할 수 있다. 목표 API의 보안/오류 변화에 맞춘 client 수정은 필요하다. | 라우팅, 렌더링, 캐시, 취소·지연응답 차단, 창 상태, 접근성을 다시 구현한다. React hook 공유는 이식 가능성의 근거가 아니다. | 같은 HTTP fixture, URL의 기업/기간/asOf/버전, 로그아웃 후 이전 응답 차단, 빈 자료/실패 분리, Figma 목표와 토큰. |
+| 앱 BE: FastAPI / Java·Spring | 현재 라우터·서비스·저장 로직은 같은 Python 의존성과 의미에서 재사용 가능하다. `/api/v1` gap은 별도 수정 대상이다. | Controller/DTO/Service/Repository/WorkerClient로 책임을 옮기고 서버의 세션·CSRF·권한·멱등 처리를 구현한다. Python import는 전환 계약이 아니다. | HTTP/OpenAPI, 소유권, 상태 전이, decimal 계산, 불변 발행과 현재 visibility, 고정 버전 조회. |
+| AI: Python worker / 다른 런타임 | 기존 PoC 고정 버전의 공개 port와 worker adapter를 활용한다. 원본 PoC는 읽기 전용이다. | JSON 입력·receipt·결과를 동일하게 처리하는 runner와 provider adapter를 다시 구현한다. 추출/동일성/근거/fence/outbox 동작도 재증명해야 한다. | 같은 worker JSON fixture와 정확 인용, 단계 실패·복구, 중복 요청, 실제 usage/unknown, 공개 gate. |
+
+**이식 가능한 것은 직렬화된 경계와 불변식이다.** 앱·worker·PoC의 물리 DB 테이블 공유, Python 객체 import, React hooks 공유를 portability 근거로 사용하지 않는다. worker는 자기 실행 저장소를 소유하며 앱은 transport를 통해 제출·조회·회수한다. 미래 HTTP worker transport는 설계 선택이지 현재 별도 HTTP 서비스가 있다는 뜻이 아니다.
+
+## 3. 자산별 채택 분류
+
+표의 ‘그대로 복사 가능’은 **동일 스택만**을 뜻하며 의존성·라이선스·목표 계약 확인을 면제하지 않는다. 파일이 있다는 사실은 수용 기준 통과가 아니다.
+
+| 영역 | 분류 | 현재 경로/자산 | 담당자가 판단할 범위 |
+|---|---|---|---|
+| FE | 그대로 복사 가능(동일 스택만) | `prototype/web/src/components/ui/`, `components/domain/`, `features/`, `pages/`, `App.tsx` | React/Radix/라우터/Query를 유지할 때 구현 참고·재사용. Figma 최종 디자인과 S1 consumer 변경을 포함해 선택한다. |
+| FE | 계약·fixture·디자인 토큰만 이식 | `docs/design/tokens.json`, `components/README.md`, 화면계획서, HTTP 계약, `src/lib/`의 상태 계산 규칙·관련 테스트 | 다른 프레임워크에서는 상태·표시·접근성 계약을 옮긴다. 순수 TS 함수도 대상 런타임을 확인한 뒤 선택하며 framework-neutral이라는 이유만으로 자동 채택하지 않는다. |
+| FE | 다시 구현 | `src/api/queries.ts`, API client, `features/use-chat.ts`, overlays, URL/캐시·취소 연결 | 다른 FE의 생명주기/반응성/캐시 방식으로 구현한다. `/api` client 및 생성 `src/api/schema.d.ts`는 목표 OpenAPI로 일괄 갱신한다. |
+| FE | prototype-only 폐기 | 디자인시스템 정적 예시 데이터, 개발용 mock IdP 동의 화면, Vite 로컬 proxy/시연 전용 연결 | 디자인시스템의 토큰·상태 규칙은 보존하되 예시를 실제 자료나 로그인으로 서비스하지 않는다. |
+| BE | 그대로 복사 가능(동일 스택만) | `prototype/bff/src/zoop_bff/routers/`, `schemas.py`, 업무 서비스, `accounts.py`, `chat_jobs.py` | FastAPI/Python 유지 시 참고. 현재 오류·세션·페이지 방식까지 목표 구현이라고 복사하지 않는다. |
+| BE | 계약·fixture·디자인 토큰만 이식 | 목표/관측 OpenAPI, `prototype/bff/fixtures/poc-synthetic-inspect.json`, 합성 regression 자료, 회차·버전·소유권의 테스트 시나리오 | DTO wire와 도메인 의미를 옮긴다. actual-news fixture는 별도 권리·공개 여부 확인 대상이며 golden 합성 fixture와 섞지 않는다. |
+| BE | 다시 구현 | 세션/CSRF/error/idempotency HTTP adapter, Repository, clock/scheduler, `graph_versions.py`, `briefing_rounds.py`, worker transport | Spring 등 다른 언어에서는 transaction·concurrency·쓰기 호환성을 새 저장 구현에서 증명한다. SQLite 테이블 이름을 공개 계약으로 삼지 않는다. |
+| BE | prototype-only 폐기 | 모의 계정 seed/IdP, 데모 회차 재생, sandbox 경로, 임시 무키 공급원 전제 | 가상 보유 기능의 요구 자체를 폐기하지 않는다. 모의 데이터를 본인 실계좌로 승격하지 않는다. Yahoo/Naver 임시 연결을 운영 권리로 채택하지 않는다. |
+| worker | 그대로 복사 가능(동일 스택만) | `prototype/ai-worker/src/zoop_ai/`의 확정 구현과 고정 PoC 공개 port adapter | Python 유지 시만 해당한다. S1 병행 구현 범위와 future stage를 구분한다. |
+| worker | 계약·fixture·디자인 토큰만 이식 | versioned JSON Schema, 합성 입력/출력, evidence offset·grant·artifact·receipt 의미 | 다른 런타임이 소비하는 wire 계약. 모델/프롬프트/정책 revision과 input digest도 보존한다. |
+| worker | 다시 구현 | CLI/선택 transport, provider, job/fence/receipt/budget storage, exact/semantic validation adapter | 다른 런타임 선택 시 필요한 책임이다. public API read에서 분석을 재실행하지 않는다. |
+| worker | prototype-only 폐기 | authored replay 실행 설정, 로컬 경로 가정, 임시 테스트 policy | replay fixture는 회귀 검증 자료로 보존한다. replay 결과·0 paid call을 실제 provider 품질/과금 보장으로 표시하지 않는다. |
+
+## 4. Java/Spring 참고 매핑 — 구현이나 버전 선택 아님
+
+아래 그림은 **목표 책임 매핑**이다. Spring API 사용법·버전·build tool을 정하지 않으며 Java 앱을 생성하지 않았다. 실제 framework 설정을 정할 때 공식 문서를 Context7로 확인해야 한다.
+
+```mermaid
+flowchart LR
+    FE["React 또는 다른 FE"] -->|"HTTP JSON /api/v1"| C["Controller · HTTP adapter"]
+    C --> D["DTO · wire 계약"]
+    D --> S["Service · 권한/업무 불변식"]
+    S --> R["Repository · 앱 저장소"]
+    S --> W["WorkerClient · versioned JSON"]
+    W --> P["Python 또는 다른 worker"]
+    P --> A["worker 저장소 · receipt/artifact"]
+```
+
+| 현재 seam | Spring 참고 책임 | 잃으면 안 되는 조건 |
+|---|---|---|
+| `routers/*.py`, `deps.py`, `errors.py` | Controller + 공통 HTTP/security/error adapter | cookie 확인과 ownership은 서버 책임. 상태 코드/헤더/오류 envelope를 목표로 맞춘다. |
+| `schemas.py`, `admin_schemas.py`, worker schema | DTO | camelCase, enum, missing/null, decimal, 오프셋의 의미를 그대로 전달한다. DB entity를 직접 직렬화하지 않는다. |
+| `chat_jobs.py`, `briefing_rounds.py`, `admin_pipeline.py` | Service | 최초 context 고정, active job 제약, 검증 후 저장, 불변 회차, revalidation→publish 순서. |
+| `statedb.py`, `accounts.py`, `graph_versions.py` | Repository + artifact storage adapter | atomic 앱 commit, 예상 버전 CAS, 버전별 읽기, 데이터 손실 없는 write cutover. |
+| worker transport seam | WorkerClient | worker DB 직접 접근 금지. submit 재전송 멱등, ready와 앱 공개 완료 분리, 저장만 복구 시 provider 재호출 금지. |
+
+## 5. 전환 수용 순서와 롤백
+
+각 단계는 **후속 담당자가 실행할 수용 게이트**다. 이 문서 작업에서 실행하지 않았다. feature flag나 compatibility shim을 영구 유지하지 않는다. 전환 중 라우팅 장치가 필요하면 제거 조건·소유자를 정하고, 최종 전환에서 모든 caller와 생성 타입을 함께 옮겨 오래된 새-쓰기 경로를 제거한다.
+
+| 순서 | 수용 게이트 | 실패하면 유지할 기준선 |
+|---|---|---|
+| 1. golden HTTP/worker JSON fixtures | current와 target 사례를 별도 보존. 정상·빈 결과·오류·nullable·보조평면 문자·decimal·중복 요청을 새 consumer/producer에서 대조한다. snapshot·schema·policy·prompt·fixture revision/hash를 고정한다. | 기존 contract와 불변 artifact. live 호출을 golden 생성 조건으로 요구하지 않는다. |
+| 2. read paths | 전체/개인화 그래프, 기업 문서, 직접 evidence, 과거 회차·cache가 같은 pin과 현재 visibility/권한을 적용한다. 미래 자료와 HOLD/REJECT는 노출되지 않는다. | 기존 read 서비스/active manifest. 읽기 실패를 0건으로 만들지 않는다. |
+| 3. identity/jobs | 회원/관리자/비회원 분리, logout·차단, CSRF/Origin, 타인 리소스, 동시 job, 동일 digest 재전송·다른 digest 409, 취소 후 늦은 결과 fence를 확인한다. | 기존 identity와 작업 기록. 세션 저장 형식이 다르면 명시적 재로그인 전환을 선택하며 세션을 무조건 공유하지 않는다. |
+| 4. writes/version | 앱 receipt+result 저장 원자성, worker artifact import 멱등, save_only 무호출, 회차 불변, projection 준비·CAS·두 조회 경로 준비, dependency 철회를 확인한다. | 기존 writer와 공개 버전. 새 writer를 열기 전에 schema write compatibility를 결정한다. |
+| 5. switch | 한 시점에 writer/active pointer를 전환하고 실제 두 consumer 경로의 version/evidence를 확인한다. 구 endpoint·생성 타입·hook caller를 일괄 제거한다. | 단계 4에서 고정한 유효 버전. 부분 성공 상태로 새 공개 포인터를 열지 않는다. |
+| 6. rollback | 전환 이후 새 쓰기·진행 job·receipt·발행·철회 기록까지 보존 가능한지를 실제 복구로 확인한다. | 단순 옛 바이너리 복귀와 데이터 복구를 구분한다. |
+
+**롤백의 데이터 손실 조건:** 구 바이너리가 새 schema/enum/금액 표현/버전 metadata를 읽거나 쓸 수 없다면 바이너리만 되돌리면 안 된다. writer 중지·진행 작업 reconcile·새 쓰기 export/import 또는 승인된 역변환을 먼저 수행한다. 호환성 없는 새 쓰기를 열기 전, 현재 고정 artifact와 manifest·내용 hash·receipt·권한/visibility revision·schema decoder를 보존한다. 백업 시점 이후 쓰기를 버리는 restore는 데이터 손실 롤백이므로 영향 범위와 승인 없이 선택하지 않는다. 삭제/철회 자료는 백업 복귀로 다시 공개하지 않는다. 법적 삭제는 무조건 영구 보존보다 우선하며 최소 tombstone/audit만 허용 범위에서 보존한다.
+
+옛 불변 artifact를 읽는 versioned decoder는 형식 보존 수단이다. 새 쓰기를 구 DTO로 우회시키는 영구 호환 shim과 다르다. 이식 완료 뒤 구 writer와 전환 flag는 제거하되 허용된 역사 자료의 의미는 유지한다.
+
+## 6. 담당 선택표와 WBS 연결
+
+새 담당자나 날짜를 임의로 배정하지 않는다. 아래 역할의 실제 수행인력은 10-08 WBS 원문과 [`links.yaml`](../system/links.yaml)에서 확인한다. 원문 표지 `6.5.13~20` 대신 본문 `6.6.13~20`을 의미 연결에 사용하며 충돌은 정정 요청으로 보존한다.
+
+| 결정/인계 | 선택권·책임 역할 | 선택 가능한 자료 | 현재 WBS 의미 연결 |
+|---|---|---|---|
+| FE 스택과 UI 채택 | 본개발 FE 담당 | React 구현 유지 / 다른 FE에 HTTP fixture·토큰·상태 계약 이식. Figma 목표는 동일, 폰트 SUIT 유지. | 인증 FE `6.2.6~7`, 그래프 FE `6.6.21~26`, 기업 FE `6.7.8~12`, 질문 FE `6.9.11~14` |
+| 앱 BE 스택·저장소 | 본개발 BE/공통 기반 담당 | FastAPI 재사용 / Spring 참고 매핑. 보안·오류·쓰기 불변식을 모두 구현. | 공통 `6.1.2~5`, 인증 BE `6.2.1~5`, 데이터 `6.5.1~7`, 질문 BE `6.9.1~10` |
+| AI runtime·PoC adapter | AI/데이터 담당 | Python worker+PoC 공개 port / 다른 runtime에서 같은 JSON과 의미 검증 재증명. S1과 후속 범위를 분리. | 원천/정제 `6.6.13~14`, 추출/동일성 `6.6.15~16`, 관계/영향 `6.6.17~18`, 공개/복구 `6.6.19~20` |
+| 계약·전환 acceptance | API/통합 담당 | 목표 operationId·FS·screen·WBS, golden fixture와 current-target gap | `6.1.2`, `6.11.1`, 환경/DB `6.11.2`, E2E `6.11.3`, 정합 `6.11.4`, AI복구 `6.11.5`, 회귀 `6.11.7` |
+| 모노레포/CI 준비 | 다음 RepoPrep 담당 | [언어별 CI target 인계](contract-handoff.md#5-repoprep에-전달할-ci-target-기준). 선택된 스택만 실행 target으로 등록. | 개발환경 `6.1.1`, DB `6.1.3`, 환경통합 `6.11.2`; 배포 `6.11.8`은 별도 승인 단계 |
+
+FS042의 재무/시점그래프 ID 충돌과 기존/v2 AI 정의는 자동 통합하지 않는다. 재무 요구를 시점그래프 WBS에 붙이거나 폐기로 결정하지 않으며 [정정 요청](../system/out/source-corrections.md)을 인계한다. 본개발 채택 여부와 미정 운영 수치는 담당자가 결정하고, 채택한 계약·source revision·수용 증거를 기록한다.

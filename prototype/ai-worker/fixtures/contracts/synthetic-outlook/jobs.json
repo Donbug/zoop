@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "zoop-ai-s1-1",
+  "jobs": [
+    {
+      "schemaVersion": "zoop-ai-s1-1",
+      "jobId": "outlook-brf-2026-10-08-evening-19b59f79e5c935f9fc74dc85",
+      "kind": "briefing-outlook",
+      "input": {
+        "roundId": "brf-2026-10-08-evening",
+        "scheduledAt": "2026-10-08T18:10:00+09:00",
+        "graphVersion": "v1",
+        "reviewRevision": 0,
+        "ruleRevision": 0,
+        "issues": [
+          {
+            "eventId": "event-synthetic-s1",
+            "title": "두 기업의 사업 변화",
+            "eventTime": "2026-10-08",
+            "companies": [
+              {
+                "id": "SYNTH-A",
+                "name": "합성 알파",
+                "role": null,
+                "roleUnconfirmed": false,
+                "relationType": "INVOLVES"
+              },
+              {
+                "id": "SYNTH-B",
+                "name": "합성 베타",
+                "role": null,
+                "roleUnconfirmed": false,
+                "relationType": "INVOLVES"
+              }
+            ]
+          }
+        ],
+        "documentSentiments": [],
+        "marketVariables": {
+          "status": "available",
+          "referenceAt": "2026-10-08T18:10:00+09:00",
+          "rateCutoffAt": "2026-10-08T18:05:00+09:00",
+          "indicators": [
+            {
+              "id": "kospi",
+              "label": "KOSPI",
+              "unit": "pt",
+              "status": "unavailable",
+              "value": null,
+              "valueKind": null,
+              "observedDate": null,
+              "observedAt": null,
+              "baseline": null,
+              "change": null,
+              "changeRate": null,
+              "source": null,
+              "reasonCode": "not_connected",
+              "reason": "시장 지표 출처를 연결하지 않았어요."
+            },
+            {
+              "id": "kosdaq",
+              "label": "KOSDAQ",
+              "unit": "pt",
+              "status": "unavailable",
+              "value": null,
+              "valueKind": null,
+              "observedDate": null,
+              "observedAt": null,
+              "baseline": null,
+              "change": null,
+              "changeRate": null,
+              "source": null,
+              "reasonCode": "not_connected",
+              "reason": "시장 지표 출처를 연결하지 않았어요."
+            },
+            {
+              "id": "usdkrw",
+              "label": "원/달러",
+              "unit": "KRW",
+              "status": "unavailable",
+              "value": null,
+              "valueKind": null,
+              "observedDate": null,
+              "observedAt": null,
+              "baseline": null,
+              "change": null,
+              "changeRate": null,
+              "source": null,
+              "reasonCode": "not_connected",
+              "reason": "시장 지표 출처를 연결하지 않았어요."
+            }
+          ]
+        },
+        "sourceId": "authored-synthetic-round",
+        "grantId": "grant-synthetic-outlook",
+        "grantRevision": "grant-synthetic-outlook-1"
+      },
+      "mode": "replay",
+      "provenance": {
+        "sourceKind": "synthetic",
+        "executionMode": "replay",
+        "recordingKind": "authored-test"
+      }
+    }
+  ]
+}

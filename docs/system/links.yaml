@@ -1,13 +1,117 @@
 schemaVersion: 1
 policy: "이 파일은 사람이 편집한다. import_sources.py는 이 파일과 openapi.yaml을 변경하지 않는다. 존재하는 ID만 연결하며 원본 ID 오류를 별칭으로 고치지 않는다. API 연결의 정본은 openapi.yaml의 x-zoop이고 중복 목록을 두지 않는다."
 apiContract: "docs/api/openapi.yaml"
+authority:
+  decisionId: "user-2026-10-08-day"
+  source: "docs/share/day-work-2026-10-08.md"
+  authority: "사용자 결정(팀 합의 요구의 현재 해석)"
+  rawPolicy: "원문 상태·우선순위·scopeClass·WBS 충돌은 보존한다. 유효 기준을 원문 승인 상태로 덮어쓰지 않는다."
+  implementationScope:
+    appliesTo: "all-specs-and-wbs"
+    status: "팀합의요구/설계대상"
+    includeRawProposalIds: ["FS074", "FS075", "FS076", "FS077", "FS078", "FS079", "FS080", "FS081"]
+    implementationComplete: false
+    paidExecutionApproved: false
+  prototype: {permission: "전권 범위·끝까지 완성", productionAdoption: "담당자 선택"}
+  schedule: {authority: "WBS", notion: "outdated", internalConflicts: "정정 요청으로 수집"}
+  design: {current: "기존 UI 코드", target: "Figma(폰트 제외 최종)", font: "SUIT 유지", sequence: "기능 먼저·디자인 후"}
+  migration: {stackFrozen: false, backendCandidate: "Java/Spring(유력 후보)", frontendReuseRequired: false, backendReuseRequired: false}
+  ai: {sequence: "설계 먼저", additionalApiResearch: true, liveBudget: "미정", modelConfiguration: ".env", executionApproval: "별도"}
+wbsMigration:
+  previousWbsSource: "docs/evidence/raw/wbs_2026-10-03/01-프로젝트-WBS.csv"
+  currentWbsSource: "docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv"
+  headerComparison: "두 본문 모두 xlsx10행 A:J = 구분/WBS/업무/유형/산출물/수행인력/시작일/종료일/가중치/진행률. 열 계약은 동일; 업무173개와 역할 의미는 재대조."
+  previousTaskCount: 117
+  currentTaskCount: 173
+  groups:
+    - previousIds: "6.1.2 / 6.10.1"
+      meaning: "API 공통 계약·통합 검증"
+      currentTargets: "6.1.2 / 6.11.1"
+      reason: "API 최종 검토 작업(진척0)과 통합 계약 점검. 현 6.10.1은 관리자 인증이므로 같은 번호를 유지하지 않음."
+    - previousIds: "6.2.1~7 / 6.4.8"
+      meaning: "시작/이메일/소셜/비회원/세션"
+      currentTargets: "6.2.1~5(BE), 6.2.6~7(FE)"
+      reason: "이메일 로그인+가입은 BE 6.2.1로 합쳐지고 FE 로그인/가입으로 나뉨. 소셜은 BE6.2.2, 비회원6.2.3, 상태6.2.4, 로그아웃6.2.5."
+    - previousIds: "6.3.1~9 / 6.4.9"
+      meaning: "온보딩·가상계좌·초기 설정·튜토리얼"
+      currentTargets: "6.3.1~7(BE), 6.3.8~10(FE), 6.4.4"
+      reason: "검색 FS011-01과 추천 FS011-02는 검색/추천 의미로 연결. 등록 FS012와 저장 FS013을 분리. 가상계좌 상태/해제는 내 종목 BE6.4.4."
+    - previousIds: "6.4.1 / 6.5.11 / 6.6.2"
+      meaning: "회원 데이터·관심/모의보유"
+      currentTargets: "6.4.1~4(BE), 6.4.5~7(FE), 6.6.12"
+      reason: "새 6.4는 데이터 관리가 아니라 내 종목. 목록/추가삭제/모의보유/계좌상태의 역할 분리."
+    - previousIds: "6.4.2~6 / 6.4.10~11"
+      meaning: "관계·문서·브리핑 저장·수집·공개·외부 분석"
+      currentTargets: "6.5.1~7(BE)"
+      reason: "현재 데이터 영역6.5. 브리핑 저장의 원문FS057은 현 FS035로 편집 연결하고 raw 유지. FS074~081도 팀합의 설계대상이며 재사용 작업과 중복 공수 합산 금지."
+    - previousIds: "6.5.1~3 / 6.3.7"
+      meaning: "전체·개인화·모드·초기 그래프"
+      currentTargets: "6.6.1~3(BE), 6.3.6(BE), 6.6.21(FE)"
+      reason: "전체/개인화/전환의 조회 생산자와 동일 캔버스 소비자 분리."
+    - previousIds: "6.5.4~8"
+      meaning: "기업/이슈 노드·영향·관계·근거"
+      currentTargets: "6.6.4~9(BE), 6.6.22~26(FE)"
+      reason: "기업별 영향과 경로는 BE6.6.6/7, 관계6.6.8, 근거6.6.9. 기존 표시 조회와 FS079 영향 생산 설계대상은 서로 다른 책임이며 완료 판정으로 연결하지 않음."
+    - previousIds: "6.5.9~10"
+      meaning: "선택 노드 질문·사이드바"
+      currentTargets: "6.6.10~11(BE), 6.9.12(FE), 6.4.7(FE)"
+      reason: "질문 진입과 목록/검색 맥락 소비를 분리."
+    - previousIds: "6.6 / 6.6.1~4,6~7"
+      meaning: "종목·상세·보유·차트·사건·문서·복원"
+      currentTargets: "6.7.1~7(BE), 6.7.8~12(FE), 6.4.3(BE)"
+      reason: "종목 검색은 더 이상 옛 상위6.6이 아님. 상세/시점그래프/문서/선택동기화별 소비자를 연결."
+    - previousIds: "6.6.3의 FS040-01 / 상세 FS0??"
+      meaning: "시점 관계 그래프"
+      currentTargets: "FS042 / 6.7.5(BE), 6.7.11~12(FE)"
+      reason: "10-08 상세79행 ID 정리. FS040-01 원문 경고는 현 WBS에서 사라졌으므로 해소. 재무 의미와는 별도 충돌."
+    - previousIds: "6.6.5의 FS042"
+      meaning: "재무와 실적 조회"
+      currentTargets: "현 대응 WBS 없음; 공통6.1.2/6.11.1만"
+      reason: "getCompanyFinancials 기존 목표는 보존하되 현6.7.5 시점 그래프를 재무 담당으로 오연결하지 않음. getCompanyMetrics는 FS020/FS038 지표 조회."
+    - previousIds: "6.7.1~6,8~9 / 6.4.4"
+      meaning: "출퇴근·핵심이슈·시장·회차·개인화"
+      currentTargets: "6.8.1~6,8~9(BE), 6.8.11~14(FE), 6.5.3"
+      reason: "출근/퇴근/회차 소비자와 저장계약 분리."
+    - previousIds: "6.7.7"
+      meaning: "중복 발행 방지 FS034"
+      currentTargets: "6.8.8 / 6.10.9"
+      reason: "현6.8.7은 업무 공란. 옛 의미를 번호에 자동 부여하지 않고 발행본 저장/상태 관리 계약으로 연결."
+    - previousIds: "6.7.10 / 6.9.2의 평가"
+      meaning: "좋아요/싫어요·공통 결과 평가"
+      currentTargets: "6.8.10 / 6.10.5(BE), 6.8.14 / 6.10.15(FE)"
+      reason: "옛FS037 브리핑 평가는 FS066-01 의미로 편집 연결. 현재FS037 종목 목록과 혼동하지 않음."
+    - previousIds: "6.8.1~9 / 6.4.7"
+      meaning: "질문·맥락·생성·근거·대화·작업"
+      currentTargets: "6.9.1~10(BE), 6.9.11~14(FE)"
+      reason: "현재 BE6.9.2~5는 해석FS047·맥락FS048·답변검증FS049·근거탐색FS050-01/-02로 재배치됐다. FS046 권한/중복작업 통제는 질문 진입과 비동기 작업 UI에 연결한다. 기존/v2 채택 미정은 보존."
+    - previousIds: "6.9.1~9"
+      meaning: "관리자 통계·피드백·검수·비용·회원·브리핑·인증"
+      currentTargets: "6.10.1~12(BE), 6.10.13~18(FE)"
+      reason: "관리자 인증1, 대시보드2, 회원3, 통계4, 평가5, 상태6, 검수7, 비용8, 브리핑9, 정정10, 대화록11, 감사12로 역할 분리."
+    - previousIds: "6.10.2~6"
+      meaning: "E2E·품질·보안/성능·배포·발표"
+      currentTargets: "6.11.2~9"
+      reason: "환경/DB검증2, E2E3, 데이터정합4, AI복구5, 성능예외6, 회귀7, 배포8, 발표9. NFS007은 현6.11.6."
+    - previousIds: "표지6.5.13~20"
+      meaning: "FS074~081(원문 추가 제안·현재 팀합의 설계대상)"
+      currentTargets: "본문6.6.13~20"
+      reason: "같은 원본의 표지/요약과 본문 번호·기간·가중치·역할 충돌은 정정 요청이다. raw proposal 8개를 보존하되 현재 사용자 결정에 따라 구현 계획에 포함하며 기존 작업의 재사용 공수를 중복 산정하지 않는다."
+commonWbs:
+  "6.1.2": "API 명세 최종 검토·구현 기준 확정"
+  "6.11.1": "API·스키마 계약 통합 점검"
+userDecisions:
+  impactLabels: "사용자 결정 완료: 긍정/부정, 혼재/판단 보류 유지. 명칭은 재질문하지 않는다. 퍼센트/영향 생산 정책은 별도 팀 질문이다."
+  apiCommon: "사용자 잠정 채택 · 시연 기준. 팀 숙독/최종 승인/구현 완료가 아니다."
+  modelConfiguration: "LLM 모델/추론 수준은 .env에서 명시 설정한다. 값 선택·유료 실호출·예산 승인은 별개이며 예산은 미정이다."
+  conflictPermission: "원본 충돌은 작업자 가결정→시연→팀 최종 결정으로 처리하고 정정 요청을 보존한다. 요구 범위는 authority의 사용자 결정으로 이미 포함되지만 유료 호출 허가는 별개다."
 featureDecisions:
   "FS???":
     apiDisposition: "계약 미정"
-    reason: "브리핑 목록·검색 상세의 잘못된 원본 ID다. 팀 정정 전 명세 번호를 추정하거나 부여하지 않는다. 기존 회차/목록 API 연결과 구분한다."
-  "FS0??":
-    apiDisposition: "계약 미정"
-    reason: "재무 상세 행의 잘못된 원본 ID다. FS042로 추정 치환하지 않는다. 목표 재무 API는 목차 FS042에 연결했다."
+    reason: "브리핑 리뷰 상세의 잘못된 원본 ID다. 공통 평가 FS066-01과의 관계 및 목차 연결은 정정 요청으로 남기며 명세 번호를 임의 부여하지 않는다."
+  FS042:
+    apiDisposition: "기존 API로 지원"
+    reason: "10-08 상세 FS042는 FS0?? 시점 그래프 ID를 승계해 getCompanyGraphAsOf에 연결한다. 목차/요구42/옛 판정은 재무·실적 의미를 유지하므로 getCompanyFinancials는 충돌 별도 추적한다. 재무 폐기·시점그래프 완료·팀 승인으로 승격하지 않는다."
+    wbsIds: ["6.7.5", "6.7.11", "6.7.12"]
   FS050:
     apiDisposition: "계약 미정"
     reason: "AI v2 새 대화 정의와 기존 FS050-01/-02 의미가 다르다. 채택/이전 선언 없이 같은 번호로 통합하지 않는다."
@@ -28,7 +132,7 @@ featureDecisions:
     apiDisposition: "계약 미정"
     reason: "측정 부하·데이터 규모·표본·성능 목표값이 미정이다. 계약 검증 WBS에 연결하고 서버 성능 수치를 만들어내지 않는다."
     wbsIds:
-      - "6.10.4"
+      - "6.11.6"
   FS044:
     apiDisposition: "기존 API로 지원"
     reason: "카메라·선택·탭·스크롤 복원은 클라이언트 상태다. 기업/그래프 API가 필요한 조회 조건과 버전을 제공하며 복원 전용 서버 API는 만들지 않는다."
@@ -48,87 +152,678 @@ featureDecisions:
     reason: "D-SEN-02는 디자인시스템의 회차 판단 예시다. 데모 발행본에는 outlook 값이 없으며 기존 브리핑 API가 발행 시 고정할 판단과 근거 이슈를 제공하는 목표 계약이다."
     screenIds:
       - "D-SEN-02"
+  FS074:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS058", "FS063"]
+    wbsIds: ["6.6.13", "6.5.4", "6.5.6"]
+    reason: "기존 수집 회차·공급원 연동 재사용. 수집 단계는 오프라인 파이프라인이므로 공개 HTTP API 불필요; 공급처/겹침 재조회 정책과 관리자 운영 연동은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS075:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS056", "FS058"]
+    wbsIds: ["6.6.14", "6.5.2", "6.5.4"]
+    reason: "원문·정제·내용해시·수정 버전은 오프라인 파이프라인 계약이다. 공개 HTTP API 불필요; 보존/중복 정책·운영 조회 어댑터는 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS076:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS056", "FS058", "FS064"]
+    wbsIds: ["6.6.15", "6.5.2", "6.5.4", "6.5.7"]
+    reason: "기존 분석 호출·후보 원장 재사용 경계다. 후보 생산은 오프라인 파이프라인이므로 공개 HTTP API 불필요; 추출 모델/정책과 운영 연동은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS077:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS056", "FS058"]
+    wbsIds: ["6.6.16", "6.5.2", "6.5.4"]
+    reason: "정규 ID와 동일성 판정은 오프라인 파이프라인 계약이므로 공개 HTTP API 불필요. 병합 승인/취소와 복수 이슈 연결 운영 계약은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS078:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS055", "FS058"]
+    wbsIds: ["6.6.17", "6.5.1", "6.5.4"]
+    reason: "기존 관계·근거 계약을 재사용하되 관계 후보 생산은 오프라인 파이프라인이다. 공개 HTTP API 불필요; 기업 간 유형/경로 생산과 운영 조회 연동은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS079:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS021", "FS055", "FS058", "FS067-02"]
+    wbsIds: ["6.6.18", "6.5.1", "6.5.4", "6.10.7"]
+    reason: "기존 조회/검수 경계 재사용. 영향 방향 생산·관계근거 공개 적격 검증은 오프라인 파이프라인이라 공개 HTTP API 불필요; 4상태·확률변환 금지를 유지하고 검증 정책/운영 연동은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS080:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS055", "FS059"]
+    wbsIds: ["6.6.19", "6.5.1", "6.5.5"]
+    reason: "기존 공통 공개/저장 계약 재사용. GraphDB 멱등 upsert·기대 버전·공개 전환은 오프라인 저장 단계이므로 공개 HTTP API 불필요; 목표 운영 연동은 미정. 저장 재시도는 모델 재호출 허가가 아니다. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
+  FS081:
+    rawScopeStatus: "추가 제안 · 검토 전"
+    apiDisposition: "API 불필요"
+    operationalIntegration: "미정"
+    reusesSpecIds: ["FS055", "FS058", "FS059", "FS067-03"]
+    wbsIds: ["6.6.20", "6.5.1", "6.5.4", "6.5.5", "6.10.7"]
+    reason: "기존 운영/재처리 계약 재사용. 증분 갱신·비활성화·실패 단계 복구는 오프라인 파이프라인이라 공개 HTTP API 불필요; 횟수/간격/보존/병합 취소와 운영 연동은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다."
 wbsConnections:
-  -
-    wbsId: "6.3.4"
-    specIds:
-      - "FS011-01"
-      - "FS011-02"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.4.4"
-    specIds:
-      - "FS035"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.6"
-    specIds:
-      - "FS037"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.7.10"
-    specIds:
-      - "FS066-01"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.7.8"
-    specIds:
-      - "FS035"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.8.5"
-    specIds:
-      - "FS050-01"
-      - "FS050-02"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.8.6"
-    specIds:
-      - "FS052-01"
-      - "FS051"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.8.7"
-    specIds:
-      - "FS051"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.8.8"
-    specIds:
-      - "FS052-02"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.9.2"
-    specIds:
-      - "FS066-01"
-      - "FS066-02"
-      - "FS066-03"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.9.3"
-    specIds:
-      - "FS067-01"
-      - "FS067-02"
-      - "FS067-03"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.9.5"
-    specIds:
-      - "FS069-01"
-      - "FS069-02"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.9.6"
-    specIds:
-      - "FS070-01"
-      - "FS070-02"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
-  -
-    wbsId: "6.9.7"
-    specIds:
-      - "FS071-01"
-      - "FS071-02"
-    reason: "기존 WBS 번호는 유지하고 v1.2 분리·통합 명세와 현재 목표 작업을 사람이 연결했다. rawSpecIds는 catalog.yaml에 그대로 남는다."
+  - wbsId: "6.2.1"
+    title: "(BE) 이메일 로그인/회원가입 API 개발"
+    role: "BE"
+    specIds: ["FS002", "FS003"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.2"
+    title: "(BE) 소셜 로그인·회원가입 및 기존 계정 연결 처리"
+    role: "BE"
+    specIds: ["FS004", "FS061"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.3"
+    title: "(BE) 비회원 접근 및 권한 처리"
+    role: "BE"
+    specIds: ["FS005", "NFS001"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.4"
+    title: "(BE) 로그인 상태 및 초기 진입 경로 처리"
+    role: "BE"
+    specIds: ["FS001", "FS006"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.5"
+    title: "(BE) 로그아웃 및 세션 무효화"
+    role: "BE"
+    specIds: ["FS007"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.6"
+    title: "(FE) D-AUT-01 로그인 화면 구현 및 인증 API 연동"
+    role: "FE"
+    specIds: ["FS001", "FS002", "FS005", "FS006"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.7"
+    title: "(FE) D-AUT-02 회원가입 화면 구현 및 가입 API 연동"
+    role: "FE"
+    specIds: ["FS003", "FS006"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.2.8"
+    title: "인증 기능 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS001", "FS002", "FS003", "FS004", "FS005", "FS006", "FS007", "FS061"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.1"
+    title: "(BE) 투자 여부 및 초기 설정 API 개발"
+    role: "BE"
+    specIds: ["FS008", "FS013"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.2"
+    title: "(BE) 가상계좌 프로필 연동 기능 개발"
+    role: "BE"
+    specIds: ["FS009", "FS010", "FS062"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.3"
+    title: "(BE) 관심종목 검색 API 개발"
+    role: "BE"
+    specIds: ["FS011-01", "FS011-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.4"
+    title: "(BE) 초기 관심종목 등록 API 개발"
+    role: "BE"
+    specIds: ["FS012"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.5"
+    title: "(BE) 초기 설정 저장"
+    role: "BE"
+    specIds: ["FS013"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.6"
+    title: "(BE) 초기 개인화 관계그래프 연동"
+    role: "BE"
+    specIds: ["FS014"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.7"
+    title: "(BE) 그래프 튜토리얼 및 완료 상태 처리"
+    role: "BE"
+    specIds: ["FS015", "FS016"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.8"
+    title: "(FE) D-ONB-01 투자 여부 선택 화면 및 설정 API 연동"
+    role: "FE"
+    specIds: ["FS008"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.9"
+    title: "(FE) D-ONB-02 가상계좌 연결 화면 및 프로필 API 연동"
+    role: "FE"
+    specIds: ["FS009", "FS010", "FS062"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.10"
+    title: "(FE) D-GRP-T2~T5 관계 그래프 튜토리얼 및 완료 API 연동"
+    role: "FE"
+    specIds: ["FS015", "FS016"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.3.11"
+    title: "온보딩 전체 흐름 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS008", "FS009", "FS010", "FS011-01", "FS011-02", "FS012", "FS013", "FS014", "FS015", "FS016", "FS062"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.1"
+    title: "(BE) 내 관심종목 목록 조회 API 개발"
+    role: "BE"
+    specIds: ["FS027", "FS054"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.2"
+    title: "(BE) 관심종목 추가·삭제 API 개발"
+    role: "BE"
+    specIds: ["FS027"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.3"
+    title: "(BE) 모의 보유종목 조회 API 개발"
+    role: "BE"
+    specIds: ["FS039", "FS054"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.4"
+    title: "(BE) 모의계좌 연결 상태·해제 기능 개발"
+    role: "BE"
+    specIds: ["FS009", "FS062"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.5"
+    title: "(FE) D-WAT-01b 초기 관심종목 선택 화면 및 검색·등록 API 연동"
+    role: "FE"
+    specIds: ["FS011-01", "FS011-02", "FS012"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.6"
+    title: "(FE) D-MY-01 내 종목 관리 화면 및 종목·가상계좌 API 연동"
+    role: "FE"
+    specIds: ["FS027", "FS039", "FS054", "FS062"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.7"
+    title: "(FE) D-STK-01 종목 검색·사이드바 및 관심종목 API 연동"
+    role: "FE"
+    specIds: ["FS026", "FS037", "FS027"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.4.8"
+    title: "내 종목 관리 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS027", "FS039", "FS054", "FS062"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.1"
+    title: "(BE) 관계와 근거 연결"
+    role: "BE"
+    specIds: ["FS055"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.2"
+    title: "(BE) 이슈와 근거 문서를 구분 관리"
+    role: "BE"
+    specIds: ["FS056"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.3"
+    title: "(BE) 브리핑 정보 저장(분석 결과와 생성 재료 제공)"
+    role: "BE"
+    specIds: ["FS035"]
+    reason: "브리핑 재료/회차 저장 업무를 현 FS035로 연결한다. 원문 FS057은 새 번호를 추정 정정하지 않고 rawSpecIds에 남긴다."
+  - wbsId: "6.5.4"
+    title: "(BE) 신규 경제뉴스 정기 수집 및 이슈 분석"
+    role: "BE"
+    specIds: ["FS058"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.5"
+    title: "(BE) 분석 결과 저장 및 조회 반영"
+    role: "BE"
+    specIds: ["FS059"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.6"
+    title: "(BE) 뉴스와 시장 데이터 연동"
+    role: "BE"
+    specIds: ["FS063"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.7"
+    title: "(BE) AI 분석 연동"
+    role: "BE"
+    specIds: ["FS064"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.5.8"
+    title: "데이터 관리·외부 연동 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS055", "FS056", "FS035", "FS058", "FS059", "FS063", "FS064"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.1"
+    title: "(BE) 개인화 관계 그래프 조회 API 구현"
+    role: "BE"
+    specIds: ["FS017"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.2"
+    title: "(BE)  전체 관계 그래프 조회 API 구현"
+    role: "BE"
+    specIds: ["FS018"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.3"
+    title: "(BE) 그래프 모드 전환 API 구현"
+    role: "BE"
+    specIds: ["FS019"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.4"
+    title: "(BE) 기업 노드 정보 API 구현 기본 정보·시세·주요 지표 조회 및 미제공 구분"
+    role: "BE"
+    specIds: ["FS020"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.5"
+    title: "(BE) 이슈 노드 정보 API 구현"
+    role: "BE"
+    specIds: ["FS021"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.6"
+    title: "(BE) 기업별 이슈 영향 조회 API 구현"
+    role: "BE"
+    specIds: ["FS022"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.7"
+    title: "(BE) 기업·이슈 영향 경로 조회 API 구현"
+    role: "BE"
+    specIds: ["FS022"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.8"
+    title: "(BE) 기업 간 관계 상세 조회 API 구현"
+    role: "BE"
+    specIds: ["FS023"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.9"
+    title: "(BE) 관계 근거 조회 API 구현"
+    role: "BE"
+    specIds: ["FS024"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.10"
+    title: "(BE) 선택 노드 AI 질문 API 구현"
+    role: "BE"
+    specIds: ["FS025"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.11"
+    title: "(BE) 사이드바 기업 목록·검색 API 구현"
+    role: "BE"
+    specIds: ["FS026"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.12"
+    title: "(BE) 관심 종목 수정 API 구현"
+    role: "BE"
+    specIds: ["FS027"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.13"
+    title: "(BE) 뉴스·공시 수집 및 수집 회차 관리"
+    role: "BE"
+    specIds: ["FS074"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.14"
+    title: "(BE) 원천 문서 정제·중복 제거 및 버전 관리"
+    role: "BE"
+    specIds: ["FS075"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.15"
+    title: "(BE) AI 사건·이슈 추출 및 이슈 후보 생성"
+    role: "BE"
+    specIds: ["FS076"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.16"
+    title: "(BE) 기업·이슈 Entity Linking 및 동일성 판정"
+    role: "BE"
+    specIds: ["FS077"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.17"
+    title: "(BE) 기업–이슈·기업–기업 관계 추출"
+    role: "BE"
+    specIds: ["FS078"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.18"
+    title: "(BE) 영향 방향·근거 검증 및 공개 적격 판정"
+    role: "BE"
+    specIds: ["FS079"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.19"
+    title: "(BE) GraphDB 노드·간선 upsert 및 공개 버전 반영"
+    role: "BE"
+    specIds: ["FS080"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.20"
+    title: "(BE) 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구"
+    role: "BE"
+    specIds: ["FS081"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. 추가 제안/검토 전·우선 미정으로 분리하며 본문 P1을 승인/공수 확정으로 읽지 않는다."
+  - wbsId: "6.6.21"
+    title: "(FE) D-GRP-01·01b 전체·개인화 관계 그래프 화면 및 조회 API 연동"
+    role: "FE"
+    specIds: ["FS014", "FS017", "FS018", "FS019", "FS026"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.22"
+    title: "(FE) D-GRP-02 이슈 노드 상세 패널 및 이슈 API 연동"
+    role: "FE"
+    specIds: ["FS021", "FS024"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.23"
+    title: "(FE) D-GRP-03 기업 노드 상세 패널 및 기업 API 연동"
+    role: "FE"
+    specIds: ["FS020", "FS026", "FS027"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.24"
+    title: "(FE) D-GRP-04 간선 상세 패널 및 관계 API 연동"
+    role: "FE"
+    specIds: ["FS023", "FS024"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.25"
+    title: "(FE) D-GRP-05 근거 상세 창 및 근거 문서 API 연동"
+    role: "FE"
+    specIds: ["FS024"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.26"
+    title: "(FE) D-GRP-06·07b 영향 경로·포커스 그래프 및 경로 API 연동"
+    role: "FE"
+    specIds: ["FS020", "FS022", "FS024"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.6.27"
+    title: "메인 그래프 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS017", "FS018", "FS019", "FS020", "FS021", "FS022", "FS023", "FS024", "FS025", "FS026", "FS027"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.1"
+    title: "(BE) 종목 목록·검색 API 구현"
+    role: "BE"
+    specIds: ["FS037"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.2"
+    title: "(BE) 기업 상세 조회 API 구현"
+    role: "BE"
+    specIds: ["FS038"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.3"
+    title: "(BE) 차트·타임라인 기간 조회 API 구현"
+    role: "BE"
+    specIds: ["FS040"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.4"
+    title: "(BE) 동일 시점 이슈 조회 API 구현"
+    role: "BE"
+    specIds: ["FS041"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.5"
+    title: "(BE) 시점 기반 관계 그래프 조회 API 구현"
+    role: "BE"
+    specIds: ["FS042"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다."
+  - wbsId: "6.7.6"
+    title: "(BE) 뉴스·공시 조회 API 구현"
+    role: "BE"
+    specIds: ["FS043"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.7"
+    title: "(BE) 기업 상세·관계 그래프 이동 API 구현"
+    role: "BE"
+    specIds: ["FS044"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.8"
+    title: "(FE) D-COM-01·01b 기업 상세·차트 화면 및 기업·시세 API 연동"
+    role: "FE"
+    specIds: ["FS038", "FS039", "FS040", "FS041", "FS044"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.9"
+    title: "(FE) D-COM-02 기업 문서 탭 및 뉴스·공시 API 연동"
+    role: "FE"
+    specIds: ["FS043"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.10"
+    title: "(FE) D-COM-03 기업 정보 탭 및 기업 기준정보 API 연동"
+    role: "FE"
+    specIds: ["FS020", "FS038", "FS044"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.7.11"
+    title: "(FE) D-COM-04 기업 중심 관계 그래프 및 시점 조회 API 연동"
+    role: "FE"
+    specIds: ["FS042", "FS038", "FS040", "FS044"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다."
+  - wbsId: "6.7.12"
+    title: "(FE) D-COM-05·06 사건 타임라인·차트·그래프 선택 동기화"
+    role: "FE"
+    specIds: ["FS040", "FS041", "FS042", "FS044"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다."
+  - wbsId: "6.7.13"
+    title: "기업 상세·타임라인 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS037", "FS038", "FS039", "FS040", "FS041", "FS042", "FS043", "FS044"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다."
+  - wbsId: "6.8.1"
+    title: "(BE) 출근 브리핑 생성"
+    role: "BE"
+    specIds: ["FS028"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.2"
+    title: "(BE) 퇴근 브리핑 생성"
+    role: "BE"
+    specIds: ["FS029"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.3"
+    title: "(BE) 핵심 이슈 선정 및 제공"
+    role: "BE"
+    specIds: ["FS030"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.4"
+    title: "(BE) 주요 시장 지표 제공"
+    role: "BE"
+    specIds: ["FS031"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.5"
+    title: "(BE) 브리핑 관계 그래프 조회"
+    role: "BE"
+    specIds: ["FS032"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.6"
+    title: "(BE) 공통 브리핑 조회"
+    role: "BE"
+    specIds: ["FS033"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.8"
+    title: "(BE) 브리핑 이력 보존(회차·발행본·스냅샷 저장 및 조회)"
+    role: "BE"
+    specIds: ["FS034", "FS035"]
+    reason: "회차·발행본 보존과 중복 발행 방지의 저장 계약을 연결한다. 6.8.7 업무 공란을 옛 FS034 의미로 추정 복원하지 않는다."
+  - wbsId: "6.8.9"
+    title: "(BE) 개인화 브리핑 조회"
+    role: "BE"
+    specIds: ["FS036"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.10"
+    title: "(BE) 좋아요/싫어요 등록"
+    role: "BE"
+    specIds: ["FS066-01"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.11"
+    title: "(FE) D-BRF-01 출근 브리핑 화면 및 브리핑 API 연동"
+    role: "FE"
+    specIds: ["FS028", "FS030", "FS031", "FS033", "FS035"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.12"
+    title: "(FE) D-BRF-02 퇴근 브리핑 화면 및 브리핑 API 연동"
+    role: "FE"
+    specIds: ["FS029", "FS030", "FS031", "FS033", "FS035"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.13"
+    title: "(FE) D-BRF-04 브리핑 회차·이력 화면 및 조회 API 연동"
+    role: "FE"
+    specIds: ["FS033", "FS035"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.14"
+    title: "(FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동"
+    role: "FE"
+    specIds: ["FS032", "FS036", "FS066-01"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.8.15"
+    title: "출퇴근 브리핑 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS028", "FS029", "FS030", "FS031", "FS032", "FS033", "FS034", "FS035", "FS036", "FS066-01"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.1"
+    title: "(BE) AI 질문 진입·맥락 전달"
+    role: "BE"
+    specIds: ["FS025", "FS045", "FS046"]
+    reason: "질문 진입·맥락 접수 시 FS046의 회원 권한·대화별 중복 작업 통제를 함께 적용한다. 원문 FS025/FS045와 편집 연결을 구분한다."
+  - wbsId: "6.9.2"
+    title: "(BE) 질문 대상·기간 해석·되묻기"
+    role: "BE"
+    specIds: ["FS047"]
+    reason: "질문 대상·기간 해석/되묻기는 현재 FS047 의미다. 옛 업무의 FS046 번호를 그대로 옮기지 않는다."
+  - wbsId: "6.9.3"
+    title: "(BE) 근거·관계 그래프 맥락 조회"
+    role: "BE"
+    specIds: ["FS048"]
+    reason: "근거·관계 그래프 맥락 조회는 현재 FS048의 개인화 조건/근거 확보 의미와 대응한다."
+  - wbsId: "6.9.4"
+    title: "(BE) 근거 기반 답변 생성·안전 검증"
+    role: "BE"
+    specIds: ["FS049"]
+    reason: "근거 기반 답변 생성·안전 검증은 현재 FS049 답변 검증/제공 의미와 대응한다."
+  - wbsId: "6.9.5"
+    title: "(BE) 답변 근거·관련 그래프 탐색"
+    role: "BE"
+    specIds: ["FS050-01", "FS050-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.6"
+    title: "(BE) 새 대화·후속 질문"
+    role: "BE"
+    specIds: ["FS051", "FS052-01"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.7"
+    title: "(BE) 패널 상태 유지·결과 재조회"
+    role: "BE"
+    specIds: ["FS052-02", "FS053"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.8"
+    title: "(BE) 대화와 내부 패널 유지"
+    role: "BE"
+    specIds: ["FS052-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.9"
+    title: "(BE) AI 결과 회수와 재시도"
+    role: "BE"
+    specIds: ["FS053"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.10"
+    title: "(BE) 대화와 질문 기록"
+    role: "BE"
+    specIds: ["FS060"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.11"
+    title: "(FE) D-AI-01 AI 챗봇 기본 화면 및 세션 API 연동"
+    role: "FE"
+    specIds: ["FS025", "FS045", "FS051", "FS060"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.12"
+    title: "(FE) D-AI-01b 기업·이슈·간선 선택 맥락 질문 연동"
+    role: "FE"
+    specIds: ["FS025", "FS045", "FS047"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.13"
+    title: "(FE) D-AI-02 AI 비동기 작업 상태·결과·재시도 API 연동"
+    role: "FE"
+    specIds: ["FS046", "FS049", "FS053", "NFS003"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.14"
+    title: "(FE) D-AI-02b 대화 이력·후속 질문·답변 재조회 API 연동"
+    role: "FE"
+    specIds: ["FS050-01", "FS050-02", "FS051", "FS052-01", "FS052-02", "FS053", "FS060", "NFS003"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.9.15"
+    title: "AI 챗봇 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS025", "FS045", "FS046", "FS047", "FS048", "FS049", "FS050-01", "FS050-02", "FS051", "FS052-01", "FS052-02", "FS053", "FS060"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.1"
+    title: "(BE) 관리자 인증·권한 관리 API 개발"
+    role: "BE"
+    specIds: ["FS073", "NFS001"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.2"
+    title: "(BE) 관리자 대시보드 통합 API 개발"
+    role: "BE"
+    specIds: ["FS072"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.3"
+    title: "(BE) 회원 활동 조회·차단 관리 API 개발"
+    role: "BE"
+    specIds: ["FS069-01", "FS069-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.4"
+    title: "(BE) 사용자·기업 통계 API 개발"
+    role: "BE"
+    specIds: ["FS065"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.5"
+    title: "(BE) AI 결과 평가·선호도 통계 API 개발"
+    role: "BE"
+    specIds: ["FS066-01", "FS066-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.6"
+    title: "(BE) 관계추출·이슈 분석 상태 조회 API 개발"
+    role: "BE"
+    specIds: ["FS067-01"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.7"
+    title: "(BE) 보류 이슈 검수·분석 재처리 기능 개발"
+    role: "BE"
+    specIds: ["FS067-02", "FS067-03"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.8"
+    title: "(BE) AI 사용량·비용·오류 조회 기능 개발"
+    role: "BE"
+    specIds: ["FS068"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.9"
+    title: "(BE) 브리핑 회차·발행 상태 관리 API 개발"
+    role: "BE"
+    specIds: ["FS070-01", "FS070-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.10"
+    title: "(BE) 브리핑 정정·제공 중단 기능 개발"
+    role: "BE"
+    specIds: ["FS071-01", "FS071-02"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.11"
+    title: "(BE) 관리자 대화록 마스킹 조회 기능 개발"
+    role: "BE"
+    specIds: ["FS066-03"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.12"
+    title: "(BE) 관리자 주요 작업 감사기록 저장·조회 구현"
+    role: "BE"
+    specIds: ["FS072", "NFS008"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.13"
+    title: "(FE) A-ADM-05c 관리자 로그인·권한 화면 및 인증 API 연동"
+    role: "FE"
+    specIds: ["FS073", "NFS001"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.14"
+    title: "(FE) A-ADM-01 운영 대시보드 및 통합 현황 API 연동"
+    role: "FE"
+    specIds: ["FS072"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.15"
+    title: "(FE) A-ADM-02·02b 통계·피드백 화면 및 평가 API 연동"
+    role: "FE"
+    specIds: ["FS065", "FS066-02", "FS066-03"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.16"
+    title: "(FE) A-ADM-03 그래프 파이프라인·검수 화면 및 재처리 API 연동"
+    role: "FE"
+    specIds: ["FS067-01", "FS067-02", "FS067-03"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.17"
+    title: "(FE) A-ADM-04·04b 브리핑·AI 사용량 운영 화면 및 API 연동"
+    role: "FE"
+    specIds: ["FS070-01", "FS070-02", "FS071-01", "FS071-02", "FS068"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.18"
+    title: "(FE) A-ADM-05·05b 회원·감사 로그 화면 및 관리 API 연동"
+    role: "FE"
+    specIds: ["FS069-01", "FS069-02", "NFS008"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+  - wbsId: "6.10.19"
+    title: "관리자 권한·운영 기능 통합 테스트"
+    role: "공통/통합"
+    specIds: ["FS065", "FS066-01", "FS066-02", "FS066-03", "FS067-01", "FS067-02", "FS067-03", "FS068", "FS069-01", "FS069-02", "FS070-01", "FS070-02", "FS071-01", "FS071-02", "FS072", "FS073"]
+    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
 implementationLocations:
   -
     specId: "FS001"
@@ -539,4 +1234,4 @@ knownDifferences:
     reason: "스냅샷 파일·SQLite 상태 디렉터리·데모 재생 스크립트·PoC 샌드박스 명령은 구현 환경 차이이며 정식 API 필드가 아니다."
   -
     id: "AUTH_PROPOSAL"
-    reason: "정식 서버의 쿠키 세션·CSRF·/api/v1·오류 코드·불투명 커서는 이 목표 계약의 제안이다. 사용자 데이터 보안·멱등성은 NFS 요구이며 세부 운영값은 팀 확인 필요다."
+    reason: "정식 서버의 쿠키 세션·CSRF·/api/v1·오류 코드·불투명 커서는 사용자 잠정 채택/시연 기준이다. 팀 최종 승인·운영값 확정·구현 완료를 뜻하지 않는다."

@@ -209,8 +209,6 @@ export function buildStyle(isMobile: boolean, lod: Lod): StylesheetJson {
     { selector: "edge.emph", style: { width: 3, "z-index": 10 } },
     { selector: "edge.labelled", style: { label: "data(short)", "z-index": 15 } },
     { selector: "edge.quiet", style: { label: "" } },
-    // 겹침 정리(graph-declutter): 우선순위가 낮아 다른 라벨과 겹치는 노드 캡션은 숨긴다. 선택·경로 캡션은 아래 규칙이 다시 보인다.
-    { selector: "node.label-cull", style: { label: "" } },
     // 호버·선택한 간선은 말줄임 없이 전체 요약을 줄바꿈해 보인다.
     { selector: "edge.hover", style: { label: "data(summary)", "text-wrap": "wrap", "text-max-width": `${160 * lod.scale}px`, "z-index": 40 } },
     {
@@ -231,6 +229,8 @@ export function buildStyle(isMobile: boolean, lod: Lod): StylesheetJson {
     // 경로 규칙은 호버가 붙이는 .quiet보다 뒤에 둬 요약이 사라지지 않게 한다.
     { selector: "node.path", style: { label: "data(caption)", "z-index": 25 } },
     { selector: "edge.path", style: { label: "data(summary)", "text-wrap": "wrap", "text-max-width": `${160 * lod.scale}px`, width: 4, "z-index": 25 } },
+    // 선택·경로 스타일보다 뒤에서 노드 이름과 선 요약을 함께 정리한다. 실제 선택·호버는 선별에서 보호한다.
+    { selector: "node.label-cull, edge.label-cull", style: { label: "" } },
     { selector: ".focus-hidden, .filter-hidden", style: { display: "none" } },
     { selector: "node.entering", style: { opacity: 0 } },
   ];

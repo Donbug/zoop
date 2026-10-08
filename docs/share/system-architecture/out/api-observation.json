@@ -1,0 +1,97 @@
+{
+  "status": "passed",
+  "observedAt": "2026-10-07T18:12:31.772836+00:00",
+  "scope": "Isolated synthetic seed; public GET requests only. Runtime and source inspection are separate evidence.",
+  "url": "http://127.0.0.1:8864",
+  "stateDir": "/tmp/zoop-diagram-2026-10-08",
+  "disabled": [
+    "briefing scheduler",
+    "quote provider",
+    "metrics provider"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/openapi.json",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/graph?mode=all",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/companies",
+      "status": 200
+    }
+  ],
+  "health": {
+    "status": "ok",
+    "source": {
+      "mode": "snapshot",
+      "label": "snapshot:poc-synthetic-inspect.json",
+      "connected": true,
+      "error": null
+    },
+    "datasetKind": "synthetic-preview",
+    "asOf": "2026-09-29T08:57:06+00:00",
+    "graphVersion": "v1",
+    "counts": {
+      "issues": 3,
+      "companies": 1,
+      "approvedEdges": 2,
+      "derivedEdges": 0,
+      "evidence": 4
+    },
+    "sourceErrors": [],
+    "warnings": []
+  },
+  "schema": {
+    "title": "Zoop BFF",
+    "pathCount": 79,
+    "apiV1PathCount": 0
+  },
+  "publicGraph": {
+    "metadata": {
+      "datasetKind": "synthetic-preview",
+      "source": "snapshot:poc-synthetic-inspect.json",
+      "asOf": "2026-09-29T08:57:06+00:00",
+      "sourceMode": "snapshot",
+      "synthetic": true,
+      "generatedBy": null,
+      "graphVersion": "v1",
+      "mode": "all",
+      "truncated": false,
+      "emptyReason": null,
+      "focusCompanyIds": [],
+      "depth": null,
+      "limit": 500
+    },
+    "nodeCount": 4,
+    "edgeCount": 2
+  },
+  "snapshot": {
+    "path": "/tmp/zoop-diagram-2026-10-08/graph/v1.json",
+    "version": "v1",
+    "kind": "seed",
+    "sha256MatchesSQLite": true,
+    "bytes": 26850
+  },
+  "notExercised": [
+    "production data",
+    "admin ledger / PostgreSQL / Neo4j",
+    "publication",
+    "chat or briefing generation",
+    "LLM / embedding / Jev",
+    "external market HTTP",
+    "frontend interactions",
+    "target /api/v1",
+    "cloud deployment"
+  ]
+}

@@ -215,6 +215,7 @@ export function GraphCanvas({
       onNodeMoved: (id, position) => void (!viewRef.current.focus && positionsRef.current.set(id, position)),
       lod: { get: () => lodRef.current, set: (lod) => void (lodRef.current = lod) },
       onLodChange: (lod) => cy.style(buildStyle(motionRef.current.isMobile, lod)),
+      onLabelsChange: () => declutterLabels(cy),
       onViewportIdle: () => {
         if (layoutRunningRef.current) return;
         declutterLabels(cy);
@@ -255,7 +256,10 @@ export function GraphCanvas({
 
   // 2) 테마·화면 폭이 바뀌면 색만 다시 입힌다.
   useEffect(() => {
-    cyRef.current?.style(buildStyle(isMobile, lodRef.current));
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.style(buildStyle(isMobile, lodRef.current));
+    declutterLabels(cy);
   }, [theme, isMobile]);
 
   /** 포커스 화면 여백: 위는 포커스 바(56 + 간격), 모바일은 좌우·아래를 좁혀 방사형 배치를 크게 보인다. 데스크톱은 상세 패널 자리를 비운다. */

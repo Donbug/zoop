@@ -1,0 +1,112 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs",
+  "export_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs/export?format=xlsx",
+  "collected_at_kst": "2026-10-08T02:52:05.448099+09:00",
+  "auth": "none",
+  "baseline": "functional-spec_2026-10-06",
+  "baseline_xlsx_sha256": "c005e9ec9963f797ea8e64c28818720212ec44a5de3da1aa00fb66622d88df2d",
+  "response_sha256": "ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175",
+  "http_status": 200,
+  "data_only": true,
+  "csv_encoding": "utf-8-sig",
+  "content_identical": false,
+  "sheet_ranges": {
+    "명세 목차": {
+      "rows": 111,
+      "columns": 8
+    },
+    "회원가입·로그인": {
+      "rows": 104,
+      "columns": 2
+    },
+    "온보딩·튜토리얼": {
+      "rows": 146,
+      "columns": 2
+    },
+    "메인 그래프": {
+      "rows": 160,
+      "columns": 2
+    },
+    "메인그래프 v2": {
+      "rows": 995,
+      "columns": 26
+    },
+    "출퇴근 브리핑": {
+      "rows": 144,
+      "columns": 2
+    },
+    "기업 상세·타임라인": {
+      "rows": 118,
+      "columns": 26
+    },
+    "AI 챗봇": {
+      "rows": 160,
+      "columns": 2
+    },
+    "AI 챗봇 v2": {
+      "rows": 105,
+      "columns": 2
+    },
+    "데이터 관리": {
+      "rows": 90,
+      "columns": 5
+    },
+    "외부 연동": {
+      "rows": 62,
+      "columns": 2
+    },
+    "AI 평가·관리자": {
+      "rows": 230,
+      "columns": 2
+    },
+    "비기능 상세": {
+      "rows": 174,
+      "columns": 2
+    },
+    "변경 내역": {
+      "rows": 64,
+      "columns": 6
+    },
+    "제안·확인 사항": {
+      "rows": 30,
+      "columns": 5
+    }
+  },
+  "xlsx": "zoop-functional-spec_2026-10-08.xlsx",
+  "sha256": "ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175",
+  "sheets": {
+    "명세 목차": "00-명세-목차.csv",
+    "회원가입·로그인": "01-회원가입-로그인.csv",
+    "온보딩·튜토리얼": "02-온보딩-튜토리얼.csv",
+    "메인 그래프": "03-메인-그래프.csv",
+    "메인그래프 v2": "04-메인그래프-v2.csv",
+    "출퇴근 브리핑": "05-출퇴근-브리핑.csv",
+    "기업 상세·타임라인": "06-기업-상세-타임라인.csv",
+    "AI 챗봇": "07-AI-챗봇.csv",
+    "AI 챗봇 v2": "08-AI-챗봇-v2.csv",
+    "데이터 관리": "09-데이터-관리.csv",
+    "외부 연동": "10-외부-연동.csv",
+    "AI 평가·관리자": "11-AI-평가-관리자.csv",
+    "비기능 상세": "12-비기능-상세.csv",
+    "변경 내역": "13-변경-내역.csv",
+    "제안·확인 사항": "14-제안-확인-사항.csv"
+  },
+  "files": {
+    "zoop-functional-spec_2026-10-08.xlsx": "ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175",
+    "00-명세-목차.csv": "ddfbc265de0b96cebba637f804de65a471de3f6b37b0b57e136579c88a6bde8f",
+    "01-회원가입-로그인.csv": "c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74",
+    "02-온보딩-튜토리얼.csv": "6791468a7182c719146b5b7db966bbc0f8246c956d33edd85a22f75dec228c8a",
+    "03-메인-그래프.csv": "f12f4de4e9987c3e7ff3a001786f823bad0695c37e82f05c7d5ca6d27daff67d",
+    "04-메인그래프-v2.csv": "76a315e56e1a2fd018b347da2fee3eac5c563c077bad437d6bc3510cebeed53d",
+    "05-출퇴근-브리핑.csv": "f3bf6e8a6643af054b62c3ff645fd507cb34c4aeabadbed3fd1c00d444ea646f",
+    "06-기업-상세-타임라인.csv": "8e19b90a9c107bdc479e9595f0e307d818bba857199ad8b9a83e8ae06053619f",
+    "07-AI-챗봇.csv": "c17d26d4d6f3f868b81db406fbb13a2dda9f172c584fc3a8b5a771c9c31c07c6",
+    "08-AI-챗봇-v2.csv": "5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90",
+    "09-데이터-관리.csv": "a8cb1cb80b359eb5cc187450bcdbb96ca9c0fcfc1d9f2b8b7e436fbcbd973560",
+    "10-외부-연동.csv": "8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6",
+    "11-AI-평가-관리자.csv": "d214f780afcf3e01d3cafc43fc4e006f87ed98d7c54beabc8073c9c20d41363a",
+    "12-비기능-상세.csv": "fc03c7cc08a7f78e17a4608b4e70654e9374473f865497bb5a6cdbb634de5dba",
+    "13-변경-내역.csv": "22ffe90153049049f4f3610512d7b1cd598bd184dd863fda0782fc2a848e3897",
+    "14-제안-확인-사항.csv": "a5d50ff2500e2382eb7470109fa2acac13114572419a40001a43e4f7c4c51089"
+  }
+}

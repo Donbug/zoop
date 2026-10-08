@@ -461,13 +461,16 @@ def get_company_documents(
     for issue in sort_recent(ds.issues_of_company(company_id)):
         for article_id in issue.article_ids:
             rec = ds.article_for(article_id)
-            if rec is None:
+            if rec is None or rec.poc is not None and rec.poc.withdrawn or state.admin.sentiment.analysis_store.denied(article_id):
                 continue
             published = _reported(rec.published_at)
             if window.bounded and (published is None or not window.contains(published)):
                 continue
             doc = docs.get(article_id)
             if doc is None:
+                analysis = state.admin.sentiment.analysis(ds, rec.id, company_id, document_version=rec.version)
+                if round_id:
+                    analysis["sentiment"] = state.admin.sentiment.frozen_document(round_id, rec.id, company_id)
                 doc = docs[article_id] = CompanyDocument(
                     id=rec.id,
                     title=rec.title,
@@ -477,8 +480,7 @@ def get_company_documents(
                     synthetic=rec.synthetic,
                     events=[],
                     quotes=[],
-                    sentiment=state.admin.sentiment.frozen_document(round_id, rec.id, company_id) if round_id
-                    else state.admin.sentiment.document(ds, rec.id, company_id),
+                    **analysis,
                 )
             doc.events.append(
                 DocumentEventRef(
@@ -709,9 +711,18 @@ def get_evidence(
 ) -> EvidenceResponse:
     ds = state.dataset(round_id)
     ev = ds.evidence.get(evidence_id)
-    if ev is None:
+    if ev is None or state.admin.sentiment.analysis_store.denied(ev.article_id):
         raise not_found("evidence_not_found", "근거를 찾을 수 없습니다.")
     article = ds.article_for(ev.article_id, ev.article_version)
+    if article is not None and article.poc is not None and article.poc.withdrawn:
+        raise not_found("evidence_not_found", "근거를 찾을 수 없습니다.")
+    analysis = state.admin.sentiment.analysis(ds, ev.article_id, company_id, document_version=ev.article_version) if company_id else {
+        "document_version": ev.article_version,
+        "document_summary": None,
+        "analysis_status": None,
+        "analysis_provenance": None,
+        "result_version": None,
+    }
     sentiment = None
     if company_id is not None:
         _require_company(ds, company_id)
@@ -742,5 +753,5 @@ def get_evidence(
         quote_verified=ev.quote_verified,
         event_ids=list(ds.evidence_issues.get(ev.id, ())),
         metadata=meta(ds),
-        sentiment=sentiment,
+        **{**analysis, "sentiment": sentiment},
     )

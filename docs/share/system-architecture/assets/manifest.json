@@ -1,0 +1,369 @@
+{
+  "collectedOn": "2026-10-08",
+  "notice": "기술 식별 목적이며 협력·승인·후원을 뜻하지 않습니다. 저작권 허용은 상표권 양도가 아닙니다. PostgreSQL/Neo4j는 로고 재사용 권리가 명확하지 않아 Lucide 역할 아이콘과 기술명으로 대체합니다.",
+  "assets": [
+    {
+      "file": "react.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/facebook/create-react-app/282c03f9525fdf8061ffa1ec50dce89296d916bd/test/fixtures/relative-paths/src/logo.svg",
+      "collectedOn": "2026-10-08",
+      "license": "MIT",
+      "licenseUrl": "https://raw.githubusercontent.com/facebook/create-react-app/282c03f9525fdf8061ffa1ec50dce89296d916bd/LICENSE",
+      "notice": "REACT-LICENSE.txt",
+      "sha256": "6000b0e9b0b05b3f112de04f0d039768a1db63588ff9b6ef7099dbd71632f383",
+      "modifications": "none; proportional display resize only",
+      "currentConnection": "Current React browser frontend"
+    },
+    {
+      "file": "fastapi.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/fastapi/fastapi/ffb4f77a11f83132b521ba0aac6c95792c19e797/docs/en/docs/img/icon-white.svg",
+      "collectedOn": "2026-10-08",
+      "license": "MIT",
+      "licenseUrl": "https://raw.githubusercontent.com/fastapi/fastapi/ffb4f77a11f83132b521ba0aac6c95792c19e797/LICENSE",
+      "notice": "FASTAPI-LICENSE.txt",
+      "sha256": "4df893703e4f165e5fc1f0270fe70d63aea454135ebdb98a646a2d7967ceef6e",
+      "modifications": "none; proportional display resize only",
+      "currentConnection": "Current FastAPI BFF /api"
+    },
+    {
+      "file": "python.svg",
+      "sourceUrl": "https://s3.dualstack.us-east-2.amazonaws.com/pythondotorg-assets/media/files/python-logo-only.svg",
+      "collectedOn": "2026-10-08",
+      "license": "PSF logo identification permission; trademark retained",
+      "licenseUrl": "https://www.python.org/community/logos/",
+      "notice": "RIGHTS-NOTICE.txt",
+      "sha256": "baec8662a1461c2cacc326b54d2727cb2f1ce07ba02d00f5b826d035104f649f",
+      "modifications": "none; proportional display resize only",
+      "currentConnection": "Current Python BFF/independent JSON CLI worker"
+    },
+    {
+      "file": "sqlite.svg",
+      "sourceUrl": "https://sqlite.org/images/sqlite370_banner.svg",
+      "collectedOn": "2026-10-08",
+      "license": "Public domain SQLite documentation; trademark not transferred",
+      "licenseUrl": "https://sqlite.org/copyright.html",
+      "notice": "RIGHTS-NOTICE.txt",
+      "sha256": "462c4ce8229b585dd6880cd308b121d9de63eb619db05e469598594e80d7b151",
+      "modifications": "none; proportional display resize only",
+      "currentConnection": "Separate app SQLite and worker SQLite; no shared DB write"
+    },
+    {
+      "file": "screen-graph.png",
+      "sourceUrl": "docs/screen-plan/captures/D-GRP-01.png",
+      "collectedOn": "2026-10-08",
+      "license": "User-authorized project screenshot; third-party marks retain their rights",
+      "notice": null,
+      "sha256": "fbecd1c8e4ef9d2439587d5fadf689b11f3f494efb78ee862f250a4dff74739b",
+      "sourceSha256": "0436fab3b0ae6747f87fb1e050234c4e38d8864c4ccffc53acddc5a966c862f5",
+      "modifications": {
+        "cropPixels": [
+          240,
+          140,
+          1110,
+          790
+        ],
+        "sourcePixels": [
+          1440,
+          900
+        ],
+        "display": "proportional resize only; no UI painting"
+      },
+      "currentConnection": "Existing published snapshot screen capture; article provenance not revalidated here; not a new runtime test",
+      "evidence": "docs/screen-plan/captures/D-GRP-01.json"
+    },
+    {
+      "file": "screen-evidence.png",
+      "sourceUrl": "docs/design/v10/ai-document-evidence-1440-light.png",
+      "collectedOn": "2026-10-08",
+      "license": "User-authorized project screenshot; third-party marks retain their rights",
+      "notice": null,
+      "sha256": "1cd646c4bba55154cf5099c5c6895f4dc953f6019d4ab08846fc8c1e3f681179",
+      "sourceSha256": "1df255c6f01bf8ed184a8a0c716414885b7e28d8c65c82715124fdb016b6be60",
+      "modifications": {
+        "cropPixels": [
+          1200,
+          0,
+          1800,
+          760
+        ],
+        "sourcePixels": [
+          1800,
+          1250
+        ],
+        "display": "proportional resize only; no UI painting"
+      },
+      "currentConnection": "Synthetic replay; actual evidence sheet UI",
+      "evidence": "docs/design/v10/ai-document-runtime-evidence.json"
+    },
+    {
+      "file": "SUIT-Variable.woff2",
+      "sourceUrl": "https://github.com/sun-typeface/SUIT",
+      "localSource": "prototype/web/node_modules/@sun-typeface/suit/fonts/variable/woff2/SUIT-Variable.woff2",
+      "collectedOn": "2026-10-08",
+      "license": "SIL OFL 1.1; reserved name SUIT",
+      "notice": "../SUIT-LICENSE.txt",
+      "sha256": "aa894a204d5a6fbae259dac6868d350cbd373a390caee0313f92946af741df23",
+      "modifications": "none; WOFF2 unchanged",
+      "currentConnection": "Existing diagram font; embedded data URI"
+    },
+    {
+      "file": "role-archive.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/archive.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "ea9f9a3708f80e43a58e7f7bebe3bab33c83528abe9694e920f77a39bffae409",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role archive"
+    },
+    {
+      "file": "role-chart-no-axes-combined.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/chart-no-axes-combined.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "1c0b7bee15431f3d49e694503c78b44e2bc726843aa97e02d057ebaa176bb5e2",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role chart-no-axes-combined"
+    },
+    {
+      "file": "role-check-check.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/check-check.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "be0a27909c0ad4ad28c69ec6738d204119543d7f270a4e27347fa4f2a31e8c84",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role check-check"
+    },
+    {
+      "file": "role-clock.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/clock.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "006cac8e2bbe17037d9526c0744788dfbf16837bf84c857f8250c446439e8aa1",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role clock"
+    },
+    {
+      "file": "role-cloud.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/cloud.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "ecfe62319933992f85a1a98fa2c27bcde116a0e169849af4aa57094a8292098a",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role cloud"
+    },
+    {
+      "file": "role-database.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/database.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "5c62cf603f34c873aae1bae712c60aa7edac9bbdcc8012e2d57cdf3a64eb4337",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role database"
+    },
+    {
+      "file": "role-file-text.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/file-text.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "eb8ee2889f99d787132853d6338f195981ee67b034f4ca685334dcf14453374a",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role file-text"
+    },
+    {
+      "file": "role-layers.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/layers.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "8013c135093da01de980f7f617f6b54a1cb0314d44663ed7cb2deb36c544c86c",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role layers"
+    },
+    {
+      "file": "role-lock-keyhole.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/lock-keyhole.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "0c480a614ae159023ef900218604bc980ca0867c0b837b13e71f8072419b2d69",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role lock-keyhole"
+    },
+    {
+      "file": "role-message-square.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/message-square.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "99cbb7aeb99d11893682f3c80ff1fd5892c037785cb019a8e57779bdea49d2f3",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role message-square"
+    },
+    {
+      "file": "role-network.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/network.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "1459f52b9415e753c9e15f48c858c5c495b3829264fc49f02e797109d20ac3c9",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role network"
+    },
+    {
+      "file": "role-route.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/route.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "639c2c73eaf8a7991b8933f8121a1f709d8e32e1887c4a1532bb3852b076c0c7",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role route"
+    },
+    {
+      "file": "role-send.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/send.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "45692db2cb80ac4b2e944de82b88e10b4c2bf793937658329adc87db6f4b87fb",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role send"
+    },
+    {
+      "file": "role-shield-check.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/shield-check.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "1d8518338de7168107a77cb9fa04d0363cf550274a6098ca1016c986b8dc4fb1",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role shield-check"
+    },
+    {
+      "file": "role-terminal.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/terminal.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "8a0b092c3587d05fe3db2f24cacf67292e069947726a2319788b8b4c8aef1f0b",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role terminal"
+    },
+    {
+      "file": "role-workflow.svg",
+      "sourceUrl": "https://github.com/lucide-icons/lucide",
+      "localSource": "prototype/web/node_modules/lucide-react/dist/esm/icons/workflow.mjs",
+      "collectedOn": "2026-10-08",
+      "license": "ISC; Feather-derived shapes MIT as listed in notice",
+      "notice": "LUCIDE-LICENSE.txt",
+      "sha256": "0cbb66a314595bef8a695c45c3119b33d000820c94215f5817a102a07b120a03",
+      "modifications": "Existing geometry extracted as static SVG; key props removed; consistent stroke color/width",
+      "currentConnection": "Architecture role workflow"
+    },
+    {
+      "file": "screen-selection.png",
+      "sourceUrl": "docs/screen-plan/captures/D-COM-01b.png",
+      "collectedOn": "2026-10-08",
+      "license": "User-authorized project screenshot; third-party marks retain rights",
+      "notice": "RIGHTS-NOTICE.txt",
+      "sha256": "30202d4595ca1da18864b70b5479f218e33bc682467e01b11e4e41a82ba40317",
+      "sourceSha256": "944fe1051778d0e0c1ddcf54602217c4355b2fbaeae14c337f7c693b1be9e9ed",
+      "modifications": {
+        "cropPixels": [
+          305,
+          75,
+          1040,
+          235
+        ],
+        "sourcePixels": [
+          1440,
+          900
+        ],
+        "display": "proportional resize only; no UI painting"
+      },
+      "currentConnection": "Existing Samsung company capture: period/as-of controls; not a before/after test",
+      "evidence": "docs/screen-plan/captures/D-COM-01b.json"
+    },
+    {
+      "file": "screen-chart.png",
+      "sourceUrl": "docs/screen-plan/captures/D-COM-01b.png",
+      "collectedOn": "2026-10-08",
+      "license": "User-authorized project screenshot; third-party marks retain rights",
+      "notice": "RIGHTS-NOTICE.txt",
+      "sha256": "63506f60e8519c7ca6d8dbd8859914f64ada2823376e9d9a483576dfc5c4f04e",
+      "sourceSha256": "944fe1051778d0e0c1ddcf54602217c4355b2fbaeae14c337f7c693b1be9e9ed",
+      "modifications": {
+        "cropPixels": [
+          310,
+          210,
+          1040,
+          565
+        ],
+        "sourcePixels": [
+          1440,
+          900
+        ],
+        "display": "proportional resize only; no UI painting"
+      },
+      "currentConnection": "Same Samsung capture: price/chart/source/non-causation notice",
+      "evidence": "docs/screen-plan/captures/D-COM-01b.json"
+    },
+    {
+      "file": "screen-relation.png",
+      "sourceUrl": "docs/screen-plan/captures/D-COM-01b.png",
+      "collectedOn": "2026-10-08",
+      "license": "User-authorized project screenshot; third-party marks retain rights",
+      "notice": "RIGHTS-NOTICE.txt",
+      "sha256": "fad96f71faa2ca8c2c5211052a98b5ab9e12ae3afe79313c25b493f42724de3f",
+      "sourceSha256": "944fe1051778d0e0c1ddcf54602217c4355b2fbaeae14c337f7c693b1be9e9ed",
+      "modifications": {
+        "cropPixels": [
+          1055,
+          320,
+          1415,
+          640
+        ],
+        "sourcePixels": [
+          1440,
+          900
+        ],
+        "display": "proportional resize only; no UI painting"
+      },
+      "currentConnection": "Same Samsung capture: relationship graph; not an AI judgement",
+      "evidence": "docs/screen-plan/captures/D-COM-01b.json"
+    }
+  ],
+  "omittedBrandLogos": [
+    {
+      "name": "PostgreSQL",
+      "sourceUrl": "https://www.postgresql.org/about/policies/trademarks/",
+      "reason": "Logo permitted forms / no combination / other uses approval restrictions; factual name + licensed database icon instead"
+    },
+    {
+      "name": "Neo4j",
+      "sourceUrl": "https://neo4j.com/brand/",
+      "reason": "Redirected design system did not expose clear artwork reuse license; factual name + licensed network icon instead"
+    }
+  ]
+}

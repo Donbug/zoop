@@ -3,7 +3,7 @@
     "page": 1,
     "id": "COVER",
     "title": "줍 화면계획서 v2.1",
-    "route": "프로토타입 기준 · 2026-10-06"
+    "route": "프로토타입 기준 · 2026-10-08 정합화 · 기존 77쪽/ID 유지"
   },
   {
     "page": 2,
@@ -14,7 +14,7 @@
   {
     "page": 3,
     "id": "HISTORY-21",
-    "title": "변경 이력 · v2.0 → v2.1",
+    "title": "변경 이력 · v2.1 · 10-08 정합화",
     "route": ""
   },
   {
@@ -225,19 +225,19 @@
     "page": 38,
     "id": "D-COM-01",
     "title": "기업 상세·시세·모의 보유",
-    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z"
+    "route": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A59%3A09.207Z"
   },
   {
     "page": 39,
     "id": "D-COM-01b",
     "title": "차트·시간 버킷·인과관계 고지",
-    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=events"
+    "route": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A59%3A09.207Z&tab=events"
   },
   {
     "page": 40,
     "id": "D-COM-02",
     "title": "사건 타임라인·문서 탭",
-    "route": "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=documents"
+    "route": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A59%3A09.207Z&tab=documents"
   },
   {
     "page": 41,
@@ -446,7 +446,7 @@
   {
     "page": 75,
     "id": "APP-POLICY-02",
-    "title": "팀 확인 필요 · 10-03 명세 충돌",
+    "title": "결정 상태 · 10-08 정합화",
     "route": ""
   },
   {

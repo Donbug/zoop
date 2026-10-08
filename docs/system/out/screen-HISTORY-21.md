@@ -1,4 +1,4 @@
-# HISTORY-21 · 변경 이력 · v2.0 → v2.1
+# HISTORY-21 · 변경 이력 · v2.1 · 10-08 정합화
 
 [전체 목록](index.md) · [검사 결과](warnings.md)
 

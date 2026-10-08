@@ -457,6 +457,8 @@ class BriefingService:
                     # Fixed now, at generation: the stored values are what the round shows from then on (FS035).
                     market = self._indicators.collect(day, edition, scheduled_at(day, edition), now=self._clock.now())
                     published = self._payload(rid, day, edition, dataset, stamp, window, items, selected_from, data, market)
+        except ApiError as exc:
+            failure = ("generate", exc.code, exc.message)
         except Exception as exc:  # a bug must end as a visible failed round, never a stuck "generating"
             log.exception("briefing generation crashed for %s", rid)
             failure = ("generate", "generation_error", f"생성 중 예기치 않은 오류({type(exc).__name__})")
@@ -620,7 +622,10 @@ class BriefingService:
         graph_version, revision, (_, rule_revision) = stamp  # type: ignore[misc]
         companies = list(dict.fromkeys(c["id"] for item in items for c in item["companies"]))
         self._sentiment.freeze_documents(ds, items)
-        outlook = self._sentiment.judge_outlook(outlook_input(rid, _kst(scheduled_at(day, edition)), items, market.model_dump(by_alias=True, mode="json")))
+        outlook = self._sentiment.judge_outlook(outlook_input(rid, _kst(scheduled_at(day, edition)), items, market.model_dump(by_alias=True, mode="json"),
+            graph_version=graph_version, review_revision=revision, rule_revision=rule_revision), synthetic=ds.synthetic)
+        if self._provider.source.stamp() != stamp:
+            raise ApiError(503, "briefing_context_changed", "판정 중 공개 근거가 바뀌어 회차를 발행하지 않았습니다.")
         evidence = list(dict.fromkeys(e for item in items for e in item["evidenceIds"]))
         metadata = BriefingMetadata(
             **meta(ds, GENERATED_BY).model_dump(),

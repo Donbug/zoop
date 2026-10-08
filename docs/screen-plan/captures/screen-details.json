@@ -469,7 +469,7 @@
         {
           "role": "css",
           "name": "aside[aria-label=\"상세\"] details summary",
-          "result": "받은 주요 지표를 펼쳐요",
+          "result": "기업의 다른 이름을 펼쳐요",
           "destination": "D-GRP-03",
           "mode": "toggle"
         }

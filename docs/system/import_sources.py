@@ -39,11 +39,21 @@ def number(value: str) -> str:
     return value.removesuffix(".0").strip()
 
 
+def header(rows: list[list[str]], expected: list[str], path: Path) -> tuple[int, dict[str, int]]:
+    matches = [(n, row) for n, row in enumerate(rows, 1) if row[:len(expected)] == expected]
+    if len(matches) != 1:
+        raise ValueError(f"고정 열 헤더 불일치: {path} (기대: {expected})")
+    n, row = matches[0]
+    return n, {name: index for index, name in enumerate(row[:len(expected)])}
+
+
 def import_specs(folder: Path, warnings: list[dict]) -> list[dict]:
     files = sorted(folder.glob("*.csv"))
     indexes = [p for p in files if any(r and r[0] == "명세 ID" for r in csv_rows(p))]
     if len(indexes) != 1:
         raise ValueError(f"명세 목차 CSV는 하나여야 한다: {folder} ({len(indexes)})")
+    header(csv_rows(indexes[0]), ["명세 ID", "영역별 시트", "기능·요구사항명", "원본 우선순위",
+                                "원본 상태", "요구사항 ID", "상세 위치", "v1.2 변경"], indexes[0])
     records = []
     for row_no, row in enumerate(csv_rows(indexes[0]), 1):
         if not row or not SPEC_ID.fullmatch(row[0].strip()):
@@ -78,6 +88,13 @@ def import_specs(folder: Path, warnings: list[dict]) -> list[dict]:
             if not VALID_ID.fullmatch(raw):
                 warnings.append({"code": "MALFORMED_SPEC_ID", "id": raw, "message": "명세 ID 형식 오류. 번호를 추정하거나 고치지 않는다.", "source": origin(path, row_no)})
     for rec in records:
+        # 원문 추가 제안 8개의 분류다. 현재 구현 범위는 links.yaml.authority에서 별도로 해석한다.
+        rec["scopeClass"] = "proposal" if "추가 제안" in rec["status"] and "파이프라인 상세 추가" in rec["change"] else "existing"
+        if rec["id"] == "FS042" and "재무" in rec["title"] and any(
+                "시점" in d["fields"].get("기능명", "") for d in rec["definitions"]):
+            warnings.append({"code": "SPEC_ID_MEANING_CONFLICT", "id": rec["id"],
+                             "message": "목차 FS042는 재무·실적, 상세 FS042는 FS0??를 승계한 시점 관계 그래프다. ID 정리는 완료됐지만 재무 폐기 선언은 없다. 두 의미를 별도로 추적한다.",
+                             "source": rec["source"]})
         if len(rec["definitions"]) > 1:
             warnings.append({"code": "MULTIPLE_SPEC_DEFINITIONS", "id": rec["id"], "message": "동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.", "source": rec["source"]})
         if not rec["definitions"]:
@@ -90,6 +107,8 @@ def import_requirements(folder: Path, warnings: list[dict]) -> list[dict]:
              if any(r and r[0] == "요구사항 ID" and "필요 기능" in r for r in csv_rows(p))]
     if len(files) != 1:
         raise ValueError(f"요구사항 정의 CSV는 하나여야 한다: {folder} ({len(files)})")
+    header(csv_rows(files[0]), ["요구사항 ID", "구분", "서비스(메뉴)", "필요 기능", "기능상세설명",
+                              "Column 6", "우선순위", "확정 상태"], files[0])
     result = []
     for n, row in enumerate(csv_rows(files[0]), 1):
         if not row or not re.fullmatch(r"\d+(?:\.0)?", row[0].strip()):
@@ -105,21 +124,48 @@ def import_requirements(folder: Path, warnings: list[dict]) -> list[dict]:
     return result
 
 
-def import_wbs(folder: Path) -> list[dict]:
+def import_wbs(folder: Path, warnings: list[dict]) -> tuple[list[dict], dict]:
     files = [p for p in sorted(folder.glob("*.csv"))
              if any(len(r) > 2 and r[:3] == ["구분", "WBS", "업무"] for r in csv_rows(p))]
     if len(files) != 1:
         raise ValueError(f"WBS CSV는 하나여야 한다: {folder} ({len(files)})")
+    path = files[0]
+    rows = csv_rows(path)
+    header_row, columns = header(rows, ["구분", "WBS", "업무", "유형", "산출물", "수행인력",
+                                     "시작일", "종료일", "가중치", "진행률"], path)
     result = []
-    for n, row in enumerate(csv_rows(files[0]), 1):
-        if len(row) < 10 or not re.fullmatch(r"\d+(?:\.\d+)*", row[1].strip()):
+    for n, row in enumerate(rows, 1):
+        if len(row) < len(columns) or not re.fullmatch(r"\d+(?:\.\d+)*", row[columns["WBS"]].strip()):
             continue
-        result.append({"id": row[1].strip(), "title": row[2].strip(), "type": row[3],
-                       "deliverable": row[4], "owners": row[5], "start": row[6].split(" ")[0],
-                       "end": row[7].split(" ")[0], "weight": row[8], "progress": row[9],
-                       "rawSpecIds": list(dict.fromkeys(SPEC_ID.findall(row[2] + " " + row[4]))),
-                       "source": origin(files[0], n)})
-    return result
+        value = lambda name: row[columns[name]]
+        title = value("업무").strip()
+        role = "FE" if "(FE)" in title else "BE" if "(BE)" in title else "공통/통합"
+        result.append({"id": value("WBS").strip(), "title": title, "type": value("유형"),
+                       "role": role, "deliverable": value("산출물"), "owners": value("수행인력"),
+                       "start": value("시작일").split(" ")[0], "end": value("종료일").split(" ")[0],
+                       "weight": value("가중치"), "progress": value("진행률"),
+                       "rawSpecIds": list(dict.fromkeys(SPEC_ID.findall(title + " " + value("산출물")))),
+                       "source": origin(path, n)})
+        if not title:
+            warnings.append({"code": "WBS_TITLE_MISSING", "id": value("WBS").strip(),
+                             "message": "업무명이 비어 있다. 옛 번호의 업무를 현재 의미로 승계하지 않는다.",
+                             "source": origin(path, n)})
+    if len({r["id"] for r in result}) != len(result):
+        raise ValueError("WBS 본문에 중복 ID가 있다.")
+    ancillary = {relative(p): [{"source": origin(p, n), "cells": row}
+                              for n, row in enumerate(csv_rows(p), 1) if any(row)]
+                 for p in sorted(folder.glob("*.csv")) if p != path}
+    proposal_tasks = [r for r in result if re.match(r"\(BE\)", r["title"]) and
+                      any(f"FS{i:03}" in r["rawSpecIds"] for i in range(74, 82)) and
+                      r["id"].startswith("6.6.") and 13 <= int(r["id"].split(".")[-1]) <= 20]
+    for source_path, records in ancillary.items():
+        for record in records:
+            if any("6.5.13" in text and "6.5.20" in text for text in record["cells"]) and proposal_tasks:
+                warnings.append({"code": "WBS_COVER_BODY_CONFLICT", "id": "FS074~FS081",
+                                 "message": "표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.",
+                                 "source": record["source"]})
+    return result, {"bodyHeader": {"source": origin(path, header_row), "columns": columns},
+                    "ancillaryRows": ancillary}
 
 
 def import_implementation(path: Path) -> list[dict]:
@@ -173,14 +219,15 @@ def main() -> None:
     warnings: list[dict] = []
     specs = import_specs(args.spec_dir, warnings)
     requirements = import_requirements(args.requirements_dir, warnings)
-    tasks = import_wbs(args.wbs_dir)
+    tasks, wbs_sources = import_wbs(args.wbs_dir, warnings)
     screens = json.loads(args.screens.read_text())
     inputs = sorted({p for folder in (args.spec_dir, args.wbs_dir, args.requirements_dir)
-                     for p in folder.glob("*.csv")} | {args.screens, args.gap})
+                     for p in folder.iterdir() if p.suffix in (".csv", ".xlsx") or p.name == "_collection-manifest.json"}
+                    | {args.screens, args.gap})
     catalog = {"schemaVersion": 1, "sources": {"specDir": relative(args.spec_dir), "wbsDir": relative(args.wbs_dir),
                "requirementsDir": relative(args.requirements_dir), "screens": relative(args.screens), "gap": relative(args.gap)},
                "fingerprints": {relative(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},
-               "specs": specs, "requirements": requirements, "wbs": tasks,
+               "specs": specs, "requirements": requirements, "wbs": tasks, "wbsSources": wbs_sources,
                "screens": [{**s, "source": {"path": relative(args.screens), "row": s["page"], "rowUnit": "slide-page"}}
                            for s in screens], "implementation": import_implementation(args.gap), "warnings": warnings}
     args.out.parent.mkdir(parents=True, exist_ok=True)

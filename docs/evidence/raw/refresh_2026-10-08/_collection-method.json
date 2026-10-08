@@ -1,0 +1,18 @@
+{
+  "description": "10-06 frozen manifests와 XLSX–CSV 독립 검증 방식을 재사용한 공개 읽기 수집. requests 2.34.2 / openpyxl 3.1.5, 기존 /tmp/zoop-docrefresh-env 사용. 설치 없음.",
+  "google": {"method": "GET", "url_template": "https://docs.google.com/spreadsheets/d/{source_id}/export?format=xlsx", "authentication": "none", "all_worksheets": true, "data_only": true, "csv_encoding": "utf-8-sig", "empty_cell": "", "other_values": "str(value)", "baseline_comparison": "시트명·순서·행열범위·모든 계산값 동일 시 이전 원본 유지"},
+  "notion": {
+    "host": "https://www.notion.so/api/v3/",
+    "authentication": "none",
+    "minimum_interval_seconds": 2,
+    "request_timeout_seconds": 45,
+    "retries": 0,
+    "rate_limit_policy": "HTTP 429 즉시 중단. 대량 재시도 없음.",
+    "loadPageChunk": {"pageId": "3cafef49-d8d5-80cb-9a25-e53f97ec3f90", "limit": 100, "cursor": {"stack": []}, "chunkNumber": 0, "verticalColumns": false},
+    "queryCollection": {"collections": [{"collectionId": "3cbfef49-d8d5-80de-85b2-000bd4865730", "collectionViewId": "3cbfef49-d8d5-8046-b2dc-000ce66e9f2d", "rows": 64}, {"collectionId": "b73fef49-d8d5-8291-b967-87d18d091160", "collectionViewId": "836fef49-d8d5-8317-b020-08d48187f648", "rows": 7}], "query": {}, "loader": {"type": "reducer", "reducers": {"collection_group_results": {"type": "results", "limit": 1000}}, "searchQuery": "", "userTimeZone": "Asia/Seoul"}, "observed_has_more": false},
+    "syncRecordValues": {"requests_template": {"id": "reachable_missing_block_id", "table": "block", "version": -1}, "maximum_batch": 200, "walk": "루트 content와 허용 collection 결과만 추적; 상위 skeleton/제외 collection은 순회하지 않음"},
+    "redaction": "가시 필드만 직렬화. CRDT/삭제 이력/사용자 식별자 제거, 공개본문의 공유 비밀번호 가림. 첨부 바이너리 미수집.",
+    "unchanged_pages": "가시 type/properties/content/선별 format 전수 비교 후 기존 파일 경로와 sha256 참조",
+    "root_membership": "블록 내용이 같더라도 회의록 collection 회원목록 변화는 새 루트 Markdown에 반영"
+  }
+}

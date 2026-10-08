@@ -60,6 +60,7 @@ describe("기업 패널 독립 요약 (FS020)", () => {
       publishedAt: "2026-09-20T10:00:00+09:00", synthetic: true, quotes: [],
       events: [{ eventId: event.id, title: event.title, relationType: "REPORTS" }],
       sentiment: { label: "positive", companyId: ALPHA.id, rationale: "시험용 사업 계약의 긍정적 내용이에요.", quotes: [], judgedAt: "2026-10-06T09:00:00+09:00", model: "fixed-test", promptVersion: "test" },
+      documentSummary: null, analysisStatus: null, analysisProvenance: null, documentVersion: null, resultVersion: null,
     };
     await openApp(`/?mode=all&select=node:${encodeURIComponent(ALPHA.id)}`, (b) => b.on("GET", endpoint.documents(ALPHA), json({ items: [judged, { ...judged, id: "test-null-document", title: "시험용 판정 없는 문서", sentiment: null }], metadata })));
     const news = await screen.findByRole("region", { name: "뉴스·공시" });

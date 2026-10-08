@@ -4,7 +4,11 @@
 
 | 항목 | 원본/연결 |
 | --- | --- |
-| 우선순위·상태 | P1 · 검토 중 |
+| 원본 우선순위·상태 | P1 · 검토 중 |
+| 원문 범위 분류 | existing |
+| 유효 구현 범위 | 팀합의요구/설계대상 |
+| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
 | 요구사항 번호 | 40 |
 | API 대응 | 연결됨 |
 | 사유 |  |
@@ -13,11 +17,21 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv:50 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:50 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-06/06-기업-상세-타임라인.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-06/06-기업-상세-타임라인.csv) — 차트와 타임라인 기간 조회: 시스템은 기업별 1일, 1주, 1개월, 1년 기간을 제공한다. 사용자가 차트 또는 타임라인에서 기준 시점을 선택하면 해당 시점까지 공개·유효한 이슈를 함께 표시한다. 기본 기간은 1개월, 기본 기준 시점은 최신 제공 시점이다.
+- [docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv) — 차트와 타임라인 기간 조회: 시스템은 기업별 1일, 1주, 1개월, 1년 기간을 제공한다. 사용자가 차트 또는 타임라인에서 기준 시점을 선택하면 해당 시점까지 공개·유효한 이슈를 함께 표시한다. 기본 기간은 1개월, 기본 기준 시점은 최신 제공 시점이다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:78 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:84 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+
+## WBS 편집 연결
+
+| WBS | 역할 | 현재 업무 | 연결 근거 |
+| --- | --- | --- | --- |
+| 6.7.3 | BE | (BE) 차트·타임라인 기간 조회 API 구현 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
+| 6.7.8 | FE | (FE) D-COM-01·01b 기업 상세·차트 화면 및 기업·시세 API 연동 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
+| 6.7.11 | FE | (FE) D-COM-04 기업 중심 관계 그래프 및 시점 조회 API 연동 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다. |
+| 6.7.12 | FE | (FE) D-COM-05·06 사건 타임라인·차트·그래프 선택 동기화 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다. |
+| 6.7.13 | 공통/통합 | 기업 상세·타임라인 통합 테스트 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. FS042 연결은 시점 관계 그래프 의미이며 기존 재무·실적을 이 작업으로 배정하지 않는다. |
 
 ## 화면·목표 API
 
@@ -25,7 +39,7 @@
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
-| [getGraph](../../api/out/zoop-api-spec.md#getgraph) | GET /api/v1/graph | 6.1.2, 6.10.1, 6.3.7, 6.5.1, 6.5.2, 6.5.3, 6.5.10, 6.7.5, 6.6.3, 6.6.7, 6.4.2 | 공개(all) / 회원 본인(personal) |
-| [getCompanyPrices](../../api/out/zoop-api-spec.md#getcompanyprices) | GET /api/v1/companies/{id}/prices | 6.1.2, 6.10.1, 6.6.1, 6.6.3 | 공개 |
-| [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | 6.1.2, 6.10.1, 6.6.3, 6.6.4, 6.4.3 | 공개 |
-| [getCompanyGraphAsOf](../../api/out/zoop-api-spec.md#getcompanygraphasof) | GET /api/v1/companies/{id}/graph | 6.1.2, 6.6.3, 6.6.4, 6.4.2, 6.10.1 | 공개 |
+| [getGraph](../../api/out/zoop-api-spec.md#getgraph) | GET /api/v1/graph | 6.1.2, 6.11.1, 6.3.6, 6.4.7, 6.6.1, 6.6.2, 6.6.3, 6.6.11, 6.6.21, 6.6.23, 6.7.3, 6.7.7, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.8.5, 6.8.14, 6.5.1 | 공개(all) / 회원 본인(personal) |
+| [getCompanyPrices](../../api/out/zoop-api-spec.md#getcompanyprices) | GET /api/v1/companies/{id}/prices | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.8, 6.7.10, 6.7.11, 6.7.12 | 공개 |
+| [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | 6.1.2, 6.11.1, 6.7.3, 6.7.4, 6.7.8, 6.7.11, 6.7.12, 6.5.2 | 공개 |
+| [getCompanyGraphAsOf](../../api/out/zoop-api-spec.md#getcompanygraphasof) | GET /api/v1/companies/{id}/graph | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.4, 6.7.5, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.5.1 | 공개 |

@@ -1,0 +1,5177 @@
+{
+  "recordedAt": "2026-10-07T18:56:28.061Z",
+  "fixture": "prototype/bff/fixtures/poc-real-inspect.json",
+  "companyCatalog": "prototype/bff/fixtures/poc-real-companies.json",
+  "host": "labels.localhost",
+  "backendPort": 8866,
+  "webPort": 5236,
+  "stateDirectory": "/tmp/zoop-labels-20261008",
+  "outbound": {
+    "briefingScheduler": false,
+    "quoteProvider": "off",
+    "metricsProvider": "off",
+    "questionsSent": 0,
+    "recentBrowserHttpExternalRequests": 0,
+    "recentBrowserChatWrites": 0,
+    "recentBrowserRequestRecords": 200
+  },
+  "method": {
+    "labelBounds": "Cytoscape renderedBoundingBox: includeNodes=false, includeEdges=false, includeLabels=true, includeOverlays=false, includeUnderlays=false; includes wrap/padding/rotation",
+    "overlaps": "All on-canvas label AABBs have strict positive intersection; conservative for rotated edge labels",
+    "exposed": "Whole label box inside viewport and not intersecting visible detail/AI dialog/minimap rectangles; existing translucent scrims do not remove visual labels",
+    "stable": "Camera and node animations stopped; viewport, node count and document geometry stable for 350ms. Earlier explicitly retained desktop/path measurements used camera stability 220ms plus elapsed interaction/render time.",
+    "limits": [
+      "Node circles, evidence badges and edge strokes crossing text are not counted as text-text collisions.",
+      "AI mobile full sheet intentionally covers the map; after close the same selected-company label returns.",
+      "Mobile zoom/pan was exercised after dismissing the modal detail sheet, then Samsung was selected again.",
+      "Caption counts include on-canvas labels; exposed counts exclude whole-box viewport clipping and overlay cover.",
+      "Before screenshots were reused; no new numeric before collision count is claimed.",
+      "URL slop scanner sees the unauthenticated login surface, not the protected graph."
+    ]
+  },
+  "diagnostics": {
+    "pageErrors": 0,
+    "abortedRequestsObserved": 106,
+    "abortContext": "Aborted requests were observed during route/theme changes and development HMR. They were not individually triaged; no JavaScript page errors were observed."
+  },
+  "verification": {
+    "fullWebTests": { "command": "pnpm test", "testFiles": 18, "tests": 93, "result": "passed" },
+    "finalNarrowRegression": { "command": "pnpm exec vitest run tests/graph-declutter.test.ts", "tests": 5, "result": "passed" },
+    "typecheck": { "command": "pnpm typecheck", "result": "passed", "scope": "Application and test TypeScript configurations" },
+    "build": { "command": "pnpm build", "result": "passed", "warning": "Main JavaScript chunk 1555.21 kB exceeds the 500 kB warning threshold; no bundle optimization or warning suppression was added in this label repair." },
+    "resolvedTypecheckFailures": [
+      "Cytoscape runtime useCache option is absent from BoundingBoxOptions; a structurally typed options variable preserves the real renderer behavior without a cast.",
+      "StylesheetJsonBlock may use style or css; the regression consumer now narrows both forms and keeps only actual string label mappings."
+    ],
+    "cachedSlopBinary": "/Users/asqi/Library/Caches/pnpm/dlx/978660c9c83a7aaf54240d83cb82e719/muw1qxw8-1pbg/node_modules/.pnpm/@impeccable+cli-darwin-arm64@0.1.5/node_modules/@impeccable/cli-darwin-arm64/bin/impeccable",
+    "cachedSlopPackage": "impeccable@4.1.0",
+    "slopScans": [
+      { "arguments": "detect --json src/", "result": "[]", "exitCode": 0 },
+      { "arguments": "detect --json --viewport 1440x900 http://labels.localhost:5236/", "result": "[]", "exitCode": 0 },
+      { "arguments": "detect --json --viewport 390x844 http://labels.localhost:5236/", "result": "[]", "exitCode": 0 }
+    ],
+    "slopSurfaceLimit": "Unauthenticated URL scans do not prove the protected graph surface; authenticated browser captures and Cytoscape measurements are separate evidence.",
+    "downloads": 0
+  },
+  "additionalDarkZoomPan": {
+    "desktop": { "viewport": "1440x900", "zoom": 1.125, "panDelta": { "x": 55, "y": 40 }, "companies": 3, "issues": 19, "edgeLabels": 3, "overlapCount": 0, "capture": "label-1440-dark-zoom-pan.png" },
+    "mobilePan": { "viewport": "390x844", "detailSheetDismissed": true, "zoom": 1.125, "panDelta": { "x": 50, "y": 30 }, "companies": 2, "issues": 8, "edgeLabels": 1, "overlapCount": 0 },
+    "mobileReselectedSamsung": { "zoom": 1.125, "companies": 2, "issues": 7, "edgeLabels": 3, "exposedCompanies": 1, "exposedIssues": 0, "exposedEdgeLabels": 1, "overlapCount": 0, "capture": "label-390-dark-zoom-pan.png" },
+    "mobileAiClosed": { "selectionUnchanged": true, "cameraUnchanged": true, "overlapCount": 0 },
+    "limit": "The existing modal detail sheet blocks graph gestures; mobile pan is exercised after sheet dismissal. At zoom 1.125 the sheet and viewport can cover or clip all complete issue captions even while seven issue captions remain on the canvas."
+  },
+  "restore": {
+    "url": true,
+    "selection": true,
+    "path": true,
+    "cameraDelta": {
+      "zoom": 0,
+      "x": 0,
+      "y": 0
+    },
+    "realCompanyIssueNodePositionsChanged": 0,
+    "isolatedBundle": {
+      "id": "bundle:isolated",
+      "dx": -361.9437654989956,
+      "dy": 0
+    }
+  },
+  "observations": [
+    {
+      "scenario": "1440-light-real-pan",
+      "url": "/?select=node%3AKRX%3A005930",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 1.125,
+      "pan": {
+        "x": 554.5038716378392,
+        "y": -309.119511636556
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 4,
+      "issues": 15,
+      "edgeLabels": 4,
+      "culled": 2,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "issue-25ac3f6d1288d2b7ffa5454d",
+          "kind": "issue",
+          "text": "첨단 D램 제조용\nHigh NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 736.7824164256735,
+            "x2": 847.0324164256735,
+            "y1": 738.7141502669923,
+            "y2": 780.6204002669923,
+            "w": 110.25,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 522.1173062645126,
+            "x2": 582.8673062645126,
+            "y1": 456.1096326126294,
+            "y2": 479.7346326126294,
+            "w": 60.75,
+            "h": 23.625
+          }
+        },
+        {
+          "id": "issue-5076a08d41130921fe519e6c",
+          "kind": "issue",
+          "text": "Helix Digital\nInfrastructure",
+          "protected": false,
+          "box": {
+            "x1": 921.5281352188646,
+            "x2": 1019.4031352188646,
+            "y1": 387.73933609384346,
+            "y2": 429.64558609384346,
+            "w": 97.875,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 1351.0741984888791,
+            "x2": 1411.8241984888791,
+            "y1": 411.55881409456674,
+            "y2": 435.18381409456674,
+            "w": 60.75,
+            "h": 23.625
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 1245.1534293691825,
+            "x2": 1305.9034293691825,
+            "y1": 71.98795210694885,
+            "y2": 95.61295210694885,
+            "w": 60.75,
+            "h": 23.625
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 560.1051923288637,
+            "x2": 680.4801923288637,
+            "y1": 693.6333874487882,
+            "y2": 735.5396374487881,
+            "w": 120.375,
+            "h": 41.906249999999886
+          }
+        },
+        {
+          "id": "issue-3eb9fdee2155d2350cd03c6d",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 352.28672742076833,
+            "x2": 482.78672742076833,
+            "y1": 593.3252326659508,
+            "y2": 635.2314826659508,
+            "w": 130.5,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 964.4178131859283,
+            "x2": 1037.5428131859283,
+            "y1": 664.2394921798618,
+            "y2": 687.8644921798618,
+            "w": 73.125,
+            "h": 23.625
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 219.23976943879114,
+            "x2": 349.7397694387911,
+            "y1": 427.9937432960022,
+            "y2": 469.8999932960022,
+            "w": 130.49999999999994,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-952cc29df833d4076db7b7b3",
+          "kind": "issue",
+          "text": "Hana Financial Group\nsmart office",
+          "protected": false,
+          "box": {
+            "x1": -24.316026884667508,
+            "x2": 125.30897311533249,
+            "y1": 350.43276331505274,
+            "y2": 392.33901331505274,
+            "w": 149.625,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-3a358efea4d9c2e9a079bd4f",
+          "kind": "issue",
+          "text": "SK Telecom's AI RAN\nproject",
+          "protected": false,
+          "box": {
+            "x1": -29.640609891544727,
+            "x2": 118.85939010845527,
+            "y1": 564.9123060275888,
+            "y2": 606.8185560275888,
+            "w": 148.5,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-4ee47caf06699e6d8cfb7a8d",
+          "kind": "issue",
+          "text": "AI-powered quadruped\nwelding robot use case",
+          "protected": false,
+          "box": {
+            "x1": -103.57897089700441,
+            "x2": 58.42102910299565,
+            "y1": 718.0770308200146,
+            "y2": 759.9832808200146,
+            "w": 162.00000000000006,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-90249aed4684bbb6a3dc2e63",
+          "kind": "issue",
+          "text": "AI RAN projects under\nMSIT's Hyper AI Network…",
+          "protected": false,
+          "box": {
+            "x1": 182.5296889887685,
+            "x2": 367.0296889887685,
+            "y1": 168.70781959216663,
+            "y2": 210.61406959216663,
+            "w": 184.5,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-cb25477ad5c985cd1f9282d9",
+          "kind": "issue",
+          "text": "무풍 기술 및 비스포크\nAI 무풍 프로의 모…",
+          "protected": false,
+          "box": {
+            "x1": 370.8992957564129,
+            "x2": 505.8992957564129,
+            "y1": 108.83259398343182,
+            "y2": 150.73884398343182,
+            "w": 135,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-ab86647da08eedac922e77a1",
+          "kind": "issue",
+          "text": "차세대 12인치 포토\n마스크",
+          "protected": false,
+          "box": {
+            "x1": 172.7341113648663,
+            "x2": 291.9841113648663,
+            "y1": 719.4119333182986,
+            "y2": 761.3181833182986,
+            "w": 119.25,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-5d502e58fe8c09bfc16f21ab",
+          "kind": "issue",
+          "text": "삼성전자 종류주식",
+          "protected": false,
+          "box": {
+            "x1": 402.49272233553756,
+            "x2": 517.2427223355376,
+            "y1": 302.32788387728056,
+            "y2": 325.95288387728056,
+            "w": 114.75,
+            "h": 23.625
+          }
+        },
+        {
+          "id": "issue-a228721c1658bfe0016fb39e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라·폴드8·플립8…",
+          "protected": false,
+          "box": {
+            "x1": -110.37103658841124,
+            "x2": 31.378963411588757,
+            "y1": 191.606373703676,
+            "y2": 233.512623703676,
+            "w": 141.75,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-0df77571ff2b8a680ead5513",
+          "kind": "issue",
+          "text": "수면, 활동, 심혈관\n건강 및 회복 관련 …",
+          "protected": false,
+          "box": {
+            "x1": 122.56673237588768,
+            "x2": 247.44173237588768,
+            "y1": 266.93625879707884,
+            "y2": 308.84250879707884,
+            "w": 124.875,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-41d8481162fdcacdc066a074",
+          "kind": "issue",
+          "text": "광주 신규 반도체\nFab 2개 건설 및…",
+          "protected": false,
+          "box": {
+            "x1": 63.03624008921031,
+            "x2": 177.7862400892103,
+            "y1": 27.843956159420998,
+            "y2": 69.750206159421,
+            "w": 114.75,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "edge-74f10a3fc395db42",
+          "kind": "edge",
+          "text": "주최/진행",
+          "protected": false,
+          "box": {
+            "x1": 781.7654967381574,
+            "x2": 843.9112465479529,
+            "y1": 663.5919129847563,
+            "y2": 728.5842251164123,
+            "w": 62.145749809795575,
+            "h": 64.99231213165604
+          }
+        },
+        {
+          "id": "edge-edff28be6a330757",
+          "kind": "edge",
+          "text": "High NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 635.415541291506,
+            "x2": 721.8802440014563,
+            "y1": 518.3436787599751,
+            "y2": 618.4221259003042,
+            "w": 86.4647027099503,
+            "h": 100.0784471403291
+          }
+        },
+        {
+          "id": "edge-6d693371f11f9405",
+          "kind": "edge",
+          "text": "발행회사",
+          "protected": false,
+          "box": {
+            "x1": 555.9206890007079,
+            "x2": 583.9493937010088,
+            "y1": 615.3614035642943,
+            "y2": 677.6843302526603,
+            "w": 28.028704700300977,
+            "h": 62.32292668836601
+          }
+        },
+        {
+          "id": "edge-6c689c22365f2bdb",
+          "kind": "edge",
+          "text": "투자사",
+          "protected": false,
+          "box": {
+            "x1": 746.3275612719859,
+            "x2": 797.1816863540155,
+            "y1": 368.93959319923204,
+            "y2": 398.18272134645485,
+            "w": 50.854125082029555,
+            "h": 29.24312814722282
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-light-path",
+      "url": "/?path=KRX%3A005930%2CNASDAQ%3AASML",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 0.6453678191905333,
+      "pan": {
+        "x": 617.4778048707417,
+        "y": -298.6844299712767
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 2,
+      "issues": 1,
+      "edgeLabels": 1,
+      "culled": 1,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "label": "ASML"
+        }
+      ],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 590.8318208499219,
+            "x2": 641.815878565974,
+            "y1": 143.4271719563617,
+            "y2": 161.59427606657522,
+            "w": 50.98405771605212,
+            "h": 18.16710411021353
+          }
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "kind": "company",
+          "text": "ASML",
+          "protected": true,
+          "box": {
+            "x1": 575.3867355647442,
+            "x2": 617.9810116313195,
+            "y1": 570.4271719563617,
+            "y2": 588.5942760665752,
+            "w": 42.594276066575276,
+            "h": 18.167104110213472
+          }
+        },
+        {
+          "id": "issue-ab86647da08eedac922e77a1",
+          "kind": "issue",
+          "text": "차세대 12인치 포토\n마스크",
+          "protected": false,
+          "box": {
+            "x1": 381.04672475680957,
+            "x2": 484.3055758272949,
+            "y1": 293.1179720642996,
+            "y2": 327.54027812037464,
+            "w": 103.25885107048532,
+            "h": 34.42230605607506
+          }
+        },
+        {
+          "id": "edge-932c3969dca88b4a",
+          "kind": "edge",
+          "text": "컨소시엄 참여 및 공동…",
+          "protected": false,
+          "box": {
+            "x1": 465.58845473065827,
+            "x2": 573.0853515106301,
+            "y1": 147.43633624527297,
+            "y2": 245.0041666480555,
+            "w": 107.49689677997179,
+            "h": 97.56783040278253
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-light-company-1hop",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A39%3A11.439Z&period=1m",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 360,
+        "height": 382,
+        "x": 1056,
+        "y": 321.5
+      },
+      "zoom": 0.1503894712344616,
+      "pan": {
+        "x": 171.4783834179716,
+        "y": 170.21320845659818
+      },
+      "nodes": 37,
+      "edges": 57,
+      "companies": 9,
+      "issues": 0,
+      "edgeLabels": 0,
+      "culled": 1,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 156.68530282000555,
+            "x2": 203.4564283739231,
+            "y1": 174.54552510001116,
+            "y2": 188.74981065810604,
+            "w": 46.77112555391756,
+            "h": 14.204285558094881
+          }
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "kind": "company",
+          "text": "ASML",
+          "protected": false,
+          "box": {
+            "x1": 141.62357898232318,
+            "x2": 179.67211520464198,
+            "y1": 275.72101887577037,
+            "y2": 289.9253044338653,
+            "w": 38.0485362223188,
+            "h": 14.20428555809491
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 70.0642137307645,
+            "x2": 116.83533928468205,
+            "y1": 249.8381237687841,
+            "y2": 264.042409326879,
+            "w": 46.77112555391756,
+            "h": 14.20428555809491
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 89.17941951500636,
+            "x2": 134.29626088534482,
+            "y1": 86.23253160157184,
+            "y2": 100.43681715966673,
+            "w": 45.11684137033846,
+            "h": 14.204285558094895
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 37.19263079718763,
+            "x2": 83.81336687987073,
+            "y1": 136.13476271944765,
+            "y2": 150.33904827754256,
+            "w": 46.620736082683095,
+            "h": 14.20428555809491
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 203.34343911984917,
+            "x2": 261.39377501635136,
+            "y1": 267.9467201201886,
+            "y2": 282.1510056782835,
+            "w": 58.05033589650219,
+            "h": 14.20428555809491
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 285.516774050448,
+            "x2": 330.4832259495521,
+            "y1": 165.46349665157638,
+            "y2": 179.6677822096713,
+            "w": 44.96645189910407,
+            "h": 14.20428555809491
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 259.0711590891738,
+            "x2": 311.85786349246985,
+            "y1": 232.56352135632488,
+            "y2": 246.7678069144198,
+            "w": 52.78670440329603,
+            "h": 14.20428555809491
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 258.0843777935135,
+            "x2": 276.73267222658677,
+            "y1": 97.97977438848856,
+            "y2": 112.18405994658346,
+            "w": 18.64829443307326,
+            "h": 14.204285558094895
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-light-company-2hop",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A39%3A11.439Z&period=1m&hops=2",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 360,
+        "height": 382,
+        "x": 1056,
+        "y": 321.5
+      },
+      "zoom": 0.1500068301037681,
+      "pan": {
+        "x": 195.3773401300033,
+        "y": 193.74458019502197
+      },
+      "nodes": 102,
+      "edges": 141,
+      "companies": 9,
+      "issues": 0,
+      "edgeLabels": 0,
+      "culled": 10,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 156.52007837349046,
+            "x2": 203.47221619596988,
+            "y1": 174.39965606337785,
+            "y2": 188.6653056062462,
+            "w": 46.952137822479415,
+            "h": 14.265649542868346
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 120.5755893102346,
+            "x2": 139.3264430732056,
+            "y1": 204.46349933746504,
+            "y2": 218.72914888033338,
+            "w": 18.750853762971005,
+            "h": 14.265649542868346
+          }
+        },
+        {
+          "id": "KRX:000660",
+          "kind": "company",
+          "text": "SK하이닉스",
+          "protected": false,
+          "box": {
+            "x1": 240.75044294269142,
+            "x2": 305.2533798873117,
+            "y1": 244.27287538165953,
+            "y2": 258.5385249245279,
+            "w": 64.5029369446203,
+            "h": 14.265649542868374
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 201.4012955048695,
+            "x2": 242.20315329309443,
+            "y1": 76.14325485863473,
+            "y2": 90.40890440150308,
+            "w": 40.801857788224936,
+            "h": 14.265649542868346
+          }
+        },
+        {
+          "id": "NASDAQ:MSFT",
+          "kind": "company",
+          "text": "Microsoft",
+          "protected": false,
+          "box": {
+            "x1": 120.65763087958454,
+            "x2": 177.8102331491202,
+            "y1": 73.51358042185596,
+            "y2": 87.77922996472432,
+            "w": 57.15260226953565,
+            "h": 14.26564954286836
+          }
+        },
+        {
+          "id": "NASDAQ:PLTR",
+          "kind": "company",
+          "text": "Palantir",
+          "protected": false,
+          "box": {
+            "x1": 260.66407381611026,
+            "x2": 307.01618431817457,
+            "y1": 113.27199690377938,
+            "y2": 127.53764644664773,
+            "w": 46.352110502064306,
+            "h": 14.265649542868346
+          }
+        },
+        {
+          "id": "NASDAQ:AAPL",
+          "kind": "company",
+          "text": "Apple",
+          "protected": false,
+          "box": {
+            "x1": 82.49231457322033,
+            "x2": 118.94397428843597,
+            "y1": 254.37167107475153,
+            "y2": 268.6373206176199,
+            "w": 36.45165971521564,
+            "h": 14.265649542868346
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 123.30972508875628,
+            "x2": 167.26172630916034,
+            "y1": 272.6450790994088,
+            "y2": 286.91072864227715,
+            "w": 43.95200122040406,
+            "h": 14.265649542868346
+          }
+        },
+        {
+          "id": "NYSE:TSM",
+          "kind": "company",
+          "text": "TSMC",
+          "protected": false,
+          "box": {
+            "x1": 48.53546421000772,
+            "x2": 87.08721954667612,
+            "y1": 123.89494456306718,
+            "y2": 138.16059410593553,
+            "w": 38.55175533666841,
+            "h": 14.265649542868346
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-dark-company-2hop",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A39%3A11.439Z&period=1m&hops=2",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 360,
+        "height": 382,
+        "x": 1056,
+        "y": 321.5
+      },
+      "zoom": 0.15003549103805155,
+      "pan": {
+        "x": 190.93653029880926,
+        "y": 196.5185133651811
+      },
+      "nodes": 102,
+      "edges": 141,
+      "companies": 8,
+      "issues": 0,
+      "edgeLabels": 0,
+      "culled": 11,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 156.48918127265247,
+            "x2": 203.4502899675626,
+            "y1": 174.39135016177215,
+            "y2": 188.65972535949084,
+            "w": 46.96110869491014,
+            "h": 14.268375197718683
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 158.19423303270233,
+            "x2": 239.36343368428822,
+            "y1": 221.99263377390835,
+            "y2": 236.26100897162706,
+            "w": 81.1692006515859,
+            "h": 14.268375197718711
+          }
+        },
+        {
+          "id": "KRX:000660",
+          "kind": "company",
+          "text": "SK하이닉스",
+          "protected": false,
+          "box": {
+            "x1": 241.71336375310526,
+            "x2": 306.22862489946743,
+            "y1": 243.43656980866274,
+            "y2": 257.7049450063814,
+            "w": 64.51526114636218,
+            "h": 14.268375197718683
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 163.28396505654405,
+            "x2": 204.09361861889408,
+            "y1": 70.5102419113849,
+            "y2": 84.7786171091036,
+            "w": 40.809653562350036,
+            "h": 14.268375197718711
+          }
+        },
+        {
+          "id": "NASDAQ:MSFT",
+          "kind": "company",
+          "text": "Microsoft",
+          "protected": false,
+          "box": {
+            "x1": 95.52892060754522,
+            "x2": 152.69244269304286,
+            "y1": 80.78946030112671,
+            "y2": 95.05783549884542,
+            "w": 57.16352208549765,
+            "h": 14.268375197718711
+          }
+        },
+        {
+          "id": "NASDAQ:PLTR",
+          "kind": "company",
+          "text": "Palantir",
+          "protected": false,
+          "box": {
+            "x1": 263.8552843216479,
+            "x2": 310.2162510524059,
+            "y1": 116.9987573097207,
+            "y2": 131.26713250743938,
+            "w": 46.36096673075798,
+            "h": 14.268375197718683
+          }
+        },
+        {
+          "id": "NASDAQ:AAPL",
+          "kind": "company",
+          "text": "Apple",
+          "protected": false,
+          "box": {
+            "x1": 140.5287604645384,
+            "x2": 176.98738478678493,
+            "y1": 275.09171964188835,
+            "y2": 289.3600948396071,
+            "w": 36.45862432224652,
+            "h": 14.26837519771874
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 74.58719166428281,
+            "x2": 118.54759053843192,
+            "y1": 251.65692103569262,
+            "y2": 265.92529623341136,
+            "w": 43.96039887414911,
+            "h": 14.26837519771874
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-dark-company-1hop",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A39%3A11.439Z&period=1m&hops=1",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 360,
+        "height": 382,
+        "x": 1056,
+        "y": 321.5
+      },
+      "zoom": 0.15001505099838292,
+      "pan": {
+        "x": 196.84355172148292,
+        "y": 183.08271128707042
+      },
+      "nodes": 37,
+      "edges": 57,
+      "companies": 8,
+      "issues": 0,
+      "edgeLabels": 0,
+      "culled": 2,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 156.3292075852773,
+            "x2": 203.28391854777112,
+            "y1": 174.39694609409088,
+            "y2": 188.6633774440371,
+            "w": 46.954710962493834,
+            "h": 14.266431349946231
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 259.08864600723564,
+            "x2": 306.04335696972953,
+            "y1": 234.92664852531092,
+            "y2": 249.19307987525715,
+            "w": 46.95471096249389,
+            "h": 14.266431349946231
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 141.04080523656262,
+            "x2": 222.19894782668777,
+            "y1": 276.49685578810056,
+            "y2": 290.7632871380468,
+            "w": 81.15814259012515,
+            "h": 14.266431349946231
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 285.0389286743822,
+            "x2": 330.3434740758938,
+            "y1": 168.88778797041277,
+            "y2": 183.154219320359,
+            "w": 45.30454540151163,
+            "h": 14.266431349946231
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 258.4363308800277,
+            "x2": 305.39104184252153,
+            "y1": 111.36672871242946,
+            "y2": 125.63316006237568,
+            "w": 46.954710962493834,
+            "h": 14.266431349946217
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 35.190657603564944,
+            "x2": 93.54651244193592,
+            "y1": 218.0198692529382,
+            "y2": 232.28630060288444,
+            "w": 58.35585483837097,
+            "h": 14.266431349946231
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 80.93134696994605,
+            "x2": 134.03667502337362,
+            "y1": 88.50137313870431,
+            "y2": 102.76780448865053,
+            "w": 53.10532805342757,
+            "h": 14.266431349946217
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 42.9328579374631,
+            "x2": 61.68473931226097,
+            "y1": 164.2654322453027,
+            "y2": 178.5318635952489,
+            "w": 18.751881374797875,
+            "h": 14.266431349946203
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-restoration",
+      "urlRestored": true,
+      "cameraDelta": {
+        "zoom": 0,
+        "x": 0,
+        "y": 0
+      },
+      "positionsRestored": false,
+      "pathRestored": true
+    },
+    {
+      "scenario": "390-dark-market",
+      "url": "/",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 390,
+        "height": 605,
+        "x": 0,
+        "y": 170
+      },
+      "zoom": 0.1,
+      "pan": {
+        "x": 167.7932243703815,
+        "y": 240.34457697075976
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 11,
+      "issues": 0,
+      "edgeLabels": 0,
+      "culled": 15,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": false,
+          "box": {
+            "x1": 140.66241791397266,
+            "x2": 186.96241791397267,
+            "y1": 335.80426297364477,
+            "y2": 349.6042629736447,
+            "w": 46.30000000000001,
+            "h": 13.799999999999955
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 206.86166944767353,
+            "x2": 253.16166944767355,
+            "y1": 290.3525042568724,
+            "y2": 304.1525042568724,
+            "w": 46.30000000000001,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 86.65670561163859,
+            "x2": 139.0567056116386,
+            "y1": 287.12102596755676,
+            "y2": 300.9210259675568,
+            "w": 52.400000000000006,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 144.68688243051523,
+            "x2": 189.18688243051523,
+            "y1": 395.72653212014484,
+            "y2": 409.52653212014485,
+            "w": 44.5,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 91.49189684948813,
+            "x2": 109.69189684948813,
+            "y1": 343.3836177243061,
+            "y2": 357.1836177243061,
+            "w": 18.200000000000003,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NYSE:CRM",
+          "kind": "company",
+          "text": "Salesforce",
+          "protected": false,
+          "box": {
+            "x1": 73.83206314251093,
+            "x2": 135.63206314251093,
+            "y1": 154.29667215955544,
+            "y2": 168.09667215955545,
+            "w": 61.8,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NYSE:GM",
+          "kind": "company",
+          "text": "General Motors",
+          "protected": false,
+          "box": {
+            "x1": 232.59111673747293,
+            "x2": 323.291116737473,
+            "y1": 386.09519865960146,
+            "y2": 399.8951986596015,
+            "w": 90.70000000000005,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 282.62078825130277,
+            "x2": 322.7207882513028,
+            "y1": 279.1173209706751,
+            "y2": 292.9173209706751,
+            "w": 40.10000000000002,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "KRX:009150",
+          "kind": "company",
+          "text": "삼성전기",
+          "protected": false,
+          "box": {
+            "x1": 8.189700843434025,
+            "x2": 54.489700843434036,
+            "y1": 337.40460426663026,
+            "y2": 351.2046042666302,
+            "w": 46.30000000000001,
+            "h": 13.799999999999955
+          }
+        },
+        {
+          "id": "NASDAQ:AMZN",
+          "kind": "company",
+          "text": "Amazon",
+          "protected": false,
+          "box": {
+            "x1": -6.051190062674749,
+            "x2": 43.54880993732526,
+            "y1": 239.50867383976245,
+            "y2": 253.30867383976246,
+            "w": 49.60000000000001,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 198.78043691768755,
+            "x2": 242.08043691768756,
+            "y1": 236.04354865783463,
+            "y2": 249.84354865783462,
+            "w": 43.30000000000001,
+            "h": 13.799999999999983
+          }
+        },
+        {
+          "id": "bundle:isolated",
+          "kind": "bundle",
+          "text": "연결 없는 사건 41",
+          "protected": false,
+          "box": {
+            "x1": 123.34999999999997,
+            "x2": 214.64999999999998,
+            "y1": 507.0068827495729,
+            "y2": 520.8068827495729,
+            "w": 91.30000000000001,
+            "h": 13.799999999999955
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "390-dark-ai-open",
+      "url": "/?select=node%3AKRX%3A005930",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 390,
+        "height": 605,
+        "x": 0,
+        "y": 170
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 230.8272581076795,
+        "y": -602.0996740259648
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 1,
+      "issues": 10,
+      "edgeLabels": 3,
+      "culled": 3,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 167.55,
+            "x2": 222.45000000000002,
+            "y1": 123.61250000000007,
+            "y2": 144.26750000000015,
+            "w": 54.900000000000006,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-5edaf3fcdb7c9277c1258a7f",
+          "kind": "issue",
+          "text": "그란츠 포레스트 파크\n개발사업 (필리핀 세…",
+          "protected": false,
+          "box": {
+            "x1": 386.93660283258953,
+            "x2": 511.1366028325896,
+            "y1": 449.2313042909643,
+            "y2": 486.7050542909642,
+            "w": 124.20000000000005,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 168.69571844753452,
+            "x2": 317.19571844753455,
+            "y1": 501.4807471913348,
+            "y2": 538.9544971913349,
+            "w": 148.50000000000003,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-5648816bae658d1cb8af0eeb",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -21.75418201790626,
+            "x2": 97.94581798209376,
+            "y1": 527.1649892546668,
+            "y2": 564.6387392546669,
+            "w": 119.70000000000002,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 282.0991495136724,
+            "x2": 391.89914951367246,
+            "y1": 260.6853975587435,
+            "y2": 298.1591475587435,
+            "w": 109.80000000000007,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-3eb9fdee2155d2350cd03c6d",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 105.6618119367782,
+            "x2": 225.3618119367782,
+            "y1": 225.93228687060184,
+            "y2": 263.40603687060184,
+            "w": 119.7,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 355.6203262569164,
+            "x2": 510.4203262569164,
+            "y1": 368.7904521330928,
+            "y2": 406.2642021330928,
+            "w": 154.79999999999995,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -68.96723768634993,
+            "x2": 50.732762313650056,
+            "y1": 119.88133289232769,
+            "y2": 157.3550828923277,
+            "w": 119.69999999999999,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-ab86647da08eedac922e77a1",
+          "kind": "issue",
+          "text": "차세대 12인치 포토\n마스크",
+          "protected": false,
+          "box": {
+            "x1": -35.14712932855522,
+            "x2": 73.75287067144475,
+            "y1": 340.62848686565883,
+            "y2": 378.10223686565894,
+            "w": 108.89999999999998,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-5d502e58fe8c09bfc16f21ab",
+          "kind": "issue",
+          "text": "삼성전자 종류주식",
+          "protected": false,
+          "box": {
+            "x1": 27.03615804271618,
+            "x2": 131.43615804271616,
+            "y1": 11.853308185427636,
+            "y2": 32.50830818542772,
+            "w": 104.39999999999998,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 110.37780096171714,
+            "x2": 235.47780096171715,
+            "y1": 388.73832185144977,
+            "y2": 426.21207185144976,
+            "w": 125.10000000000001,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "edge-edff28be6a330757",
+          "kind": "edge",
+          "text": "High NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 302.44885479280583,
+            "x2": 402.04974616332436,
+            "y1": 116.19969130878337,
+            "y2": 172.09406995553093,
+            "w": 99.60089137051853,
+            "h": 55.894378646747555
+          }
+        },
+        {
+          "id": "edge-d604cff20561de0f",
+          "kind": "edge",
+          "text": "직접 관련",
+          "protected": false,
+          "box": {
+            "x1": 93.45770620152311,
+            "x2": 132.9732128154667,
+            "y1": 269.55580917243367,
+            "y2": 330.7417206538348,
+            "w": 39.515506613943586,
+            "h": 61.18591148140115
+          }
+        },
+        {
+          "id": "edge-6c689c22365f2bdb",
+          "kind": "edge",
+          "text": "투자사",
+          "protected": false,
+          "box": {
+            "x1": 343.554982981207,
+            "x2": 387.7507757795016,
+            "y1": 61.24173817715166,
+            "y2": 84.06987454273474,
+            "w": 44.19579279829463,
+            "h": 22.828136365583077
+          }
+        }
+      ],
+      "exposedCompanies": 0,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0
+    },
+    {
+      "scenario": "390-dark-ai-closed",
+      "url": "/?select=node%3AKRX%3A005930",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 390,
+        "height": 605,
+        "x": 0,
+        "y": 170
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 230.8272581076795,
+        "y": -602.0996740259648
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 1,
+      "issues": 10,
+      "edgeLabels": 3,
+      "culled": 3,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 167.55,
+            "x2": 222.45000000000002,
+            "y1": 123.61250000000007,
+            "y2": 144.26750000000015,
+            "w": 54.900000000000006,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-5edaf3fcdb7c9277c1258a7f",
+          "kind": "issue",
+          "text": "그란츠 포레스트 파크\n개발사업 (필리핀 세…",
+          "protected": false,
+          "box": {
+            "x1": 386.93660283258953,
+            "x2": 511.1366028325896,
+            "y1": 449.2313042909643,
+            "y2": 486.7050542909642,
+            "w": 124.20000000000005,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 168.69571844753452,
+            "x2": 317.19571844753455,
+            "y1": 501.4807471913348,
+            "y2": 538.9544971913349,
+            "w": 148.50000000000003,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-5648816bae658d1cb8af0eeb",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -21.75418201790626,
+            "x2": 97.94581798209376,
+            "y1": 527.1649892546668,
+            "y2": 564.6387392546669,
+            "w": 119.70000000000002,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 282.0991495136724,
+            "x2": 391.89914951367246,
+            "y1": 260.6853975587435,
+            "y2": 298.1591475587435,
+            "w": 109.80000000000007,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-3eb9fdee2155d2350cd03c6d",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 105.6618119367782,
+            "x2": 225.3618119367782,
+            "y1": 225.93228687060184,
+            "y2": 263.40603687060184,
+            "w": 119.7,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 355.6203262569164,
+            "x2": 510.4203262569164,
+            "y1": 368.7904521330928,
+            "y2": 406.2642021330928,
+            "w": 154.79999999999995,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -68.96723768634993,
+            "x2": 50.732762313650056,
+            "y1": 119.88133289232769,
+            "y2": 157.3550828923277,
+            "w": 119.69999999999999,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-ab86647da08eedac922e77a1",
+          "kind": "issue",
+          "text": "차세대 12인치 포토\n마스크",
+          "protected": false,
+          "box": {
+            "x1": -35.14712932855522,
+            "x2": 73.75287067144475,
+            "y1": 340.62848686565883,
+            "y2": 378.10223686565894,
+            "w": 108.89999999999998,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-5d502e58fe8c09bfc16f21ab",
+          "kind": "issue",
+          "text": "삼성전자 종류주식",
+          "protected": false,
+          "box": {
+            "x1": 27.03615804271618,
+            "x2": 131.43615804271616,
+            "y1": 11.853308185427636,
+            "y2": 32.50830818542772,
+            "w": 104.39999999999998,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 110.37780096171714,
+            "x2": 235.47780096171715,
+            "y1": 388.73832185144977,
+            "y2": 426.21207185144976,
+            "w": 125.10000000000001,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "edge-edff28be6a330757",
+          "kind": "edge",
+          "text": "High NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 302.44885479280583,
+            "x2": 402.04974616332436,
+            "y1": 116.19969130878337,
+            "y2": 172.09406995553093,
+            "w": 99.60089137051853,
+            "h": 55.894378646747555
+          }
+        },
+        {
+          "id": "edge-d604cff20561de0f",
+          "kind": "edge",
+          "text": "직접 관련",
+          "protected": false,
+          "box": {
+            "x1": 93.45770620152311,
+            "x2": 132.9732128154667,
+            "y1": 269.55580917243367,
+            "y2": 330.7417206538348,
+            "w": 39.515506613943586,
+            "h": 61.18591148140115
+          }
+        },
+        {
+          "id": "edge-6c689c22365f2bdb",
+          "kind": "edge",
+          "text": "투자사",
+          "protected": false,
+          "box": {
+            "x1": 343.554982981207,
+            "x2": 387.7507757795016,
+            "y1": 61.24173817715166,
+            "y2": 84.06987454273474,
+            "w": 44.19579279829463,
+            "h": 22.828136365583077
+          }
+        }
+      ],
+      "exposedCompanies": 1,
+      "exposedIssues": 1,
+      "exposedEdgeLabels": 1
+    },
+    {
+      "scenario": "390-light-market",
+      "url": "/",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 390,
+        "height": 605,
+        "x": 0,
+        "y": 170
+      },
+      "zoom": 0.1,
+      "pan": {
+        "x": 167.79322437038152,
+        "y": 230.51082697075972
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 11,
+      "issues": 0,
+      "edgeLabels": 0,
+      "culled": 15,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": false,
+          "box": {
+            "x1": 144.2075027361688,
+            "x2": 190.50750273616882,
+            "y1": 320.5206789467137,
+            "y2": 334.3206789467137,
+            "w": 46.30000000000001,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 213.26747715851,
+            "x2": 259.56747715851,
+            "y1": 272.6550709648221,
+            "y2": 286.4550709648221,
+            "w": 46.29999999999998,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 88.73760661913735,
+            "x2": 141.13760661913736,
+            "y1": 274.2135765091076,
+            "y2": 288.0135765091076,
+            "w": 52.400000000000006,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 154.02336563954074,
+            "x2": 198.52336563954074,
+            "y1": 383.3797522144092,
+            "y2": 397.1797522144093,
+            "w": 44.5,
+            "h": 13.800000000000068
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 94.85238264878444,
+            "x2": 113.05238264878444,
+            "y1": 330.1864985537772,
+            "y2": 343.9864985537772,
+            "w": 18.200000000000003,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NYSE:CRM",
+          "kind": "company",
+          "text": "Salesforce",
+          "protected": false,
+          "box": {
+            "x1": 74.24391258322764,
+            "x2": 136.04391258322764,
+            "y1": 146.964165806627,
+            "y2": 160.76416580662698,
+            "w": 61.8,
+            "h": 13.799999999999983
+          }
+        },
+        {
+          "id": "NYSE:GM",
+          "kind": "company",
+          "text": "General Motors",
+          "protected": false,
+          "box": {
+            "x1": 240.62381151521902,
+            "x2": 331.32381151521906,
+            "y1": 370.65040900215104,
+            "y2": 384.45040900215105,
+            "w": 90.70000000000005,
+            "h": 13.800000000000011
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 290.83875772278316,
+            "x2": 330.9387577227832,
+            "y1": 255.61373385292345,
+            "y2": 269.41373385292343,
+            "w": 40.10000000000002,
+            "h": 13.799999999999983
+          }
+        },
+        {
+          "id": "KRX:009150",
+          "kind": "company",
+          "text": "삼성전기",
+          "protected": false,
+          "box": {
+            "x1": 7.793099100424627,
+            "x2": 54.09309910042464,
+            "y1": 330.02182675356676,
+            "y2": 343.8218267535667,
+            "w": 46.30000000000001,
+            "h": 13.799999999999955
+          }
+        },
+        {
+          "id": "NASDAQ:AMZN",
+          "kind": "company",
+          "text": "Amazon",
+          "protected": false,
+          "box": {
+            "x1": -6.05430502549828,
+            "x2": 43.54569497450173,
+            "y1": 232.28778791720597,
+            "y2": 246.08778791720596,
+            "w": 49.60000000000001,
+            "h": 13.799999999999983
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 203.678175429866,
+            "x2": 246.97817542986598,
+            "y1": 220.00633031681926,
+            "y2": 233.80633031681924,
+            "w": 43.29999999999998,
+            "h": 13.799999999999983
+          }
+        },
+        {
+          "id": "bundle:isolated",
+          "kind": "bundle",
+          "text": "연결 없는 사건 41",
+          "protected": false,
+          "box": {
+            "x1": 123.35,
+            "x2": 214.65,
+            "y1": 501.3797522144092,
+            "y2": 515.1797522144093,
+            "w": 91.30000000000001,
+            "h": 13.800000000000068
+          }
+        }
+      ],
+      "exposedCompanies": 10,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "theme": "light"
+    },
+    {
+      "scenario": "390-light-samsung",
+      "url": "/?select=node%3AKRX%3A005930",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 390,
+        "height": 605,
+        "x": 0,
+        "y": 170
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 198.92149470791435,
+        "y": -553.3886677835859
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 1,
+      "issues": 10,
+      "edgeLabels": 2,
+      "culled": 3,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "issue-25ac3f6d1288d2b7ffa5454d",
+          "kind": "issue",
+          "text": "첨단 D램 제조용\nHigh NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 363.6086005253485,
+            "x2": 463.5086005253485,
+            "y1": 249.88394561695588,
+            "y2": 287.3576956169559,
+            "w": 99.90000000000003,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 167.54999999999998,
+            "x2": 222.45,
+            "y1": 123.27499999999998,
+            "y2": 143.93000000000006,
+            "w": 54.900000000000006,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 186.86226950859472,
+            "x2": 335.36226950859475,
+            "y1": 489.6113507943761,
+            "y2": 527.085100794376,
+            "w": 148.50000000000003,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-5648816bae658d1cb8af0eeb",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 13.233100672528224,
+            "x2": 132.9331006725282,
+            "y1": 548.0573991049642,
+            "y2": 585.5311491049644,
+            "w": 119.69999999999999,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 129.7195876686356,
+            "x2": 239.5195876686356,
+            "y1": 273.60107242797983,
+            "y2": 311.07482242797994,
+            "w": 109.80000000000001,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-3eb9fdee2155d2350cd03c6d",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -42.79101787530209,
+            "x2": 76.9089821246979,
+            "y1": 222.52219587066236,
+            "y2": 259.99594587066235,
+            "w": 119.69999999999999,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 268.82712451100406,
+            "x2": 423.627124511004,
+            "y1": 366.4601055994268,
+            "y2": 403.9338555994267,
+            "w": 154.79999999999995,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -90.77663150268148,
+            "x2": 28.923368497318535,
+            "y1": 100.63401415965234,
+            "y2": 138.10776415965245,
+            "w": 119.70000000000002,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-ab86647da08eedac922e77a1",
+          "kind": "issue",
+          "text": "차세대 12인치 포토\n마스크",
+          "protected": false,
+          "box": {
+            "x1": -59.958891348127224,
+            "x2": 48.94110865187278,
+            "y1": 343.51557082243903,
+            "y2": 380.9893208224389,
+            "w": 108.9,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-5d502e58fe8c09bfc16f21ab",
+          "kind": "issue",
+          "text": "삼성전자 종류주식",
+          "protected": false,
+          "box": {
+            "x1": 76.51278957353335,
+            "x2": 180.91278957353336,
+            "y1": -2.0520984948581145,
+            "y2": 18.60290150514186,
+            "w": 104.4,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 88.38770496200915,
+            "x2": 213.48770496200916,
+            "y1": 400.4971356976648,
+            "y2": 437.9708856976648,
+            "w": 125.10000000000001,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "edge-edff28be6a330757",
+          "kind": "edge",
+          "text": "High NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 264.87689252234304,
+            "x2": 359.05152149095716,
+            "y1": 121.72411048482286,
+            "y2": 193.16766507919374,
+            "w": 94.17462896861412,
+            "h": 71.44355459437088
+          }
+        },
+        {
+          "id": "edge-6c689c22365f2bdb",
+          "kind": "edge",
+          "text": "투자사",
+          "protected": false,
+          "box": {
+            "x1": 351.3573345453833,
+            "x2": 395.7689491739624,
+            "y1": 80.59015244895056,
+            "y2": 103.91676224855405,
+            "w": 44.411614628579116,
+            "h": 23.32660979960349
+          }
+        }
+      ],
+      "exposedCompanies": 1,
+      "exposedIssues": 1,
+      "exposedEdgeLabels": 1,
+      "theme": "light"
+    },
+    {
+      "scenario": "390-light-zoom-pan-sheet-dismissed",
+      "url": "/",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 390,
+        "height": 605,
+        "x": 0,
+        "y": 57
+      },
+      "zoom": 1.125,
+      "pan": {
+        "x": 254.90186838489302,
+        "y": -727.3608347294823
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 1,
+      "issues": 7,
+      "edgeLabels": 0,
+      "culled": 0,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": false,
+          "box": {
+            "x1": 219.62500000000006,
+            "x2": 280.37500000000006,
+            "y1": 117.625,
+            "y2": 141.25,
+            "w": 60.75,
+            "h": 23.625
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 251.07783688574347,
+            "x2": 414.20283688574347,
+            "y1": 575.5454384929701,
+            "y2": 617.4516884929701,
+            "w": 163.125,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 176.83698458579457,
+            "x2": 297.2119845857946,
+            "y1": 305.5325905349748,
+            "y2": 347.4388405349748,
+            "w": 120.37500000000003,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-3eb9fdee2155d2350cd03c6d",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -37.67627234412754,
+            "x2": 92.82372765587246,
+            "y1": 241.68399483832798,
+            "y2": 283.590244838328,
+            "w": 130.5,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 354.09640563875513,
+            "x2": 523.9714056387552,
+            "y1": 421.6063819992835,
+            "y2": 463.5126319992835,
+            "w": 169.87500000000006,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": -97.65828937835175,
+            "x2": 32.84171062164825,
+            "y1": 89.32376769956545,
+            "y2": 131.23001769956545,
+            "w": 130.5,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-ab86647da08eedac922e77a1",
+          "kind": "issue",
+          "text": "차세대 12인치 포토\n마스크",
+          "protected": false,
+          "box": {
+            "x1": -60.26111418515893,
+            "x2": 58.98888581484107,
+            "y1": 392.92571352804885,
+            "y2": 434.83196352804885,
+            "w": 119.25,
+            "h": 41.90625
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 126.29713120251154,
+            "x2": 263.54713120251154,
+            "y1": 464.152669622081,
+            "y2": 506.058919622081,
+            "w": 137.25,
+            "h": 41.90625
+          }
+        }
+      ],
+      "exposedCompanies": 1,
+      "exposedIssues": 2,
+      "exposedEdgeLabels": 0,
+      "theme": "light"
+    },
+    {
+      "scenario": "390-dark-keyboard-selected-issue",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A44%3A17.720Z&period=1m&hops=1&tab=events&issue=issue-25ac3f6d1288d2b7ffa5454d",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 358,
+        "height": 382,
+        "x": 16,
+        "y": 231.125
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 726.915637473959,
+        "y": -401.84799961683234
+      },
+      "nodes": 37,
+      "edges": 57,
+      "companies": 0,
+      "issues": 1,
+      "edgeLabels": 0,
+      "culled": 0,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "issue-25ac3f6d1288d2b7ffa5454d",
+          "label": "첨단 D램 제조용\nHigh NA EUV…"
+        }
+      ],
+      "samsung": [
+        {
+          "id": "KRX:005930",
+          "direct": 27
+        }
+      ],
+      "labels": [
+        {
+          "id": "issue-25ac3f6d1288d2b7ffa5454d",
+          "kind": "issue",
+          "text": "첨단 D램 제조용\nHigh NA EUV…",
+          "protected": true,
+          "box": {
+            "x1": 127.70000000000005,
+            "x2": 230.3,
+            "y1": 23.14187499999997,
+            "y2": 60.615624999999966,
+            "w": 102.59999999999997,
+            "h": 37.473749999999995
+          }
+        }
+      ],
+      "exposedCompanies": 0,
+      "exposedIssues": 1,
+      "exposedEdgeLabels": 0
+    },
+    {
+      "scenario": "390-light-company-1hop-stable",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A44%3A17.720Z&period=1m&hops=1",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 358,
+        "height": 382,
+        "x": 16,
+        "y": 231
+      },
+      "zoom": 0.15027390482584232,
+      "pan": {
+        "x": 176.66405398036972,
+        "y": 145.74509379084674
+      },
+      "nodes": 37,
+      "edges": 57,
+      "companies": 10,
+      "issues": 0,
+      "edgeLabels": 0,
+      "exposedCompanies": 10,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "culled": 0,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 155.41041049324394,
+            "x2": 202.4461427037326,
+            "y1": 174.5342668139902,
+            "y2": 188.8253151629278,
+            "w": 47.035732210488646,
+            "h": 14.291048348937608
+          }
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "kind": "company",
+          "text": "ASML",
+          "protected": false,
+          "box": {
+            "x1": 182.20385254529322,
+            "x2": 220.523698275883,
+            "y1": 275.2037606079732,
+            "y2": 289.49480895691084,
+            "w": 38.319845730589776,
+            "h": 14.291048348937636
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 31.690425044412393,
+            "x2": 78.72615725490104,
+            "y1": 197.70955210582915,
+            "y2": 212.00060045476675,
+            "w": 47.035732210488646,
+            "h": 14.291048348937608
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 24.118445227014575,
+            "x2": 105.41662773779527,
+            "y1": 128.07587842272946,
+            "y2": 142.36692677166707,
+            "w": 81.29818251078069,
+            "h": 14.291048348937608
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 151.0971665165209,
+            "x2": 196.4798857739253,
+            "y1": 70.52877246502635,
+            "y2": 84.81982081396396,
+            "w": 45.3827192574044,
+            "h": 14.291048348937608
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 95.95089955810798,
+            "x2": 142.98663176859662,
+            "y1": 82.40589569390634,
+            "y2": 96.69694404284395,
+            "w": 47.035732210488646,
+            "h": 14.291048348937608
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 244.54819662730068,
+            "x2": 303.00474560455336,
+            "y1": 242.41095517647267,
+            "y2": 256.7020035254103,
+            "w": 58.45654897725268,
+            "h": 14.291048348937636
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 264.6911506493959,
+            "x2": 309.92359600197443,
+            "y1": 119.57968277729076,
+            "y2": 133.87073112622835,
+            "w": 45.23244535257851,
+            "h": 14.291048348937593
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 279.3544566972866,
+            "x2": 332.5514190056348,
+            "y1": 179.51985943291686,
+            "y2": 193.81090778185444,
+            "w": 53.19696230834819,
+            "h": 14.29104834893758
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 219.40711205898066,
+            "x2": 238.19135016221094,
+            "y1": 78.70181189529453,
+            "y2": 92.99286024423213,
+            "w": 18.78423810323028,
+            "h": 14.291048348937608
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "390-light-company-2hop-stable",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A44%3A17.720Z&period=1m&hops=2",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 358,
+        "height": 382,
+        "x": 16,
+        "y": 231
+      },
+      "zoom": 0.15010483180170095,
+      "pan": {
+        "x": 222.12180549825706,
+        "y": 180.7777697386092
+      },
+      "nodes": 102,
+      "edges": 141,
+      "companies": 7,
+      "issues": 0,
+      "edgeLabels": 0,
+      "exposedCompanies": 7,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "culled": 12,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 155.8728810365017,
+            "x2": 202.85569339043408,
+            "y1": 174.35618070544655,
+            "y2": 188.6311502097883,
+            "w": 46.98281235393239,
+            "h": 14.274969504341755
+          }
+        },
+        {
+          "id": "KRX:000660",
+          "kind": "company",
+          "text": "SK하이닉스",
+          "protected": false,
+          "box": {
+            "x1": 273.4296337595558,
+            "x2": 337.9747114342872,
+            "y1": 162.26780425897618,
+            "y2": 176.54277376331794,
+            "w": 64.54507767473137,
+            "h": 14.274969504341755
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 228.51533401236574,
+            "x2": 269.3438482624284,
+            "y1": 87.19595162308389,
+            "y2": 101.47092112742564,
+            "w": 40.82851425006268,
+            "h": 14.274969504341755
+          }
+        },
+        {
+          "id": "NASDAQ:PLTR",
+          "kind": "company",
+          "text": "Palantir",
+          "protected": false,
+          "box": {
+            "x1": 173.9993297878692,
+            "x2": 220.38172281459478,
+            "y1": 71.4025524710454,
+            "y2": 85.67752197538715,
+            "w": 46.382393026725595,
+            "h": 14.274969504341755
+          }
+        },
+        {
+          "id": "NASDAQ:AAPL",
+          "kind": "company",
+          "text": "Apple",
+          "protected": false,
+          "box": {
+            "x1": 254.27158310926384,
+            "x2": 290.7470572370772,
+            "y1": 243.5777025146838,
+            "y2": 257.8526720190256,
+            "w": 36.47547412781333,
+            "h": 14.274969504341783
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 123.62840668869332,
+            "x2": 167.6091224065917,
+            "y1": 272.8275990624579,
+            "y2": 287.1025685667997,
+            "w": 43.98071571789838,
+            "h": 14.274969504341755
+          }
+        },
+        {
+          "id": "NYSE:TSM",
+          "kind": "company",
+          "text": "TSMC",
+          "protected": false,
+          "box": {
+            "x1": 81.89970668489283,
+            "x2": 120.47664845792998,
+            "y1": 254.72015177892857,
+            "y2": 268.99512128327035,
+            "w": 38.57694177303715,
+            "h": 14.274969504341783
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "390-dark-company-2hop-stable",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A44%3A17.720Z&period=1m&hops=2",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 358,
+        "height": 382,
+        "x": 16,
+        "y": 231
+      },
+      "zoom": 0.1504861526170996,
+      "pan": {
+        "x": 212.4447088488963,
+        "y": 188.51175204056972
+      },
+      "nodes": 102,
+      "edges": 141,
+      "companies": 7,
+      "issues": 0,
+      "edgeLabels": 0,
+      "exposedCompanies": 7,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "culled": 12,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 155.21762328828106,
+            "x2": 202.01881675219903,
+            "y1": 174.2517659633309,
+            "y2": 188.46518307801597,
+            "w": 46.80119346391797,
+            "h": 14.213417114685058
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 146.36967125871377,
+            "x2": 227.18073521409625,
+            "y1": 224.2831400837108,
+            "y2": 238.49655719839586,
+            "w": 80.81106395538248,
+            "h": 14.213417114685058
+          }
+        },
+        {
+          "id": "NYSE:GM",
+          "kind": "company",
+          "text": "General Motors",
+          "protected": false,
+          "box": {
+            "x1": 6.402695757018819,
+            "x2": 97.59730424298117,
+            "y1": 161.83504052260784,
+            "y2": 176.0484576372929,
+            "w": 91.19460848596235,
+            "h": 14.213417114685058
+          }
+        },
+        {
+          "id": "NASDAQ:PLTR",
+          "kind": "company",
+          "text": "Palantir",
+          "protected": false,
+          "box": {
+            "x1": 125.67439394471995,
+            "x2": 171.87364279816953,
+            "y1": 72.88975953173741,
+            "y2": 87.10317664642247,
+            "w": 46.199248853449575,
+            "h": 14.213417114685058
+          }
+        },
+        {
+          "id": "NASDAQ:AAPL",
+          "kind": "company",
+          "text": "Apple",
+          "protected": false,
+          "box": {
+            "x1": 279.20780214317404,
+            "x2": 315.474964923895,
+            "y1": 210.85401020780228,
+            "y2": 225.06742732248733,
+            "w": 36.26716278072098,
+            "h": 14.213417114685058
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 170.5414843241723,
+            "x2": 214.3329547357483,
+            "y1": 276.07309402232715,
+            "y2": 290.2865111370122,
+            "w": 43.791470411576,
+            "h": 14.213417114685058
+          }
+        },
+        {
+          "id": "NYSE:TSM",
+          "kind": "company",
+          "text": "TSMC",
+          "protected": false,
+          "box": {
+            "x1": 84.87768484906859,
+            "x2": 123.25165376642899,
+            "y1": 257.1456301401846,
+            "y2": 271.35904725486967,
+            "w": 38.3739689173604,
+            "h": 14.213417114685058
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "390-dark-company-1hop-stable",
+      "url": "/companies/KRX%3A005930?asOf=2026-10-07T18%3A44%3A17.720Z&period=1m&hops=1",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "scrollWidth": 390
+      },
+      "canvas": {
+        "width": 358,
+        "height": 382,
+        "x": 16,
+        "y": 231
+      },
+      "zoom": 0.1505762745661832,
+      "pan": {
+        "x": 216.22035977365718,
+        "y": 180.57276634820255
+      },
+      "nodes": 37,
+      "edges": 57,
+      "companies": 9,
+      "issues": 0,
+      "edgeLabels": 0,
+      "exposedCompanies": 9,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "culled": 1,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 156.05840514449724,
+            "x2": 202.88762653458022,
+            "y1": 174.7203028255527,
+            "y2": 188.94223195832868,
+            "w": 46.82922139008298,
+            "h": 14.221929132775983
+          }
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "kind": "company",
+          "text": "ASML",
+          "protected": false,
+          "box": {
+            "x1": 77.16213404040596,
+            "x2": 115.2579315056503,
+            "y1": 252.11504771806779,
+            "y2": 266.33697685084377,
+            "w": 38.095797465244345,
+            "h": 14.221929132775983
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 245.7337169806309,
+            "x2": 292.5629383707139,
+            "y1": 247.30966622125968,
+            "y2": 261.5315953540357,
+            "w": 46.82922139008298,
+            "h": 14.221929132776012
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 283.37769177083425,
+            "x2": 328.5505741406892,
+            "y1": 186.7211744197258,
+            "y2": 200.9431035525018,
+            "w": 45.17288236985496,
+            "h": 14.221929132776012
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 273.00936437466424,
+            "x2": 319.68800949018106,
+            "y1": 132.51634549301085,
+            "y2": 146.73827462578686,
+            "w": 46.678645115516815,
+            "h": 14.221929132776012
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 134.68678449126293,
+            "x2": 192.80922647380962,
+            "y1": 276.4230071931725,
+            "y2": 290.6449363259485,
+            "w": 58.12244198254669,
+            "h": 14.221929132775983
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 34.46763272877885,
+            "x2": 79.48993882406762,
+            "y1": 202.47171604564377,
+            "y2": 216.69364517841979,
+            "w": 45.02230609528877,
+            "h": 14.221929132776012
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 120.37583929511553,
+            "x2": 173.22811166784584,
+            "y1": 73.87394996476063,
+            "y2": 88.09587909753662,
+            "w": 52.85227237273031,
+            "h": 14.221929132775998
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 53.37760180830412,
+            "x2": 72.04905985451083,
+            "y1": 132.30111885297868,
+            "y2": 146.52304798575466,
+            "w": 18.67145804620671,
+            "h": 14.221929132775983
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-dark-market-stable",
+      "url": "/",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 0.17366408776618064,
+      "pan": {
+        "x": 614.984268091875,
+        "y": 341.8786214820225
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 26,
+      "issues": 0,
+      "edgeLabels": 0,
+      "exposedCompanies": 26,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "culled": 0,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": false,
+          "box": {
+            "x1": 479.2225221278263,
+            "x2": 526.4591540002275,
+            "y1": 469.29659590937536,
+            "y2": 483.7801808290748,
+            "w": 47.236631872401176,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "kind": "company",
+          "text": "ASML",
+          "protected": false,
+          "box": {
+            "x1": 381.0135238174546,
+            "x2": 419.56695130154674,
+            "y1": 562.0485313358502,
+            "y2": 576.5321162555497,
+            "w": 38.55342748409214,
+            "h": 14.483584919699524
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 622.9716131687679,
+            "x2": 670.2082450411691,
+            "y1": 541.5621865845762,
+            "y2": 556.0457715042758,
+            "w": 47.236631872401176,
+            "h": 14.483584919699524
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 542.222161324958,
+            "x2": 623.844282575063,
+            "y1": 391.1431274409872,
+            "y2": 405.6267123606866,
+            "w": 81.6221212501049,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 570.4760694813932,
+            "x2": 616.1497245638986,
+            "y1": 523.7749262845315,
+            "y2": 538.2585112042309,
+            "w": 45.673655082505434,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 699.6147441305801,
+            "x2": 746.8513760029812,
+            "y1": 408.7205281639873,
+            "y2": 423.2041130836868,
+            "w": 47.23663187240106,
+            "h": 14.483584919699524
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 341.83377869396105,
+            "x2": 395.3223177259447,
+            "y1": 490.2266720868648,
+            "y2": 504.71025700656423,
+            "w": 53.488539031983635,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 635.3413267081536,
+            "x2": 694.0397883731226,
+            "y1": 486.5145230769228,
+            "y2": 500.99810799662225,
+            "w": 58.698461664969045,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 498.8205008131898,
+            "x2": 544.3204918079291,
+            "y1": 582.9319414575652,
+            "y2": 597.4155263772647,
+            "w": 45.49999099473928,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "KRX:000660",
+          "kind": "company",
+          "text": "SK하이닉스",
+          "protected": false,
+          "box": {
+            "x1": 864.3765992804815,
+            "x2": 929.3269681050331,
+            "y1": 389.7740530861274,
+            "y2": 404.2576380058269,
+            "w": 64.95036882455156,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 447.75921270271886,
+            "x2": 466.68859826923256,
+            "y1": 589.9005338831782,
+            "y2": 604.3841188028778,
+            "w": 18.9293855665137,
+            "h": 14.483584919699524
+          }
+        },
+        {
+          "id": "NYSE:CRM",
+          "kind": "company",
+          "text": "Salesforce",
+          "protected": false,
+          "box": {
+            "x1": 418.96936423190607,
+            "x2": 481.8357640032634,
+            "y1": 252.71821813232899,
+            "y2": 267.2018030520285,
+            "w": 62.86639977135735,
+            "h": 14.483584919699496
+          }
+        },
+        {
+          "id": "NYSE:GM",
+          "kind": "company",
+          "text": "General Motors",
+          "protected": false,
+          "box": {
+            "x1": 675.5200742187102,
+            "x2": 767.5620407347859,
+            "y1": 626.0638723444235,
+            "y2": 640.5474572641231,
+            "w": 92.04196651607572,
+            "h": 14.483584919699524
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 804.5907852225959,
+            "x2": 845.5755099354144,
+            "y1": 508.17057510767427,
+            "y2": 522.6541600273737,
+            "w": 40.98472471281855,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "NASDAQ:CRWV",
+          "kind": "company",
+          "text": "CoreWeave",
+          "protected": false,
+          "box": {
+            "x1": 752.5183322368381,
+            "x2": 822.1576314310765,
+            "y1": 127.48361813496203,
+            "y2": 141.96720305466152,
+            "w": 69.63929919423845,
+            "h": 14.483584919699496
+          }
+        },
+        {
+          "id": "NASDAQ:MSFT",
+          "kind": "company",
+          "text": "Microsoft",
+          "protected": false,
+          "box": {
+            "x1": 709.9808736656098,
+            "x2": 767.4636867162155,
+            "y1": 269.2933068652518,
+            "y2": 283.77689178495126,
+            "w": 57.48281305060573,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NASDAQ:NBIS",
+          "kind": "company",
+          "text": "Nebius",
+          "protected": false,
+          "box": {
+            "x1": 873.1562380399353,
+            "x2": 915.5302754548834,
+            "y1": 184.84705646232314,
+            "y2": 199.3306413820226,
+            "w": 42.374037414948134,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NYSE:ORCL",
+          "kind": "company",
+          "text": "Oracle",
+          "protected": false,
+          "box": {
+            "x1": 839.2005312056583,
+            "x2": 879.6642636551784,
+            "y1": 263.9945773482988,
+            "y2": 278.47816226799824,
+            "w": 40.46373244952008,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NASDAQ:TSLA",
+          "kind": "company",
+          "text": "Tesla",
+          "protected": false,
+          "box": {
+            "x1": 726.0516960225585,
+            "x2": 758.0058881715358,
+            "y1": 194.53891615699652,
+            "y2": 209.02250107669596,
+            "w": 31.954192148977313,
+            "h": 14.483584919699439
+          }
+        },
+        {
+          "id": "KRX:009150",
+          "kind": "company",
+          "text": "삼성전기",
+          "protected": false,
+          "box": {
+            "x1": 312.6451196035954,
+            "x2": 359.8817514759965,
+            "y1": 420.10791498937874,
+            "y2": 434.59149990907815,
+            "w": 47.23663187240112,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "NASDAQ:PLTR",
+          "kind": "company",
+          "text": "Palantir",
+          "protected": false,
+          "box": {
+            "x1": 721.9918437366869,
+            "x2": 768.7074833457895,
+            "y1": 547.7213542043297,
+            "y2": 562.2049391240291,
+            "w": 46.715639609102595,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "NASDAQ:AMZN",
+          "kind": "company",
+          "text": "Amazon",
+          "protected": false,
+          "box": {
+            "x1": 393.0201697430607,
+            "x2": 443.5564192830193,
+            "y1": 356.8352949074024,
+            "y2": 371.31887982710185,
+            "w": 50.53624953995859,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NASDAQ:AAPL",
+          "kind": "company",
+          "text": "Apple",
+          "protected": false,
+          "box": {
+            "x1": 840.682092695942,
+            "x2": 877.4988793023722,
+            "y1": 447.5800251286801,
+            "y2": 462.0636100483796,
+            "w": 36.81678660643024,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 790.6252289914561,
+            "x2": 834.9095713718322,
+            "y1": 329.636539144293,
+            "y2": 344.1201240639925,
+            "w": 44.284342380376074,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NASDAQ:CDNS",
+          "kind": "company",
+          "text": "Cadence",
+          "protected": false,
+          "box": {
+            "x1": 536.2762907224765,
+            "x2": 589.9384938422263,
+            "y1": 328.7292987855522,
+            "y2": 343.21288370525167,
+            "w": 53.66220311974985,
+            "h": 14.483584919699467
+          }
+        },
+        {
+          "id": "NYSE:TSM",
+          "kind": "company",
+          "text": "TSMC",
+          "protected": false,
+          "box": {
+            "x1": 630.4358828754342,
+            "x2": 669.1629744472925,
+            "y1": 288.0453701569271,
+            "y2": 302.5289550766265,
+            "w": 38.727091571858296,
+            "h": 14.48358491969941
+          }
+        },
+        {
+          "id": "bundle:isolated",
+          "kind": "bundle",
+          "text": "연결 없는 사건 41",
+          "protected": false,
+          "box": {
+            "x1": 1028.074238049709,
+            "x2": 1120.6371968290832,
+            "y1": 381.0156432112069,
+            "y2": 395.4992281309064,
+            "w": 92.56295877937418,
+            "h": 14.483584919699467
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-dark-samsung-stable",
+      "url": "/?select=node%3AKRX%3A005930",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 1086.1741985536648,
+        "y": -235.99578168006906
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 4,
+      "issues": 18,
+      "edgeLabels": 4,
+      "exposedCompanies": 1,
+      "exposedIssues": 17,
+      "exposedEdgeLabels": 4,
+      "culled": 10,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "labels": [
+        {
+          "id": "issue-25ac3f6d1288d2b7ffa5454d",
+          "kind": "issue",
+          "text": "첨단 D램 제조용\nHigh NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 346.00780982925266,
+            "x2": 445.90780982925264,
+            "y1": 724.5306940543824,
+            "y2": 762.0044440543824,
+            "w": 99.89999999999998,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 477.54999999999995,
+            "x2": 532.4499999999999,
+            "y1": 359.13250000000005,
+            "y2": 379.7875,
+            "w": 54.89999999999998,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-5076a08d41130921fe519e6c",
+          "kind": "issue",
+          "text": "Helix Digital\nInfrastructure",
+          "protected": false,
+          "box": {
+            "x1": 1021.6069025156662,
+            "x2": 1110.7069025156663,
+            "y1": 331.72928724360247,
+            "y2": 369.20303724360247,
+            "w": 89.10000000000014,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 1222.517964309555,
+            "x2": 1277.4179643095551,
+            "y1": 733.6430418412622,
+            "y2": 754.2980418412621,
+            "w": 54.90000000000009,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 947.3140818612231,
+            "x2": 1000.4140818612232,
+            "y1": 641.4620130750036,
+            "y2": 662.1170130750037,
+            "w": 53.10000000000002,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-5edaf3fcdb7c9277c1258a7f",
+          "kind": "issue",
+          "text": "그란츠 포레스트 파크\n개발사업 (필리핀 세…",
+          "protected": false,
+          "box": {
+            "x1": 795.174634756232,
+            "x2": 919.374634756232,
+            "y1": 458.08861637062637,
+            "y2": 495.56236637062636,
+            "w": 124.20000000000005,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-643f415e6316dce2b0030076",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8과\n민음사가 함께하는 북…",
+          "protected": false,
+          "box": {
+            "x1": 748.3184005894361,
+            "x2": 878.8184005894362,
+            "y1": 197.66576816700774,
+            "y2": 235.13951816700774,
+            "w": 130.5000000000001,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 795.1063376396952,
+            "x2": 943.6063376396952,
+            "y1": 307.68639120148794,
+            "y2": 345.16014120148793,
+            "w": 148.5,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 682.347548001177,
+            "x2": 792.1475480011769,
+            "y1": 622.2895772786685,
+            "y2": 659.7633272786685,
+            "w": 109.79999999999995,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 716.1324157169772,
+            "x2": 870.9324157169773,
+            "y1": 537.2246246617219,
+            "y2": 574.6983746617219,
+            "w": 154.80000000000007,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 1310.4729979330639,
+            "x2": 1377.072997933064,
+            "y1": 448.36300614618995,
+            "y2": 469.01800614619003,
+            "w": 66.60000000000014,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-c4034c968261db969bb0ae9d",
+          "kind": "issue",
+          "text": "Hana Financial Group\nprivate 5G project",
+          "protected": false,
+          "box": {
+            "x1": 493.22888459721537,
+            "x2": 630.0288845972154,
+            "y1": 165.28368545776868,
+            "y2": 202.75743545776868,
+            "w": 136.80000000000007,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-3a358efea4d9c2e9a079bd4f",
+          "kind": "issue",
+          "text": "SK Telecom's AI RAN\nproject",
+          "protected": false,
+          "box": {
+            "x1": 438.75393263454043,
+            "x2": 574.6539326345404,
+            "y1": -15.145499104109376,
+            "y2": 22.328250895890676,
+            "w": 135.89999999999998,
+            "h": 37.47375000000005
+          }
+        },
+        {
+          "id": "issue-90249aed4684bbb6a3dc2e63",
+          "kind": "issue",
+          "text": "AI RAN projects under\nMSIT's Hyper AI Network…",
+          "protected": false,
+          "box": {
+            "x1": 150.6408969298093,
+            "x2": 319.8408969298092,
+            "y1": 693.182846577315,
+            "y2": 730.656596577315,
+            "w": 169.19999999999993,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-c24ac9a7d789a5f8db4c9361",
+          "kind": "issue",
+          "text": "가전 테크세미나 ‘더\n브리프(The Bri…",
+          "protected": false,
+          "box": {
+            "x1": 113.65306493348373,
+            "x2": 225.25306493348376,
+            "y1": 191.89009973886857,
+            "y2": 229.36384973886862,
+            "w": 111.60000000000002,
+            "h": 37.47375000000005
+          }
+        },
+        {
+          "id": "issue-cb25477ad5c985cd1f9282d9",
+          "kind": "issue",
+          "text": "무풍 기술 및 비스포크\nAI 무풍 프로의 모…",
+          "protected": false,
+          "box": {
+            "x1": 65.62045908492553,
+            "x2": 188.0204590849255,
+            "y1": 357.8539203679545,
+            "y2": 395.3276703679546,
+            "w": 122.39999999999998,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-1e6784f87c8e7a1852433ac1",
+          "kind": "issue",
+          "text": "에너지 절감 솔루션",
+          "protected": false,
+          "box": {
+            "x1": 405.3551283822444,
+            "x2": 513.3551283822444,
+            "y1": 94.4492490014386,
+            "y2": 115.10424900143863,
+            "w": 108,
+            "h": 20.65500000000003
+          }
+        },
+        {
+          "id": "issue-5d502e58fe8c09bfc16f21ab",
+          "kind": "issue",
+          "text": "삼성전자 종류주식",
+          "protected": false,
+          "box": {
+            "x1": 390.5745456212675,
+            "x2": 494.97454562126745,
+            "y1": 27.603287056820932,
+            "y2": 48.258287056820905,
+            "w": 104.39999999999998,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-5d62fd49122208356fb5b295",
+          "kind": "issue",
+          "text": "삼성전자 보통주식",
+          "protected": false,
+          "box": {
+            "x1": 76.82093106671698,
+            "x2": 181.22093106671707,
+            "y1": 167.2898630107262,
+            "y2": 187.94486301072618,
+            "w": 104.40000000000009,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-0df77571ff2b8a680ead5513",
+          "kind": "issue",
+          "text": "수면, 활동, 심혈관\n건강 및 회복 관련 …",
+          "protected": false,
+          "box": {
+            "x1": 226.74049742923194,
+            "x2": 340.1404974292319,
+            "y1": 127.27694068115005,
+            "y2": 164.75069068115005,
+            "w": 113.39999999999998,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 859.7062559738097,
+            "x2": 984.8062559738097,
+            "y1": 361.1663666163347,
+            "y2": 398.6401166163348,
+            "w": 125.10000000000002,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-41d8481162fdcacdc066a074",
+          "kind": "issue",
+          "text": "광주 신규 반도체\nFab 2개 건설 및…",
+          "protected": false,
+          "box": {
+            "x1": 292.6967770489765,
+            "x2": 397.0967770489765,
+            "y1": 54.8018442448373,
+            "y2": 92.2755942448373,
+            "w": 104.39999999999998,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "edge-9c0cf08c3efa3cab",
+          "kind": "edge",
+          "text": "MOU 체결사",
+          "protected": false,
+          "box": {
+            "x1": 648.909040003968,
+            "x2": 729.7721103640592,
+            "y1": 357.9719287585582,
+            "y2": 401.6185313667329,
+            "w": 80.86307036009123,
+            "h": 43.6466026081747
+          }
+        },
+        {
+          "id": "edge-74f10a3fc395db42",
+          "kind": "edge",
+          "text": "주최/진행",
+          "protected": false,
+          "box": {
+            "x1": 635.4031957035597,
+            "x2": 698.7234724567779,
+            "y1": 220.94194818443896,
+            "y2": 265.53109677674166,
+            "w": 63.320276753218195,
+            "h": 44.589148592302706
+          }
+        },
+        {
+          "id": "edge-edff28be6a330757",
+          "kind": "edge",
+          "text": "High NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 424.51447625932894,
+            "x2": 471.68721007512056,
+            "y1": 468.2316197000347,
+            "y2": 569.0873376721722,
+            "w": 47.17273381579162,
+            "h": 100.85571797213754
+          }
+        },
+        {
+          "id": "edge-6d693371f11f9405",
+          "kind": "edge",
+          "text": "발행회사",
+          "protected": false,
+          "box": {
+            "x1": 667.3975971510131,
+            "x2": 724.1053384234718,
+            "y1": 288.03154666380794,
+            "y2": 314.13395580803274,
+            "w": 56.70774127245875,
+            "h": 26.102409144224794
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-hidden-hover-recovery",
+      "id": "issue-5648816bae658d1cb8af0eeb",
+      "beforeLabel": "",
+      "afterLabel": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+      "restoredSelection": true,
+      "cameraUnchanged": true
+    },
+    {
+      "scenario": "124-node-declutter-cost",
+      "nodes": 124,
+      "edges": 170,
+      "ms": [
+        8.700000047683716,
+        5.099999904632568,
+        4.300000071525574,
+        4.699999928474426,
+        4.200000047683716
+      ],
+      "counts": [
+        9,
+        9,
+        9,
+        9,
+        9
+      ],
+      "cameraUnchanged": true,
+      "positionsUnchanged": true
+    },
+    {
+      "scenario": "1440-dark-ai-stable",
+      "url": "/?select=node%3AKRX%3A005930",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 1086.1741985536648,
+        "y": -235.99578168006906
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 4,
+      "issues": 19,
+      "edgeLabels": 4,
+      "exposedCompanies": 1,
+      "exposedIssues": 16,
+      "exposedEdgeLabels": 4,
+      "culled": 9,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "labels": [
+        {
+          "id": "issue-25ac3f6d1288d2b7ffa5454d",
+          "kind": "issue",
+          "text": "첨단 D램 제조용\nHigh NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 346.00780982925266,
+            "x2": 445.90780982925264,
+            "y1": 724.5306940543824,
+            "y2": 762.0044440543824,
+            "w": 99.89999999999998,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 477.54999999999995,
+            "x2": 532.4499999999999,
+            "y1": 359.13250000000005,
+            "y2": 379.7875,
+            "w": 54.89999999999998,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-5076a08d41130921fe519e6c",
+          "kind": "issue",
+          "text": "Helix Digital\nInfrastructure",
+          "protected": false,
+          "box": {
+            "x1": 1021.6069025156662,
+            "x2": 1110.7069025156663,
+            "y1": 331.72928724360247,
+            "y2": 369.20303724360247,
+            "w": 89.10000000000014,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 1222.517964309555,
+            "x2": 1277.4179643095551,
+            "y1": 733.6430418412622,
+            "y2": 754.2980418412621,
+            "w": 54.90000000000009,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 947.3140818612231,
+            "x2": 1000.4140818612232,
+            "y1": 641.4620130750036,
+            "y2": 662.1170130750037,
+            "w": 53.10000000000002,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-5edaf3fcdb7c9277c1258a7f",
+          "kind": "issue",
+          "text": "그란츠 포레스트 파크\n개발사업 (필리핀 세…",
+          "protected": false,
+          "box": {
+            "x1": 795.174634756232,
+            "x2": 919.374634756232,
+            "y1": 458.08861637062637,
+            "y2": 495.56236637062636,
+            "w": 124.20000000000005,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-643f415e6316dce2b0030076",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8과\n민음사가 함께하는 북…",
+          "protected": false,
+          "box": {
+            "x1": 748.3184005894361,
+            "x2": 878.8184005894362,
+            "y1": 197.66576816700774,
+            "y2": 235.13951816700774,
+            "w": 130.5000000000001,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 795.1063376396952,
+            "x2": 943.6063376396952,
+            "y1": 307.68639120148794,
+            "y2": 345.16014120148793,
+            "w": 148.5,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-5648816bae658d1cb8af0eeb",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": true,
+          "box": {
+            "x1": 624.7859810197974,
+            "x2": 744.4859810197975,
+            "y1": 172.99316582314663,
+            "y2": 210.46691582314662,
+            "w": 119.70000000000005,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 682.347548001177,
+            "x2": 792.1475480011769,
+            "y1": 622.2895772786685,
+            "y2": 659.7633272786685,
+            "w": 109.79999999999995,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 716.1324157169772,
+            "x2": 870.9324157169773,
+            "y1": 537.2246246617219,
+            "y2": 574.6983746617219,
+            "w": 154.80000000000007,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "KRX:005380",
+          "kind": "company",
+          "text": "현대자동차",
+          "protected": false,
+          "box": {
+            "x1": 1310.4729979330639,
+            "x2": 1377.072997933064,
+            "y1": 448.36300614618995,
+            "y2": 469.01800614619003,
+            "w": 66.60000000000014,
+            "h": 20.655000000000086
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 451.47656509298815,
+            "x2": 571.1765650929882,
+            "y1": 133.17387544200676,
+            "y2": 170.6476254420067,
+            "w": 119.70000000000005,
+            "h": 37.47374999999994
+          }
+        },
+        {
+          "id": "issue-3a358efea4d9c2e9a079bd4f",
+          "kind": "issue",
+          "text": "SK Telecom's AI RAN\nproject",
+          "protected": false,
+          "box": {
+            "x1": 438.75393263454043,
+            "x2": 574.6539326345404,
+            "y1": -15.145499104109376,
+            "y2": 22.328250895890676,
+            "w": 135.89999999999998,
+            "h": 37.47375000000005
+          }
+        },
+        {
+          "id": "issue-90249aed4684bbb6a3dc2e63",
+          "kind": "issue",
+          "text": "AI RAN projects under\nMSIT's Hyper AI Network…",
+          "protected": false,
+          "box": {
+            "x1": 150.6408969298093,
+            "x2": 319.8408969298092,
+            "y1": 693.182846577315,
+            "y2": 730.656596577315,
+            "w": 169.19999999999993,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-c24ac9a7d789a5f8db4c9361",
+          "kind": "issue",
+          "text": "가전 테크세미나 ‘더\n브리프(The Bri…",
+          "protected": false,
+          "box": {
+            "x1": 113.65306493348373,
+            "x2": 225.25306493348376,
+            "y1": 191.89009973886857,
+            "y2": 229.36384973886862,
+            "w": 111.60000000000002,
+            "h": 37.47375000000005
+          }
+        },
+        {
+          "id": "issue-cb25477ad5c985cd1f9282d9",
+          "kind": "issue",
+          "text": "무풍 기술 및 비스포크\nAI 무풍 프로의 모…",
+          "protected": false,
+          "box": {
+            "x1": 65.62045908492553,
+            "x2": 188.0204590849255,
+            "y1": 357.8539203679545,
+            "y2": 395.3276703679546,
+            "w": 122.39999999999998,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-5d502e58fe8c09bfc16f21ab",
+          "kind": "issue",
+          "text": "삼성전자 종류주식",
+          "protected": false,
+          "box": {
+            "x1": 390.5745456212675,
+            "x2": 494.97454562126745,
+            "y1": 27.603287056820932,
+            "y2": 48.258287056820905,
+            "w": 104.39999999999998,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-5d62fd49122208356fb5b295",
+          "kind": "issue",
+          "text": "삼성전자 보통주식",
+          "protected": false,
+          "box": {
+            "x1": 76.82093106671698,
+            "x2": 181.22093106671707,
+            "y1": 167.2898630107262,
+            "y2": 187.94486301072618,
+            "w": 104.40000000000009,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-a228721c1658bfe0016fb39e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라·폴드8·플립8…",
+          "protected": false,
+          "box": {
+            "x1": 443.39099034190656,
+            "x2": 572.9909903419066,
+            "y1": 68.88220948866496,
+            "y2": 106.35595948866495,
+            "w": 129.60000000000002,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-0df77571ff2b8a680ead5513",
+          "kind": "issue",
+          "text": "수면, 활동, 심혈관\n건강 및 회복 관련 …",
+          "protected": false,
+          "box": {
+            "x1": 226.74049742923194,
+            "x2": 340.1404974292319,
+            "y1": 127.27694068115005,
+            "y2": 164.75069068115005,
+            "w": 113.39999999999998,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 859.7062559738097,
+            "x2": 984.8062559738097,
+            "y1": 361.1663666163347,
+            "y2": 398.6401166163348,
+            "w": 125.10000000000002,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-41d8481162fdcacdc066a074",
+          "kind": "issue",
+          "text": "광주 신규 반도체\nFab 2개 건설 및…",
+          "protected": false,
+          "box": {
+            "x1": 292.6967770489765,
+            "x2": 397.0967770489765,
+            "y1": 54.8018442448373,
+            "y2": 92.2755942448373,
+            "w": 104.39999999999998,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "edge-9c0cf08c3efa3cab",
+          "kind": "edge",
+          "text": "MOU 체결사",
+          "protected": false,
+          "box": {
+            "x1": 648.909040003968,
+            "x2": 729.7721103640592,
+            "y1": 357.9719287585582,
+            "y2": 401.6185313667329,
+            "w": 80.86307036009123,
+            "h": 43.6466026081747
+          }
+        },
+        {
+          "id": "edge-74f10a3fc395db42",
+          "kind": "edge",
+          "text": "주최/진행",
+          "protected": false,
+          "box": {
+            "x1": 635.4031957035597,
+            "x2": 698.7234724567779,
+            "y1": 220.94194818443896,
+            "y2": 265.53109677674166,
+            "w": 63.320276753218195,
+            "h": 44.589148592302706
+          }
+        },
+        {
+          "id": "edge-edff28be6a330757",
+          "kind": "edge",
+          "text": "High NA EUV…",
+          "protected": false,
+          "box": {
+            "x1": 424.51447625932894,
+            "x2": 471.68721007512056,
+            "y1": 468.2316197000347,
+            "y2": 569.0873376721722,
+            "w": 47.17273381579162,
+            "h": 100.85571797213754
+          }
+        },
+        {
+          "id": "edge-6d693371f11f9405",
+          "kind": "edge",
+          "text": "발행회사",
+          "protected": false,
+          "box": {
+            "x1": 667.3975971510131,
+            "x2": 724.1053384234718,
+            "y1": 288.03154666380794,
+            "y2": 314.13395580803274,
+            "w": 56.70774127245875,
+            "h": 26.102409144224794
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-dark-ai-restoration-stable",
+      "urlUnchanged": true,
+      "cameraUnchanged": true,
+      "selectionUnchanged": true,
+      "overlapCount": 0,
+      "theme": "dark"
+    },
+    {
+      "scenario": "1440-light-samsung-stable",
+      "url": "/?select=node%3AKRX%3A005930",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 0.9,
+      "pan": {
+        "x": 353.37521583760906,
+        "y": 10.209318717211033
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 4,
+      "issues": 21,
+      "edgeLabels": 2,
+      "exposedCompanies": 3,
+      "exposedIssues": 19,
+      "exposedEdgeLabels": 2,
+      "culled": 4,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [
+        {
+          "id": "KRX:005930",
+          "label": "삼성전자"
+        }
+      ],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": true,
+          "box": {
+            "x1": 477.6922593154623,
+            "x2": 532.5922593154623,
+            "y1": 396.41945029244204,
+            "y2": 417.074450292442,
+            "w": 54.900000000000034,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "NASDAQ:ASML",
+          "kind": "company",
+          "text": "ASML",
+          "protected": false,
+          "box": {
+            "x1": -13.314906120692513,
+            "x2": 32.585093879307465,
+            "y1": 590.5940688163946,
+            "y2": 611.2490688163948,
+            "w": 45.89999999999998,
+            "h": 20.6550000000002
+          }
+        },
+        {
+          "id": "issue-5076a08d41130921fe519e6c",
+          "kind": "issue",
+          "text": "Helix Digital\nInfrastructure",
+          "protected": false,
+          "box": {
+            "x1": 995.9921795545389,
+            "x2": 1085.0921795545387,
+            "y1": 560.1465681762454,
+            "y2": 597.6203181762455,
+            "w": 89.0999999999998,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 785.2919925606261,
+            "x2": 875.2919925606261,
+            "y1": 418.2280450050125,
+            "y2": 438.8830450050125,
+            "w": 90,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 1253.8751083706084,
+            "x2": 1308.7751083706085,
+            "y1": 363.83175556991193,
+            "y2": 384.4867555699119,
+            "w": 54.90000000000009,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-5edaf3fcdb7c9277c1258a7f",
+          "kind": "issue",
+          "text": "그란츠 포레스트 파크\n개발사업 (필리핀 세…",
+          "protected": false,
+          "box": {
+            "x1": 817.577274235031,
+            "x2": 941.7772742350311,
+            "y1": 463.59892356443345,
+            "y2": 501.0726735644335,
+            "w": 124.20000000000005,
+            "h": 37.47375000000005
+          }
+        },
+        {
+          "id": "issue-643f415e6316dce2b0030076",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8과\n민음사가 함께하는 북…",
+          "protected": false,
+          "box": {
+            "x1": 643.0061893856492,
+            "x2": 773.5061893856492,
+            "y1": 336.9977987498964,
+            "y2": 374.4715487498964,
+            "w": 130.5,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-d0acab2197bc79b080e73290",
+          "kind": "issue",
+          "text": "최대주주등소유주식변동신\n고서",
+          "protected": false,
+          "box": {
+            "x1": 1049.939428601356,
+            "x2": 1198.439428601356,
+            "y1": 267.16597302753485,
+            "y2": 304.63972302753484,
+            "w": 148.5,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-5648816bae658d1cb8af0eeb",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 594.0293793162123,
+            "x2": 713.7293793162123,
+            "y1": 246.0311091676944,
+            "y2": 283.5048591676944,
+            "w": 119.70000000000005,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-e770acd4feeee942d34b5a6e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라, 갤럭시 Z …",
+          "protected": false,
+          "box": {
+            "x1": 672.0328883069326,
+            "x2": 781.8328883069325,
+            "y1": 725.2192797636701,
+            "y2": 762.6930297636702,
+            "w": 109.79999999999995,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-3eb9fdee2155d2350cd03c6d",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 746.5179519068397,
+            "x2": 866.2179519068397,
+            "y1": 203.67225347755675,
+            "y2": 241.14600347755675,
+            "w": 119.70000000000005,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-8935d7729ba8ee773b66e719",
+          "kind": "issue",
+          "text": "AI Summit stage\ngathering in San Franci…",
+          "protected": false,
+          "box": {
+            "x1": 435.4433266989164,
+            "x2": 590.2433266989163,
+            "y1": 687.8935549449914,
+            "y2": 725.3673049449915,
+            "w": 154.79999999999995,
+            "h": 37.47375000000011
+          }
+        },
+        {
+          "id": "issue-d92f4cd466a64520837b987c",
+          "kind": "issue",
+          "text": "갤럭시 워치 울트라2,\n갤럭시 워치9",
+          "protected": false,
+          "box": {
+            "x1": 375.2516834735939,
+            "x2": 494.9516834735939,
+            "y1": 43.05544227186248,
+            "y2": 80.52919227186247,
+            "w": 119.69999999999999,
+            "h": 37.47374999999999
+          }
+        },
+        {
+          "id": "issue-c4034c968261db969bb0ae9d",
+          "kind": "issue",
+          "text": "Hana Financial Group\nprivate 5G project",
+          "protected": false,
+          "box": {
+            "x1": 445.8674010150395,
+            "x2": 582.6674010150394,
+            "y1": 158.05883813840754,
+            "y2": 195.5325881384075,
+            "w": 136.79999999999995,
+            "h": 37.47374999999997
+          }
+        },
+        {
+          "id": "issue-4ee47caf06699e6d8cfb7a8d",
+          "kind": "issue",
+          "text": "AI-powered quadruped\nwelding robot use case",
+          "protected": false,
+          "box": {
+            "x1": 122.14900665600203,
+            "x2": 269.74900665600205,
+            "y1": 637.9058200340803,
+            "y2": 675.3795700340802,
+            "w": 147.60000000000002,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-90249aed4684bbb6a3dc2e63",
+          "kind": "issue",
+          "text": "AI RAN projects under\nMSIT's Hyper AI Network…",
+          "protected": false,
+          "box": {
+            "x1": 275.55418882513175,
+            "x2": 444.75418882513173,
+            "y1": 520.0051321009101,
+            "y2": 557.4788821009101,
+            "w": 169.2,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-c24ac9a7d789a5f8db4c9361",
+          "kind": "issue",
+          "text": "가전 테크세미나 ‘더\n브리프(The Bri…",
+          "protected": false,
+          "box": {
+            "x1": 274.6561616208528,
+            "x2": 386.2561616208528,
+            "y1": 363.9855365813961,
+            "y2": 401.4592865813961,
+            "w": 111.60000000000002,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-cb25477ad5c985cd1f9282d9",
+          "kind": "issue",
+          "text": "무풍 기술 및 비스포크\nAI 무풍 프로의 모…",
+          "protected": false,
+          "box": {
+            "x1": 99.28742211734055,
+            "x2": 221.68742211734056,
+            "y1": 444.20108040773084,
+            "y2": 481.6748304077309,
+            "w": 122.4,
+            "h": 37.47375000000005
+          }
+        },
+        {
+          "id": "issue-1e6784f87c8e7a1852433ac1",
+          "kind": "issue",
+          "text": "에너지 절감 솔루션",
+          "protected": false,
+          "box": {
+            "x1": 296.7186092516758,
+            "x2": 404.7186092516758,
+            "y1": 139.20511177057088,
+            "y2": 159.86011177057088,
+            "w": 108,
+            "h": 20.655
+          }
+        },
+        {
+          "id": "issue-5d62fd49122208356fb5b295",
+          "kind": "issue",
+          "text": "삼성전자 보통주식",
+          "protected": false,
+          "box": {
+            "x1": 56.69355687131298,
+            "x2": 161.093556871313,
+            "y1": 352.91514591783067,
+            "y2": 373.57014591783064,
+            "w": 104.40000000000003,
+            "h": 20.654999999999973
+          }
+        },
+        {
+          "id": "issue-a228721c1658bfe0016fb39e",
+          "kind": "issue",
+          "text": "갤럭시 Z 폴드8\n울트라·폴드8·플립8…",
+          "protected": false,
+          "box": {
+            "x1": 489.26502345927895,
+            "x2": 618.865023459279,
+            "y1": -25.47158404163865,
+            "y2": 12.002165958361351,
+            "w": 129.60000000000002,
+            "h": 37.47375
+          }
+        },
+        {
+          "id": "issue-0df77571ff2b8a680ead5513",
+          "kind": "issue",
+          "text": "수면, 활동, 심혈관\n건강 및 회복 관련 …",
+          "protected": false,
+          "box": {
+            "x1": 215.16046360491893,
+            "x2": 328.56046360491894,
+            "y1": 245.85551871206243,
+            "y2": 283.3292687120624,
+            "w": 113.4,
+            "h": 37.47374999999997
+          }
+        },
+        {
+          "id": "issue-7b1d3400bb5ea3b8850b860c",
+          "kind": "issue",
+          "text": "구미 (휴머노이드 양산\n체계, 로봇 데이터 …",
+          "protected": false,
+          "box": {
+            "x1": 493.8491717409819,
+            "x2": 618.9491717409819,
+            "y1": 616.9489210278998,
+            "y2": 654.4226710278997,
+            "w": 125.10000000000002,
+            "h": 37.47374999999988
+          }
+        },
+        {
+          "id": "issue-41d8481162fdcacdc066a074",
+          "kind": "issue",
+          "text": "광주 신규 반도체\nFab 2개 건설 및…",
+          "protected": false,
+          "box": {
+            "x1": 215.95877391568644,
+            "x2": 320.35877391568647,
+            "y1": 24.186171892851977,
+            "y2": 61.659921892851976,
+            "w": 104.40000000000003,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "issue-a049ae856a76c299a24583c5",
+          "kind": "issue",
+          "text": "new semiconductor Fab,\ninnovation hub, product…",
+          "protected": false,
+          "box": {
+            "x1": -1.5083518148005624,
+            "x2": 155.99164818519944,
+            "y1": 140.8654163456579,
+            "y2": 178.3391663456579,
+            "w": 157.5,
+            "h": 37.473749999999995
+          }
+        },
+        {
+          "id": "edge-9c0cf08c3efa3cab",
+          "kind": "edge",
+          "text": "MOU 체결사",
+          "protected": false,
+          "box": {
+            "x1": 660.0490370794307,
+            "x2": 740.9511114689844,
+            "y1": 381.8933714531411,
+            "y2": 418.7393886324314,
+            "w": 80.90207438955372,
+            "h": 36.8460171792903
+          }
+        },
+        {
+          "id": "edge-6d693371f11f9405",
+          "kind": "edge",
+          "text": "발행회사",
+          "protected": false,
+          "box": {
+            "x1": 793.9335634399318,
+            "x2": 851.6802605455705,
+            "y1": 283.6656474595694,
+            "y2": 313.9889076009727,
+            "w": 57.746697105638646,
+            "h": 30.323260141403296
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "1440-light-market-fit-stable",
+      "url": "/",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "scrollWidth": 1440
+      },
+      "canvas": {
+        "width": 1390,
+        "height": 749,
+        "x": 25,
+        "y": 134
+      },
+      "zoom": 0.2117069441686767,
+      "pan": {
+        "x": 614.0281406112011,
+        "y": 332.21805354944
+      },
+      "nodes": 124,
+      "edges": 170,
+      "companies": 22,
+      "issues": 0,
+      "edgeLabels": 0,
+      "exposedCompanies": 22,
+      "exposedIssues": 0,
+      "exposedEdgeLabels": 0,
+      "culled": 4,
+      "overlapCount": 0,
+      "overlaps": [],
+      "selected": [],
+      "labels": [
+        {
+          "id": "KRX:005930",
+          "kind": "company",
+          "text": "삼성전자",
+          "protected": false,
+          "box": {
+            "x1": 626.017115086766,
+            "x2": 673.4394705805496,
+            "y1": 434.18085341026745,
+            "y2": 448.94741276603264,
+            "w": 47.422355493783584,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "KRX:028260",
+          "kind": "company",
+          "text": "삼성물산",
+          "protected": false,
+          "box": {
+            "x1": 748.3336583384902,
+            "x2": 795.7560138322738,
+            "y1": 560.2338792282144,
+            "y2": 575.0004385839796,
+            "w": 47.422355493783584,
+            "h": 14.766559355765253
+          }
+        },
+        {
+          "id": "KRX:018260",
+          "kind": "company",
+          "text": "삼성에스디에스",
+          "protected": false,
+          "box": {
+            "x1": 685.3538041897632,
+            "x2": 767.0726846388725,
+            "y1": 439.3108877916135,
+            "y2": 454.0774471473787,
+            "w": 81.71888044910929,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "KRX:006400",
+          "kind": "company",
+          "text": "삼성SDI",
+          "protected": false,
+          "box": {
+            "x1": 672.3495693528189,
+            "x2": 718.2899762374218,
+            "y1": 546.2981783817029,
+            "y2": 561.064737737468,
+            "w": 45.94040688460291,
+            "h": 14.76655935576514
+          }
+        },
+        {
+          "id": "NASDAQ:NVDA",
+          "kind": "company",
+          "text": "NVIDIA",
+          "protected": false,
+          "box": {
+            "x1": 808.5985585196574,
+            "x2": 856.0209140134409,
+            "y1": 426.5152520022579,
+            "y2": 441.2818113580231,
+            "w": 47.42235549378347,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "KRX:017670",
+          "kind": "company",
+          "text": "SK텔레콤",
+          "protected": false,
+          "box": {
+            "x1": 495.24083444974553,
+            "x2": 548.8026913244207,
+            "y1": 412.7462585026264,
+            "y2": 427.5128178583916,
+            "w": 53.561856874675186,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "KRX:035420",
+          "kind": "company",
+          "text": "NAVER",
+          "protected": false,
+          "box": {
+            "x1": 619.4767263730669,
+            "x2": 665.205426313501,
+            "y1": 568.1967974600445,
+            "y2": 582.9633568158098,
+            "w": 45.728699940434126,
+            "h": 14.766559355765253
+          }
+        },
+        {
+          "id": "KRX:000660",
+          "kind": "company",
+          "text": "SK하이닉스",
+          "protected": false,
+          "box": {
+            "x1": 950.0732005539799,
+            "x2": 1015.0672324137636,
+            "y1": 351.27520416139987,
+            "y2": 366.04176351716507,
+            "w": 64.99403185978372,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "KRX:030200",
+          "kind": "company",
+          "text": "KT",
+          "protected": false,
+          "box": {
+            "x1": 527.4869249149357,
+            "x2": 546.7522568342853,
+            "y1": 528.986678153356,
+            "y2": 543.7532375091212,
+            "w": 19.26533191934959,
+            "h": 14.76655935576514
+          }
+        },
+        {
+          "id": "NYSE:CRM",
+          "kind": "company",
+          "text": "Salesforce",
+          "protected": false,
+          "box": {
+            "x1": 505.58001195380626,
+            "x2": 568.6686813160719,
+            "y1": 192.44591566679648,
+            "y2": 207.2124750225617,
+            "w": 63.08866936226565,
+            "h": 14.766559355765224
+          }
+        },
+        {
+          "id": "NYSE:GM",
+          "kind": "company",
+          "text": "General Motors",
+          "protected": false,
+          "box": {
+            "x1": 739.9904881810519,
+            "x2": 832.0830088944261,
+            "y1": 647.3297239345484,
+            "y2": 662.0962832903135,
+            "w": 92.09252071337426,
+            "h": 14.76655935576514
+          }
+        },
+        {
+          "id": "NASDAQ:MU",
+          "kind": "company",
+          "text": "Micron",
+          "protected": false,
+          "box": {
+            "x1": 944.487143382765,
+            "x2": 985.7699974956569,
+            "y1": 528.2131270291932,
+            "y2": 542.9796863849584,
+            "w": 41.28285411289187,
+            "h": 14.766559355765253
+          }
+        },
+        {
+          "id": "NASDAQ:CRWV",
+          "kind": "company",
+          "text": "CoreWeave",
+          "protected": false,
+          "box": {
+            "x1": 782.9824267408219,
+            "x2": 852.8457183164852,
+            "y1": 153.02773095936024,
+            "y2": 167.79429031512544,
+            "w": 69.86329157566331,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "NASDAQ:NBIS",
+          "kind": "company",
+          "text": "Nebius",
+          "protected": false,
+          "box": {
+            "x1": 868.8913854248167,
+            "x2": 911.4444812027207,
+            "y1": 138.8437683379683,
+            "y2": 153.6103276937335,
+            "w": 42.55309577790399,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "NYSE:ORCL",
+          "kind": "company",
+          "text": "Oracle",
+          "protected": false,
+          "box": {
+            "x1": 908.4952610942265,
+            "x2": 949.1429943746125,
+            "y1": 217.27135781643756,
+            "y2": 232.03791717220275,
+            "w": 40.64773328038598,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "NASDAQ:TSLA",
+          "kind": "company",
+          "text": "Tesla",
+          "protected": false,
+          "box": {
+            "x1": 779.8237046469702,
+            "x2": 812.003160160609,
+            "y1": 228.88082341417908,
+            "y2": 243.6473827699443,
+            "w": 32.1794555136388,
+            "h": 14.766559355765224
+          }
+        },
+        {
+          "id": "KRX:009150",
+          "kind": "company",
+          "text": "삼성전기",
+          "protected": false,
+          "box": {
+            "x1": 288.86329632202387,
+            "x2": 336.28565181580746,
+            "y1": 439.0704605653723,
+            "y2": 453.8370199211375,
+            "w": 47.422355493783584,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "NASDAQ:PLTR",
+          "kind": "company",
+          "text": "Palantir",
+          "protected": false,
+          "box": {
+            "x1": 892.0426638187344,
+            "x2": 939.0416054241805,
+            "y1": 555.5508107576856,
+            "y2": 570.3173701134508,
+            "w": 46.998941605446134,
+            "h": 14.766559355765253
+          }
+        },
+        {
+          "id": "NASDAQ:AMZN",
+          "kind": "company",
+          "text": "Amazon",
+          "protected": false,
+          "box": {
+            "x1": 385.40566361593153,
+            "x2": 436.2153302164139,
+            "y1": 325.3628176232042,
+            "y2": 340.1293769789694,
+            "w": 50.80966660048239,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "NASDAQ:AAPL",
+          "kind": "company",
+          "text": "Apple",
+          "protected": false,
+          "box": {
+            "x1": 958.6678870377199,
+            "x2": 995.7166022672383,
+            "y1": 402.38242578481197,
+            "y2": 417.1489851405772,
+            "w": 37.04871522951839,
+            "h": 14.766559355765253
+          }
+        },
+        {
+          "id": "NASDAQ:GOOGL",
+          "kind": "company",
+          "text": "Google",
+          "protected": false,
+          "box": {
+            "x1": 885.3850526171286,
+            "x2": 929.8435108925507,
+            "y1": 287.9310841877266,
+            "y2": 302.6976435434918,
+            "w": 44.45845827542212,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "NASDAQ:CDNS",
+          "kind": "company",
+          "text": "Cadence",
+          "protected": false,
+          "box": {
+            "x1": 714.1498967143976,
+            "x2": 768.1351674774103,
+            "y1": 301.5424719117153,
+            "y2": 316.3090312674805,
+            "w": 53.985270763012636,
+            "h": 14.766559355765196
+          }
+        },
+        {
+          "id": "bundle:isolated",
+          "kind": "bundle",
+          "text": "연결 없는 사건 41",
+          "protected": false,
+          "box": {
+            "x1": 1059.1649077039062,
+            "x2": 1151.8925492497865,
+            "y1": 372.8508037825605,
+            "y2": 387.6173631383257,
+            "w": 92.72764154588026,
+            "h": 14.766559355765196
+          }
+        }
+      ]
+    }
+  ]
+}

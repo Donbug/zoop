@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "zoop-ai-s1-1",
+  "recordingKind": "authored-test",
+  "responses": [
+    {
+      "stage": "briefing-outlook",
+      "inputDigest": "9601ac83666013f37af2b2f5d6acef39bd59a76cfd6f551031f5f2e30b792787",
+      "response": {
+        "label": "undetermined",
+        "rationale": "회차의 합성 사업 사실만으로 전체 유불리를 확인하기 어렵습니다.",
+        "issueIds": [
+          "event-synthetic-s1"
+        ]
+      }
+    }
+  ]
+}

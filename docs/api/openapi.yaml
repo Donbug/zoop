@@ -2,7 +2,7 @@ openapi: "3.1.0"
 info:
   title: "줍 정식 서버 목표 API 계약"
   version: "0.1.0"
-  description: "WBS 6.1.2 및 6.10 계약·검증 산출물. 프로토타입 BFF로부터 출발했으나 정식 서버가 구현할 목표다. 운영 수치와 팀 미결정은 확정하지 않는다. docs/system/links.yaml 및 x-zoop 확장은 사람이 편집한다."
+  description: "WBS 6.1.2 API 명세 최종 검토·구현 기준 확정 및 6.11.1 API·스키마 계약 통합 점검에 연결한 목표 계약. API 공통 규칙은 사용자 잠정 채택/시연 기준이며 정식 구현 완료는 아니다. 모든 명세/WBS 요구(FS074~081 포함)는 현재 사용자 결정에 따라 팀합의 설계대상이다. 원문 상태·충돌과 운영 미결정은 별도로 보존한다."
 servers:
   -
     url: "/"
@@ -20,7 +20,18 @@ x-zoop-common-rules:
   partialFailures: "영역별 API는 독립 조회한다. 집계 결과의 일부 영역만 실패하면 200과 metadata.partial=true/failures를 반환하고 성공 영역을 유지한다. 자료 미제공은 unavailable, 실제 장애는 failed 또는 failures로 표현한다. 요청 전체를 처리하지 못한 경우에만 비2xx 오류다. 재시도는 실패 조회만 하며 저장/분석 재실행을 암묵적으로 수행하지 않는다."
   aiJobs: "질문은 대화 ID·작업 ID·질문·대상·기간·asOf·graphVersion을 최초 접수 시 고정한다. 202는 접수, completed는 검증 및 결과 저장 완료다. queued/running/completed/failed/cancelled와 실패 종류·retryable·저장 결과를 회수한다. 되묻기·조건 부족·근거 부족은 기술 오류와 다르다. 생성 중 대화당 추가 질문을 거절한다. 검증 실패는 재생성하지 않고, 보존된 검증 결과의 저장 실패는 저장만 복구한다. 창 닫기는 취소가 아니다."
   sentiment: "DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이다. label은 positive/negative/mixed/undetermined(긍정/부정/혼재/판단 보류)이며 확률·점수를 제공하지 않는다. null은 아직 판정하지 않음이고 undetermined와 다르다. 원문 인용과 이유·판정 시각·모델·프롬프트 버전을 보존한다. 브리핑의 documentSentiments/outlook은 발행 시점에 고정한다. 이슈 자체의 종합 방향이나 투자 수익률로 확장하지 않는다."
-  approvalBoundary: "이 계약은 정식 서버의 구현 목표 초안이다. FS/NFS와 공유 긍부정 계약의 확정 사항을 반영하되 다중 정의·운영 수치·정식 배포 인증 선택은 x-zoop.teamQuestions와 추적표에 남긴다. BFF 동작을 목표 계약의 확정 근거로 삼지 않는다."
+  approvalBoundary: "명세/WBS의 모든 내용은 현재 사용자 결정에 따라 팀합의요구/설계대상이며 FS074~081도 포함한다. 원문의 검토 전 표기는 갱신되지 않은 상태로 보존한다. 요구 범위 포함과 구현 완료·유료 모델 실행 승인·본개발 채택은 별개다. API 공통 규칙은 기존 잠정 채택/시연 기준이고 원본 충돌·운영 수치·정식 배포 인증 선택은 teamQuestions와 추적표에 보존한다."
+  modelConfiguration: "LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결정과 실제 모델/공급자 선택·실행 승인은 구분하며 예산은 추후 결정이다. 판정 CLI의 ZOOP_SENTIMENT_MODEL/ZOOP_SENTIMENT_REASONING_EFFORT와 외부 PoC의 미지원 추론 전송 경계를 구분한다. 공개 API에서 비밀 설정값을 반환하지 않는다."
+  conflictPermission: "프로토타입은 전권 범위로 끝까지 완성하며 본개발 채택은 담당자가 선택한다. 원본 충돌은 근거 있는 작업자 안과 정정 요청을 남겨 팀이 정정한다. 확정 일정은 WBS이고 Notion 일정은 오래된 자료다. 원문 날짜·우선순위·승인 상태를 덮어쓰지 않는다."
+x-zoop-approvals:
+  apiCommon: {status: "잠정채택/시연기준", authority: "사용자", teamFinalApproval: false}
+  impactLabels: {status: "명칭 결정 완료", labels: ["긍정", "부정", "혼재", "판단 보류"]}
+  modelConfiguration: {location: ".env", executionApproval: "별도", budget: "미정"}
+  implementationScope:
+    authorityRef: "docs/system/links.yaml#authority"
+    decisionId: "user-2026-10-08-day"
+    source: "docs/share/day-work-2026-10-08.md"
+  conflicts: {permission: "작업자 가결정→시연→팀 최종 결정", rawCorrections: "정정 요청 보존"}
 x-zoop-error-codes:
   -
     code: "INVALID_REQUEST"
@@ -198,9 +209,10 @@ paths:
           - "D-ONB-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.1"
+          - "6.11.1"
+          - "6.2.4"
           - "6.2.6"
+          - "6.2.7"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -263,8 +275,9 @@ paths:
           - "D-AUT-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.3"
+          - "6.11.1"
+          - "6.2.1"
+          - "6.2.7"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -338,8 +351,9 @@ paths:
           - "D-AUT-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.3"
+          - "6.11.1"
+          - "6.2.1"
+          - "6.2.7"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -421,9 +435,11 @@ paths:
           - "D-AUT-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.2"
+          - "6.11.1"
+          - "6.2.1"
+          - "6.2.4"
           - "6.2.6"
+          - "6.2.7"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -495,8 +511,9 @@ paths:
           - "M-GRP-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.5"
+          - "6.11.1"
+          - "6.2.3"
+          - "6.2.6"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -560,8 +577,8 @@ paths:
           - "D-MY-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.7"
+          - "6.11.1"
+          - "6.2.5"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -648,9 +665,9 @@ paths:
           - "D-GRP-T5"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.3.8"
-          - "6.3.9"
+          - "6.11.1"
+          - "6.3.7"
+          - "6.3.10"
         priority: "P1"
         authority: "회원 또는 비회원 세션"
         errorCodes:
@@ -724,9 +741,8 @@ paths:
           - "D-AUT-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.4"
-          - "6.4.8"
+          - "6.11.1"
+          - "6.2.2"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -812,9 +828,8 @@ paths:
           - "D-AUT-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.4"
-          - "6.4.8"
+          - "6.11.1"
+          - "6.2.2"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -918,9 +933,8 @@ paths:
           - "D-AUT-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.2.4"
-          - "6.4.8"
+          - "6.11.1"
+          - "6.2.2"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -993,11 +1007,15 @@ paths:
           - "D-MY-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
+          - "6.11.1"
           - "6.3.1"
+          - "6.3.4"
           - "6.3.5"
-          - "6.3.6"
+          - "6.3.8"
           - "6.4.1"
+          - "6.4.3"
+          - "6.4.5"
+          - "6.4.6"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1083,11 +1101,14 @@ paths:
           - "D-WAT-01b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
+          - "6.11.1"
           - "6.3.1"
-          - "6.3.3"
+          - "6.3.2"
+          - "6.3.4"
           - "6.3.5"
-          - "6.3.6"
+          - "6.3.8"
+          - "6.3.9"
+          - "6.4.5"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1181,8 +1202,13 @@ paths:
           - "M-STK-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.11"
+          - "6.11.1"
+          - "6.4.1"
+          - "6.4.2"
+          - "6.4.6"
+          - "6.4.7"
+          - "6.6.12"
+          - "6.6.23"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1256,8 +1282,9 @@ paths:
           - "D-WAT-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.3.4"
+          - "6.11.1"
+          - "6.3.3"
+          - "6.4.5"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1331,9 +1358,11 @@ paths:
           - "D-ONB-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
+          - "6.11.1"
           - "6.3.2"
-          - "6.4.9"
+          - "6.3.9"
+          - "6.4.4"
+          - "6.4.6"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1409,9 +1438,11 @@ paths:
           - "D-ONB-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
+          - "6.11.1"
           - "6.3.2"
-          - "6.4.9"
+          - "6.3.9"
+          - "6.4.4"
+          - "6.4.6"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1496,10 +1527,11 @@ paths:
           - "D-ONB-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
+          - "6.11.1"
           - "6.3.2"
-          - "6.3.3"
-          - "6.4.9"
+          - "6.3.9"
+          - "6.4.4"
+          - "6.4.6"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1572,9 +1604,11 @@ paths:
           - "M-COM-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.6.2"
+          - "6.11.1"
           - "6.4.1"
+          - "6.4.3"
+          - "6.4.6"
+          - "6.7.8"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1652,9 +1686,11 @@ paths:
           - "D-MY-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
+          - "6.11.1"
           - "6.3.2"
-          - "6.4.9"
+          - "6.3.9"
+          - "6.4.4"
+          - "6.4.6"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -1799,16 +1835,24 @@ paths:
           - "D-COM-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.3.7"
-          - "6.5.1"
-          - "6.5.2"
-          - "6.5.3"
-          - "6.5.10"
-          - "6.7.5"
+          - "6.11.1"
+          - "6.3.6"
+          - "6.4.7"
+          - "6.6.1"
+          - "6.6.2"
           - "6.6.3"
-          - "6.6.7"
-          - "6.4.2"
+          - "6.6.11"
+          - "6.6.21"
+          - "6.6.23"
+          - "6.7.3"
+          - "6.7.7"
+          - "6.7.8"
+          - "6.7.10"
+          - "6.7.11"
+          - "6.7.12"
+          - "6.8.5"
+          - "6.8.14"
+          - "6.5.1"
         priority: "P1"
         authority: "공개(all) / 회원 본인(personal)"
         errorCodes:
@@ -1899,10 +1943,14 @@ paths:
           - "D-GRP-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.7"
-          - "6.5.8"
-          - "6.4.2"
+          - "6.11.1"
+          - "6.6.8"
+          - "6.6.9"
+          - "6.6.22"
+          - "6.6.24"
+          - "6.6.25"
+          - "6.6.26"
+          - "6.5.1"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -1991,10 +2039,14 @@ paths:
           - "M-COM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.3.4"
-          - "6.5.10"
-          - "6.6"
+          - "6.11.1"
+          - "6.3.3"
+          - "6.4.5"
+          - "6.4.7"
+          - "6.6.11"
+          - "6.6.21"
+          - "6.6.23"
+          - "6.7.1"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2083,10 +2135,16 @@ paths:
           - "M-COM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.4"
-          - "6.6.1"
-          - "6.6.7"
+          - "6.11.1"
+          - "6.6.4"
+          - "6.6.23"
+          - "6.6.26"
+          - "6.7.2"
+          - "6.7.7"
+          - "6.7.8"
+          - "6.7.10"
+          - "6.7.11"
+          - "6.7.12"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2172,10 +2230,15 @@ paths:
           - "M-COM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.4"
-          - "6.6.1"
-          - "6.4.10"
+          - "6.11.1"
+          - "6.6.4"
+          - "6.6.23"
+          - "6.6.26"
+          - "6.7.2"
+          - "6.7.8"
+          - "6.7.10"
+          - "6.7.11"
+          - "6.5.6"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2244,7 +2307,7 @@ paths:
       x-zoop:
         fsIds:
           - "FS020"
-          - "FS042"
+          - "FS038"
         nfsIds:
           - "NFS001"
           - "NFS002"
@@ -2256,9 +2319,11 @@ paths:
           - "M-COM-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.4"
-          - "6.6.5"
+          - "6.11.1"
+          - "6.6.4"
+          - "6.6.23"
+          - "6.7.2"
+          - "6.7.10"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2377,9 +2442,13 @@ paths:
           - "D-COM-06"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.6.1"
-          - "6.6.3"
+          - "6.11.1"
+          - "6.7.2"
+          - "6.7.3"
+          - "6.7.8"
+          - "6.7.10"
+          - "6.7.11"
+          - "6.7.12"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2501,12 +2570,14 @@ paths:
           - "D-SEN-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.5"
-          - "6.6.6"
-          - "6.4.3"
-          - "6.4.10"
-          - "6.4.11"
+          - "6.11.1"
+          - "6.6.5"
+          - "6.6.22"
+          - "6.7.6"
+          - "6.7.9"
+          - "6.5.2"
+          - "6.5.6"
+          - "6.5.7"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2523,7 +2594,7 @@ paths:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
         teamQuestions:
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/events":
     get:
       tags:
@@ -2625,10 +2696,13 @@ paths:
           - "D-COM-06"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.6.3"
-          - "6.6.4"
-          - "6.4.3"
+          - "6.11.1"
+          - "6.7.3"
+          - "6.7.4"
+          - "6.7.8"
+          - "6.7.11"
+          - "6.7.12"
+          - "6.5.2"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2716,10 +2790,13 @@ paths:
           - "D-COM-05"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.5"
-          - "6.6.4"
-          - "6.4.3"
+          - "6.11.1"
+          - "6.6.5"
+          - "6.6.22"
+          - "6.7.4"
+          - "6.7.8"
+          - "6.7.12"
+          - "6.5.2"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2736,7 +2813,7 @@ paths:
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
         teamQuestions:
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/evidence/{id}":
     get:
       tags:
@@ -2817,11 +2894,17 @@ paths:
           - "D-SEN-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.8"
-          - "6.6.6"
-          - "6.8.5"
-          - "6.4.2"
+          - "6.11.1"
+          - "6.6.9"
+          - "6.6.22"
+          - "6.6.24"
+          - "6.6.25"
+          - "6.6.26"
+          - "6.7.6"
+          - "6.7.9"
+          - "6.9.5"
+          - "6.9.14"
+          - "6.5.1"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2838,7 +2921,7 @@ paths:
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
         teamQuestions:
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/briefings":
     get:
       tags:
@@ -2919,15 +3002,17 @@ paths:
           - "D-SEN-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.1"
-          - "6.7.2"
-          - "6.7.3"
-          - "6.7.4"
-          - "6.7.6"
-          - "6.7.7"
-          - "6.7.8"
-          - "6.4.4"
+          - "6.11.1"
+          - "6.8.1"
+          - "6.8.2"
+          - "6.8.3"
+          - "6.8.4"
+          - "6.8.6"
+          - "6.8.8"
+          - "6.8.11"
+          - "6.8.12"
+          - "6.8.13"
+          - "6.5.3"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -2943,7 +3028,7 @@ paths:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
         teamQuestions:
           - "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다."
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/briefings/rounds":
     get:
       tags:
@@ -2994,10 +3079,13 @@ paths:
           - "M-BRF-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.6"
-          - "6.7.8"
-          - "6.4.4"
+          - "6.11.1"
+          - "6.8.6"
+          - "6.8.8"
+          - "6.8.11"
+          - "6.8.12"
+          - "6.8.13"
+          - "6.5.3"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -3067,10 +3155,14 @@ paths:
           - "D-BRF-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.5"
-          - "6.7.8"
-          - "6.4.4"
+          - "6.11.1"
+          - "6.8.5"
+          - "6.8.8"
+          - "6.8.11"
+          - "6.8.12"
+          - "6.8.13"
+          - "6.8.14"
+          - "6.5.3"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -3169,10 +3261,11 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.8.6"
-          - "6.8.7"
-          - "6.4.7"
+          - "6.11.1"
+          - "6.9.6"
+          - "6.9.10"
+          - "6.9.11"
+          - "6.9.14"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3261,10 +3354,13 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.8.6"
-          - "6.8.8"
-          - "6.4.7"
+          - "6.11.1"
+          - "6.9.6"
+          - "6.9.7"
+          - "6.9.8"
+          - "6.9.10"
+          - "6.9.11"
+          - "6.9.14"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3339,9 +3435,12 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.8.8"
-          - "6.4.7"
+          - "6.11.1"
+          - "6.9.7"
+          - "6.9.8"
+          - "6.9.10"
+          - "6.9.11"
+          - "6.9.14"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3459,16 +3558,20 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.9"
-          - "6.8.1"
-          - "6.8.2"
-          - "6.8.3"
-          - "6.8.4"
-          - "6.8.5"
-          - "6.8.6"
-          - "6.4.7"
-          - "6.4.11"
+          - "6.11.1"
+          - "6.6.10"
+          - "6.9.1"
+          - "6.9.2"
+          - "6.9.3"
+          - "6.9.4"
+          - "6.9.5"
+          - "6.9.6"
+          - "6.9.10"
+          - "6.9.11"
+          - "6.9.12"
+          - "6.9.13"
+          - "6.9.14"
+          - "6.5.7"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3498,7 +3601,7 @@ paths:
         teamQuestions:
           - "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다."
           - "동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다."
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/chat/jobs/{job_id}":
     get:
       tags:
@@ -3568,10 +3671,13 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.8.2"
-          - "6.8.5"
-          - "6.8.9"
+          - "6.11.1"
+          - "6.9.4"
+          - "6.9.5"
+          - "6.9.7"
+          - "6.9.9"
+          - "6.9.13"
+          - "6.9.14"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3678,8 +3784,11 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.8.9"
+          - "6.11.1"
+          - "6.9.7"
+          - "6.9.9"
+          - "6.9.13"
+          - "6.9.14"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3778,9 +3887,11 @@ paths:
           - "M-AI-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.8.2"
-          - "6.8.9"
+          - "6.11.1"
+          - "6.9.7"
+          - "6.9.9"
+          - "6.9.13"
+          - "6.9.14"
         priority: "P1"
         authority: "회원(본인)"
         errorCodes:
@@ -3851,8 +3962,9 @@ paths:
           - "A-ADM-05c"
         wbsIds:
           - "6.1.2"
+          - "6.11.1"
           - "6.10.1"
-          - "6.9.9"
+          - "6.10.13"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -3928,8 +4040,9 @@ paths:
           - "A-ADM-05c"
         wbsIds:
           - "6.1.2"
+          - "6.11.1"
           - "6.10.1"
-          - "6.9.9"
+          - "6.10.13"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -3997,8 +4110,9 @@ paths:
           - "A-ADM-01"
         wbsIds:
           - "6.1.2"
+          - "6.11.1"
           - "6.10.1"
-          - "6.9.9"
+          - "6.10.13"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -4067,8 +4181,9 @@ paths:
           - "A-ADM-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.8"
+          - "6.11.1"
+          - "6.10.2"
+          - "6.10.14"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4179,8 +4294,9 @@ paths:
           - "A-ADM-05b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.8"
+          - "6.11.1"
+          - "6.10.12"
+          - "6.10.18"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4253,11 +4369,12 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.5"
-          - "6.4.6"
-          - "6.4.10"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.16"
+          - "6.5.4"
+          - "6.5.5"
+          - "6.5.6"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4398,8 +4515,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.7"
+          - "6.10.16"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4477,8 +4596,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.7"
+          - "6.10.16"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4570,9 +4691,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.6"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.7"
+          - "6.10.16"
+          - "6.5.5"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4652,9 +4774,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.6"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.16"
+          - "6.5.5"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4745,9 +4868,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.6"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.7"
+          - "6.10.16"
+          - "6.5.5"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4823,9 +4947,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.6"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.16"
+          - "6.5.5"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -4910,9 +5035,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.6"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.7"
+          - "6.10.16"
+          - "6.5.5"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5006,9 +5132,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.6"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.7"
+          - "6.10.16"
+          - "6.5.5"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5101,9 +5228,10 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.5"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.16"
+          - "6.5.4"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5192,11 +5320,11 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.4.5"
-          - "6.4.6"
-          - "6.4.10"
-          - "6.4.11"
+          - "6.11.1"
+          - "6.5.4"
+          - "6.5.5"
+          - "6.5.6"
+          - "6.5.7"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5218,7 +5346,7 @@ paths:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
             - "로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다."
         teamQuestions:
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/admin/jobs/{job_id}":
     get:
       tags:
@@ -5275,8 +5403,9 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.6"
+          - "6.10.16"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5367,8 +5496,9 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.7"
+          - "6.10.16"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5462,8 +5592,9 @@ paths:
           - "A-ADM-03"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.3"
+          - "6.11.1"
+          - "6.10.7"
+          - "6.10.16"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5545,8 +5676,9 @@ paths:
           - "A-ADM-04b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.4"
+          - "6.11.1"
+          - "6.10.8"
+          - "6.10.17"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5643,8 +5775,9 @@ paths:
           - "A-ADM-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.6"
+          - "6.11.1"
+          - "6.10.9"
+          - "6.10.17"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5719,8 +5852,9 @@ paths:
           - "A-ADM-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.6"
+          - "6.11.1"
+          - "6.10.9"
+          - "6.10.17"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5812,11 +5946,14 @@ paths:
           - "A-ADM-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.1"
-          - "6.7.2"
-          - "6.7.7"
-          - "6.9.6"
+          - "6.11.1"
+          - "6.8.1"
+          - "6.8.2"
+          - "6.8.8"
+          - "6.8.11"
+          - "6.8.12"
+          - "6.10.9"
+          - "6.10.17"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -5839,7 +5976,7 @@ paths:
           differences:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
         teamQuestions:
-          - "긍부정 표기는 공유 계약에 따르며 모델·운영 승인·재판정 정책과 이슈 수준 종합 방향은 팀 확인 필요다. 실제 판정 없으면 null을 반환한다."
+          - "긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다."
   "/api/v1/admin/briefings/{round_id}/corrections":
     post:
       tags:
@@ -5912,10 +6049,14 @@ paths:
           - "A-ADM-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.8"
-          - "6.4.4"
-          - "6.9.7"
+          - "6.11.1"
+          - "6.8.8"
+          - "6.8.11"
+          - "6.8.12"
+          - "6.8.13"
+          - "6.10.10"
+          - "6.10.17"
+          - "6.5.3"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6010,8 +6151,9 @@ paths:
           - "A-ADM-04"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.7"
+          - "6.11.1"
+          - "6.10.10"
+          - "6.10.17"
         priority: "P1"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6100,8 +6242,9 @@ paths:
           - "D-GRP-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.1"
+          - "6.11.1"
+          - "6.10.4"
+          - "6.10.15"
         priority: "P2"
         authority: "회원 또는 비회원 세션"
         errorCodes:
@@ -6196,9 +6339,10 @@ paths:
           - "D-COM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.10"
-          - "6.9.2"
+          - "6.11.1"
+          - "6.8.10"
+          - "6.8.14"
+          - "6.10.5"
         priority: "P2"
         authority: "회원(본인)"
         errorCodes:
@@ -6282,9 +6426,10 @@ paths:
           - "D-COM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.10"
-          - "6.9.2"
+          - "6.11.1"
+          - "6.8.10"
+          - "6.8.14"
+          - "6.10.5"
         priority: "P2"
         authority: "회원(본인)"
         errorCodes:
@@ -6354,8 +6499,9 @@ paths:
           - "A-ADM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.1"
+          - "6.11.1"
+          - "6.10.4"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6432,8 +6578,9 @@ paths:
           - "A-ADM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.1"
+          - "6.11.1"
+          - "6.10.4"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6514,8 +6661,9 @@ paths:
           - "A-ADM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.1"
+          - "6.11.1"
+          - "6.10.4"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6600,8 +6748,9 @@ paths:
           - "A-ADM-02"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.1"
+          - "6.11.1"
+          - "6.10.4"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6704,8 +6853,9 @@ paths:
           - "A-ADM-02b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.2"
+          - "6.11.1"
+          - "6.10.5"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6812,8 +6962,9 @@ paths:
           - "A-ADM-02b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.2"
+          - "6.11.1"
+          - "6.10.5"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -6905,8 +7056,9 @@ paths:
           - "A-ADM-02b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.2"
+          - "6.11.1"
+          - "6.10.11"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자 + transcript:read + 열람 목적"
         errorCodes:
@@ -6993,8 +7145,9 @@ paths:
           - "A-ADM-02b"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.2"
+          - "6.11.1"
+          - "6.10.11"
+          - "6.10.15"
         priority: "P2"
         authority: "관리자 + transcript:read + 열람 목적"
         errorCodes:
@@ -7094,8 +7247,9 @@ paths:
           - "A-ADM-05"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.5"
+          - "6.11.1"
+          - "6.10.3"
+          - "6.10.18"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -7172,8 +7326,9 @@ paths:
           - "A-ADM-05"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.5"
+          - "6.11.1"
+          - "6.10.3"
+          - "6.10.18"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -7264,8 +7419,9 @@ paths:
           - "A-ADM-05"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.5"
+          - "6.11.1"
+          - "6.10.3"
+          - "6.10.18"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -7359,8 +7515,9 @@ paths:
           - "A-ADM-05"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.9.5"
+          - "6.11.1"
+          - "6.10.3"
+          - "6.10.18"
         priority: "P2"
         authority: "관리자(작업별 권한)"
         errorCodes:
@@ -7428,6 +7585,8 @@ paths:
       x-zoop:
         fsIds:
           - "FS042"
+        meaningQualifications:
+          FS042: "목차·요구42의 기존 재무/실적 의미를 보존한 목표다. 새 상세 FS042 시점 그래프와 다르며 현재 WBS에 대응 재무 업무가 없어 공통 계약검토만 연결한다. 폐기·구현·배정 완료가 아니다."
         nfsIds:
           - "NFS001"
           - "NFS002"
@@ -7439,8 +7598,7 @@ paths:
           - "M-COM-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.6.5"
+          - "6.11.1"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -7455,6 +7613,7 @@ paths:
             - "직접 대응 API 없음. 재무는 기업 지표와 구분한다."
         teamQuestions:
           - "재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다."
+          - "현재 WBS 6.7.5는 시점 관계 그래프다. 옛 6.6.5 재무 의미를 그 번호로 이행하지 않는다. 재무 유지/분리 ID·담당/일정은 팀 최종 결정 대상이며 API는 기존 목표만 보존한다."
   "/api/v1/companies/{id}/issues/{issueId}/impact":
     get:
       operationId: "getCompanyIssueImpact"
@@ -7518,10 +7677,15 @@ paths:
           - "D-GRP-05"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.5.6"
-          - "6.5.8"
-          - "6.4.2"
+          - "6.11.1"
+          - "6.6.6"
+          - "6.6.7"
+          - "6.6.9"
+          - "6.6.22"
+          - "6.6.24"
+          - "6.6.25"
+          - "6.6.26"
+          - "6.5.1"
         priority: "P1"
         authority: "공개"
         errorCodes:
@@ -7594,8 +7758,9 @@ paths:
           - "M-BRF-01"
         wbsIds:
           - "6.1.2"
-          - "6.10.1"
-          - "6.7.9"
+          - "6.11.1"
+          - "6.8.9"
+          - "6.8.14"
         priority: "P2"
         authority: "회원(본인)"
         errorCodes:
@@ -7666,10 +7831,12 @@ paths:
         "503":
           "$ref": "#/components/responses/Error503"
       x-zoop:
-        fsIds: [FS038, FS040, FS041, FS055]
+        fsIds: [FS038, FS040, FS041, FS042, FS055]
+        meaningQualifications:
+          FS042: "기업 상세 77/79행의 FS0??→FS042 ID 승계. 시점 관계 그래프 의미이며 기존 재무/실적 공급을 뜻하지 않는다."
         nfsIds: [NFS001, NFS002, NFS004, NFS005, NFS008]
         screenIds: [D-COM-01b, D-COM-02, M-COM-01, D-COM-04, D-COM-05, D-COM-06]
-        wbsIds: ["6.1.2", "6.6.3", "6.6.4", "6.4.2", "6.10.1"]
+        wbsIds: ["6.1.2", "6.11.1", "6.7.2", "6.7.3", "6.7.4", "6.7.5", "6.7.8", "6.7.10", "6.7.11", "6.7.12", "6.5.1"]
         priority: "P1"
         authority: "공개"
         errorCodes: [INVALID_REQUEST, RESOURCE_NOT_FOUND, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE, INTERNAL_ERROR]
@@ -7681,7 +7848,7 @@ paths:
             - "/api → /api/v1 경로 버전 및 공통 오류·요청 ID 적용."
             - "BFF는 현재 저장된 승인 자료를 문서 공개 시각으로 거른다. 목표는 asOf와 실제 사용한 불변 공개 버전을 함께 고정한다."
         teamQuestions:
-          - "WBS FS040-01은 현재 명세 목차에 없는 원본 ID다. FS040 연결은 시점별 조회 의미의 수동 연결이며 원문 번호 정정을 뜻하지 않는다."
+          - "10-08 상세 FS042는 FS0?? 시점 관계 그래프를 승계했지만 목차/요구42의 기존 재무·실적 의미와 충돌한다. 재무 폐기 선언 없이 시점 그래프 의미로 연결하며 의미별 승인 범위는 팀 최종 확인이 필요하다."
           - "날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다."
 components:
   securitySchemes:
@@ -9798,6 +9965,23 @@ components:
               "$ref": "#/components/schemas/DocumentSentiment"
             -
               type: "null"
+        documentVersion:
+          type: [string, "null"]
+        documentSummary:
+          anyOf:
+            - "$ref": "#/components/schemas/DocumentAnalysisSummary"
+            - type: "null"
+        analysisStatus:
+          anyOf:
+            - "$ref": "#/components/schemas/DocumentAnalysisStatus"
+            - type: "null"
+        analysisProvenance:
+          anyOf:
+            - "$ref": "#/components/schemas/AnalysisProvenance"
+            - type: "null"
+        resultVersion:
+          type: [string, "null"]
+          description: "요약이 있으면 요약 버전, 요약 없이 판정만 있으면 판정 버전. 미공개는 null."
         kind:
           type: "string"
           enum:
@@ -11093,6 +11277,22 @@ components:
               "$ref": "#/components/schemas/DocumentSentiment"
             -
               type: "null"
+        documentVersion:
+          type: [string, "null"]
+        documentSummary:
+          anyOf:
+            - "$ref": "#/components/schemas/DocumentAnalysisSummary"
+            - type: "null"
+        analysisStatus:
+          anyOf:
+            - "$ref": "#/components/schemas/DocumentAnalysisStatus"
+            - type: "null"
+        analysisProvenance:
+          anyOf:
+            - "$ref": "#/components/schemas/AnalysisProvenance"
+            - type: "null"
+        resultVersion:
+          type: [string, "null"]
       type: "object"
       required:
         - "id"
@@ -15405,6 +15605,122 @@ components:
         - "model"
         - "promptVersion"
       description: "브리핑 발행 당시 고정하는 회차 종합 판정이다. 공개 후 변경하거나 최신 판정으로 바꾸지 않는다."
+    AnalysisProvenance:
+      type: "object"
+      properties:
+        sourceKind:
+          type: "string"
+          enum: ["synthetic", "actual"]
+        executionMode:
+          type: "string"
+          enum: ["replay", "live"]
+        recordingKind:
+          type: "string"
+          enum: ["authored-test", "provider"]
+      required: ["sourceKind", "executionMode", "recordingKind"]
+      additionalProperties: false
+    AnalysisCitation:
+      type: "object"
+      properties:
+        evidenceId:
+          type: "string"
+        documentId:
+          type: "string"
+        documentVersion:
+          type: "string"
+        textArtifactId:
+          type: "string"
+        offsetUnit:
+          type: "string"
+          const: "unicode_code_point"
+        start:
+          type: "integer"
+          minimum: 0
+        end:
+          type: "integer"
+          minimum: 1
+          description: "Exclusive Unicode code point offset, not JavaScript/Java UTF-16."
+        quote:
+          type: "string"
+        inputKind:
+          type: "string"
+          enum: ["body", "summary"]
+        rawLocatorIds:
+          type: "array"
+          items:
+            type: "string"
+          minItems: 1
+      required: ["evidenceId", "documentId", "documentVersion", "textArtifactId", "offsetUnit", "start", "end", "quote", "inputKind", "rawLocatorIds"]
+      additionalProperties: false
+    AnalysisClaim:
+      type: "object"
+      properties:
+        claimId:
+          type: "string"
+        text:
+          type: "string"
+        assertionKind:
+          type: "string"
+          enum: ["fact", "interpretation", "limitation"]
+        evidenceIds:
+          type: "array"
+          items:
+            type: "string"
+      required: ["claimId", "text", "assertionKind", "evidenceIds"]
+      additionalProperties: false
+    AnalysisStageStatus:
+      type: "object"
+      properties:
+        status:
+          type: "string"
+          enum: ["not_requested", "pending", "failed", "withheld", "available"]
+        reason:
+          type: [string, "null"]
+      required: ["status", "reason"]
+      description: "undetermined는 유효한 판정 label. null 판정의 실패/미요청/보류를 별도 status로 구분."
+    DocumentAnalysisStatus:
+      type: "object"
+      properties:
+        summary:
+          "$ref": "#/components/schemas/AnalysisStageStatus"
+        sentiment:
+          "$ref": "#/components/schemas/AnalysisStageStatus"
+      required: ["summary", "sentiment"]
+    DocumentAnalysisSummary:
+      type: "object"
+      properties:
+        schemaVersion:
+          type: "string"
+          const: "zoop-ai-s1-1"
+        artifactId:
+          type: "string"
+        documentId:
+          type: "string"
+        documentVersion:
+          type: "string"
+        resultVersion:
+          type: "string"
+        text:
+          type: "string"
+        claims:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/AnalysisClaim"
+        citations:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/AnalysisCitation"
+        limitations:
+          type: "array"
+          items:
+            type: "string"
+        producedAt:
+          type: "string"
+          format: "date-time"
+        provenance:
+          "$ref": "#/components/schemas/AnalysisProvenance"
+      required: ["schemaVersion", "artifactId", "documentId", "documentVersion", "resultVersion", "text", "claims", "citations", "limitations", "producedAt", "provenance"]
+      description: "S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 앱이 수입한 후만 제공. GET은 모델 호출 0. 현재 버전·철회·grant gate 실패는 null."
     AnalysisSummary:
       type: "object"
       properties:

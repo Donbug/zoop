@@ -1,0 +1,23 @@
+{
+  "method": "Original SVG text elements, Unicode incl/excl whitespace; raster screen text excluded",
+  "pages": [
+    {
+      "id": "01-system",
+      "visibleTextCharacters": 916,
+      "visibleLabels": 45,
+      "visibleTextCharactersWithoutWhitespace": 743
+    },
+    {
+      "id": "02-frontend",
+      "visibleTextCharacters": 798,
+      "visibleLabels": 37,
+      "visibleTextCharactersWithoutWhitespace": 655
+    },
+    {
+      "id": "03-backend",
+      "visibleTextCharacters": 963,
+      "visibleLabels": 45,
+      "visibleTextCharactersWithoutWhitespace": 791
+    }
+  ]
+}
