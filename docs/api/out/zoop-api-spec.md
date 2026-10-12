@@ -2,7 +2,7 @@
 
 생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 API 명세 최종 검토·구현 기준 확정**, **6.11.1 API·스키마 계약 통합 점검**에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 정식 구현 완료가 아니다. 전체 명세/WBS(FS074~081 포함)의 현재 범위는 팀합의요구/설계대상이며 원문 승인 표기·구현 증거·유료 실행 승인은 별개다. 추천 종목·산업·테마(FS011-02)는 활성 사용자 기능에서 제외하되 작업을 유보하며 요구 42의 재무·실적은 폐기되지 않았다(기록된 예외). 프로토타입 관측과 구현 목표를 구분한다.
 
-[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [범위 예외·상세 권한](../../system/out/detail-authority.md) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)
+[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [10-12 원문 갱신 기록](../../evidence/doc-delta-2026-10-12.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [범위 예외·상세 권한](../../system/out/detail-authority.md) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)
 
 ## 공통 규칙
 

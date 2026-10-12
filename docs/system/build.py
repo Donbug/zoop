@@ -123,6 +123,14 @@ def detail_authority(specs: dict, links: dict, api: dict, requirements: dict, fi
                    and (d.get("heading") or {}).get("row") == c["headingRow"]
                    and (d.get("heading") or {}).get("text", "").startswith(c["effectiveSpecId"]) for d in rec["definitions"]):
             invalid(rid, "원문 ID 행/제목 행/제목의 연결 ID가 현재 고정본과 다르다.")
+    resolved = detail.get("resolvedRawIdCorrections", [])
+    for c in resolved:
+        target = specs.get(c["effectiveSpecId"])
+        if c["rawId"] in specs or not target or c["effectiveSpecId"] not in active:
+            invalid(c["rawId"], "해소로 기록한 원문 오류 ID가 현재 고정본에 남아 있거나 대상 ID가 활성 ID가 아니다.")
+        elif not any(definition_file(d) == c["file"] and d["source"]["row"] == c["idRow"]
+                     and (d.get("heading") or {}).get("row") == c["headingRow"] for d in target["definitions"]):
+            invalid(c["rawId"], "해소로 기록한 기능 ID 행·제목 행이 현재 고정본의 대상 ID 정의와 다르다.")
     for item in detail.get("legacyAiMeaning", []):
         legacy, source = item["legacySpecId"], item["legacySource"]
         if legacy not in specs or not any(definition_file(d) == source["file"] and d["source"]["row"] == source["row"]
@@ -188,7 +196,8 @@ def detail_authority(specs: dict, links: dict, api: dict, requirements: dict, fi
             or set(chart.values()) != set(series["interval"].get("enum", [])) or set(chart) != set(series["period"]["enum"]):
         invalid("chartResolution", "고정 봉 해상도가 links.authority, OpenAPI 승인 기록, PriceSeries 열거값과 일치하지 않는다.")
     return {"historicalFiles": historical_files, "historicalOnly": historical_only, "corrections": corrections,
-            "active": active, "legacyAi": detail.get("legacyAiMeaning", []), "ops": ops, "screenlessAllowed": screenless}
+            "resolvedCorrections": resolved, "active": active, "legacyAi": detail.get("legacyAiMeaning", []),
+            "ops": ops, "screenlessAllowed": screenless}
 
 
 def effective_mapping(rid: str, rec: dict, definition: dict | None, ctx: dict, req_bindings: dict) -> tuple[list[str], list[str]]:
@@ -812,7 +821,7 @@ def main() -> int:
         correction("LEGACY_AI_ID_MEANING_MOVED", f"{item['legacySpecId']} → {', '.join(item['currentSpecIds'])}", definition_original(legacy_definition),
                    spec_original(item["currentSpecIds"][0]),
                    f"{item['relation']}. 보존 의무: {item['preserved']}",
-                   "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.")
+                   "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.")
     for rid, link in raw_corrections.items():
         correction("MALFORMED_SPEC_ID", f"{rid} → {link['effectiveSpecId']}", spec_original(rid), spec_original(link["effectiveSpecId"]),
                    "원문 기능 ID 셀은 고치지 않는다. 제목 행과 목차의 통합 선언에 근거해 FS066-01에만 유효 연결한다.",
@@ -831,10 +840,6 @@ def main() -> int:
         correction("WBS_RAW_ID_REVIEW", "FS057 / 6.5.3", task_original("6.5.3"), spec_original("FS035"),
                    "기존 FS057→FS035 통합 선언에 따라 저장 업무를 FS035로 편집 연결하고 raw FS057은 보존한다.",
                    "WBS 담당자가 산출물 FS057을 현재 통합 ID와 일치시키고 기존 저장 업무와 중복 산정하지 않도록 정정해 주세요.")
-    if "6.8.7" in tasks and "FS034" in specs:
-        correction("WBS_TITLE_MISSING", "6.8.7", task_original("6.8.7"), spec_original("FS034"),
-                   "공란 번호에 이전 중복 발행 방지 의미를 부여하지 않는다. 기존 저장/상태 계약 연결을 유지한다.",
-                   "WBS 담당자가 공란 업무의 유지/삭제와 실제 업무·산출물·담당·기간을 명시하고 FS034 책임을 확인해 주세요.")
     for records in catalog.get("wbsSources", {}).get("ancillaryRows", {}).values():
         for record in records:
             if any("6.5.13" in text and "6.5.20" in text for text in record["cells"]) and "6.6.13" in tasks:
@@ -911,6 +916,10 @@ def main() -> int:
         authority_rows.append(["이력 전용 ID", rid, spec_scope(rid), source_label(specs[rid]["source"]), mapped, "현재 목차에서 사라졌다. 활성 ID로 승격하지 않는다.", authority.get("decisionId")])
     for rid, link in raw_corrections.items():
         authority_rows.append(["원문 ID 정정 연결", rid, spec_scope(rid), source_label(specs[rid]["source"]), [link["effectiveSpecId"]], f"{link['observed']} {link['reported']} {link['status']}", authority.get("decisionId")])
+    for link in detail_ctx["resolvedCorrections"]:
+        authority_rows.append(["원문 ID 정정 해소", f"{link['rawId']} → {link['effectiveSpecId']}", f"원문 정정됨 · 활성 ID {link['effectiveSpecId']}",
+                               f"{link['file']} {link['idRow']}행(제목 {link['headingRow']}행)", [link["effectiveSpecId"]],
+                               f"{link['observed']} {link['boundary']} 이력 증거: {', '.join(link['historicalProof'])}", authority.get("decisionId")])
     for m in legacy_ai:
         authority_rows.append(["AI 의미 이행", f"{m['legacySpecId']} {m['legacyTitle']}", m["relation"], f"{m['legacySource']['file']}:{m['legacySource']['row']}", m["currentSpecIds"], f"요구 {m['requirementIds']} · 보존: {m['preserved']}", authority.get("decisionId")])
     for b in links.get("requirementBindings", []):
@@ -939,7 +948,7 @@ def main() -> int:
         + table(sheets["수용 기준"][0], acceptance_rows))
     (OUT / "source-corrections.json").write_text(json.dumps({"status": "원문 변경 없음",
         "authorityDecisionId": authority.get("decisionId"), "records": corrections}, ensure_ascii=False, indent=2) + "\n")
-    (OUT / "source-corrections.md").write_text("# 원문 정정 요청\n\n두 원문·출처와 작업자 가결정을 분리한다. 이 요청으로 원문 ID/상태/일정을 수정하거나 기능 완료로 승격하지 않는다. WBS 내부 마일스톤/상위 종료일 충돌은 [10-08 기준](../../share/day-work-2026-10-08.md)의 일정 정정 요청과 [현재 작업 기준](../../share/day-work-2026-10-10.md)의 10-10 갱신을 함께 읽는다.\n\n"
+    (OUT / "source-corrections.md").write_text("# 원문 정정 요청\n\n두 원문·출처와 작업자 가결정을 분리한다. 이 요청으로 원문 ID/상태/일정을 수정하거나 기능 완료로 승격하지 않는다. WBS 내부 마일스톤/상위 종료일 충돌은 [10-08 기준](../../share/day-work-2026-10-08.md)의 일정 정정 요청과 [현재 작업 기준](../../share/day-work-2026-10-10.md)의 10-10 갱신을 함께 읽는다. [10-12 원문 갱신 기록](../../evidence/doc-delta-2026-10-12.md)은 10-10 이후 작업자 기록 변경과 팀 미기록 변경, 해소된 원문 ID 오류와 남은 정정 요청을 구분한다.\n\n"
         + table(["분류", "대상", "원문 A 출처", "원문 A", "원문 B 출처", "원문 B", "작업자 가결정", "담당자 수정 요청", "상태"], correction_rows))
     (OUT / "effective-authority.json").write_text(json.dumps({
         "authority": authority, "valid": authority_valid,
@@ -947,7 +956,8 @@ def main() -> int:
         "scopeExceptions": exceptions,
         "reservedRequirements": reserved_requirements,
         "detailAuthority": {"historicalSheets": list(historical_files.values()), "historicalOnlySpecIds": sorted(historical_only),
-                            "rawIdCorrections": list(raw_corrections.values()), "activeIndexSpecIds": sorted(active_ids)},
+                            "rawIdCorrections": list(raw_corrections.values()), "resolvedRawIdCorrections": detail_ctx["resolvedCorrections"],
+                            "activeIndexSpecIds": sorted(active_ids)},
         "specs": effective_specs,
         "wbsImplementationScope": {"status": effective_scope, "count": len(tasks)},
     }, ensure_ascii=False, indent=2) + "\n")
@@ -1052,7 +1062,7 @@ def main() -> int:
         if feature_findings:
             lines += "\n## 확인 필요\n\n" + "".join(f"- {w['code']}: {w['message']}\n" for w in feature_findings)
         (OUT / f"feature-{slug(rid)}.md").write_text(lines)
-    (OUT / "index.md").write_text("# 줍 연결 문서\n\n이 문서는 생성물이다. 변경은 catalog.yaml 가져오기, links.yaml 또는 docs/api/openapi.yaml 편집으로 한다.\n\n[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [유효 기준 JSON](effective-authority.json) · [범위 예외·상세 권한](detail-authority.md) · [전체 수용 기준](acceptance-matrix.md) · [원문 정정 요청](source-corrections.md) · [API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [WBS 내용 기반 이행](wbs-migration.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)\n\n"
+    (OUT / "index.md").write_text("# 줍 연결 문서\n\n이 문서는 생성물이다. 변경은 catalog.yaml 가져오기, links.yaml 또는 docs/api/openapi.yaml 편집으로 한다.\n\n[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [10-12 원문 갱신 기록](../../evidence/doc-delta-2026-10-12.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [유효 기준 JSON](effective-authority.json) · [범위 예외·상세 권한](detail-authority.md) · [전체 수용 기준](acceptance-matrix.md) · [원문 정정 요청](source-corrections.md) · [API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [WBS 내용 기반 이행](wbs-migration.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)\n\n"
         + f"현행 목차 {len(active_ids)}개 ID의 유효 구현 범위: **{effective_scope}**(기록된 예외 {len(exception_specs)}개 명세 제외). 원문 상태는 아래에 별도로 보존하며 완료·실행 승인으로 해석하지 않는다.\n\n## 화면\n\n"
         + "\n".join(f"- [{sid} · {s['title']}](screen-{slug(sid)}.md) — {s['page']}쪽" for sid, s in screens.items())
         + "\n\n## 현행 목차의 기능·비기능(원문 추가 제안 제외)\n\n"
@@ -1061,7 +1071,7 @@ def main() -> int:
         + "\n".join(f"- [{r['id']} · {r['title']}](feature-{slug(r['id'])}.md) — 원문 {r['priority']} · {r['status']} / 유효 {effective_scope}" for r in proposals)
         + "\n\n## 현행 목차 밖 이력·원문 오류 ID(활성 목록 아님)\n\n"
         + "\n".join(f"- [{rid} · {s['title']}](feature-{slug(rid)}.md) — {spec_scope(rid)}" for rid, s in specs.items() if rid not in active_ids) + "\n")
-    api_md = "# 줍 정식 서버 목표 API 명세서\n\n생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 API 명세 최종 검토·구현 기준 확정**, **6.11.1 API·스키마 계약 통합 점검**에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 정식 구현 완료가 아니다. 전체 명세/WBS(FS074~081 포함)의 현재 범위는 팀합의요구/설계대상이며 원문 승인 표기·구현 증거·유료 실행 승인은 별개다. 추천 종목·산업·테마(FS011-02)는 활성 사용자 기능에서 제외하되 작업을 유보하며 요구 42의 재무·실적은 폐기되지 않았다(기록된 예외). 프로토타입 관측과 구현 목표를 구분한다.\n\n[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [범위 예외·상세 권한](../../system/out/detail-authority.md) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)\n\n## 공통 규칙\n\n"
+    api_md = "# 줍 정식 서버 목표 API 명세서\n\n생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 API 명세 최종 검토·구현 기준 확정**, **6.11.1 API·스키마 계약 통합 점검**에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 정식 구현 완료가 아니다. 전체 명세/WBS(FS074~081 포함)의 현재 범위는 팀합의요구/설계대상이며 원문 승인 표기·구현 증거·유료 실행 승인은 별개다. 추천 종목·산업·테마(FS011-02)는 활성 사용자 기능에서 제외하되 작업을 유보하며 요구 42의 재무·실적은 폐기되지 않았다(기록된 예외). 프로토타입 관측과 구현 목표를 구분한다.\n\n[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [10-12 원문 갱신 기록](../../evidence/doc-delta-2026-10-12.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [범위 예외·상세 권한](../../system/out/detail-authority.md) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)\n\n## 공통 규칙\n\n"
     for name, rule in api["x-zoop-common-rules"].items():
         api_md += f"### {name}\n\n{rule}\n\n"
     api_md += "## 오류 코드\n\n" + table(sheets["오류 코드"][0], error_rows) + "\n## 작업 목록\n\n" + table(["작업", "메서드", "목표 경로", "권한", "우선순위"], [[f"[{op['operationId']}](#{op['operationId'].lower()})", method.upper(), path, op["x-zoop"]["authority"], op["x-zoop"]["priority"]] for path, method, op in all_ops])

@@ -1,0 +1,191 @@
+[
+  {
+    "workbook": "wbs",
+    "sheet": "표지·변경이력",
+    "row": 20,
+    "column": 2,
+    "cell": "B20",
+    "before": "",
+    "after": "2026-10-12 검토·동기화"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "표지·변경이력",
+    "row": 20,
+    "column": 3,
+    "cell": "C20",
+    "before": "",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "표지·변경이력",
+    "row": 20,
+    "column": 4,
+    "cell": "D20",
+    "before": "",
+    "after": "작업 기록(팀 재합의 아님)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "표지·변경이력",
+    "row": 20,
+    "column": 5,
+    "cell": "E20",
+    "before": "",
+    "after": "현행 AI 챗봇 v2 기능명·ID 확인 후 프로젝트 WBS E140:E147(6.9.2~6.9.9) 산출물 참조만 옛047→046, 048→047, 049→048, 050-01/02→049, 051/052-01→050, 052-02/053→051로 이행했다. 담당·시작/종료일·가중치·진척률 유지. FE 복합 참조 E149:E152는 임의 치환하지 않고 검토 대상으로 남긴다. 옛FS046 권한·중복 통제는 공통 의무로 유지하며 새FS046과 동일시하지 않는다. 6.9.15 시작10/28·종료10/24 및 표지/요약 일정 충돌은 그대로 확인 요청. 정본 https://github.com/Donbug/zoop/commit/472796a ; API docs/api/out/zoop-api-spec.md ; 주간 계획 docs/share/seojin-work-plan-2026-10-12.md . 목표 /api/v1과 프로토타입 /api, 구현/검증과 목표를 구분한다."
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 3,
+    "cell": "C129",
+    "before": "",
+    "after": "        (BE) 중복 발행 방지"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 4,
+    "cell": "D129",
+    "before": "",
+    "after": "P1"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 5,
+    "cell": "E129",
+    "before": "",
+    "after": "FS034 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 6,
+    "cell": "F129",
+    "before": "",
+    "after": "홍정현"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 7,
+    "cell": "G129",
+    "before": "",
+    "after": "2026-10-26 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 8,
+    "cell": "H129",
+    "before": "",
+    "after": "2026-10-28 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 9,
+    "cell": "I129",
+    "before": "",
+    "after": "0.0005"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 129,
+    "column": 10,
+    "cell": "J129",
+    "before": "",
+    "after": "0.0"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 130,
+    "column": 9,
+    "cell": "I130",
+    "before": "0.0015",
+    "after": "0.001"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 140,
+    "column": 5,
+    "cell": "E140",
+    "before": "FS047 구현·단위테스트",
+    "after": "FS046 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 141,
+    "column": 5,
+    "cell": "E141",
+    "before": "FS048 구현·단위테스트",
+    "after": "FS047 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 142,
+    "column": 5,
+    "cell": "E142",
+    "before": "FS049 구현·단위테스트",
+    "after": "FS048 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 143,
+    "column": 5,
+    "cell": "E143",
+    "before": "FS050-01 · FS050-02 구현·단위테스트",
+    "after": "FS049 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 144,
+    "column": 5,
+    "cell": "E144",
+    "before": "FS051 · FS052-01 구현·단위테스트",
+    "after": "FS050 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 145,
+    "column": 5,
+    "cell": "E145",
+    "before": "FS052-02 · FS053 구현·단위테스트",
+    "after": "FS051 구현·단위테스트"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 146,
+    "column": 5,
+    "cell": "E146",
+    "before": "FS052-02 내부 처리",
+    "after": "FS051 내부 처리"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 147,
+    "column": 5,
+    "cell": "E147",
+    "before": "FS053 내부 처리",
+    "after": "FS051 내부 처리"
+  }
+]

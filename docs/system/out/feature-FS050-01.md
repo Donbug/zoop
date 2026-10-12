@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv) — AI 답변 근거·원문 확인: 회원이 AI 답변에서 근거 또는 원문을 선택하면 해당 답변에 연결된 출처·확보된 인용·외부 원문을 확인할 수 있다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — AI 답변 근거·원문 확인: 회원이 AI 답변에서 근거 또는 원문을 선택하면 해당 답변에 연결된 출처·확보된 인용·외부 원문을 확인할 수 있다.
 
 ## 상세 권한과 의미 이행
 

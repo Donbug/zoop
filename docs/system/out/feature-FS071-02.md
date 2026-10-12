@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:85 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:85 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:191 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 발행 브리핑 제공 중단: 관리자가 발행된 브리핑의 제공 중단을 요청하면 해당 회차의 중단 상태를 사용자 조회에 반영하고 기존 발행 이력을 보존한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:191 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — 발행 브리핑 제공 중단: 관리자가 발행된 브리핑의 제공 중단을 요청하면 해당 회차의 중단 상태를 사용자 조회에 반영하고 기존 발행 이력을 보존한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:287 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

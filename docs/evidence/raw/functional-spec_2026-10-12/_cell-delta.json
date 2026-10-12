@@ -1,0 +1,236 @@
+[
+  {
+    "workbook": "functional-spec",
+    "sheet": "출퇴근 브리핑",
+    "row": 134,
+    "column": 2,
+    "cell": "B134",
+    "before": "ㅊ",
+    "after": "FS066-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "기업 상세·타임라인",
+    "row": 56,
+    "column": 2,
+    "cell": "B56",
+    "before": "기간별 해상도는 1Y: 월/주, 1M: 일, 1W: 시간, 1D: 5분으로 제한한다. \n1일은 해당 기업이 상장된 거래소의 당일 거래 시간, 1주·1개월·1년은 거래일 기준 데이터를 사용한다. \n기준 시점 이전에 시스템이 확보한 문서·이슈만 타임라인에 표시한다. \n휴장 구간의 가격·이슈를 임의 생성하지 않는다.\n기업·기간·기준 시점·영역이 일치하는 최신 응답만 반영한다.\n기간 변경 시 기간 밖 이슈 선택·강조는 해제한다.",
+    "after": "기간별 해상도는 1Y: 주, 1M: 일, 1W: 시간, 1D: 5분으로 제한한다. \n1일은 해당 기업이 상장된 거래소의 당일 거래 시간, 1주·1개월·1년은 거래일 기준 데이터를 사용한다. \n기준 시점 이전에 시스템이 확보한 문서·이슈만 타임라인에 표시한다. \n휴장 구간의 가격·이슈를 임의 생성하지 않는다.\n기업·기간·기준 시점·영역이 일치하는 최신 응답만 반영한다.\n기간 변경 시 기간 밖 이슈 선택·강조는 해제한다."
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "column": 1,
+    "cell": "A63",
+    "before": "",
+    "after": "2026-10-12 정책 동기화"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "column": 2,
+    "cell": "B63",
+    "before": "",
+    "after": "FS011-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "column": 3,
+    "cell": "C63",
+    "before": "",
+    "after": "FS011-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "column": 4,
+    "cell": "D63",
+    "before": "",
+    "after": "추천 기능 제외·API 유보"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "column": 5,
+    "cell": "E63",
+    "before": "",
+    "after": "사용자 결정: 추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations(listRecommendations)는 삭제·무동작·가짜 응답 없이 유보한다. 기존 요구사항과 이력은 삭제하지 않는다. 목표 prefix는 /api/v1, 현재 BFF는 /api다."
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "column": 6,
+    "cell": "F63",
+    "before": "",
+    "after": "https://github.com/Donbug/zoop/commit/472796a"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "column": 1,
+    "cell": "A64",
+    "before": "",
+    "after": "2026-10-12 원문 정정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "column": 2,
+    "cell": "B64",
+    "before": "",
+    "after": "FS040 · FS066-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "column": 3,
+    "cell": "C64",
+    "before": "",
+    "after": "FS040 · FS066-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "column": 4,
+    "cell": "D64",
+    "before": "",
+    "after": "1Y 주봉 확정·브리핑 ID 오타 정정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "column": 5,
+    "cell": "E64",
+    "before": "",
+    "after": "기업 상세·타임라인 B56의 1Y: 월/주를 1Y: 주로 정정(나머지 규칙 유지). 출퇴근 브리핑 A132의 FS066-01 제목을 재확인하여 B134의 ㅊ을 FS066-01로 정정했다. 원본 승인 상태·담당·일정은 바꾸지 않았다."
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "column": 6,
+    "cell": "F64",
+    "before": "",
+    "after": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "column": 1,
+    "cell": "A65",
+    "before": "",
+    "after": "2026-10-12 의미 연결"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "column": 2,
+    "cell": "B65",
+    "before": "",
+    "after": "옛 AI 047~053"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "column": 3,
+    "cell": "C65",
+    "before": "",
+    "after": "현행 AI v2 046~051"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "column": 4,
+    "cell": "D65",
+    "before": "",
+    "after": "AI WBS 산출물 참조 동기화"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "column": 5,
+    "cell": "E65",
+    "before": "",
+    "after": "현행 AI 챗봇 v2의 기능명·ID를 재확인하여 WBS 프로젝트 WBS E140:E147(6.9.2~6.9.9)의 산출물 ID만 의미로 이행했다. 옛 FS046 권한·중복 작업 통제는 새 FS046 질문 해석과 다른 의미이며 공통 의무로 보존한다. FE 복합 참조·목차 FS051 상세 위치/요구 번호·재무 요구42는 추가 확인 대상이다."
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "column": 6,
+    "cell": "F65",
+    "before": "",
+    "after": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 66,
+    "column": 1,
+    "cell": "A66",
+    "before": "",
+    "after": "2026-10-12 주말 인계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 66,
+    "column": 2,
+    "cell": "B66",
+    "before": "",
+    "after": "목표 계약 /api/v1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 66,
+    "column": 3,
+    "cell": "C66",
+    "before": "",
+    "after": "프로토타입 /api"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 66,
+    "column": 4,
+    "cell": "D66",
+    "before": "",
+    "after": "API 정본과 구현 경계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 66,
+    "column": 5,
+    "cell": "E66",
+    "before": "",
+    "after": "주말 로컬 회귀: BFF380·웹110·문서17·tooling17 통과(저장소 실행 기록). F05 정상 부재200/공급자 장애503 경계 구현, 목표 공통 오류 모델·독립 조회는 차이 남음. F03 Origin/CSRF는 미이행. 원격 CI·배포·전체 기능 완료 증거가 아니다. Notion 인계 게시: https://app.notion.com/p/2026-10-12-API-3f7fef49d8d580f0a235d25cadb0dd8b (로그인 후 문서 영역 새 하위 페이지, 새로고침 재조회 확인)."
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 66,
+    "column": 6,
+    "cell": "F66",
+    "before": "",
+    "after": "https://github.com/Donbug/zoop/blob/main/docs/api/out/zoop-api-spec.md"
+  }
+]

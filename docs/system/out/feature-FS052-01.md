@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv) — 같은 대화에서 후속 질문 전송: 회원이 기존 답변에 이어 질문하면 같은 대화에 새 질문 작업을 생성한다. 최초 작업의 상태 조회·결과 회수와 구분한다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — 같은 대화에서 후속 질문 전송: 회원이 기존 답변에 이어 질문하면 같은 대화에 새 질문 작업을 생성한다. 최초 작업의 상태 조회·결과 회수와 구분한다.
 
 ## 상세 권한과 의미 이행
 

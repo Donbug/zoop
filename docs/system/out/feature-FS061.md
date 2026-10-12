@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:68 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:68 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv) — 소셜 인증 연동: 시스템은 소셜 인증 결과를 서버에서 검증한 뒤 가입 또는 로그인을 처리한다. 이미 연결된 소셜 계정은 연결된 회원으로 로그인한다. 처음 연결하는 계정은 사용 가능한 이메일로 기존 회원을 확인하고, 같은 이메일의 회원이 있으면 기존 서비스 계정의 본인 여부와 연결 권한을 확인한 뒤 연결하고 없으면 가입한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv) — 소셜 인증 연동: 시스템은 소셜 인증 결과를 서버에서 검증한 뒤 가입 또는 로그인을 처리한다. 이미 연결된 소셜 계정은 연결된 회원으로 로그인한다. 처음 연결하는 계정은 사용 가능한 이메일로 기존 회원을 확인하고, 같은 이메일의 회원이 있으면 기존 서비스 계정의 본인 여부와 연결 권한을 확인한 뒤 연결하고 없으면 가입한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:265 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

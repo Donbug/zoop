@@ -1,0 +1,531 @@
+{
+  "logged_changes_source": "docs/evidence/raw/refresh_2026-10-12/_logged-changes.json",
+  "compared_against": "2026-10-10 frozen captures",
+  "workbooks": {
+    "wbs": {
+      "matched": [
+        {
+          "change": "wbs-cover-B20-E20",
+          "workbook": "wbs",
+          "sheet": "표지·변경이력",
+          "cell": "B20",
+          "before": "",
+          "after": "2026-10-12 검토·동기화",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-cover-B20-E20",
+          "workbook": "wbs",
+          "sheet": "표지·변경이력",
+          "cell": "C20",
+          "before": "",
+          "after": "2026-10-12 00:00:00",
+          "typing": "sheets-date-cell"
+        },
+        {
+          "change": "wbs-cover-B20-E20",
+          "workbook": "wbs",
+          "sheet": "표지·변경이력",
+          "cell": "D20",
+          "before": "",
+          "after": "작업 기록(팀 재합의 아님)",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-cover-B20-E20",
+          "workbook": "wbs",
+          "sheet": "표지·변경이력",
+          "cell": "E20",
+          "before": "",
+          "after": "현행 AI 챗봇 v2 기능명·ID 확인 후 프로젝트 WBS E140:E147(6.9.2~6.9.9) 산출물 참조만 옛047→046, 048→047, 049→048, 050-01/02→049, 051/052-01→050, 052-02/053→051로 이행했다. 담당·시작/종료일·가중치·진척률 유지. FE 복합 참조 E149:E152는 임의 치환하지 않고 검토 대상으로 남긴다. 옛FS046 권한·중복 통제는 공통 의무로 유지하며 새FS046과 동일시하지 않는다. 6.9.15 시작10/28·종료10/24 및 표지/요약 일정 충돌은 그대로 확인 요청. 정본 https://github.com/Donbug/zoop/commit/472796a ; API docs/api/out/zoop-api-spec.md ; 주간 계획 docs/share/seojin-work-plan-2026-10-12.md . 목표 /api/v1과 프로토타입 /api, 구현/검증과 목표를 구분한다.",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E140",
+          "before": "FS047 구현·단위테스트",
+          "after": "FS046 구현·단위테스트",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E141",
+          "before": "FS048 구현·단위테스트",
+          "after": "FS047 구현·단위테스트",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E142",
+          "before": "FS049 구현·단위테스트",
+          "after": "FS048 구현·단위테스트",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E143",
+          "before": "FS050-01 · FS050-02 구현·단위테스트",
+          "after": "FS049 구현·단위테스트",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E144",
+          "before": "FS051 · FS052-01 구현·단위테스트",
+          "after": "FS050 구현·단위테스트",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E145",
+          "before": "FS052-02 · FS053 구현·단위테스트",
+          "after": "FS051 구현·단위테스트",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E146",
+          "before": "FS052-02 내부 처리",
+          "after": "FS051 내부 처리",
+          "typing": "exact"
+        },
+        {
+          "change": "wbs-ai-be-E140-E147",
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "cell": "E147",
+          "before": "FS053 내부 처리",
+          "after": "FS051 내부 처리",
+          "typing": "exact"
+        }
+      ],
+      "mismatched": [],
+      "absent": [],
+      "unlogged": [
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 3,
+          "cell": "C129",
+          "before": "",
+          "after": "        (BE) 중복 발행 방지"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 4,
+          "cell": "D129",
+          "before": "",
+          "after": "P1"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 5,
+          "cell": "E129",
+          "before": "",
+          "after": "FS034 구현·단위테스트"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 6,
+          "cell": "F129",
+          "before": "",
+          "after": "홍정현"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 7,
+          "cell": "G129",
+          "before": "",
+          "after": "2026-10-26 00:00:00"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 8,
+          "cell": "H129",
+          "before": "",
+          "after": "2026-10-28 00:00:00"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 9,
+          "cell": "I129",
+          "before": "",
+          "after": "0.0005"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 129,
+          "column": 10,
+          "cell": "J129",
+          "before": "",
+          "after": "0.0"
+        },
+        {
+          "workbook": "wbs",
+          "sheet": "프로젝트 WBS",
+          "row": 130,
+          "column": 9,
+          "cell": "I130",
+          "before": "0.0015",
+          "after": "0.001"
+        }
+      ],
+      "hyperlinks_logged": [],
+      "hyperlinks_unlogged": [],
+      "structures": []
+    },
+    "functional-spec": {
+      "matched": [
+        {
+          "change": "fs-briefing-B134",
+          "workbook": "functional-spec",
+          "sheet": "출퇴근 브리핑",
+          "cell": "B134",
+          "before": "ㅊ",
+          "after": "FS066-01",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-company-B56",
+          "workbook": "functional-spec",
+          "sheet": "기업 상세·타임라인",
+          "cell": "B56",
+          "before": "기간별 해상도는 1Y: 월/주, 1M: 일, 1W: 시간, 1D: 5분으로 제한한다. \n1일은 해당 기업이 상장된 거래소의 당일 거래 시간, 1주·1개월·1년은 거래일 기준 데이터를 사용한다. \n기준 시점 이전에 시스템이 확보한 문서·이슈만 타임라인에 표시한다. \n휴장 구간의 가격·이슈를 임의 생성하지 않는다.\n기업·기간·기준 시점·영역이 일치하는 최신 응답만 반영한다.\n기간 변경 시 기간 밖 이슈 선택·강조는 해제한다.",
+          "after": "기간별 해상도는 1Y: 주, 1M: 일, 1W: 시간, 1D: 5분으로 제한한다. \n1일은 해당 기업이 상장된 거래소의 당일 거래 시간, 1주·1개월·1년은 거래일 기준 데이터를 사용한다. \n기준 시점 이전에 시스템이 확보한 문서·이슈만 타임라인에 표시한다. \n휴장 구간의 가격·이슈를 임의 생성하지 않는다.\n기업·기간·기준 시점·영역이 일치하는 최신 응답만 반영한다.\n기간 변경 시 기간 밖 이슈 선택·강조는 해제한다.",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "A63",
+          "before": "",
+          "after": "2026-10-12 정책 동기화",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "B63",
+          "before": "",
+          "after": "FS011-02",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "C63",
+          "before": "",
+          "after": "FS011-02",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "D63",
+          "before": "",
+          "after": "추천 기능 제외·API 유보",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "E63",
+          "before": "",
+          "after": "사용자 결정: 추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations(listRecommendations)는 삭제·무동작·가짜 응답 없이 유보한다. 기존 요구사항과 이력은 삭제하지 않는다. 목표 prefix는 /api/v1, 현재 BFF는 /api다.",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F63",
+          "before": "",
+          "after": "https://github.com/Donbug/zoop/commit/472796a",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "A64",
+          "before": "",
+          "after": "2026-10-12 원문 정정",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "B64",
+          "before": "",
+          "after": "FS040 · FS066-01",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "C64",
+          "before": "",
+          "after": "FS040 · FS066-01",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "D64",
+          "before": "",
+          "after": "1Y 주봉 확정·브리핑 ID 오타 정정",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "E64",
+          "before": "",
+          "after": "기업 상세·타임라인 B56의 1Y: 월/주를 1Y: 주로 정정(나머지 규칙 유지). 출퇴근 브리핑 A132의 FS066-01 제목을 재확인하여 B134의 ㅊ을 FS066-01로 정정했다. 원본 승인 상태·담당·일정은 바꾸지 않았다.",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F64",
+          "before": "",
+          "after": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "A65",
+          "before": "",
+          "after": "2026-10-12 의미 연결",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "B65",
+          "before": "",
+          "after": "옛 AI 047~053",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "C65",
+          "before": "",
+          "after": "현행 AI v2 046~051",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "D65",
+          "before": "",
+          "after": "AI WBS 산출물 참조 동기화",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "E65",
+          "before": "",
+          "after": "현행 AI 챗봇 v2의 기능명·ID를 재확인하여 WBS 프로젝트 WBS E140:E147(6.9.2~6.9.9)의 산출물 ID만 의미로 이행했다. 옛 FS046 권한·중복 작업 통제는 새 FS046 질문 해석과 다른 의미이며 공통 의무로 보존한다. FE 복합 참조·목차 FS051 상세 위치/요구 번호·재무 요구42는 추가 확인 대상이다.",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F65",
+          "before": "",
+          "after": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "A66",
+          "before": "",
+          "after": "2026-10-12 주말 인계",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "B66",
+          "before": "",
+          "after": "목표 계약 /api/v1",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "C66",
+          "before": "",
+          "after": "프로토타입 /api",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "D66",
+          "before": "",
+          "after": "API 정본과 구현 경계",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "E66",
+          "before": "",
+          "after": "주말 로컬 회귀: BFF380·웹110·문서17·tooling17 통과(저장소 실행 기록). F05 정상 부재200/공급자 장애503 경계 구현, 목표 공통 오류 모델·독립 조회는 차이 남음. F03 Origin/CSRF는 미이행. 원격 CI·배포·전체 기능 완료 증거가 아니다. Notion 인계 게시: https://app.notion.com/p/2026-10-12-API-3f7fef49d8d580f0a235d25cadb0dd8b (로그인 후 문서 영역 새 하위 페이지, 새로고침 재조회 확인).",
+          "typing": "exact"
+        },
+        {
+          "change": "fs-change-history-A63-F66",
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F66",
+          "before": "",
+          "after": "https://github.com/Donbug/zoop/blob/main/docs/api/out/zoop-api-spec.md",
+          "typing": "exact"
+        }
+      ],
+      "mismatched": [],
+      "absent": [],
+      "unlogged": [],
+      "hyperlinks_logged": [
+        {
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F63",
+          "before": null,
+          "after": {
+            "target": "https://github.com/Donbug/zoop/commit/472796a",
+            "location": null,
+            "display": null,
+            "tooltip": null
+          },
+          "change": "fs-change-history-A63-F66",
+          "typing": "sheets-autolink-of-logged-url"
+        },
+        {
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F64",
+          "before": null,
+          "after": {
+            "target": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md",
+            "location": null,
+            "display": null,
+            "tooltip": null
+          },
+          "change": "fs-change-history-A63-F66",
+          "typing": "sheets-autolink-of-logged-url"
+        },
+        {
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F65",
+          "before": null,
+          "after": {
+            "target": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md",
+            "location": null,
+            "display": null,
+            "tooltip": null
+          },
+          "change": "fs-change-history-A63-F66",
+          "typing": "sheets-autolink-of-logged-url"
+        },
+        {
+          "workbook": "functional-spec",
+          "sheet": "변경 내역",
+          "cell": "F66",
+          "before": null,
+          "after": {
+            "target": "https://github.com/Donbug/zoop/blob/main/docs/api/out/zoop-api-spec.md",
+            "location": null,
+            "display": null,
+            "tooltip": null
+          },
+          "change": "fs-change-history-A63-F66",
+          "typing": "sheets-autolink-of-logged-url"
+        }
+      ],
+      "hyperlinks_unlogged": [],
+      "structures": [
+        {
+          "sheet": "변경 내역",
+          "before": [
+            64,
+            6
+          ],
+          "after": [
+            66,
+            6
+          ],
+          "explained_by_logged_cells": true
+        }
+      ]
+    }
+  },
+  "counts": {
+    "logged_cells_expected": 38,
+    "logged_cell_deltas_matched": 38,
+    "logged_cell_deltas_mismatched": 0,
+    "logged_cells_absent_from_delta": 0,
+    "unlogged_cell_deltas": 9,
+    "logged_hyperlink_deltas": 4,
+    "unlogged_hyperlink_deltas": 0,
+    "unexplained_structural_deltas": 0,
+    "total_cell_deltas": 47
+  }
+}

@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:149 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv) — 관심 종목 수정: 사용자는 사이드바 또는 기업 노드를 클릭하여 관심 종목을 선택 및 해제할 수 있다.
-- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:154 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 관심 종목 수정: 사용자는 사이드바 또는 기업 노드를 클릭하여 관심 종목을 선택 및 해제할 수 있다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:149 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv) — 관심 종목 수정: 사용자는 사이드바 또는 기업 노드를 클릭하여 관심 종목을 선택 및 해제할 수 있다.
+- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:154 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 관심 종목 수정: 사용자는 사이드바 또는 기업 노드를 클릭하여 관심 종목을 선택 및 해제할 수 있다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:33 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

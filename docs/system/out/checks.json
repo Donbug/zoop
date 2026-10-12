@@ -2,234 +2,213 @@
   "findings": [
     {
       "code": "SPEC_NOT_IN_INDEX",
-      "target": "ㅊ",
-      "severity": "warning",
-      "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv:134 (xlsx-row)"
-    },
-    {
-      "code": "MALFORMED_SPEC_ID",
-      "target": "ㅊ",
-      "severity": "warning",
-      "message": "명세 ID 형식 오류. 번호를 추정하거나 고치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv:134 (xlsx-row)"
-    },
-    {
-      "code": "SPEC_NOT_IN_INDEX",
       "target": "FS050-01",
       "severity": "warning",
       "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:79 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row)"
     },
     {
       "code": "SPEC_NOT_IN_INDEX",
       "target": "FS050-02",
       "severity": "warning",
       "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:93 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row)"
     },
     {
       "code": "SPEC_NOT_IN_INDEX",
       "target": "FS052-01",
       "severity": "warning",
       "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:121 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row)"
     },
     {
       "code": "SPEC_NOT_IN_INDEX",
       "target": "FS052-02",
       "severity": "warning",
       "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:135 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:135 (xlsx-row)"
     },
     {
       "code": "SPEC_NOT_IN_INDEX",
       "target": "FS053",
       "severity": "warning",
       "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:149 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:149 (xlsx-row)"
     },
     {
-      "code": "WBS_TITLE_MISSING",
-      "target": "6.8.7",
+      "code": "MULTIPLE_SPEC_DEFINITIONS",
+      "target": "FS066-01",
       "severity": "warning",
-      "message": "업무명이 비어 있다. 옛 번호의 업무를 현재 의미로 승계하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:129 (xlsx-row)"
-    },
-    {
-      "code": "WBS_COVER_BODY_CONFLICT",
-      "target": "FS074~FS081",
-      "severity": "warning",
-      "message": "표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv:19 (xlsx-row)"
+      "message": "동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.",
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:73 (xlsx-row)"
     },
     {
       "code": "WBS_COVER_BODY_CONFLICT",
       "target": "FS074~FS081",
       "severity": "warning",
       "message": "표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv:29 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv:19 (xlsx-row)"
+    },
+    {
+      "code": "WBS_COVER_BODY_CONFLICT",
+      "target": "FS074~FS081",
+      "severity": "warning",
+      "message": "표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.",
+      "source": "docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv:29 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS017",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:9 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:9 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS018",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:23 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:23 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS019",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:37 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:37 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS020",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:51 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:51 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS021",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:65 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:65 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS022",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:79 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:79 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS023",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:93 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:93 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS024",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:107 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:107 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS025",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:121 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:121 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS026",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:135 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:135 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS027",
       "severity": "warning",
       "message": "옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:149 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:149 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS045",
       "severity": "warning",
       "message": "옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:9 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:9 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS046",
       "severity": "warning",
       "message": "옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:23 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:23 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS047",
       "severity": "warning",
       "message": "옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:37 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:37 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS048",
       "severity": "warning",
       "message": "옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:51 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:51 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS049",
       "severity": "warning",
       "message": "옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:65 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:65 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_DETAIL_SUPERSEDED",
       "target": "FS051",
       "severity": "warning",
       "message": "옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:107 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:107 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_ONLY_ID",
       "target": "FS050-01",
       "severity": "warning",
       "message": "현재 목차 밖의 이력 ID다. 활성 목록으로 승격하지 않고 현재 의미는 FS049로 이행한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:79 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_ONLY_ID",
       "target": "FS050-02",
       "severity": "warning",
       "message": "현재 목차 밖의 이력 ID다. 활성 목록으로 승격하지 않고 현재 의미는 FS049로 이행한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:93 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_ONLY_ID",
       "target": "FS052-01",
       "severity": "warning",
       "message": "현재 목차 밖의 이력 ID다. 활성 목록으로 승격하지 않고 현재 의미는 FS050로 이행한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:121 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_ONLY_ID",
       "target": "FS052-02",
       "severity": "warning",
       "message": "현재 목차 밖의 이력 ID다. 활성 목록으로 승격하지 않고 현재 의미는 FS051, FS060로 이행한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:135 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:135 (xlsx-row)"
     },
     {
       "code": "HISTORICAL_ONLY_ID",
       "target": "FS053",
       "severity": "warning",
       "message": "현재 목차 밖의 이력 ID다. 활성 목록으로 승격하지 않고 현재 의미는 FS051, NFS003, NFS009로 이행한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:149 (xlsx-row)"
-    },
-    {
-      "code": "RAW_ID_CORRECTION",
-      "target": "ㅊ",
-      "severity": "warning",
-      "message": "원문 기능 ID 셀(05-출퇴근-브리핑.csv 134행)은 정정되지 않았다. 제목 행(132행)과 목차 통합 선언에 근거해 FS066-01에 유효 연결만 기록한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv:134 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:149 (xlsx-row)"
     },
     {
       "code": "SCOPE_EXCEPTION",
@@ -257,140 +236,147 @@
       "target": "FS019",
       "severity": "warning",
       "message": "목차 상세 위치 A35:B47와 현행 상세 구획 제목 행 [36]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:29 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:29 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS020",
       "severity": "warning",
       "message": "목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [50]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:30 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:30 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS021",
       "severity": "warning",
       "message": "목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [64]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:31 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:31 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS022",
       "severity": "warning",
       "message": "목차 상세 위치 A77:B89와 현행 상세 구획 제목 행 [78]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:32 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:32 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS023",
       "severity": "warning",
       "message": "목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:33 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:33 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS024",
       "severity": "warning",
       "message": "목차 상세 위치 A105:B117와 현행 상세 구획 제목 행 [109]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:34 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:34 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS025",
       "severity": "warning",
       "message": "목차 상세 위치 A119:B131와 현행 상세 구획 제목 행 [123]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:35 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:35 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS026",
       "severity": "warning",
       "message": "목차 상세 위치 A133:B145와 현행 상세 구획 제목 행 [137]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:36 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:36 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS027",
       "severity": "warning",
       "message": "목차 상세 위치 A147:B159와 현행 상세 구획 제목 행 [152]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:37 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:37 (xlsx-row)"
     },
     {
       "code": "INDEX_REQUIREMENT_META_MISMATCH",
       "target": "FS037",
       "severity": "warning",
       "message": "목차 요구 번호 []와 현행 상세 메타 요구 번호 ['38']가 다르다. 원문을 보존한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:9 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:9 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS038",
       "severity": "warning",
       "message": "목차 상세 위치 A7:B19와 현행 상세 구획 제목 행 [21]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:48 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:48 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS039",
       "severity": "warning",
       "message": "목차 상세 위치 A21:B33와 현행 상세 구획 제목 행 [35]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:49 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:49 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS040",
       "severity": "warning",
       "message": "목차 상세 위치 A35:B47와 현행 상세 구획 제목 행 [49]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:50 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:50 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS041",
       "severity": "warning",
       "message": "목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [63]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:51 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:51 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS042",
       "severity": "warning",
       "message": "목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [77]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:52 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:52 (xlsx-row)"
     },
     {
       "code": "INDEX_REQUIREMENT_META_MISMATCH",
       "target": "FS042",
       "severity": "warning",
       "message": "목차 요구 번호 ['42']와 현행 상세 메타 요구 번호 ['41']가 다르다. 원문을 보존한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:79 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:79 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS043",
       "severity": "warning",
       "message": "목차 상세 위치 A77:B89와 현행 상세 구획 제목 행 [91]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:53 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:53 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS044",
       "severity": "warning",
       "message": "목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [105]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:54 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:54 (xlsx-row)"
     },
     {
       "code": "INDEX_DETAIL_RANGE_STALE",
       "target": "FS051",
       "severity": "warning",
       "message": "목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:61 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:61 (xlsx-row)"
     },
     {
       "code": "INDEX_REQUIREMENT_META_MISMATCH",
       "target": "FS051",
       "severity": "warning",
       "message": "목차 요구 번호 ['50']와 현행 상세 메타 요구 번호 ['51']가 다르다. 원문을 보존한다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv:94 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:94 (xlsx-row)"
+    },
+    {
+      "code": "INDEX_REQUIREMENT_META_MISMATCH",
+      "target": "FS066-01",
+      "severity": "warning",
+      "message": "목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다.",
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:134 (xlsx-row)"
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
@@ -915,7 +901,7 @@
       "target": "FS074",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:100 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:100 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -936,7 +922,7 @@
       "target": "FS075",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:101 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:101 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -964,7 +950,7 @@
       "target": "FS076",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:102 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:102 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -985,7 +971,7 @@
       "target": "FS077",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:103 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:103 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -1006,7 +992,7 @@
       "target": "FS078",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:104 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:104 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -1041,7 +1027,7 @@
       "target": "FS079",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:105 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:105 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -1062,7 +1048,7 @@
       "target": "FS080",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:106 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:106 (xlsx-row)"
     },
     {
       "code": "REQUIREMENT_TITLE_REVIEW",
@@ -1097,434 +1083,357 @@
       "target": "FS081",
       "severity": "warning",
       "message": "원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.",
-      "source": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:107 (xlsx-row)"
+      "source": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:107 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.1",
       "severity": "warning",
       "message": "원문 FS078는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:72 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:72 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.1",
       "severity": "warning",
       "message": "원문 FS080는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:72 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:72 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.2",
       "severity": "warning",
       "message": "원문 FS075는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:73 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:73 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.2",
       "severity": "warning",
       "message": "원문 FS077는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:73 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:73 (xlsx-row)"
     },
     {
       "code": "WBS_RAW_ID_REVIEW",
       "target": "6.5.3",
       "severity": "warning",
       "message": "원본 WBS의 FS057는 현재 명세 ID가 아니다. 사람이 정한 연결과 구분하여 원문을 보존한다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:74 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:74 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.4",
       "severity": "warning",
       "message": "원문 FS074는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:75 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:75 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.4",
       "severity": "warning",
       "message": "원문 FS079는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:75 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:75 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.4",
       "severity": "warning",
       "message": "원문 FS081는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:75 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:75 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.5",
       "severity": "warning",
       "message": "원문 FS080는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:76 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:76 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.5",
       "severity": "warning",
       "message": "원문 FS081는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:76 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:76 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.6",
       "severity": "warning",
       "message": "원문 FS074는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:77 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:77 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.7",
       "severity": "warning",
       "message": "원문 FS076는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:78 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:78 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.5.7",
       "severity": "warning",
       "message": "원문 FS079는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:78 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:78 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.6",
       "severity": "warning",
       "message": "원문 FS079는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:86 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:86 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.13",
       "severity": "warning",
       "message": "원문 FS058는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:93 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:93 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.13",
       "severity": "warning",
       "message": "원문 FS063는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:93 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:93 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.14",
       "severity": "warning",
       "message": "원문 FS074는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:94 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:94 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.14",
       "severity": "warning",
       "message": "원문 FS056는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:94 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:94 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.14",
       "severity": "warning",
       "message": "원문 FS058는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:94 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:94 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.15",
       "severity": "warning",
       "message": "원문 FS075는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:95 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:95 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.15",
       "severity": "warning",
       "message": "원문 FS058는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:95 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:95 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.15",
       "severity": "warning",
       "message": "원문 FS064는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:95 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:95 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.16",
       "severity": "warning",
       "message": "원문 FS076는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:96 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:96 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.16",
       "severity": "warning",
       "message": "원문 FS056는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:96 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:96 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.16",
       "severity": "warning",
       "message": "원문 FS058는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:96 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:96 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.17",
       "severity": "warning",
       "message": "원문 FS077는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:97 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:97 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.17",
       "severity": "warning",
       "message": "원문 FS055는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:97 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:97 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.17",
       "severity": "warning",
       "message": "원문 FS058는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:97 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:97 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.18",
       "severity": "warning",
       "message": "원문 FS078는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:98 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:98 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.18",
       "severity": "warning",
       "message": "원문 FS022는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:98 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:98 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.19",
       "severity": "warning",
       "message": "원문 FS079는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:99 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:99 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.19",
       "severity": "warning",
       "message": "원문 FS055는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:99 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:99 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.19",
       "severity": "warning",
       "message": "원문 FS059는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:99 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:99 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.20",
       "severity": "warning",
       "message": "원문 FS080는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:100 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:100 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.20",
       "severity": "warning",
       "message": "원문 FS058는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:100 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:100 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.20",
       "severity": "warning",
       "message": "원문 FS059는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:100 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:100 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.6.20",
       "severity": "warning",
       "message": "원문 FS067-03는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:100 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:100 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.7.9",
       "severity": "warning",
       "message": "원문 FS040는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:117 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:117 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.7.9",
       "severity": "warning",
       "message": "원문 FS041는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:117 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:117 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.8.13",
       "severity": "warning",
       "message": "원문 FS032는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:135 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.2",
-      "severity": "warning",
-      "message": "원문 FS047는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:140 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.3",
-      "severity": "warning",
-      "message": "원문 FS048는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:141 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.4",
-      "severity": "warning",
-      "message": "원문 FS049는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:142 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.5",
-      "severity": "warning",
-      "message": "원문 FS050-01는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:143 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.5",
-      "severity": "warning",
-      "message": "원문 FS050-02는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:143 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.6",
-      "severity": "warning",
-      "message": "원문 FS051는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:144 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.6",
-      "severity": "warning",
-      "message": "원문 FS052-01는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:144 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.7",
-      "severity": "warning",
-      "message": "원문 FS052-02는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:145 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.7",
-      "severity": "warning",
-      "message": "원문 FS053는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:145 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.8",
-      "severity": "warning",
-      "message": "원문 FS052-02는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:146 (xlsx-row)"
-    },
-    {
-      "code": "WBS_EDITORIAL_ID_DIFFERENCE",
-      "target": "6.9.9",
-      "severity": "warning",
-      "message": "원문 FS053는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:147 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:135 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.11",
       "severity": "warning",
       "message": "원문 FS047는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:149 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:149 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.11",
       "severity": "warning",
       "message": "원문 FS048는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:149 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:149 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.12",
       "severity": "warning",
       "message": "원문 FS047는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:150 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:150 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.13",
       "severity": "warning",
       "message": "원문 FS046는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:151 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:151 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.13",
       "severity": "warning",
       "message": "원문 FS049는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:151 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:151 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.13",
       "severity": "warning",
       "message": "원문 FS052-02는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:151 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:151 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.13",
       "severity": "warning",
       "message": "원문 FS053는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:151 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:151 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.9.14",
       "severity": "warning",
       "message": "원문 FS053는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:152 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:152 (xlsx-row)"
     },
     {
       "code": "WBS_DATE_ORDER_INVALID",
       "target": "6.9.15",
       "severity": "warning",
       "message": "원문 시작일 2026-10-28이 종료일 2026-10-24보다 늦다. 날짜를 추정·수정하지 않고 일정 정정 대상으로 보존한다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:153 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:153 (xlsx-row)"
     },
     {
       "code": "WBS_EDITORIAL_ID_DIFFERENCE",
       "target": "6.10.18",
       "severity": "warning",
       "message": "원문 FS073는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다.",
-      "source": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv:172 (xlsx-row)"
+      "source": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:172 (xlsx-row)"
     },
     {
       "code": "BFF_CACHED_OBSERVATION",
@@ -2711,23 +2620,21 @@
     }
   ],
   "counts": {
-    "SPEC_NOT_IN_INDEX": 6,
-    "MALFORMED_SPEC_ID": 1,
-    "WBS_TITLE_MISSING": 1,
+    "SPEC_NOT_IN_INDEX": 5,
+    "MULTIPLE_SPEC_DEFINITIONS": 1,
     "WBS_COVER_BODY_CONFLICT": 2,
     "HISTORICAL_DETAIL_SUPERSEDED": 17,
     "HISTORICAL_ONLY_ID": 5,
-    "RAW_ID_CORRECTION": 1,
     "SCOPE_EXCEPTION": 2,
     "RESERVED_REQUIREMENT_UNMAPPED": 1,
     "INDEX_DETAIL_RANGE_STALE": 17,
-    "INDEX_REQUIREMENT_META_MISMATCH": 3,
+    "INDEX_REQUIREMENT_META_MISMATCH": 4,
     "TEAM_DECISION_REQUIRED": 38,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
     "RAW_SCOPE_STATUS_CORRECTION": 8,
-    "WBS_EDITORIAL_ID_DIFFERENCE": 59,
+    "WBS_EDITORIAL_ID_DIFFERENCE": 48,
     "WBS_RAW_ID_REVIEW": 1,
     "WBS_DATE_ORDER_INVALID": 1,
     "BFF_CACHED_OBSERVATION": 1,
@@ -2737,30 +2644,30 @@
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
-    "warning": 219,
+    "warning": 206,
     "difference": 168
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 629,
+      "추적표": 628,
       "화면→기능→API": 1364,
       "기능→WBS→구현 상태": 500,
       "API 목록": 84,
       "오류 코드": 26,
-      "경고": 387,
+      "경고": 374,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 46826
+    "cells": 46740
   },
   "acceptanceCoverage": {
     "status": "passed",
-    "specIds": 104,
+    "specIds": 103,
     "activeIndexSpecIds": 98,
-    "coveredSpecIds": 104,
+    "coveredSpecIds": 103,
     "expectedDefinitions": 121,
     "coveredDefinitions": 121,
     "currentDefinitions": 99,
@@ -2770,7 +2677,7 @@
     "missingDetailIds": [],
     "currentRuntimeVerification": "미실행"
   },
-  "sourceCorrectionCount": 97,
+  "sourceCorrectionCount": 96,
   "authority": {
     "decisionId": "user-2026-10-10-feedback",
     "source": "docs/share/day-work-2026-10-10.md",
@@ -2780,9 +2687,9 @@
     "rawIndexSpecs": 98,
     "rawExistingSpecs": 90,
     "rawProposals": 8,
-    "rawDetailOnlyRecords": 6,
+    "rawDetailOnlyRecords": 5,
     "historicalDetailOnlyIds": 5,
-    "rawMalformedIds": 1,
+    "rawMalformedIds": 0,
     "activeIndexSpecs": 98,
     "scopeExceptionSpecs": 1,
     "effectiveIncludedSpecs": 97,
@@ -2795,19 +2702,19 @@
     ],
     "wbs": 173,
     "wbsRoles": {
-      "공통/통합": 59,
-      "BE": 81,
+      "공통/통합": 58,
+      "BE": 82,
       "FE": 33
     },
     "targetOperations": 84
   },
   "sheetDataRows": {
-    "추적표": 629,
+    "추적표": 628,
     "화면→기능→API": 1364,
     "기능→WBS→구현 상태": 500,
     "API 목록": 84,
     "오류 코드": 26,
-    "경고": 387,
+    "경고": 374,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

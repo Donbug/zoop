@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:70 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:70 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv) — 뉴스와 시장 데이터 연동: 기업·기간에 맞는 시세·재무·뉴스·공시와 근거를 실제 제공 범위와 접근 권한이 확인된 공급원에서 조회한다. 출처·자료 기준 시점·미제공·지연·오류 상태를 구분해 전달한다. 원본의 토스 API·뉴스 크롤링은 연동 후보이며 실제 이용 가능성이 확인된 것으로 간주하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv) — 뉴스와 시장 데이터 연동: 기업·기간에 맞는 시세·재무·뉴스·공시와 근거를 실제 제공 범위와 접근 권한이 확인된 공급원에서 조회한다. 출처·자료 기준 시점·미제공·지연·오류 상태를 구분해 전달한다. 원본의 토스 API·뉴스 크롤링은 연동 후보이며 실제 이용 가능성이 확인된 것으로 간주하지 않는다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:267 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

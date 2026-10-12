@@ -36,8 +36,8 @@ flowchart LR
 ### 원문과 사람이 정한 연결을 구분하는 규칙
 
 - CSV 출처의 `row`는 CSV 물리적 줄이 아니라 **xlsx 행 번호**다. 여러 줄 셀이 있어도 `csv.reader`의 레코드 번호로 원본 행을 보존한다. 구현 대조 마크다운은 텍스트 줄, 화면계획서는 슬라이드 쪽수를 쓴다.
-- 10-10 목차는 **98개 ID**다. 목차 밖에 남은 상세 ID(옛 AI 5개와 원문 오류 `ㅊ`)와 옛 `메인 그래프`(03)·`AI 챗봇`(07) 탭은 `links.yaml.detailAuthority`로 현행/이력을 구분한다. 목차 밖 ID가 이력·정정 목록에 없으면 hard error이며 활성 목록으로 자동 승격하지 않는다. 이력 정의는 인수 기준 대체 증거가 아니고 번호가 같아도 의미가 다른 AI ID(FS046~051)는 `legacyAiMeaning`의 의미 이행표로만 잇는다. 옛 FS046의 서버 공통 의무는 `aiJobs`·NFS001/003에 보존한다.
-- 상세 `FS???`는 10-10에 `ㅊ`로 바뀌었고 같은 구획 제목은 `FS066-01 브리핑 리뷰`다. `ㅊ`은 `MALFORMED_SPEC_ID`로 보존하고 `rawIdCorrections`로 FS066-01에만 유효 연결한다. 원문 ID 오류 해소로 보고하지 않는다. FS042는 시점 기반 관계 그래프이며 요구 42의 재무·실적은 `reservedRequirements`로 요구 번호에만 연결한다. 새 FS/WBS를 만들지 않는다.
+- 목차는 **98개 ID**다(10-10·10-12 동일). 목차 밖에 남은 상세 ID(옛 AI 5개)와 옛 `메인 그래프`(03)·`AI 챗봇`(07) 탭은 `links.yaml.detailAuthority`로 현행/이력을 구분한다. 두 탭은 10-12 XLSX에서 삭제되지 않고 숨김 상태다. 목차 밖 ID가 이력·정정 목록에 없으면 hard error이며 활성 목록으로 자동 승격하지 않는다. 이력 정의는 인수 기준 대체 증거가 아니고 번호가 같아도 의미가 다른 AI ID(FS046~051)는 `legacyAiMeaning`의 의미 이행표로만 잇는다. 옛 FS046의 서버 공통 의무는 `aiJobs`·NFS001/003에 보존한다.
+- 상세 `FS???`는 10-10에 `ㅊ`로 바뀌었고 같은 구획 제목은 `FS066-01 브리핑 리뷰`였다. 10-12 원문에서 B134가 `FS066-01`로 정정되어 `rawIdCorrections`는 비었고 해소 기록은 `resolvedRawIdCorrections`에 남는다. 생성기는 해소 기록의 원문 오류 ID가 고정본에 남아 있거나 대상 정의 행·제목 행이 다르면 hard error를 낸다. 이 정정은 B134 한 셀의 해소이며 목차 F61/G61, WBS FE 복합 산출물, 일정 역전, 표지/본문 충돌, 브리핑 메타 요구 36 등은 해소되지 않았다([10-12 기록](../evidence/doc-delta-2026-10-12.md)). FS042는 시점 기반 관계 그래프이며 요구 42의 재무·실적은 `reservedRequirements`로 요구 번호에만 연결한다. 새 FS/WBS를 만들지 않는다.
 - 요구사항의 원본 번호 연결과 새 고정본의 제목이 다르면 확인 경고를 남긴다. 분리·통합인지 번호 이동인지 팀이 확인해야 한다. 새 정의서에서 중복이 사라졌다면 그 사실도 현재 입력에 따라 달라진다.
 - WBS의 원문 FS/선행·재사용 참조는 `rawSpecIds`로 보존한다. 현재 제목·역할·FS 의미에 맞춘 편집 연결은 `links.yaml.wbsConnections`, API별 연결 정본은 `x-zoop.wbsIds`다. 번호가 우연히 존재해도 같은 업무로 보지 않는다. 저장한 제목/BE·FE 역할과 현재 본문이 다르면 hard error다. [내용 기반 이행표](out/wbs-migration.md)가 옛 번호·새 역할 분리의 근거를 보존한다.
 - API 대응이 필요한 **P1 및 원문 제안 8개의 유효 포함 요구**는 작업 또는 `featureDecisions`의 **계약 미정 + 사유**가 필요하다. 클라이언트 품질·오프라인 파이프라인은 **API 불필요 + 사유**, 운영 연동은 별도 미정으로 구분한다. `FS074~081`의 원문 추가 제안·검토 전/우선 미정은 보존하되 현재 유효 구현 범위는 **팀합의요구/설계대상**이다. `원문 제안·유효 기준` 시트는 원문/현재 기준의 비교이며 보류 공수 목록이 아니다. 원문 WBS 충돌은 정정 요청으로 남기고 오프라인 요구를 가짜 API로 덮지 않는다.
@@ -53,14 +53,14 @@ flowchart LR
 
 ### 1. 고정본을 새 날짜 폴더에 저장한다
 
-현재 조합은 **명세 `functional-spec_2026-10-10`, WBS `wbs_2026-10-10`, 요구사항 `requirements-sheet_2026-10-06`**이다. [10-10 원문 갱신 기록](../evidence/doc-delta-2026-10-10.md)에서 전체 21탭 147,636셀을 다시 읽어 변경 333셀(명세 326·WBS 7)을 확인했다. 요구사항 3탭은 의미 셀이 같아 10-06 고정본을 유지한다. 10-08 입력(`functional-spec_2026-10-08`, `wbs_2026-10-08-api-review`)과 새벽 기록([10-08 delta](../evidence/doc-delta-2026-10-08.md))은 역사 기록으로 유지한다. 원본은 수정하지 않는다. WBS는 173개이며 제목·BE/FE 역할과 본문 A:J 헤더는 이전 고정본과 동일하다. 표지 `6.5.13~20` vs 본문 `6.6.13~20` 충돌은 별도로 남는다.
+현재 조합은 **명세 `functional-spec_2026-10-12`, WBS `wbs_2026-10-12`, 요구사항 `requirements-sheet_2026-10-06`**이다. [10-12 원문 갱신 기록](../evidence/doc-delta-2026-10-12.md)에서 2026-10-12 09:45(KST) 재수집한 명세·WBS 18탭 135,892셀을 10-10 고정본과 대조해 변경 47셀(명세 26·WBS 21)을 확인했다. 38셀은 작업자가 공유 시트에 기록한 수정이고 9셀(WBS 6.8.7 신규 기재와 6.8.8 가중치)은 기록에 없는 팀 변경이다. 요구사항은 다시 받지 않고 10-06 고정본을 유지한다. 10-10 입력(`functional-spec_2026-10-10`, `wbs_2026-10-10`)과 [10-10 기록](../evidence/doc-delta-2026-10-10.md), 10-08 입력과 [10-08 delta](../evidence/doc-delta-2026-10-08.md)는 역사 기록으로 유지한다. 원본은 수정하지 않는다. WBS는 173개이며 본문 A:J 헤더는 이전 고정본과 동일하고 6.8.7 공란이 채워진 점만 제목·역할 변화다. 표지 `6.5.13~20` vs 본문 `6.6.13~20` 충돌은 별도로 남는다.
 
 ### 2. 기계 추출 원본을 가져온다
 
 ```bash
 uv run --with pyyaml python docs/system/import_sources.py \
-  --spec-dir docs/evidence/raw/functional-spec_2026-10-10 \
-  --wbs-dir docs/evidence/raw/wbs_2026-10-10 \
+  --spec-dir docs/evidence/raw/functional-spec_2026-10-12 \
+  --wbs-dir docs/evidence/raw/wbs_2026-10-12 \
   --requirements-dir docs/evidence/raw/requirements-sheet_2026-10-06
 ```
 
@@ -127,7 +127,7 @@ env -i PATH="$PATH" HOME="$HOME" \
 4. **[`out/warnings.md`](out/warnings.md)** 및 **[`out/api-differences.md`](out/api-differences.md)**: 현재 원본 오류·확인 필요·프로토타입과의 차이를 함께 전달한다. xlsx의 경고 시트를 제외해서 공유하지 않는다.
 5. **[`out/wbs-migration.md`](out/wbs-migration.md)**: 117→173개 WBS의 번호·역할·의미 이행 근거다. 표지/본문·FS042 충돌과 공란 업무는 해결된 것처럼 소개하지 않는다.
 6. **[`out/effective-authority.json`](out/effective-authority.json)** 및 **[`out/detail-authority.md`](out/detail-authority.md)**: 원문 상태·분류를 바꾸지 않고 현재 결정과 명세별 `implementationScope`, 범위 예외, 현행/이력 상세 권한을 기계 판독할 수 있다. `checks.json.scopeCounts`는 원문 기준(`rawIndexSpecs`·`rawProposals`·`rawDetailOnlyRecords`)과 유효 포함(`effectiveIncludedSpecs`·`scopeExceptionSpecs`)을 구분해 보인다. 전체 포함이라는 단일 수치로 합치지 않는다.
-7. **[`out/acceptance-matrix.md`](out/acceptance-matrix.md)** 및 **[`out/acceptance-matrix.json`](out/acceptance-matrix.json)**: 전체 104개 ID(현행 목차 98 + 이력·원문 오류 6)의 121개 상세 정의(현행 99·이력 22)를 출처별 원문 수용 기준, 유효 범위, 의미 이행된 기존 판정 출처, 코드 위치와 연결한다. 다른 정의를 합치지 않고 과거 통과 수치를 현재 runtime pass로 올리지 않는다. `checks.json.acceptanceCoverage`에서 ID/상세 출처 전수 coverage와 기준/상세 누락을 확인한다.
-8. **[`out/source-corrections.md`](out/source-corrections.md)** 및 JSON: 현행/이력 정의, 번호가 재사용된 AI ID, 목차/상세 의미, 요구사항 제목·의미 연결, 요구 42와 FS042, `ㅊ` ID, 미갱신 추가 제안 상태, WBS raw ID/표지·본문·날짜 순서·GraphDB 담당 경계의 두 원문과 작업자 안·담당자 수정 요청을 보존한다. 추가 WBS 일정/담당 충돌은 현재 작업 기준 문서에 별도로 연결한다.
+7. **[`out/acceptance-matrix.md`](out/acceptance-matrix.md)** 및 **[`out/acceptance-matrix.json`](out/acceptance-matrix.json)**: 전체 103개 ID(현행 목차 98 + 이력 전용 5)의 121개 상세 정의(현행 99·이력 22)를 출처별 원문 수용 기준, 유효 범위, 의미 이행된 기존 판정 출처, 코드 위치와 연결한다. 다른 정의를 합치지 않고 과거 통과 수치를 현재 runtime pass로 올리지 않는다. `checks.json.acceptanceCoverage`에서 ID/상세 출처 전수 coverage와 기준/상세 누락을 확인한다.
+8. **[`out/source-corrections.md`](out/source-corrections.md)** 및 JSON: 현행/이력 정의, 번호가 재사용된 AI ID, 목차/상세 의미, 요구사항 제목·의미 연결, 요구 42와 FS042, FS066-01의 두 상세 정의, 미갱신 추가 제안 상태, WBS raw ID/표지·본문·날짜 순서·GraphDB 담당 경계의 두 원문과 작업자 안·담당자 수정 요청을 보존한다. 해소된 원문 ID 오류는 [`out/detail-authority.md`](out/detail-authority.md)에 해소 항목으로 남는다. 추가 WBS 일정/담당 충돌은 현재 작업 기준 문서에 별도로 연결한다.
 
 팀이 구글 시트에서 제안한 수정은 담당자가 `links.yaml` 또는 `openapi.yaml`에 반영하고 다시 생성한다. 생성물만 고치면 다음 실행에서 사라진다. 원본 명세 번호의 정정은 원본 담당자가 새 고정본을 만든 뒤 가져오는 절차로 반영한다.

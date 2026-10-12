@@ -1,8 +1,8 @@
-# 줍(Zoop) 증거 통합본 — 최신 수집 2026-10-10
+# 줍(Zoop) 증거 통합본 — 최신 수집 2026-10-12
 
 LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI/UX·백엔드 연동·플로우 작업을 위한 근거 요약이다. 세부 주장과 출처(파일:줄)는 아래 상세 문서에 있다.
 
-현재 구현 범위·일정·디자인의 유효 기준은 [10-10 작업 기준](../share/day-work-2026-10-10.md)이며 [10-08 결정](../share/day-work-2026-10-08.md)을 이어받는다. 최신 팀 원문(명세·WBS 10-10 고정본, 요구사항 10-06 고정본)과 팀 보고의 대조는 [10-10 원문 갱신 기록](doc-delta-2026-10-10.md)이다. 원문의 오래된 `검토 전` 표기로 기능을 제외하지 않으며, WBS 일정을 우선하고 Figma를 폰트 제외 최종 디자인으로 따른다. 아래 고정본·과거 조사는 당시 원문과 관측을 보존한 기록이다.
+현재 구현 범위·일정·디자인의 유효 기준은 [10-10 작업 기준](../share/day-work-2026-10-10.md)이며 [10-08 결정](../share/day-work-2026-10-08.md)을 이어받는다. 최신 팀 원문(명세·WBS 10-12 고정본, 요구사항 10-06 고정본)과 10-10 고정본의 대조, 작업자 기록 변경과 팀 미기록 변경의 구분은 [10-12 원문 갱신 기록](doc-delta-2026-10-12.md)이며 팀 보고와의 대조는 [10-10 원문 갱신 기록](doc-delta-2026-10-10.md)이다. 원문의 오래된 `검토 전` 표기로 기능을 제외하지 않으며, WBS 일정을 우선하고 Figma를 폰트 제외 최종 디자인으로 따른다. 아래 고정본·과거 조사는 당시 원문과 관측을 보존한 기록이다.
 
 | 문서 | 내용 |
 |---|---|
@@ -30,17 +30,19 @@ LG CNS AM Inspire Camp **5기** 2조(금융 도메인) 최종 프로젝트의 UI
 | `raw/requirements-sheet_2026-10-06/` | 요구사항 재고정(2026-10-06 11:05:01 KST). 원본 `zoop-requirements_2026-10-06.xlsx`와 계산값 기준 CSV 3개. 요구 82→85레코드, 신규 26·27·37, 번호 재배정·상태 변경. 검증 기준/정책 결정 내용 동일. [출처](https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k). sha256: `cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18`. |
 | `raw/notion_2026-10-06/` | [Notion 공개 루트](https://www.notion.so/3cafef49d8d580cb9a25e53f97ec3f90) 재고정(2026-10-06 11:05:06–11:14:42 KST). 121페이지, 빈 회의록 1개 추가, 역할/휴지통 본문 2개 변경·삭제 0. 최종 비밀번호 가림본 `_record-map.json` sha256: `07dfad10d5b7412210c96823c12c184e505b468aab9ea01dd5ae814a5e227759`. 페이지별 sha256·편집 시각·175회 요청 기록 포함(시트 GET 3회 포함, 최종 HTTP 200 모두; 429 없음). 3기/4기 첨부·강의 캘린더 제외. |
 | WBS 10-06 재확인 → `raw/wbs_2026-10-03/` 유지 | 2026-10-06 11:04:57 KST 재수집. **변경 없음(내용 동일)**: 3시트 모든 계산값·셀 범위·담당·일정 동일. 새 폴더 없음. 재수집 xlsx 응답 sha256: `a48831fd7ac90c5f0774569c20204f6ea6534a1d6ef378147ee206a7e4b0fcd0`(컨테이너 바이트만 달라 10-03 원본 유지). [출처](https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c). |
-| `raw/functional-spec_2026-10-08/` | 현재 명세 입력(2026-10-08 02:52:05 KST 수집, 15:05 전셀 동일 재확인). XLSX와 계산값 CSV 15개, 새벽 전셀 차이266개. FS074~081의 **원문**은 추가 제안·검토 전/우선순위 미정이고 **현재 유효 범위**는 사용자 결정에 따른 팀합의 설계대상이다. FS0??→FS042 정리 포함. [출처](https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs). XLSX sha256 `ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175`. |
+| `raw/functional-spec_2026-10-08/` | 10-08 명세 입력(2026-10-08 02:52:05 KST 수집, 15:05 전셀 동일 재확인; 현재 입력은 10-10·10-12 고정본으로 이어졌다). XLSX와 계산값 CSV 15개, 새벽 전셀 차이266개. FS074~081의 **원문**은 추가 제안·검토 전/우선순위 미정이고 **현재 유효 범위**는 사용자 결정에 따른 팀합의 설계대상이다. FS0??→FS042 정리 포함. [출처](https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs). XLSX sha256 `ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175`. |
 | `raw/wbs_2026-10-08/` | 새벽 WBS 고정본(2026-10-08 02:52:01 KST), 현재 입력은 아래 오후 고정본으로 대체했다. 모든3탭 XLSX/CSV, 173개 ID, 셀 차이1,181개와 이전/현재 담당·기간·산출물을 보존한다. 표지/요약6.5.13~20·미산정 안내와 본문6.6.13~20·P1·담당/기간 충돌은 여전히 원문 정정 대상이다. [출처](https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/edit?gid=136329476#gid=136329476). XLSX sha256 `d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320`. |
 | 요구 10-08 재확인 → `raw/requirements-sheet_2026-10-06/` 유지 | 2026-10-08 02:52:09 KST, HTTP200. 85개 요구와 모든 3탭의 계산값·순서·범위가 **내용 동일**하여 중복 고정본을 만들지 않았다. 재수집 응답 sha256 `22c4580c86672dfc3d9a8930e4dd6b95b1e82ac457236fd1feef5b65e7d16b5b`; 비교 기록은 `raw/refresh_2026-10-08/_source-recheck.json`. |
 | `raw/notion_2026-10-08/` | [공개 루트](https://www.notion.so/3cafef49d8d580cb9a25e53f97ec3f90) 02:52:43–02:57:22 KST 수집·변환. 프로젝트 116페이지, 회의록 64·일정 7항목, 새 회의록 3개. 106개 동일 본문은 이전 경로/sha256 참조, 변경·신규·가림 직렬화 10파일만 새 저장. 개인 자기소개 8페이지 미수집은 삭제가 아니다. 가시 블록 미회수 0, Notion 60요청 모두200, 429/재시도0. 첨부 바이너리·ClovaNote·3/4기·강의 캘린더·Figma 제외. |
 | `raw/refresh_2026-10-08/` | 원본 재확인/파일별 sha256/검증 요약. 독립 XLSX–CSV 셀 대조 **21 CSV·147,668셀 passed**(변경 WBS/명세와 내용 동일한 기존 요구 포함). 프로젝트 테스트·PoC·유료 모델 호출은 수행하지 않았다. |
 | `raw/wireframe_2026-10-08/` | [새 팀 Figma](https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/?node-id=620-617). 10개 페이지의 화면·그룹 52개 개별 확대 PNG와 설명 텍스트 57개, node permalink·수집시각·coverage를 보존했다. 로그인·토큰·외부 쓰기 없이 공개 열람했으며 기능 동작·숨은 상태는 확인하지 않았다. |
-| `raw/wbs_2026-10-08-api-review/` | **현재 WBS 입력**, 15:05:32 KST 공개 재수집. 3탭·173ID, 값11셀·수식34셀 변화와 E136 FS066-01 정정. XLSX sha256 `28daf3437092e34b11351328ae6ee314574a19f00483356df796eb7f1348719a`. 원본·CSV·수집 manifest와 의미 delta를 보존한다. |
+| `raw/wbs_2026-10-08-api-review/` | 10-08 오후 WBS 입력(현재 입력은 10-10·10-12 고정본으로 이어졌다), 15:05:32 KST 공개 재수집. 3탭·173ID, 값11셀·수식34셀 변화와 E136 FS066-01 정정. XLSX sha256 `28daf3437092e34b11351328ae6ee314574a19f00483356df796eb7f1348719a`. 원본·CSV·수집 manifest와 의미 delta를 보존한다. |
 | `raw/refresh_2026-10-08-api-review/` | 명세15탭 전셀 동일·WBS3탭 변경의 재확인 증거, 전셀/수식 delta·hyperlink inventory·독립 CSV135,912셀 되읽기 결과를 보존한다. 요구사항은 이 오후 재조회에 포함하지 않았다. |
 | `raw/api-spec-v2_2026-10-08/` | 수신 팀원 Markdown의 불변 사본과 `source.json`. 327,701bytes / sha256 `458a51bbdf7dfa3b417ad9c41882208be88d6e91eaec3d7ad3d1973969b9667a`. 원본 YAML은 제공되지 않았고 Notion/WBS 내 이 파일의 직접 합의 링크는 미확인이다. |
-| `raw/functional-spec_2026-10-10/` · `raw/wbs_2026-10-10/` | 2026-10-10 16:47(KST) 팀 명세 15탭·WBS 3탭 고정본(CSV·보존 XLSX·manifest·셀 변경 목록). 이전 고정본은 수정하지 않았다. 변경 대조는 [doc-delta-2026-10-10.md](doc-delta-2026-10-10.md) |
+| `raw/functional-spec_2026-10-10/` · `raw/wbs_2026-10-10/` | 2026-10-10 16:47(KST) 팀 명세 15탭·WBS 3탭 고정본(CSV·보존 XLSX·manifest·셀 변경 목록). 이전 고정본은 수정하지 않았다. 10-12 재수집의 비교 기준이며 변경 대조는 [doc-delta-2026-10-10.md](doc-delta-2026-10-10.md) |
 | `raw/refresh_2026-10-10/` | 3개 원본의 전체 셀 readback·baseline 대조·소스 분석 증거와 의미가 같아 새 고정본으로 승격하지 않은 요구사항 재수신본. 요구사항 현행 고정본은 `raw/requirements-sheet_2026-10-06/` |
+| `raw/functional-spec_2026-10-12/` · `raw/wbs_2026-10-12/` | **현재 명세·WBS 입력**, 2026-10-12 09:45(KST) 공개 export 재수집(CSV·보존 XLSX·manifest·셀/수식/링크/구조/가시성 변경 목록). 명세 15탭 26셀·WBS 3탭 21셀 변경, 이 중 작업자 기록 38셀과 팀 미기록 9셀(WBS 6.8.7·6.8.8)을 구분했다. 10-10 고정본은 수정하지 않았다. 변경 대조는 [doc-delta-2026-10-12.md](doc-delta-2026-10-12.md) |
+| `raw/refresh_2026-10-12/` | 수집 도구와 전체 셀 readback(18탭 135,892셀), 10-10 대비 변경 목록, 작업자 기록 기대값(`_logged-changes.json`)과 셀별 대조(`_change-attribution.json`). 요구사항은 다시 받지 않았고 현행 고정본은 `raw/requirements-sheet_2026-10-06/`이다 |
 
 ## 증거 범위와 제외
 

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv) — 모델 전달 데이터 최소화: AI 모델에는 답변 생성에 필요한 기업, 이슈, 관계 경로 및 허용된 근거만 전달해야 한다. 비밀번호, 인증토큰, 세션 정보 및 불필요한 개인식별정보는 모델 입력과 로그에 포함해서는 안 된다. 보유 종목과 관심 종목 정보는 개인화 답변에 필요한 경우에만 최소 범위로 전달해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 모델 전달 데이터 최소화: AI 모델에는 답변 생성에 필요한 기업, 이슈, 관계 경로 및 허용된 근거만 전달해야 한다. 비밀번호, 인증토큰, 세션 정보 및 불필요한 개인식별정보는 모델 입력과 로그에 포함해서는 안 된다. 보유 종목과 관심 종목 정보는 개인화 답변에 필요한 경우에만 최소 범위로 전달해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:300 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

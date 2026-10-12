@@ -216,8 +216,8 @@ def import_implementation(path: Path) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-10")
-    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-10-10")
+    parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-12")
+    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-10-12")
     parser.add_argument("--requirements-dir", type=Path, default=ROOT / "docs/evidence/raw/requirements-sheet_2026-10-06")
     parser.add_argument("--screens", type=Path, default=ROOT / "docs/screen-plan/captures/slide-index.json")
     parser.add_argument("--gap", type=Path, default=ROOT / "docs/evidence/spec-v1.2-gap.md")

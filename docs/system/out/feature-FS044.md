@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:54 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:54 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv) — 기업 상세와 관계 그래프 이동·상태 복원: 사용자가 기업 상세와 관계 그래프를 오갈 때 선택 기업, 차트 기간, 기준 시점, 선택 탭, 선택 이슈를 유지한다. 사건에서 그래프로 이동하면 해당 기업·이슈의 실제 영향 경로만 강조한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 기업 상세와 관계 그래프 이동·상태 복원: 사용자가 기업 상세와 관계 그래프를 오갈 때 선택 기업, 차트 기간, 기준 시점, 선택 탭, 선택 이슈를 유지한다. 사건에서 그래프로 이동하면 해당 기업·이슈의 실제 영향 경로만 강조한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:101 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

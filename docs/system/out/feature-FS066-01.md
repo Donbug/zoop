@@ -18,13 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:73 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:73 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — AI 답변·뉴스 요약·브리핑 평가 등록: 로그인 회원이 제공받은 AI 답변·뉴스 요약·브리핑 결과에 좋아요 또는 싫어요를 등록·변경·취소한다. 평가를 결과 종류와 해당 결과 버전에 연결한다.
-
-## 상세 권한과 의미 이행
-
-- 정정 연결 정의: 원문 ID `ㅊ`의 05-출퇴근-브리핑.csv 134행(제목 132행).
+- [docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:134 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv) — 브리핑 리뷰: 사용자는 각 회차별 브리핑에 대한 반응(좋아요/싫어요)을 남길 수 있다.
+- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — AI 답변·뉴스 요약·브리핑 평가 등록: 로그인 회원이 제공받은 AI 답변·뉴스 요약·브리핑 결과에 좋아요 또는 싫어요를 등록·변경·취소한다. 평가를 결과 종류와 해당 결과 버전에 연결한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:49 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
@@ -49,5 +46,7 @@
 
 ## 확인 필요
 
+- MULTIPLE_SPEC_DEFINITIONS: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+- INDEX_REQUIREMENT_META_MISMATCH: 목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다.
 - REQUIREMENT_TITLE_REVIEW: 명세 'AI 답변·뉴스 요약·브리핑 평가 등록' ↔ 요구사항 37 '좋아요/싫어요 만족도 조사'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
 - REQUIREMENT_TITLE_REVIEW: 명세 'AI 답변·뉴스 요약·브리핑 평가 등록' ↔ 요구사항 78 'AI 대화록, 뉴스 요약, 브리핑 등 수집 및 선호도 확인'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).

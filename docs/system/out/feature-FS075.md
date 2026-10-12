@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:101 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:101 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:182 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 원천 문서 정제·중복 제거 및 버전 관리: 뉴스·공시를 분석 가능한 문서로 정제하고 동일 문서 재수집과 내용 수정, 같은 사건의 별도 보도를 구분한다. AI는 정제·중복 판정 규칙을, 백엔드 B는 문서 ID·버전·참조 저장 계약을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:182 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 원천 문서 정제·중복 제거 및 버전 관리: 뉴스·공시를 분석 가능한 문서로 정제하고 동일 문서 재수집과 내용 수정, 같은 사건의 별도 보도를 구분한다. AI는 정제·중복 판정 규칙을, 백엔드 B는 문서 ID·버전·참조 저장 계약을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS056](feature-FS056.md) · [FS058](feature-FS058.md)
 

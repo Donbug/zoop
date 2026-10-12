@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv) — AI 내부 패널 닫기·재열기와 대화 유지: 회원이 상세페이지의 AI 내부 패널을 닫아도 상세 상태·대화 기록·서버 작업을 유지한다. 새 대화로 바꾸지 않았다면 다시 열 때 같은 대화의 상태와 완료 결과를 회수한다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — AI 내부 패널 닫기·재열기와 대화 유지: 회원이 상세페이지의 AI 내부 패널을 닫아도 상세 상태·대화 기록·서버 작업을 유지한다. 새 대화로 바꾸지 않았다면 다시 열 때 같은 대화의 상태와 완료 결과를 회수한다.
 
 ## 상세 권한과 의미 이행
 

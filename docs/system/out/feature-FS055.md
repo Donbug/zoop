@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:63 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:63 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv) — 관계와 근거 연결: 기업·이슈 간 관계와 이를 뒷받침하는 뉴스·공시를 연결해 저장한다. 관계 유형별 필수 정보, 근거 확보 상태, 검증·공개 상태와 변경 버전을 함께 관리한다. 근거 미확보 관계는 비공개 검토 후보로 보관할 수 있으며, 필수 근거와 자동 검증·공개 조건을 통과한 결과만 기존 공개 조회에 반영한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv) — 관계와 근거 연결: 기업·이슈 간 관계와 이를 뒷받침하는 뉴스·공시를 연결해 저장한다. 관계 유형별 필수 정보, 근거 확보 상태, 검증·공개 상태와 변경 버전을 함께 관리한다. 근거 미확보 관계는 비공개 검토 후보로 보관할 수 있으며, 필수 근거와 자동 검증·공개 조건을 통과한 결과만 기존 공개 조회에 반영한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:255 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:71 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:71 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv) — AI 분석 연동: 호출 기능의 작업·유효 실행에 맞는 허용된 질문과 근거만 분석 서비스에 전달하고, 응답의 형식·인용·대상 참조를 검증한다. 중복 요청·응답 미수신·호출 장애·근거 부족·검증 실패·결과 저장 실패를 구분하여 불필요한 재호출을 막는다.
+- [docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv) — AI 분석 연동: 호출 기능의 작업·유효 실행에 맞는 허용된 질문과 근거만 분석 서비스에 전달하고, 응답의 형식·인용·대상 참조를 검증한다. 중복 요청·응답 미수신·호출 장애·근거 부족·검증 실패·결과 저장 실패를 구분하여 불필요한 재호출을 막는다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:268 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

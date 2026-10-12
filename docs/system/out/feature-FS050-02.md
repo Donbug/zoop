@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv) — AI 답변 관련 그래프 탐색: 회원이 AI 답변의 관련 기업·이슈·관계를 선택하면 실제 존재하고 조회 권한이 있는 대상을 그래프에서 강조하여 탐색할 수 있다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — AI 답변 관련 그래프 탐색: 회원이 AI 답변의 관련 기업·이슈·관계를 선택하면 실제 존재하고 조회 권한이 있는 대상을 그래프에서 강조하여 탐색할 수 있다.
 
 ## 상세 권한과 의미 이행
 

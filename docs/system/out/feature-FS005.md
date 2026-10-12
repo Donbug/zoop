@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:14 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:14 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv) — 비회원 시작: 사용자가 회원가입과 로그인 없이 서비스를 시작한다. 개인 설정 절차를 거치지 않고 메인 그래프에 진입하며, 회원과 동일한 메인 그래프 튜토리얼을 제공받는다. 로그인 전에는 계좌 연결·관심종목 설정·AI 질문을 이용할 수 없다. 비회원의 튜토리얼 진행·완료·건너뛰기 상태는 저장하지 않으며, 메인 그래프에서 튜토리얼 다시 보기 기능을 통해 언제든 튜토리얼을 다시 실행할 수 있다
+- [docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv) — 비회원 시작: 사용자가 회원가입과 로그인 없이 서비스를 시작한다. 개인 설정 절차를 거치지 않고 메인 그래프에 진입하며, 회원과 동일한 메인 그래프 튜토리얼을 제공받는다. 로그인 전에는 계좌 연결·관심종목 설정·AI 질문을 이용할 수 없다. 비회원의 튜토리얼 진행·완료·건너뛰기 상태는 저장하지 않으며, 메인 그래프에서 튜토리얼 다시 보기 기능을 통해 언제든 튜토리얼을 다시 실행할 수 있다
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:173 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

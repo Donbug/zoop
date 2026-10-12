@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:75 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:75 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 마스킹된 AI 대화록 조회: 별도 대화록 열람 권한을 가진 관리자가 허용된 목적·대상 범위 안에서 개인정보를 마스킹한 AI 대화록을 확인한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — 마스킹된 AI 대화록 조회: 별도 대화록 열람 권한을 가진 관리자가 허용된 목적·대상 범위 안에서 개인정보를 마스킹한 AI 대화록을 확인한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:277 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

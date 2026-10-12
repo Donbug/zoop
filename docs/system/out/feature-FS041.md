@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv) — 동일 시점 이슈 구분: 같은 시간 버킷에 여러 이슈가 있으면 이슈 수를 표시하고, 사용자가 버킷을 선택했을 때 이슈별 카드를 펼쳐 선택할 수 있게 한다. 시간 버킷은 FS040에서 선택한 기간의 해상도를 따른다.
+- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 동일 시점 이슈 구분: 같은 시간 버킷에 여러 이슈가 있으면 이슈 수를 표시하고, 사용자가 버킷을 선택했을 때 이슈별 카드를 펼쳐 선택할 수 있게 한다. 시간 버킷은 FS040에서 선택한 기간의 해상도를 따른다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:97 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

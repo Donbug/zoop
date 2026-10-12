@@ -7,7 +7,7 @@
       "target": "FS011-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 20,
           "rowUnit": "xlsx-row"
         },
@@ -30,7 +30,7 @@
       "target": "FS011-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 21,
           "rowUnit": "xlsx-row"
         },
@@ -53,7 +53,7 @@
       "target": "FS017",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 9,
           "rowUnit": "xlsx-row"
         },
@@ -62,7 +62,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 9,
           "rowUnit": "xlsx-row"
         },
@@ -78,7 +78,7 @@
       "target": "FS018",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -87,7 +87,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -103,7 +103,7 @@
       "target": "FS019",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         },
@@ -112,7 +112,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 39,
           "rowUnit": "xlsx-row"
         },
@@ -128,7 +128,7 @@
       "target": "FS020",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -137,7 +137,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 53,
           "rowUnit": "xlsx-row"
         },
@@ -153,7 +153,7 @@
       "target": "FS021",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 65,
           "rowUnit": "xlsx-row"
         },
@@ -162,7 +162,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 67,
           "rowUnit": "xlsx-row"
         },
@@ -178,7 +178,7 @@
       "target": "FS022",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 32,
           "rowUnit": "xlsx-row"
         },
@@ -201,7 +201,7 @@
       "target": "FS022",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 79,
           "rowUnit": "xlsx-row"
         },
@@ -210,7 +210,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 80,
           "rowUnit": "xlsx-row"
         },
@@ -226,7 +226,7 @@
       "target": "FS023",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 33,
           "rowUnit": "xlsx-row"
         },
@@ -249,7 +249,7 @@
       "target": "FS023",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },
@@ -258,7 +258,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -274,7 +274,7 @@
       "target": "FS024",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -283,7 +283,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 112,
           "rowUnit": "xlsx-row"
         },
@@ -299,7 +299,7 @@
       "target": "FS025",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 121,
           "rowUnit": "xlsx-row"
         },
@@ -308,7 +308,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 125,
           "rowUnit": "xlsx-row"
         },
@@ -324,7 +324,7 @@
       "target": "FS026",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 135,
           "rowUnit": "xlsx-row"
         },
@@ -333,7 +333,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 139,
           "rowUnit": "xlsx-row"
         },
@@ -349,7 +349,7 @@
       "target": "FS027",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv",
           "row": 149,
           "rowUnit": "xlsx-row"
         },
@@ -358,7 +358,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
           "row": 154,
           "rowUnit": "xlsx-row"
         },
@@ -374,7 +374,7 @@
       "target": "FS031",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 41,
           "rowUnit": "xlsx-row"
         },
@@ -397,7 +397,7 @@
       "target": "FS032",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 42,
           "rowUnit": "xlsx-row"
         },
@@ -420,7 +420,7 @@
       "target": "FS035",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         },
@@ -443,7 +443,7 @@
       "target": "FS035",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         },
@@ -466,7 +466,7 @@
       "target": "FS041",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -489,7 +489,7 @@
       "target": "FS042",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 52,
           "rowUnit": "xlsx-row"
         },
@@ -512,7 +512,7 @@
       "target": "FS044",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 54,
           "rowUnit": "xlsx-row"
         },
@@ -535,7 +535,7 @@
       "target": "FS045",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 55,
           "rowUnit": "xlsx-row"
         },
@@ -558,7 +558,7 @@
       "target": "FS045",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 9,
           "rowUnit": "xlsx-row"
         },
@@ -567,7 +567,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
           "row": 9,
           "rowUnit": "xlsx-row"
         },
@@ -583,7 +583,7 @@
       "target": "FS046",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 56,
           "rowUnit": "xlsx-row"
         },
@@ -606,7 +606,7 @@
       "target": "FS046",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -615,7 +615,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -631,7 +631,7 @@
       "target": "FS047",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 57,
           "rowUnit": "xlsx-row"
         },
@@ -654,7 +654,7 @@
       "target": "FS047",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         },
@@ -663,7 +663,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         },
@@ -679,7 +679,7 @@
       "target": "FS048",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 58,
           "rowUnit": "xlsx-row"
         },
@@ -702,7 +702,7 @@
       "target": "FS048",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -711,7 +711,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -727,7 +727,7 @@
       "target": "FS049",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         },
@@ -750,7 +750,7 @@
       "target": "FS049",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 65,
           "rowUnit": "xlsx-row"
         },
@@ -759,7 +759,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
           "row": 65,
           "rowUnit": "xlsx-row"
         },
@@ -775,7 +775,7 @@
       "target": "FS050",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         },
@@ -798,7 +798,7 @@
       "target": "FS051",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         },
@@ -821,7 +821,7 @@
       "target": "FS051",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -830,7 +830,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -846,7 +846,7 @@
       "target": "FS065",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 72,
           "rowUnit": "xlsx-row"
         },
@@ -869,7 +869,7 @@
       "target": "FS066-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 73,
           "rowUnit": "xlsx-row"
         },
@@ -892,7 +892,7 @@
       "target": "FS066-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 73,
           "rowUnit": "xlsx-row"
         },
@@ -911,11 +911,36 @@
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
+      "code": "MULTIPLE_SPEC_DEFINITIONS",
+      "target": "FS066-01",
+      "originalA": {
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv",
+          "row": 134,
+          "rowUnit": "xlsx-row"
+        },
+        "text": "브리핑 리뷰",
+        "rawAcceptance": "1. 로그인한 사용자가 반응을 선택할 수 있다.\n2. 브리핑별 반응 통계를 확인할 수 있다."
+      },
+      "originalB": {
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv",
+          "row": 23,
+          "rowUnit": "xlsx-row"
+        },
+        "text": "AI 답변·뉴스 요약·브리핑 평가 등록",
+        "rawAcceptance": "1. 같은 평가 요청을 두 번 보내도 한 평가로 유지되고 마지막 유효 변경 시각이 재전송만으로 갱신되지 않는다.\n2. 좋아요에서 싫어요로 변경하면 현재 좋아요는 남지 않으며, 뒤늦은 이전 요청·응답이 변경된 상태를 되돌리지 않는다.\n3. 같은 버튼 재선택으로 취소하되 통신 재전송은 추가 취소·등록을 일으키지 않는다.\n4. 다른 회원의 개인화 결과나 현재 조회 권한이 없는 결과를 평가할 수 없다.\n5. 답변·뉴스 요약·브리핑의 평가가 정확한 결과 종류·ID·버전에 연결되고 새 버전에 자동 이전되지 않는다.\n6. 저장 실패·응답 미수신 후 재조회·재전송·저장 복구에서도 최초 평가 대상 종류·결과 ID·버전이 유지되고 다른 버전으로 이전되지 않는다. 기존 확정 상태·요청 처리 여부를 확인하며 평가 완료를 임의로 표시하지 않는다."
+      },
+      "workerDecision": "두 상세를 독립 행으로 유지하고 자동으로 우선 정의를 선택하지 않는다.",
+      "ownerCorrectionRequest": "명세 담당자가 두 정의의 유지/이전/통합 관계와 의미별 수용 기준을 명시해 주세요.",
+      "status": "원문 담당자 정정 요청(원문 변경 없음)"
+    },
+    {
       "code": "REQUIREMENT_TITLE_REVIEW",
       "target": "FS066-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 74,
           "rowUnit": "xlsx-row"
         },
@@ -938,7 +963,7 @@
       "target": "FS066-03",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 75,
           "rowUnit": "xlsx-row"
         },
@@ -961,7 +986,7 @@
       "target": "FS067-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 76,
           "rowUnit": "xlsx-row"
         },
@@ -984,7 +1009,7 @@
       "target": "FS067-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 77,
           "rowUnit": "xlsx-row"
         },
@@ -1007,7 +1032,7 @@
       "target": "FS067-03",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 78,
           "rowUnit": "xlsx-row"
         },
@@ -1030,7 +1055,7 @@
       "target": "FS069-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 80,
           "rowUnit": "xlsx-row"
         },
@@ -1053,7 +1078,7 @@
       "target": "FS069-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 81,
           "rowUnit": "xlsx-row"
         },
@@ -1076,7 +1101,7 @@
       "target": "FS070-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 82,
           "rowUnit": "xlsx-row"
         },
@@ -1099,7 +1124,7 @@
       "target": "FS070-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 83,
           "rowUnit": "xlsx-row"
         },
@@ -1122,7 +1147,7 @@
       "target": "FS071-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 84,
           "rowUnit": "xlsx-row"
         },
@@ -1145,7 +1170,7 @@
       "target": "FS071-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 85,
           "rowUnit": "xlsx-row"
         },
@@ -1168,7 +1193,7 @@
       "target": "FS073",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 87,
           "rowUnit": "xlsx-row"
         },
@@ -1191,7 +1216,7 @@
       "target": "FS074",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1214,7 +1239,7 @@
       "target": "FS074",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1237,7 +1262,7 @@
       "target": "FS074",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1245,7 +1270,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },
@@ -1260,7 +1285,7 @@
       "target": "FS075",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         },
@@ -1283,7 +1308,7 @@
       "target": "FS075",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         },
@@ -1306,7 +1331,7 @@
       "target": "FS075",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         },
@@ -1314,7 +1339,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -1329,7 +1354,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1352,7 +1377,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1375,7 +1400,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1398,7 +1423,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1406,7 +1431,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 95,
           "rowUnit": "xlsx-row"
         },
@@ -1421,7 +1446,7 @@
       "target": "FS077",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         },
@@ -1444,7 +1469,7 @@
       "target": "FS077",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         },
@@ -1467,7 +1492,7 @@
       "target": "FS077",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         },
@@ -1475,7 +1500,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 96,
           "rowUnit": "xlsx-row"
         },
@@ -1490,7 +1515,7 @@
       "target": "FS078",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         },
@@ -1513,7 +1538,7 @@
       "target": "FS078",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         },
@@ -1536,7 +1561,7 @@
       "target": "FS078",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         },
@@ -1544,7 +1569,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 97,
           "rowUnit": "xlsx-row"
         },
@@ -1559,7 +1584,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1582,7 +1607,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1605,7 +1630,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1628,7 +1653,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1651,7 +1676,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1659,7 +1684,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 98,
           "rowUnit": "xlsx-row"
         },
@@ -1674,7 +1699,7 @@
       "target": "FS080",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         },
@@ -1697,7 +1722,7 @@
       "target": "FS080",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         },
@@ -1720,7 +1745,7 @@
       "target": "FS080",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         },
@@ -1728,7 +1753,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         },
@@ -1743,7 +1768,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1766,7 +1791,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1789,7 +1814,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1812,7 +1837,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1835,7 +1860,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1843,7 +1868,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1858,7 +1883,7 @@
       "target": "요구42 / FS042",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 52,
           "rowUnit": "xlsx-row"
         },
@@ -1881,7 +1906,7 @@
       "target": "FS046 → FS045, FS047, FS051, NFS001, NFS003, FS060",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -1890,14 +1915,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 55,
           "rowUnit": "xlsx-row"
         },
         "text": "FS045: AI 질문 진입과 맥락 전달 / P1 / 팀 검토 전"
       },
       "workerDecision": "단일 신규 ID 없음 · 서버 공통 의무로 분산 보존. 보존 의무: 로그인·대화 소유권·근거 접근 권한 재검증, 같은 작업 ID의 내용 불일치 거절, 같은 대화에 서로 다른 작업 ID가 동시에 와도 유효 실행 하나, 상태 조회·결과 회수는 신규 접수와 구분. 버튼 비활성화만으로 대체하지 않는다. 공통 규칙 aiJobs·idempotency와 NFS001/003이 서버 계약으로 유지한다.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -1905,7 +1930,7 @@
       "target": "FS047 → FS046",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         },
@@ -1914,14 +1939,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 56,
           "rowUnit": "xlsx-row"
         },
         "text": "FS046: 질문 대상·기간 해석 및 되묻기 / P1 / 팀 검토 전"
       },
       "workerDecision": "다른 번호로 이동. 보존 의무: 최초 질문 시각·맥락·대상·실제 기간 고정, 명시 조건 우선, KST 작년=직전 달력 연도·최근=기본 1개월, 되묻기 저장 완료, 보충 입력은 새 작업.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -1929,7 +1954,7 @@
       "target": "FS048 → FS047",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -1938,14 +1963,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 57,
           "rowUnit": "xlsx-row"
         },
         "text": "FS047: 근거·관계 그래프 맥락 조회 / P1 / 팀 검토 전"
       },
       "workerDecision": "다른 번호로 이동. 보존 의무: 현재 권한과 지정 문서·버전 유지, 과거 asOf 이후 공개 문서 제외, 조건 부족·근거 부족·기술 장애 구분, 지정 버전을 최신으로 대체 금지, 안내 결과 저장 후 같은 작업 재평가 금지.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -1953,7 +1978,7 @@
       "target": "FS049 → FS048, NFS003",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 65,
           "rowUnit": "xlsx-row"
         },
@@ -1962,14 +1987,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 58,
           "rowUnit": "xlsx-row"
         },
         "text": "FS048: 근거 기반 답변 생성 및 안전 검증 / P1 / 팀 검토 전"
       },
       "workerDecision": "다른 번호로 이동. 보존 의무: 인용·원문 구간·그래프 참조 검증, 현재 유효 실행만 저장, 저장 후 완료, 검증 실패의 자동 재생성 금지, 보존 결과는 모델 재호출 없는 저장 복구.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -1977,7 +2002,7 @@
       "target": "FS050-01 → FS049",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 79,
           "rowUnit": "xlsx-row"
         },
@@ -1986,14 +2011,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         },
         "text": "FS049: 답변 근거와 관련 그래프 탐색 / P1 / 팀 검토 전"
       },
       "workerDecision": "병합·번호 이동. 보존 의무: 답변에 실제 연결된 출처·인용·원문 링크만 제공, 접근 실패는 답변 재생성이 아님, 기사 전문 재배포 안 함.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -2001,7 +2026,7 @@
       "target": "FS050-02 → FS049",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },
@@ -2010,14 +2035,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         },
         "text": "FS049: 답변 근거와 관련 그래프 탐색 / P1 / 팀 검토 전"
       },
       "workerDecision": "병합·번호 이동. 보존 의무: 존재·공개 권한이 있는 대상만 기존 그래프에서 강조, 이슈–기업 간선 제외, AI가 새 관계를 만들지 않음.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -2025,7 +2050,7 @@
       "target": "FS051 → FS050",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -2034,14 +2059,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         },
         "text": "FS050: 새 대화와 후속 질문 / P1 / 팀 검토 전"
       },
       "workerDecision": "병합·번호 이동(현 FS051은 다른 의미). 보존 의무: 새 대화는 별도 ID·빈 맥락, 기존 대화·작업 삭제·취소 아님, 생성 실패 시 기존 대화와 입력 유지.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -2049,7 +2074,7 @@
       "target": "FS052-01 → FS050",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 121,
           "rowUnit": "xlsx-row"
         },
@@ -2058,14 +2083,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         },
         "text": "FS050: 새 대화와 후속 질문 / P1 / 팀 검토 전"
       },
       "workerDecision": "병합·번호 이동. 보존 의무: 후속 질문은 같은 대화의 새 질문 작업, 명시 조건 우선, 늦은 응답은 원래 대화에만 연결.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -2073,7 +2098,7 @@
       "target": "FS052-02 → FS051, FS060",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 135,
           "rowUnit": "xlsx-row"
         },
@@ -2082,14 +2107,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         },
         "text": "FS051: AI 패널 상태 유지와 결과 재조회 / P1 / 팀 검토 전"
       },
       "workerDecision": "병합·번호 이동. 보존 의무: 닫기는 취소·삭제가 아니고 재열기는 새 생성이 아님, 대화·작업 회수, 상세 기업 변경이 기존 대화 맥락을 바꾸지 않음.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -2097,7 +2122,7 @@
       "target": "FS053 → FS051, NFS003, NFS009",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 149,
           "rowUnit": "xlsx-row"
         },
@@ -2106,37 +2131,14 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         },
         "text": "FS051: AI 패널 상태 유지와 결과 재조회 / P1 / 팀 검토 전"
       },
       "workerDecision": "병합·번호 이동. 보존 의무: 상태 조회·결과 회수 먼저, 조회 장애를 미등록·실패로 단정하지 않음, 서버가 확정한 일시 장애만 같은 맥락으로 허용된 방식의 재시도, 검증 실패·권한 오류·결과 소실의 자동 재생성 금지.",
-      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차·변경 내역·WBS 산출물 열에서 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
-      "status": "원문 담당자 정정 요청(원문 변경 없음)"
-    },
-    {
-      "code": "MALFORMED_SPEC_ID",
-      "target": "ㅊ → FS066-01",
-      "originalA": {
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv",
-          "row": 134,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "ㅊ: 브리핑 리뷰 / P2 / 목차 없음"
-      },
-      "originalB": {
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
-          "row": 73,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "FS066-01: AI 답변·뉴스 요약·브리핑 평가 등록 / FS037: 미기재 / FS066: P2 / FS037: 미기재 / FS066: 미기재"
-      },
-      "workerDecision": "원문 기능 ID 셀은 고치지 않는다. 제목 행과 목차의 통합 선언에 근거해 FS066-01에만 유효 연결한다.",
-      "ownerCorrectionRequest": "명세 담당자가 05-출퇴근-브리핑.csv 134행의 기능 ID 셀을 FS066-01로 정정해 주세요.",
+      "ownerCorrectionRequest": "AI 명세 담당자가 같은 번호가 다른 의미로 재사용된 점을 목차의 FS051 상세 위치·요구 번호와 WBS FE 복합 산출물 열(BE 산출물·변경 내역은 10-12에 정정)에 명시하고 옛 FS046의 서버 공통 의무를 v2 상세에 반영할지 정해 주세요.",
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
@@ -2144,7 +2146,7 @@
       "target": "6.5.5 / 6.6.19 / 6.6.20",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 76,
           "rowUnit": "xlsx-row"
         },
@@ -2152,7 +2154,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         },
@@ -2167,7 +2169,7 @@
       "target": "6.9.15",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 153,
           "rowUnit": "xlsx-row"
         },
@@ -2175,7 +2177,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 153,
           "rowUnit": "xlsx-row"
         },
@@ -2190,7 +2192,7 @@
       "target": "FS057 / 6.5.3",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 74,
           "rowUnit": "xlsx-row"
         },
@@ -2198,7 +2200,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         },
@@ -2209,34 +2211,11 @@
       "status": "원문 담당자 정정 요청(원문 변경 없음)"
     },
     {
-      "code": "WBS_TITLE_MISSING",
-      "target": "6.8.7",
-      "originalA": {
-        "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
-          "row": 129,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "6.8.7:  /  / ~ / 가중치  / raw "
-      },
-      "originalB": {
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
-          "row": 44,
-          "rowUnit": "xlsx-row"
-        },
-        "text": "FS034: 중복 발행 방지 / P1 / 미기재"
-      },
-      "workerDecision": "공란 번호에 이전 중복 발행 방지 의미를 부여하지 않는다. 기존 저장/상태 계약 연결을 유지한다.",
-      "ownerCorrectionRequest": "WBS 담당자가 공란 업무의 유지/삭제와 실제 업무·산출물·담당·기간을 명시하고 FS034 책임을 확인해 주세요.",
-      "status": "원문 담당자 정정 요청(원문 변경 없음)"
-    },
-    {
       "code": "WBS_COVER_BODY_CONFLICT",
       "target": "FS074~FS081 / 6.6.13~20",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv",
           "row": 19,
           "rowUnit": "xlsx-row"
         },
@@ -2244,7 +2223,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },
@@ -2259,7 +2238,7 @@
       "target": "FS074~FS081 / 6.6.13~20",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv",
           "row": 29,
           "rowUnit": "xlsx-row"
         },
@@ -2267,7 +2246,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv",
+          "path": "docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         },

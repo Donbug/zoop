@@ -193,16 +193,22 @@
       "FS052-02",
       "FS053"
     ],
-    "rawIdCorrections": [
+    "rawIdCorrections": [],
+    "resolvedRawIdCorrections": [
       {
         "rawId": "ㅊ",
         "effectiveSpecId": "FS066-01",
         "file": "05-출퇴근-브리핑.csv",
         "headingRow": 132,
         "idRow": 134,
-        "observed": "상세 A132 제목이 `FS036 브리핑 리뷰`→`FS066-01 브리핑 리뷰`로 바뀌었다. 같은 구획의 실제 기능 ID 셀 B134는 `FS???`→`ㅊ`로 바뀌었다.",
-        "reported": "팀 피드백은 FS???→FS066-01 정정을 보고했다. 그러나 현재 원문에서 기능 ID 셀은 정정되지 않았다.",
-        "status": "원문 기능 ID 셀은 오류로 보존한다. 제목 행과 목차 FS066-01 통합 선언에 근거한 유효 연결만 별도로 기록하며 원문 오류가 해소됐다고 보고하지 않는다."
+        "resolvedIn": "docs/evidence/raw/functional-spec_2026-10-12",
+        "observed": "10-10 고정본(raw/functional-spec_2026-10-10)에서 A132 제목은 `FS066-01 브리핑 리뷰`이고 기능 ID 셀 B134는 `ㅊ`이었다. 10-12 고정본에서 B134는 `FS066-01`이다. 변경 내역 A64:F64의 작업자 기록은 B134 정정과 `원본 승인 상태·담당·일정은 바꾸지 않았다`를 함께 남긴다.",
+        "boundary": "이 해소는 B134 한 셀의 원문 ID 정정이다. 목차 F61/G61의 FS051 상세 위치, WBS FE 복합 산출물 E149:E152, WBS 6.9.15 일정 역전, 6.5.13~20 표지/본문 충돌, 재무 요구 42의 FS/WBS 부재는 정정되지 않았고 다른 정정 요청으로 남는다.",
+        "historicalProof": [
+          "docs/evidence/doc-delta-2026-10-10.md",
+          "docs/evidence/raw/refresh_2026-10-10/_cell-delta.json",
+          "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv"
+        ]
       }
     ],
     "activeIndexSpecIds": [
@@ -313,7 +319,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 10,
           "rowUnit": "xlsx-row"
         }
@@ -335,7 +341,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 11,
           "rowUnit": "xlsx-row"
         }
@@ -357,7 +363,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 12,
           "rowUnit": "xlsx-row"
         }
@@ -379,7 +385,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 13,
           "rowUnit": "xlsx-row"
         }
@@ -401,7 +407,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 14,
           "rowUnit": "xlsx-row"
         }
@@ -423,7 +429,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 15,
           "rowUnit": "xlsx-row"
         }
@@ -445,7 +451,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 16,
           "rowUnit": "xlsx-row"
         }
@@ -467,7 +473,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 17,
           "rowUnit": "xlsx-row"
         }
@@ -489,7 +495,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 18,
           "rowUnit": "xlsx-row"
         }
@@ -511,7 +517,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 19,
           "rowUnit": "xlsx-row"
         }
@@ -533,7 +539,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 20,
           "rowUnit": "xlsx-row"
         }
@@ -555,7 +561,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 21,
           "rowUnit": "xlsx-row"
         }
@@ -577,7 +583,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 22,
           "rowUnit": "xlsx-row"
         }
@@ -599,7 +605,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         }
@@ -621,7 +627,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 24,
           "rowUnit": "xlsx-row"
         }
@@ -643,7 +649,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 25,
           "rowUnit": "xlsx-row"
         }
@@ -665,7 +671,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 26,
           "rowUnit": "xlsx-row"
         }
@@ -687,7 +693,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 27,
           "rowUnit": "xlsx-row"
         }
@@ -709,7 +715,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 28,
           "rowUnit": "xlsx-row"
         }
@@ -731,7 +737,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 29,
           "rowUnit": "xlsx-row"
         }
@@ -753,7 +759,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 30,
           "rowUnit": "xlsx-row"
         }
@@ -775,7 +781,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 31,
           "rowUnit": "xlsx-row"
         }
@@ -797,7 +803,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 32,
           "rowUnit": "xlsx-row"
         }
@@ -819,7 +825,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 33,
           "rowUnit": "xlsx-row"
         }
@@ -841,7 +847,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 34,
           "rowUnit": "xlsx-row"
         }
@@ -863,7 +869,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 35,
           "rowUnit": "xlsx-row"
         }
@@ -885,7 +891,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 36,
           "rowUnit": "xlsx-row"
         }
@@ -907,7 +913,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         }
@@ -929,7 +935,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 38,
           "rowUnit": "xlsx-row"
         }
@@ -951,7 +957,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 39,
           "rowUnit": "xlsx-row"
         }
@@ -973,7 +979,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 40,
           "rowUnit": "xlsx-row"
         }
@@ -995,7 +1001,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 41,
           "rowUnit": "xlsx-row"
         }
@@ -1017,7 +1023,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 42,
           "rowUnit": "xlsx-row"
         }
@@ -1039,7 +1045,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 43,
           "rowUnit": "xlsx-row"
         }
@@ -1061,7 +1067,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 44,
           "rowUnit": "xlsx-row"
         }
@@ -1083,7 +1089,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         }
@@ -1106,7 +1112,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 46,
           "rowUnit": "xlsx-row"
         }
@@ -1128,7 +1134,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 47,
           "rowUnit": "xlsx-row"
         }
@@ -1148,7 +1154,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 48,
           "rowUnit": "xlsx-row"
         }
@@ -1170,7 +1176,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 49,
           "rowUnit": "xlsx-row"
         }
@@ -1192,7 +1198,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 50,
           "rowUnit": "xlsx-row"
         }
@@ -1214,7 +1220,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         }
@@ -1236,7 +1242,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 52,
           "rowUnit": "xlsx-row"
         }
@@ -1256,7 +1262,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 53,
           "rowUnit": "xlsx-row"
         }
@@ -1278,7 +1284,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 54,
           "rowUnit": "xlsx-row"
         }
@@ -1300,7 +1306,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 55,
           "rowUnit": "xlsx-row"
         }
@@ -1322,7 +1328,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 56,
           "rowUnit": "xlsx-row"
         }
@@ -1344,7 +1350,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 57,
           "rowUnit": "xlsx-row"
         }
@@ -1366,7 +1372,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 58,
           "rowUnit": "xlsx-row"
         }
@@ -1388,7 +1394,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         }
@@ -1410,7 +1416,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         }
@@ -1433,7 +1439,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         }
@@ -1456,7 +1462,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 62,
           "rowUnit": "xlsx-row"
         }
@@ -1478,7 +1484,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 63,
           "rowUnit": "xlsx-row"
         }
@@ -1500,7 +1506,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 64,
           "rowUnit": "xlsx-row"
         }
@@ -1522,7 +1528,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 65,
           "rowUnit": "xlsx-row"
         }
@@ -1544,7 +1550,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 66,
           "rowUnit": "xlsx-row"
         }
@@ -1566,7 +1572,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 67,
           "rowUnit": "xlsx-row"
         }
@@ -1588,7 +1594,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 68,
           "rowUnit": "xlsx-row"
         }
@@ -1610,7 +1616,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 69,
           "rowUnit": "xlsx-row"
         }
@@ -1632,7 +1638,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 70,
           "rowUnit": "xlsx-row"
         }
@@ -1654,7 +1660,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 71,
           "rowUnit": "xlsx-row"
         }
@@ -1676,7 +1682,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 72,
           "rowUnit": "xlsx-row"
         }
@@ -1698,7 +1704,7 @@
         "priority": "FS037: 미기재 / FS066: P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 73,
           "rowUnit": "xlsx-row"
         }
@@ -1721,7 +1727,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 74,
           "rowUnit": "xlsx-row"
         }
@@ -1743,7 +1749,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 75,
           "rowUnit": "xlsx-row"
         }
@@ -1765,7 +1771,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 76,
           "rowUnit": "xlsx-row"
         }
@@ -1787,7 +1793,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 77,
           "rowUnit": "xlsx-row"
         }
@@ -1809,7 +1815,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 78,
           "rowUnit": "xlsx-row"
         }
@@ -1831,7 +1837,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 79,
           "rowUnit": "xlsx-row"
         }
@@ -1853,7 +1859,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 80,
           "rowUnit": "xlsx-row"
         }
@@ -1875,7 +1881,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 81,
           "rowUnit": "xlsx-row"
         }
@@ -1897,7 +1903,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 82,
           "rowUnit": "xlsx-row"
         }
@@ -1919,7 +1925,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 83,
           "rowUnit": "xlsx-row"
         }
@@ -1941,7 +1947,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 84,
           "rowUnit": "xlsx-row"
         }
@@ -1963,7 +1969,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 85,
           "rowUnit": "xlsx-row"
         }
@@ -1985,7 +1991,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 86,
           "rowUnit": "xlsx-row"
         }
@@ -2007,7 +2013,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 87,
           "rowUnit": "xlsx-row"
         }
@@ -2029,7 +2035,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 88,
           "rowUnit": "xlsx-row"
         }
@@ -2051,7 +2057,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 89,
           "rowUnit": "xlsx-row"
         }
@@ -2073,7 +2079,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 90,
           "rowUnit": "xlsx-row"
         }
@@ -2095,7 +2101,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 91,
           "rowUnit": "xlsx-row"
         }
@@ -2117,7 +2123,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 92,
           "rowUnit": "xlsx-row"
         }
@@ -2139,7 +2145,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         }
@@ -2161,7 +2167,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         }
@@ -2183,7 +2189,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 95,
           "rowUnit": "xlsx-row"
         }
@@ -2205,7 +2211,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 96,
           "rowUnit": "xlsx-row"
         }
@@ -2227,7 +2233,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 97,
           "rowUnit": "xlsx-row"
         }
@@ -2249,7 +2255,7 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 98,
           "rowUnit": "xlsx-row"
         }
@@ -2271,7 +2277,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 99,
           "rowUnit": "xlsx-row"
         }
@@ -2293,7 +2299,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         }
@@ -2316,7 +2322,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         }
@@ -2339,7 +2345,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         }
@@ -2363,7 +2369,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         }
@@ -2386,7 +2392,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         }
@@ -2409,7 +2415,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         }
@@ -2434,7 +2440,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         }
@@ -2457,7 +2463,7 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         }
@@ -2476,33 +2482,13 @@
       "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
-    "ㅊ": {
-      "raw": {
-        "status": "목차 없음",
-        "priority": "P2",
-        "scopeClass": "existing",
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv",
-          "row": 134,
-          "rowUnit": "xlsx-row"
-        }
-      },
-      "implementationScope": "원문 ID 오류 · FS066-01에 유효 연결",
-      "scopeState": "raw-malformed-id",
-      "effectiveSpecIds": [
-        "FS066-01"
-      ],
-      "effectiveRequirementIds": [],
-      "authorityDecisionId": "user-2026-10-10-feedback",
-      "implementationEvidence": "문서 판정 없음"
-    },
     "FS050-01": {
       "raw": {
         "status": "목차 없음",
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 79,
           "rowUnit": "xlsx-row"
         }
@@ -2524,7 +2510,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 93,
           "rowUnit": "xlsx-row"
         }
@@ -2546,7 +2532,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 121,
           "rowUnit": "xlsx-row"
         }
@@ -2568,7 +2554,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 135,
           "rowUnit": "xlsx-row"
         }
@@ -2591,7 +2577,7 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv",
           "row": 149,
           "rowUnit": "xlsx-row"
         }

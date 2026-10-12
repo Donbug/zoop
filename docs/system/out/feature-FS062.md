@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:69 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:69 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv) — 가상계좌 데이터 연동: 프로젝트용 고정 Mock 데이터에서 모의 프로필·계좌 식별자·예수금·보유종목을 조회한다. 각 프로필의 보유 종목·수량·평균 매입가는 변경하지 않으며 매수·매도나 실계좌 연동을 제공하지 않는다. 실제 증권사 비밀번호·인증서 등 자격 증명을 요구하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv) — 가상계좌 데이터 연동: 프로젝트용 고정 Mock 데이터에서 모의 프로필·계좌 식별자·예수금·보유종목을 조회한다. 각 프로필의 보유 종목·수량·평균 매입가는 변경하지 않으며 매수·매도나 실계좌 연동을 제공하지 않는다. 실제 증권사 비밀번호·인증서 등 자격 증명을 요구하지 않는다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:67 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

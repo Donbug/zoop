@@ -1,0 +1,71 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c",
+  "export_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/export?format=xlsx",
+  "request_started_at_utc": "2026-10-12T00:45:26.112391+00:00",
+  "collected_at_utc": "2026-10-12T00:45:27.609472+00:00",
+  "collected_at_kst": "2026-10-12T09:45:27.609472+09:00",
+  "auth": "none",
+  "http_status": 200,
+  "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "response_bytes": 86905,
+  "response_sha256": "a77905d5830c09031263c0063bbf466cb41cdc02ff04898363c23a466d0a907e",
+  "baseline": "wbs_2026-10-10",
+  "baseline_xlsx_sha256": "e3eeab150457e5d6d7fa9d737b8c2271d1f261f15151430edbb16c9182b7e801",
+  "content_identical": false,
+  "meaningful_cell_content_changed": true,
+  "data_only": true,
+  "csv_encoding": "utf-8-sig",
+  "xlsx": "zoop-wbs_2026-10-12.xlsx",
+  "sha256": "a77905d5830c09031263c0063bbf466cb41cdc02ff04898363c23a466d0a907e",
+  "sheets": {
+    "표지·변경이력": "00-표지-변경이력.csv",
+    "프로젝트 WBS": "01-프로젝트-WBS.csv",
+    "개발 일정 요약": "02-개발-일정-요약.csv"
+  },
+  "sheet_ranges": {
+    "표지·변경이력": {
+      "rows": 36,
+      "columns": 7
+    },
+    "프로젝트 WBS": {
+      "rows": 1021,
+      "columns": 100
+    },
+    "개발 일정 요약": {
+      "rows": 30,
+      "columns": 6
+    }
+  },
+  "sheet_states": {
+    "표지·변경이력": "visible",
+    "프로젝트 WBS": "visible",
+    "개발 일정 요약": "visible"
+  },
+  "sheet_state_deltas": [],
+  "files": {
+    "00-표지-변경이력.csv": "902057ccd1b7587c0cc0340de3f743eedaa6cebf02d47ac63da4686195da305f",
+    "01-프로젝트-WBS.csv": "4b349b6ec84cb64bfef621c160257d47da11cea82533c9e53ac813893ac9940d",
+    "zoop-wbs_2026-10-12.xlsx": "a77905d5830c09031263c0063bbf466cb41cdc02ff04898363c23a466d0a907e",
+    "02-개발-일정-요약.csv": "f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3"
+  },
+  "baseline_sheet_order": [
+    "표지·변경이력",
+    "프로젝트 WBS",
+    "개발 일정 요약"
+  ],
+  "current_sheet_order": [
+    "표지·변경이력",
+    "프로젝트 WBS",
+    "개발 일정 요약"
+  ],
+  "cell_delta_count": 21,
+  "formula_delta_count": 0,
+  "structural_delta_count": 0,
+  "logged_cell_deltas_matched": 12,
+  "logged_cell_deltas_mismatched": 0,
+  "logged_cells_absent_from_delta": 0,
+  "unlogged_cell_deltas": 9,
+  "logged_hyperlink_deltas": 0,
+  "unlogged_hyperlink_deltas": 0,
+  "unexplained_structural_deltas": 0
+}

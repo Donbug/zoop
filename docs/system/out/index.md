@@ -2,7 +2,7 @@
 
 이 문서는 생성물이다. 변경은 catalog.yaml 가져오기, links.yaml 또는 docs/api/openapi.yaml 편집으로 한다.
 
-[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [유효 기준 JSON](effective-authority.json) · [범위 예외·상세 권한](detail-authority.md) · [전체 수용 기준](acceptance-matrix.md) · [원문 정정 요청](source-corrections.md) · [API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [WBS 내용 기반 이행](wbs-migration.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)
+[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [10-12 원문 갱신 기록](../../evidence/doc-delta-2026-10-12.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [유효 기준 JSON](effective-authority.json) · [범위 예외·상세 권한](detail-authority.md) · [전체 수용 기준](acceptance-matrix.md) · [원문 정정 요청](source-corrections.md) · [API 명세서](../../api/out/zoop-api-spec.md) · [검사 결과](warnings.md) · [WBS 내용 기반 이행](wbs-migration.md) · [BFF 차이](api-differences.md) · [팀용 xlsx](zoop-trace.xlsx)
 
 현행 목차 98개 ID의 유효 구현 범위: **팀합의요구/설계대상**(기록된 예외 1개 명세 제외). 원문 상태는 아래에 별도로 보존하며 완료·실행 승인으로 해석하지 않는다.
 
@@ -192,7 +192,6 @@
 
 ## 현행 목차 밖 이력·원문 오류 ID(활성 목록 아님)
 
-- [ㅊ · 브리핑 리뷰](feature-ㅊ.md) — 원문 ID 오류 · FS066-01에 유효 연결
 - [FS050-01 · AI 답변 근거·원문 확인](feature-FS050-01.md) — 이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조
 - [FS050-02 · AI 답변 관련 그래프 탐색](feature-FS050-02.md) — 이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조
 - [FS052-01 · 같은 대화에서 후속 질문 전송](feature-FS052-01.md) — 이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:84 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:84 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:177 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 발행 브리핑 정정 등록: 관리자가 발행된 브리핑의 오류에 대해 정정을 등록하면 원래 발행 내용과 정정 내용·사유·시점을 구분하여 보존한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:177 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — 발행 브리핑 정정 등록: 관리자가 발행된 브리핑의 오류에 대해 정정을 등록하면 원래 발행 내용과 정정 내용·사유·시점을 구분하여 보존한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:286 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:66 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:66 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv) — 분석 결과 저장 및 조회 반영: 시스템은 수집·분석된 뉴스, 이슈, 기업 관계, 사건 시각 및 근거 정보를 서로 연결하여 저장해야 한다. 저장된 공개 대상 결과는 메인 그래프와 기업 상세페이지에서 각 화면의 기업·기간·선택 조건에 맞게 조회할 수 있어야 한다. 처리 중이거나 검증에 실패한 결과는 공개 조회에서 제외해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv) — 분석 결과 저장 및 조회 반영: 시스템은 수집·분석된 뉴스, 이슈, 기업 관계, 사건 시각 및 근거 정보를 서로 연결하여 저장해야 한다. 저장된 공개 대상 결과는 메인 그래프와 기업 상세페이지에서 각 화면의 기업·기간·선택 조건에 맞게 조회할 수 있어야 한다. 처리 중이거나 검증에 실패한 결과는 공개 조회에서 제외해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:258 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

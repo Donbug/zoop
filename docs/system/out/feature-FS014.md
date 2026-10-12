@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:24 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:24 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv) — 초기 관계 그래프 제공: 시스템은 연결된 가상 보유종목과 선택한 관심종목을 중심으로 둘 다 없다면 전체 시장 기업·이슈·산업·제품의 관계 그래프를 제공해야 한다. 그래프 조회 실패 시 안내와 재시도를 제공해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv) — 초기 관계 그래프 제공: 시스템은 연결된 가상 보유종목과 선택한 관심종목을 중심으로 둘 다 없다면 전체 시장 기업·이슈·산업·제품의 관계 그래프를 제공해야 한다. 그래프 조회 실패 시 안내와 재시도를 제공해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:188 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

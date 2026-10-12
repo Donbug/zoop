@@ -1,0 +1,251 @@
+[
+  {
+    "workbook": "functional-spec",
+    "sheet": "출퇴근 브리핑",
+    "row": 134,
+    "fs_nfs_ids_in_row": [
+      "FS066-01"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "ㅊ"
+    },
+    "after_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS066-01"
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "출퇴근 브리핑",
+        "row": 134,
+        "column": 2,
+        "cell": "B134",
+        "before": "ㅊ",
+        "after": "FS066-01"
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 63,
+    "fs_nfs_ids_in_row": [
+      "FS011-02"
+    ],
+    "before_nonempty_cells": {},
+    "after_nonempty_cells": {
+      "A": "2026-10-12 정책 동기화",
+      "B": "FS011-02",
+      "C": "FS011-02",
+      "D": "추천 기능 제외·API 유보",
+      "E": "사용자 결정: 추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations(listRecommendations)는 삭제·무동작·가짜 응답 없이 유보한다. 기존 요구사항과 이력은 삭제하지 않는다. 목표 prefix는 /api/v1, 현재 BFF는 /api다.",
+      "F": "https://github.com/Donbug/zoop/commit/472796a"
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 63,
+        "column": 1,
+        "cell": "A63",
+        "before": "",
+        "after": "2026-10-12 정책 동기화"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 63,
+        "column": 2,
+        "cell": "B63",
+        "before": "",
+        "after": "FS011-02"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 63,
+        "column": 3,
+        "cell": "C63",
+        "before": "",
+        "after": "FS011-02"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 63,
+        "column": 4,
+        "cell": "D63",
+        "before": "",
+        "after": "추천 기능 제외·API 유보"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 63,
+        "column": 5,
+        "cell": "E63",
+        "before": "",
+        "after": "사용자 결정: 추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations(listRecommendations)는 삭제·무동작·가짜 응답 없이 유보한다. 기존 요구사항과 이력은 삭제하지 않는다. 목표 prefix는 /api/v1, 현재 BFF는 /api다."
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 63,
+        "column": 6,
+        "cell": "F63",
+        "before": "",
+        "after": "https://github.com/Donbug/zoop/commit/472796a"
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 64,
+    "fs_nfs_ids_in_row": [
+      "FS040",
+      "FS066",
+      "FS066-01"
+    ],
+    "before_nonempty_cells": {},
+    "after_nonempty_cells": {
+      "A": "2026-10-12 원문 정정",
+      "B": "FS040 · FS066-01",
+      "C": "FS040 · FS066-01",
+      "D": "1Y 주봉 확정·브리핑 ID 오타 정정",
+      "E": "기업 상세·타임라인 B56의 1Y: 월/주를 1Y: 주로 정정(나머지 규칙 유지). 출퇴근 브리핑 A132의 FS066-01 제목을 재확인하여 B134의 ㅊ을 FS066-01로 정정했다. 원본 승인 상태·담당·일정은 바꾸지 않았다.",
+      "F": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md"
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 64,
+        "column": 1,
+        "cell": "A64",
+        "before": "",
+        "after": "2026-10-12 원문 정정"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 64,
+        "column": 2,
+        "cell": "B64",
+        "before": "",
+        "after": "FS040 · FS066-01"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 64,
+        "column": 3,
+        "cell": "C64",
+        "before": "",
+        "after": "FS040 · FS066-01"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 64,
+        "column": 4,
+        "cell": "D64",
+        "before": "",
+        "after": "1Y 주봉 확정·브리핑 ID 오타 정정"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 64,
+        "column": 5,
+        "cell": "E64",
+        "before": "",
+        "after": "기업 상세·타임라인 B56의 1Y: 월/주를 1Y: 주로 정정(나머지 규칙 유지). 출퇴근 브리핑 A132의 FS066-01 제목을 재확인하여 B134의 ㅊ을 FS066-01로 정정했다. 원본 승인 상태·담당·일정은 바꾸지 않았다."
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 64,
+        "column": 6,
+        "cell": "F64",
+        "before": "",
+        "after": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md"
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 65,
+    "fs_nfs_ids_in_row": [
+      "FS046",
+      "FS051"
+    ],
+    "before_nonempty_cells": {},
+    "after_nonempty_cells": {
+      "A": "2026-10-12 의미 연결",
+      "B": "옛 AI 047~053",
+      "C": "현행 AI v2 046~051",
+      "D": "AI WBS 산출물 참조 동기화",
+      "E": "현행 AI 챗봇 v2의 기능명·ID를 재확인하여 WBS 프로젝트 WBS E140:E147(6.9.2~6.9.9)의 산출물 ID만 의미로 이행했다. 옛 FS046 권한·중복 작업 통제는 새 FS046 질문 해석과 다른 의미이며 공통 의무로 보존한다. FE 복합 참조·목차 FS051 상세 위치/요구 번호·재무 요구42는 추가 확인 대상이다.",
+      "F": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md"
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 65,
+        "column": 1,
+        "cell": "A65",
+        "before": "",
+        "after": "2026-10-12 의미 연결"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 65,
+        "column": 2,
+        "cell": "B65",
+        "before": "",
+        "after": "옛 AI 047~053"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 65,
+        "column": 3,
+        "cell": "C65",
+        "before": "",
+        "after": "현행 AI v2 046~051"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 65,
+        "column": 4,
+        "cell": "D65",
+        "before": "",
+        "after": "AI WBS 산출물 참조 동기화"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 65,
+        "column": 5,
+        "cell": "E65",
+        "before": "",
+        "after": "현행 AI 챗봇 v2의 기능명·ID를 재확인하여 WBS 프로젝트 WBS E140:E147(6.9.2~6.9.9)의 산출물 ID만 의미로 이행했다. 옛 FS046 권한·중복 작업 통제는 새 FS046 질문 해석과 다른 의미이며 공통 의무로 보존한다. FE 복합 참조·목차 FS051 상세 위치/요구 번호·재무 요구42는 추가 확인 대상이다."
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 65,
+        "column": 6,
+        "cell": "F65",
+        "before": "",
+        "after": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md"
+      }
+    ]
+  }
+]

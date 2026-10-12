@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:95 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:95 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv) — 운영 추적: 시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.
+- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 운영 추적: 시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:302 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

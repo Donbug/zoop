@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:18 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:18 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv) — 가상계좌 프로필 연결: 회원은 서비스에서 미리 준비한 가상계좌 프로필 중 하나를 선택하여 자신의 초기 설정에 연결할 수 있다. 시스템은 해당 데이터가 실제 증권계좌가 아닌 서비스 시연·체험용 모의 데이터임을 명확히 안내한다. 연결이 완료되면 해당 가상계좌의 보유종목을 개인화 그래프 구성에 사용할 수 있다.
+- [docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv) — 가상계좌 프로필 연결: 회원은 서비스에서 미리 준비한 가상계좌 프로필 중 하나를 선택하여 자신의 초기 설정에 연결할 수 있다. 시스템은 해당 데이터가 실제 증권계좌가 아닌 서비스 시연·체험용 모의 데이터임을 명확히 안내한다. 연결이 완료되면 해당 가상계좌의 보유종목을 개인화 그래프 구성에 사용할 수 있다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:182 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

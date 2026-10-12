@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:100 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:100 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:168 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 뉴스·공시 수집 및 수집 회차 관리: 메인 그래프 분석에 사용할 뉴스·공시의 신규·수정 문서를 수집한다. FS058의 회차 관리와 FS063의 공급원 연동을 재사용하며, 별도 수집기를 중복 구현하지 않는다. AI는 공급원 연동·수집을, 백엔드 B는 후속 처리에 필요한 문서 계약·상태 연계를 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:168 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 뉴스·공시 수집 및 수집 회차 관리: 메인 그래프 분석에 사용할 뉴스·공시의 신규·수정 문서를 수집한다. FS058의 회차 관리와 FS063의 공급원 연동을 재사용하며, 별도 수집기를 중복 구현하지 않는다. AI는 공급원 연동·수집을, 백엔드 B는 후속 처리에 필요한 문서 계약·상태 연계를 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS058](feature-FS058.md) · [FS063](feature-FS063.md)
 

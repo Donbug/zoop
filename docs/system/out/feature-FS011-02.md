@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:21 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:21 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv) — 추천 종목·산업·테마 조회: 로그인 회원이 초기 설정 또는 관심종목 수정 화면을 열면 검색어 없이 살펴볼 수 있는 추천 종목·산업·테마 목록을 제공한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv) — 추천 종목·산업·테마 조회: 로그인 회원이 초기 설정 또는 관심종목 수정 화면을 열면 검색어 없이 살펴볼 수 있는 추천 종목·산업·테마 목록을 제공한다.
 
 ## 상세 권한과 의미 이행
 

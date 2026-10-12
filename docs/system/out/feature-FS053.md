@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:149 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:149 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:149 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv) — AI 결과 회수와 재시도: 응답을 받지 못하면 새 답변 생성 전에 기존 질문 작업의 상태를 확인해야 한다. 완료 작업은 저장된 결과를 받고, 처리 중이면 대기하며, 서버가 확인한 실패만 허용된 방식으로 재실행해야 한다. 상태 조회 장애를 작업 미등록으로 취급하지 않고 같은 작업 재시도는 원래 질문 맥락을 유지해야 한다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:149 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — AI 결과 회수와 재시도: 응답을 받지 못하면 새 답변 생성 전에 기존 질문 작업의 상태를 확인해야 한다. 완료 작업은 저장된 결과를 받고, 처리 중이면 대기하며, 서버가 확인한 실패만 허용된 방식으로 재실행해야 한다. 상태 조회 장애를 작업 미등록으로 취급하지 않고 같은 작업 재시도는 원래 질문 맥락을 유지해야 한다.
 
 ## 상세 권한과 의미 이행
 

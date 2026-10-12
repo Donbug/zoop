@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:25 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:25 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv) — 관계 그래프 튜토리얼: 사용자는 튜토리얼에서 기본 조작 방법 및 기업·이슈 선택, 관계선 선택, 상세 정보와 근거 확인, AI 질문 방법을 안내받을 수 있어야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv) — 관계 그래프 튜토리얼: 사용자는 튜토리얼에서 기본 조작 방법 및 기업·이슈 선택, 관계선 선택, 상세 정보와 근거 확인, AI 질문 방법을 안내받을 수 있어야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:31 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

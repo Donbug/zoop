@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:81 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:81 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 회원 차단·차단 해제: 관리자가 특정 회원의 차단 또는 차단 해제를 요청하면 시스템은 관리자 권한과 대상 회원을 확인하여 허용된 관리 조치를 적용한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — 회원 차단·차단 해제: 관리자가 특정 회원의 차단 또는 차단 해제를 요청하면 시스템은 관리자 권한과 대상 회원을 확인하여 허용된 관리 조치를 적용한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:283 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

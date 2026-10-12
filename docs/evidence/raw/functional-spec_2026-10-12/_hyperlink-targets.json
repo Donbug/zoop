@@ -1,0 +1,87 @@
+{
+  "baseline": [],
+  "current": [
+    {
+      "sheet": "변경 내역",
+      "cell": "F63",
+      "target": "https://github.com/Donbug/zoop/commit/472796a",
+      "location": null,
+      "display": null,
+      "tooltip": null
+    },
+    {
+      "sheet": "변경 내역",
+      "cell": "F64",
+      "target": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md",
+      "location": null,
+      "display": null,
+      "tooltip": null
+    },
+    {
+      "sheet": "변경 내역",
+      "cell": "F65",
+      "target": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md",
+      "location": null,
+      "display": null,
+      "tooltip": null
+    },
+    {
+      "sheet": "변경 내역",
+      "cell": "F66",
+      "target": "https://github.com/Donbug/zoop/blob/main/docs/api/out/zoop-api-spec.md",
+      "location": null,
+      "display": null,
+      "tooltip": null
+    }
+  ],
+  "deltas": [
+    {
+      "workbook": "functional-spec",
+      "sheet": "변경 내역",
+      "cell": "F63",
+      "before": null,
+      "after": {
+        "target": "https://github.com/Donbug/zoop/commit/472796a",
+        "location": null,
+        "display": null,
+        "tooltip": null
+      }
+    },
+    {
+      "workbook": "functional-spec",
+      "sheet": "변경 내역",
+      "cell": "F64",
+      "before": null,
+      "after": {
+        "target": "https://github.com/Donbug/zoop/blob/main/docs/share/day-work-2026-10-10.md",
+        "location": null,
+        "display": null,
+        "tooltip": null
+      }
+    },
+    {
+      "workbook": "functional-spec",
+      "sheet": "변경 내역",
+      "cell": "F65",
+      "before": null,
+      "after": {
+        "target": "https://github.com/Donbug/zoop/blob/main/docs/evidence/doc-delta-2026-10-10.md",
+        "location": null,
+        "display": null,
+        "tooltip": null
+      }
+    },
+    {
+      "workbook": "functional-spec",
+      "sheet": "변경 내역",
+      "cell": "F66",
+      "before": null,
+      "after": {
+        "target": "https://github.com/Donbug/zoop/blob/main/docs/api/out/zoop-api-spec.md",
+        "location": null,
+        "display": null,
+        "tooltip": null
+      }
+    }
+  ]
+}

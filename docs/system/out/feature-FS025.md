@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:35 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:35 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv) — 선택한 노드로 AI 질문: 시스템은 그래프에서 선택한 노드에서 AI 질문을 선택하면 선택 대상, 적용 기간 및 근거 자료 정보를 질문에 연결하고, 사용자가 연결된 대상을 확인한 뒤 질문을 보낼 수 있어야 한다.  관계 탐색, 자료 요약 및 허용된 개인화 질문에 공통 챗봇 규칙을 적용해야 한다. 개인화 정보는 사용자의 조회 권한 범위에서만 활용해야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:125 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 선택한 노드로 AI 질문: 시스템은 그래프에서 선택한 노드에서 AI 질문을 선택하면 선택 대상, 적용 기간 및 근거 자료 정보를 질문에 연결하고, 사용자가 연결된 대상을 확인한 뒤 질문을 보낼 수 있어야 한다.  관계 탐색, 자료 요약 및 허용된 개인화 질문에 공통 챗봇 규칙을 적용해야 한다. 개인화 정보는 사용자의 조회 권한 범위에서만 활용해야 한다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv) — 선택한 노드로 AI 질문: 시스템은 그래프에서 선택한 노드에서 AI 질문을 선택하면 선택 대상, 적용 기간 및 근거 자료 정보를 질문에 연결하고, 사용자가 연결된 대상을 확인한 뒤 질문을 보낼 수 있어야 한다.  관계 탐색, 자료 요약 및 허용된 개인화 질문에 공통 챗봇 규칙을 적용해야 한다. 개인화 정보는 사용자의 조회 권한 범위에서만 활용해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:125 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 선택한 노드로 AI 질문: 시스템은 그래프에서 선택한 노드에서 AI 질문을 선택하면 선택 대상, 적용 기간 및 근거 자료 정보를 질문에 연결하고, 사용자가 연결된 대상을 확인한 뒤 질문을 보낼 수 있어야 한다.  관계 탐색, 자료 요약 및 허용된 개인화 질문에 공통 챗봇 규칙을 적용해야 한다. 개인화 정보는 사용자의 조회 권한 범위에서만 활용해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:204 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:49 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:49 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv) — 가상 보유 정보 표시: 가상 계좌를 연결한 로그인 회원에게만 선택 기업의 모의 보유 수량, 평균 매입가, 평가 금액, 자산 비중을 제공한다. 이는 실제 계좌 정보가 아닌 프로젝트용 모의 데이터임을 표시한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 가상 보유 정보 표시: 가상 계좌를 연결한 로그인 회원에게만 선택 기업의 모의 보유 수량, 평균 매입가, 평가 금액, 자산 비중을 제공한다. 이는 실제 계좌 정보가 아닌 프로젝트용 모의 데이터임을 표시한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:63 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

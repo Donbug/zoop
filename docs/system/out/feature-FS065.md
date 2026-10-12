@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:72 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:72 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 기업 및 사용자 통계 조사 및 확인: 관리자는 인증된 별도 관리자 패널에서 관심 종목, 고정 Mock 보유 종목, 자주 확인한 노드 등을 요약 및 기업별 통계로 확인한다. 온보딩 완료율, 그래프 노드·간선 클릭률, 브리핑 조회율 및 관심도, AI 질문 이용률을 포함하되 지표별 집계 정의가 확정되고 필요한 원천 자료가 확보된 범위에서 제공한다. 통계에 사용자의 실명 등 개인 식별 정보를 포함하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — 기업 및 사용자 통계 조사 및 확인: 관리자는 인증된 별도 관리자 패널에서 관심 종목, 고정 Mock 보유 종목, 자주 확인한 노드 등을 요약 및 기업별 통계로 확인한다. 온보딩 완료율, 그래프 노드·간선 클릭률, 브리핑 조회율 및 관심도, AI 질문 이용률을 포함하되 지표별 집계 정의가 확정되고 필요한 원천 자료가 확보된 범위에서 제공한다. 통계에 사용자의 실명 등 개인 식별 정보를 포함하지 않는다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:274 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

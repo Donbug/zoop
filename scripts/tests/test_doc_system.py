@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import re
 import unittest
 from pathlib import Path
 
@@ -112,6 +113,36 @@ class DetailAuthorityTests(unittest.TestCase):
         _, findings = self.run_check(specs, links, api)
         self.assertTrue(any(f[1] == "ㅊ" for f in findings))
 
+    def corrected_fixture(self):
+        """The briefing definition now carries FS066-01 in its own function-ID cell, so the malformed raw ID is gone."""
+        specs, links, api = fixture()
+        specs = copy.deepcopy(specs)
+        del specs["ㅊ"]
+        specs["FS066-01"]["definitions"].append(definition("05-brief.csv", 134, "FS066-01  브리핑 리뷰", 132))
+        detail = links["detailAuthority"]
+        resolved = dict(detail["rawIdCorrections"][0])
+        detail["rawIdCorrections"], detail["resolvedRawIdCorrections"] = [], [resolved]
+        return specs, links, api
+
+    def test_resolved_raw_id_correction_is_accepted_once_the_source_cell_is_corrected(self):
+        context, findings = self.run_check(*self.corrected_fixture())
+        self.assertEqual(findings, [])
+        self.assertEqual(context["corrections"], {})
+        self.assertEqual(context["active"], {"FS046", "FS066-01"})
+
+    def test_resolved_raw_id_correction_is_rejected_while_the_malformed_id_remains(self):
+        specs, links, api = self.corrected_fixture()
+        specs = copy.deepcopy(specs)
+        specs["ㅊ"] = fixture()[0]["ㅊ"]
+        _, findings = self.run_check(specs, links, api)
+        self.assertTrue(any(f[0] == "DETAIL_AUTHORITY_INVALID" and f[1] == "ㅊ" and f[3] == "error" and "해소" in f[2] for f in findings))
+
+    def test_resolved_raw_id_correction_must_point_at_the_corrected_definition(self):
+        specs, links, api = self.corrected_fixture()
+        links["detailAuthority"]["resolvedRawIdCorrections"][0]["idRow"] = 140
+        _, findings = self.run_check(specs, links, api)
+        self.assertTrue(any(f[0] == "DETAIL_AUTHORITY_INVALID" and f[1] == "ㅊ" and f[3] == "error" and "해소" in f[2] for f in findings))
+
     def op(self, api, oid):
         return next(item["get"]["x-zoop"] for item in api["paths"].values() if item["get"]["operationId"] == oid)
 
@@ -205,7 +236,9 @@ class GeneratedProjectionTests(unittest.TestCase):
         if not (out / "acceptance-matrix.json").is_file():
             raise unittest.SkipTest("generated outputs are absent")
         cls.records = json.loads((out / "acceptance-matrix.json").read_text())["records"]
-        cls.authority = json.loads((out / "effective-authority.json").read_text())["specs"]
+        payload = json.loads((out / "effective-authority.json").read_text())
+        cls.authority = payload["specs"]
+        cls.detail = payload["detailAuthority"]
 
     def row(self, spec_id, file, number):
         found = [r for r in self.records if r["specId"] == spec_id and r["definitionSource"]["path"].endswith(file)
@@ -227,10 +260,16 @@ class GeneratedProjectionTests(unittest.TestCase):
         self.assertEqual(old["specId"], "FS050-01")  # the raw historical ID stays visible
         self.assertEqual(self.authority["FS050-01"]["effectiveSpecIds"], ["FS049"])
 
-    def test_malformed_briefing_id_projects_to_fs066_01_only(self):
-        row = self.row("ㅊ", "05-출퇴근-브리핑.csv", 134)
-        self.assertEqual(row["effectiveSpecIds"], ["FS066-01"])
-        self.assertEqual(row["specId"], "ㅊ")
+    def test_generated_spec_ids_are_well_formed_unless_declared_as_raw_corrections(self):
+        declared = {c["rawId"] for c in self.detail["rawIdCorrections"]}
+        malformed = {r["specId"] for r in self.records if not re.fullmatch(r"N?FS\d{3}(-\d{2})?", r["specId"])}
+        self.assertEqual(malformed, declared)
+
+    def test_resolved_raw_id_corrections_leave_no_malformed_row_and_a_current_definition_for_the_effective_id(self):
+        for item in self.detail["resolvedRawIdCorrections"]:
+            self.assertNotIn(item["rawId"], {r["specId"] for r in self.records})
+            row = self.row(item["effectiveSpecId"], item["file"], item["idRow"])
+            self.assertEqual((row["detailAuthority"], row["effectiveSpecIds"]), ("current", [item["effectiveSpecId"]]))
 
 
 if __name__ == "__main__":

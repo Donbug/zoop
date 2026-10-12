@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:103 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:103 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:210 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 기업·이슈 Entity Linking 및 동일성 판정: 추출된 기업 표기를 기업 마스터 ID에 연결하고 사건·이슈 후보를 기존 사건·이슈와 비교하여 연결·신규 생성·보류를 결정한다. AI는 동일성 판정을, 백엔드 B는 안정적인 ID와 참조 정합성을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:210 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 기업·이슈 Entity Linking 및 동일성 판정: 추출된 기업 표기를 기업 마스터 ID에 연결하고 사건·이슈 후보를 기존 사건·이슈와 비교하여 연결·신규 생성·보류를 결정한다. AI는 동일성 판정을, 백엔드 B는 안정적인 ID와 참조 정합성을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS056](feature-FS056.md) · [FS058](feature-FS058.md)
 
