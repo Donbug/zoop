@@ -1,6 +1,9 @@
 # OS / editor
 .DS_Store
 
+# SpringBoot
+.idea/
+
 # Python
 .venv/
 __pycache__/
