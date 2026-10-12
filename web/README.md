@@ -24,8 +24,19 @@ pnpm build
 
 ## 주요 구조
 
-- `src/apis`: 공통 API 클라이언트와 기능별 요청·응답 타입
+- `src/apis`: 공통 API 클라이언트와 API 전용 응답 래퍼
 - `src/components`: 공통 및 기능별 UI 컴포넌트
 - `src/hooks`: 재사용 React Hook
 - `src/pages`: 라우트 진입 페이지
 - `src/util`: UI와 API에 독립적인 유틸리티
+- `src/stores`: 인증·온보딩 초안·지도 UI·AI UI의 Zustand 상태
+- `src/types`: auth, map, company 등 페이지 도메인별 공유 타입
+- `src/constants`: 사용자/관리자 내비게이션
+
+## 개발 문서
+
+- [초기 설정 정리](docs/FRONTEND_SETUP.md): 실행 환경, 품질 도구, API, Git 훅
+- [와이어프레임 기반 구조](docs/WIREFRAME_ARCHITECTURE.md): 19개 페이지와 라우트, 공통 컴포넌트·상태·훅 후보
+
+현재 화면은 와이어프레임 기반 개발 골조입니다. 실제 인증·그래프·차트·관리자
+API는 후속 연결 대상입니다. 개발용 로그인은 Vite 개발 모드에서만 표시됩니다.
