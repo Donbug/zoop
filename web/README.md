@@ -18,7 +18,11 @@ pnpm dev
 pnpm lint
 pnpm format:check
 pnpm build
+pnpm test
 ```
+
+테스트는 Vitest·Testing Library(jsdom)로 실행하며 `tests/`에 둡니다. API는
+`tests/support/fakeServer.ts`로 fetch를 대체해 응답을 흉내 냅니다.
 
 커밋 시 Husky와 lint-staged가 staged 파일의 린트와 포맷을 검사합니다.
 

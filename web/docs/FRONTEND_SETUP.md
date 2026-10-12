@@ -25,7 +25,10 @@ corepack pnpm dev
 corepack pnpm lint
 corepack pnpm format:check
 corepack pnpm build
+corepack pnpm test
 ```
+
+테스트: Vitest + Testing Library + jsdom. 설정은 `vite.config.ts`의 `test`, 파일은 `tests/**/*.test.{ts,tsx}`, 공통 준비는 `tests/setup.ts`. API 호출은 `tests/support/fakeServer.ts`가 전역 fetch를 대체해 응답한다. 테스트 타입 검사는 `tsconfig.test.json`이 `tsc -b`에 포함한다.
 
 자동 수정: `corepack pnpm lint:fix`, `corepack pnpm format`.
 빌드 결과 확인: `corepack pnpm preview`.
