@@ -27,7 +27,7 @@ export default function OnboardingStep({
       </div>
       {children}
       {footer && (
-        <div className="sticky bottom-0 flex flex-col gap-2 border-t border-gray-200 bg-white py-3">
+        <div className="sticky bottom-0 flex flex-col gap-2 border-t border-gray-200 bg-[#f5f5f5] py-3">
           {footer}
         </div>
       )}
