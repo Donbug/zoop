@@ -1,0 +1,912 @@
+# 프론트엔드 프로젝트 초기 설정 가이드
+
+## 1. 문서 목적
+
+이 문서는 현재 `discpedia-frontend`의 구조와 개발 방식을 기준으로, 새로운 웹 프로젝트의 초기 골조를 구성하기 위한 가이드다.
+
+화면의 실제 콘텐츠와 도메인은 새 프로젝트에 맞게 바꾸되, 다음 항목은 동일한 방식으로 유지한다.
+
+- `Vite + React + TypeScript` 기반 구성
+- `src/apis`, `src/assets`, `src/components`, `src/hooks`, `src/pages`, `src/util` 중심의 폴더 구조
+- ESLint, Prettier, Husky를 이용한 코드 품질 관리
+- `createBrowserRouter`와 중첩 라우트를 이용한 라우팅
+- 공통 API 호출 함수와 제네릭 응답 타입을 이용한 API 계층
+- 인증이 필요한 페이지를 `ProtectedRoute`로 묶는 방식
+
+새 프로젝트에서는 아래 두 가지를 다르게 적용한다.
+
+1. 모바일 화면에서만 Bottom Navigation을 노출하고, 데스크톱 화면에서는 데스크톱 전용 Header 또는 Sidebar를 사용한다.
+2. 패키지 관리자는 npm 대신 pnpm을 사용한다.
+
+> 기준 브레이크포인트는 Tailwind CSS의 `md`인 `768px`로 한다. 즉, `768px` 미만은 모바일, `768px` 이상은 데스크톱 레이아웃으로 취급한다.
+
+---
+
+## 2. 기술 스택
+
+| 구분          | 적용 기술                                |
+| ------------- | ---------------------------------------- |
+| 빌드 도구     | Vite                                     |
+| UI            | React                                    |
+| 언어          | TypeScript                               |
+| 라우팅        | React Router DOM (`createBrowserRouter`) |
+| 스타일        | Tailwind CSS                             |
+| API 통신      | Fetch 기반 공통 API 래퍼                 |
+| 전역 상태     | Zustand가 필요한 경우 사용               |
+| 코드 검사     | ESLint                                   |
+| 코드 포맷     | Prettier                                 |
+| Git Hook      | Husky + lint-staged                      |
+| 패키지 관리자 | pnpm                                     |
+
+---
+
+## 3. 사전 준비와 프로젝트 생성
+
+### 3.1 권장 환경
+
+- Node.js 22 LTS 권장
+- pnpm 10 사용
+- Git 설치
+
+Corepack을 이용해 pnpm을 활성화한다.
+
+```bash
+corepack enable
+corepack prepare pnpm@10 --activate
+pnpm --version
+```
+
+### 3.2 Vite 프로젝트 생성
+
+```bash
+pnpm create vite <프로젝트명> --template react-ts
+cd <프로젝트명>
+pnpm install
+```
+
+### 3.3 의존성 설치
+
+```bash
+pnpm add react-router-dom axios zustand
+pnpm add -D prettier husky lint-staged eslint-config-prettier
+pnpm add -D tailwindcss @tailwindcss/vite
+```
+
+현재 프로젝트와 동일하게 React Compiler 구성을 사용할 경우 아래 패키지도 설치한다.
+
+```bash
+pnpm add -D @babel/core @rolldown/plugin-babel babel-plugin-react-compiler
+```
+
+### 3.4 패키지 관리자 고정
+
+루트 `package.json`에 `packageManager`를 추가해 팀 전체가 같은 pnpm 메이저 버전을 사용하도록 한다.
+
+```json
+{
+  "packageManager": "pnpm@10"
+}
+```
+
+프로젝트에는 `pnpm-lock.yaml`을 커밋한다. `package-lock.json`, `yarn.lock` 등 다른 패키지 관리자의 lock 파일은 함께 사용하지 않는다.
+
+---
+
+## 4. 폴더 구조
+
+화면 이름과 기능 이름은 새 서비스에 맞게 바꾸되, 최상위 역할 분리는 아래 구조를 유지한다.
+
+```text
+<project-root>/
+├─ .husky/
+│  └─ pre-commit
+├─ public/
+├─ src/
+│  ├─ apis/
+│  │  ├─ auth/
+│  │  │  ├─ api-config.ts
+│  │  │  ├─ ApiService.ts
+│  │  │  └─ auth.ts
+│  │  ├─ <feature>/
+│  │  │  └─ <feature>.ts
+│  │  ├─ apiResponse.ts
+│  │  └─ commonType.ts
+│  ├─ assets/
+│  │  └─ common/
+│  ├─ components/
+│  │  ├─ common/
+│  │  │  ├─ AppLayout.tsx
+│  │  │  ├─ BottomNav.tsx
+│  │  │  ├─ DesktopHeader.tsx
+│  │  │  └─ ProtectedRoute.tsx
+│  │  └─ <feature>/
+│  ├─ hooks/
+│  ├─ pages/
+│  ├─ util/
+│  ├─ App.tsx
+│  ├─ index.css
+│  └─ main.tsx
+├─ .env.example
+├─ .gitignore
+├─ .prettierignore
+├─ .prettierrc.json
+├─ eslint.config.js
+├─ package.json
+├─ pnpm-lock.yaml
+├─ tsconfig.app.json
+└─ vite.config.ts
+```
+
+### 폴더별 책임
+
+| 경로                       | 책임                                              |
+| -------------------------- | ------------------------------------------------- |
+| `src/apis`                 | API 요청·응답 타입, 요청 함수, 응답 정규화        |
+| `src/apis/auth`            | 인증 API, 토큰 처리, 공통 API 호출 함수           |
+| `src/assets`               | 이미지, 아이콘, 폰트 등의 정적 리소스             |
+| `src/components/common`    | 여러 화면에서 재사용하는 공통 컴포넌트와 레이아웃 |
+| `src/components/<feature>` | 특정 기능에서만 사용하는 컴포넌트                 |
+| `src/hooks`                | 재사용 가능한 React Hook                          |
+| `src/pages`                | 라우트와 일대일로 연결되는 페이지 컴포넌트        |
+| `src/util`                 | UI나 API 계층에 종속되지 않는 순수 유틸리티       |
+
+다음 기준을 지킨다.
+
+- 페이지는 라우팅의 진입점 역할을 하고, 반복되는 UI는 `components`로 분리한다.
+- 기능 전용 컴포넌트는 해당 기능 폴더에 둔다.
+- API 요청·응답 타입은 해당 API 파일 가까이에 둔다.
+- 여러 API에서 공통으로 쓰는 응답 타입만 `commonType.ts`에 둔다.
+
+---
+
+## 5. TypeScript 경로 별칭
+
+`tsconfig.app.json`의 `compilerOptions`에 별칭을 추가한다.
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
+```
+
+`vite.config.ts`에도 같은 별칭을 등록한다.
+
+```ts
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vite";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
+import tailwindcss from "@tailwindcss/vite";
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [
+    tailwindcss(),
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(dirname, "./src"),
+    },
+  },
+});
+```
+
+React Compiler를 사용하지 않는다면 `babel` 관련 import와 plugin 설정만 제거한다.
+
+---
+
+## 6. ESLint, Prettier, Husky 설정
+
+참고 프로젝트는 ESLint와 Husky가 설정되어 있지만, Prettier는 패키지만 설치되어 있고 별도 실행 스크립트와 설정 파일은 없다. 새 프로젝트에서는 같은 방향을 유지하면서 실제 포맷 검사가 동작하도록 설정 파일과 스크립트를 함께 둔다.
+
+### 6.1 ESLint
+
+루트의 `eslint.config.js`를 다음과 같이 구성한다.
+
+```js
+import js from "@eslint/js";
+import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import tseslint from "typescript-eslint";
+import { defineConfig, globalIgnores } from "eslint/config";
+import eslintConfigPrettier from "eslint-config-prettier";
+
+export default defineConfig([
+  globalIgnores([
+    "dist",
+    "node_modules",
+    "build",
+    "public/mockServiceWorker.js",
+  ]),
+  {
+    files: ["**/*.{ts,tsx}"],
+    extends: [
+      js.configs.recommended,
+      ...tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      globals: globals.browser,
+    },
+    rules: {
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+      "no-console": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "react-refresh/only-export-components": [
+        "warn",
+        { allowConstantExport: true },
+      ],
+    },
+  },
+  eslintConfigPrettier,
+]);
+```
+
+`eslint-config-prettier`는 반드시 마지막에 두어 ESLint의 스타일 규칙과 Prettier가 충돌하지 않게 한다.
+
+### 6.2 Prettier
+
+루트에 `.prettierrc.json`을 생성한다.
+
+```json
+{
+  "semi": true,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "endOfLine": "lf"
+}
+```
+
+루트에 `.prettierignore`를 생성한다.
+
+```text
+node_modules
+dist
+build
+coverage
+public/mockServiceWorker.js
+pnpm-lock.yaml
+```
+
+### 6.3 package.json 스크립트와 lint-staged
+
+`package.json`에 아래 항목을 반영한다.
+
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "preview": "vite preview",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
+    "*.{json,css,md,yml,yaml}": ["prettier --write"]
+  }
+}
+```
+
+### 6.4 Husky
+
+Husky를 초기화한다.
+
+```bash
+pnpm exec husky init
+```
+
+`.husky/pre-commit`은 다음 한 줄로 구성한다.
+
+```sh
+pnpm exec lint-staged
+```
+
+참고 프로젝트처럼 커밋 전에 전체 프로젝트를 검사하려면 `pnpm lint`를 사용할 수 있다. 다만 프로젝트 규모가 커질수록 커밋이 느려지므로, 새 프로젝트에서는 staged 파일만 검사하는 `lint-staged` 방식을 기본값으로 권장한다.
+
+설정 후 다음 명령으로 각각 검증한다.
+
+```bash
+pnpm lint
+pnpm format:check
+pnpm build
+```
+
+---
+
+## 7. 라우팅 구성
+
+라우팅은 현재 프로젝트와 동일하게 `createBrowserRouter`를 사용한다.
+
+- 공개 라우트와 인증 라우트를 구분한다.
+- 인증 라우트는 `ProtectedRoute`의 자식으로 둔다.
+- 공통 Header, Sidebar, Bottom Navigation이 필요한 페이지는 `AppLayout`의 중첩 라우트로 둔다.
+- 페이지 내부에는 자식 라우트가 렌더링될 `<Outlet />`을 둔다.
+
+### 7.1 ProtectedRoute
+
+`src/components/common/ProtectedRoute.tsx`
+
+```tsx
+import { Navigate, Outlet } from "react-router-dom";
+import { isAuthenticated } from "@/apis/auth/auth";
+
+export default function ProtectedRoute() {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+}
+```
+
+### 7.2 App.tsx
+
+실제 페이지명은 새 서비스의 화면 구성에 맞춰 교체한다.
+
+```tsx
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+} from "react-router-dom";
+import AppLayout from "@/components/common/AppLayout";
+import ProtectedRoute from "@/components/common/ProtectedRoute";
+import DetailPage from "@/pages/DetailPage";
+import HomePage from "@/pages/HomePage";
+import LoginPage from "@/pages/LoginPage";
+import MyPage from "@/pages/MyPage";
+import SearchPage from "@/pages/SearchPage";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Navigate to="/login" replace />,
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: "/detail/:id",
+        element: <DetailPage />,
+      },
+      {
+        element: <AppLayout />,
+        children: [
+          { path: "/home", element: <HomePage /> },
+          { path: "/search", element: <SearchPage /> },
+          { path: "/my", element: <MyPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
+  },
+]);
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+Vercel 같은 정적 호스팅에 배포하면서 `createBrowserRouter`를 사용한다면 새로고침 시에도 SPA 진입점으로 연결되도록 rewrite 설정이 필요하다.
+
+`vercel.json`
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+---
+
+## 8. 모바일·데스크톱 반응형 레이아웃
+
+이 부분이 참고 프로젝트와 가장 큰 차이점이다. 참고 프로젝트는 `#root`의 최대 너비를 `640px`로 제한하고 Bottom Navigation을 항상 렌더링하지만, 새 프로젝트는 전체 웹 너비를 사용한다.
+
+### 8.1 표시 정책
+
+| 화면 너비  | 레이아웃 | 내비게이션                    |
+| ---------- | -------- | ----------------------------- |
+| `< 768px`  | 모바일   | 하단 고정 Bottom Navigation   |
+| `>= 768px` | 데스크톱 | 상단 Header 또는 좌측 Sidebar |
+
+화면 표시 여부만 바꿀 때는 JavaScript로 `window.innerWidth`를 검사하지 않고 CSS/Tailwind 반응형 클래스를 우선 사용한다. 이렇게 하면 resize 이벤트 관리가 필요 없고 첫 렌더링 깜빡임도 줄일 수 있다.
+
+### 8.2 AppLayout
+
+`src/components/common/AppLayout.tsx`
+
+```tsx
+import { Outlet } from "react-router-dom";
+import BottomNav from "./BottomNav";
+import DesktopHeader from "./DesktopHeader";
+
+export default function AppLayout() {
+  return (
+    <div className="min-h-dvh bg-gray-50">
+      <div className="hidden md:block">
+        <DesktopHeader />
+      </div>
+
+      <main className="mx-auto w-full max-w-screen-xl px-4 pb-20 md:px-8 md:pb-8">
+        <Outlet />
+      </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-50 md:hidden">
+        <BottomNav />
+      </div>
+    </div>
+  );
+}
+```
+
+핵심은 다음 두 클래스다.
+
+- 데스크톱 UI: `hidden md:block`
+- 모바일 Bottom Navigation: `md:hidden`
+
+모바일 본문에 `pb-20`을 주어 고정된 Bottom Navigation이 콘텐츠 마지막 부분을 가리지 않도록 한다. 데스크톱에서는 `md:pb-8`로 모바일 전용 여백을 제거한다.
+
+### 8.3 BottomNav
+
+라우트 상태를 별도 숫자 상태로 저장하기보다 `NavLink`를 사용하면 현재 URL과 활성 메뉴가 자동으로 동기화된다.
+
+`src/components/common/BottomNav.tsx`
+
+```tsx
+import { NavLink } from "react-router-dom";
+
+const menus = [
+  { to: "/home", label: "홈" },
+  { to: "/search", label: "탐색" },
+  { to: "/my", label: "MY" },
+];
+
+export default function BottomNav() {
+  return (
+    <nav
+      aria-label="모바일 주 메뉴"
+      className="border-t border-gray-200 bg-white"
+    >
+      <ul className="mx-auto flex h-16 max-w-md items-center">
+        {menus.map((menu) => (
+          <li key={menu.to} className="flex-1">
+            <NavLink
+              to={menu.to}
+              className={({ isActive }) =>
+                `flex h-16 items-center justify-center text-sm ${
+                  isActive ? "font-semibold text-black" : "text-gray-400"
+                }`
+              }
+            >
+              {menu.label}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+```
+
+### 8.4 전역 CSS
+
+참고 프로젝트의 `#root { max-width: 640px; }` 제한은 새 프로젝트에서 제거한다.
+
+`src/index.css`
+
+```css
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: #f5f5f5;
+}
+
+#root {
+  width: 100%;
+}
+```
+
+콘텐츠의 최대 너비가 필요하면 `#root` 전체를 제한하지 말고 `main` 내부 컨테이너에 `max-w-screen-xl` 같은 클래스를 적용한다. 그래야 데스크톱 Header의 배경과 전체 레이아웃은 화면 너비를 모두 사용할 수 있다.
+
+---
+
+## 9. API 호출과 타입 구성
+
+API 계층은 다음 흐름을 유지한다.
+
+```text
+Page / Hook
+    ↓
+기능별 API 함수 + 요청·응답 타입
+    ↓
+공통 call 함수
+    ↓
+서버 API
+```
+
+### 9.1 환경 변수
+
+`.env.example`
+
+```text
+VITE_API_BASE_URL=https://api.example.com
+```
+
+실제 값은 `.env.local`에 두고 Git에 커밋하지 않는다.
+
+`src/apis/auth/api-config.ts`
+
+```ts
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+```
+
+운영 URL을 소스 코드에 직접 하드코딩하지 않는다.
+
+### 9.2 공통 응답 타입
+
+`src/apis/commonType.ts`
+
+```ts
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+  timestamp: string;
+};
+
+export type PageResponse<T> = {
+  items: T[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+  hasNext: boolean;
+};
+```
+
+### 9.3 공통 API 호출 함수
+
+현재 프로젝트처럼 아래 책임을 공통 `call` 함수에 모은다.
+
+- API Base URL 결합
+- JSON Header와 Body 처리
+- Access Token 추가
+- 쿠키 전송을 위한 `credentials: 'include'`
+- `401` 발생 시 토큰 갱신 후 원 요청 1회 재시도
+- 갱신 실패 시 인증 정보 제거 및 로그인 화면 이동
+- HTTP 오류를 예외로 변환
+
+`src/apis/auth/ApiService.ts`의 기본 형태는 다음과 같다.
+
+```ts
+import { API_BASE_URL } from "./api-config";
+
+type CallOptions = {
+  skipAuth?: boolean;
+};
+
+type RefreshResponse = {
+  data?: {
+    accessToken?: {
+      token?: unknown;
+    };
+  };
+};
+
+const ACCESS_TOKEN_KEY = "accessToken";
+const REFRESH_API = "/api/v1/auth/refresh";
+
+let refreshPromise: Promise<string> | null = null;
+
+function clearAuthentication() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem("oauth_state");
+}
+
+function moveToLogin() {
+  if (window.location.pathname !== "/login") {
+    window.location.replace("/login");
+  }
+}
+
+async function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const response = await fetch(`${API_BASE_URL}${REFRESH_API}`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(response.statusText || `HTTP ${response.status}`);
+      }
+
+      const body = (await response.json()) as RefreshResponse;
+      const token = body.data?.accessToken?.token;
+
+      if (typeof token !== "string" || token.length === 0) {
+        throw new Error("Access token is missing from refresh response");
+      }
+
+      localStorage.setItem(ACCESS_TOKEN_KEY, token);
+      return token;
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+function createRequestOptions(
+  method: string,
+  request: unknown,
+  accessToken: string | null,
+  skipAuth: boolean,
+): RequestInit {
+  const headers = new Headers({ "Content-Type": "application/json" });
+
+  if (accessToken && !skipAuth) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  return {
+    method,
+    headers,
+    credentials: "include",
+    ...(request !== undefined && request !== null
+      ? { body: JSON.stringify(request) }
+      : {}),
+  };
+}
+
+export async function call<TResponse = unknown>(
+  api: string,
+  method: string,
+  request?: unknown,
+  option?: CallOptions,
+): Promise<TResponse> {
+  const url = `${API_BASE_URL}${api}`;
+  const skipAuth = option?.skipAuth ?? false;
+  const requestedWithToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+
+  let response = await fetch(
+    url,
+    createRequestOptions(method, request, requestedWithToken, skipAuth),
+  );
+
+  if (response.status === 401 && !skipAuth) {
+    try {
+      const latestToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      const nextToken =
+        latestToken && latestToken !== requestedWithToken
+          ? latestToken
+          : await refreshAccessToken();
+
+      response = await fetch(
+        url,
+        createRequestOptions(method, request, nextToken, false),
+      );
+    } catch (error) {
+      clearAuthentication();
+      moveToLogin();
+      throw error;
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 && !skipAuth) {
+      clearAuthentication();
+      moveToLogin();
+    }
+
+    throw new Error(response.statusText || `HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return (await response.json()) as TResponse;
+}
+```
+
+동시에 여러 요청에서 `401`이 발생해도 `refreshPromise`를 공유하므로 refresh API는 한 번만 호출된다.
+
+### 9.4 기능별 API와 타입
+
+요청 타입과 응답 타입은 기능별 API 파일에 선언하고, 컴포넌트에서 `fetch`를 직접 호출하지 않는다.
+
+`src/apis/items/items.ts`
+
+```ts
+import { call } from "@/apis/auth/ApiService";
+import type { ApiResponse, PageResponse } from "@/apis/commonType";
+
+export type Item = {
+  id: number;
+  title: string;
+  createdAt: string;
+};
+
+export type ItemListParams = {
+  page?: number;
+  size?: number;
+  keyword?: string;
+};
+
+export type CreateItemRequest = {
+  title: string;
+};
+
+const ITEMS_BASE = "/api/v1/items";
+
+function toQueryString(params: ItemListParams) {
+  const search = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      search.set(key, String(value));
+    }
+  });
+
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function getItems(
+  params: ItemListParams = {},
+): Promise<PageResponse<Item>> {
+  const response = await call<ApiResponse<PageResponse<Item>>>(
+    `${ITEMS_BASE}${toQueryString(params)}`,
+    "GET",
+  );
+
+  return response.data;
+}
+
+export async function createItem(request: CreateItemRequest): Promise<Item> {
+  const response = await call<ApiResponse<Item>>(ITEMS_BASE, "POST", request);
+
+  return response.data;
+}
+```
+
+타입 작성 규칙은 다음과 같다.
+
+- 서버 JSON의 필드명과 TypeScript 타입의 필드명을 일치시킨다.
+- 요청 타입은 `...Request`, 단건 응답은 도메인명, 목록 조건은 `...Params`로 명명한다.
+- 값의 범위가 정해져 있으면 `string` 대신 문자열 유니온을 사용한다.
+- 알 수 없는 외부 데이터는 `any`보다 `unknown`을 우선 사용한다.
+- 컴포넌트는 공통 응답 래퍼가 아닌 실제 `data` 타입만 전달받게 한다.
+- 서버 응답 구조가 달라질 수 있다면 변환 함수를 API 계층에 두고 UI 계층으로 차이를 전파하지 않는다.
+
+---
+
+## 10. Git ignore
+
+기본 `.gitignore`에 다음 항목이 포함되어 있는지 확인한다.
+
+```gitignore
+# dependencies and build output
+node_modules
+dist
+dist-ssr
+coverage
+
+# local environment
+.env
+.env.*
+!.env.example
+*.local
+
+# logs
+*.log
+pnpm-debug.log*
+
+# editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+```
+
+---
+
+## 11. 초기 설정 완료 체크리스트
+
+### 프로젝트와 의존성
+
+- [ ] `pnpm install` 후 `pnpm-lock.yaml`이 생성되었다.
+- [ ] `package.json`에 `packageManager: pnpm@10`이 선언되어 있다.
+- [ ] 다른 패키지 관리자의 lock 파일이 없다.
+
+### 폴더와 타입
+
+- [ ] `apis`, `assets`, `components`, `hooks`, `pages`, `util` 구조가 생성되었다.
+- [ ] 공통 응답 타입과 기능별 요청·응답 타입이 분리되어 있다.
+- [ ] 컴포넌트 내부에서 API를 직접 호출하지 않는다.
+
+### 코드 품질
+
+- [ ] `pnpm lint`가 성공한다.
+- [ ] `pnpm format:check`가 성공한다.
+- [ ] 커밋 시 Husky와 lint-staged가 실행된다.
+- [ ] `pnpm build`가 성공한다.
+
+### 라우팅과 인증
+
+- [ ] 공개 라우트와 인증 라우트가 분리되어 있다.
+- [ ] 인증이 필요한 화면은 `ProtectedRoute` 아래에 있다.
+- [ ] 공통 레이아웃은 중첩 라우트와 `<Outlet />`을 사용한다.
+- [ ] 배포 환경에서 SPA rewrite가 적용되어 있다.
+
+### 반응형 UI
+
+- [ ] 모바일에서만 Bottom Navigation이 보인다.
+- [ ] 데스크톱에서는 Bottom Navigation이 숨겨진다.
+- [ ] 데스크톱 전용 Header 또는 Sidebar가 `md` 이상에서 보인다.
+- [ ] 모바일 본문 하단이 Bottom Navigation에 가리지 않는다.
+- [ ] `#root`에 모바일용 `max-width`가 강제되어 있지 않다.
+
+### API
+
+- [ ] Base URL은 `VITE_API_BASE_URL` 환경 변수로 관리한다.
+- [ ] 인증이 필요한 요청에 Access Token이 포함된다.
+- [ ] refresh 요청에는 쿠키가 포함된다.
+- [ ] 동시 `401`에서 refresh 요청이 중복 실행되지 않는다.
+- [ ] refresh 실패 시 로그인 화면으로 이동한다.
+
+---
+
+## 12. 최종 적용 원칙
+
+이 프로젝트에서 재사용할 대상은 개별 화면 디자인이 아니라 구조와 책임 분리 방식이다.
+
+- 페이지·컴포넌트·API·유틸리티의 경계를 동일하게 유지한다.
+- 라우터는 공개/보호/공통 레이아웃의 중첩 구조를 유지한다.
+- API는 공통 호출 계층과 기능별 타입 계층을 유지한다.
+- 코드 품질 도구는 커밋 전에 자동 실행되게 한다.
+- 모바일과 데스크톱은 같은 라우트를 공유하되 내비게이션과 배치만 반응형으로 분기한다.
+- pnpm을 단일 패키지 관리자로 사용한다.
+
+이 원칙을 따르면 화면 내용은 달라도 프로젝트의 개발 경험과 코드 골조는 현재 프로젝트와 일관되게 가져갈 수 있다.
