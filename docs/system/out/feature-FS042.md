@@ -1,27 +1,32 @@
-# FS042 · 재무와 실적 조회
+# FS042 · 시점 기반 관계 그래프 조회
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 팀 검토 전 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 42 |
+| 요구사항 번호(원문) | 42 |
+| 의미 기준 요구사항 |  |
 | API 대응 | 기존 API로 지원 |
-| 사유 | 10-08 상세 FS042는 FS0?? 시점 그래프 ID를 승계해 getCompanyGraphAsOf에 연결한다. 목차/요구42/옛 판정은 재무·실적 의미를 유지하므로 getCompanyFinancials는 충돌 별도 추적한다. 재무 폐기·시점그래프 완료·팀 승인으로 승격하지 않는다. |
+| 사유 | 목차·상세 FS042는 시점 기반 관계 그래프이며 getCompanyGraphAsOf에 연결한다. 목차의 요구 번호 42는 기준일 재무·실적(요구 42)이며 폐기 선언이 없어 reservedRequirements로 별도 유보한다. 재무 폐기·시점 그래프 완료·팀 승인으로 승격하지 않는다. |
 | 프로토타입 문서 판정 | 충돌(시점그래프 부분·재무 미구현) |
 | 코드 위치(실행 증거 아님) | prototype/bff/src/zoop_bff/routers/market.py |
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:52 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:52 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv) — 시점 기반 관계 그래프 조회: 시스템은 기업 상세에서 선택한 기준 시점의 기업 관계 그래프를 제공한다. 기업의 비교적 고정적인 구조 관계와, 해당 시점까지 공개되어 유효한 이슈 기반 관계를 구분하여 함께 표시한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv) — 시점 기반 관계 그래프 조회: 시스템은 기업 상세에서 선택한 기준 시점의 기업 관계 그래프를 제공한다. 기업의 비교적 고정적인 구조 관계와, 해당 시점까지 공개되어 유효한 이슈 기반 관계를 구분하여 함께 표시한다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:111 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+## 상세 권한과 의미 이행
+
+- 목차의 요구 번호 42는 번호만 일치한다. 요구 42는 요구 유지 · 전용 FS/WBS 미대응(유보)이며 ['getCompanyFinancials']에 요구 번호로만 연결한다.
+
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:111 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 
@@ -34,13 +39,14 @@
 
 ## 화면·목표 API
 
-[D-COM-01](screen-D-COM-01.md) · [M-COM-01](screen-M-COM-01.md) · [D-COM-01b](screen-D-COM-01b.md) · [D-COM-02](screen-D-COM-02.md) · [D-COM-04](screen-D-COM-04.md) · [D-COM-05](screen-D-COM-05.md) · [D-COM-06](screen-D-COM-06.md)
+[D-COM-01b](screen-D-COM-01b.md) · [D-COM-02](screen-D-COM-02.md) · [M-COM-01](screen-M-COM-01.md) · [D-COM-04](screen-D-COM-04.md) · [D-COM-05](screen-D-COM-05.md) · [D-COM-06](screen-D-COM-06.md)
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
-| [getCompanyFinancials](../../api/out/zoop-api-spec.md#getcompanyfinancials) | GET /api/v1/companies/{id}/financials | 6.1.2, 6.11.1 | 공개 |
 | [getCompanyGraphAsOf](../../api/out/zoop-api-spec.md#getcompanygraphasof) | GET /api/v1/companies/{id}/graph | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.4, 6.7.5, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.5.1 | 공개 |
 
 ## 확인 필요
 
-- SPEC_ID_MEANING_CONFLICT: 목차 FS042는 재무·실적, 상세 FS042는 FS0??를 승계한 시점 관계 그래프다. ID 정리는 완료됐지만 재무 폐기 선언은 없다. 두 의미를 별도로 추적한다.
+- INDEX_DETAIL_RANGE_STALE: 목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [77]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.
+- INDEX_REQUIREMENT_META_MISMATCH: 목차 요구 번호 ['42']와 현행 상세 메타 요구 번호 ['41']가 다르다. 원문을 보존한다.
+- REQUIREMENT_BINDING_BY_MEANING: 명세 '시점 기반 관계 그래프 조회' ↔ 원문 요구 번호 42 '재무와 실적 조회'. 의미 기준 연결은 요구 없음이다(원본 번호와 의미 충돌): 목차 FS042는 시점 기반 관계 그래프이나 목차의 요구 번호 42는 기준일 재무·실적(요구 42)이다. 상세 FS042의 메타는 요구 41을 표기한다. 시점 그래프만을 위한 요구 행은 요구사항 시트에 없다. 번호 일치로 재무 의미를 FS042에 붙이지 않고 요구 42는 reservedRequirements로 별도 추적한다.

@@ -253,7 +253,7 @@ prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixtur
 
 ## 시세 (요구 35·36·37·72)
 
-`ZOOP_QUOTE_PROVIDER`로 고른다. 실패는 빈 값이 아니라 `{"status":"unavailable","reasonCode","reason"}`이며 `reasonCode`는 `not_connected`(꺼짐·키 없음) / `unsupported_symbol`(출처가 다루지 않는 종목) / `no_data`(출처는 답했지만 그 기간 자료 없음) / `auth_failed`(토스 인증 실패) / `temporary_failure`(시간 초과·네트워크·429·5xx, 다시 시도 가능) / `format_changed`(응답이 JSON이 아니거나 예상한 필드가 없음, 다시 시도해도 같음)로 나뉜다.
+`ZOOP_QUOTE_PROVIDER`로 고른다. **정상 부재**는 200 `{"status":"unavailable","reasonCode","reason"}`이고 `reasonCode`는 `not_connected`(의도적으로 꺼짐·키 미설정) / `unsupported_symbol`(출처가 다루지 않는 종목) / `no_data`(출처는 답했지만 그 기간 자료 없음) 셋뿐이다. **출처 장애**는 빈 값이 아니라 503 `source_unavailable`(기존 오류 봉투 `{"error":{"code","message","details"}}`)이고 `details`는 `{"source":"market","area":"quote|metrics|prices","reasonCode","retryable"}`다. `reasonCode`는 `auth_failed`(토스 인증 실패, 또는 키 없는 야후·네이버가 401·403으로 접근 거부 — 키 문제가 아닐 수도 있다) / `temporary_failure`(시간 초과·네트워크·429·5xx) / `format_changed`(응답이 JSON이 아니거나 예상한 모양이 아님)이며, `retryable`은 `temporary_failure`일 때만 true다(인증·형식 문제는 그대로 다시 물어도 같다). `Retry-After`·비용 같은 값은 출처가 주지 않으므로 만들지 않는다. 오류 봉투에 최상위 `retryable`·대문자 코드는 아직 없다(`docs/api/openapi.yaml` 목표 계약과의 이행 차이).
 
 | 출처 | 쓰는 경우 | 주는 값 | 비고 |
 |---|---|---|---|
@@ -275,10 +275,14 @@ prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixtur
 | **네이버 증권** 국내 | `m.stock.naver.com/api/stock/{6자리}/integration`(`totalInfos`) + `/basic`(`localTradedAt`) | 시가총액·PER·EPS·PBR·BPS·배당수익률·주당배당금·외국인 소진율, 항목별 기준 기간(`valueDesc`, 예: `2026.06.`) |
 | **네이버 증권** 해외(미국·도쿄) | `ac.stock.naver.com/ac?q={티커}&target=stock`으로 거래소가 같은 항목의 `reutersCode`(`NVDA.O`·`PINS.K`·`HPE`·`6702.T`, 접미사가 거래소만으로 정해지지 않아 조회, 12시간 캐시) → `api.stock.naver.com/stock/{reutersCode}/basic`(`stockItemTotalInfos`) | 같은 항목(외국인 소진율 제외), 기준 기간은 `keyDesc`. 해외 행의 `valueDesc`는 원화 환산값이라 쓰지 않는다 |
 
-- 값은 출처가 적은 문자열 그대로(`1,606조 2,650억`, `12.33배`, `5조 5,040억 USD`)이고 계산·환산·추정하지 않는다. `N/A`는 행을 뺀다. 전일·시가·고저·거래량·52주는 시세 공급자가 맡고, 추정 PER/EPS(컨센서스)는 쓰지 않는다. 매출·영업이익 추이 같은 재무제표는 이 출처 응답에 없어 만들지 않는다.
+- 값은 출처가 적은 문자열 그대로(`1,606조 2,650억`, `12.33배`, `5조 5,040억 USD`)이고 계산·환산·추정하지 않는다. `N/A`·빈 값·읽을 수 없는 값의 행은 `items`에서 빠질 뿐 0으로 채우지 않으며 나머지 값은 그대로 준다(실제 `0.00%`는 값이다). 알려진 지표 행은 있는데 모두 값이 없거나(`N/A`·빈 값, 모르는 코드가 섞여 있어도) 유효한 빈 목록이면 `items: []`인 200 available이 아니라 200 `unavailable` `no_data`다. 알려진 지표 코드가 하나도 없는 비어 있지 않은 목록(이름이 바뀐 코드만 온 경우)은 어댑터가 구조를 해석하지 못한 것이라 503 `format_changed`다. 알려진 값 옆의 모르는 행은 무시한다. 전일·시가·고저·거래량·52주는 시세 공급자가 맡고, 추정 PER/EPS(컨센서스)는 쓰지 않는다. 매출·영업이익 추이 같은 재무제표는 이 출처 응답에 없어 만들지 않는다.
 - 시가총액 우선순위: 토스 키가 있어 `/quote`에 `marketCap`(현재가 × 발행주식수)이 있으면 화면은 그 값을 쓰고 이 출처의 시가총액은 숨긴다. 다른 지표는 이 출처.
 - 캐시: 지표 30분, `reutersCode` 12시간. 미지원(404·409)·형식 변경은 캐시해 같은 실패를 반복 요청하지 않고, 일시 장애는 캐시하지 않는다.
-- **위험과 교체 지점:** 문서 없는 공개 JSON이라 차단·필드 이름 변경·응답 형식 변경이 예고 없이 일어날 수 있다. 형식이 바뀌면 `format_changed`(JSON이 아님·`totalInfos`/`stockItemTotalInfos` 없음), 막히면 `temporary_failure`로 지표 영역만 `unavailable`이 된다. 교체는 `src/zoop_bff/quote_naver.py` 한 파일(`NaverMetricsProvider.metrics(listing) -> (Source, Metrics)`)만 바꾸면 되고, `ZOOP_METRICS_PROVIDER=off`로 끌 수 있다. 상용 배포 전에는 이용 조건을 확인한 공식 출처(토스증권 등)로 바꿔야 한다.
+- **위험과 교체 지점:** 문서 없는 공개 JSON이라 차단·필드 이름 변경·응답 형식 변경이 예고 없이 일어날 수 있다. 형식이 바뀌면 `format_changed`(JSON이 아님·`totalInfos`/`stockItemTotalInfos` 없음·알려진 지표 코드가 하나도 없음), 401·403 접근 거부는 `auth_failed`, 429·시간 초과·5xx는 `temporary_failure`로 지표 영역만 503 `source_unavailable`이 된다. 교체는 `src/zoop_bff/quote_naver.py` 한 파일(`NaverMetricsProvider.metrics(listing) -> (Source, Metrics)`)만 바꾸면 되고, `ZOOP_METRICS_PROVIDER=off`로 끌 수 있다. 상용 배포 전에는 이용 조건을 확인한 공식 출처(토스증권 등)로 바꿔야 한다.
+
+### 시세·지표 오류 계약의 런타임 확인 (2026-10-10)
+
+실제 `create_app` + `TestClient` HTTP로 `/quote`·`/metrics`·`/prices` 46건을 가짜 토스·야후·네이버 서버(`httpx.MockTransport`)에 물려 정상 부재(200 `unavailable`)와 출처 장애(503 `source_unavailable`)가 섞이지 않는지 확인했다. 46건 모두 기대와 일치(수정 전에도 돌린 39건 중 22건은 200 `unavailable`/`available`로 잘못 답함). 경계는 `tests/test_market_data.py`의 "absence vs failure at the HTTP boundary" 테스트가 지킨다. 실제 공급자·키·네트워크는 쓰지 않았고 이 확인은 정확성 스모크일 뿐 성능·용량 시험이 아니다. 표와 관찰 결과는 팀 공유용 보고서에 있다.
 
 ## Snapshot 확장 키 (`zoop`)
 
@@ -396,6 +400,20 @@ uv run python scripts/make_stress_fixture.py --check   # 커밋된 파일과 다
 - **기사 처리 결과와 기준 시점(FS058·D11)**: `ingest-run` 작업의 `ingest`는 `outcome`(`collected` 신규 있음 / `empty` 정상 확인된 신규 0건 = 성공 / `failed` / `cancelled`), 확인된 `newArticles`·`duplicateArticles`, `baselineBefore`·`baselineAfter`·`baselineAdvanced`를 기록한다. 성공은 종료 코드 0 + 읽을 수 있는 보고서 + 수집 요청 오류 0건일 때만이다. 보고서가 없거나(`ingest_unconfirmed`) 수집 요청이 실패했으면(`collection_failed`, 보고서의 `collectionErrorCount`) 신규 0건으로 기록하지 않고 실패로 둔다. 실패·취소 작업의 `newArticles`는 `null`이다(0이 아님). 기준 시점은 **정상 종료한 가장 최근 기사 처리 작업의 시작 시각**이며 신규 0건 성공도 옮기고, 실패·취소·재시작 중단은 옮기지 않는다(뒤로도 가지 않는다). 재시도하면 마지막 성공 시점에서 다시 시작한다. `GET /api/admin/jobs`의 `ingest`(`at`·`jobId`·`outcome`·`newArticles`·`unresolvedFailures`)와 `pipeline/overview`의 `jobs.ingest`가 현재 기준 시점을 준다. 05·35분 정기 수집, 공급 문서 ID·지연 유입 조회는 외부 수집원이 없어 만들지 않았다. 상태는 `queued/running/succeeded/failed/cancelled`, 시작·종료 시각, 종료 코드, RunReport(processed·approved·held·rejected·pending·errors·usage), 실행 전후 원장 수치, 로그 꼬리(300줄, 비밀값 마스킹), 취소(SIGINT → SIGTERM → SIGKILL)를 기록한다. CLI가 남은 오류로 종료 코드 1을 내면 `failed`(`cli_nonzero_exit`)로 두되 보고서는 그대로 싣는다.
 - 작업 기록은 상태 디렉터리에 영속한다. BFF가 재시작될 때 `queued|running`이던 작업은 남은 프로세스를 정리하고 `failed` + `recovered:true` + `interrupted_by_restart`로 확정한다(출력된 보고서가 있으면 첨부).
 - 작업이 끝나도 **사용자 그래프는 바뀌지 않는다.** 원장이 바뀐 것을 반영하려면 관리자가 버전을 게시해야 한다.
+
+### 독립 오프라인 원문 준비 (S2-1, FS074·FS075 일부)
+
+`zoop_bff.ingestion_cli`의 `run/resume/inspect`는 위 admin `ingest-run`과 **다른 내부 실행 경계**다. 설치된 BFF의 pinned PoC parser만 재사용하고 네트워크·모델·PoC 원장·앱/S1 DB에는 연결하지 않는다. 명시한 전용 `--state-dir`의 private `ingestion.sqlite3`에 원래 response/raw BLOB, source-local 문서 ID, raw/text version, HTML node/PDF page span과 연속 checkpoint를 저장한다. 현재 operator `--sources`는 매번 완전한 snapshot으로 읽고, fixture manifest는 hash-pinned 파일 입력일 뿐 권한을 발급하지 않는다.
+
+저장소 루트에서 다음 명령으로 합성 HTML/PDF와 실제 subprocess CLI를 재현한다. driver는 fresh 임시 입력/상태를 만들고 검사 후 모두 제거한다.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/ingestion_smoke.py
+```
+
+실제 결과는 `status=passed, preparedDocuments=2, providerCalls=0, modelCalls=0`이었다. receipt/raw/version/checkpoint 저장 뒤 프로세스 중단·resume, 같은 cursor replay, 변경 body의 새 버전, zero/failure/partial/parse hold, stale checkpoint, registry 철회/누락, entity·tail·반복 한글/emoji와 PDF page 좌표, S1 exact의 생성 separator 거부를 확인했다. review 회귀까지 포함한 focused `tests/test_ingestion.py`는 **43 passed, 기존 Starlette warning 1개**였다. 실제 scope A 철회 뒤 scope B의 XPath에 맞는 text/hold 분리와, 첫 supplier의 raw commit 뒤 파일이 없어도 공유 body로 둘째 supplier를 준비하는 복구도 통과했다.
+
+wire schema는 `zoop-ingestion-s2-1`이며 공용 OpenAPI나 S1 schema를 바꾸지 않았다. 정확한 문서/version을 고른 `inspect`만 현재 read 권한으로 내부 S1 `Document` projection을 반환한다. 원문 span 해석에는 quote-display도 요구한다. HTML 위치는 decoded DOM text/tail 좌표이고 PDF 위치는 frozen page-extracted text 좌표이지 raw byte·glyph geometry가 아니다. 이 문서는 앱 Dataset에 등록되거나 게시되지 않는다. 실제 공급원/정기 수집·기업/이슈 연결·S2-2/S3·공개 등록/게시·유료 의미 검증은 구현 완료로 주장하지 않는다. 명령·registry·manifest·한계와 실행 증거는 [AI 실행 계약의 S2-1 절](../../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)을 따른다.
 
 ### 샌드박스 (`ZOOP_POC_SANDBOX`, 기본 `~/.local/share/zoop/investmate-sandbox`)
 

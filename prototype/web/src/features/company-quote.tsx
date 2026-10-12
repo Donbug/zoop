@@ -1,7 +1,8 @@
 // 기업 상세 시세 영역(요구 35·72). 기업 개요와 따로 조회해 늦거나 실패해도 다른 영역을 막지 않는다(요구 54).
 //  - 현재가·전일 대비(색 + 부호 + 화살표 + 글자)·기준 시각·출처, 받은 지표만(시가총액·거래량·당일 고저·52주 고저).
 //  - 출처 상세(공식 여부·지연 가능·BFF가 계산한 값·출처 링크)는 Info 팝오버에 둔다.
-//  - 일시 장애는 이 영역만 오류와 [다시 시도], 미연결·미지원 종목·자료 없음은 사유 한 줄. 값을 지어내지 않는다.
+//  - 출처 장애는 BFF가 503 source_unavailable로 보낸다: 이 영역만 서버 사유를 보이고, 일시 장애(retryable)만 [다시 시도].
+//    미연결·미지원 종목·자료 없음(200 unavailable)은 사유 한 줄. 값을 지어내지 않는다.
 import { ChartNoAxesColumn, ExternalLink, Info } from "lucide-react";
 import { ApiError, type Schemas } from "@/api/client";
 import { useCompanyQuote } from "@/api/queries";
@@ -48,6 +49,12 @@ export function UnavailableLine({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** 시세·지표·차트 조회 오류. 출처 장애(503 source_unavailable)는 서버가 준 사유를 쓰고, 다시 해도 같은 장애(retryable=false)에는 [다시 시도]를 두지 않는다. */
+export function MarketErrorState({ error, title, onRetry }: { error: unknown; title: string; onRetry: () => void }) {
+  const source = error instanceof ApiError && error.code === "source_unavailable" ? error : null;
+  return <ErrorState compact error={error} title={title} message={source?.message} onRetry={source?.details?.retryable === false ? undefined : onRetry} />;
+}
+
 export function CompanyQuote({ companyId }: { companyId: string }) {
   const quote = useCompanyQuote(companyId);
 
@@ -60,15 +67,9 @@ export function CompanyQuote({ companyId }: { companyId: string }) {
       </LoadingBlock>
     );
   } else if (quote.isError) {
-    body = <ErrorState compact error={quote.error} title="시세를 불러오지 못했어요" onRetry={() => void quote.refetch()} />;
+    body = <MarketErrorState error={quote.error} title="시세를 불러오지 못했어요" onRetry={() => void quote.refetch()} />;
   } else if (quote.data.status === "unavailable") {
-    const data = quote.data;
-    body =
-      data.reasonCode === "temporary_failure" ? (
-        <ErrorState compact title="시세를 불러오지 못했어요" error={new ApiError(200, data.reasonCode, data.reason)} message={data.reason} onRetry={() => void quote.refetch()} />
-      ) : (
-        <UnavailableLine>{data.reason}</UnavailableLine>
-      );
+    body = <UnavailableLine>{quote.data.reason}</UnavailableLine>;
   } else {
     const { quote: q, source } = quote.data;
     const range = (low: number | null, high: number | null) =>

@@ -424,6 +424,18 @@
     }
   },
   "changed": {
+    "response:200:application/json.items[].id": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "google",
+          "kakao"
+        ]
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
     "response:401:application/json.error.code": {
       "target": {
         "type": "string",

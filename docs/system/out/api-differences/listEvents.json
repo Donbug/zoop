@@ -25,6 +25,18 @@
       "minimum": 1
     },
     "query.limit:required": false,
+    "response:200:application/json.items[].relationTypes": {
+      "type": "array",
+      "uniqueItems": true
+    },
+    "response:200:application/json.items[].relationTypes:required": true,
+    "response:200:application/json.items[].relationTypes[]": {
+      "type": "string",
+      "enum": [
+        "INVOLVES",
+        "STRUCTURALLY_RELATED_TO"
+      ]
+    },
     "response:200:application/json.nextCursor": {
       "type": [
         "string",
@@ -32,6 +44,18 @@
       ]
     },
     "response:200:application/json.nextCursor:required": true,
+    "response:200:application/json.unknownTimeItems[].relationTypes": {
+      "type": "array",
+      "uniqueItems": true
+    },
+    "response:200:application/json.unknownTimeItems[].relationTypes:required": true,
+    "response:200:application/json.unknownTimeItems[].relationTypes[]": {
+      "type": "string",
+      "enum": [
+        "INVOLVES",
+        "STRUCTURALLY_RELATED_TO"
+      ]
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -70,6 +94,43 @@
     },
     "response:404:application/json.error.retryable:required": true,
     "response:404:header:X-Request-ID": {
+      "type": "string"
+    },
+    "response:409:application/json.error.details": {
+      "type": "object"
+    },
+    "response:409:application/json.error.details.currentRevision": {
+      "type": "integer"
+    },
+    "response:409:application/json.error.details.currentRevision:required": false,
+    "response:409:application/json.error.details.fields": {
+      "type": "array"
+    },
+    "response:409:application/json.error.details.fields:required": false,
+    "response:409:application/json.error.details.fields[]": {
+      "type": "object"
+    },
+    "response:409:application/json.error.details.fields[].field": {
+      "type": "string"
+    },
+    "response:409:application/json.error.details.fields[].field:required": true,
+    "response:409:application/json.error.details.fields[].reason": {
+      "type": "string"
+    },
+    "response:409:application/json.error.details.fields[].reason:required": true,
+    "response:409:application/json.error.details.resourceId": {
+      "type": "string"
+    },
+    "response:409:application/json.error.details.resourceId:required": false,
+    "response:409:application/json.error.requestId": {
+      "type": "string"
+    },
+    "response:409:application/json.error.requestId:required": true,
+    "response:409:application/json.error.retryable": {
+      "type": "boolean"
+    },
+    "response:409:application/json.error.retryable:required": true,
+    "response:409:header:X-Request-ID": {
       "type": "string"
     },
     "response:422:application/json.error.details": {
@@ -310,29 +371,12 @@
     "response:404:application/json.error.details<anyOf:1>": {
       "type": "null"
     },
-    "response:409": true,
-    "response:409:application/json": {
-      "type": "object"
-    },
-    "response:409:application/json.error": {
-      "type": "object"
-    },
-    "response:409:application/json.error.code": {
-      "type": "string"
-    },
-    "response:409:application/json.error.code:required": true,
-    "response:409:application/json.error.details:required": false,
     "response:409:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
     "response:409:application/json.error.details<anyOf:1>": {
       "type": "null"
     },
-    "response:409:application/json.error.message": {
-      "type": "string"
-    },
-    "response:409:application/json.error.message:required": true,
-    "response:409:application/json.error:required": true,
     "response:422:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
@@ -434,6 +478,42 @@
       }
     },
     "response:404:application/json.error.code": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "INVALID_REQUEST",
+          "INVALID_CREDENTIALS",
+          "AUTH_REQUIRED",
+          "MEMBER_REQUIRED",
+          "ACCESS_DENIED",
+          "MEMBER_BLOCKED",
+          "EMAIL_TAKEN",
+          "TERMS_REQUIRED",
+          "RESOURCE_NOT_FOUND",
+          "EVIDENCE_UNAVAILABLE",
+          "VERSION_UNAVAILABLE",
+          "REVISION_CONFLICT",
+          "IDEMPOTENCY_CONFLICT",
+          "JOB_IN_PROGRESS",
+          "JOB_NOT_RETRYABLE",
+          "ALREADY_PUBLISHED",
+          "VALIDATION_FAILED",
+          "SOCIAL_AUTH_CANCELLED",
+          "SOCIAL_AUTH_FAILED",
+          "INVALID_CURSOR",
+          "RATE_LIMITED",
+          "SOURCE_UNAVAILABLE",
+          "MODEL_UNAVAILABLE",
+          "AUDIT_UNAVAILABLE",
+          "MASKING_FAILED",
+          "INTERNAL_ERROR"
+        ]
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
+    "response:409:application/json.error.code": {
       "target": {
         "type": "string",
         "enum": [

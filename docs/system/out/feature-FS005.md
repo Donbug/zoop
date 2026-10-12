@@ -1,15 +1,16 @@
 # FS005 · 비회원 시작
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 확정 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 5 |
+| 요구사항 번호(원문) | 5 |
+| 의미 기준 요구사항 | 5 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 부분 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:14 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:14 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv) — 비회원 시작: 사용자가 회원가입과 로그인 없이 서비스를 시작한다. 개인 설정 절차를 거치지 않고 메인 그래프에 진입하며, 회원과 동일한 메인 그래프 튜토리얼을 제공받는다. 로그인 전에는 계좌 연결·관심종목 설정·AI 질문을 이용할 수 없다. 비회원의 튜토리얼 진행·완료·건너뛰기 상태는 저장하지 않으며, 메인 그래프에서 튜토리얼 다시 보기 기능을 통해 언제든 튜토리얼을 다시 실행할 수 있다
+- [docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv) — 비회원 시작: 사용자가 회원가입과 로그인 없이 서비스를 시작한다. 개인 설정 절차를 거치지 않고 메인 그래프에 진입하며, 회원과 동일한 메인 그래프 튜토리얼을 제공받는다. 로그인 전에는 계좌 연결·관심종목 설정·AI 질문을 이용할 수 없다. 비회원의 튜토리얼 진행·완료·건너뛰기 상태는 저장하지 않으며, 메인 그래프에서 튜토리얼 다시 보기 기능을 통해 언제든 튜토리얼을 다시 실행할 수 있다
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:173 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:173 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

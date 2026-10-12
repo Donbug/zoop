@@ -9,7 +9,7 @@
 | 기능 | 목표 API | 경로 | 우선순위 |
 | --- | --- | --- | --- |
 | [FS038](feature-FS038.md) · [FS040](feature-FS040.md) | [getCompanyPrices](../../api/out/zoop-api-spec.md#getcompanyprices) | GET /api/v1/companies/{id}/prices | P1 |
-| [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) | [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | P1 |
+| [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) · [FS055](feature-FS055.md) | [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | P1 |
 | [FS021](feature-FS021.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) | [getEvent](../../api/out/zoop-api-spec.md#getevent) | GET /api/v1/events/{id} | P1 |
 | [FS038](feature-FS038.md) · [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS042](feature-FS042.md) · [FS055](feature-FS055.md) | [getCompanyGraphAsOf](../../api/out/zoop-api-spec.md#getcompanygraphasof) | GET /api/v1/companies/{id}/graph | P1 |
 

@@ -6,6 +6,8 @@
 
 기존 회차 `briefing-outlook` provider/replay 생성 기능은 worker로 이행해 **보존**했습니다. 현재 생산 명령은 `bff/scripts/judge_outlook.py`이고 합성 재현은 `ai-worker/scripts/replay_outlook_fixture.py`입니다. [설명서의 기존 outlook 절](../docs/share/prototype-guide.md#기존-회차-outlook-생성은-보존합니다)에서 fresh 상태·0이슈 무호출·발행 후 null까지 불변인 조건을 확인합니다. 기존 exact 정책(`semantic=null`)을 문서 의미 검증과 같은 수준으로 표시하지 않습니다. 새 기업·시장 요약만 S5 후속입니다.
 
+S2-1의 독립 오프라인 source-round→raw→정제/map→불변 문서 버전→resume→inspect도 구현했습니다. 합성 재현은 저장소 루트에서 `PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/ingestion_smoke.py`로 실행하며, 실제 JSON subprocess·HTML/PDF 좌표·중단 복구를 검사한 뒤 임시 상태를 모두 제거합니다. 이 경로는 앱/S1 DB를 쓰거나 문서를 사용자 화면에 등록·게시하지 않습니다. 현재 source registry와 hash-pinned fixture가 필수이며 HTTP fallback·모델 호출은 없습니다. [BFF 안내](bff/README.md#독립-오프라인-원문-준비-s2-1-fs074fs075-일부)와 [AI 실행 계약](../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)에서 실행 범위와 한계를 확인합니다. FS074·FS075 전체의 실제 공급원/정기 수집·앱 공개까지 완료했다는 뜻은 아닙니다.
+
 ## 1. 사전 준비
 
 - Node.js 22.12 이상, pnpm 11.9 계열, Python 3.12 이상, uv가 필요합니다.

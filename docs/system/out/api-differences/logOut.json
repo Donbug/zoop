@@ -3,11 +3,52 @@
   "targetPath": "/api/v1/auth/logout",
   "bffPath": "/api/auth/logout",
   "targetOnly": {
+    "header.X-CSRF-Token": {
+      "type": "string"
+    },
+    "header.X-CSRF-Token:required": false,
     "header.X-Request-ID": {
       "type": "string"
     },
     "header.X-Request-ID:required": false,
     "response:204:header:X-Request-ID": {
+      "type": "string"
+    },
+    "response:403:application/json.error.details": {
+      "type": "object"
+    },
+    "response:403:application/json.error.details.currentRevision": {
+      "type": "integer"
+    },
+    "response:403:application/json.error.details.currentRevision:required": false,
+    "response:403:application/json.error.details.fields": {
+      "type": "array"
+    },
+    "response:403:application/json.error.details.fields:required": false,
+    "response:403:application/json.error.details.fields[]": {
+      "type": "object"
+    },
+    "response:403:application/json.error.details.fields[].field": {
+      "type": "string"
+    },
+    "response:403:application/json.error.details.fields[].field:required": true,
+    "response:403:application/json.error.details.fields[].reason": {
+      "type": "string"
+    },
+    "response:403:application/json.error.details.fields[].reason:required": true,
+    "response:403:application/json.error.details.resourceId": {
+      "type": "string"
+    },
+    "response:403:application/json.error.details.resourceId:required": false,
+    "response:403:application/json.error.requestId": {
+      "type": "string"
+    },
+    "response:403:application/json.error.requestId:required": true,
+    "response:403:application/json.error.retryable": {
+      "type": "boolean"
+    },
+    "response:403:application/json.error.retryable:required": true,
+    "response:403:header:X-Request-ID": {
       "type": "string"
     },
     "response:404:application/json.error.details": {
@@ -45,43 +86,6 @@
     },
     "response:404:application/json.error.retryable:required": true,
     "response:404:header:X-Request-ID": {
-      "type": "string"
-    },
-    "response:409:application/json.error.details": {
-      "type": "object"
-    },
-    "response:409:application/json.error.details.currentRevision": {
-      "type": "integer"
-    },
-    "response:409:application/json.error.details.currentRevision:required": false,
-    "response:409:application/json.error.details.fields": {
-      "type": "array"
-    },
-    "response:409:application/json.error.details.fields:required": false,
-    "response:409:application/json.error.details.fields[]": {
-      "type": "object"
-    },
-    "response:409:application/json.error.details.fields[].field": {
-      "type": "string"
-    },
-    "response:409:application/json.error.details.fields[].field:required": true,
-    "response:409:application/json.error.details.fields[].reason": {
-      "type": "string"
-    },
-    "response:409:application/json.error.details.fields[].reason:required": true,
-    "response:409:application/json.error.details.resourceId": {
-      "type": "string"
-    },
-    "response:409:application/json.error.details.resourceId:required": false,
-    "response:409:application/json.error.requestId": {
-      "type": "string"
-    },
-    "response:409:application/json.error.requestId:required": true,
-    "response:409:application/json.error.retryable": {
-      "type": "boolean"
-    },
-    "response:409:application/json.error.retryable:required": true,
-    "response:409:header:X-Request-ID": {
       "type": "string"
     },
     "response:422:application/json.error.details": {
@@ -350,41 +354,41 @@
     },
     "response:401:application/json.error.message:required": true,
     "response:401:application/json.error:required": true,
-    "response:403": true,
-    "response:403:application/json": {
-      "type": "object"
-    },
-    "response:403:application/json.error": {
-      "type": "object"
-    },
-    "response:403:application/json.error.code": {
-      "type": "string"
-    },
-    "response:403:application/json.error.code:required": true,
-    "response:403:application/json.error.details:required": false,
     "response:403:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
     "response:403:application/json.error.details<anyOf:1>": {
       "type": "null"
     },
-    "response:403:application/json.error.message": {
-      "type": "string"
-    },
-    "response:403:application/json.error.message:required": true,
-    "response:403:application/json.error:required": true,
     "response:404:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
     "response:404:application/json.error.details<anyOf:1>": {
       "type": "null"
     },
+    "response:409": true,
+    "response:409:application/json": {
+      "type": "object"
+    },
+    "response:409:application/json.error": {
+      "type": "object"
+    },
+    "response:409:application/json.error.code": {
+      "type": "string"
+    },
+    "response:409:application/json.error.code:required": true,
+    "response:409:application/json.error.details:required": false,
     "response:409:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
     "response:409:application/json.error.details<anyOf:1>": {
       "type": "null"
     },
+    "response:409:application/json.error.message": {
+      "type": "string"
+    },
+    "response:409:application/json.error.message:required": true,
+    "response:409:application/json.error:required": true,
     "response:422:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
@@ -399,7 +403,7 @@
     }
   },
   "changed": {
-    "response:404:application/json.error.code": {
+    "response:403:application/json.error.code": {
       "target": {
         "type": "string",
         "enum": [
@@ -435,7 +439,7 @@
         "type": "string"
       }
     },
-    "response:409:application/json.error.code": {
+    "response:404:application/json.error.code": {
       "target": {
         "type": "string",
         "enum": [
@@ -542,6 +546,15 @@
       "bff": {
         "type": "string"
       }
+    },
+    "security": {
+      "target": [
+        {
+          "memberSession": []
+        },
+        {}
+      ],
+      "bff": []
     }
   }
 }

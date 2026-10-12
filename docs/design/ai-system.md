@@ -2,12 +2,12 @@
 
 ## 현재 구현 범위와 설계 논의 적용
 
-**현재 실행 단위는 S1 문서 요약·문서×기업 판정·별도 의미 검증이며, 기존 회차 outlook 생성 기능도 worker 경계로 보존·이행한다. 전체 AI 기능이나 FS074–081 전체의 완료를 뜻하지 않는다.** 설계 보고서 `local://ai-contract-design.md`의 §3–6과 §8/S1에서 합의한 worker 소유 경계, camelCase JSON, 불변 영수증, 현재 공개 gate, 무호출 저장 복구를 적용한다. 기존 outlook 생산자를 삭제하지 않는다는 추가 합의도 반영했다. 보고서는 설계 근거이며 실행 증거는 아니다.
+**현재 실행 단위는 S1 문서 요약·문서×기업 판정·별도 의미 검증과 기존 회차 outlook이며, S2-1의 독립 오프라인 원문 준비·검사도 구현했다. 전체 AI 기능이나 FS074–081 전체의 완료를 뜻하지 않는다.** 설계 보고서 `local://ai-contract-design.md`의 §3–6과 §8/S1에서 합의한 worker 소유 경계, camelCase JSON, 불변 영수증, 현재 공개 gate, 무호출 저장 복구를 적용한다. 기존 outlook 생산자를 삭제하지 않는다는 추가 합의도 반영했다. S2-1은 `local://s2-ingestion-contract.md`의 독립 저장소·현재 registry·정확한 원문 좌표 계약을 적용했다. 보고서는 설계 근거이며 실행 증거는 아래 별도로 기록한다.
 
 | 실행 단위 | 현재 상태 | 소유 의미와 후속 범위 |
 |---|---|---|
 | S1 | 구현: 문서 세 stage + 기존 briefing-outlook 이행 + 실제 JSON CLI + BFF 수입 | 문서의 versioned claim/citation과 기업별 판정을 검증·저장하고, 기존 회차 판정의 생성·발행 고정을 유지한다. |
-| S2 | 계획, 미구현 | 수집 회차·cursor·정제/raw 위치, 기존 PoC 추출/SAME 재사용, 별도 주제형 이슈 |
+| S2 | S2-1 구현: 오프라인 회차·raw·정제/map·불변 문서 버전·재개·검사 | 실제 공급원·정기 수집·앱 문서 등록은 미구현이다. PoC 추출/SAME 재사용과 별도 주제형 이슈는 S2-2에 남아 있다. |
 | S3 | 계획, 미구현 | 공급/경쟁/투자 관계와 영향, 관계 적격성, HOLD 검수 후 재검증 |
 | S4 | 계획, 미구현 | 전체 의존성 철회, 과거 pin·채팅·회차·캐시까지 공개 barrier와 증분 복구 |
 | S5 | 계획, 미구현 | 기업·시장 요약, 중요도 선정, 공통 출퇴근 브리핑 강화. 이미 있는 outlook 생산 능력은 S1 이행으로 보존한다. |
@@ -27,7 +27,7 @@
 
 새 BFF 필드는 항상 직렬화하되 결과가 없으면 nullable이다. 목표 OpenAPI에서는 단계적 소비자를 위해 새 필드를 optional·nullable로 명시한다. `analysisStatus.summary/sentiment`는 각각 `not_requested|pending|failed|withheld|available`이다. 실제 평가를 마쳤으나 방향 근거가 부족한 `sentiment.label=undetermined`와, 판정 산출물이 없는 `sentiment=null`은 다르다. 요약과 판정은 독립 작업이다. 요약의 HOLD/실패가 유효한 기업별 판정을 지우지 않는다. 외부 오류를 판단 보류로 바꾸지 않는다.
 
-`resultVersion`은 공개 요약이 있으면 그 요약 버전, 요약 없이 판정만 있으면 판정 버전이다. summary citation의 document/version/resultVersion과 evidence 응답 문맥을 프론트엔드가 대조한다. JS/Java는 UTF-16 index를 그대로 쓰면 안 된다. `offsetUnit=unicode_code_point`, `end`는 exclusive이고, exact 검증 때 공백·NFC·따옴표를 임의 정규화하지 않는다. S1 합성 표본의 cleaner는 identity이며 raw locator도 명시한다. 실제 HTML/PDF 정제·복수 raw locator 복원 전체는 S2에 남아 있다.
+`resultVersion`은 공개 요약이 있으면 그 요약 버전, 요약 없이 판정만 있으면 판정 버전이다. summary citation의 document/version/resultVersion과 evidence 응답 문맥을 프론트엔드가 대조한다. JS/Java는 UTF-16 index를 그대로 쓰면 안 된다. `offsetUnit=unicode_code_point`, `end`는 exclusive이고, exact 검증 때 공백·NFC·따옴표를 임의 정규화하지 않는다. S1 합성 표본의 cleaner는 identity이며 raw locator도 명시한다. S2-1은 별도 ingestion 저장소에서 HTML/PDF 정제와 복수 locator를 복원한다. 이 내부 문서를 현재 앱 Dataset에 등록하거나 공개하는 경로는 아직 없다.
 
 ## 호출·상태·복구
 
@@ -125,17 +125,18 @@ uv build --project prototype/ai-worker --offline --wheel --out-dir /tmp/zoop-ai-
 
 ## FS 구현 상태와 증거 위치
 
-| 기능 | S1에서 구현한 부분 | 아직 남은 부분 | 확인 코드/표본 |
+| 기능 | 현재 구현한 부분 | 아직 남은 부분 | 확인 코드/표본 |
 |---|---|---|---|
 | 문서 긍부정 / 뉴스 요약 | 기업별 독립 판정과 summary claim·근거·버전·실제 provider/replay→BFF GET | 실제 승인 모델/운영 품질·비용 결정 | `test_documents.py`, BFF `test_sentiment.py`, synthetic-document fixture |
 | 기존 회차 outlook 보존 | 실제 worker provider/replay·정확 참조/금지 표현 정책·미발행 회차 생성·발행 고정·0이슈 무호출 | 새 기업/시장 요약과 강화된 별도 의미 검증은 S5 등 후속 범위 | `test_outlook.py`, `test_outlook_worker.py`, `replay_outlook_fixture.py` |
-| FS075 | Unicode codepoint exact 인용, 동일입력 멱등, immutable 문서 version/citation 대조 | 실제 수집/HTML·PDF locator/cleaner 수정 전체 | emoji·한글 fixture 및 invalid span 시험 |
+| FS075 | S1 exact 인용·불변 version 대조, S2-1 source-local identity·raw/text 버전·HTML node/PDF page 좌표·재개 | 실제 공급원 정책·앱 등록·공개 인용 연동·추가 cleaner 정책 | `test_ingestion.py`, `ingestion_smoke.py`, S1 exact 규칙 |
 | FS080 | 호출 예약·received receipt·validated artifact·앱 import commit 분리, 같은 결과 수입 멱등 | GraphDB 양쪽 projection/readiness·manifest CAS 전체 | 저장 실패/수입 rollback 시험 |
 | FS081 | 문서 두 consumer의 현재 deny/version/hash gate, 저장 복구 시 새 호출 없음 | 전체 dependency closure·옛 채팅/회차/pin 제외 | direct evidence deny·cache/model/effort/version 시험 |
 | FS066/068 연동 | 문서 요약·기업판정·의미검증의 actual/replay 영수증을 관리자 사용량에 분리 연결 | S7 전체 평가·개인 결과 통합 | 관리자 ai-usage 수입 중복/토큰 null 시험 |
-| FS074/076/077/078/079 | S1에서 완료 주장하지 않음 | S2–4의 수집·주제·관계·영향·검수 | 설계 scope 표 |
+| FS074 | S2-1 합성 source-round·페이지 응답/raw 영속·연속 checkpoint·저장 복구 | 실제 공급원·05/35분 스케줄·지연 등록/조회 보장·앱 등록 | 독립 `ingestion_cli`, `test_ingestion.py`, `ingestion_smoke.py` |
+| FS076/077/078/079 | S1/S2-1에서 완료 주장하지 않음 | S2-2–4의 주제·관계·영향·검수 | 설계 scope 표 |
 
-이 문서의 구현 설명은 위 source와 합성 계약을 가리킨다. 실제 운영 모델의 의미 품질, 출처 라이선스 최종 승인, 금액 상한, S2–7은 검증된 완료 항목이 아니다.
+이 문서의 구현 설명은 위 source와 합성 계약을 가리킨다. 실제 운영 모델의 의미 품질, 출처 라이선스 최종 승인, 금액 상한, S2–7 전체는 검증된 완료 항목이 아니다.
 
 ## 실행으로 확인한 결과
 
@@ -151,3 +152,55 @@ uv build --project prototype/ai-worker --offline --wheel --out-dir /tmp/zoop-ai-
 - `uv lock --offline` 및 `uv sync --offline --frozen --group dev --no-install-project`는 기존 캐시만 재사용했다. `uv build --offline --wheel`도 성공하여 `/tmp/zoop-ai-doc-backend-dist/zoop_ai_worker-0.1.0-py3-none-any.whl`을 만들었다. 실제 model HTTP는 0이며 HTTP adapter는 합성 MockTransport에서만 실행했다.
 
 위 API smoke에 사용한 소유 서버는 모두 종료했다. 원본 PoC의 소스/DB에 쓰지 않았고, 실제 `.env`/키/개인정보나 공유 포트/상태는 읽거나 사용하지 않았다. 고정 PoC dependency의 읽기 규칙만 기존 환경에서 재사용했다.
+
+## S2-1: 독립 오프라인 원문 준비와 검사
+
+`prototype/bff/src/zoop_bff/ingestion_cli.py`는 설치된 BFF interpreter로 실행하는 **내부 JSON 프로세스**다. FastAPI route, admin job, S1 명령이나 앱 문서 등록 API가 아니다. 명시한 전용 `--state-dir`의 `ingestion.sqlite3`만 쓰며, 앱/S1 상태와 섞인 디렉터리는 거부한다. 디렉터리는 0700, DB·lock은 0600이고 SQLite WAL·FULL commit·foreign key와 OS 독점 잠금을 사용한다. 원본 응답과 문서 바이트는 같은 DB의 SHA-256 content-addressed BLOB에 저장하므로 checkpoint가 미게시 파일을 가리키는 문제가 없다. 원본 PoC checkout은 import하지 않고 기존 pinned 설치본의 URL 검증·HTML scope/noise/access 검사·PDF decoding/preflight helper만 한 adapter에서 재사용한다. 의존성이나 lock 변경은 없다.
+
+### 명령과 권한
+
+wire schema는 `zoop-ingestion-s2-1`이다. 알 수 없는 필드·버전은 거부하며, `ingestion_contracts.py`의 strict 모델이 실행 계약을 소유한다. stdout은 JSON 한 객체다. 등록 전 오류는 `{schemaVersion,error:{code}}`와 종료 코드 2를 반환하고, 등록 이후 운영 실패는 `state=incomplete`와 저장된 `failure.code`를 반환한다. `state=complete`는 원문 준비 회차의 완료이며 분석·게시 성공이 아니다.
+
+| 명령 | stdin 필드 | 별도 파일 |
+|---|---|---|
+| `run` | `schemaVersion,roundId,sourceId,scopeId,window,checkpointRevision,fixtureManifestHash,cleanerVersion` | `--sources`, `--fixture-manifest` |
+| `resume` | `schemaVersion,roundId,sourceId` | 새로 읽는 현재 `--sources` |
+| `inspect` | `schemaVersion,roundId,sourceId`; 선택적으로 정확한 `documentId,documentVersion` | 현재 `--sources` |
+
+`window`는 null 또는 timezone이 있는 `{from,through}`다. `cleanerVersion`은 현재 `exact-copy-1`만 지원한다. `inspect`의 메타데이터는 `offset,limit`(기본 50, 최대 100)으로 안정적인 페이지/후보 순서를 나누고, 본문은 정확한 문서·버전 하나를 선택한 경우에만 반환한다. 좌표 해석에는 추가로 `locatorId,start,end`를 보내며, clean interval과 겹치는 원문 span을 산술로 계산한다. 같은 문자열을 원문에서 검색해 위치를 추정하지 않는다.
+
+registry는 `{schemaVersion,revision,sources}`의 **현재 완전한 snapshot**이다. source는 `sourceId,adapter="authored-files",inputRoot,allowedHosts,scopes,grant`를 가진다. scope는 `scopeId,selection,initialCursor,articleXPath,timestampLimitations`를 고정한다. grant는 기존 `grantId,revision,sourceId,enabled,rights,allowedOperations,recipients,purposes,evidence,expiresAt` 어휘를 보존한다. 수집/정제에는 read·store가 필요하고, 내부 본문 검사에는 read, 원문 인용 span 검사에는 read·quote-display가 필요하다. model-send를 요구하거나 저장 권한에서 추론하지 않는다. 누락·disabled·unknown·만료·권한 근거 부재는 거부한다. raw 접근·내용 commit·checkpoint·본문 반환 직전에 현재 파일을 다시 대조하며, 실행 중 atomic 교체가 일어나면 rollback/중단하고 명시적 resume에서 새 snapshot을 읽는다. 과거 실행의 registry hash/BLOB이 현재 권한을 복구하지 않는다.
+
+fixture manifest는 권한 파일이 아니다. `{schemaVersion,sourceId,scopeId,pages,documents}`를 가지며 모든 응답은 `{file,sha256}`로 고정한다. page는 `pageId,cursor,response,status,nextCursor,terminal,coverageThrough`를 선언하고, 저장하는 discovery JSON은 `{items,more,nextCursor}`다. item은 supplier ID·원래 URL·본문 ref·media type·제목·published/modified/source revision을 구별한다. `documents`는 body ref에서 응답 파일로 연결한다. 입력은 source의 명시적 absolute namespace 안의 상대 파일만 읽는다. traversal·절대 경로·URL·symlink·device/FIFO·hash 불일치를 거부하며, 파일이 없어도 HTTP로 전환하지 않는다. JSON은 2 MB, raw 문서는 10 MB, 추출 text/source representation은 500,000 code point로 제한한다. node/segment 수에도 상한이 있다.
+
+### 영속성과 좌표의 의미
+
+- source-local supplier ID가 우선이며, 없으면 pinned PoC의 최소 canonical URL을 쓴다. query 순서를 바꾸거나 tracking parameter를 삭제하지 않는다. URL fallback 뒤 유일하고 충돌 없는 supplier ID가 확인되면 기존 document ID에 alias를 붙인다. 경쟁하는 URL identity는 조용히 합치지 않으며, supplier를 확정할 수 없는 후보는 raw를 보존하고 identity hold로 남긴다. 같은 이벤트·같은 본문이어도 다른 supplier/source 문서는 별개다.
+- `rawHash`는 수신 바이트의 SHA-256이고, S1 `sourceHash`는 canonical JSON string의 digest다. raw revision에는 안정적인 문서 metadata를 포함하되 observed time·round·grant revision은 제외한다. parser/cleaner·text hash·mapping digest를 포함한 `documentVersion`과 locator는 불변이다. 같은 입력은 재사용하고 바이트만 바뀌어 정제 text가 같아도 raw/text lineage를 새로 보존한다.
+- 현재 adapter의 동적 본문 선택 설정인 `articleXPath`도 `parserProfile`에 고정하고 preparation key·`documentVersion`에 포함한다. 서로 다른 selector는 정제 text가 같아도 별도 준비 버전이다. scope ID·grant revision 같은 권한 이력을 원문 identity/raw revision으로 섞지 않는다. selector가 바뀐 새 scope는 이전 scope의 text나 parse hold를 재사용하지 않으며, selector binding이 없는 옛 profile의 본문 조회는 `preparation_profile_unbound`로 거부한다.
+- raw save·정제 결과/hold save·page/checkpoint commit은 독립적인 복구 경계다. 저장된 입력은 resume 때 파일 없이 재사용하고, 아직 저장하지 못한 응답만 원래 hash의 파일이 필요하다. 페이지의 모든 raw·text 결과 또는 reasoned hold가 durable해야 연속 cursor를 옮긴다. 부분 discovery·항목 오류·누락 body는 페이지를 끝내지 않는다. 유효한 zero와 비영(非零) discovery의 버전 재사용은 counts/completion으로 구별한다.
+- 여러 supplier 후보가 같은 body hash를 가리키면, 현재 권한을 다시 확인한 뒤 **동일 source/round slice에서 실제로 저장한 문서 BLOB**을 재사용한다. 다른 source/round의 global BLOB을 hash만으로 가져오지 않는다. 첫 후보의 raw commit 뒤 입력 파일이 없어져도 다음 후보를 이어 준비하며, supplier별 document/raw/text identity는 별개로 유지한다.
+- 성공한 조회 범위는 모든 페이지와 terminal coverage가 확인된 경우만 이동한다. `more=true`에서 fixture가 끝나면 incomplete다. 마지막 transaction에서도 checkpoint revision을 비교하므로 오래된 round가 새 checkpoint를 덮지 못한다. 완료된 과거 round는 현재 checkpoint 문맥과 자신의 완료 revision을 함께 반환한다.
+- HTML 위치는 원래 parsed DOM의 절대 path·text/tail slot과 저장된 **decoded node string**의 Unicode `[start,end)`다. entity 확장·HTML repair 뒤의 위치이며 markup byte offset은 아니다. inline node를 잇는 인용은 각 원래 span을 보존하고, 제거한 noise의 surviving tail도 원래 slot을 유지한다. 삽입한 block/noise separator에는 좌표를 만들지 않는다.
+- PDF는 최대 30초로 감독하는 disposable child에서 PoC의 raw/page/decoded/aggregate/filter 예산과 encrypted/external decoder 거부를 유지한다. 각 page의 수정하지 않은 추출 문자열·page hash·1-based page number를 저장한다. 모든 page가 비어 있어 `no_usable_body` hold가 된 경우에도 frozen page table을 private preparation에 보존하고, bounded 후보 metadata에 page/empty-page 수와 representation hash를 반환한다. output limit이면 hold하며 잘린 text를 성공으로 반환하지 않는다. 좌표는 page-extracted text의 code point이지 PDF byte·glyph·bounding box·OCR·시각적 읽기 순서 보장이 아니다.
+- 내부 S1 `Document` projection은 최대 연속 mapped run만 `rawLocators`로 제공한다. 생성 separator나 PDF page 경계를 가로지르는 인용은 기존 `exact()`에서 거부된다. S1 schema·exact 규칙·권한 검사는 변경하지 않았다. 이것은 앱 Dataset 문서나 PoC `Article.version` 등록이 아니므로 기존 BFF importer를 우회하지 않는다. 기업 연결·현재 문서 소유권·public registration·publication·유료 semantic validation은 이 실행에 없다.
+
+### 실제 재현 결과
+
+저장소 루트에서 실행하는 재현 명령은 다음과 같다.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=prototype/bff/src \
+  prototype/bff/.venv/bin/python -m pytest prototype/bff/tests/test_ingestion.py -q -p no:cacheprovider
+PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/ingestion_smoke.py
+```
+
+2026-10-08에 BFF 디렉터리에서 첫 명령과 동등한 `PYTHONPATH=src .venv/bin/python -m pytest tests/test_ingestion.py -q -p no:cacheprovider --basetemp <소유 임시 디렉터리>`를 최종 실행하여 **43 passed, 1 warning**을 확인했다. warning은 기존 conftest의 Starlette HTTPX deprecation이다. 최초 실행은 XPath wire alias 불일치로 36 failed/3 passed였고 명시 alias로 고쳤다. 다음 실행의 1 failed/38 passed는 과거 문서 조회에서 현재 checkpoint도 고정돼야 한다는 잘못된 시험 기대였으며, 불변 document/map과 현재 checkpoint를 따로 대조하도록 수정했다. 초기 39개 시험에 아래 review 회귀 4개를 더했다. 최종 시험은 raw/clean save 복구, commit 안의 권한 변경 rollback, 최종 checkpoint CAS, identity 모호성, 권한·범위 누락, HTML entity/tail/emoji, PDF encrypted/page/output/external decoder hold와 scope별 준비 identity를 포함한다.
+
+실제 `ingestion_smoke.py`는 합성 HTML/PDF 두 문서에서 `status=passed, preparedDocuments=2, providerCalls=0, modelCalls=0`을 반환했다. 같은 cursor replay·변경 body의 새 버전·서로 다른 supplier·zero/failed/partial/hold·registry 철회/누락·정확한 HTML/PDF span·기존 S1 exact의 separator 거부를 실제 JSON subprocess로 실행했다. page receipt/raw/version/checkpoint 각각의 commit 뒤 프로세스를 종료 코드 75로 중단한 뒤, 이미 저장한 입력 파일과 manifest를 없애고 새 프로세스 resume으로 복구했다. 별도 stale round는 새 revision을 유지하면서 `checkpoint_stale`을 반환했다. 앱/S1 sentinel 파일은 unchanged였으며 ingestion 전용 파일만 생겼다.
+
+review에서 지적한 두 문제도 수정 전에 재현했다. A/B가 같은 source·supplier·raw·metadata에 서로 다른 XPath를 쓰고 A scope를 registry에서 제거했는데, B가 A의 text/hold를 재사용했다. 저장된 B version에서 실제 `이전 A😀`를 확인했다. 또 서로 다른 두 supplier가 같은 body ref를 쓰는 subprocess를 첫 raw commit 뒤 종료하고 원문 파일·page·manifest를 제거하니 resume이 incomplete였다. 세 재현 시험은 수정 전 모두 실패했다. selector profile binding과 같은 source/round의 저장 raw 재사용으로 고친 뒤, 동일 본문을 선택하는 서로 다른 XPath와 grant revision 변경의 무재준비까지 포함해 43개 시험이 통과했다. 중간 1 failed/42 passed는 기존 missing-body fixture가 이미 저장한 원문과 같은 hash를 썼기 때문이며, 정말 미저장인 다른 바이트의 body로 바꿔 checkpoint 미전진·복구 조건을 유지했다. 실제 smoke의 `reviewRegressions`도 A-ready/B, A-hold/B, 첫 raw commit 뒤 공유 body 복구 세 항목 모두 통과했다.
+
+suite의 소유 임시 상태와 smoke의 모든 원문·DB·lock·sentinel은 실행 뒤 제거했다. `ingestion_smoke.py`는 매번 fresh `TemporaryDirectory`를 만들고 제거 여부를 출력한다. 남긴 것은 재현 가능한 authored helper와 behavioral tests뿐이다. 실제 공급원·네트워크·모델·새 서비스·원본 PoC 상태·앱/S1 상태에 연결하지 않았다. 실운영 공급원 pagination/late-registration 보장, 정기 수집, 회사/이슈 연결, 앱 등록·공개와 S2-2/S3/S4는 별도 범위다.
+
+Main의 최종 통합 실행에서도 BFF 전체 **353 passed, 1 warning**과 위 실제 CLI smoke의 전체 항목·review 회귀 3개 통과를 확인했다. 두 review 지적은 수정 후 해당 경로의 독립 소스 재검토에서 resolved로 확인됐다. OpenAPI/기존 합성 계약 검사와 생성 문서 drift **274개**, XLSX **9시트·45,428셀** 비교도 통과했고 원문 경고·목표/BFF 차이333건은 보존했다. 공개 OpenAPI·의미 연결·웹 생성 타입·S1 contracts/CLI·BFF manifest/lock의 SHA-256은 작업 시작 때와 동일하다. 이는 기존 팀 검토본과 S1 경계를 보존한 증거이며 전체 운영 보안이나 실수집 품질 인증이 아니다. 커밋·푸시·배포는 수행하지 않았다.

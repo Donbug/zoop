@@ -1,0 +1,65 @@
+[
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 34,
+    "column": 8,
+    "cell": "H34",
+    "before": "2026-11-27 00:00:00",
+    "after": "2026-11-06 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 92,
+    "column": 6,
+    "cell": "F92",
+    "before": "정세빈",
+    "after": "임현"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 159,
+    "column": 6,
+    "cell": "F159",
+    "before": "임현",
+    "after": "김도현/홍정현"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 174,
+    "column": 8,
+    "cell": "H174",
+    "before": "2026-11-27 00:00:00",
+    "after": "2026-10-28 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 179,
+    "column": 8,
+    "cell": "H179",
+    "before": "2026-11-27 00:00:00",
+    "after": "2026-10-27 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 181,
+    "column": 8,
+    "cell": "H181",
+    "before": "2026-11-02 00:00:00",
+    "after": "2026-10-28 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 183,
+    "column": 8,
+    "cell": "H183",
+    "before": "2026-11-05 00:00:00",
+    "after": "2026-10-28 00:00:00"
+  }
+]

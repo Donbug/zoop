@@ -298,6 +298,23 @@ def select_company(page):
     settle(page)
 
 
+# 관심 종목 추천은 제거됐다(2026-10-10). 검색을 실행한 결과 행을 직접 눌러 고른다.
+WATCH_PICKS=[('NVIDIA',['NVIDIA']),('SK',['SK하이닉스']),('삼성',['삼성전자','삼성SDI'])]
+
+
+def pick_watchlist_by_search(page):
+    assert not page.locator('[aria-labelledby="onboarding-recommended"], ul[aria-label="추천 종목"]').count(), '추천 영역이 남아 있음'
+    form=page.get_by_role('search',name='종목 검색',exact=True)
+    for query,names in WATCH_PICKS:
+        form.get_by_placeholder('종목명이나 종목 코드').fill(query)
+        observed_click(page,form.get_by_role('button',name='검색',exact=True),{'role':'button','name':'검색','query':query})
+        results=page.get_by_role('list',name=f'‘{query}’ 검색 결과',exact=True)
+        for name in names:
+            observed_click(page,results.get_by_role('button',name=re.compile('^'+re.escape(name))).first,{'role':'button','name':name,'list':f'‘{query}’ 검색 결과'})
+    expect(page.get_by_role('button',name='4개 종목으로 시작하기',exact=True)).to_be_visible()
+    assert not any(c['path']=='/api/me/recommendations' for c in api_calls), '온보딩이 추천 API를 요청함'
+
+
 def run_watchlist_only(browser):
     previous=json.loads((OUT/'manifest.json').read_text())
     old_history=json.loads((OUT/'interaction-history.json').read_text()) if (OUT/'interaction-history.json').exists() else []
@@ -311,20 +328,20 @@ def run_watchlist_only(browser):
     click(page,'button',re.compile('지금 주식에 투자'))
     click(page,'button','선택한 가상 계좌 연결하기')
     click(page,'button','관심 종목도 고르기')
-    recommended=page.locator('ul[aria-label="추천 종목"] li button')
-    for n in range(4): recommended.nth(n).click()
+    pick_watchlist_by_search(page)
     if 'D-WAT-01b' in args.slides:
-        snap(page,'D-WAT-01b','관심 종목 4개 선택','FS012','추천 기업을 네 번 선택',states='4개 선택',checks=[('button','NVIDIA 빼기','선택 목록에서 NVIDIA를 빼고 3개로 바꿔요.','D-WAT-01')],note='3개 상한 없이 실제 4개를 선택했어요.')
+        snap(page,'D-WAT-01b','관심 종목 4개 선택','FS012','검색 3회 실행 후 결과 행 네 번 선택',states='4개 선택',checks=[('button','NVIDIA 빼기','선택 목록에서 NVIDIA를 빼고 3개로 바꿔요.','D-WAT-01')],note='3개 상한 없이 실제 검색으로 4개를 선택했어요.')
     picked=page.locator('section[aria-labelledby="onboarding-picked"] button')
     while picked.count(): picked.first.click()
     expect(page.get_by_text('고르지 않아도 보유 종목 기준 내 종목 지도로 시작할 수 있어요.',exact=True)).to_be_visible()
     if 'D-WAT-01' in args.slides:
-        snap(page,'D-WAT-01','관심 종목 선택','FS011-01·FS011-02·FS012·FS013','모의 보유 3개 연결 후 관심 종목 고르기',states='선택 0개 · 보유 기준 진입 안내',checks=[('button','고르지 않고 지도 보기','관심 0개를 저장하고 보유 종목 기준 내 종목 지도를 열어요.','D-GRP-01b')],note='관심 0개여도 연결한 보유 종목을 기준으로 시작해요.')
+        snap(page,'D-WAT-01','관심 종목 선택','FS011-01·FS012·FS013','모의 보유 3개 연결 후 관심 종목 고르기',states='선택 0개 · 검색 결과',checks=[('button','고르지 않고 지도 보기','관심 0개를 저장하고 보유 종목 기준 내 종목 지도를 열어요.','D-GRP-01b')],note='관심 0개여도 연결한 보유 종목을 기준으로 시작해요. 추천 목록 없이 검색으로만 골라요.')
+    assert not any(c['path']=='/api/me/recommendations' for c in api_calls), '온보딩이 추천 API를 요청함'
     updated={s['id']:s for s in slides}
     merged=[updated.get(s['id'],s) for s in previous]
     (OUT/'manifest.json').write_text(json.dumps(merged,ensure_ascii=False,indent=2))
     (OUT/'interaction-history.json').write_text(json.dumps(old_history+click_history,ensure_ascii=False,indent=2))
-    (OUT/'targeted-capture.json').write_text(json.dumps({'selected':args.slides,'updated':list(updated),'otherCapturesUnchanged':True},ensure_ascii=False,indent=2))
+    (OUT/'targeted-capture.json').write_text(json.dumps({'selected':args.slides,'updated':list(updated),'otherCapturesUnchanged':True,'stateSource':str(args.state_source),'scheduler':'off','modelCalls':0,'adminOperations':0,'recommendationRequests':0,'apiCalls':api_calls},ensure_ascii=False,indent=2))
     context.close()
     print('DONE targeted',','.join(updated),flush=True)
 
@@ -348,14 +365,11 @@ def run(browser):
     snap(page, 'D-ONB-01', '투자 여부 선택', 'FS008', '가입 성공 후 초기 설정',checks=[('button',re.compile('지금 주식에 투자'), '가상 계좌 선택 단계로 가요.','D-ONB-02')])
     snap(page, 'D-ONB-02', '가상 계좌 연결', 'FS009·FS010·FS062', '투자 중 선택',checks=[('button','선택한 가상 계좌 연결하기','모의 보유 종목을 표시해요.','D-ONB-02')],states='기본 · 모의 데이터',note='실제 증권 계좌가 아니에요.')
     click(page,'button','관심 종목도 고르기')
-    recommended=page.locator('ul[aria-label="추천 종목"] li button')
-    assert recommended.count()>=4
-    for n in range(4): recommended.nth(n).click()
-    expect(page.get_by_role('button',name='4개 종목으로 시작하기',exact=True)).to_be_visible()
-    snap(page,'D-WAT-01b','관심 종목 4개 선택','FS012','추천 기업을 네 번 선택',states='4개 선택',checks=[('button','NVIDIA 빼기','선택 목록에서 NVIDIA를 빼고 3개로 바꿔요.','D-WAT-01')],note='3개 상한을 두지 않는 것을 실제 4개 선택으로 확인했어요.')
+    pick_watchlist_by_search(page)
+    snap(page,'D-WAT-01b','관심 종목 4개 선택','FS012','검색 3회 실행 후 결과 행 네 번 선택',states='4개 선택',checks=[('button','NVIDIA 빼기','선택 목록에서 NVIDIA를 빼고 3개로 바꿔요.','D-WAT-01')],note='3개 상한을 두지 않는 것을 실제 검색 4개 선택으로 확인했어요.')
     picked=page.locator('section[aria-labelledby="onboarding-picked"] button')
     while picked.count(): picked.first.click()
-    snap(page, 'D-WAT-01', '관심 종목 선택', 'FS011-01·FS011-02·FS012·FS013', '계좌 연결 후 관심 종목도 고르기',checks=[('button','고르지 않고 지도 보기','관심 0개를 저장하고, 연결한 모의 보유 기준 내 종목 지도를 열어요.','D-GRP-01b')],states='선택 0개 · 추천 목록',note='개수 제한 없음. 추천 근거는 승인된 사건 수예요. 이 캡처에서는 모의 보유 3개가 연결되어 있어요.')
+    snap(page, 'D-WAT-01', '관심 종목 선택', 'FS011-01·FS012·FS013', '계좌 연결 후 관심 종목도 고르기',checks=[('button','고르지 않고 지도 보기','관심 0개를 저장하고, 연결한 모의 보유 기준 내 종목 지도를 열어요.','D-GRP-01b')],states='선택 0개 · 검색 결과',note='개수 제한 없음. 추천 목록 없이 검색을 실행해 골라요. 이 캡처에서는 모의 보유 3개가 연결되어 있어요.')
     # 모든 5단계를 실제 다음 버튼으로 열어 보존한다.
     goto(page,'/?mode=all&tour=1')
     for step in range(1,6):

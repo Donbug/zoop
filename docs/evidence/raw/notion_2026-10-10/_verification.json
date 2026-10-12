@@ -1,0 +1,21 @@
+{
+  "verified_at_kst": "2026-10-10T16:58:38.625531+09:00",
+  "scope": "source collection/redaction/hash verification only",
+  "page_hashes_checked": 119,
+  "page_hash_failures": [],
+  "new_markdown_count": 10,
+  "unchanged_baseline_references_checked": 109,
+  "record_map_hash_matches_manifest": true,
+  "forbidden_key_count": 0,
+  "user_mention_annotation_count": 0,
+  "unredacted_explicit_password_count": 0,
+  "dead_record_count": 0,
+  "excluded_record_count": 0,
+  "unresolved_reachable_blocks": 0,
+  "min_observed_request_start_interval_seconds": 2.000566,
+  "status_counts": {
+    "200": 63
+  },
+  "result": "passed",
+  "limitation": "Pattern checks cover explicit password assignments and structured identifiers; they are not a claim that arbitrary public free text contains no sensitive information."
+}

@@ -1,15 +1,16 @@
 # FS064 · AI 분석 연동
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 팀 검토 전 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 76 |
+| 요구사항 번호(원문) | 76 |
+| 의미 기준 요구사항 | 76 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 부분 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:75 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:71 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv) — AI 분석 연동: 호출 기능의 작업·유효 실행에 맞는 허용된 질문과 근거만 분석 서비스에 전달하고, 응답의 형식·인용·대상 참조를 검증한다. 중복 요청·응답 미수신·호출 장애·근거 부족·검증 실패·결과 저장 실패를 구분하여 불필요한 재호출을 막는다.
+- [docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv) — AI 분석 연동: 호출 기능의 작업·유효 실행에 맞는 허용된 질문과 근거만 분석 서비스에 전달하고, 응답의 형식·인용·대상 참조를 검증한다. 중복 요청·응답 미수신·호출 장애·근거 부족·검증 실패·결과 저장 실패를 구분하여 불필요한 재호출을 막는다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:268 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:268 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

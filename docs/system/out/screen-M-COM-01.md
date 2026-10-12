@@ -15,8 +15,8 @@
 | [FS020](feature-FS020.md) · [FS038](feature-FS038.md) | [getCompanyMetrics](../../api/out/zoop-api-spec.md#getcompanymetrics) | GET /api/v1/companies/{id}/metrics | P1 |
 | [FS038](feature-FS038.md) · [FS040](feature-FS040.md) | [getCompanyPrices](../../api/out/zoop-api-spec.md#getcompanyprices) | GET /api/v1/companies/{id}/prices | P1 |
 | [FS021](feature-FS021.md) · [FS043](feature-FS043.md) · [FS056](feature-FS056.md) · [FS063](feature-FS063.md) · [FS064](feature-FS064.md) | [listCompanyDocuments](../../api/out/zoop-api-spec.md#listcompanydocuments) | GET /api/v1/companies/{id}/documents | P1 |
-| [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) | [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | P1 |
-| [FS042](feature-FS042.md) | [getCompanyFinancials](../../api/out/zoop-api-spec.md#getcompanyfinancials) | GET /api/v1/companies/{id}/financials | P1 |
+| [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) · [FS055](feature-FS055.md) | [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | P1 |
+|  | [getCompanyFinancials](../../api/out/zoop-api-spec.md#getcompanyfinancials) | GET /api/v1/companies/{id}/financials | P1 |
 | [FS038](feature-FS038.md) · [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS042](feature-FS042.md) · [FS055](feature-FS055.md) | [getCompanyGraphAsOf](../../api/out/zoop-api-spec.md#getcompanygraphasof) | GET /api/v1/companies/{id}/graph | P1 |
 
 공통 품질: [NFS001](feature-NFS001.md) · [NFS002](feature-NFS002.md) · [NFS004](feature-NFS004.md) · [NFS008](feature-NFS008.md) · [NFS005](feature-NFS005.md) · [NFS006](feature-NFS006.md)

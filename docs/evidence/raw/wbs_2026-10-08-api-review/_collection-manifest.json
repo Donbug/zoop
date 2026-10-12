@@ -1,0 +1,58 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c",
+  "export_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/export?format=xlsx",
+  "request_started_at_utc": "2026-10-08T06:05:30.530609+00:00",
+  "collected_at_utc": "2026-10-08T06:05:32.080935+00:00",
+  "collected_at_kst": "2026-10-08T15:05:32.080935+09:00",
+  "auth": "none",
+  "http_status": 200,
+  "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "response_bytes": 86532,
+  "response_sha256": "28daf3437092e34b11351328ae6ee314574a19f00483356df796eb7f1348719a",
+  "baseline": "wbs_2026-10-08",
+  "baseline_xlsx_sha256": "d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320",
+  "content_identical": false,
+  "meaningful_cell_content_changed": true,
+  "data_only": true,
+  "csv_encoding": "utf-8-sig",
+  "xlsx": "zoop-wbs_2026-10-08-api-review.xlsx",
+  "sha256": "28daf3437092e34b11351328ae6ee314574a19f00483356df796eb7f1348719a",
+  "sheets": {
+    "표지·변경이력": "00-표지-변경이력.csv",
+    "프로젝트 WBS": "01-프로젝트-WBS.csv",
+    "개발 일정 요약": "02-개발-일정-요약.csv"
+  },
+  "sheet_ranges": {
+    "표지·변경이력": {
+      "rows": 36,
+      "columns": 7
+    },
+    "프로젝트 WBS": {
+      "rows": 1021,
+      "columns": 100
+    },
+    "개발 일정 요약": {
+      "rows": 30,
+      "columns": 6
+    }
+  },
+  "files": {
+    "00-표지-변경이력.csv": "2e77b9c5f9a797278bba1fd0a799dad88558e03acf918dddb1ece001bb4b678d",
+    "01-프로젝트-WBS.csv": "2104643224f37de2ce52a1afcfa1631d78a692787858c4a4b95bbd3446416100",
+    "02-개발-일정-요약.csv": "f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3",
+    "zoop-wbs_2026-10-08-api-review.xlsx": "28daf3437092e34b11351328ae6ee314574a19f00483356df796eb7f1348719a"
+  },
+  "baseline_sheet_order": [
+    "표지·변경이력",
+    "프로젝트 WBS",
+    "개발 일정 요약"
+  ],
+  "current_sheet_order": [
+    "표지·변경이력",
+    "프로젝트 WBS",
+    "개발 일정 요약"
+  ],
+  "cell_delta_count": 11,
+  "formula_delta_count": 34,
+  "structural_delta_count": 0
+}

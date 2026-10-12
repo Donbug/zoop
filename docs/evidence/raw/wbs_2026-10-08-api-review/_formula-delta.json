@@ -1,0 +1,240 @@
+[
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G108",
+    "before": "=MIN(MIN(G110:G115),G121)",
+    "after": "=MIN(G109:G121)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G122",
+    "before": "=MIN(MIN(G123:G132),G137)",
+    "after": "=MIN(G123:G137)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G138",
+    "before": "=MIN(MIN(G139:G147),G153)",
+    "after": "=MIN(G139:G153)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G154",
+    "before": "=MIN(G158:G164)",
+    "after": "=MIN(G155:G173)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G174",
+    "before": "=MIN(G175:G182)",
+    "after": "=MIN(G175:G183)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G34",
+    "before": "=MIN(G35,G41,G50,G71,G80,G108,G122,G138,G154,G174)",
+    "after": "=MIN(G35,G41,G50,G62,G71,G80,G108,G122,G138,G154,G174)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G35",
+    "before": "=MIN(G38:G40)",
+    "after": "=MIN(G36:G40)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G41",
+    "before": "=MIN(G43:G46)",
+    "after": "=MIN(G42:G49)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G62",
+    "before": "",
+    "after": "=MIN(G63:G70)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G71",
+    "before": "=MIN(MIN(G72:G78),G79)",
+    "after": "=MIN(G72:G79)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "G80",
+    "before": "=MIN(MIN(G81:G100),G107)",
+    "after": "=MIN(G81:G107)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H108",
+    "before": "=MAX(MAX(H110:H115),H121)",
+    "after": "=MAX(H109:H121)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H122",
+    "before": "=MAX(MAX(H123:H132),H137)",
+    "after": "=MAX(H123:H137)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H138",
+    "before": "=MAX(MAX(H139:H147),H153)",
+    "after": "=MAX(H139:H153)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H154",
+    "before": "=MAX(H158:H164)",
+    "after": "=MAX(H155:H173)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H174",
+    "before": "=MAX(H175:H182)",
+    "after": "=MAX(H175:H183)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H34",
+    "before": "=MAX(H35,H41,H50,H71,H80,H108,H122,H138,H154,H174)",
+    "after": "=MAX(H35,H41,H50,H62,H71,H80,H108,H122,H138,H154,H174)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H35",
+    "before": "=MAX(H38:H40)",
+    "after": "=MAX(H36:H40)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H41",
+    "before": "=MAX(H43:H46)",
+    "after": "=MAX(H42:H49)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H62",
+    "before": "",
+    "after": "=MAX(H63:H70)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H71",
+    "before": "=MAX(MAX(H72:H78),H79)",
+    "after": "=MAX(H72:H79)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "H80",
+    "before": "=MAX(MAX(H81:H100),H107)",
+    "after": "=MAX(H81:H107)"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J108",
+    "before": "=IFERROR((((I110*J110+#REF!*#REF!+I111*J111+I112*J112+I113*J113+I114*J114+I115*J115))+I121*J121)/((SUM(I110:I115))+I121),0)",
+    "after": "=IF(SUM(I109:I121)=0,0,SUMPRODUCT(I109:I121,J109:J121)/SUM(I109:I121))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J122",
+    "before": "=IFERROR((((I123*J123+I124*J124+I125*J125+I126*J126+I127*J127+I128*J128+#REF!*#REF!+I130*J130+I131*J131+I132*J132))+I137*J137)/((SUM(I123:I132))+I137),0)",
+    "after": "=IF(SUM(I123:I137)=0,0,SUMPRODUCT(I123:I137,J123:J137)/SUM(I123:I137))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J138",
+    "before": "=IFERROR((((I139*J139+I140*J140+I141*J141+I142*J142+I143*J143+I144*J144+I145*J145+I146*J146+I147*J147))+I153*J153)/((SUM(I139:I147))+I153),0)",
+    "after": "=IF(SUM(I139:I153)=0,0,SUMPRODUCT(I139:I153,J139:J153)/SUM(I139:I153))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J154",
+    "before": "=IFERROR((I158*J158+I159*J159+I161*J161+I162*J162+I157*J157+I163*J163+I164*J164+I156*J156+I155*J155)/SUM(I158:I164),0)",
+    "after": "=IF(SUM(I155:I173)=0,0,SUMPRODUCT(I155:I173,J155:J173)/SUM(I155:I173))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J174",
+    "before": "=IFERROR((I175*J175+I177*J177+I178*J178+I180*J180+I182*J182)/SUM(I175:I182),0)",
+    "after": "=IF(SUM(I175:I183)=0,0,SUMPRODUCT(I175:I183,J175:J183)/SUM(I175:I183))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J34",
+    "before": "=IFERROR((I35*J35+I41*J41+I50*J50+I71*J71+I80*J80+I108*J108+I122*J122+I138*J138+I154*J154+I174*J174)/SUM(I35,I41,I50,I71,I80,I108,I122,I138,I154,I174),0)",
+    "after": "=IF(SUM(I35,I41,I50,I62,I71,I80,I108,I122,I138,I154,I174)=0,0,(I35*J35+I41*J41+I50*J50+I62*J62+I71*J71+I80*J80+I108*J108+I122*J122+I138*J138+I154*J154+I174*J174)/SUM(I35,I41,I50,I62,I71,I80,I108,I122,I138,I154,I174))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J35",
+    "before": "=IFERROR((I38*J38+I37*J37+I39*J39+#REF!*#REF!)/SUM(I38:I40),0)",
+    "after": "=IF(SUM(I36:I40)=0,0,SUMPRODUCT(I36:I40,J36:J40)/SUM(I36:I40))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J41",
+    "before": "=IFERROR((I42*J42+I43*J43+I44*J44+I49*J49+I45*J45+I46*J46+#REF!*#REF!)/SUM(I43:I46),0)",
+    "after": "=IF(SUM(I42:I49)=0,0,SUMPRODUCT(I42:I49,J42:J49)/SUM(I42:I49))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J50",
+    "before": "=IFERROR((I51*J51+I52*J52+I53*J53+I54*J54+#REF!*#REF!+I55*J55+I56*J56+I57*J57+I61*J61)/SUM(I51:I61),0)",
+    "after": "=IF(SUM(I51:I61)=0,0,SUMPRODUCT(I51:I61,J51:J61)/SUM(I51:I61))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J62",
+    "before": "",
+    "after": "=IF(SUM(I63:I70)=0,0,SUMPRODUCT(I63:I70,J63:J70)/SUM(I63:I70))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J71",
+    "before": "=IFERROR((((#REF!*#REF!+I72*J72+I73*J73+I74*J74+I75*J75+I76*J76+I148*J148+#REF!*#REF!+#REF!*#REF!+I77*J77+I78*J78))+I79*J79)/((SUM(I72:I78))+I79),0)",
+    "after": "=IF(SUM(I72:I79)=0,0,SUMPRODUCT(I72:I79,J72:J79)/SUM(I72:I79))"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "cell": "J80",
+    "before": "=IFERROR(((SUMPRODUCT(I81:I100,J81:J100))+I107*J107)/((SUM(I81:I100))+I107),0)",
+    "after": "=IF(SUM(I81:I107)=0,0,SUMPRODUCT(I81:I107,J81:J107)/SUM(I81:I107))"
+  }
+]

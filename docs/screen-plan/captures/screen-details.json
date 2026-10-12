@@ -230,15 +230,15 @@
           "result": "삼성전자를 선택 목록에서 빼요",
           "destination": "D-WAT-01",
           "mode": "picked",
-          "restore_css": "ul[aria-label=\"추천 종목\"] li:nth-child(2) button"
+          "restore_css": "ul[aria-label=\"‘삼성’ 검색 결과\"] li button:has-text(\"삼성전자\")"
         },
         {
           "role": "button",
-          "name": "SK텔레콤 빼기",
-          "result": "SK텔레콤을 선택 목록에서 빼요",
+          "name": "삼성SDI 빼기",
+          "result": "삼성SDI를 선택 목록에서 빼요",
           "destination": "D-WAT-01",
           "mode": "picked",
-          "restore_css": "ul[aria-label=\"추천 종목\"] li:nth-child(3) button"
+          "restore_css": "ul[aria-label=\"‘삼성’ 검색 결과\"] li button:has-text(\"삼성SDI\")"
         }
       ]
     },
@@ -246,15 +246,15 @@
       "controls": [
         {
           "role": "css",
-          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(1) button",
-          "result": "추천 첫 기업을 선택·해제해요",
+          "name": "form[role=\"search\"] input[placeholder=\"종목명이나 종목 코드\"]",
+          "result": "종목명·코드를 입력해요. 검색 버튼이나 Enter로만 조회해요",
           "destination": "D-WAT-01",
-          "mode": "toggle"
+          "mode": "input"
         },
         {
           "role": "css",
-          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(2) button",
-          "result": "추천 둘째 기업을 선택·해제해요",
+          "name": "ul[aria-label=\"‘삼성’ 검색 결과\"] li:nth-child(1) button",
+          "result": "검색 결과 첫 기업을 선택·해제해요",
           "destination": "D-WAT-01",
           "mode": "toggle"
         }

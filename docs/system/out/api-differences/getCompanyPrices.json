@@ -339,6 +339,20 @@
         "type": "null"
       }
     },
+    "response:200:application/json<oneOf:0>.interval": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "5m",
+          "1h",
+          "1d",
+          "1wk"
+        ]
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
     "response:404:application/json.error.code": {
       "target": {
         "type": "string",

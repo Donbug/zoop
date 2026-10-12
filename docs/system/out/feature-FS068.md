@@ -1,15 +1,16 @@
 # FS068 · AI 사용량·비용·오류 통계
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 미기재 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 80 |
+| 요구사항 번호(원문) | 80 |
+| 의미 기준 요구사항 | 80 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 부분 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:83 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv) — AI 사용량·비용·오류 통계: 관리자가 챗봇·뉴스 분석·브리핑별 요청 작업, 실제 AI 호출·재시도, 성공·실패와 처리 시간·사용량을 구분해 운영 현황을 확인한다. 비용을 제공할 경우 실제 확인 비용과 추정 비용을 구분하고 자료가 없는 값을 0으로 대체하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — AI 사용량·비용·오류 통계: 관리자가 챗봇·뉴스 분석·브리핑별 요청 작업, 실제 AI 호출·재시도, 성공·실패와 처리 시간·사용량을 구분해 운영 현황을 확인한다. 비용을 제공할 경우 실제 확인 비용과 추정 비용을 구분하고 자료가 없는 값을 0으로 대체하지 않는다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:281 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:281 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

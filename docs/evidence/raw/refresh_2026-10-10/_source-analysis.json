@@ -1,0 +1,5809 @@
+{
+  "source_paths": {
+    "wbs": "docs/evidence/raw/wbs_2026-10-10",
+    "functional-spec": "docs/evidence/raw/functional-spec_2026-10-10",
+    "requirements-sheet": "docs/evidence/raw/requirements-sheet_2026-10-06"
+  },
+  "counts": {
+    "wbs_rows": 173,
+    "explicit_owner_rows": 21,
+    "team_all_rows": 20,
+    "index_ids": 98,
+    "detailed_definitions": 121,
+    "unique_detailed_ids": 104
+  },
+  "current_index_vs_old_same_id": [
+    {
+      "id": "FS001",
+      "current": {
+        "row": 10,
+        "title": "서비스 시작 방식 선택",
+        "sheet": "회원가입·로그인",
+        "requirements": "1",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 10,
+        "title": "서비스 시작 방식 선택",
+        "sheet": "회원가입·로그인",
+        "requirements": "1",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 9,
+          "title": "서비스 시작 방식 선택"
+        }
+      ]
+    },
+    {
+      "id": "FS002",
+      "current": {
+        "row": 11,
+        "title": "이메일 로그인",
+        "sheet": "회원가입·로그인",
+        "requirements": "2",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 11,
+        "title": "이메일 로그인",
+        "sheet": "회원가입·로그인",
+        "requirements": "2",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 23,
+          "title": "이메일 로그인"
+        }
+      ]
+    },
+    {
+      "id": "FS003",
+      "current": {
+        "row": 12,
+        "title": "이메일 회원가입",
+        "sheet": "회원가입·로그인",
+        "requirements": "3",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 12,
+        "title": "이메일 회원가입",
+        "sheet": "회원가입·로그인",
+        "requirements": "3",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 37,
+          "title": "이메일 회원가입"
+        }
+      ]
+    },
+    {
+      "id": "FS004",
+      "current": {
+        "row": 13,
+        "title": "소셜 로그인과 회원가입",
+        "sheet": "회원가입·로그인",
+        "requirements": "4",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 13,
+        "title": "소셜 로그인과 회원가입",
+        "sheet": "회원가입·로그인",
+        "requirements": "4",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 51,
+          "title": "소셜 로그인과 회원가입"
+        }
+      ]
+    },
+    {
+      "id": "FS005",
+      "current": {
+        "row": 14,
+        "title": "비회원 시작",
+        "sheet": "회원가입·로그인",
+        "requirements": "5",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 14,
+        "title": "비회원 시작",
+        "sheet": "회원가입·로그인",
+        "requirements": "5",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 65,
+          "title": "비회원 시작"
+        }
+      ]
+    },
+    {
+      "id": "FS006",
+      "current": {
+        "row": 15,
+        "title": "로그인 후 화면 이동",
+        "sheet": "회원가입·로그인",
+        "requirements": "6",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 15,
+        "title": "로그인 후 화면 이동",
+        "sheet": "회원가입·로그인",
+        "requirements": "6",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 79,
+          "title": "로그인 후 화면 이동"
+        }
+      ]
+    },
+    {
+      "id": "FS007",
+      "current": {
+        "row": 16,
+        "title": "로그아웃",
+        "sheet": "회원가입·로그인",
+        "requirements": "7",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 16,
+        "title": "로그아웃",
+        "sheet": "회원가입·로그인",
+        "requirements": "7",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "회원가입·로그인",
+          "id_row": 93,
+          "title": "로그아웃"
+        }
+      ]
+    },
+    {
+      "id": "FS008",
+      "current": {
+        "row": 17,
+        "title": "투자 여부 선택",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "8",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 17,
+        "title": "투자 여부 선택",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "8",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 9,
+          "title": "투자 여부 선택"
+        }
+      ]
+    },
+    {
+      "id": "FS009",
+      "current": {
+        "row": 18,
+        "title": "가상계좌 프로필 연결",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "9",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 18,
+        "title": "가상계좌 프로필 연결",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "9",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 23,
+          "title": "가상계좌 프로필 연결"
+        }
+      ]
+    },
+    {
+      "id": "FS010",
+      "current": {
+        "row": 19,
+        "title": "가상계좌 연결 재시도와 건너뛰기",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "10",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 19,
+        "title": "가상계좌 연결 재시도와 건너뛰기",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "10",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 37,
+          "title": "가상계좌 연결 재시도와 건너뛰기"
+        }
+      ]
+    },
+    {
+      "id": "FS011-01",
+      "current": {
+        "row": 20,
+        "title": "관심종목 검색",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "11",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 20,
+        "title": "관심종목 검색",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "11",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 51,
+          "title": "관심종목 검색"
+        }
+      ]
+    },
+    {
+      "id": "FS011-02",
+      "current": {
+        "row": 21,
+        "title": "추천 종목·산업·테마 조회",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "11",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 21,
+        "title": "추천 종목·산업·테마 조회",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "11",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 65,
+          "title": "추천 종목·산업·테마 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS012",
+      "current": {
+        "row": 22,
+        "title": "초기 관심종목 선택",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "12",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 22,
+        "title": "초기 관심종목 선택",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "12",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 79,
+          "title": "초기 관심종목 선택"
+        }
+      ]
+    },
+    {
+      "id": "FS013",
+      "current": {
+        "row": 23,
+        "title": "초기 설정 저장",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "13",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 23,
+        "title": "초기 설정 저장",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "13",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 93,
+          "title": "초기 설정 저장"
+        }
+      ]
+    },
+    {
+      "id": "FS014",
+      "current": {
+        "row": 24,
+        "title": "초기 관계 그래프 제공",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "14",
+        "detailRange": "A105:B117"
+      },
+      "old_same_id": {
+        "row": 24,
+        "title": "초기 관계 그래프 제공",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "14",
+        "detailRange": "A105:B117"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 107,
+          "title": "초기 관계 그래프 제공"
+        }
+      ]
+    },
+    {
+      "id": "FS015",
+      "current": {
+        "row": 25,
+        "title": "관계 그래프 튜토리얼",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "15",
+        "detailRange": "A119:B131"
+      },
+      "old_same_id": {
+        "row": 25,
+        "title": "관계 그래프 튜토리얼",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "15",
+        "detailRange": "A119:B131"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 121,
+          "title": "관계 그래프 튜토리얼"
+        }
+      ]
+    },
+    {
+      "id": "FS016",
+      "current": {
+        "row": 26,
+        "title": "튜토리얼 완료와 건너뛰기",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "16",
+        "detailRange": "A133:B145"
+      },
+      "old_same_id": {
+        "row": 26,
+        "title": "튜토리얼 완료와 건너뛰기",
+        "sheet": "온보딩·튜토리얼",
+        "requirements": "16",
+        "detailRange": "A133:B145"
+      },
+      "definitions": [
+        {
+          "sheet": "온보딩·튜토리얼",
+          "id_row": 135,
+          "title": "튜토리얼 완료와 건너뛰기"
+        }
+      ]
+    },
+    {
+      "id": "FS017",
+      "current": {
+        "row": 27,
+        "title": "개인화 관계 그래프",
+        "sheet": "메인그래프 v2",
+        "requirements": "17",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 27,
+        "title": "개인화 관계 그래프",
+        "sheet": "메인 그래프",
+        "requirements": "17",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 9,
+          "title": "개인화 관계 그래프"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 9,
+          "title": "개인화 관계 그래프"
+        }
+      ]
+    },
+    {
+      "id": "FS018",
+      "current": {
+        "row": 28,
+        "title": "전체 관계 그래프",
+        "sheet": "메인그래프 v2",
+        "requirements": "18",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 28,
+        "title": "전체 관계 그래프",
+        "sheet": "메인 그래프",
+        "requirements": "18",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 23,
+          "title": "전체 관계 그래프"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 23,
+          "title": "전체 관계 그래프"
+        }
+      ]
+    },
+    {
+      "id": "FS019",
+      "current": {
+        "row": 29,
+        "title": "그래프 모드 전환",
+        "sheet": "메인그래프 v2",
+        "requirements": "19",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 29,
+        "title": "그래프 모드 전환",
+        "sheet": "메인 그래프",
+        "requirements": "19",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 37,
+          "title": "그래프 모드 전환"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 39,
+          "title": "그래프 모드 전환"
+        }
+      ]
+    },
+    {
+      "id": "FS020",
+      "current": {
+        "row": 30,
+        "title": "기업 노드 정보",
+        "sheet": "메인그래프 v2",
+        "requirements": "20",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 30,
+        "title": "기업 노드 정보",
+        "sheet": "메인 그래프",
+        "requirements": "20",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 51,
+          "title": "기업 노드 정보"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 53,
+          "title": "기업 노드 정보"
+        }
+      ]
+    },
+    {
+      "id": "FS021",
+      "current": {
+        "row": 31,
+        "title": "이슈 노드 정보",
+        "sheet": "메인그래프 v2",
+        "requirements": "21",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 31,
+        "title": "이슈 노드 정보",
+        "sheet": "메인 그래프",
+        "requirements": "21",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 65,
+          "title": "이슈 노드 정보"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 67,
+          "title": "이슈 노드 정보"
+        }
+      ]
+    },
+    {
+      "id": "FS022",
+      "current": {
+        "row": 32,
+        "title": "기업 패널에서 이슈 영향 경로 확인",
+        "sheet": "메인그래프 v2",
+        "requirements": "22",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 32,
+        "title": "기업 패널에서 이슈 영향 경로 확인",
+        "sheet": "메인 그래프",
+        "requirements": "22",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 79,
+          "title": "기업 패널에서 이슈 영향 경로 확인"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 80,
+          "title": "기업 패널에서 이슈 영향 경로 확인"
+        }
+      ]
+    },
+    {
+      "id": "FS023",
+      "current": {
+        "row": 33,
+        "title": "기업 간 관계 확인(기업 간 간선 클릭)",
+        "sheet": "메인그래프 v2",
+        "requirements": "23",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 33,
+        "title": "기업 간 관계 확인(기업 간 간선 클릭)",
+        "sheet": "메인 그래프",
+        "requirements": "23",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 93,
+          "title": "기업 간 관계 확인(기업 간 간선 클릭)"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 94,
+          "title": "기업 간 관계 확인(기업 간 간선 클릭)"
+        }
+      ]
+    },
+    {
+      "id": "FS024",
+      "current": {
+        "row": 34,
+        "title": "관계 근거 확인",
+        "sheet": "메인그래프 v2",
+        "requirements": "24",
+        "detailRange": "A105:B117"
+      },
+      "old_same_id": {
+        "row": 34,
+        "title": "관계 근거 확인",
+        "sheet": "메인 그래프",
+        "requirements": "24",
+        "detailRange": "A105:B117"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 107,
+          "title": "관계 근거 확인"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 112,
+          "title": "관계 근거 확인"
+        }
+      ]
+    },
+    {
+      "id": "FS025",
+      "current": {
+        "row": 35,
+        "title": "선택한 노드로 AI 질문",
+        "sheet": "메인그래프 v2",
+        "requirements": "25",
+        "detailRange": "A119:B131"
+      },
+      "old_same_id": {
+        "row": 35,
+        "title": "선택한 노드로 AI 질문",
+        "sheet": "메인 그래프",
+        "requirements": "25",
+        "detailRange": "A119:B131"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 121,
+          "title": "선택한 노드로 AI 질문"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 125,
+          "title": "선택한 노드로 AI 질문"
+        }
+      ]
+    },
+    {
+      "id": "FS026",
+      "current": {
+        "row": 36,
+        "title": "사이드바 기업 선택",
+        "sheet": "메인그래프 v2",
+        "requirements": "26",
+        "detailRange": "A133:B145"
+      },
+      "old_same_id": {
+        "row": 36,
+        "title": "사이드바 기업 선택",
+        "sheet": "메인 그래프",
+        "requirements": "26",
+        "detailRange": "A133:B145"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 135,
+          "title": "사이드바 기업 선택"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 139,
+          "title": "사이드바 기업 선택"
+        }
+      ]
+    },
+    {
+      "id": "FS027",
+      "current": {
+        "row": 37,
+        "title": "관심 종목 수정",
+        "sheet": "메인그래프 v2",
+        "requirements": "27",
+        "detailRange": "A147:B159"
+      },
+      "old_same_id": {
+        "row": 37,
+        "title": "관심 종목 수정",
+        "sheet": "메인 그래프",
+        "requirements": "27",
+        "detailRange": "A147:B159"
+      },
+      "definitions": [
+        {
+          "sheet": "메인 그래프",
+          "id_row": 149,
+          "title": "관심 종목 수정"
+        },
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 154,
+          "title": "관심 종목 수정"
+        }
+      ]
+    },
+    {
+      "id": "FS028",
+      "current": {
+        "row": 38,
+        "title": "출근 브리핑 생성",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "28",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 38,
+        "title": "출근 브리핑 생성",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "28",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 9,
+          "title": "출근 브리핑 생성"
+        }
+      ]
+    },
+    {
+      "id": "FS029",
+      "current": {
+        "row": 39,
+        "title": "퇴근 브리핑 생성",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "29",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 39,
+        "title": "퇴근 브리핑 생성",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "29",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 23,
+          "title": "퇴근 브리핑 생성"
+        }
+      ]
+    },
+    {
+      "id": "FS030",
+      "current": {
+        "row": 40,
+        "title": "핵심 이슈 선정 및 제공",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "30",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 40,
+        "title": "핵심 이슈 선정 및 제공",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "30",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 37,
+          "title": "핵심 이슈 선정 및 제공"
+        }
+      ]
+    },
+    {
+      "id": "FS031",
+      "current": {
+        "row": 41,
+        "title": "주요 시장 지표 제공",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "31",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 41,
+        "title": "시장 변수 제공",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "31",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 51,
+          "title": "주요 시장 지표 제공"
+        }
+      ]
+    },
+    {
+      "id": "FS032",
+      "current": {
+        "row": 42,
+        "title": "브리핑 관계 그래프 조회",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "32",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 42,
+        "title": "관계 그래프 조회",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "32",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 65,
+          "title": "브리핑 관계 그래프 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS033",
+      "current": {
+        "row": 43,
+        "title": "공통 브리핑 조회",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "33",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 43,
+        "title": "공통 브리핑 조회",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "33",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 79,
+          "title": "공통 브리핑 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS034",
+      "current": {
+        "row": 44,
+        "title": "중복 발행 방지",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "34",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 44,
+        "title": "중복 발행 방지",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "34",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 93,
+          "title": "중복 발행 방지"
+        }
+      ]
+    },
+    {
+      "id": "FS035",
+      "current": {
+        "row": 45,
+        "title": "브리핑 회차 저장 및 이력 보존",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "35, 69",
+        "detailRange": "A105:B117"
+      },
+      "old_same_id": {
+        "row": 45,
+        "title": "브리핑 회차 저장 및 이력 보존",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "35, 69",
+        "detailRange": "A105:B117"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 107,
+          "title": "브리핑 회차 저장 및 이력 보존"
+        }
+      ]
+    },
+    {
+      "id": "FS036",
+      "current": {
+        "row": 46,
+        "title": "개인화 브리핑 조회",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "36",
+        "detailRange": "A119:B131"
+      },
+      "old_same_id": {
+        "row": 46,
+        "title": "개인화 브리핑 조회",
+        "sheet": "출퇴근 브리핑",
+        "requirements": "36",
+        "detailRange": "A119:B131"
+      },
+      "definitions": [
+        {
+          "sheet": "출퇴근 브리핑",
+          "id_row": 121,
+          "title": "개인화 브리핑 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS037",
+      "current": {
+        "row": 47,
+        "title": "종목 목록·검색 및 상세 진입",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "",
+        "detailRange": ""
+      },
+      "old_same_id": {
+        "row": 47,
+        "title": "종목 목록·검색 및 상세 진입",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "",
+        "detailRange": ""
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 9,
+          "title": "종목 목록·검색 및 상세 진입"
+        }
+      ]
+    },
+    {
+      "id": "FS038",
+      "current": {
+        "row": 48,
+        "title": "기업 상세 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "38",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 48,
+        "title": "기업 상세 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "38",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 23,
+          "title": "기업 상세 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS039",
+      "current": {
+        "row": 49,
+        "title": "가상 보유 정보 표시",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "39",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 49,
+        "title": "가상 보유 정보 표시",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "39",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 37,
+          "title": "가상 보유 정보 표시"
+        }
+      ]
+    },
+    {
+      "id": "FS040",
+      "current": {
+        "row": 50,
+        "title": "차트와 타임라인 기간 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "40",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 50,
+        "title": "차트와 타임라인 기간 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "40",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 51,
+          "title": "차트와 타임라인 기간 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS041",
+      "current": {
+        "row": 51,
+        "title": "동일 시점 이슈 구분",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "41",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 51,
+        "title": "동일 날짜 사건 구분",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "41",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 65,
+          "title": "동일 시점 이슈 구분"
+        }
+      ]
+    },
+    {
+      "id": "FS042",
+      "current": {
+        "row": 52,
+        "title": "시점 기반 관계 그래프 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "42",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 52,
+        "title": "재무와 실적 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "42",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 79,
+          "title": "시점 기반 관계 그래프 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS043",
+      "current": {
+        "row": 53,
+        "title": "뉴스와 공시 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "43",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 53,
+        "title": "뉴스와 공시 조회",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "43",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 93,
+          "title": "뉴스와 공시 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS044",
+      "current": {
+        "row": 54,
+        "title": "기업 상세와 관계 그래프 이동·상태 복원",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "44",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 54,
+        "title": "기업 상세와 관계 그래프 이동·상태 복원",
+        "sheet": "기업 상세·타임라인",
+        "requirements": "44",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "기업 상세·타임라인",
+          "id_row": 107,
+          "title": "기업 상세와 관계 그래프 이동·상태 복원"
+        }
+      ]
+    },
+    {
+      "id": "FS045",
+      "current": {
+        "row": 55,
+        "title": "AI 질문 진입과 맥락 전달",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "45",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 55,
+        "title": "AI 질문 진입과 전송",
+        "sheet": "AI 챗봇",
+        "requirements": "45",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 챗봇",
+          "id_row": 9,
+          "title": "AI 질문 진입과 전송"
+        },
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 9,
+          "title": "AI 질문 진입과 맥락 전달"
+        }
+      ]
+    },
+    {
+      "id": "FS046",
+      "current": {
+        "row": 56,
+        "title": "질문 대상·기간 해석 및 되묻기",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "46",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 56,
+        "title": "AI 권한과 중복 작업 통제",
+        "sheet": "AI 챗봇",
+        "requirements": "46",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 챗봇",
+          "id_row": 23,
+          "title": "AI 권한과 중복 작업 통제"
+        },
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 23,
+          "title": "질문 대상·기간 해석 및 되묻기"
+        }
+      ]
+    },
+    {
+      "id": "FS047",
+      "current": {
+        "row": 57,
+        "title": "근거·관계 그래프 맥락 조회",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "47",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 57,
+        "title": "질문 해석과 되묻기",
+        "sheet": "AI 챗봇",
+        "requirements": "47",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 챗봇",
+          "id_row": 37,
+          "title": "질문 해석과 되묻기"
+        },
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 37,
+          "title": "근거·관계 그래프 맥락 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS048",
+      "current": {
+        "row": 58,
+        "title": "근거 기반 답변 생성 및 안전 검증",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "48",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 58,
+        "title": "개인화 조건과 근거 확보",
+        "sheet": "AI 챗봇",
+        "requirements": "48",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 챗봇",
+          "id_row": 51,
+          "title": "개인화 조건과 근거 확보"
+        },
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 51,
+          "title": "근거 기반 답변 생성 및 안전 검증"
+        }
+      ]
+    },
+    {
+      "id": "FS049",
+      "current": {
+        "row": 59,
+        "title": "답변 근거와 관련 그래프 탐색",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "49",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 59,
+        "title": "답변 검증과 제공",
+        "sheet": "AI 챗봇",
+        "requirements": "49",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 챗봇",
+          "id_row": 65,
+          "title": "답변 검증과 제공"
+        },
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 65,
+          "title": "답변 근거와 관련 그래프 탐색"
+        }
+      ]
+    },
+    {
+      "id": "FS050",
+      "current": {
+        "row": 60,
+        "title": "새 대화와 후속 질문",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "50",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": null,
+      "definitions": [
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 79,
+          "title": "새 대화와 후속 질문"
+        }
+      ]
+    },
+    {
+      "id": "FS051",
+      "current": {
+        "row": 61,
+        "title": "AI 패널 상태 유지와 결과 재조회",
+        "sheet": "AI 챗봇 v2",
+        "requirements": "50",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 62,
+        "title": "새 대화 시작",
+        "sheet": "AI 챗봇",
+        "requirements": "51",
+        "detailRange": "A105:B117"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 챗봇",
+          "id_row": 107,
+          "title": "새 대화 시작"
+        },
+        {
+          "sheet": "AI 챗봇 v2",
+          "id_row": 94,
+          "title": "AI 패널 상태 유지와 결과 재조회"
+        }
+      ]
+    },
+    {
+      "id": "FS054",
+      "current": {
+        "row": 62,
+        "title": "사용자와 모의 보유",
+        "sheet": "데이터 관리",
+        "requirements": "66",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 66,
+        "title": "사용자와 모의 보유",
+        "sheet": "데이터 관리",
+        "requirements": "66",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "데이터 관리",
+          "id_row": 9,
+          "title": "사용자와 모의 보유"
+        }
+      ]
+    },
+    {
+      "id": "FS055",
+      "current": {
+        "row": 63,
+        "title": "관계와 근거 연결",
+        "sheet": "데이터 관리",
+        "requirements": "67",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 67,
+        "title": "관계와 근거 연결",
+        "sheet": "데이터 관리",
+        "requirements": "67",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "데이터 관리",
+          "id_row": 23,
+          "title": "관계와 근거 연결"
+        }
+      ]
+    },
+    {
+      "id": "FS056",
+      "current": {
+        "row": 64,
+        "title": "사건과 문서 구분",
+        "sheet": "데이터 관리",
+        "requirements": "68",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 68,
+        "title": "사건과 문서 구분",
+        "sheet": "데이터 관리",
+        "requirements": "68",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "데이터 관리",
+          "id_row": 37,
+          "title": "사건과 문서 구분"
+        }
+      ]
+    },
+    {
+      "id": "FS058",
+      "current": {
+        "row": 65,
+        "title": "신규 경제뉴스 정기 수집 및 이슈 분석",
+        "sheet": "데이터 관리",
+        "requirements": "70",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 69,
+        "title": "신규 경제뉴스 정기 수집 및 이슈 분석",
+        "sheet": "데이터 관리",
+        "requirements": "70",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "데이터 관리",
+          "id_row": 51,
+          "title": "신규 경제뉴스 정기 수집 및 이슈 분석"
+        }
+      ]
+    },
+    {
+      "id": "FS059",
+      "current": {
+        "row": 66,
+        "title": "분석 결과 저장 및 조회 반영",
+        "sheet": "데이터 관리",
+        "requirements": "71",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 70,
+        "title": "분석 결과 저장 및 조회 반영",
+        "sheet": "데이터 관리",
+        "requirements": "71",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "데이터 관리",
+          "id_row": 65,
+          "title": "분석 결과 저장 및 조회 반영"
+        }
+      ]
+    },
+    {
+      "id": "FS060",
+      "current": {
+        "row": 67,
+        "title": "대화와 질문 기록",
+        "sheet": "데이터 관리",
+        "requirements": "72",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 71,
+        "title": "대화와 질문 기록",
+        "sheet": "데이터 관리",
+        "requirements": "72",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "데이터 관리",
+          "id_row": 79,
+          "title": "대화와 질문 기록"
+        }
+      ]
+    },
+    {
+      "id": "FS061",
+      "current": {
+        "row": 68,
+        "title": "소셜 인증 연동",
+        "sheet": "외부 연동",
+        "requirements": "73",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 72,
+        "title": "소셜 인증 연동",
+        "sheet": "외부 연동",
+        "requirements": "73",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "외부 연동",
+          "id_row": 9,
+          "title": "소셜 인증 연동"
+        }
+      ]
+    },
+    {
+      "id": "FS062",
+      "current": {
+        "row": 69,
+        "title": "가상계좌 데이터 연동",
+        "sheet": "외부 연동",
+        "requirements": "74",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 73,
+        "title": "가상계좌 데이터 연동",
+        "sheet": "외부 연동",
+        "requirements": "74",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "외부 연동",
+          "id_row": 23,
+          "title": "가상계좌 데이터 연동"
+        }
+      ]
+    },
+    {
+      "id": "FS063",
+      "current": {
+        "row": 70,
+        "title": "뉴스와 시장 데이터 연동",
+        "sheet": "외부 연동",
+        "requirements": "75",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 74,
+        "title": "뉴스와 시장 데이터 연동",
+        "sheet": "외부 연동",
+        "requirements": "75",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "외부 연동",
+          "id_row": 37,
+          "title": "뉴스와 시장 데이터 연동"
+        }
+      ]
+    },
+    {
+      "id": "FS064",
+      "current": {
+        "row": 71,
+        "title": "AI 분석 연동",
+        "sheet": "외부 연동",
+        "requirements": "76",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 75,
+        "title": "AI 분석 연동",
+        "sheet": "외부 연동",
+        "requirements": "76",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "외부 연동",
+          "id_row": 51,
+          "title": "AI 분석 연동"
+        }
+      ]
+    },
+    {
+      "id": "FS065",
+      "current": {
+        "row": 72,
+        "title": "기업 및 사용자 통계 조사 및 확인",
+        "sheet": "AI 평가·관리자",
+        "requirements": "77",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 76,
+        "title": "기업 및 사용자 통계 조사 및 확인",
+        "sheet": "AI 평가·관리자",
+        "requirements": "77",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 9,
+          "title": "기업 및 사용자 통계 조사 및 확인"
+        }
+      ]
+    },
+    {
+      "id": "FS066-01",
+      "current": {
+        "row": 73,
+        "title": "AI 답변·뉴스 요약·브리핑 평가 등록",
+        "sheet": "AI 평가·관리자",
+        "requirements": "37, 78",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 77,
+        "title": "AI 답변·뉴스 요약·브리핑 평가 등록",
+        "sheet": "AI 평가·관리자",
+        "requirements": "37, 78",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 23,
+          "title": "AI 답변·뉴스 요약·브리핑 평가 등록"
+        }
+      ]
+    },
+    {
+      "id": "FS066-02",
+      "current": {
+        "row": 74,
+        "title": "AI 기능별 선호도 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "78",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 78,
+        "title": "AI 기능별 선호도 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "78",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 37,
+          "title": "AI 기능별 선호도 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS066-03",
+      "current": {
+        "row": 75,
+        "title": "마스킹된 AI 대화록 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "78",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 79,
+        "title": "마스킹된 AI 대화록 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "78",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 51,
+          "title": "마스킹된 AI 대화록 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS067-01",
+      "current": {
+        "row": 76,
+        "title": "이슈 분석·공개 반영 상태 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "79",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 80,
+        "title": "이슈 분석·공개 반영 상태 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "79",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 65,
+          "title": "이슈 분석·공개 반영 상태 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS067-02",
+      "current": {
+        "row": 77,
+        "title": "보류 이슈 검수 및 허용·거부",
+        "sheet": "AI 평가·관리자",
+        "requirements": "79",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 81,
+        "title": "보류 이슈 검수 및 허용·거부",
+        "sheet": "AI 평가·관리자",
+        "requirements": "79",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 79,
+          "title": "보류 이슈 검수 및 허용·거부"
+        }
+      ]
+    },
+    {
+      "id": "FS067-03",
+      "current": {
+        "row": 78,
+        "title": "실패한 이슈 분석·반영 작업 재시도",
+        "sheet": "AI 평가·관리자",
+        "requirements": "79",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 82,
+        "title": "실패한 이슈 분석·반영 작업 재시도",
+        "sheet": "AI 평가·관리자",
+        "requirements": "79",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 93,
+          "title": "실패한 이슈 분석·반영 작업 재시도"
+        }
+      ]
+    },
+    {
+      "id": "FS068",
+      "current": {
+        "row": 79,
+        "title": "AI 사용량·비용·오류 통계",
+        "sheet": "AI 평가·관리자",
+        "requirements": "80",
+        "detailRange": "A105:B117"
+      },
+      "old_same_id": {
+        "row": 83,
+        "title": "AI 사용량·비용·오류 통계",
+        "sheet": "AI 평가·관리자",
+        "requirements": "80",
+        "detailRange": "A105:B117"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 107,
+          "title": "AI 사용량·비용·오류 통계"
+        }
+      ]
+    },
+    {
+      "id": "FS069-01",
+      "current": {
+        "row": 80,
+        "title": "회원 활동 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "81",
+        "detailRange": "A119:B131"
+      },
+      "old_same_id": {
+        "row": 84,
+        "title": "회원 활동 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "81",
+        "detailRange": "A119:B131"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 121,
+          "title": "회원 활동 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS069-02",
+      "current": {
+        "row": 81,
+        "title": "회원 차단·차단 해제",
+        "sheet": "AI 평가·관리자",
+        "requirements": "81",
+        "detailRange": "A133:B145"
+      },
+      "old_same_id": {
+        "row": 85,
+        "title": "회원 차단·차단 해제",
+        "sheet": "AI 평가·관리자",
+        "requirements": "81",
+        "detailRange": "A133:B145"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 135,
+          "title": "회원 차단·차단 해제"
+        }
+      ]
+    },
+    {
+      "id": "FS070-01",
+      "current": {
+        "row": 82,
+        "title": "브리핑 회차별 생성·검증·발행 상태 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "82",
+        "detailRange": "A147:B159"
+      },
+      "old_same_id": {
+        "row": 86,
+        "title": "브리핑 회차별 생성·검증·발행 상태 조회",
+        "sheet": "AI 평가·관리자",
+        "requirements": "82",
+        "detailRange": "A147:B159"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 149,
+          "title": "브리핑 회차별 생성·검증·발행 상태 조회"
+        }
+      ]
+    },
+    {
+      "id": "FS070-02",
+      "current": {
+        "row": 83,
+        "title": "미발행 브리핑 회차 재처리",
+        "sheet": "AI 평가·관리자",
+        "requirements": "82",
+        "detailRange": "A161:B173"
+      },
+      "old_same_id": {
+        "row": 87,
+        "title": "미발행 브리핑 회차 재처리",
+        "sheet": "AI 평가·관리자",
+        "requirements": "82",
+        "detailRange": "A161:B173"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 163,
+          "title": "미발행 브리핑 회차 재처리"
+        }
+      ]
+    },
+    {
+      "id": "FS071-01",
+      "current": {
+        "row": 84,
+        "title": "발행 브리핑 정정 등록",
+        "sheet": "AI 평가·관리자",
+        "requirements": "83",
+        "detailRange": "A175:B187"
+      },
+      "old_same_id": {
+        "row": 88,
+        "title": "발행 브리핑 정정 등록",
+        "sheet": "AI 평가·관리자",
+        "requirements": "83",
+        "detailRange": "A175:B187"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 177,
+          "title": "발행 브리핑 정정 등록"
+        }
+      ]
+    },
+    {
+      "id": "FS071-02",
+      "current": {
+        "row": 85,
+        "title": "발행 브리핑 제공 중단",
+        "sheet": "AI 평가·관리자",
+        "requirements": "83",
+        "detailRange": "A189:B201"
+      },
+      "old_same_id": {
+        "row": 89,
+        "title": "발행 브리핑 제공 중단",
+        "sheet": "AI 평가·관리자",
+        "requirements": "83",
+        "detailRange": "A189:B201"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 191,
+          "title": "발행 브리핑 제공 중단"
+        }
+      ]
+    },
+    {
+      "id": "FS072",
+      "current": {
+        "row": 86,
+        "title": "대시보드",
+        "sheet": "AI 평가·관리자",
+        "requirements": "84",
+        "detailRange": "A203:B215"
+      },
+      "old_same_id": {
+        "row": 90,
+        "title": "대시보드",
+        "sheet": "AI 평가·관리자",
+        "requirements": "84",
+        "detailRange": "A203:B215"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 205,
+          "title": "대시보드"
+        }
+      ]
+    },
+    {
+      "id": "FS073",
+      "current": {
+        "row": 87,
+        "title": "관리자 인증 및 접근 제어",
+        "sheet": "AI 평가·관리자",
+        "requirements": "85",
+        "detailRange": "A217:B229"
+      },
+      "old_same_id": {
+        "row": 91,
+        "title": "관리자 로그인(SSO, ID/PW)",
+        "sheet": "AI 평가·관리자",
+        "requirements": "85",
+        "detailRange": "A217:B229"
+      },
+      "definitions": [
+        {
+          "sheet": "AI 평가·관리자",
+          "id_row": 219,
+          "title": "관리자 인증 및 접근 제어"
+        }
+      ]
+    },
+    {
+      "id": "NFS001",
+      "current": {
+        "row": 88,
+        "title": "접근 통제",
+        "sheet": "비기능 상세",
+        "requirements": "54",
+        "detailRange": "A7:B19"
+      },
+      "old_same_id": {
+        "row": 92,
+        "title": "접근 통제",
+        "sheet": "비기능 상세",
+        "requirements": "54",
+        "detailRange": "A7:B19"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 9,
+          "title": "접근 통제"
+        }
+      ]
+    },
+    {
+      "id": "NFS002",
+      "current": {
+        "row": 89,
+        "title": "응답과 화면 정합성",
+        "sheet": "비기능 상세",
+        "requirements": "55",
+        "detailRange": "A21:B33"
+      },
+      "old_same_id": {
+        "row": 93,
+        "title": "응답과 화면 정합성",
+        "sheet": "비기능 상세",
+        "requirements": "55",
+        "detailRange": "A21:B33"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 23,
+          "title": "응답과 화면 정합성"
+        }
+      ]
+    },
+    {
+      "id": "NFS003",
+      "current": {
+        "row": 90,
+        "title": "작업 일관성과 복구",
+        "sheet": "비기능 상세",
+        "requirements": "56",
+        "detailRange": "A35:B47"
+      },
+      "old_same_id": {
+        "row": 94,
+        "title": "작업 일관성과 복구",
+        "sheet": "비기능 상세",
+        "requirements": "56",
+        "detailRange": "A35:B47"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 37,
+          "title": "작업 일관성과 복구"
+        }
+      ]
+    },
+    {
+      "id": "NFS004",
+      "current": {
+        "row": 91,
+        "title": "부분 실패 내성",
+        "sheet": "비기능 상세",
+        "requirements": "57",
+        "detailRange": "A49:B61"
+      },
+      "old_same_id": {
+        "row": 95,
+        "title": "부분 실패 내성",
+        "sheet": "비기능 상세",
+        "requirements": "57",
+        "detailRange": "A49:B61"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 51,
+          "title": "부분 실패 내성"
+        }
+      ]
+    },
+    {
+      "id": "NFS005",
+      "current": {
+        "row": 92,
+        "title": "근거와 해석의 품질",
+        "sheet": "비기능 상세",
+        "requirements": "58",
+        "detailRange": "A63:B75"
+      },
+      "old_same_id": {
+        "row": 96,
+        "title": "근거와 해석의 품질",
+        "sheet": "비기능 상세",
+        "requirements": "58",
+        "detailRange": "A63:B75"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 65,
+          "title": "근거와 해석의 품질"
+        }
+      ]
+    },
+    {
+      "id": "NFS006",
+      "current": {
+        "row": 93,
+        "title": "모델 전달 데이터 최소화",
+        "sheet": "비기능 상세",
+        "requirements": "59",
+        "detailRange": "A77:B89"
+      },
+      "old_same_id": {
+        "row": 97,
+        "title": "모델 전달 데이터 최소화",
+        "sheet": "비기능 상세",
+        "requirements": "59",
+        "detailRange": "A77:B89"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 79,
+          "title": "모델 전달 데이터 최소화"
+        }
+      ]
+    },
+    {
+      "id": "NFS007",
+      "current": {
+        "row": 94,
+        "title": "성능 측정 기준",
+        "sheet": "비기능 상세",
+        "requirements": "60",
+        "detailRange": "A91:B103"
+      },
+      "old_same_id": {
+        "row": 98,
+        "title": "성능 측정 기준",
+        "sheet": "비기능 상세",
+        "requirements": "60",
+        "detailRange": "A91:B103"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 93,
+          "title": "성능 측정 기준"
+        }
+      ]
+    },
+    {
+      "id": "NFS008",
+      "current": {
+        "row": 95,
+        "title": "운영 추적",
+        "sheet": "비기능 상세",
+        "requirements": "61",
+        "detailRange": "A105:B117"
+      },
+      "old_same_id": {
+        "row": 99,
+        "title": "운영 추적",
+        "sheet": "비기능 상세",
+        "requirements": "61",
+        "detailRange": "A105:B117"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 107,
+          "title": "운영 추적"
+        }
+      ]
+    },
+    {
+      "id": "NFS009",
+      "current": {
+        "row": 96,
+        "title": "중단 작업 복구",
+        "sheet": "비기능 상세",
+        "requirements": "62",
+        "detailRange": "A119:B131"
+      },
+      "old_same_id": {
+        "row": 100,
+        "title": "중단 작업 복구",
+        "sheet": "비기능 상세",
+        "requirements": "62",
+        "detailRange": "A119:B131"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 121,
+          "title": "중단 작업 복구"
+        }
+      ]
+    },
+    {
+      "id": "NFS010",
+      "current": {
+        "row": 97,
+        "title": "지원 환경",
+        "sheet": "비기능 상세",
+        "requirements": "63",
+        "detailRange": "A133:B145"
+      },
+      "old_same_id": {
+        "row": 101,
+        "title": "지원 환경",
+        "sheet": "비기능 상세",
+        "requirements": "63",
+        "detailRange": "A133:B145"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 135,
+          "title": "지원 환경"
+        }
+      ]
+    },
+    {
+      "id": "NFS011",
+      "current": {
+        "row": 98,
+        "title": "웹 접근성",
+        "sheet": "비기능 상세",
+        "requirements": "64",
+        "detailRange": "A147:B159"
+      },
+      "old_same_id": {
+        "row": 102,
+        "title": "웹 접근성",
+        "sheet": "비기능 상세",
+        "requirements": "64",
+        "detailRange": "A147:B159"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 149,
+          "title": "웹 접근성"
+        }
+      ]
+    },
+    {
+      "id": "NFS012",
+      "current": {
+        "row": 99,
+        "title": "정기 갱신 반영 시간 보장",
+        "sheet": "비기능 상세",
+        "requirements": "65",
+        "detailRange": "A161:B173"
+      },
+      "old_same_id": {
+        "row": 103,
+        "title": "정기 갱신 반영 시간 보장",
+        "sheet": "비기능 상세",
+        "requirements": "65",
+        "detailRange": "A161:B173"
+      },
+      "definitions": [
+        {
+          "sheet": "비기능 상세",
+          "id_row": 163,
+          "title": "정기 갱신 반영 시간 보장"
+        }
+      ]
+    },
+    {
+      "id": "FS074",
+      "current": {
+        "row": 100,
+        "title": "뉴스·공시 수집 및 수집 회차 관리",
+        "sheet": "메인그래프 v2",
+        "requirements": "70, 75",
+        "detailRange": "A166:B178"
+      },
+      "old_same_id": {
+        "row": 104,
+        "title": "뉴스·공시 수집 및 수집 회차 관리",
+        "sheet": "메인그래프 v2",
+        "requirements": "70, 75",
+        "detailRange": "A166:B178"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 168,
+          "title": "뉴스·공시 수집 및 수집 회차 관리"
+        }
+      ]
+    },
+    {
+      "id": "FS075",
+      "current": {
+        "row": 101,
+        "title": "원천 문서 정제·중복 제거 및 버전 관리",
+        "sheet": "메인그래프 v2",
+        "requirements": "68, 70",
+        "detailRange": "A180:B192"
+      },
+      "old_same_id": {
+        "row": 105,
+        "title": "원천 문서 정제·중복 제거 및 버전 관리",
+        "sheet": "메인그래프 v2",
+        "requirements": "68, 70",
+        "detailRange": "A180:B192"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 182,
+          "title": "원천 문서 정제·중복 제거 및 버전 관리"
+        }
+      ]
+    },
+    {
+      "id": "FS076",
+      "current": {
+        "row": 102,
+        "title": "AI 사건·이슈 추출 및 이슈 후보 생성",
+        "sheet": "메인그래프 v2",
+        "requirements": "68, 70, 76",
+        "detailRange": "A194:B206"
+      },
+      "old_same_id": {
+        "row": 106,
+        "title": "AI 사건·이슈 추출 및 이슈 후보 생성",
+        "sheet": "메인그래프 v2",
+        "requirements": "68, 70, 76",
+        "detailRange": "A194:B206"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 196,
+          "title": "AI 사건·이슈 추출 및 이슈 후보 생성"
+        }
+      ]
+    },
+    {
+      "id": "FS077",
+      "current": {
+        "row": 103,
+        "title": "기업·이슈 Entity Linking 및 동일성 판정",
+        "sheet": "메인그래프 v2",
+        "requirements": "68, 70",
+        "detailRange": "A208:B220"
+      },
+      "old_same_id": {
+        "row": 107,
+        "title": "기업·이슈 Entity Linking 및 동일성 판정",
+        "sheet": "메인그래프 v2",
+        "requirements": "68, 70",
+        "detailRange": "A208:B220"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 210,
+          "title": "기업·이슈 Entity Linking 및 동일성 판정"
+        }
+      ]
+    },
+    {
+      "id": "FS078",
+      "current": {
+        "row": 104,
+        "title": "기업–이슈·기업–기업 관계 추출",
+        "sheet": "메인그래프 v2",
+        "requirements": "67, 70",
+        "detailRange": "A222:B234"
+      },
+      "old_same_id": {
+        "row": 108,
+        "title": "기업–이슈·기업–기업 관계 추출",
+        "sheet": "메인그래프 v2",
+        "requirements": "67, 70",
+        "detailRange": "A222:B234"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 224,
+          "title": "기업–이슈·기업–기업 관계 추출"
+        }
+      ]
+    },
+    {
+      "id": "FS079",
+      "current": {
+        "row": 105,
+        "title": "영향 방향·근거 검증 및 공개 적격 판정",
+        "sheet": "메인그래프 v2",
+        "requirements": "21, 67, 70, 79",
+        "detailRange": "A236:B248"
+      },
+      "old_same_id": {
+        "row": 109,
+        "title": "영향 방향·근거 검증 및 공개 적격 판정",
+        "sheet": "메인그래프 v2",
+        "requirements": "21, 67, 70, 79",
+        "detailRange": "A236:B248"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 238,
+          "title": "영향 방향·근거 검증 및 공개 적격 판정"
+        }
+      ]
+    },
+    {
+      "id": "FS080",
+      "current": {
+        "row": 106,
+        "title": "GraphDB 노드·간선 upsert 및 공개 버전 반영",
+        "sheet": "메인그래프 v2",
+        "requirements": "67, 71",
+        "detailRange": "A250:B262"
+      },
+      "old_same_id": {
+        "row": 110,
+        "title": "GraphDB 노드·간선 upsert 및 공개 버전 반영",
+        "sheet": "메인그래프 v2",
+        "requirements": "67, 71",
+        "detailRange": "A250:B262"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 252,
+          "title": "GraphDB 노드·간선 upsert 및 공개 버전 반영"
+        }
+      ]
+    },
+    {
+      "id": "FS081",
+      "current": {
+        "row": 107,
+        "title": "그래프 증분 갱신·관계 비활성화 및 실패 단계 복구",
+        "sheet": "메인그래프 v2",
+        "requirements": "67, 70, 71, 79",
+        "detailRange": "A264:B276"
+      },
+      "old_same_id": {
+        "row": 111,
+        "title": "그래프 증분 갱신·관계 비활성화 및 실패 단계 복구",
+        "sheet": "메인그래프 v2",
+        "requirements": "67, 70, 71, 79",
+        "detailRange": "A264:B276"
+      },
+      "definitions": [
+        {
+          "sheet": "메인그래프 v2",
+          "id_row": 266,
+          "title": "그래프 증분 갱신·관계 비활성화 및 실패 단계 복구"
+        }
+      ]
+    }
+  ],
+  "removed_index_ids": [
+    "FS050-01",
+    "FS050-02",
+    "FS052-01",
+    "FS052-02",
+    "FS053"
+  ],
+  "explicit_owner_rows": [
+    {
+      "row": 19,
+      "id": "2.3",
+      "title": "이슈 추출 PoC",
+      "type": "기술검증",
+      "deliverable": "이슈 추출 PoC 보고서",
+      "owners": "윤서진",
+      "start": "2026-09-18",
+      "end": "2026-09-28",
+      "weight": "0.015",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 29,
+      "id": "4.2",
+      "title": "화면 계획서 작성",
+      "type": "UI·UX",
+      "deliverable": "화면 계획서",
+      "owners": "김도현, 안재현, 박주형, 윤서진",
+      "start": "2026-10-02",
+      "end": "2026-10-06",
+      "weight": "0.04",
+      "progress": "0.1",
+      "dependencies": []
+    },
+    {
+      "row": 72,
+      "id": "6.5.1",
+      "title": "(BE) 관계와 근거 연결",
+      "type": "P1",
+      "deliverable": "FS055 구현·단위테스트 유지. 관계·근거 계약은 FS078~FS080 공통 사용.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-16",
+      "weight": "0.01",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 73,
+      "id": "6.5.2",
+      "title": "(BE) 이슈와 근거 문서를 구분 관리",
+      "type": "P1",
+      "deliverable": "FS056 구현·단위테스트 유지. 문서·사건 구분/동일성은 FS075~FS077로 상세화.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-14",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 74,
+      "id": "6.5.3",
+      "title": "(BE) 브리핑 정보 저장(분석 결과와 생성 재료 제공)",
+      "type": "P1",
+      "deliverable": "FS057 구현·단위테스트",
+      "owners": "윤서진",
+      "start": "2026-10-13",
+      "end": "2026-10-16",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 75,
+      "id": "6.5.4",
+      "title": "(BE) 신규 경제뉴스 정기 수집 및 이슈 분석",
+      "type": "P1",
+      "deliverable": "FS058 회차·분석 총괄 유지. FS074~FS079·FS081은 상세 단계이며 별도 중복 구현·공수 합산 금지.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-21",
+      "weight": "0.011",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 76,
+      "id": "6.5.5",
+      "title": "(BE) 분석 결과 저장 및 조회 반영",
+      "type": "P1",
+      "deliverable": "FS059 AI 결과·공통 공개 계약 유지. 정세빈의 GraphDB 저장·조회 반영/복구는 FS080~FS081과 연계.",
+      "owners": "윤서진",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.011",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 77,
+      "id": "6.5.6",
+      "title": "(BE) 뉴스와 시장 데이터 연동",
+      "type": "P1",
+      "deliverable": "FS063 공급원 연동 유지. FS074 수집은 기존 어댑터를 재사용.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-16",
+      "weight": "0.01",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 78,
+      "id": "6.5.7",
+      "title": "(BE) AI 분석 연동",
+      "type": "P1",
+      "deliverable": "FS064 AI 호출·검증 계약 유지. FS076~FS079는 같은 호출 계약 사용.",
+      "owners": "윤서진",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 79,
+      "id": "6.5.8",
+      "title": "데이터 관리·외부 연동 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "윤서진",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 93,
+      "id": "6.6.13",
+      "title": "(BE) 뉴스·공시 수집 및 수집 회차 관리",
+      "type": "P1",
+      "deliverable": "FS074 수집 회차·문서 계약·수집 시험\nFS058/FS063 재사용\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 94,
+      "id": "6.6.14",
+      "title": "(BE) 원천 문서 정제·중복 제거 및 버전 관리",
+      "type": "P1",
+      "deliverable": "FS075 정제·중복/수정 판정·원문 위치 시험\n선행 FS074 / FS056·FS058 연계",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": [
+        "FS074 "
+      ]
+    },
+    {
+      "row": 95,
+      "id": "6.6.15",
+      "title": "(BE) AI 사건·이슈 추출 및 이슈 후보 생성",
+      "type": "P1",
+      "deliverable": "FS076 사건·이슈 후보·근거·추출 시험\n선행 FS075 / FS058·FS064 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0075",
+      "progress": "0.0",
+      "dependencies": [
+        "FS075 "
+      ]
+    },
+    {
+      "row": 96,
+      "id": "6.6.16",
+      "title": "(BE) 기업·이슈 Entity Linking 및 동일성 판정",
+      "type": "P1",
+      "deliverable": "FS077 정규 ID 매핑·동일성/오병합 시험\n선행 FS076 / FS056·FS058 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0055",
+      "progress": "0.0",
+      "dependencies": [
+        "FS076 "
+      ]
+    },
+    {
+      "row": 97,
+      "id": "6.6.17",
+      "title": "(BE) 기업–이슈·기업–기업 관계 추출",
+      "type": "P1",
+      "deliverable": "FS078 관계 유형·방향·경로 추출 시험\n선행 FS077 / FS055·FS058 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0075",
+      "progress": "0.0",
+      "dependencies": [
+        "FS077 "
+      ]
+    },
+    {
+      "row": 98,
+      "id": "6.6.18",
+      "title": "(BE) 영향 방향·근거 검증 및 공개 적격 판정",
+      "type": "P1",
+      "deliverable": "FS079 영향·근거·공개 검증 시험\n선행 FS078 / FS022는 조회·표시\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": [
+        "FS078 "
+      ]
+    },
+    {
+      "row": 99,
+      "id": "6.6.19",
+      "title": "(BE) GraphDB 노드·간선 upsert 및 공개 버전 반영",
+      "type": "P1",
+      "deliverable": "FS080 멱등 upsert·트랜잭션·공개 버전 시험\n선행 FS079 / FS055·FS059 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": [
+        "FS079 "
+      ]
+    },
+    {
+      "row": 100,
+      "id": "6.6.20",
+      "title": "(BE) 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구",
+      "type": "P1",
+      "deliverable": "FS081 증분 갱신·비활성화·복구 시험\n선행 FS080 / FS058·FS059·FS067-03 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": [
+        "FS080 "
+      ]
+    },
+    {
+      "row": 107,
+      "id": "6.6.27",
+      "title": "메인 그래프 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "정세빈, 윤서진, 김도현",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 170,
+      "id": "6.10.16",
+      "title": "(FE) A-ADM-03 그래프 파이프라인·검수 화면 및 재처리 API 연동",
+      "type": "P1",
+      "deliverable": "FS067-01 · FS067-02 · FS067-03",
+      "owners": "윤서진",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0022",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 178,
+      "id": "6.11.4",
+      "title": "데이터·GraphDB·근거 정합성 검증",
+      "type": "통합검증",
+      "deliverable": "그래프·근거·버전·기업/사건 연결 검증",
+      "owners": "윤서진",
+      "start": "2026-10-12",
+      "end": "2026-10-27",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    }
+  ],
+  "team_all_rows": [
+    {
+      "row": 12,
+      "id": "1.1",
+      "title": "아이디어 도출",
+      "type": "기획",
+      "deliverable": "아이디어 후보안",
+      "owners": "팀원 전원",
+      "start": "2026-08-29",
+      "end": "2026-09-11",
+      "weight": "0.04",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 13,
+      "id": "1.2",
+      "title": "벤치마킹",
+      "type": "조사",
+      "deliverable": "벤치마킹 분석 자료",
+      "owners": "팀원 전원",
+      "start": "2026-09-09",
+      "end": "2026-09-11",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 14,
+      "id": "1.3",
+      "title": "아이디어 확정",
+      "type": "기획",
+      "deliverable": "최종 주제안",
+      "owners": "팀원 전원",
+      "start": "2026-09-11",
+      "end": "2026-09-11",
+      "weight": "0.02",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 15,
+      "id": "1.4",
+      "title": "기능 구체화",
+      "type": "기획",
+      "deliverable": "기능 정의안",
+      "owners": "팀원 전원",
+      "start": "2026-09-11",
+      "end": "2026-09-19",
+      "weight": "0.06",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 17,
+      "id": "2.1",
+      "title": "중간 발표 준비",
+      "type": "발표",
+      "deliverable": "중간 발표 자료",
+      "owners": "팀원 전원",
+      "start": "2026-09-15",
+      "end": "2026-09-18",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 18,
+      "id": "2.2",
+      "title": "중간 발표",
+      "type": "발표",
+      "deliverable": "발표 및 피드백",
+      "owners": "팀원 전원",
+      "start": "2026-09-17",
+      "end": "2026-09-17",
+      "weight": "0.005",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 21,
+      "id": "3.1",
+      "title": "사용자 시나리오 작성 및 검토",
+      "type": "설계",
+      "deliverable": "사용자 시나리오",
+      "owners": "팀원 전원",
+      "start": "2026-09-21",
+      "end": "2026-09-22",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 22,
+      "id": "3.2",
+      "title": "시퀀스 다이어그램 작성 및 검토",
+      "type": "설계",
+      "deliverable": "시퀀스 다이어그램",
+      "owners": "팀원 전원",
+      "start": "2026-09-28",
+      "end": "2026-09-30",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 23,
+      "id": "3.3",
+      "title": "요구사항 정의서 작성 및 검토",
+      "type": "문서",
+      "deliverable": "요구사항 정의서",
+      "owners": "팀원 전원",
+      "start": "2026-09-30",
+      "end": "2026-10-01",
+      "weight": "0.035",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 26,
+      "id": "3.6",
+      "title": "WBS 작성",
+      "type": "문서",
+      "deliverable": "프로젝트 WBS",
+      "owners": "팀원 전원",
+      "start": "2026-10-02",
+      "end": "2026-10-03",
+      "weight": "0.01",
+      "progress": "0.5",
+      "dependencies": []
+    },
+    {
+      "row": 31,
+      "id": "5.1",
+      "title": "시스템 아키텍처 제작",
+      "type": "아키텍처",
+      "deliverable": "시스템 아키텍처",
+      "owners": "팀원 전원",
+      "start": "2026-10-06",
+      "end": "2026-10-07",
+      "weight": "0.02",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 36,
+      "id": "6.1.1",
+      "title": "개발 환경·브랜치·코드 규칙 구성",
+      "type": "공통기반",
+      "deliverable": "Git, 디렉터리, 실행 환경 통일",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 37,
+      "id": "6.1.2",
+      "title": "API 명세 최종 검토·구현 기준 확정",
+      "type": "공통기반",
+      "deliverable": "API 계약서·공통 오류 모델",
+      "owners": "팀원 전원",
+      "start": "2026-10-06",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 38,
+      "id": "6.1.3",
+      "title": "DB 스키마·마이그레이션 구성",
+      "type": "공통기반",
+      "deliverable": "개발 환경·CI 파이프라인",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 39,
+      "id": "6.1.4",
+      "title": "Graph DB 적재·조회 스키마 확정",
+      "type": "공통기반",
+      "deliverable": "스키마·마이그레이션",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 40,
+      "id": "6.1.5",
+      "title": "인증·공통 보안 모듈 기반 구현",
+      "type": "공통기반",
+      "deliverable": "Session, CSRF, 권한 검사 등",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 173,
+      "id": "6.10.19",
+      "title": "관리자 권한·운영 기능 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "팀원 전원",
+      "start": "2026-10-22",
+      "end": "2026-10-24",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 175,
+      "id": "6.11.1",
+      "title": "API·스키마 계약 통합 점검",
+      "type": "통합검증",
+      "deliverable": "계약 점검 결과",
+      "owners": "팀원 전원",
+      "start": "2026-10-12",
+      "end": "2026-10-20",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 181,
+      "id": "6.11.7",
+      "title": "결함 수정 및 회귀 테스트",
+      "type": "통합검증",
+      "deliverable": "Critical/Major 결함 해결 및 재검증",
+      "owners": "팀원 전원",
+      "start": "2026-10-25",
+      "end": "2026-10-28",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 183,
+      "id": "6.11.9",
+      "title": "시연 영상 및 발표 PPT 제작",
+      "type": "발표준비",
+      "deliverable": "영상·PPT·발표본",
+      "owners": "팀원 전원",
+      "start": "2026-10-26",
+      "end": "2026-10-28",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    }
+  ],
+  "wbs_all_rows": [
+    {
+      "row": 11,
+      "id": "1",
+      "title": "기획 및 방향 설정",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-08-29",
+      "end": "2026-09-19",
+      "weight": "0.15",
+      "progress": "1",
+      "dependencies": []
+    },
+    {
+      "row": 12,
+      "id": "1.1",
+      "title": "아이디어 도출",
+      "type": "기획",
+      "deliverable": "아이디어 후보안",
+      "owners": "팀원 전원",
+      "start": "2026-08-29",
+      "end": "2026-09-11",
+      "weight": "0.04",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 13,
+      "id": "1.2",
+      "title": "벤치마킹",
+      "type": "조사",
+      "deliverable": "벤치마킹 분석 자료",
+      "owners": "팀원 전원",
+      "start": "2026-09-09",
+      "end": "2026-09-11",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 14,
+      "id": "1.3",
+      "title": "아이디어 확정",
+      "type": "기획",
+      "deliverable": "최종 주제안",
+      "owners": "팀원 전원",
+      "start": "2026-09-11",
+      "end": "2026-09-11",
+      "weight": "0.02",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 15,
+      "id": "1.4",
+      "title": "기능 구체화",
+      "type": "기획",
+      "deliverable": "기능 정의안",
+      "owners": "팀원 전원",
+      "start": "2026-09-11",
+      "end": "2026-09-19",
+      "weight": "0.06",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 16,
+      "id": "2",
+      "title": "발표 및 기술 검증",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-09-15",
+      "end": "2026-09-28",
+      "weight": "0.05",
+      "progress": "1",
+      "dependencies": []
+    },
+    {
+      "row": 17,
+      "id": "2.1",
+      "title": "중간 발표 준비",
+      "type": "발표",
+      "deliverable": "중간 발표 자료",
+      "owners": "팀원 전원",
+      "start": "2026-09-15",
+      "end": "2026-09-18",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 18,
+      "id": "2.2",
+      "title": "중간 발표",
+      "type": "발표",
+      "deliverable": "발표 및 피드백",
+      "owners": "팀원 전원",
+      "start": "2026-09-17",
+      "end": "2026-09-17",
+      "weight": "0.005",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 19,
+      "id": "2.3",
+      "title": "이슈 추출 PoC",
+      "type": "기술검증",
+      "deliverable": "이슈 추출 PoC 보고서",
+      "owners": "윤서진",
+      "start": "2026-09-18",
+      "end": "2026-09-28",
+      "weight": "0.015",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 20,
+      "id": "3",
+      "title": "요구사항 및 문서화",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-09-21",
+      "end": "2026-10-03",
+      "weight": "0.15",
+      "progress": "0.9666666667",
+      "dependencies": []
+    },
+    {
+      "row": 21,
+      "id": "3.1",
+      "title": "사용자 시나리오 작성 및 검토",
+      "type": "설계",
+      "deliverable": "사용자 시나리오",
+      "owners": "팀원 전원",
+      "start": "2026-09-21",
+      "end": "2026-09-22",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 22,
+      "id": "3.2",
+      "title": "시퀀스 다이어그램 작성 및 검토",
+      "type": "설계",
+      "deliverable": "시퀀스 다이어그램",
+      "owners": "팀원 전원",
+      "start": "2026-09-28",
+      "end": "2026-09-30",
+      "weight": "0.03",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 23,
+      "id": "3.3",
+      "title": "요구사항 정의서 작성 및 검토",
+      "type": "문서",
+      "deliverable": "요구사항 정의서",
+      "owners": "팀원 전원",
+      "start": "2026-09-30",
+      "end": "2026-10-01",
+      "weight": "0.035",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 24,
+      "id": "3.4",
+      "title": "기능 명세서 작성 및 검토",
+      "type": "문서",
+      "deliverable": "기능 명세서",
+      "owners": "정세빈, 정현, 홍정현",
+      "start": "2026-10-01",
+      "end": "2026-10-02",
+      "weight": "0.025",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 25,
+      "id": "3.5",
+      "title": "비기능 명세서 작성",
+      "type": "문서",
+      "deliverable": "비기능 명세서",
+      "owners": "정세빈, 정현, 홍정현",
+      "start": "2026-10-01",
+      "end": "2026-10-02",
+      "weight": "0.02",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 26,
+      "id": "3.6",
+      "title": "WBS 작성",
+      "type": "문서",
+      "deliverable": "프로젝트 WBS",
+      "owners": "팀원 전원",
+      "start": "2026-10-02",
+      "end": "2026-10-03",
+      "weight": "0.01",
+      "progress": "0.5",
+      "dependencies": []
+    },
+    {
+      "row": 27,
+      "id": "4",
+      "title": "UI·UX 설계",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-10-02",
+      "end": "2026-10-07",
+      "weight": "0.1",
+      "progress": "0.1",
+      "dependencies": []
+    },
+    {
+      "row": 28,
+      "id": "4.1",
+      "title": "와이어프레임 제작",
+      "type": "UI·UX",
+      "deliverable": "화면별 와이어프레임",
+      "owners": "김도현, 박주형",
+      "start": "2026-10-02",
+      "end": "2026-10-07",
+      "weight": "0.06",
+      "progress": "0.1",
+      "dependencies": []
+    },
+    {
+      "row": 29,
+      "id": "4.2",
+      "title": "화면 계획서 작성",
+      "type": "UI·UX",
+      "deliverable": "화면 계획서",
+      "owners": "김도현, 안재현, 박주형, 윤서진",
+      "start": "2026-10-02",
+      "end": "2026-10-06",
+      "weight": "0.04",
+      "progress": "0.1",
+      "dependencies": []
+    },
+    {
+      "row": 30,
+      "id": "5",
+      "title": "시스템 상세 설계",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-10-06",
+      "end": "2026-10-12",
+      "weight": "0.05",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 31,
+      "id": "5.1",
+      "title": "시스템 아키텍처 제작",
+      "type": "아키텍처",
+      "deliverable": "시스템 아키텍처",
+      "owners": "팀원 전원",
+      "start": "2026-10-06",
+      "end": "2026-10-07",
+      "weight": "0.02",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 32,
+      "id": "5.2",
+      "title": "ERD 작성",
+      "type": "DB 설계",
+      "deliverable": "ERD",
+      "owners": "백엔드",
+      "start": "2026-10-06",
+      "end": "2026-10-12",
+      "weight": "0.015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 33,
+      "id": "5.3",
+      "title": "AI 거버넌스 문서 작성",
+      "type": "거버넌스",
+      "deliverable": "AI 거버넌스 문서",
+      "owners": "김도현",
+      "start": "2026-10-07",
+      "end": "2026-10-10",
+      "weight": "0.015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 34,
+      "id": "6",
+      "title": "개발 및 통합 검증",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-09-21",
+      "end": "2026-11-06",
+      "weight": "0.5",
+      "progress": "0.008",
+      "dependencies": []
+    },
+    {
+      "row": 35,
+      "id": "6.1",
+      "title": "공통 개발 기반",
+      "type": "",
+      "deliverable": "전체 기능 공통 기반",
+      "owners": "",
+      "start": "2026-10-06",
+      "end": "2026-10-08",
+      "weight": "0.02",
+      "progress": "0.2",
+      "dependencies": []
+    },
+    {
+      "row": 36,
+      "id": "6.1.1",
+      "title": "개발 환경·브랜치·코드 규칙 구성",
+      "type": "공통기반",
+      "deliverable": "Git, 디렉터리, 실행 환경 통일",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 37,
+      "id": "6.1.2",
+      "title": "API 명세 최종 검토·구현 기준 확정",
+      "type": "공통기반",
+      "deliverable": "API 계약서·공통 오류 모델",
+      "owners": "팀원 전원",
+      "start": "2026-10-06",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "1.0",
+      "dependencies": []
+    },
+    {
+      "row": 38,
+      "id": "6.1.3",
+      "title": "DB 스키마·마이그레이션 구성",
+      "type": "공통기반",
+      "deliverable": "개발 환경·CI 파이프라인",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 39,
+      "id": "6.1.4",
+      "title": "Graph DB 적재·조회 스키마 확정",
+      "type": "공통기반",
+      "deliverable": "스키마·마이그레이션",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 40,
+      "id": "6.1.5",
+      "title": "인증·공통 보안 모듈 기반 구현",
+      "type": "공통기반",
+      "deliverable": "Session, CSRF, 권한 검사 등",
+      "owners": "팀원 전원",
+      "start": "2026-10-07",
+      "end": "2026-10-08",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 41,
+      "id": "6.2",
+      "title": "회원가입·로그인",
+      "type": "",
+      "deliverable": "공통 API·인증 구조",
+      "owners": "",
+      "start": "2026-10-12",
+      "end": "2026-10-15",
+      "weight": "0.015",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 42,
+      "id": "6.2.1",
+      "title": "(BE) 이메일 로그인/회원가입 API 개발",
+      "type": "P1",
+      "deliverable": "FS002 · FS003 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-12",
+      "end": "2026-10-13",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 43,
+      "id": "6.2.2",
+      "title": "(BE) 소셜 로그인·회원가입 및 기존 계정 연결 처리",
+      "type": "P1",
+      "deliverable": "FS004 · FS061 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 44,
+      "id": "6.2.3",
+      "title": "(BE) 비회원 접근 및 권한 처리",
+      "type": "P1",
+      "deliverable": "FS005 · NFS001 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 45,
+      "id": "6.2.4",
+      "title": "(BE) 로그인 상태 및 초기 진입 경로 처리",
+      "type": "P1",
+      "deliverable": "FS001 · FS006 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 46,
+      "id": "6.2.5",
+      "title": "(BE) 로그아웃 및 세션 무효화",
+      "type": "P1",
+      "deliverable": "FS007 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 47,
+      "id": "6.2.6",
+      "title": "(FE) D-AUT-01 로그인 화면 구현 및 인증 API 연동",
+      "type": "P1",
+      "deliverable": "FS001 · FS002 · FS005 · FS006",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 48,
+      "id": "6.2.7",
+      "title": "(FE) D-AUT-02 회원가입 화면 구현 및 가입 API 연동",
+      "type": "P1",
+      "deliverable": "FS003 · FS006",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 49,
+      "id": "6.2.8",
+      "title": "인증 기능 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "임현, 박주형",
+      "start": "2026-10-12",
+      "end": "2026-10-15",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 50,
+      "id": "6.3",
+      "title": "온보딩·튜토리얼",
+      "type": "",
+      "deliverable": "회원 상태·가상계좌·관심종목 API",
+      "owners": "",
+      "start": "2026-10-12",
+      "end": "2026-10-19",
+      "weight": "0.025",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 51,
+      "id": "6.3.1",
+      "title": "(BE) 투자 여부 및 초기 설정 API 개발",
+      "type": "P1",
+      "deliverable": "FS008 · FS013 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-14",
+      "end": "2026-10-15",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 52,
+      "id": "6.3.2",
+      "title": "(BE) 가상계좌 프로필 연동 기능 개발",
+      "type": "P1",
+      "deliverable": "FS009 · FS010 · FS062 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-14",
+      "end": "2026-10-15",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 53,
+      "id": "6.3.3",
+      "title": "(BE) 관심종목 검색 API 개발",
+      "type": "P1",
+      "deliverable": "FS011-01 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-12",
+      "end": "2026-10-13",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 54,
+      "id": "6.3.4",
+      "title": "(BE) 초기 관심종목 등록 API 개발",
+      "type": "P1",
+      "deliverable": "FS012 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-14",
+      "end": "2026-10-16",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 55,
+      "id": "6.3.5",
+      "title": "(BE) 초기 설정 저장",
+      "type": "P1",
+      "deliverable": "FS013 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-15",
+      "end": "2026-10-17",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 56,
+      "id": "6.3.6",
+      "title": "(BE) 초기 개인화 관계그래프 연동",
+      "type": "P1",
+      "deliverable": "FS014 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-15",
+      "end": "2026-10-17",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 57,
+      "id": "6.3.7",
+      "title": "(BE) 그래프 튜토리얼 및 완료 상태 처리",
+      "type": "P1",
+      "deliverable": "FS015 · FS016 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-17",
+      "end": "2026-10-18",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 58,
+      "id": "6.3.8",
+      "title": "(FE) D-ONB-01 투자 여부 선택 화면 및 설정 API 연동",
+      "type": "P1",
+      "deliverable": "FS008",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 59,
+      "id": "6.3.9",
+      "title": "(FE) D-ONB-02 가상계좌 연결 화면 및 프로필 API 연동",
+      "type": "P1",
+      "deliverable": "FS009 · FS010 · FS062",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 60,
+      "id": "6.3.10",
+      "title": "(FE) D-GRP-T2~T5 관계 그래프 튜토리얼 및 완료 API 연동",
+      "type": "P1",
+      "deliverable": "FS015 · FS016",
+      "owners": "김도현",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 61,
+      "id": "6.3.11",
+      "title": "온보딩 전체 흐름 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "박주형, 김도현, 정세빈, 임현",
+      "start": "2026-10-18",
+      "end": "2026-10-19",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 62,
+      "id": "6.4",
+      "title": "내 종목 관리",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-10-13",
+      "end": "2026-10-20",
+      "weight": "0.025",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 63,
+      "id": "6.4.1",
+      "title": "(BE) 내 관심종목 목록 조회 API 개발",
+      "type": "P1",
+      "deliverable": "FS054 · FS027 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-14",
+      "end": "2026-10-16",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 64,
+      "id": "6.4.2",
+      "title": "(BE) 관심종목 추가·삭제 API 개발",
+      "type": "P1",
+      "deliverable": "FS027 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-14",
+      "end": "2026-10-16",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 65,
+      "id": "6.4.3",
+      "title": "(BE) 모의 보유종목 조회 API 개발",
+      "type": "P1",
+      "deliverable": "FS039 · FS054 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-16",
+      "end": "2026-10-19",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 66,
+      "id": "6.4.4",
+      "title": "(BE) 모의계좌 연결 상태·해제 기능 개발",
+      "type": "P1",
+      "deliverable": "FS009 · FS062 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-16",
+      "end": "2026-10-19",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 67,
+      "id": "6.4.5",
+      "title": "(FE) D-WAT-01b 초기 관심종목 선택 화면 및 검색·등록 API 연동",
+      "type": "P1",
+      "deliverable": "FS012",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 68,
+      "id": "6.4.6",
+      "title": "(FE) D-MY-01 내 종목 관리 화면 및 종목·가상계좌 API 연동",
+      "type": "P1",
+      "deliverable": "FS027 · FS054 · FS062",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 69,
+      "id": "6.4.7",
+      "title": "(FE) D-STK-01 종목 검색·사이드바 및 관심종목 API 연동",
+      "type": "P1",
+      "deliverable": "FS037 · FS027",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 70,
+      "id": "6.4.8",
+      "title": "내 종목 관리 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "임현, 박주형",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 71,
+      "id": "6.5",
+      "title": "데이터 관리·외부 연동",
+      "type": "",
+      "deliverable": "스키마·수집 정책·AI 분석 계약",
+      "owners": "",
+      "start": "2026-10-07",
+      "end": "2026-10-23",
+      "weight": "0.065",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 72,
+      "id": "6.5.1",
+      "title": "(BE) 관계와 근거 연결",
+      "type": "P1",
+      "deliverable": "FS055 구현·단위테스트 유지. 관계·근거 계약은 FS078~FS080 공통 사용.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-16",
+      "weight": "0.01",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 73,
+      "id": "6.5.2",
+      "title": "(BE) 이슈와 근거 문서를 구분 관리",
+      "type": "P1",
+      "deliverable": "FS056 구현·단위테스트 유지. 문서·사건 구분/동일성은 FS075~FS077로 상세화.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-14",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 74,
+      "id": "6.5.3",
+      "title": "(BE) 브리핑 정보 저장(분석 결과와 생성 재료 제공)",
+      "type": "P1",
+      "deliverable": "FS057 구현·단위테스트",
+      "owners": "윤서진",
+      "start": "2026-10-13",
+      "end": "2026-10-16",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 75,
+      "id": "6.5.4",
+      "title": "(BE) 신규 경제뉴스 정기 수집 및 이슈 분석",
+      "type": "P1",
+      "deliverable": "FS058 회차·분석 총괄 유지. FS074~FS079·FS081은 상세 단계이며 별도 중복 구현·공수 합산 금지.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-21",
+      "weight": "0.011",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 76,
+      "id": "6.5.5",
+      "title": "(BE) 분석 결과 저장 및 조회 반영",
+      "type": "P1",
+      "deliverable": "FS059 AI 결과·공통 공개 계약 유지. 정세빈의 GraphDB 저장·조회 반영/복구는 FS080~FS081과 연계.",
+      "owners": "윤서진",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.011",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 77,
+      "id": "6.5.6",
+      "title": "(BE) 뉴스와 시장 데이터 연동",
+      "type": "P1",
+      "deliverable": "FS063 공급원 연동 유지. FS074 수집은 기존 어댑터를 재사용.",
+      "owners": "윤서진",
+      "start": "2026-10-07",
+      "end": "2026-10-16",
+      "weight": "0.01",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 78,
+      "id": "6.5.7",
+      "title": "(BE) AI 분석 연동",
+      "type": "P1",
+      "deliverable": "FS064 AI 호출·검증 계약 유지. FS076~FS079는 같은 호출 계약 사용.",
+      "owners": "윤서진",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 79,
+      "id": "6.5.8",
+      "title": "데이터 관리·외부 연동 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "윤서진",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 80,
+      "id": "6.6",
+      "title": "메인 그래프",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "2026-09-21",
+      "end": "2026-10-21",
+      "weight": "0.16",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 81,
+      "id": "6.6.1",
+      "title": "(BE) 개인화 관계 그래프 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS017 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-15",
+      "end": "2026-10-17",
+      "weight": "0.014",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 82,
+      "id": "6.6.2",
+      "title": "(BE)  전체 관계 그래프 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS018 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-14",
+      "end": "2026-10-16",
+      "weight": "0.01",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 83,
+      "id": "6.6.3",
+      "title": "(BE) 그래프 모드 전환 API 구현",
+      "type": "P1",
+      "deliverable": "FS019 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-16",
+      "end": "2026-10-17",
+      "weight": "0.005",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 84,
+      "id": "6.6.4",
+      "title": "(BE) 기업 노드 정보 API 구현 기본 정보·시세·주요 지표 조회 및 미제공 구분",
+      "type": "P1",
+      "deliverable": "FS020 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-12",
+      "end": "2026-10-14",
+      "weight": "0.007",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 85,
+      "id": "6.6.5",
+      "title": "(BE) 이슈 노드 정보 API 구현",
+      "type": "P1",
+      "deliverable": "FS021 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-16",
+      "end": "2026-10-19",
+      "weight": "0.007",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 86,
+      "id": "6.6.6",
+      "title": "(BE) 기업별 이슈 영향 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS022 영향 결과 조회·표시 구현·단위테스트. 영향 생성·근거 검증은 AI의 FS079 제공 결과 사용.",
+      "owners": "정세빈",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.008",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 87,
+      "id": "6.6.7",
+      "title": "(BE) 기업·이슈 영향 경로 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS022 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.011",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 88,
+      "id": "6.6.8",
+      "title": "(BE) 기업 간 관계 상세 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS023 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.008",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 89,
+      "id": "6.6.9",
+      "title": "(BE) 관계 근거 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS024 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-20",
+      "end": "2026-10-21",
+      "weight": "0.009",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 90,
+      "id": "6.6.10",
+      "title": "(BE) 선택 노드 AI 질문 API 구현",
+      "type": "P1",
+      "deliverable": "FS025 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-20",
+      "end": "2026-10-21",
+      "weight": "0.006",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 91,
+      "id": "6.6.11",
+      "title": "(BE) 사이드바 기업 목록·검색 API 구현",
+      "type": "P1",
+      "deliverable": "FS026 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-12",
+      "end": "2026-10-13",
+      "weight": "0.005",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 92,
+      "id": "6.6.12",
+      "title": "(BE) 관심 종목 수정 API 구현",
+      "type": "P1",
+      "deliverable": "FS027 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-14",
+      "end": "2026-10-15",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 93,
+      "id": "6.6.13",
+      "title": "(BE) 뉴스·공시 수집 및 수집 회차 관리",
+      "type": "P1",
+      "deliverable": "FS074 수집 회차·문서 계약·수집 시험\nFS058/FS063 재사용\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 94,
+      "id": "6.6.14",
+      "title": "(BE) 원천 문서 정제·중복 제거 및 버전 관리",
+      "type": "P1",
+      "deliverable": "FS075 정제·중복/수정 판정·원문 위치 시험\n선행 FS074 / FS056·FS058 연계",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": [
+        "FS074 "
+      ]
+    },
+    {
+      "row": 95,
+      "id": "6.6.15",
+      "title": "(BE) AI 사건·이슈 추출 및 이슈 후보 생성",
+      "type": "P1",
+      "deliverable": "FS076 사건·이슈 후보·근거·추출 시험\n선행 FS075 / FS058·FS064 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0075",
+      "progress": "0.0",
+      "dependencies": [
+        "FS075 "
+      ]
+    },
+    {
+      "row": 96,
+      "id": "6.6.16",
+      "title": "(BE) 기업·이슈 Entity Linking 및 동일성 판정",
+      "type": "P1",
+      "deliverable": "FS077 정규 ID 매핑·동일성/오병합 시험\n선행 FS076 / FS056·FS058 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0055",
+      "progress": "0.0",
+      "dependencies": [
+        "FS076 "
+      ]
+    },
+    {
+      "row": 97,
+      "id": "6.6.17",
+      "title": "(BE) 기업–이슈·기업–기업 관계 추출",
+      "type": "P1",
+      "deliverable": "FS078 관계 유형·방향·경로 추출 시험\n선행 FS077 / FS055·FS058 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0075",
+      "progress": "0.0",
+      "dependencies": [
+        "FS077 "
+      ]
+    },
+    {
+      "row": 98,
+      "id": "6.6.18",
+      "title": "(BE) 영향 방향·근거 검증 및 공개 적격 판정",
+      "type": "P1",
+      "deliverable": "FS079 영향·근거·공개 검증 시험\n선행 FS078 / FS022는 조회·표시\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0065",
+      "progress": "0.0",
+      "dependencies": [
+        "FS078 "
+      ]
+    },
+    {
+      "row": 99,
+      "id": "6.6.19",
+      "title": "(BE) GraphDB 노드·간선 upsert 및 공개 버전 반영",
+      "type": "P1",
+      "deliverable": "FS080 멱등 upsert·트랜잭션·공개 버전 시험\n선행 FS079 / FS055·FS059 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": [
+        "FS079 "
+      ]
+    },
+    {
+      "row": 100,
+      "id": "6.6.20",
+      "title": "(BE) 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구",
+      "type": "P1",
+      "deliverable": "FS081 증분 갱신·비활성화·복구 시험\n선행 FS080 / FS058·FS059·FS067-03 연계\n",
+      "owners": "윤서진",
+      "start": "2026-09-21",
+      "end": "2026-10-15",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": [
+        "FS080 "
+      ]
+    },
+    {
+      "row": 101,
+      "id": "6.6.21",
+      "title": "(FE) D-GRP-01·01b 전체·개인화 관계 그래프 화면 및 조회 API 연동",
+      "type": "P1",
+      "deliverable": "FS017 · FS018 · FS019 · FS026",
+      "owners": "김도현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 102,
+      "id": "6.6.22",
+      "title": "(FE) D-GRP-02 이슈 노드 상세 패널 및 이슈 API 연동",
+      "type": "P1",
+      "deliverable": "FS021 · FS024",
+      "owners": "김도현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 103,
+      "id": "6.6.23",
+      "title": "(FE) D-GRP-03 기업 노드 상세 패널 및 기업 API 연동",
+      "type": "P1",
+      "deliverable": "FS020 · FS026 · FS027",
+      "owners": "김도현",
+      "start": "2026-10-14",
+      "end": "2026-10-19",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 104,
+      "id": "6.6.24",
+      "title": "(FE) D-GRP-04 간선 상세 패널 및 관계 API 연동",
+      "type": "P1",
+      "deliverable": "FS023 · FS024",
+      "owners": "김도현",
+      "start": "2026-10-14",
+      "end": "2026-10-19",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 105,
+      "id": "6.6.25",
+      "title": "(FE) D-GRP-05 근거 상세 창 및 근거 문서 API 연동",
+      "type": "P1",
+      "deliverable": "FS024",
+      "owners": "김도현",
+      "start": "2026-10-14",
+      "end": "2026-10-19",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 106,
+      "id": "6.6.26",
+      "title": "(FE) D-GRP-06·07b 영향 경로·포커스 그래프 및 경로 API 연동",
+      "type": "P1",
+      "deliverable": "FS020 · FS022 · FS024",
+      "owners": "김도현",
+      "start": "2026-10-14",
+      "end": "2026-10-19",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 107,
+      "id": "6.6.27",
+      "title": "메인 그래프 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "정세빈, 윤서진, 김도현",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 108,
+      "id": "6.7",
+      "title": "기업 상세·타임라인",
+      "type": "",
+      "deliverable": "기업·시장·근거 조회 API",
+      "owners": "",
+      "start": "2026-10-12",
+      "end": "2026-10-23",
+      "weight": "0.035",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 109,
+      "id": "6.7.1",
+      "title": "(BE) 종목 목록·검색 API 구현",
+      "type": "P1",
+      "deliverable": "FS037 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-12",
+      "end": "2026-10-13",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 110,
+      "id": "6.7.2",
+      "title": "(BE) 기업 상세 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS038 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-12",
+      "end": "2026-10-14",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 111,
+      "id": "6.7.3",
+      "title": "(BE) 차트·타임라인 기간 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS040 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-19",
+      "end": "2026-10-21",
+      "weight": "0.0055",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 112,
+      "id": "6.7.4",
+      "title": "(BE) 동일 시점 이슈 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS041 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-20",
+      "end": "2026-10-21",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 113,
+      "id": "6.7.5",
+      "title": "(BE) 시점 기반 관계 그래프 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS042 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-19",
+      "end": "2026-10-21",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 114,
+      "id": "6.7.6",
+      "title": "(BE) 뉴스·공시 조회 API 구현",
+      "type": "P1",
+      "deliverable": "FS043 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-17",
+      "end": "2026-10-20",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 115,
+      "id": "6.7.7",
+      "title": "(BE) 기업 상세·관계 그래프 이동 API 구현",
+      "type": "P1",
+      "deliverable": "FS044 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-21",
+      "end": "2026-10-22",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 116,
+      "id": "6.7.8",
+      "title": "(FE) D-COM-01·01b 기업 상세·차트 화면 및 기업·시세 API 연동",
+      "type": "P1",
+      "deliverable": "FS038 · FS039 · FS040 · FS041 · FS044",
+      "owners": "박주형",
+      "start": "2026-10-21",
+      "end": "2026-10-22",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 117,
+      "id": "6.7.9",
+      "title": "(FE) D-COM-02 기업 문서 탭 및 뉴스·공시 API 연동",
+      "type": "P1",
+      "deliverable": "FS040 · FS041 · FS043",
+      "owners": "박주형",
+      "start": "2026-10-21",
+      "end": "2026-10-22",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 118,
+      "id": "6.7.10",
+      "title": "(FE) D-COM-03 기업 정보 탭 및 기업 기준정보 API 연동",
+      "type": "P1",
+      "deliverable": "FS038 · FS044",
+      "owners": "박주형",
+      "start": "2026-10-21",
+      "end": "2026-10-22",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 119,
+      "id": "6.7.11",
+      "title": "(FE) D-COM-04 기업 중심 관계 그래프 및 시점 조회 API 연동",
+      "type": "P1",
+      "deliverable": "FS038 · FS040 · FS044",
+      "owners": "박주형",
+      "start": "2026-10-21",
+      "end": "2026-10-22",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 120,
+      "id": "6.7.12",
+      "title": "(FE) D-COM-05·06 사건 타임라인·차트·그래프 선택 동기화",
+      "type": "P1",
+      "deliverable": "FS040 · FS041 · FS044",
+      "owners": "박주형",
+      "start": "2026-10-21",
+      "end": "2026-10-22",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 121,
+      "id": "6.7.13",
+      "title": "기업 상세·타임라인 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "정세빈, 박주형",
+      "start": "2026-10-21",
+      "end": "2026-10-23",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 122,
+      "id": "6.8",
+      "title": "출퇴근 브리핑",
+      "type": "",
+      "deliverable": "이슈 선정·시장 데이터·관계 그래프",
+      "owners": "",
+      "start": "2026-10-12",
+      "end": "2026-11-06",
+      "weight": "0.03",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 123,
+      "id": "6.8.1",
+      "title": "(BE) 출근 브리핑 생성",
+      "type": "P1",
+      "deliverable": "FS028 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-23",
+      "end": "2026-10-29",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 124,
+      "id": "6.8.2",
+      "title": "(BE) 퇴근 브리핑 생성",
+      "type": "P1",
+      "deliverable": "FS029 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-23",
+      "end": "2026-10-29",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 125,
+      "id": "6.8.3",
+      "title": "(BE) 핵심 이슈 선정 및 제공",
+      "type": "P1",
+      "deliverable": "FS030 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 126,
+      "id": "6.8.4",
+      "title": "(BE) 주요 시장 지표 제공",
+      "type": "P1",
+      "deliverable": "FS031 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-20",
+      "end": "2026-10-23",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 127,
+      "id": "6.8.5",
+      "title": "(BE) 브리핑 관계 그래프 조회",
+      "type": "P1",
+      "deliverable": "FS032 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-26",
+      "end": "2026-10-30",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 128,
+      "id": "6.8.6",
+      "title": "(BE) 공통 브리핑 조회",
+      "type": "P1",
+      "deliverable": "FS033 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-29",
+      "end": "2026-11-02",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 129,
+      "id": "6.8.7",
+      "title": "",
+      "type": "",
+      "deliverable": "",
+      "owners": "",
+      "start": "",
+      "end": "",
+      "weight": "",
+      "progress": "",
+      "dependencies": []
+    },
+    {
+      "row": 130,
+      "id": "6.8.8",
+      "title": "(BE) 브리핑 이력 보존(회차·발행본·스냅샷 저장 및 조회)",
+      "type": "P1",
+      "deliverable": "FS035 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-28",
+      "end": "2026-10-30",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 131,
+      "id": "6.8.9",
+      "title": "(BE) 개인화 브리핑 조회",
+      "type": "P2",
+      "deliverable": "FS036 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.001",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 132,
+      "id": "6.8.10",
+      "title": "(BE) 좋아요/싫어요 등록",
+      "type": "P2",
+      "deliverable": "FS066-01 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.001",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 133,
+      "id": "6.8.11",
+      "title": "(FE) D-BRF-01 출근 브리핑 화면 및 브리핑 API 연동",
+      "type": "P1",
+      "deliverable": "FS028 · FS030 · FS031 · FS033 · FS035",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 134,
+      "id": "6.8.12",
+      "title": "(FE) D-BRF-02 퇴근 브리핑 화면 및 브리핑 API 연동",
+      "type": "P1",
+      "deliverable": "FS029 · FS030 · FS031 · FS033 · FS035",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 135,
+      "id": "6.8.13",
+      "title": "(FE) D-BRF-04 브리핑 회차·이력 화면 및 조회 API 연동",
+      "type": "P2",
+      "deliverable": "FS032 · FS035",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 136,
+      "id": "6.8.14",
+      "title": "(FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동",
+      "type": "P2",
+      "deliverable": "FS032 · FS036 · FS066-01",
+      "owners": "박주형",
+      "start": "2026-10-13",
+      "end": "2026-10-15",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 137,
+      "id": "6.8.15",
+      "title": "출퇴근 브리핑 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "홍정현, 박주형",
+      "start": "2026-11-02",
+      "end": "2026-11-06",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 138,
+      "id": "6.9",
+      "title": "AI 챗봇",
+      "type": "",
+      "deliverable": "질의 분기 거버넌스·그래프/근거 조회",
+      "owners": "",
+      "start": "2026-10-08",
+      "end": "2026-10-24",
+      "weight": "0.05",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 139,
+      "id": "6.9.1",
+      "title": "(BE) AI 질문 진입·맥락 전달",
+      "type": "P1",
+      "deliverable": "FS025 · FS045 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-08",
+      "end": "2026-10-13",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 140,
+      "id": "6.9.2",
+      "title": "(BE) 질문 대상·기간 해석·되묻기",
+      "type": "P1",
+      "deliverable": "FS047 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-08",
+      "end": "2026-10-13",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 141,
+      "id": "6.9.3",
+      "title": "(BE) 근거·관계 그래프 맥락 조회",
+      "type": "P1",
+      "deliverable": "FS048 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-08",
+      "end": "2026-10-13",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 142,
+      "id": "6.9.4",
+      "title": "(BE) 근거 기반 답변 생성·안전 검증",
+      "type": "P1",
+      "deliverable": "FS049 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-08",
+      "end": "2026-10-13",
+      "weight": "0.006",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 143,
+      "id": "6.9.5",
+      "title": "(BE) 답변 근거·관련 그래프 탐색",
+      "type": "P1",
+      "deliverable": "FS050-01 · FS050-02 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-08",
+      "end": "2026-10-13",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 144,
+      "id": "6.9.6",
+      "title": "(BE) 새 대화·후속 질문",
+      "type": "P1",
+      "deliverable": "FS051 · FS052-01 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-13",
+      "end": "2026-10-23",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 145,
+      "id": "6.9.7",
+      "title": "(BE) 패널 상태 유지·결과 재조회",
+      "type": "P1",
+      "deliverable": "FS052-02 · FS053 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-13",
+      "end": "2026-10-23",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 146,
+      "id": "6.9.8",
+      "title": "(BE) 대화와 내부 패널 유지",
+      "type": "P1",
+      "deliverable": "FS052-02 내부 처리",
+      "owners": "김도현",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 147,
+      "id": "6.9.9",
+      "title": "(BE) AI 결과 회수와 재시도",
+      "type": "P1",
+      "deliverable": "FS053 내부 처리",
+      "owners": "김도현",
+      "start": "2026-10-16",
+      "end": "2026-10-23",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 148,
+      "id": "6.9.10",
+      "title": "(BE) 대화와 질문 기록",
+      "type": "P1",
+      "deliverable": "FS060 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-19",
+      "end": "2026-10-21",
+      "weight": "0.003",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 149,
+      "id": "6.9.11",
+      "title": "(FE) D-AI-01 AI 챗봇 기본 화면 및 세션 API 연동",
+      "type": "P1",
+      "deliverable": "FS025 · FS045 · FS047 · FS048",
+      "owners": "김도현",
+      "start": "2026-10-19",
+      "end": "2026-10-24",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 150,
+      "id": "6.9.12",
+      "title": "(FE) D-AI-01b 기업·이슈·간선 선택 맥락 질문 연동",
+      "type": "P1",
+      "deliverable": "FS047",
+      "owners": "김도현",
+      "start": "2026-10-19",
+      "end": "2026-10-24",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 151,
+      "id": "6.9.13",
+      "title": "(FE) D-AI-02 AI 비동기 작업 상태·결과·재시도 API 연동",
+      "type": "P1",
+      "deliverable": "FS046 · FS049 · FS051 · FS052-02 · FS053 · NFS003",
+      "owners": "김도현",
+      "start": "2026-10-19",
+      "end": "2026-10-24",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 152,
+      "id": "6.9.14",
+      "title": "(FE) D-AI-02b 대화 이력·후속 질문·답변 재조회 API 연동",
+      "type": "P1",
+      "deliverable": "FS053 · NFS003",
+      "owners": "김도현",
+      "start": "2026-10-22",
+      "end": "2026-10-24",
+      "weight": "0.0035",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 153,
+      "id": "6.9.15",
+      "title": "AI 챗봇 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "김도현",
+      "start": "2026-10-28",
+      "end": "2026-10-24",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 154,
+      "id": "6.10",
+      "title": "관리자",
+      "type": "",
+      "deliverable": "운영 데이터·권한·검토 워크플로",
+      "owners": "",
+      "start": "2026-10-12",
+      "end": "2026-10-24",
+      "weight": "0.035",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 155,
+      "id": "6.10.1",
+      "title": "(BE) 관리자 인증·권한 관리 API 개발",
+      "type": "P1",
+      "deliverable": "FS073 · NFS001 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-19",
+      "end": "2026-10-20",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 156,
+      "id": "6.10.2",
+      "title": "(BE) 관리자 대시보드 통합 API 개발",
+      "type": "P1",
+      "deliverable": "FS072 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-19",
+      "end": "2026-10-21",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 157,
+      "id": "6.10.3",
+      "title": "(BE) 회원 활동 조회·차단 관리 API 개발",
+      "type": "P2",
+      "deliverable": "FS069-01 · FS069-02 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-19",
+      "end": "2026-10-21",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 158,
+      "id": "6.10.4",
+      "title": "(BE) 사용자·기업 통계 API 개발",
+      "type": "P2",
+      "deliverable": "FS065 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-20",
+      "end": "2026-10-22",
+      "weight": "0.0012",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 159,
+      "id": "6.10.5",
+      "title": "(BE) AI 결과 평가·선호도 통계 API 개발",
+      "type": "P2",
+      "deliverable": "FS066-01 · FS066-02 구현·단위테스트",
+      "owners": "김도현/홍정현",
+      "start": "2026-10-20",
+      "end": "2026-10-22",
+      "weight": "0.0012",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 160,
+      "id": "6.10.6",
+      "title": "(BE) 관계추출·이슈 분석 상태 조회 API 개발",
+      "type": "P2",
+      "deliverable": "FS067-01 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-20",
+      "end": "2026-10-22",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 161,
+      "id": "6.10.7",
+      "title": "(BE) 보류 이슈 검수·분석 재처리 기능 개발",
+      "type": "P1",
+      "deliverable": "FS067-02 · FS067-03 구현·단위테스트",
+      "owners": "정세빈",
+      "start": "2026-10-20",
+      "end": "2026-10-22",
+      "weight": "0.0025",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 162,
+      "id": "6.10.8",
+      "title": "(BE) AI 사용량·비용·오류 조회 기능 개발",
+      "type": "P1",
+      "deliverable": "FS068 구현·단위테스트",
+      "owners": "안재현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 163,
+      "id": "6.10.9",
+      "title": "(BE) 브리핑 회차·발행 상태 관리 API 개발",
+      "type": "P1",
+      "deliverable": "FS070-01 · FS070-02 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 164,
+      "id": "6.10.10",
+      "title": "(BE) 브리핑 정정·제공 중단 기능 개발",
+      "type": "P1",
+      "deliverable": "FS071-01 · FS071-02 구현·단위테스트",
+      "owners": "홍정현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 165,
+      "id": "6.10.11",
+      "title": "(BE) 관리자 대화록 마스킹 조회 기능 개발",
+      "type": "P1",
+      "deliverable": "FS066-03 구현·단위테스트",
+      "owners": "김도현",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 166,
+      "id": "6.10.12",
+      "title": "(BE) 관리자 주요 작업 감사기록 저장·조회 구현",
+      "type": "P2",
+      "deliverable": "FS072 · NFS008 구현·단위테스트",
+      "owners": "임현",
+      "start": "2026-10-20",
+      "end": "2026-10-22",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 167,
+      "id": "6.10.13",
+      "title": "(FE) A-ADM-05c 관리자 로그인·권한 화면 및 인증 API 연동",
+      "type": "P1",
+      "deliverable": "FS073 · NFS001",
+      "owners": "박주형",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 168,
+      "id": "6.10.14",
+      "title": "(FE) A-ADM-01 운영 대시보드 및 통합 현황 API 연동",
+      "type": "P1",
+      "deliverable": "FS072",
+      "owners": "박주형",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 169,
+      "id": "6.10.15",
+      "title": "(FE) A-ADM-02·02b 통계·피드백 화면 및 평가 API 연동",
+      "type": "P2",
+      "deliverable": "FS065 · FS066-02 · FS066-03",
+      "owners": "박주형",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0018",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 170,
+      "id": "6.10.16",
+      "title": "(FE) A-ADM-03 그래프 파이프라인·검수 화면 및 재처리 API 연동",
+      "type": "P1",
+      "deliverable": "FS067-01 · FS067-02 · FS067-03",
+      "owners": "윤서진",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.0022",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 171,
+      "id": "6.10.17",
+      "title": "(FE) A-ADM-04·04b 브리핑·AI 사용량 운영 화면 및 API 연동",
+      "type": "P1",
+      "deliverable": "FS070-01 · FS070-02 · FS071-01 · FS071-02 · FS068",
+      "owners": "박주형",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 172,
+      "id": "6.10.18",
+      "title": "(FE) A-ADM-05·05b 회원·감사 로그 화면 및 관리 API 연동",
+      "type": "P2",
+      "deliverable": "FS069-01 · FS069-02 · FS073 · NFS008",
+      "owners": "박주형",
+      "start": "2026-10-12",
+      "end": "2026-10-16",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 173,
+      "id": "6.10.19",
+      "title": "관리자 권한·운영 기능 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "팀원 전원",
+      "start": "2026-10-22",
+      "end": "2026-10-24",
+      "weight": "0.0015",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 174,
+      "id": "6.11",
+      "title": "통합 검증·배포·발표",
+      "type": "",
+      "deliverable": "각 영역 기능 완료",
+      "owners": "",
+      "start": "2026-10-12",
+      "end": "2026-10-28",
+      "weight": "0.04",
+      "progress": "0",
+      "dependencies": []
+    },
+    {
+      "row": 175,
+      "id": "6.11.1",
+      "title": "API·스키마 계약 통합 점검",
+      "type": "통합검증",
+      "deliverable": "계약 점검 결과",
+      "owners": "팀원 전원",
+      "start": "2026-10-12",
+      "end": "2026-10-20",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 176,
+      "id": "6.11.2",
+      "title": "개발·테스트 환경 통합 및 DB 마이그레이션 검증",
+      "type": "통합검증",
+      "deliverable": "서버/DB/GraphDB/AI 모두 테스트 환경 정상 기동",
+      "owners": "안재현",
+      "start": "2026-10-12",
+      "end": "2026-10-23",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 177,
+      "id": "6.11.3",
+      "title": "핵심 사용자 시나리오 E2E 검증",
+      "type": "통합검증",
+      "deliverable": "주요 사용자 흐름 정상 완료",
+      "owners": "안재현",
+      "start": "2026-10-12",
+      "end": "2026-10-23",
+      "weight": "0.0055",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 178,
+      "id": "6.11.4",
+      "title": "데이터·GraphDB·근거 정합성 검증",
+      "type": "통합검증",
+      "deliverable": "그래프·근거·버전·기업/사건 연결 검증",
+      "owners": "윤서진",
+      "start": "2026-10-12",
+      "end": "2026-10-27",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 179,
+      "id": "6.11.5",
+      "title": "AI 챗봇·브리핑 결과 및 복구 검증",
+      "type": "통합검증",
+      "deliverable": "질문·브리핑·재시도·오류 상태 정상",
+      "owners": "김도현",
+      "start": "2026-10-12",
+      "end": "2026-10-27",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 180,
+      "id": "6.11.6",
+      "title": "성능·장애·예외 처리 검증",
+      "type": "통합검증",
+      "deliverable": "비기능 점검 결과",
+      "owners": "안재현",
+      "start": "2026-10-19",
+      "end": "2026-10-23",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 181,
+      "id": "6.11.7",
+      "title": "결함 수정 및 회귀 테스트",
+      "type": "통합검증",
+      "deliverable": "Critical/Major 결함 해결 및 재검증",
+      "owners": "팀원 전원",
+      "start": "2026-10-25",
+      "end": "2026-10-28",
+      "weight": "0.0045",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 182,
+      "id": "6.11.8",
+      "title": "운영 환경(Docker·CI/CD) 배포",
+      "type": "배포",
+      "deliverable": "배포본·인수 결과",
+      "owners": "안재현",
+      "start": "2026-10-19",
+      "end": "2026-10-23",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    },
+    {
+      "row": 183,
+      "id": "6.11.9",
+      "title": "시연 영상 및 발표 PPT 제작",
+      "type": "발표준비",
+      "deliverable": "영상·PPT·발표본",
+      "owners": "팀원 전원",
+      "start": "2026-10-26",
+      "end": "2026-10-28",
+      "weight": "0.004",
+      "progress": "0.0",
+      "dependencies": []
+    }
+  ],
+  "invalid_dates": [
+    {
+      "row": 153,
+      "id": "6.9.15",
+      "title": "AI 챗봇 통합 테스트",
+      "type": "P1",
+      "deliverable": "테스트 통과",
+      "owners": "김도현",
+      "start": "2026-10-28",
+      "end": "2026-10-24",
+      "weight": "0.002",
+      "progress": "0.0",
+      "dependencies": []
+    }
+  ],
+  "parent_date_conflicts": [],
+  "exact_nfs_definitions": [
+    {
+      "id": "NFS001",
+      "sheet": "비기능 상세",
+      "id_row": 9,
+      "fields": {
+        "요구사항명": "접근 통제",
+        "요구사항 설명": "회원의 개인 정보는 해당 회원에게만 제공해야 한다. 비회원은 로그인 하여야지만 관심종목 기능을 이용할 수 있어야 하며, 다른 사용자의 정보에는 접근할 수 없어야 한다.",
+        "적용 대상·범위": "관심종목·보유정보·대화·질문 작업·개인화 근거의 조회 및 변경. 로그인 상태 변경과 로그아웃 이후의 화면 표시까지 포함한다.",
+        "적용 조건·검증 입력": "비회원, 정보 소유 회원, 다른 회원의 인증 상태.\n조회·변경하려는 회원·대화·작업·근거 식별자와 현재 접근 권한.\n로그아웃 직전에 시작되어 뒤늦게 도착하는 개인화 응답.",
+        "품질 목표·준수 규칙": "1. 회원의 개인 정보는 해당 회원에게만 제공한다.\n2. 비회원은 관심종목을 이용할 수 없으며 타인 정보 접근을 허용하지 않는다.\n3. 서버에서 인증 상태와 요청 대상의 소유권·접근 권한을 확인한다. 화면에서 버튼을 숨기는 것만으로 접근 통제를 충족한 것으로 보지 않는다.\n4. 완료된 AI 결과를 다시 회수할 때도 현재 접근 권한을 확인한다. 평가 등록은 현재 결과 조회 권한이 있는 회원만 허용한다. 관리자 대화록(AI 챗봇 대화기록)은 별도 열람 권한과 마스킹·필수 열람 기록이 모두 충족된 경우만 제공한다.",
+        "정상 상태": "본인은 허용된 개인 정보를 조회·변경할 수 있다. 비회원이나 다른 회원에게 보호된 정보가 전달되지 않으며 로그아웃 후 개인 정보 표시가 해제된다.",
+        "미충족·예외 처리": "인증·소유권·접근 권한 오류: 요청을 거절하고 보호된 내용을 반환하지 않는다.\n로그아웃 후 이전 개인화 응답 도착: 현재 화면에 반영하지 않는다.\nAI 챳봇 대화기록 열람: 일반 회원의 소유권 규칙과 구분하며 마스킹·승인된 열람 범위는 별도 결정한다.",
+        "검증 방법": "1. 동일한 개인화 대상에 대해 비회원·본인·타인으로 조회와 변경을 각각 요청한다.\n2. 대화·작업·근거 식별자를 다른 회원의 값으로 바꾸어 보호 데이터가 반환되는지 확인한다.\n3. 완료 결과를 저장한 뒤 권한이 달라진 상태에서 재회수를 요청한다.\n4. 개인화 응답을 지연시킨 뒤 로그아웃하고 해당 응답이 도착했을 때 화면을 확인한다.\n평가 대상·회원 식별자를 타인으로 바꾸어 요청한다. 마스킹 또는 열람 기록 저장을 실패시켜 원문이 반환되지 않는지 점검한다.",
+        "수용 기준": "1. 다른 회원의 대화·작업·근거 식별자로 요청해도 데이터를 받지 못한다.\n2. 로그아웃 후 늦은 응답을 화면에 반영하지 않는다.\n3. 본인의 유효 요청은 처리되고 비회원·타인의 보호 데이터 조회와 변경은 거절된다.\n4. 완료 결과 회수에서도 현재 권한이 없는 정보가 노출되지 않는다.\n타인의 개인화 결과 평가가 거절되고 마스킹·열람 기록 실패 시 대화록 내용이 제공되지 않는다.",
+        "확인 필요 사항": "-"
+      }
+    },
+    {
+      "id": "NFS002",
+      "sheet": "비기능 상세",
+      "id_row": 23,
+      "fields": {
+        "요구사항명": "응답과 화면 정합성",
+        "요구사항 설명": "차트, 재무, 뉴스 등 각 영역에는 현재 기업과 조회 조건에 맞는 최신 결과만 반영해야 한다. 이전 요청의 늦은 결과가 해당 영역의 현재 내용을 덮어써서는 안 된다. AI 답변은 해당 대화와 질문에만 연결해야 한다.",
+        "적용 대상·범위": "기업 상세의 개요·차트·타임라인·재무·뉴스·보유 영역, 메인 그래프의 모드·선택 대상, AI 대화와 질문별 답변 표시.",
+        "적용 조건·검증 입력": "현재 기업, 기간 등 영역별 조회 조건, 최신 조회 식별자, 선택 이슈·노드.\n현재 활성 대화와 질문 작업 식별자.\n순서가 뒤바뀐 정상 응답과 오류 응답.",
+        "품질 목표·준수 규칙": "1. 현재 조건과 일치하는 최신 결과만 반영한다.\n2. 이전 요청의 늦은 응답이 최신 화면을 덮지 않고 AI 답변은 해당 대화·질문에만 연결한다.\n3. 정상 데이터뿐 아니라 오류 안내도 현재 조건과 최신 조회에 속하는지 확인한 뒤 표시한다.\n4. 이전 대화의 답변은 현재 대화가 아닌 해당 질문 작업에 연결한다.\nv1.2 제안: 기업·영역 조건·최신 조회 식별 정보로 정상·오류 응답을 판정한다. 차트 기간과 재무 기간을 별도로 관리한다. 상세 이탈은 전체 상세 조회, 기간 변경은 차트·타임라인·이슈 상세, 이슈 변경은 이슈 상세를 무효화한다.",
+        "정상 상태": "현재 선택한 기업·조건에 맞는 결과만 해당 영역에 표시되고, AI 답변은 원래 요청한 대화·질문에 연결된다.",
+        "미충족·예외 처리": "이전 기업·기간·그래프 모드의 응답 또는 오류: 현재 화면을 변경하지 않는다.\n새 대화 전환 뒤 이전 답변 도착: 새 대화에 붙이지 않는다.\n화면에서 응답을 무시하는 동작은 서버 기록 삭제나 기존 작업 취소를 의미하지 않는다.",
+        "검증 방법": "1. 기업 A 조회 뒤 B로 변경하고 B 응답을 먼저, A 응답을 나중에 도착시킨다.\n2. 기간과 그래프 모드를 연속 변경하고 정상·오류 응답의 도착 순서를 역전한다.\n3. 현재 조건의 성공 결과가 표시된 뒤 이전 요청의 오류를 도착시킨다.\n4. 질문을 전송한 뒤 새 대화를 시작하고 이전 질문의 답변이 도착하는 경우를 확인한다.\n1개월 조회 후 1년으로 변경하고 1개월 응답·오류를 늦게 도착시킨다.\nA 이슈 선택 후 발생 날짜 미상 B를 선택하여 A 상세·차트 강조가 정리되는지 확인한다.\n차트·재무 기간을 다르게 설정하고 그래프 왕복·AI 패널 닫기·재열기를 실행한다.",
+        "수용 기준": "1. 기업·기간을 빠르게 바꾸고 응답 순서를 역전해도 최종 조건만 표시된다.\n2. 새 대화에 이전 답변이 표시되지 않는다.\n3. 이전 요청의 오류가 현재 정상 결과를 지우거나 오류 상태로 바꾸지 않는다.\n4. 다른 영역의 독립 조회 결과를 무조건 함께 폐기하지 않고 각 영역의 현재 조건으로 표시 여부를 판단한다.\n최종 기간의 두 영역이 이전 응답으로 되돌아가지 않는다.\n범위 안 선택 이슈은 새 상세 조회로 이어지고 범위 밖 선택은 해제된다.\n패널 닫기와 화면 왕복 후 각 독립 기간·선택이 지정 규칙대로 유지된다.",
+        "확인 필요 사항": "v1.2 제안 기준: 영역별 무효화와 화면 복원 규칙을 기능 명세에 반영했다.\n조회 식별자의 내부 형식은 구현에서 정하되 조건 일치 검증은 생략할 수 없다."
+      }
+    },
+    {
+      "id": "NFS003",
+      "sheet": "비기능 상세",
+      "id_row": 37,
+      "fields": {
+        "요구사항명": "작업 일관성과 복구",
+        "요구사항 설명": "관심 종목 등록, 계좌 연결, AI 답변 생성, 브리핑 생성 등 상태를 변경하거나 결과를 생성하는 요청에는 중복 실행 방지 기준을 적용해야 한다. 동일한 작업 식별자로 요청을 재전송한 경우 결과를 중복 생성하거나 상태를 중복 변경해서는 안 된다. 네트워크 또는 서버 오류 이후 재시도할 때 기존 작업의 처리 상태를 먼저 확인해야 한다.",
+        "적용 대상·범위": "관심종목 등록, 가상계좌 연결, AI 답변 생성, 브리핑 생성 등 상태 변경 또는 결과 생성 작업의 중복 요청과 재시도.",
+        "적용 조건·검증 입력": "작업 식별자, 최초 요청 내용, 기존 작업의 서버 처리 상태, 저장된 결과, 현재 유효한 실행 정보.\nAI 질문은 대화 식별자와 해당 대화의 처리 중 작업도 확인한다.",
+        "품질 목표·준수 규칙": "1. 동일 작업을 재전송해도 중복 상태 변경·중복 결과 생성이 없어야 한다.\n2. 오류 이후 새 실행 전 기존 처리 상태를 확인한다.\n3. 클라이언트의 응답 미수신을 서버 실패나 작업 미등록으로 단정하지 않는다.\n4. AI 질문은 서로 다른 작업 ID로 동시에 접수되어도 같은 대화에 하나의 신규 작업만 접수한다. 기존 작업의 상태 확인·결과 회수는 추가 질문과 구분한다.\n5. AI 작업 재시도는 최초 질문 맥락·대상·기간·근거를 유지한다.\nv1.2 제안: AI 결과 평가 변경은 원하는 최종 상태를 저장한다. 동일 요청 재전송은 한 평가 상태를 유지하며 반복 토글하지 않는다.",
+        "정상 상태": "같은 작업을 반복 요청해도 유효한 상태 변경 또는 결과가 하나로 유지된다. 이미 완료된 작업은 기존 결과를 회수할 수 있다.",
+        "미충족·예외 처리": "완료 작업: 기존 결과를 회수한다. 처리 중 작업: 대기 또는 상태 확인을 수행한다.\n서버가 확인한 실패: 오류 유형별로 허용된 복구만 수행한다.\n같은 작업 ID에 다른 내용: 충돌로 처리하며 동일 작업인 것처럼 실행하지 않는다.\n상태 조회 실패·응답 지연: 새 결과 생성을 시작하지 않는다.\nAI 작업의 미등록을 서버가 확인한 경우에만 기존 작업 ID와 최초 요청 내용으로 접수를 다시 시도한다.",
+        "검증 방법": "1. 동일 작업과 동일 내용을 동시에 재전송하고 상태 변경·결과 생성 횟수를 확인한다.\n2. 같은 작업 ID의 내용을 변경한 요청이 충돌로 처리되는지 확인한다.\n3. 처리 중 통신을 끊은 뒤 재요청하여 기존 상태·결과가 회수되는지 확인한다.\n4. AI 질문은 서로 다른 작업 ID를 같은 대화에 동시에 전송한다.\n5. 저장 실패와 이전 실행의 지연 완료를 발생시켜 현재 유효한 결과가 유지되는지 확인한다.\n동일 좋아요 요청·취소 요청을 중복 전송하고 현재 평가 건수와 상태를 비교한다. 패널 재열기 동안 처리 중 작업이 완료되는 경우 저장된 결과 회수까지 확인한다.",
+        "수용 기준": "1. 동시 요청·네트워크 단절·저장 실패·과거 실행 지연을 시험해 유효한 결과 하나만 유지됨을 확인한다.\n2. 같은 대화에 서로 다른 질문 작업을 동시에 전송해도 하나의 신규 AI 작업만 접수된다.\n3. 상태 조회 장애나 응답 지연만으로 추가 생성이 시작되지 않는다.\n4. 동일 작업 ID의 내용 변경은 거절되고, 늦게 완료된 이전 실행이 현재 유효한 결과를 덮어쓰지 않는다.\n평가 재전송은 중복 등록·역토글을 일으키지 않는다. 패널 재열기는 새 질문 작업이나 추가 AI 생성을 만들지 않는다.",
+        "확인 필요 사항": "v1.2 제안 기준: 목표 평가 상태와 질문 작업을 구분한다. 같은 대화 신규 질문 1개 접수 원칙 유지.\n미등록은 작업 저장소 정상 조회로 기록 없음을 확인한 경우이다. 상태 조회 장애는 해당하지 않는다.\n[확인 필요: 작업 식별자 보관 유효 기간·중단 판정값은 운영 승인 필요]"
+      }
+    },
+    {
+      "id": "NFS004",
+      "sheet": "비기능 상세",
+      "id_row": 51,
+      "fields": {
+        "요구사항명": "부분 실패 내성",
+        "요구사항 설명": "기업 상세, 관계 그래프, 브리핑 등 여러 영역으로 구성된 화면에서 한 영역의 조회가 실패하더라도 정상적으로 조회된 다른 영역은 유지해야 한다. 실패 영역에는 오류 안내와 재시도 기능을 제공해야 하며, 재시도 시 해당 영역만 다시 조회해야 한다.",
+        "적용 대상·범위": "기업 상세·관계 그래프·브리핑 등 여러 조회 영역으로 구성된 화면. 각 영역의 최초 조회, 실패 표시 및 재시도에 적용한다.",
+        "적용 조건·검증 입력": "영역별 조회 결과·오류·현재 기업과 기간 등의 조건·최신 조회 식별자.\n정상 영역과 실패 영역이 함께 있는 화면 상태.",
+        "품질 목표·준수 규칙": "1. 한 영역의 실패가 정상 영역을 초기화하거나 숨기지 않아야 한다.\n2. 실패 영역만 오류와 재시도를 제공한다.\n3. 영역별 결과가 준비되는 대로 표시하되 실패한 영역의 재시도 때문에 정상 영역을 초기화하지 않는다.\n4. 재시도 결과도 해당 영역의 현재 조건과 일치할 때만 반영한다.\nv1.2 제안: 일시 조회 장애는 해당 영역 재조회, 자료 없음은 빈 상태, 권한 오류는 접근 제한으로 구분한다. 데이터 쓰기·AI 생성 재시도는 단순 조회 재시도와 분리한다.",
+        "정상 상태": "정상 조회된 영역은 계속 사용할 수 있고, 실패한 영역에는 구분된 오류와 재시도 수단이 표시된다.",
+        "미충족·예외 처리": "한 영역만 실패: 해당 영역에 오류를 표시하고 다른 정상 영역은 유지한다.\n재시도 중 조건 변경: 이전 조건의 재시도 응답을 현재 화면에 반영하지 않는다.\n이전 오류가 뒤늦게 도착: 새로 성공한 결과를 지우지 않는다.\n재시도 불가능한 오류(일시적 오류, 데이터 없음, 권한/요청 오류)의 안내·버튼 상태는 별도 정책으로 결정한다.",
+        "검증 방법": "1. 기업 상세에서 재무 조회만 실패시키고 개요·차트가 유지되는지 확인한다.\n2. 재무 재시도를 요청하여 실제로 재무 영역만 다시 조회되는지 확인한다.\n3. 재시도 중 기업·기간을 바꾸고 이전 응답의 반영 여부를 확인한다.\n4. 오류 응답을 지연시켜 성공 응답 이후에 도착하도록 한다.\n추천 조회만 실패시키고 검색을 수행한다. 관심 저장 성공 후 그래프 조회만 실패시켜 그래프 재조회가 관심 저장을 반복하지 않는지 확인한다.",
+        "수용 기준": "1. 재무만 실패시키면 개요·차트가 유지되고 재무 재시도만 발생한다.\n2. 오래된 실패 응답이 새 성공 결과를 지우지 않는다.\n3. 실패 영역 재시도 중에도 정상 영역과 사용자가 현재 선택한 조건이 유지된다.\n4. 재시도 결과가 현재 조건과 불일치하면 화면을 덮어쓰지 않는다.\n독립 조회 영역 장애가 다른 정상 영역과 편집 입력을 초기화하지 않는다. 조회 재시도가 저장·AI 생성을 다시 실행하지 않는다.",
+        "확인 필요 사항": "-"
+      }
+    },
+    {
+      "id": "NFS005",
+      "sheet": "비기능 상세",
+      "id_row": 65,
+      "fields": {
+        "요구사항명": "근거와 해석의 품질",
+        "요구사항 설명": "시스템은 확인된 사실, 시스템의 영향 해석 및 불확실한 정보를 구분하여 표시해야 한다. 사실 정보에는 출처, 발행 시각 및 원문 링크를 제공해야 한다. 영향 분석은 ‘긍정 가능’, ‘부정 가능’, ‘판단 보류’ 등 가능성 표현을 사용해야 하며 확정적인 투자 판단으로 표시해서는 안 된다. 이슈과 관련 없거나 시점이 일치하지 않는 자료는 근거로 사용해서는 안 된다.",
+        "적용 대상·범위": "표시할 사실과 영향 해석, 이슈·기업·기간, 출처·발행 시각·원문 링크, 확보된 인용 구간, 반대 근거와 불확실성.\n검증 사례: 무관한 문서, 시점 불일치, 인용 오류, 상반된 근거, 근거 부족.",
+        "적용 조건·검증 입력": "관계 그래프의 영향 설명, 기업 상세·타임라인, 출퇴근 브리핑, AI 답변의 사실·영향 해석·근거 표시.",
+        "품질 목표·준수 규칙": "1. 확인 사실, 영향 해석, 불확실 정보를 구분한다.\n2. 사실에는 출처·발행 시각·원문 링크를 제공한다.\n3. 영향은 가능성으로 표현하고 확정 투자 판단으로 표시하지 않는다.\n4. 이슈과 무관하거나 시점이 맞지 않는 자료를 근거로 사용하지 않는다.\n5. 원문을 확보하지 못한 경우 인용을 임의로 만들지 않는다.\n6. 긍정·부정 등의 분류를 주가 상승·하락 확률이나 확정된 인과관계로 바꾸어 제시하지 않는다.\n7. 근거의 반대 내용과 해석 한계를 누락해 확정 판단인 것처럼 표시하지 않는다.\n8. 이슈 발생일이 확인되지 않은 경우 문서 발행일을 이슈 발생일로 대체하지 않는다. 문서 발행일과 이슈 발생일은 별도 필드로 관리하며, 발생일 미확정 상태를 명확하게 표시한다.",
+        "정상 상태": "확인된 사실과 시스템의 해석을 구분해 읽을 수 있고, 근거의 출처·시점 및 확인 가능한 원문으로 추적할 수 있다.",
+        "미충족·예외 처리": "근거 부족: 부족 안내 또는 판단 보류로 표시한다.\n문서·시점·인용 검증 실패: 검증을 통과한 근거처럼 제시하지 않는다.\n원문 미제공·접근 실패: 임의 원문을 만들지 않고 확보된 출처·메타데이터와 미제공 상태를 구분한다.\n근거가 상충하는 경우: 확보된 반대 근거와 해석의 한계를 함께 표시한다.",
+        "검증 방법": "1. 이슈과 무관한 문서, 기간이 다른 문서, 원문에 없는 인용을 각각 넣어 근거로 잘못 노출되는지 확인한다.\n2. 사실·영향 해석·불확실한 정보의 표시가 구분되는지 확인한다.\n3. 근거가 충분한 경우와 부족한 경우, 상반된 근거가 함께 있는 경우의 결과를 비교한다.\n4. 원문 링크 미제공·접근 실패에서도 출처와 상태가 구분되는지 확인한다.\n한 이슈의 복수 문서와 같은 날 별개 이슈을 함께 제공한다. 발생 날짜 미상 이슈과 기사 발행일이 있는 자료를 주어 표기·차트 강조를 확인한다.",
+        "수용 기준": "1. 무관 문서·잘못된 시점·인용 오류·상반된 근거를 넣어 제외/표시 규칙을 점검한다.\n2. 영향 분류를 주가 확률이나 확정 인과로 표시하지 않는다.\n3. 출처·발행 시각·원문 링크를 확인할 수 있으며 원문 미제공 상태가 정상 제공인 것처럼 표시되지 않는다.\n4. 확보되지 않은 인용을 생성하지 않고 근거 부족과 해석의 한계를 표시한다.\n문서 수와 이슈 수가 혼동되지 않고 문서 발행일이 확정 이슈 날짜로 저장·표시되지 않는다. 수동 허용만으로 검증 실패 결과가 공개되지 않는다.",
+        "확인 필요 사항": "[확인 필요: 사실성·해석 품질의 정량 목표, 검증 표본 구성과 평가 기준 결정 필요]\n인용·형식·참조 검증 통과는 답변 전체의 사실 정확성을 보장하지 않는다."
+      }
+    },
+    {
+      "id": "NFS006",
+      "sheet": "비기능 상세",
+      "id_row": 79,
+      "fields": {
+        "요구사항명": "모델 전달 데이터 최소화",
+        "요구사항 설명": "AI 모델에는 답변 생성에 필요한 기업, 이슈, 관계 경로 및 허용된 근거만 전달해야 한다. 비밀번호, 인증토큰, 세션 정보 및 불필요한 개인식별정보는 모델 입력과 로그에 포함해서는 안 된다. 보유 종목과 관심 종목 정보는 개인화 답변에 필요한 경우에만 최소 범위로 전달해야 한다.",
+        "적용 대상·범위": "AI 분석 서비스로 보내는 실제 요청 내용과 운영 로그. 챗봇·브리핑·뉴스 분석의 모델 호출에 적용한다.",
+        "적용 조건·검증 입력": "기업·이슈·관계 경로·허용된 근거와 필요한 개인화 정보.\n시험용 비밀번호·인증토큰·세션 정보·불필요한 개인식별정보. 실제 사용자 비밀정보는 검증 데이터로 사용하지 않는다.",
+        "품질 목표·준수 규칙": "1. 답변에 필요한 허용 데이터만 전달한다.\n2. 비밀번호·인증토큰·세션 정보·불필요한 개인식별정보를 모델 입력과 로그에 넣지 않는다.\n3. 개인 보유·관심은 필요한 경우에만 최소 범위로 사용한다.\n4. 모델 입력에 필요한 필드와 접근 가능한 자료를 확인한 뒤 전달한다.\n5. 화면에 숨겼더라도 모델 요청 본문이나 로그에 민감정보가 남아 있으면 충족으로 보지 않는다.\n6. 민감정보 제거 후 질문을 해석할 수 없으면 필요한 정보만 다시 묻는다. 제거한 비밀값을 사용자에게 다시 입력하도록 요구하거나 모델에 전달하지 않는다.",
+        "정상 상태": "실제 모델 전송 내용과 운영 로그에는 필요한 허용 정보만 남으며 비밀번호·인증토큰·세션 정보·불필요한 개인식별정보는 포함되지 않는다.",
+        "미충족·예외 처리": "불필요하거나 금지된 민감값 발견: 모델 입력과 로그에서 차단 또는 제거한다.\n타인의 개인화 자료: 모델 전달 대상에서 제외한다.\n제거 후 질문 맥락이 부족하면 비밀정보를 다시 요구하지 않고 필요한 대상·기간 등만 되묻는다.",
+        "검증 방법": "1. 시험용 민감값을 포함한 정상·오류 요청을 준비한다.\n2. 모델에 실제 전송된 내용과 생성된 운영 로그에서 시험용 값의 포함 여부를 확인한다.\n3. 일반 질문과 개인화 질문을 비교해 개인 보유·관심 정보가 필요한 경우에만 전달되는지 확인한다.\n4. 오류·재시도 경로에서도 금지된 값이 새로 기록되지 않는지 확인한다.\n민감값 제거 뒤 맥락이 부족한 질문이 되묻기로 종료되고 제거한 값을 재요구하지 않는지 확인한다.",
+        "수용 기준": "1. 시험용 민감값을 넣은 요청을 처리한 후 모델 실제 전송 내용과 로그에 해당 값이 없는지 검사한다.\n2. 모델 호출 오류·재시도 로그에도 금지된 민감값이 기록되지 않는다.\n3. 개인화가 필요 없는 질문에 개인 보유·관심 정보가 불필요하게 포함되지 않는다.",
+        "확인 필요 사항": "[확인 필요: 모델별 허용·제거·마스킹 필드와 로그 보관 기간 승인 필요]"
+      }
+    },
+    {
+      "id": "NFS007",
+      "sheet": "비기능 상세",
+      "id_row": 93,
+      "fields": {
+        "요구사항명": "성능 측정 기준",
+        "요구사항 설명": "시스템은 동일한 네트워크 및 테스트 환경에서 화면 초기 표시, 일반 영역 조회, AI 질문 및 브리핑 생성 시간을 측정할 수 있어야 한다. 백분위 응답시간을 기준으로 측정하며, 측정 환경과 표본 수를 함께 기록해야 한다.",
+        "적용 대상·범위": "초기 화면 표시, 일반 영역 조회, AI 질문 처리, 출퇴근 브리핑 생성의 처리 시간 측정. 지원 환경이나 데이터 갱신 기한 자체와는 별개의 측정 기준이다.",
+        "적용 조건·검증 입력": "시험 네트워크·실행 환경, 데이터 규모, 동시 요청 조건, 기능별 시작·종료 이벤트, 개별 소요 시간과 표본 수.\n백분위 수준은 아래 v1.2 측정안을 적용하며 목표 응답시간은 미정이다.\nv1.2 측정안: 화면 진입부터 첫 유효 영역 표시까지, 영역 요청부터 현재 조건의 결과 표시까지, 질문 접수부터 검증·저장된 답변 표시까지, 브리핑 회차 시작부터 발행 가능 저장 완료까지 각각 측정한다.",
+        "품질 목표·준수 규칙": "1. 백분위 응답시간으로 측정하고 환경·표본 수를 함께 기록한다.\n2. 기능별 시작/종료 이벤트를 구분해 비교 가능하게 한다.\n3. 서로 다른 측정 조건의 결과를 같은 기준의 성능 결과처럼 비교하지 않는다.\n4. 측정 구간·환경·표본을 기록하여 결과를 다시 확인할 수 있게 한다.\n5. 목표값이 정해지기 전에는 임의의 수치를 합격 기준으로 적용하지 않는다.\n성공 표본의 중앙값·95백분위·최댓값과 성공/실패/시간초과 건수를 함께 기록한다. 실패·시간초과를 빠른 성공 표본으로 치환하지 않고 별도 집계한다. 시험 환경·동시 요청·데이터 규모·표본 수를 결과에 함께 명시한다.",
+        "정상 상태": "기능별 측정 구간·실제 측정값·환경·표본 수를 확인할 수 있고 같은 조건으로 측정을 반복할 수 있다.",
+        "미충족·예외 처리": "목표값 미정: 측정 결과만 기록하고 성능 목표 달성을 선언하지 않는다.\n표본 누락·실패·시간초과: 성공 측정값으로 임의 대체하지 않는다. 실패·시간초과는 성공 소요시간 통계와 별도 건수로 기록한다. 누락 표본은 측정 불완전으로 표시한다.\n시험 환경 변경: 기존 측정과 조건이 다름을 구분해 기록한다.",
+        "검증 방법": "1. 각 기능의 시작·종료 지점을 정한 뒤 동일한 환경에서 반복 실행한다.\n2. 기록된 구간별 시간과 표본 수를 원래 실행 기록과 대조한다.\n3. 정해진 백분위 수준으로 산출한 값이 같은 표본으로 재현되는지 확인한다.\n4. 목표값 미입력 상태에서 성능 합격으로 처리되지 않는지 확인한다.\n동일 실행 기록으로 성공 표본 통계와 실패·시간초과 건수를 다시 계산하여 측정 결과와 대조한다.",
+        "수용 기준": "1. 동일 조건으로 반복 측정하여 각 구간의 시간과 표본 수를 재현할 수 있는지 확인한다.\n2. 측정 조건·구간·표본 수와 구간별 시간을 확인할 수 있으면 측정 가능성의 기준을 충족한다.\n3. 응답시간 목표의 최종 합격 여부는 부하 조건·목표값 확정 전에는 판단하지 않는다.",
+        "확인 필요 사항": "[확인 필요: 목표 응답시간·동시 요청 수·데이터 규모·표본 수는 실제 서비스 측정 후 승인 필요]\n측정 방법 정의는 성능 목표 통과를 의미하지 않는다."
+      }
+    },
+    {
+      "id": "NFS008",
+      "sheet": "비기능 상세",
+      "id_row": 107,
+      "fields": {
+        "요구사항명": "운영 추적",
+        "요구사항 설명": "시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.",
+        "적용 대상·범위": "AI 답변 및 브리핑 생성 작업의 실행 상태와 이력 조회. 접수 이후 상태 변경·완료·실패·재시도 추적을 포함한다.",
+        "적용 조건·검증 입력": "작업 식별자, 대기·실행 중·완료·실패·취소 상태, 시작·종료 시각, 재시도 횟수, 오류 코드.\n로그에서 제외할 인증정보와 불필요한 개인정보.",
+        "품질 목표·준수 규칙": "1. 작업 식별자로 대기·실행 중·완료·실패·취소 상태와 시작/종료 시각·재시도 횟수·오류 코드를 추적한다.\n2. 인증정보와 불필요한 개인정보를 로그에 남기지 않는다.\n3. 같은 작업의 상태·시간·재시도·오류 기록을 작업 식별자로 연결한다.\n4. 취소 상태를 기록한다는 요구만으로 사용자 취소 버튼을 새로 추가하지 않는다.\n5. 운영 기록에도 인증정보와 불필요한 개인정보를 포함하지 않는다.\n6. 상태 기록에는 재실행과 결과 회수·저장만 복구를 구분한다. 완료는 결과와 완료 상태가 저장된 후에 기록한다. 관찰하지 못한 종료 시각은 알 수 없음으로 남긴다.\n7. AI 작업 식별자 외에 요청 흐름을 연결할 수 있는 correlation/trace 식별자를 기록한다.",
+        "정상 상태": "운영자가 작업 식별자로 처리 상태와 시작·종료 시각·재시도 횟수·오류를 확인할 수 있다.",
+        "미충족·예외 처리": "작업 실패: 실패 상태와 오류를 확인할 수 있어야 한다.\n취소: 취소가 허용되는 상태 전이 조건은 별도 결정한다.\n기록 저장 실패 또는 실행 종료 시각을 확인할 수 없음: 임의 완료 기록을 만들지 않으며 복구·안내 방식은 별도 결정한다.",
+        "검증 방법": "1. 정상 완료·실패·재시도 시험 작업을 실행하고 각각의 식별자로 상태·시각·횟수·오류를 조회한다.\n2. 각 기록을 실제 실행 결과와 대조한다.\n3. 취소 전이 정책이 정해진 경우 해당 경로를 추가 점검한다.\n4. 시험용 토큰과 개인정보가 로그에 포함되지 않는지 확인한다.\n검증 실패·저장 실패·상태 조회 실패를 각각 발생시켜 동일 오류 코드나 완료 상태로 합쳐지지 않는지 점검한다.",
+        "수용 기준": "1. 시험 작업의 상태·시간·횟수·오류를 식별자로 조회할 수 있다.\n2. 로그에 시험용 토큰·불필요 개인정보가 없다.\n3. 서로 다른 작업의 상태·오류 이력이 섞이지 않고 같은 작업의 재시도를 구분해 추적할 수 있다.\n4. 취소 동작의 합격 여부는 취소 전이 정책 확정 후 확인한다.\n작업 로그에서 재실행·저장 복구·완료 결과 회수가 구분되며 확인되지 않은 완료를 기록하지 않는다.",
+        "확인 필요 사항": "[확인 필요: 로그 보존 기간·열람 권한·기록 장애 복구 방식과 취소 전이 조건 승인 필요]"
+      }
+    },
+    {
+      "id": "NFS009",
+      "sheet": "비기능 상세",
+      "id_row": 121,
+      "fields": {
+        "요구사항명": "중단 작업 복구",
+        "요구사항 설명": "작업이 중단되면 기존 작업 상태를 확인한 뒤 허용된 복구만 수행해야 한다. 복구로 AI 답변이나 브리핑이 중복 생성·발행되어서는 안 된다. 복구할 수 없으면 실패 사유와 가능한 다음 조치를 안내하며, 재실행이 금지된 작업에 재실행을 안내하지 않는다.",
+        "적용 대상·범위": "서버 종료·저장소 장애 등으로 중단된 결과 생성 작업. 특히 AI 답변과 브리핑의 복구 및 중복 방지에 적용한다.",
+        "적용 조건·검증 입력": "기존 작업 식별자·최초 요청 내용, 서버 처리 상태, 현재 유효한 실행 정보, 오류 단계·유형, 저장 완료 여부와 현재 접근·실행 권한.\n챗봇은 보존된 검증 결과와 원래 질문·대상·기간·근거를 확인한다. 브리핑은 날짜·출근/퇴근 구분과 생성·검증·발행 상태를 확인한다.",
+        "품질 목표·준수 규칙": "1. 기존 상태와 현재 권한을 확인한 뒤 허용된 복구만 수행한다. 상태 조회 실패나 응답 지연을 미등록·확정 실패로 단정하지 않는다.\n2. 처리 중 상태가 계속되면 승인된 중단 판정 절차로 실행 상태를 확인한다. 시간초과만으로 종료를 확정하지 않는다. 이전 실행의 종료 또는 실행 권한 회수·만료가 확인되고 늦은 결과의 저장·발행을 막은 뒤에만 오류 유형·권한·보존 결과에 따라 복구 가능/불가를 판단한다. 확인 전에는 추가 실행하지 않으며, 판단하지 못한 작업은 검토 필요로 남긴다.\n3. 챗봇의 완료 작업은 저장 결과를 회수한다. 저장만 실패했고 AI 생성 및 후속 검증이 완료된 검증 결과가 보존되어 있으면 유효성을 확인해 모델 호출 없이 저장만 재시도한다.\n4. 챗봇의 검증 실패·결과 소실·권한 오류는 동일 작업 재생성을 허용하지 않는다. 확정된 일시 조회·모델 장애만 이전 실행 종료와 권한 확인 후 사용자의 재시도로 최초 질문·대상·기간·근거를 유지해 재실행한다.\n5. 브리핑은 같은 날짜·출근/퇴근 회차를 중복 생성·발행하지 않는다. 허용된 미발행 회차의 실패 단계만 복구하고 이미 발행된 본문은 일반 재처리로 덮어쓰지 않는다.\n6. 복구 유형·실패 단계·결과를 기존 작업이나 회차에 연결해 기록한다. 복구 불가 시 사유와 허용된 다음 조치만 안내한다.",
+        "정상 상태": "복구 가능한 작업은 기존 상태·권한에 맞게 복구되고 유효한 답변·브리핑이 중복 생성·발행되지 않는다. 복구 불가 작업은 실패 사유와 허용된 다음 조치를 확인할 수 있다.",
+        "미충족·예외 처리": "완료 작업: 현재 조회 권한을 확인하고 저장 결과를 회수한다. 처리 중·종료 불명확: 새 실행 없이 상태를 다시 확인한다.\n챗봇 저장 실패: 보존된 검증 결과가 유효할 때 저장만 복구한다. 결과 소실·검증 실패·권한 오류이면 동일 작업을 재생성하지 않는다.\n상태 조회 장애: 이번 복구 요청은 실행하지 않는다. 기존 작업 상태를 실패·미등록으로 바꾸지 않고 조회 장애와 실제 처리·발행 여부 미확인을 구분해 안내·기록한다.\n브리핑: 이미 발행된 회차는 원문을 유지한다. 재처리 허용 여부가 불명확하면 실행을 보류한다.\n복구 불가: 사유를 알리고 허용된 다음 조치가 없으면 재실행을 제시하지 않는다.",
+        "검증 방법": "1. 실행 중 서버 종료·저장소 장애·상태 조회 장애를 각각 발생시켜 추가 실행 여부와 복구 기록을 확인한다.\n2. 챗봇 검증 후 저장 실패를 발생시켜 보존 결과의 저장 복구에는 모델 호출이 늘지 않는지 확인한다. 검증 실패·결과 소실·권한 변경도 각각 시험한다.\n3. 허용된 일시 장애 재시도에서 최초 질문·대상·기간·근거가 유지되는지 확인하고 이전 실행의 늦은 완료를 도착시킨다.\n4. 같은 브리핑 회차의 동시 복구와 이미 발행된 회차 재처리를 요청해 중복 발행·원문 덮어쓰기가 없는지 확인한다.\n5. 복구 불가 안내에 금지된 재실행이 포함되지 않는지 확인한다.\n6. 처리 중 상태가 계속되는 작업에 중단 판정·실행 권한 정리 절차를 적용한다. 시간초과만인 경우, 종료/권한 회수가 확인된 경우, 판단 불가인 경우를 나누고 옛 실행의 늦은 저장·발행을 시험한다.",
+        "수용 기준": "1. 중단·저장 실패·동시 복구에도 유효한 결과와 브리핑 발행본이 중복되지 않고 이전 실행이 현재 결과를 덮지 않는다.\n2. 챗봇 보존 결과의 저장 복구에는 추가 모델 호출이 없다. 검증 실패·결과 소실·상태 불명확만으로 동일 작업 AI 재생성이 발생하지 않는다.\n3. 허용된 챗봇 재실행은 최초 질문·대상·기간·근거와 현재 권한을 유지한다.\n4. 브리핑 복구는 같은 날짜·출근/퇴근 회차에 연결되고 이미 발행된 본문을 변경하지 않는다.\n5. 상태 확인 장애와 확정 실패, 결과 회수·저장 복구·재실행이 기록에서 구분된다. 복구 불가 안내에는 허용된 다음 조치만 표시된다.\n6. 장기 처리 중 작업이 승인된 절차에 따라 복구 가능·불가 또는 검토 필요로 구분된다. 종료/권한 정리와 늦은 결과 차단이 확인되기 전에는 새 실행이 시작되지 않는다.",
+        "확인 필요 사항": "[확인 필요: 중단 판정 조건·확인 기한, 기존 실행 권한 회수/만료·늦은 결과 차단 방식, 복구 가능/불가 전환 조건, 시스템·운영자의 담당 및 검토 종료 절차 확정 필요. 복구 횟수·간격·검증 결과 보존 방식·브리핑 오류별 허용 범위도 결정·검증 필요]\n[팀 협의 필요: 브리핑의 상태 확인 불가 시 ‘발행 실패’ 표기와 실제 발행 여부 미확인·조회 장애의 상태 매핑을 명료화한다. 조회 장애만으로 실제 실행 실패를 확정하거나 재생성하지 않는다.]"
+      }
+    },
+    {
+      "id": "NFS010",
+      "sheet": "비기능 상세",
+      "id_row": 135,
+      "fields": {
+        "요구사항명": "지원 환경",
+        "요구사항 설명": "시스템은 팀이 지정한 데스크톱 브라우저와 최소 화면 크기에서 주요 기능을 정상적으로 제공해야 한다. 지원 대상 브라우저, 최소 버전, 해상도 및 모바일 지원 여부를 문서에 명시해야 한다.",
+        "적용 대상·범위": "팀이 승인할 데스크톱 브라우저·버전·최소 화면 크기에서의 주요 사용자 기능과 실제 제공하는 관리자 화면의 로그인·이슈 검수·브리핑 정정 동선. 모바일 지원 범위는 아직 확정하지 않는다.",
+        "적용 조건·검증 입력": "승인할 운영체제·브라우저·버전 조합, 최소 화면 크기, 브라우저 확대율과 실제 콘텐츠 표시영역의 크기, 모바일 지원 여부.\n화면 해상도와 브라우저 안에서 콘텐츠가 표시되는 영역의 크기를 구분해 기록한다. 각 환경에서 인증·그래프·브리핑·기업 상세·AI 패널 점검 시나리오를 사용한다.",
+        "품질 목표·준수 규칙": "1. 승인된 이용 환경에서 주요 기능을 정상 제공해야 한다.\n2. 지원 브라우저·최소 버전·해상도·모바일 지원 여부를 문서화한다.\n3. 지원 대상으로 문서화된 환경과 실제 점검 환경을 일치시킨다.\n4. 명시되지 않은 브라우저·모바일 환경까지 지원 완료라고 확대 해석하지 않는다.\n5. 각 환경에서 주요 기능의 표시뿐 아니라 실제 조작·결과 표시도 확인한다.",
+        "정상 상태": "승인된 환경 조합에서 주요 기능을 이용할 수 있고 환경별 점검 결과를 확인할 수 있다.",
+        "미충족·예외 처리": "지원 목록 미확정: 호환성 최종 합격을 판정하지 않는다.\n미지원 환경: 지원 완료로 표시하지 않는다.\n특정 환경에서 오류·레이아웃 잘림·조작 불가 발생: 해당 환경과 영향을 받는 기능을 기록한다. 사용자 안내·차단 방식은 별도 결정한다.",
+        "검증 방법": "1. 승인된 운영체제·브라우저·버전·최소 화면 크기 조합을 준비하고 실제 표시영역과 확대율을 기록한다.\n2. 각 환경에서 로그인, 그래프 선택·전환, 브리핑 조회, 기업 상세 탐색, AI 패널 열기·질문·닫기·재열기를 수행한다. 관리자 화면을 제공하는 환경에서는 관리자 로그인·이슈 검수·브리핑 정정의 입력·확인·결과 조회도 시험한다.\n3. 최소 표시 크기에서 핵심 정보·버튼의 잘림, 화면 겹침, 조작 불가를 확인한다. 문제의 환경·기능·재현 절차와 수정 후 재검증 결과를 남긴다.\n4. 통과·실패·미검증을 환경별로 구분한다. 모바일은 승인된 범위만 지원 합격 대상에 포함한다.",
+        "수용 기준": "1. 승인된 모든 환경 조합에서 인증·그래프·브리핑·기업 상세·AI 패널과 제공되는 관리자 로그인·검수·정정 동선의 주요 정보·조작 요소를 이용할 수 있다.\n2. 환경별 실제 브라우저 버전·표시영역·확대율, 실행한 시나리오와 통과·실패·미검증 결과가 기록된다.\n3. 지원 목록이 미정이거나 미검증·미해결 실패가 남은 환경은 지원 완료로 판단하지 않는다.",
+        "확인 필요 사항": "[확인 필요: 지원 운영체제·브라우저명·최소 버전·최소 화면 크기의 측정 기준·기준 확대율·모바일 지원 여부 결정 필요]\n[확인 필요: 미지원 환경의 안내·진입 제한 여부 결정 필요]\n브라우저명·버전·화면 크기 수치를 임의로 정하지 않는다."
+      }
+    },
+    {
+      "id": "NFS011",
+      "sheet": "비기능 상세",
+      "id_row": 149,
+      "fields": {
+        "요구사항명": "웹 접근성",
+        "요구사항 설명": "현재 초점 위치가 시각적으로 표시되어야 하며, 색상만으로 긍정·부정·오류 상태를 구분해서는 안 된다. 버튼, 링크, 차트 및 상태 메시지에는 스크린리더가 인식할 수 있는 대체 이름과 설명을 제공해야 한다.",
+        "적용 대상·범위": "버튼·링크·차트·상태 메시지와 긍정·부정·오류 표시. 주요 기능의 초점 위치와 보조기술용 이름·설명에 적용한다.",
+        "적용 조건·검증 입력": "현재 초점 요소, 상태를 표현하는 색상·텍스트·기호, 버튼·링크·차트·상태 메시지의 대체 이름과 설명.\n점검에 사용할 보조기술·환경 조합은 미정이다.",
+        "품질 목표·준수 규칙": "1. 마우스로 주요 조작 요소에 이동하고 실행할 수 있으며 현재 초점이 시각적으로 보여야 한다.\n2. 긍정·부정·오류는 색상 외의 텍스트나 기호로도 구분한다. 기호의 의미는 보조기술로도 확인할 수 있어야 한다.\n3. 버튼·링크·그래프·차트에는 동작과 표시 의미를 이해할 수 있는 이름·설명을 제공한다. 선택한 대상과 핵심 관계·수치의 의미를 시각 정보만으로 전달하지 않는다. 그래프의 핵심 대상 선택과 해당 관계·근거 확인을 마우스와 보조기술로 수행할 수 있어야 한다. 기존 목록·패널 등 가능한 수단을 활용하며 새 목록 화면이나 모든 노드의 일괄 읽기를 필수로 요구하지 않는다.\n4. AI 패널을 닫으면 진입 요소로 초점을 돌린다. 해당 요소가 사라졌다면 현재 화면에서 이어서 조작할 수 있는 요소로 옮기며 초점이 사라지지 않게 한다.\n5. 로딩·오류·평가 변경 상태를 보조기술로 확인할 수 있어야 하며 상태 갱신만으로 사용자의 초점을 임의 이동하지 않는다.",
+        "정상 상태": "현재 초점 위치가 보이고 색상을 구분하지 못해도 상태를 알 수 있다. 스크린리더로 주요 요소의 이름·설명을 확인할 수 있다.",
+        "미충족·예외 처리": "마우스 이동·실행 불가, 초점 소실, 색상만의 구분, 이름·설명 누락 또는 화면과 보조기술의 의미 불일치: 해당 환경·요소·실패 동작을 기록하고 수정 후 같은 경로를 다시 점검한다.\n보조기술 또는 점검 범위 미확정: 전체 접근성 충족이나 인증 획득으로 판단하지 않는다.",
+        "검증 방법": "1. 마우스로 종목 검색·추천 선택·그래프와 이슈 선택·AI 질문·패널 열기/닫기/재열기·평가 변경/취소를 수행하고 초점 위치를 확인한다.\n2. 색상을 구분하지 않는 조건에서 긍정·부정·오류 의미가 전달되는지 확인한다.\n3. 마우스와 정해진 보조기술로 그래프의 핵심 대상을 선택하고 관계·근거를 확인하는 경로를 끝까지 수행한다. 버튼·링크의 동작, 선택 대상·관계, 차트 핵심 정보와 상태 설명을 화면 의미와 대조한다.\n4. 패널을 닫아 진입 요소로 초점이 돌아오는지 확인한다. 진입 요소가 사라진 경우에도 현재 화면에서 조작을 이어 갈 수 있는지 확인한다.\n5. 상태가 갱신될 때 초점이 임의 이동하지 않는지 확인하고 환경별 결과를 기록한다.",
+        "수용 기준": "1. 확정된 점검 범위의 주요 동작을 마우스로 완료할 수 있고 현재 초점이 보인다.\n2. 상태의 의미가 색상만으로 전달되지 않으며 보조기술의 이름·설명이 실제 동작·선택 대상·핵심 정보와 일치한다.\n3. 패널을 닫은 뒤 초점을 잃지 않고 조작을 이어 갈 수 있다. 로딩·오류·평가 상태를 확인할 수 있으며 상태 갱신만으로 초점이 바뀌지 않는다.\n4. 점검 환경·범위·실패 및 재검증 결과가 기록된다. 미정·미검증 범위를 포함해 최종 합격을 선언하지 않는다.",
+        "확인 필요 사항": "[확인 필요: 실제 지원 환경·보조기술 조합·접근성 세부 점검표 승인 필요]\n"
+      }
+    },
+    {
+      "id": "NFS012",
+      "sheet": "비기능 상세",
+      "id_row": 163,
+      "fields": {
+        "요구사항명": "정기 갱신 반영 시간 보장",
+        "요구사항 설명": "정상 운영 시 시스템은 한국 시간 기준 매시 05분에 시작한 회차의 공개 대상 결과를 해당 시각 10분까지, 매시 35분에 시작한 회차의 결과를 해당 시각 40분까지 조회 가능하게 해야 한다. 완료 여부는 저장소 반영만이 아니라, 메인 그래프와 기업 상세페이지 조회에서 해당 새 결과를 확인할 수 있는지를 기준으로 판단해야 한다.",
+        "적용 대상·범위": "정상 운영 중 한국 시간 매시 05분·35분에 시작하는 경제뉴스 수집·분석 회차의 공개 대상 결과. 메인 그래프와 기업 상세페이지의 조회 반영을 모두 포함한다.",
+        "적용 조건·검증 입력": "한국 시간 기준 예정 시작·실제 시작 시각, 회차 식별자, 공개 대상 결과·공개 버전과 처리 상태, 두 화면의 기업·기간·선택 조건, 각 조회 경로의 확인 시각.\n신규 공개 결과가 0건이면 정상 제외·검증 탈락·보류·실패 사유를 구분한다. 표시 데이터의 기준 시점과 이번 회차 확인 시점을 별도로 기록한다.\n회차별 기사·문서 수, 문서 길이의 단위와 분포, 분석 대상 수, 동시 처리 조건 및 시험환경을 기록한다. 실제 시험 처리량과 승인할 예상 운영범위를 구분한다.",
+        "품질 목표·준수 규칙": "1. 한국 시간 매시 05분 예정 회차는 10분까지, 35분 예정 회차는 40분까지 공개 대상 새 결과를 메인 그래프와 기업 상세의 새 조회에서 확인할 수 있어야 한다. 시작이 늦어져도 기한을 임의 연장하지 않는다.\n2. 저장 완료만으로 달성 판정하지 않는다. 두 조회 경로의 준비를 확인한 공통 공개 버전을 사용하며 각 화면의 기업·기간·선택 조건에 맞는 결과를 확인한다.\n3. 기한을 맞추기 위해 처리 중·검증 실패·보류 결과를 공개하지 않는다. 부분 성공을 회차 전체 성공으로 표시하지 않는다.\n4. 신규 자료 없음·관련성 없음 등 정상 제외로 완료된 0건 회차는 기존 유효 결과와 공개 버전을 유지하고 회차 확인 시점을 기록한다. 검증 탈락·보류·실패에 따른 0건과 구분한다.\n5. 장애·시작 지연은 예정·실제 시작과 영향을 기록하며 정상 기한 준수로 섞지 않는다. 기한 내 확인 기록이 없으면 달성으로 추정하지 않는다.\n6. 이 기준은 두 화면의 새 조회 반영 기한이다. 이미 열린 화면의 동시 자동 새로고침이나 브리핑 생성 시각을 뜻하지 않는다.",
+        "정상 상태": "공개할 새 결과가 있으면 기한 이내 두 화면의 새 조회에서 공통 공개 버전과 해당 회차 결과를 확인한다. 정상 0건 회차는 기존 유효 결과를 유지하면서 기한 내 0건 완료와 회차 확인 시점을 확인한다.",
+        "미충족·예외 처리": "저장소에만 반영·캐시 미갱신·한쪽 조회 준비 실패: 반영 완료로 판정하지 않고 두 경로에 공통의 기존 유효 버전을 유지한다. 현재 공개 제외된 항목은 이전 버전에서도 제공하지 않는다.\n신규 자료 없음·정상 제외로 0건: 0건 사유·완료·회차 확인 시점을 기록한다. 기존 데이터 시점을 새 데이터 시점으로 바꾸거나 0건만으로 갱신 지연을 표시하지 않는다.\n검증 탈락·보류·처리 실패로 0건: 실제 상태와 원인을 기록하고 정상 0건 완료로 바꾸지 않는다.\n기한 초과·시작 지연·장애: 실제 지연과 미완료 상태를 기록한다. 필요한 저장·조회 반영 단계만 복구하며 기한 달성을 위해 AI 분석이나 미검증 결과 공개를 반복하지 않는다.\n관측 누락: 기한 내 반영 여부는 확인 불가로 표시한다. 늦게 확인된 결과를 기한 내 완료로 소급하지 않는다.",
+        "검증 방법": "1. 예상 운영범위의 기사·문서 수, 문서 길이, 분석 대상 수와 동시 처리 조건으로 시험한다. 시험환경·실제 처리량, 05분·35분 회차의 예정·실제 시작과 마감, 공개 대상·공개 버전을 기록한다.\n2. 대상 결과가 조회되는 기업·기간 조건으로 메인 그래프와 기업 상세를 새로 조회하여 각 확인 시각·회차·공개 버전을 대조한다.\n3. 저장 성공 후 캐시 미갱신, 한쪽 준비 실패, 이전 회차의 늦은 완료를 발생시켜 잘못된 완료·공개 버전 되돌림이 없는지 확인한다.\n4. 신규 자료 없음·정상 제외 0건과 검증 탈락·보류·처리 실패 0건을 각각 시험한다. 기존 유효 결과·회차 확인 시점과 실패 원인이 구분되는지 확인한다.\n5. 시작 지연·기한 초과·관측 누락을 각각 시험하여 임의 기한 연장이나 소급 완료가 없는지 확인한다. 부분 성공을 전체 성공으로 기록하거나 미검증 결과를 공개하지 않는지도 확인한다.",
+        "수용 기준": "1. 예: 09:05 예정 회차는 09:10까지, 09:35 예정 회차는 09:40까지 두 새 조회 경로에서 공통 공개 버전의 해당 회차 결과가 확인된다.\n2. 저장만 성공하거나 한 화면이 이전 결과를 반환하면 반영 미완료다. 이전 회차의 늦은 완료가 최신 공개 버전을 되돌리지 않는다.\n3. 정상 0건 회차는 기한 내 두 조회 경로의 정상 상태·기존 유효 결과·공개 버전 유지·0건 사유와 회차 완료를 확인한다. 데이터 기준 시점과 회차 확인 시점은 구분된다.\n4. 검증 탈락·보류·실패로 인한 0건, 부분 성공, 장애·지연은 각각 실제 상태로 기록되고 정상 전체 완료로 합쳐지지 않는다.\n5. 기한 내 관측 기록이 없으면 기한 달성으로 판정하지 않는다. 미검증 결과 공개나 불필요한 AI 재호출로 기한 미달을 숨기지 않는다.\n6. 승인된 예상 운영범위와 시험환경에서 위 기한을 검증하고 회차별 처리량을 결과와 함께 남긴다. 범위 미정·미시험이면 전체 운영범위의 기한 보장 검증을 완료로 선언하지 않는다.",
+        "확인 필요 사항": "[확인 필요: 예상 운영 처리량 범위(기사·문서 수·문서 길이·분석 대상 수·동시 처리)와 대표 시험환경을 최종 완료 검증 조건으로 확정 필요. 처리량 수치를 임의로 정하거나 기한을 완화하지 않는다]\n[확인 필요: 실제 확인 간격·대상 표본 범위·회차별 공개 대상 확정 시점·장애 분류·경보 및 복구 운영 기준 검증 필요]"
+      }
+    }
+  ],
+  "exact_ai_definitions": [
+    {
+      "id": "FS045",
+      "sheet": "AI 챗봇",
+      "id_row": 9,
+      "fields": {
+        "기능명": "AI 질문 진입과 전송",
+        "기능 설명": "전역 AI 질문창 또는 그래프·기업 상세에서 전달받은 기업·이슈·관계·문서를 기준으로 질문할 수 있어야 한다. 전달받은 선택 대상·기간·근거를 질문에 포함하고 대화 및 질문 작업과 연결해야 한다. 빈 입력과 같은 대화에서 작업 처리 중인 추가 전송은 제한해야 한다. 비회원은 질문 자체를 제한한다.",
+        "선행조건": "로그인 회원이 전역 질문창 또는 그래프·기업 상세에서 AI 질문창을 연다.",
+        "입력값": "질문 본문, 대화 식별자, 작업 식별자, 선택 대상 식별자·기간·근거 참조. 선택 맥락 없이 시작하는 전역 질문도 포함한다.",
+        "입력·검증 규칙": "전달받은 대상·기간·근거를 화면에 표시하고 실제 질문 요청에도 포함한다.\n빈 입력과 같은 대화에서 작업 처리 중인 추가 질문 전송을 제한한다.\n비회원은 질문 자체를 전송할 수 없다.\n질문 길이나 전체 사용량 제한 수치는 미정이다.",
+        "처리 절차 및 분기": "1. 전달받은 맥락을 사용자에게 표시하고 질문에 포함한다.\n2. 빈 입력을 차단한다.\n3. 같은 대화에서 작업이 처리 중이면 추가 전송을 제한한다.",
+        "정상 결과": "질문과 적용 맥락이 대화 및 질문 작업에 연결되어 처리된다.",
+        "예외 처리": "빈 입력: 질문 전송을 차단한다.\n비회원: 질문 전송을 제한하고 로그인 안내를 제공한다.\n같은 대화에서 작업 처리 중: 새로운 질문 전송을 제한한다.\n전송 후 응답 미수신: 새 생성을 시작하기 전에 기존 작업 상태를 확인하는 결과 회수 절차를 적용한다.",
+        "수용 기준": "1. 근거 참조가 서버 작업까지 전달된다.\n2. 빈 입력·비회원·동일 대화 처리 중 추가 질문이 차단된다.",
+        "확인 필요 사항": "[확인 필요: 질문 유형·길이·전체 이용 한도 결정 필요]"
+      }
+    },
+    {
+      "id": "FS046",
+      "sheet": "AI 챗봇",
+      "id_row": 23,
+      "fields": {
+        "기능명": "AI 권한과 중복 작업 통제",
+        "기능 설명": "서버는 로그인·접근 권한, 대화 소유자, 근거 문서 접근 권한과 같은 작업의 질문 내용 일치 여부를 확인해야 한다. 처리 중인 질문 작업을 중복 실행하지 않고, 완료한 작업은 현재 권한을 확인해 저장된 결과를 반환해야 한다. 동시에 요청되어도 유효한 실행 하나만 처리해야 한다.",
+        "선행조건": "서버가 신규 질문 요청 또는 기존 작업의 재요청을 받았다.",
+        "입력값": "현재 회원 인증 정보, 대화 식별자·소유자, 작업 식별자, 질문·대상·기간·근거 참조, 기존 작업 상태와 최초 요청 내용.",
+        "입력·검증 규칙": "로그인·대화 소유권·대상 및 근거 접근 권한을 확인한다.\n동일 작업 식별자의 요청 내용이 최초 요청과 일치해야 한다.\n같은 대화의 처리 중 신규 작업은 하나만 허용하며 서로 다른 작업 ID의 동시 요청에도 이를 보장한다.\n기존 작업의 상태 확인·저장 결과 회수는 새로운 질문 접수와 구분한다.\n작업 식별자와 개별 통신 추적용 식별자를 혼동하지 않는다.",
+        "처리 절차 및 분기": "1. 서버는 로그인 상태, 대화 소유자, 대상·근거 접근 권한 및 동일 작업의 요청 내용 일치 여부를 확인한다.\n2. 기존 작업 ID의 재요청은 해당 작업의 상태를 반환하거나, 현재 권한을 확인한 뒤 저장 결과를 반환한다.\n3. 신규 작업인 경우 같은 대화에 처리 중인 작업이 있으면 접수를 거절한다.\n4. 서로 다른 작업 ID의 요청이 동시에 도착하더라도 같은 대화에는 하나의 신규 작업만 접수되도록 서버에서 통제한다.\n5. 동일 작업의 재요청으로 중복 실행이 발생하지 않도록 한다.",
+        "정상 결과": "접수 가능한 신규 작업 하나가 처리되거나, 기존 작업의 처리 상태 또는 권한이 확인된 저장 결과가 반환된다.",
+        "예외 처리": "인증·소유권·근거 접근 권한 없음: 보호 데이터를 반환하지 않고 권한 오류로 안내한다.\n같은 대화의 다른 작업이 처리 중: 새 질문 접수를 거절하고 작성 입력을 유지하며 기존 작업 처리 중을 안내한다.\n같은 작업 ID에 다른 요청 내용: 충돌로 거절하고 원래 작업·질문을 유지한다. 질문 수정 후 전송은 처리 중 작업이 없을 때 새 작업으로 수행한다.\n기존 작업 재요청: 완료 결과 또는 처리 상태를 반환한다. 상태 조회 실패를 미등록으로 취급하지 않는다.",
+        "수용 기준": "1. 동일 작업의 동시 재요청으로 중복 실행이 발생하지 않는다.\n2. 서로 다른 작업 ID로 같은 대화에 동시에 질문해도 하나의 작업만 접수된다.\n3. 기존 작업의 상태 확인과 결과 회수는 신규 질문 차단과 구분하여 처리한다.\n4. 타인의 대화·근거 요청과 동일 작업 ID의 요청 내용 변경은 거절된다.",
+        "확인 필요 사항": "v1.2 제안 기준: 접수 거절·작업 내용 충돌의 입력 유지와 안내. 작업 ID는 통신 추적 ID와 구분한다."
+      }
+    },
+    {
+      "id": "FS047",
+      "sheet": "AI 챗봇",
+      "id_row": 37,
+      "fields": {
+        "기능명": "질문 해석과 되묻기",
+        "기능 설명": "처음 질문을 받은 시점의 대화 내용·대상·기간·근거를 작업에 고정해야 한다. 최근·작년 같은 날짜 표현은 그 질문 시점의 실제 기간으로 해석해 기록해야 한다. 질문에 명시한 조건을 우선하며 대상이 불명확하면 확인 질문을 저장해 반환해야 한다. 보충 입력은 새 질문 작업으로 처리해야 한다.",
+        "선행조건": "새 질문 작업이 접수되었거나 사용자가 되묻기에 보충 입력을 보낸다.",
+        "입력값": "최초 질문 시각, 질문 본문, 그 시점의 대화 맥락·대상·기간·근거 참조, 보충 입력.",
+        "입력·검증 규칙": "질문에 명시된 대상·기간 조건을 기존 맥락보다 우선한다.\n한국 시간의 최초 질문 시각을 기준으로 상대 날짜를 해석한다. 작년은 직전 달력 연도 전체, 최근은 기본 최근 1개월로 해석하고 실제 적용 기간을 답변에 표시한다.\n하나의 표현이 여러 대상으로 해석되거나 기간을 확정할 수 없으면 추정하여 실행하지 않고 되묻는다.\n동일 작업 재시도에서는 최초 맥락과 확정 조건을 유지한다. 되묻기 보충 입력은 같은 대화의 새 작업이다.",
+        "처리 절차 및 분기": "1. 최초 질문 시점의 대화·대상·기간·근거를 작업에 고정한다.\n2. 최근·작년 등은 질문 시점을 기준으로 실제 기간으로 해석한다.\n3. 질문에 명시한 조건이 우선이다.\n4. 대상이 불명확하면 확인 질문을 저장한다.",
+        "정상 결과": "질문 대상·기간·근거가 고정되어 다음 처리로 전달되거나, 저장된 확인 질문이 정상 종료 결과로 반환된다.",
+        "예외 처리": "대상·기간 불명확: 확인 질문을 저장하여 완료 결과로 반환한다.\n과거 작업 재시도: 현재 날짜·최신 대화가 아닌 최초 질문 시각·맥락을 사용한다.\n해석 서비스 장애: 기술 실패로 기록하고 근거 부족·되묻기로 위장하지 않는다. 확정된 일시 장애에 한해 사용자 재시도를 허용한다.",
+        "수용 기준": "1. 같은 작업 재시도에서 원래 대상·기간·근거가 바뀌지 않는다.\n2. 되묻기 결과는 저장된 정상 종료 결과로 회수된다.",
+        "확인 필요 사항": "v1.2 제안 기준: 한국 시간·작년의 달력 연도·최근 1개월 기본 해석. 응답마다 실제 적용 기간을 표시한다."
+      }
+    },
+    {
+      "id": "FS048",
+      "sheet": "AI 챗봇",
+      "id_row": 51,
+      "fields": {
+        "기능명": "개인화 조건과 근거 확보",
+        "기능 설명": "현재 접근 권한으로 사용할 수 있는 개인화 정보와 질문 작업에 고정된 근거 문서를 조회해야 한다. 로그인·종목 설정 등 조건 부족, 근거 부족, 기술 오류를 구분해야 한다. 선택한 문서나 버전을 사용할 수 없다고 최신 자료로 몰래 바꿔서는 안 된다.",
+        "선행조건": "질문 해석이 완료되어 해당 작업의 맥락·대상·기간·근거 참조가 고정되어 있다.",
+        "입력값": "현재 접근 권한, 작업에 고정된 문서·버전 참조, 허용된 개인 보유·관심종목 등 개인화 정보.",
+        "입력·검증 규칙": "현재 권한 범위에서 개인화 정보와 근거를 조회한다.\n로그인·종목 설정 등 조건 부족, 근거 부족, 기술 오류를 각각 구분한다.\n지정된 문서나 버전을 사용할 수 없다고 최신 자료로 조용히 대체하지 않는다.\n권한 밖 정보가 모델 입력으로 전달되지 않도록 한다.",
+        "처리 절차 및 분기": "1. 현재 권한으로 작업에 고정된 대상·기간·문서 버전과 필요한 개인화 정보만 조회한다.\n2. 종목 설정 등 조건 부족이면 조건 안내를 저장하여 작업 완료로 처리한다.\n3. 근거 부족이면 판단 보류와 확보한 근거·한계를 저장하여 작업 완료로 처리한다.\n4. 사용 가능한 근거가 있으면 답변 생성으로 진행한다. 조회 장애는 기술 실패로 처리한다.",
+        "정상 결과": "작업 조건에 맞는 허용된 개인화 맥락·근거가 확보되어 답변 생성에 사용되거나, 조건·근거 부족 안내가 제공된다.",
+        "예외 처리": "설정·근거 부족: 안내 결과를 저장한 뒤 완료한다. 같은 작업 재요청에는 같은 저장 결과를 반환한다.\n조건·근거가 바뀐 뒤 다시 분석: 회원이 새 질문 작업을 전송한다. 과거 완료 작업을 실패로 바꾸지 않는다.\n작업의 자료 접근 권한 상실: 해당 자료·기존 보호 결과를 반환하지 않는다.\n지정 버전 사용 불가: 다른 버전으로 조용히 대체하지 않고 자료 사용 불가를 안내한다.\n안내 저장 실패: 완료로 노출하지 않고 저장 복구 상태를 구분한다.",
+        "수용 기준": "1. 되묻기·조건 안내·판단 보류는 저장되면 완료 상태로 회수된다.\n2. 조건을 나중에 바꿔도 같은 작업 ID로 재평가하지 않는다. 새 질문일 때만 새 조건을 적용한다.\n3. 권한 밖 자료나 지정하지 않은 최신 버전이 모델에 전달되지 않는다.",
+        "확인 필요 사항": "v1.2 제안 기준: 안내 결과와 기술 실패의 상태 구분·권한 재검증.\n[확인 필요: 근거 문서 버전의 보존 기간과 실제 조회 가능한 범위 확인 필요]"
+      }
+    },
+    {
+      "id": "FS049",
+      "sheet": "AI 챗봇",
+      "id_row": 65,
+      "fields": {
+        "기능명": "답변 검증과 제공",
+        "기능 설명": "AI 답변의 형식, 인용이 가리키는 문서·원문 구간, 답변에 포함된 그래프 대상의 유효성을 확인해야 한다. 현재 유효한 실행의 검증된 결과를 저장한 후 답변을 제공해야 한다. 실제 적용 기업·이슈·기간을 표시하고 검증 실패 시 답변을 자동으로 다시 생성하지 않아야 한다.",
+        "선행조건": "근거를 확보한 질문 작업에서 AI 답변 생성 결과가 도착했다.",
+        "입력값": "생성 답변, 인용 문서·원문 구간, 그래프 대상 식별자, 실제 적용 기업·이슈·기간, 현재 유효한 실행 정보, 검증 결과·저장 결과.",
+        "입력·검증 규칙": "답변 형식, 인용 문서·원문 구간, 그래프 대상의 유효성을 확인한다.\n현재 유효한 실행의 검증된 결과만 저장하고 저장 성공 후에 답변을 제공한다.\n검증 실패와 저장 실패를 별도 오류로 구분한다.\n검증 실패 시 자동 재생성을 하지 않는다.\n검증 결과가 보존된 저장 실패는 모델 호출 없이 저장만 재시도할 수 있으며 유효한 실행인지 다시 확인한다.",
+        "처리 절차 및 분기": "1. 답변 형식, 인용 문서·원문 구간 및 그래프 대상의 유효성을 검사한다.\n2. 현재 유효한 실행의 검증된 결과를 저장한 뒤 답변을 제공한다.\n3. 검증 실패와 저장 실패를 구분해 기록한다.\n4. 검증 실패는 자동 재생성하지 않는다.\n5. 저장 실패 시 검증된 결과가 보존되어 있으면 현재 실행의 유효성을 확인하고 모델 호출 없이 저장만 재시도한다.\n6. 저장 실패만을 이유로 AI를 자동 재호출하지 않는다.",
+        "정상 결과": "검증과 저장을 완료한 답변이 실제 적용 기업·이슈·기간과 함께 제공된다.",
+        "예외 처리": "답변 검증 실패: 실패 사유를 기록하고 자동 재생성·동일 작업의 수동 재생성을 허용하지 않는다. 필요하면 사용자가 내용을 고쳐 새 질문으로 전송한다.\n저장 실패이며 검증 결과 보존: 현재 실행·권한·자료 유효성을 확인하고 모델 호출 없이 저장만 다시 시도한다.\n검증 결과 소실 또는 보존 여부 불명확: 자동 AI 재호출을 하지 않는다. 복구 가능 여부를 확인하고 복구 불가를 안내한다. 사용자의 명시적 새 질문만 별도 작업으로 처리한다.\n이전 실행 지연 완료: 현재 유효한 결과를 덮어쓰지 않는다.",
+        "수용 기준": "1. 잘못된 인용·원문 구간·그래프 ID, 유효하지 않은 과거 실행 및 저장 실패 결과가 완료 답변으로 노출되지 않는다.\n2. 검증 실패 시 추가 모델 호출이 자동 발생하지 않는다.\n3. 검증 실패와 저장 실패를 구분해 확인할 수 있다.\n4. 검증된 결과가 보존된 상태에서 저장에 실패하면 모델 호출 횟수 증가 없이 저장만 재시도하며, 저장 성공 후에만 완료 답변으로 제공한다.",
+        "확인 필요 사항": "v1.2 제안 기준: 검증 실패 동일 작업 재생성 금지·검증 결과 소실 시 자동 재호출 금지·저장 복구 우선.\n형식·인용·참조 검증 통과가 답변 전체의 사실 정확성을 보장하지 않는다.\n[확인 필요: 검증 결과 보존 기간·저장 매체·보존 실패 감지 방식 결정 필요]"
+      }
+    },
+    {
+      "id": "FS050-01",
+      "sheet": "AI 챗봇",
+      "id_row": 79,
+      "fields": {
+        "기능명": "AI 답변 근거·원문 확인",
+        "기능 설명": "회원이 AI 답변에서 근거 또는 원문을 선택하면 해당 답변에 연결된 출처·확보된 인용·외부 원문을 확인할 수 있다.",
+        "선행조건": "회원에게 근거 참조가 연결된 AI 답변이 제공되어 있고, 회원이 근거 또는 원문 확인을 요청한다.",
+        "입력값": "답변 식별 정보, 선택한 근거 참조, 출처 정보, 확보된 인용, 외부 원문 참조.",
+        "입력·검증 규칙": "선택한 답변에 연결된 근거와 출처를 제공한다.\n확보되지 않은 원문이나 인용을 임의로 생성하지 않는다.\n외부 원문을 열지 못해도 이미 확보한 출처와 인용은 유지한다.",
+        "처리 절차 및 분기": "1. 회원이 답변의 근거를 선택한다.\n2. 해당 답변에 연결되고 현재 조회 권한이 있는 출처·확보된 인용·원문 참조를 제공한다.\n3. 원문 링크를 선택하면 외부 원문을 연다.\n4. 원문 접근에 실패하면 확보된 출처·인용을 유지하고 접근 실패를 안내한다. 근거 조회 실패는 해당 조회만 다시 시도하며 답변을 다시 생성하지 않는다.",
+        "정상 결과": "회원이 해당 답변의 출처·확보된 인용을 확인하고, 접근 가능한 외부 원문을 확인할 수 있다.",
+        "예외 처리": "근거 조회 실패: 해당 근거 영역에 오류와 다시 시도를 표시하고 답변을 유지한다.\n원문 링크 없음: 원문 미제공을 안내한다.\n외부 원문 접근 실패: 확보된 제목·출처·인용을 유지하고 접근 실패를 안내한다. 외부 원문 재열기는 AI 답변 재생성을 실행하지 않는다.\n대상 근거 삭제·권한 없음: 해당 내용을 반환하지 않고 제공 불가를 안내한다.",
+        "수용 기준": "1. 선택한 답변과 제공된 근거 참조가 일치한다.\n2. 확보되지 않은 원문이나 인용을 새로 만들어 표시하지 않는다.\n3. 외부 원문 접근이 실패해도 확보된 출처·인용은 유지된다.",
+        "확인 필요 사항": "이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다."
+      }
+    },
+    {
+      "id": "FS050-02",
+      "sheet": "AI 챗봇",
+      "id_row": 93,
+      "fields": {
+        "기능명": "AI 답변 관련 그래프 탐색",
+        "기능 설명": "회원이 AI 답변의 관련 기업·이슈·관계를 선택하면 실제 존재하고 조회 권한이 있는 대상을 그래프에서 강조하여 탐색할 수 있다.",
+        "선행조건": "회원에게 관련 기업·이슈·관계가 연결된 AI 답변이 제공되어 있고, 회원이 그래프 탐색 대상을 선택한다.",
+        "입력값": "답변에 연결된 기업·이슈·관계 식별자, 선택 대상, 현재 접근 권한.",
+        "입력·검증 규칙": "선택 대상이 실제 그래프에 존재하는지와 현재 조회 권한을 확인한다.\n실제로 존재하고 조회 권한이 있는 대상만 강조한다.\nAI 문장만을 근거로 새로운 관계선을 만들지 않는다.",
+        "처리 절차 및 분기": "1. 회원이 답변의 관련 기업·이슈·관계를 선택한다.\n2. 시스템은 선택 대상의 존재 여부와 현재 조회 권한을 확인한다.\n3. 유효한 대상이면 그래프에서 해당 대상을 강조하여 탐색할 수 있게 한다.\n4. 대상이 없거나 권한이 없으면 강조하지 않는다.",
+        "정상 결과": "회원이 답변과 연결된 유효한 기업·이슈·관계를 그래프에서 확인할 수 있다.",
+        "예외 처리": "그래프 대상 없음·권한 없음: 대상 이용 불가를 안내하고 새 관계선이나 보호 정보를 표시하지 않는다.\n조회 장애: 답변을 유지하고 그래프 조회만 다시 시도한다.\n대상이 현재 그래프 범위 밖: 조회 권한과 존재가 확인된 대상 중심으로 그래프를 조회하되 AI 문장으로 관계를 생성하지 않는다.",
+        "수용 기준": "1. 없는 그래프 식별자나 조회 권한이 없는 대상은 강조되지 않는다.\n2. 강조되는 대상은 회원이 선택한 답변의 관련 대상과 일치한다.\n3. AI 답변 문장만으로 새로운 관계선이 생성되지 않는다.",
+        "확인 필요 사항": "이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다."
+      }
+    },
+    {
+      "id": "FS051",
+      "sheet": "AI 챗봇",
+      "id_row": 107,
+      "fields": {
+        "기능명": "새 대화 시작",
+        "기능 설명": "사용자가 이전 대화와 독립된 주제로 질문할 수 있도록 ‘새 대화’ 기능을 제공해야 한다. 새 대화를 시작하면 별도의 대화 ID를 부여하고 이전 대화의 질문·답변 및 선택 조건을 자동으로 이어받지 않아야 한다. 기존 대화 기록은 유지하며, 이전 대화에서 처리 중이던 답변이 새 대화 화면에 표시되지 않아야 한다.",
+        "선행조건": "로그인 회원이 AI 질문창에서 새 대화를 선택한다.",
+        "입력값": "새 대화 시작 요청, 기존 대화와 진행 중 작업 상태.",
+        "입력·검증 규칙": "기존 대화와 다른 별도 대화 식별자를 부여한다.\n이전 질문·답변·선택 조건을 자동 승계하지 않는다.\n기존 대화 기록은 유지하며 새 대화 시작을 삭제로 취급하지 않는다.\n이전 작업의 늦은 응답이 새 대화 화면에 표시되지 않도록 한다.",
+        "처리 절차 및 분기": "1. 별도의 대화 ID를 생성한다.\n2. 이전 질문·답변·선택 조건을 자동 승계하지 않는다.\n3. 이전 기록은 유지하되 이전 대화의 늦은 응답은 새 대화 화면에 표시하지 않는다.",
+        "정상 결과": "기존 맥락과 독립된 새 대화가 열리고 이전 대화 기록은 유지된다.",
+        "예외 처리": "이전 대화의 지연 응답: 원래 작업에만 연결하고 새 대화 화면에 표시하지 않는다.\n새 대화 생성 실패: 기존 대화와 입력을 유지하며 오류·다시 시도를 안내한다.\n새 대화 요청 응답 미수신: 생성 결과를 먼저 확인하고 중복 대화를 만들지 않는다.\n이전 작업 처리 중: 새 대화 시작만으로 취소하거나 기록을 삭제하지 않는다.",
+        "수용 기준": "1. 새 대화 조건이 비어 있고 이전 기록은 유지된다.\n2. 이전 작업 완료가 새 대화에 붙지 않는다.",
+        "확인 필요 사항": "v1.2 제안 기준: 새 대화 실패 시 기존 대화 유지·응답 미수신 결과 확인.\n[확인 필요: 대화 보존 기간과 이전 대화 목록 제공 범위 결정 필요]"
+      }
+    },
+    {
+      "id": "FS052-01",
+      "sheet": "AI 챗봇",
+      "id_row": 121,
+      "fields": {
+        "기능명": "같은 대화에서 후속 질문 전송",
+        "기능 설명": "회원이 기존 답변에 이어 질문하면 같은 대화에 새 질문 작업을 생성한다. 최초 작업의 상태 조회·결과 회수와 구분한다.",
+        "선행조건": "회원에게 현재 대화가 있고 후속 질문을 전송하려 한다.",
+        "입력값": "현재 대화 ID, 후속 질문, 새로운 작업 ID, 질문 시점의 대상·기간·근거 참조와 대화 맥락.",
+        "입력·검증 규칙": "빈 입력과 권한 없는 요청을 받지 않는다.\n같은 대화에 처리 중 작업이 있으면 다른 작업 ID의 질문도 서버에서 접수를 거절한다.\n후속 질문은 새 작업 ID를 사용하고 질문 시점의 맥락을 고정한다. 질문에 명시된 대상·기간이 기존 맥락보다 우선한다.\n기존 작업 ID의 재전송은 새 후속 질문으로 만들지 않고 기존 상태·결과 조회로 처리한다.",
+        "처리 절차 및 분기": "1. 회원이 후속 질문을 작성하고 전송한다.\n2. 서버가 권한과 동일 대화의 처리 중 작업을 확인한다.\n3. 접수 가능하면 같은 대화의 새 작업으로 등록하여 질문 시점의 맥락을 고정한다.\n4. 답변 또는 정상 종료 안내를 원래 질문 작업에 연결하고 실제 적용 조건을 표시한다.",
+        "정상 결과": "같은 대화 안에 별개의 질문·답변 작업이 순서대로 연결된다.",
+        "예외 처리": "동일 대화 처리 중: 기존 작업의 진행 상태를 안내하고 입력 내용을 유지한다.\n응답 미수신: 해당 작업 상태를 확인하며 새 질문으로 복제하지 않는다.\n새 대상이 불명확: 확인 질문을 저장하여 완료하고 보충 입력은 새 작업으로 받는다.",
+        "수용 기준": "1. 같은 대화로 서로 다른 작업 ID를 동시에 보내도 신규 작업 하나만 접수된다.\n2. 후속 질문마다 새 작업 ID가 있고 기존 작업 재요청으로 질문 수가 증가하지 않는다.\n3. 이후 대화 대상이 바뀌어도 과거 작업 재시도의 원래 조건이 유지된다.",
+        "확인 필요 사항": "이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다."
+      }
+    },
+    {
+      "id": "FS052-02",
+      "sheet": "AI 챗봇",
+      "id_row": 135,
+      "fields": {
+        "기능명": "AI 내부 패널 닫기·재열기와 대화 유지",
+        "기능 설명": "회원이 상세페이지의 AI 내부 패널을 닫아도 상세 상태·대화 기록·서버 작업을 유지한다. 새 대화로 바꾸지 않았다면 다시 열 때 같은 대화의 상태와 완료 결과를 회수한다.",
+        "선행조건": "로그인 회원이 기업 상세의 AI 내부 패널을 사용 중이거나 다시 연다.",
+        "입력값": "현재 회원·대화 ID, 질문별 작업 ID·상태, 상세 기업·차트 기간·재무 기간·사건·탭·스크롤, 저장된 답변.",
+        "입력·검증 규칙": "패널 닫기를 대화 삭제·질문 취소·상세 화면 이탈로 처리하지 않는다.\n닫혀 있는 동안에도 서버 작업 완료 결과를 해당 대화·질문에 연결한다.\n재열기는 기존 상태 조회이며 새 질문이나 새 AI 생성을 실행하지 않는다.\n기존 대화의 대상·기간을 패널에 표시한다. 상세 기업이 바뀌었다는 이유만으로 기존 대화 맥락을 덮어쓰지 않는다.\n다른 사용자·새 대화로 전환된 경우 이전 대화 응답을 현재 화면에 표시하지 않는다.",
+        "처리 절차 및 분기": "1. 패널 닫기 시 상세 탐색 상태를 그대로 유지한다.\n2. 재열기 시 현재 대화와 작업의 서버 상태를 조회한다.\n3. 완료는 저장된 결과를, 처리 중은 진행 상태를 표시한다. 처리 중에는 상태 확인을 이어 가고 같은 대화의 신규 전송을 제한한다.\n4. 상태 확인 후 작업이 완료되면 추가 질문 없이 결과를 회수한다.",
+        "정상 결과": "패널을 닫고 다시 열어도 같은 대화와 상세 탐색 상태를 이어 본다.",
+        "예외 처리": "상태 조회 실패: 확인 실패와 다시 확인을 안내하며 미등록·실패 확정으로 간주하지 않는다.\n로그아웃·권한 변경: 개인 대화 내용을 숨기고 현재 권한을 다시 확인한다.\n새 대화 전환: 이전 답변은 원래 작업 기록에만 연결한다.",
+        "수용 기준": "1. 패널을 닫은 동안 작업이 완료되어도 재열기 시 추가 모델 호출 없이 저장 답변을 확인한다.\n2. 재열기 직후 처리 중이면 후속 상태 확인을 통해 완료 답변을 회수한다.\n3. 닫기·재열기가 상세 기업·차트 기간·재무 기간·사건·탭·스크롤을 바꾸지 않는다.\n4. 상세 기업만 변경해도 기존 대화의 적용 대상이 자동 변경되지 않는다.",
+        "확인 필요 사항": "v1.2 제안 기준: 패널 상태와 질문 작업 분리·기업 변경 시 기존 대화 맥락 유지.\n[확인 필요: 상태 확인 주기·중단 판정 시간은 운영 환경 측정 후 결정 필요]"
+      }
+    },
+    {
+      "id": "FS053",
+      "sheet": "AI 챗봇",
+      "id_row": 149,
+      "fields": {
+        "기능명": "AI 결과 회수와 재시도",
+        "기능 설명": "응답을 받지 못하면 새 답변 생성 전에 기존 질문 작업의 상태를 확인해야 한다. 완료 작업은 저장된 결과를 받고, 처리 중이면 대기하며, 서버가 확인한 실패만 허용된 방식으로 재실행해야 한다. 상태 조회 장애를 작업 미등록으로 취급하지 않고 같은 작업 재시도는 원래 질문 맥락을 유지해야 한다.",
+        "선행조건": "클라이언트가 질문 응답을 받지 못했거나 사용자가 다시 시도를 선택한다.",
+        "입력값": "기존 대화·작업 식별자, 최초 질문 내용과 고정 맥락·대상·기간·근거, 서버 상태, 현재 유효한 실행 정보, 보존된 검증 결과 여부.",
+        "입력·검증 규칙": "클라이언트의 응답 미수신과 서버 작업 실패를 구분한다.\n새 생성 전에 서버의 기존 작업 상태를 확인한다.\n완료 결과 회수 시에도 현재 접근 권한을 확인한다.\n같은 작업의 재시도에는 최초 요청 내용과 맥락을 유지한다.\n저장만 재시도하는 경우와 AI를 다시 실행하는 경우를 오류 유형별 정책에 따라 구분한다.\n늦게 끝난 이전 실행이 현재 유효한 결과를 덮어쓰지 못하게 한다.",
+        "처리 절차 및 분기": "1. 현재 권한으로 기존 작업의 서버 상태를 확인한다.\n2. 완료이면 저장 결과를 반환한다. 처리 중이면 새 작업을 만들지 않고 상태 확인을 이어 간다.\n3. 상태 확인 후 완료가 되면 저장 결과를 회수한다. 패널 닫힘·오프라인 동안 화면 확인은 멈출 수 있지만 서버 작업을 취소한 것으로 보지 않는다.\n4. 확정된 일시적 조회·모델 호출 장애는 이전 실행 종료와 실행 권한을 확인한 뒤 사용자의 재시도로 같은 작업·최초 맥락을 재실행한다.\n5. 저장 실패는 보존된 검증 결과가 있을 때 저장만 다시 시도한다. 검증 실패·결과 소실·권한 오류는 동일 작업 재생성을 허용하지 않는다.\n6. 서버가 작업 저장소를 정상 조회하여 미등록을 확인한 경우에만 기존 작업 ID와 최초 요청으로 다시 접수한다.",
+        "정상 결과": "완료 작업의 저장 결과를 회수하거나 처리 중 상태를 확인한다. 허용된 실패 재시도 또는 미등록 재접수는 동일 작업의 원래 조건으로 진행된다.",
+        "예외 처리": "상태 조회 실패·시간초과: 미등록·실패로 단정하지 않고 다시 확인을 안내한다.\n서버 처리 중: 기존 작업 상태를 확인하고 추가 생성하지 않는다.\n완료 안내 결과: 되묻기·설정 안내·판단 보류도 저장된 결과로 반환한다.\n중단 여부 불명확: 이전 실행 종료를 확인하기 전에는 재실행하지 않는다.\n권한 오류·입력 오류·검증 실패: 동일 작업 재실행을 제한한다.\n이전 실행의 늦은 저장: 유효 실행 확인을 통과하지 못하면 반영하지 않는다.",
+        "수용 기준": "1. 최초 연결이 끊긴 뒤 처리 중 안내를 받아도 후속 상태 확인으로 완료 결과를 회수한다.\n2. 상태 조회 실패만으로 미등록 접수·새 생성이 일어나지 않는다.\n3. 같은 작업 재실행은 원래 질문·대상·기간·근거를 유지한다.\n4. 보존 결과의 저장 복구에는 추가 모델 호출이 없다.\n5. 검증 실패는 같은 작업으로 재생성하지 않고 이전 실행이 현재 결과를 덮지 않는다.",
+        "확인 필요 사항": "v1.2 제안 기준: 오류별 복구 경로·상태 확인 종료 조건·일시 장애의 사용자 재시도.\n[확인 필요: 상태 확인 간격·일시 장애별 최대 재시도·서버 중단 판정 시간과 실행 권한 만료값은 측정 후 결정 필요]"
+      }
+    },
+    {
+      "id": "FS045",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 9,
+      "fields": {
+        "기능명": "AI 질문 진입과 맥락 전달",
+        "기능 설명": "시스템은 전역 AI 패널과 기업·이슈·관계 패널의 AI에게 질문하기에서 질문을 시작할 수 있게 한다. 선택한 기업, 이슈, 관계, 기준 시점, 근거 문서는 질문 맥락으로 함께 전달한다. 전역 질문은 선택 맥락 없이도 시작할 수 있다.",
+        "선행조건": "로그인 회원이 AI 패널 또는 AI 질문 버튼을 연다.",
+        "입력값": "질문 본문, 대화 ID, 선택 기업·이슈·관계 ID(선택), 기준 시점(asOf, 선택), 근거 문서 ID(선택)",
+        "입력·검증 규칙": "선택 맥락은 질문 입력창 상단에 표시하고 실제 요청에도 포함한다. 사용자가 질문에서 다른 기업·기간을 명시하면 질문의 명시 조건을 우선한다. 빈 입력은 전송하지 않는다. 같은 대화에서 답변 생성 중이면 추가 전송 버튼을 비활성화한다. 비회원은 AI 질문 전송이 불가하며 로그인 안내를 제공한다.",
+        "처리 절차 및 분기": "1. 진입 위치의 선택 맥락을 수집하여 표시한다.\n2. 사용자가 질문을 작성·전송한다.\n3. 빈 입력·로그인 상태·동일 대화 처리 중 여부를 확인한다.\n4. 통과하면 질문과 맥락을 해당 대화에 저장하고 해석 단계로 전달한다.",
+        "정상 결과": "질문과 적용 맥락이 대화 및 질문 작업에 연결되어 처리된다.",
+        "예외 처리": "빈 입력: 전송 차단. 비회원: 로그인 안내. \n처리 중: 입력을 유지하고 기존 답변 생성 중 안내. \n전송 결과 미수신: 새 질문을 만들지 않고 기존 요청 상태를 확인한다.",
+        "수용 기준": "1. 기업·이슈·관계에서 시작한 질문은 해당 맥락을 표시하고 서버 요청에도 포함한다.\n2. 전역 질문은 선택 맥락 없이도 전송된다.\n3. 빈 입력·비회원·동일 대화 처리 중 추가 전송이 차단된다.",
+        "확인 필요 사항": "질문 글자 수와 사용자별 일일 이용 한도는 운영 정책 확정 후 적용한다."
+      }
+    },
+    {
+      "id": "FS046",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 23,
+      "fields": {
+        "기능명": "질문 대상·기간 해석 및 되묻기",
+        "기능 설명": "시스템은 질문과 전달된 맥락에서 분석 대상·기간을 해석한다. 대상 또는 기간을 하나로 정할 수 없으면 임의로 분석하지 않고 확인 질문을 제공한다.",
+        "선행조건": "유효한 AI 질문이 접수된다.",
+        "입력값": "질문 본문, 질문 시각, 선택 기업·이슈·관계·기준 시점, 대화의 직전 확정 맥락",
+        "입력·검증 규칙": "질문에 직접 적힌 기업·이슈·기간 조건을 화면 맥락보다 우선한다. 이 회사, 이 이슈는 현재 선택 맥락 또는 직전 답변의 명시 대상을 우선 참조한다. 여러 기업·기간으로 해석 가능한 경우 추정하지 않는다. 최근은 답변에 실제 적용 기간을 표시한다. 과거 기준 시점(asOf) 질문은 그 시점 이후 공개된 문서를 사용하지 않는다.",
+        "처리 절차 및 분기": "1. 질문의 기업·이슈·관계·기간 조건을 추출한다.\n2. 질문 조건과 전달 맥락을 비교해 분석 범위를 확정한다.\n3. 범위가 불명확하면 선택지를 포함한 확인 질문을 반환한다.\n4. 범위가 확정되면 근거 조회 단계로 전달한다.",
+        "정상 결과": "실제 적용 대상·기간·기준 시점이 확정되거나 확인 질문이 제공된다.",
+        "예외 처리": "대상·기간 불명확: 확인 질문 제공. 해석 처리 장애: 분석 준비 중 오류와 재시도 안내를 제공하며 근거 부족으로 위장하지 않는다. 과거 기준 시점 이전 자료 없음: 자료 없음 안내를 제공한다.",
+        "수용 기준": "1. 명시한 기업·기간은 화면 맥락보다 우선한다.\n2. 불명확한 질문은 임의 대상 분석 대신 확인 질문을 제공한다.\n3. 과거 기준 시점 질문에 그 이후 공개된 문서가 사용되지 않는다.",
+        "확인 필요 사항": "최근의 기본 범위는 1개월로 적용하되, UI에서 실제 적용 기간을 항상 표시한다."
+      }
+    },
+    {
+      "id": "FS047",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 37,
+      "fields": {
+        "기능명": "근거·관계 그래프 맥락 조회",
+        "기능 설명": "시스템은 확정된 질문 범위에 맞는 검증 완료 그래프 관계와 뉴스·공시 근거를 조회한다. 개인 보유·관심 종목은 본인 권한이 있을 때만 질문 맥락에 포함한다.",
+        "선행조건": "질문 대상·기간이 확정되었다.",
+        "입력값": "기업·이슈·관계 ID, 기간·기준 시점, 선택 근거 문서 ID(선택), 사용자 ID(선택)",
+        "입력·검증 규칙": "GraphDB에서는 공개·검증 완료 상태의 관계만 조회한다. 문서는 질문 기간 및 기준 시점 조건을 만족하는 자료만 사용한다. 선택 문서가 있으면 해당 문서를 우선하되, 접근 불가 또는 삭제된 문서는 최신 문서로 조용히 대체하지 않는다. 개인화 정보는 본인의 보유·관심 종목만 조회한다.",
+        "처리 절차 및 분기": "1. GraphDB에서 대상 중심 최대 2-hop 관계와 관계 근거 참조를 조회한다.\n2. 뉴스·공시 저장소에서 근거 문서의 제목·출처·공개 시각·확보된 인용 구간을 조회한다.\n3. 필요 시 본인의 보유·관심 종목과 겹치는 관계만 추가로 조회한다.\n4. 근거와 관계를 답변 생성에 전달한다.",
+        "정상 결과": "질문 조건에 맞는 기업·이슈·관계와 근거 문서가 답변 생성에 제공된다.",
+        "예외 처리": "근거 부족: 확보한 사실과 판단할 근거가 부족함을 답변으로 제공. 선택 문서 접근 불가: 해당 문서 사용 불가 안내. 개인화 정보 없음: 일반 시장 설명으로 제공. GraphDB·문서 조회 장애: 기술 오류와 재시도 안내.",
+        "수용 기준": "1. 답변에 사용하는 관계는 공개·검증 완료 상태다.\n2. 답변 근거는 질문 대상·기간·기준 시점과 일치한다.\n3. 타인의 보유·관심 정보는 조회·모델 입력·답변에 포함되지 않는다.",
+        "확인 필요 사항": "P1의 그래프 조회 범위는 중심 대상 기준 최대 2-hop으로 제한한다."
+      }
+    },
+    {
+      "id": "FS048",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 51,
+      "fields": {
+        "기능명": "근거 기반 답변 생성 및 안전 검증",
+        "기능 설명": "시스템은 조회된 근거·관계·시장 데이터만 바탕으로 답변을 생성한다. 답변에는 적용 대상·기간, 핵심 설명, 연결 근거, 한계 또는 추가 확인 사항을 포함한다. 매수·매도 권유나 수익·가격 예측은 제공하지 않는다.",
+        "선행조건": "사용 가능한 근거·관계 맥락이 확보되었거나 근거 부족 상태가 확정되었다.",
+        "입력값": "질문 본문, 적용 기업·이슈·기간·기준 시점, 관계 경로, 근거 문서·인용 구간, 개인화 정보(권한 범위 내), 답변 초안",
+        "입력·검증 규칙": "답변의 사실 주장에는 적어도 하나의 근거 문서 참조를 연결한다. 관계·문서에 없는 사실을 확정적으로 말하지 않는다. 영향 방향은 긍정 가능, 부정 가능, 혼재, 불확실로 표현한다. 주가 움직임을 단일 원인으로 단정하지 않고, 근거 부족 시 판단을 보류한다. 자동 매수·매도·목표가·수익 보장 문구를 생성하지 않는다.",
+        "처리 절차 및 분기": "1. 질문과 근거를 바탕으로 답변 초안을 생성한다.\n2. 적용 대상·기간·인용 참조·그래프 대상의 유효성을 확인한다.\n3. 근거 없는 주장·투자 권유·유효하지 않은 참조가 있으면 답변을 제공하지 않고 오류 상태로 기록한다.\n4. 검증된 답변을 저장하고 사용자에게 제공한다.",
+        "정상 결과": "사용자는 적용 조건, 근거 링크, 관계 설명, 한계·확인 사항이 포함된 답변을 확인할 수 있다.",
+        "예외 처리": "근거 부족: 판단 보류와 확인 가능한 근거만 제공. 인용·그래프 참조 검증 실패: 답변 제공 중단 및 재질문 안내. 저장 실패: 답변 완료로 표시하지 않고 저장 재시도. AI 처리 장애: 오류·재시도 안내.",
+        "수용 기준": "1. 답변은 실제 적용 대상·기간·기준 시점을 표시한다.\n2. 사실 주장마다 근거 문서 참조를 확인할 수 있다.\n3. 매수·매도 권유, 가격·수익 보장, 단일 원인 단정 문구가 없다.",
+        "확인 필요 사항": "인용 구간 자동 검증은 제목·출처·문서 ID 일치 검증부터 구현하고, 세부 문장 단위 사실성 평가는 P2로 둔다."
+      }
+    },
+    {
+      "id": "FS049",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 65,
+      "fields": {
+        "기능명": "답변 근거와 관련 그래프 탐색",
+        "기능 설명": "사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다. AI 답변 자체는 새 관계를 생성하지 않는다.",
+        "선행조건": "근거 또는 그래프 대상이 연결된 AI 답변이 표시된다.",
+        "입력값": "답변 ID, 선택 근거 문서 ID 또는 기업·이슈·관계 ID, 현재 접근 권한",
+        "입력·검증 규칙": "선택한 답변에 실제 연결된 근거·대상만 제공한다. 문서에는 제목·출처·공개 시각·확보된 인용 구간·원문 링크를 제공한다. 그래프는 존재하고 공개된 대상만 강조한다. 원문·인용·관계를 AI가 임의 생성하지 않는다.",
+        "처리 절차 및 분기": "1. 사용자가 답변의 근거 또는 그래프 대상을 선택한다.2. 답변과 선택 대상의 연결 및 권한을 확인한다.3. 근거 선택 시 문서 정보·인용 구간·원문 링크를 표시한다.4. 그래프 대상 선택 시 해당 대상 중심의 기존 그래프를 열고 경로를 강조한다.",
+        "정상 결과": "사용자는 답변의 출처를 확인하거나 관련 관계를 그래프에서 탐색할 수 있다.",
+        "예외 처리": "원문 링크 없음: 원문 미제공 안내. 외부 원문 접근 실패: 확보된 출처·인용은 유지. 그래프 대상 없음·권한 없음: 강조하지 않고 이용 불가 안내. 조회 장애: 답변은 유지하고 해당 기능만 재시도.",
+        "수용 기준": "1. 표시되는 근거는 선택 답변과 연결된 문서다.2. 그래프 강조 대상은 실제 존재하는 공개 대상이다.3. 원문 접근 실패가 AI 답변 재생성을 유발하지 않는다.",
+        "확인 필요 사항": "뉴스 원문은 링크로 이동하며 서비스 내 기사 전문 재배포는 하지 않는다."
+      }
+    },
+    {
+      "id": "FS050",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 79,
+      "fields": {
+        "기능명": "새 대화와 후속 질문",
+        "기능 설명": "사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에 새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.",
+        "선행조건": "로그인 회원이 AI 패널을 사용한다.",
+        "입력값": "현재 대화 ID, 후속 질문 또는 새 대화 요청, 선택 맥락(선택)",
+        "입력·검증 규칙": "후속 질문은 직전 대화의 확정 맥락을 참고할 수 있으나, 새 질문에 직접 적은 대상·기간이 우선한다. 새 대화는 이전 질문·답변·선택 조건을 자동 승계하지 않는다. 새 대화 시작은 기존 대화를 삭제·취소하지 않는다. 같은 대화에서 처리 중인 질문이 있으면 후속 질문 전송은 제한한다.",
+        "처리 절차 및 분기": "1. 후속 질문 선택 시 현재 대화에 새 질문 작업을 추가한다.2. 새 대화 선택 시 새로운 대화 ID와 빈 맥락을 생성한다.3. 새 질문은 FS046~FS049 절차로 처리한다.4. 이전 대화의 지연 응답은 원래 대화에만 저장한다.",
+        "정상 결과": "사용자는 동일 주제를 이어 질문하거나, 독립된 새 주제로 대화를 시작할 수 있다.",
+        "예외 처리": "새 대화 생성 실패: 기존 대화·입력 유지 및 재시도. 처리 중 후속 질문: 입력 유지 및 처리 중 안내. 이전 대화 지연 응답: 새 대화 화면에 표시하지 않음.",
+        "수용 기준": "1. 새 대화에는 이전 질문·답변·선택 맥락이 자동 표시되지 않는다.2. 후속 질문은 같은 대화에 새 질문으로 저장된다.3. 이전 대화의 늦은 답변이 새 대화에 표시되지 않는다.",
+        "확인 필요 사항": "대화 목록·보존 기간·삭제 기능은 P2로 이동한다."
+      }
+    },
+    {
+      "id": "FS051",
+      "sheet": "AI 챗봇 v2",
+      "id_row": 94,
+      "fields": {
+        "기능명": "AI 패널 상태 유지와 결과 재조회",
+        "기능 설명": "사용자가 AI 패널을 닫았다가 다시 열거나 네트워크 응답을 받지 못해도, 기존 질문 작업의 상태와 저장된 결과를 재조회할 수 있다. 패널 닫기·재열기는 질문 취소나 새 AI 생성으로 처리하지 않는다.",
+        "선행조건": "로그인 회원에게 기존 대화 또는 질문 작업이 있다.",
+        "입력값": "대화 ID, 질문 작업 ID, 현재 사용자 권한, 작업 상태",
+        "입력·검증 규칙": "패널 닫기는 상세 화면·대화·서버 작업을 삭제하거나 취소하지 않는다. 재열기와 응답 미수신 후 복구는 기존 작업 상태 조회로 처리한다. 완료 작업은 저장된 답변을 반환하고, 처리 중 작업은 상태만 표시한다. 같은 작업을 중복 생성하지 않는다. 권한이 바뀌면 보호된 대화·개인화 정보를 표시하지 않는다.",
+        "처리 절차 및 분기": "1. 패널 재열기 또는 응답 미수신 시 기존 작업 상태를 조회한다.2. 완료면 저장 답변을 반환하고, 처리 중이면 진행 상태를 표시한다.3. 서버가 실패를 확정한 경우에만 사용자가 같은 질문을 다시 전송할 수 있게 한다.4. 상세 기업이 바뀌어도 기존 대화의 적용 맥락은 자동으로 바꾸지 않는다.",
+        "정상 결과": "패널을 닫거나 일시적으로 연결이 끊겨도 기존 질문의 진행 상태 또는 저장 답변을 확인할 수 있다.",
+        "예외 처리": "상태 조회 실패: 미등록·실패로 단정하지 않고 다시 확인 안내. 권한 변경: 대화 내용 숨김 및 로그인·권한 안내. 서버 실패 확정: 실패 사유와 새 질문 또는 재시도 안내.",
+        "수용 기준": "1. 패널을 닫은 동안 완료된 질문은 재열기 시 저장 답변으로 확인된다.2. 응답 미수신 후 상태 조회만으로 중복 모델 호출이 발생하지 않는다.3. 상세 기업 변경이 기존 대화의 적용 대상·기간을 자동 변경하지 않는다.",
+        "확인 필요 사항": "처리 상태 자동 확인 간격과 최대 대기 시간은 구현 환경에서 측정 후 결정한다."
+      }
+    }
+  ],
+  "raw_briefing_id_error": {
+    "heading_row": 132,
+    "heading": "FS066-01  브리핑 리뷰",
+    "id_row": 134,
+    "raw_id": "ㅊ",
+    "prior_id": "FS???",
+    "effective_mapping": "FS066-01 by heading/index only; raw is not repaired"
+  }
+}

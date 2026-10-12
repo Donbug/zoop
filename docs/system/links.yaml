@@ -2,32 +2,240 @@ schemaVersion: 1
 policy: "이 파일은 사람이 편집한다. import_sources.py는 이 파일과 openapi.yaml을 변경하지 않는다. 존재하는 ID만 연결하며 원본 ID 오류를 별칭으로 고치지 않는다. API 연결의 정본은 openapi.yaml의 x-zoop이고 중복 목록을 두지 않는다."
 apiContract: "docs/api/openapi.yaml"
 authority:
-  decisionId: "user-2026-10-08-day"
-  source: "docs/share/day-work-2026-10-08.md"
-  authority: "사용자 결정(팀 합의 요구의 현재 해석)"
+  decisionId: "user-2026-10-10-feedback"
+  source: "docs/share/day-work-2026-10-10.md"
+  authority: "사용자 결정(팀 합의 요구의 현재 해석) — 2026-10-10 피드백 동기화. 팀원 보고와 실제 원본 변경을 구분해 반영한다."
+  inherits: {decisionId: "user-2026-10-08-day", source: "docs/share/day-work-2026-10-08.md", note: "10-08 결정은 전 범위·프로토타입 권한·일정·디자인·마이그레이션·AI 순서의 근거로 유지한다. 이번 결정은 범위 예외와 상세 시트 권한만 추가·갱신한다."}
   rawPolicy: "원문 상태·우선순위·scopeClass·WBS 충돌은 보존한다. 유효 기준을 원문 승인 상태로 덮어쓰지 않는다."
   implementationScope:
-    appliesTo: "all-specs-and-wbs"
+    appliesTo: "all-specs-and-wbs-except-recorded-exceptions"
     status: "팀합의요구/설계대상"
     includeRawProposalIds: ["FS074", "FS075", "FS076", "FS077", "FS078", "FS079", "FS080", "FS081"]
     implementationComplete: false
     paidExecutionApproved: false
+    exceptions:
+      - id: "RECOMMENDATION_FEATURE_EXCLUDED"
+        specIds: ["FS011-02"]
+        requirementIds: ["11"]
+        effectiveStatus: "사용자 기능 제외 · API 유보"
+        userFacing: false
+        retainedOperationIds: ["listRecommendations"]
+        basis: "user-2026-10-10-feedback 항목 2. 원문 목차·요구 11·NFS004 사례는 변경되지 않았고 이번 팀 원본 diff에도 제거가 없다. 최신 사용자 지시가 활성 사용자 플로우만 대체한다."
+        reason: "추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations 계약과 현재 BFF 동작은 삭제·무동작 대체·가짜 응답 없이 유보하며 이후 다시 반환할 수 있다. 유보는 활성 사용 허용을 뜻하지 않는다."
+      - id: "FINANCE_REQUIREMENT_RESERVED"
+        specIds: []
+        requirementIds: ["42"]
+        effectiveStatus: "요구 유지 · 전용 FS/WBS 미대응(유보)"
+        userFacing: true
+        retainedOperationIds: ["getCompanyFinancials"]
+        basis: "10-10 목차의 FS042는 시점 기반 관계 그래프다. 최신 요구사항 정의서 42(기준일 재무·실적)와 20·38·75 및 NFS002·004의 재무 독립 기간/부분 실패는 그대로 남아 있고 재무 제외 결정은 없다."
+        reason: "재무·실적은 삭제·완료로 보고하지 않는다. 새 FS 번호나 도메인 WBS를 만들지 않고 요구사항 번호와 목표 작업 getCompanyFinancials로만 출처 한정 연결한다. 담당·일정은 팀 결정 전까지 미대응이다."
+  chartResolution: {"1d": "5m", "1w": "1h", "1m": "1d", "1y": "1wk"}
   prototype: {permission: "전권 범위·끝까지 완성", productionAdoption: "담당자 선택"}
-  schedule: {authority: "WBS", notion: "outdated", internalConflicts: "정정 요청으로 수집"}
+  schedule: {authority: "WBS", notion: "옛 일정은 비권위. 갱신된 Notion 회의·API 결정은 사례별 증거로만 사용하며 WBS 일정을 대체하지 않는다", internalConflicts: "정정 요청으로 수집"}
   design: {current: "기존 UI 코드", target: "Figma(폰트 제외 최종)", font: "SUIT 유지", sequence: "기능 먼저·디자인 후"}
   migration: {stackFrozen: false, backendCandidate: "Java/Spring(유력 후보)", frontendReuseRequired: false, backendReuseRequired: false}
   ai: {sequence: "설계 먼저", additionalApiResearch: true, liveBudget: "미정", modelConfiguration: ".env", executionApproval: "별도"}
+detailAuthority:
+  decisionId: "user-2026-10-10-feedback"
+  basis: "팀 보고: 목차의 FS017~027 영역이 메인그래프 v2로, AI 목차가 v2 FS045~051 7행으로 정리됐고 옛 AI 행 4개가 줄었다. 실제 관측: 목차 B27:B37=메인그래프 v2, AI 목차 7행·옛 ID 5개 삭제·FS050 신규, 목차 98개. 옛 `메인 그래프`/`AI 챗봇` 탭과 `변경 내역` 시트는 그대로 남았고 상세 시트의 다른 셀 변경은 브리핑 2셀뿐이다."
+  historicalSheets:
+    - file: "03-메인-그래프.csv"
+      sheet: "메인 그래프"
+      supersededBy: "04-메인그래프-v2.csv"
+      sameIdMeaning: true
+      specIds: ["FS017", "FS018", "FS019", "FS020", "FS021", "FS022", "FS023", "FS024", "FS025", "FS026", "FS027"]
+      reason: "목차가 FS017~027의 영역을 `메인그래프 v2`로 가리키므로 04를 유효 상세로, 03을 보존된 이력 정의로 둔다. 원문 탭을 지우거나 수정하지 않는다."
+    - file: "07-AI-챗봇.csv"
+      sheet: "AI 챗봇"
+      supersededBy: "08-AI-챗봇-v2.csv"
+      specIds: ["FS045", "FS046", "FS047", "FS048", "FS049", "FS050-01", "FS050-02", "FS051", "FS052-01", "FS052-02", "FS053"]
+      reason: "목차의 AI 행이 v2 FS045~051 7개로 바뀌었다. ID 046~051은 옛 의미와 다르므로 번호 일치로 옛 정의를 현재 정의의 대체 증거로 쓰지 않는다. 옛 11개 정의는 의미별 이행표로 보존한다."
+  historicalOnlySpecIds: ["FS050-01", "FS050-02", "FS052-01", "FS052-02", "FS053"]
+  rawIdCorrections:
+    - rawId: "ㅊ"
+      effectiveSpecId: "FS066-01"
+      file: "05-출퇴근-브리핑.csv"
+      headingRow: 132
+      idRow: 134
+      observed: "상세 A132 제목이 `FS036 브리핑 리뷰`→`FS066-01 브리핑 리뷰`로 바뀌었다. 같은 구획의 실제 기능 ID 셀 B134는 `FS???`→`ㅊ`로 바뀌었다."
+      reported: "팀 피드백은 FS???→FS066-01 정정을 보고했다. 그러나 현재 원문에서 기능 ID 셀은 정정되지 않았다."
+      status: "원문 기능 ID 셀은 오류로 보존한다. 제목 행과 목차 FS066-01 통합 선언에 근거한 유효 연결만 별도로 기록하며 원문 오류가 해소됐다고 보고하지 않는다."
+  legacyAiMeaning:
+    - legacySpecId: "FS045"
+      legacyTitle: "AI 질문 진입과 전송"
+      legacySource: {file: "07-AI-챗봇.csv", row: 9}
+      relation: "같은 ID·확장 의미"
+      currentSpecIds: ["FS045"]
+      requirementIds: ["45"]
+      implementationJudgmentTo: ["FS045"]
+      preserved: "선택 기업·이슈·관계·asOf·문서 맥락과 전역 질문, 로그인·빈 입력·처리 중 차단."
+    - legacySpecId: "FS046"
+      legacyTitle: "AI 권한과 중복 작업 통제"
+      legacySource: {file: "07-AI-챗봇.csv", row: 23}
+      relation: "단일 신규 ID 없음 · 서버 공통 의무로 분산 보존"
+      currentSpecIds: ["FS045", "FS047", "FS051", "NFS001", "NFS003", "FS060"]
+      requirementIds: ["46"]
+      implementationJudgmentTo: ["FS051"]
+      preserved: "로그인·대화 소유권·근거 접근 권한 재검증, 같은 작업 ID의 내용 불일치 거절, 같은 대화에 서로 다른 작업 ID가 동시에 와도 유효 실행 하나, 상태 조회·결과 회수는 신규 접수와 구분. 버튼 비활성화만으로 대체하지 않는다. 공통 규칙 aiJobs·idempotency와 NFS001/003이 서버 계약으로 유지한다."
+    - legacySpecId: "FS047"
+      legacyTitle: "질문 해석과 되묻기"
+      legacySource: {file: "07-AI-챗봇.csv", row: 37}
+      relation: "다른 번호로 이동"
+      currentSpecIds: ["FS046"]
+      requirementIds: ["47"]
+      implementationJudgmentTo: ["FS046"]
+      preserved: "최초 질문 시각·맥락·대상·실제 기간 고정, 명시 조건 우선, KST 작년=직전 달력 연도·최근=기본 1개월, 되묻기 저장 완료, 보충 입력은 새 작업."
+    - legacySpecId: "FS048"
+      legacyTitle: "개인화 조건과 근거 확보"
+      legacySource: {file: "07-AI-챗봇.csv", row: 51}
+      relation: "다른 번호로 이동"
+      currentSpecIds: ["FS047"]
+      requirementIds: ["48"]
+      implementationJudgmentTo: ["FS047"]
+      preserved: "현재 권한과 지정 문서·버전 유지, 과거 asOf 이후 공개 문서 제외, 조건 부족·근거 부족·기술 장애 구분, 지정 버전을 최신으로 대체 금지, 안내 결과 저장 후 같은 작업 재평가 금지."
+    - legacySpecId: "FS049"
+      legacyTitle: "답변 검증과 제공"
+      legacySource: {file: "07-AI-챗봇.csv", row: 65}
+      relation: "다른 번호로 이동"
+      currentSpecIds: ["FS048", "NFS003"]
+      requirementIds: ["49"]
+      implementationJudgmentTo: ["FS048"]
+      preserved: "인용·원문 구간·그래프 참조 검증, 현재 유효 실행만 저장, 저장 후 완료, 검증 실패의 자동 재생성 금지, 보존 결과는 모델 재호출 없는 저장 복구."
+    - legacySpecId: "FS050-01"
+      legacyTitle: "AI 답변 근거·원문 확인"
+      legacySource: {file: "07-AI-챗봇.csv", row: 79}
+      relation: "병합·번호 이동"
+      currentSpecIds: ["FS049"]
+      requirementIds: ["50"]
+      implementationJudgmentTo: ["FS049"]
+      preserved: "답변에 실제 연결된 출처·인용·원문 링크만 제공, 접근 실패는 답변 재생성이 아님, 기사 전문 재배포 안 함."
+    - legacySpecId: "FS050-02"
+      legacyTitle: "AI 답변 관련 그래프 탐색"
+      legacySource: {file: "07-AI-챗봇.csv", row: 93}
+      relation: "병합·번호 이동"
+      currentSpecIds: ["FS049"]
+      requirementIds: ["50"]
+      implementationJudgmentTo: ["FS049"]
+      preserved: "존재·공개 권한이 있는 대상만 기존 그래프에서 강조, 이슈–기업 간선 제외, AI가 새 관계를 만들지 않음."
+    - legacySpecId: "FS051"
+      legacyTitle: "새 대화 시작"
+      legacySource: {file: "07-AI-챗봇.csv", row: 107}
+      relation: "병합·번호 이동(현 FS051은 다른 의미)"
+      currentSpecIds: ["FS050"]
+      requirementIds: ["51"]
+      implementationJudgmentTo: ["FS050"]
+      preserved: "새 대화는 별도 ID·빈 맥락, 기존 대화·작업 삭제·취소 아님, 생성 실패 시 기존 대화와 입력 유지."
+    - legacySpecId: "FS052-01"
+      legacyTitle: "같은 대화에서 후속 질문 전송"
+      legacySource: {file: "07-AI-챗봇.csv", row: 121}
+      relation: "병합·번호 이동"
+      currentSpecIds: ["FS050"]
+      requirementIds: ["52"]
+      implementationJudgmentTo: ["FS050"]
+      preserved: "후속 질문은 같은 대화의 새 질문 작업, 명시 조건 우선, 늦은 응답은 원래 대화에만 연결."
+    - legacySpecId: "FS052-02"
+      legacyTitle: "AI 내부 패널 닫기·재열기와 대화 유지"
+      legacySource: {file: "07-AI-챗봇.csv", row: 135}
+      relation: "병합·번호 이동"
+      currentSpecIds: ["FS051", "FS060"]
+      requirementIds: ["52"]
+      implementationJudgmentTo: ["FS051"]
+      preserved: "닫기는 취소·삭제가 아니고 재열기는 새 생성이 아님, 대화·작업 회수, 상세 기업 변경이 기존 대화 맥락을 바꾸지 않음."
+    - legacySpecId: "FS053"
+      legacyTitle: "AI 결과 회수와 재시도"
+      legacySource: {file: "07-AI-챗봇.csv", row: 149}
+      relation: "병합·번호 이동"
+      currentSpecIds: ["FS051", "NFS003", "NFS009"]
+      requirementIds: ["53"]
+      implementationJudgmentTo: ["FS051"]
+      preserved: "상태 조회·결과 회수 먼저, 조회 장애를 미등록·실패로 단정하지 않음, 서버가 확정한 일시 장애만 같은 맥락으로 허용된 방식의 재시도, 검증 실패·권한 오류·결과 소실의 자동 재생성 금지."
+requirementBindings:
+  - specId: "FS031"
+    rawRequirementIds: ["31"]
+    effectiveRequirementIds: ["31"]
+    relation: "목차명 정합화"
+    note: "시장 변수 제공→주요 시장 지표 제공. 상세 시트가 이미 가진 의미에 맞춘 이름 변경이다."
+  - specId: "FS032"
+    rawRequirementIds: ["32"]
+    effectiveRequirementIds: ["32"]
+    relation: "목차명 정합화"
+    note: "관계 그래프 조회→브리핑 관계 그래프 조회. 상세 시트의 의미와 같다."
+  - specId: "FS041"
+    rawRequirementIds: ["41"]
+    effectiveRequirementIds: ["41"]
+    relation: "목차명 정합화"
+    note: "동일 날짜 사건 구분→동일 시점 이슈 구분. 요구 41의 `동일 시점` 서술과 같은 기능이다."
+  - specId: "FS042"
+    rawRequirementIds: ["42"]
+    effectiveRequirementIds: []
+    relation: "원본 번호와 의미 충돌"
+    note: "목차 FS042는 시점 기반 관계 그래프이나 목차의 요구 번호 42는 기준일 재무·실적(요구 42)이다. 상세 FS042의 메타는 요구 41을 표기한다. 시점 그래프만을 위한 요구 행은 요구사항 시트에 없다. 번호 일치로 재무 의미를 FS042에 붙이지 않고 요구 42는 reservedRequirements로 별도 추적한다."
+  - specId: "FS045"
+    rawRequirementIds: ["45"]
+    effectiveRequirementIds: ["45"]
+    relation: "같은 번호·의미 확장"
+    note: "AI 질문 진입과 전송→AI 질문 진입과 맥락 전달."
+  - specId: "FS046"
+    rawRequirementIds: ["46"]
+    effectiveRequirementIds: ["47"]
+    relation: "의미 기준 재연결"
+    note: "목차 번호 46은 옛 `AI 권한과 중복 작업 통제`다. 현 FS046(질문 대상·기간 해석·되묻기)은 요구 47이다. 요구 46은 단일 FS로 대체하지 않고 detailAuthority.legacyAiMeaning의 공통 서버 의무로 분산 보존한다."
+  - specId: "FS047"
+    rawRequirementIds: ["47"]
+    effectiveRequirementIds: ["48"]
+    relation: "의미 기준 재연결"
+    note: "현 FS047(근거·관계 그래프 맥락 조회)은 요구 48(개인화 조건과 근거 확보)이다."
+  - specId: "FS048"
+    rawRequirementIds: ["48"]
+    effectiveRequirementIds: ["49"]
+    relation: "의미 기준 재연결"
+    note: "현 FS048(근거 기반 답변 생성·안전 검증)은 요구 49(답변 검증과 제공)다."
+  - specId: "FS049"
+    rawRequirementIds: ["49"]
+    effectiveRequirementIds: ["50"]
+    relation: "의미 기준 재연결"
+    note: "현 FS049(답변 근거·관련 그래프 탐색)는 요구 50이다. 상세 메타에는 요구 번호가 없다."
+  - specId: "FS050"
+    rawRequirementIds: ["50"]
+    effectiveRequirementIds: ["51", "52"]
+    relation: "의미 기준 재연결"
+    note: "현 FS050(새 대화와 후속 질문)은 요구 51(새 대화)과 52의 후속 질문 부분이다. 목차와 상세 메타는 50이며 옛 요구 50(답변 근거)와 다르다."
+  - specId: "FS051"
+    rawRequirementIds: ["50"]
+    effectiveRequirementIds: ["52", "53"]
+    relation: "의미 기준 재연결"
+    note: "현 FS051(패널 상태 유지와 결과 재조회)은 요구 52의 패널 유지와 요구 53이다. 목차 G61의 상세 위치와 요구 50, 상세 메타 51은 서로 다르며 모두 원문대로 보존한다."
+  - specId: "FS073"
+    rawRequirementIds: ["85"]
+    effectiveRequirementIds: ["85"]
+    relation: "목차명 정합화"
+    note: "관리자 로그인(SSO, ID/PW)→관리자 인증 및 접근 제어. 요구 85를 유지한다."
+reservedRequirements:
+  - requirementId: "42"
+    effectiveStatus: "요구 유지 · 전용 FS/WBS 미대응(유보)"
+    rawIndexSpecId: "FS042"
+    rawIndexNote: "목차 FS042의 요구 번호 42는 번호만 남은 연결이다. 목차명·상세 의미는 시점 기반 관계 그래프다."
+    relatedRequirementIds: ["20", "38", "75"]
+    operationIds: ["getCompanyFinancials"]
+    wbsIds: []
+    reason: "요구 42는 시가총액·PER·PBR·부채비율·매출·영업이익 추이 등을 요구하며 폐기 선언이 없다. 새 FS 번호·도메인 WBS를 만들지 않고 목표 작업의 요구 번호 연결로만 남긴다. 구현 주체·일정은 팀 결정 전까지 미정이다."
+wbsNotes:
+  - code: "WBS_OWNER_INTERFACE_UNCLEAR"
+    wbsIds: ["6.5.5", "6.6.19", "6.6.20"]
+    workerDecision: "WBS 6.6.19/6.6.20(GraphDB upsert·증분 갱신)의 담당은 본문 그대로 보존한다. 6.5.5 산출물이 정세빈의 GraphDB 저장·조회 반영을 언급하는 것은 후보 생성/공개 적격 판정과 DB 투영/조회 반영의 책임 경계를 나눠야 한다는 확인 요청으로만 남기며 자동 재배정하지 않는다."
+    ownerRequest: "WBS 담당자가 6.5.5와 6.6.19~20의 GraphDB 쓰기/공개 반영/조회 책임 인터페이스와 담당을 일치시켜 주세요."
 wbsMigration:
   previousWbsSource: "docs/evidence/raw/wbs_2026-10-03/01-프로젝트-WBS.csv"
-  currentWbsSource: "docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv"
-  headerComparison: "두 본문 모두 xlsx10행 A:J = 구분/WBS/업무/유형/산출물/수행인력/시작일/종료일/가중치/진행률. 열 계약은 동일; 업무173개와 역할 의미는 재대조."
+  currentWbsSource: "docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv"
+  headerComparison: "10-08 API 검토본과 10-10 본문 모두 xlsx10행 A:J = 구분/WBS/업무/유형/산출물/수행인력/시작일/종료일/가중치/진행률. 열 계약은 동일; 10-10 변경은 수행인력 2셀(6.6.12 정세빈→임현, 6.10.5 임현→김도현/홍정현)과 종료일 5셀뿐이며 제목·역할·산출물은 같다. 업무173개."
   previousTaskCount: 117
   currentTaskCount: 173
   groups:
     - previousIds: "6.1.2 / 6.10.1"
       meaning: "API 공통 계약·통합 검증"
       currentTargets: "6.1.2 / 6.11.1"
-      reason: "API 최종 검토 작업(진척0)과 통합 계약 점검. 현 6.10.1은 관리자 인증이므로 같은 번호를 유지하지 않음."
+      reason: "API 최종 검토 작업(최신 원문 진척100%)과 통합 계약 점검. 진척은 구현·수용 기준 통과 증거가 아니다. 현 6.10.1은 관리자 인증이므로 같은 번호를 유지하지 않음."
     - previousIds: "6.2.1~7 / 6.4.8"
       meaning: "시작/이메일/소셜/비회원/세션"
       currentTargets: "6.2.1~5(BE), 6.2.6~7(FE)"
@@ -79,7 +287,7 @@ wbsMigration:
     - previousIds: "6.7.10 / 6.9.2의 평가"
       meaning: "좋아요/싫어요·공통 결과 평가"
       currentTargets: "6.8.10 / 6.10.5(BE), 6.8.14 / 6.10.15(FE)"
-      reason: "옛FS037 브리핑 평가는 FS066-01 의미로 편집 연결. 현재FS037 종목 목록과 혼동하지 않음."
+      reason: "옛FS037 브리핑 평가는 현재 FS066-01 의미다. 15:05 재수집 WBS6.8.14 E136도 FS066-01로 정정되어 이 행의 raw/편집 차이는 해소했다. 현재 FS037 종목 검색과 목차/변경 이력의 남은 충돌은 별도로 보존한다."
     - previousIds: "6.8.1~9 / 6.4.7"
       meaning: "질문·맥락·생성·근거·대화·작업"
       currentTargets: "6.9.1~10(BE), 6.9.11~14(FE)"
@@ -96,6 +304,10 @@ wbsMigration:
       meaning: "FS074~081(원문 추가 제안·현재 팀합의 설계대상)"
       currentTargets: "본문6.6.13~20"
       reason: "같은 원본의 표지/요약과 본문 번호·기간·가중치·역할 충돌은 정정 요청이다. raw proposal 8개를 보존하되 현재 사용자 결정에 따라 구현 계획에 포함하며 기존 작업의 재사용 공수를 중복 산정하지 않는다."
+    - previousIds: "6.9.2~6.9.9 산출물의 옛 FS047~FS053 번호"
+      meaning: "AI v2 번호 이행(질문 해석·근거 조회·답변 생성/검증·근거 탐색·새 대화/후속 질문·패널 유지/결과 재조회)"
+      currentTargets: "6.9.2→FS046, 6.9.3→FS047, 6.9.4→FS048, 6.9.5→FS049, 6.9.6→FS050, 6.9.7~9→FS051, FE 6.9.11~15는 제목·흐름 기준으로 재연결"
+      reason: "10-10 목차가 AI v2 FS045~051 7개로 정리됐으나 WBS 산출물 열은 옛 번호를 그대로 둔다. 원문은 rawSpecIds로 보존하고 업무명·BE/FE 역할·v2 상세 의미로 편집 연결한다. 옛 FS046(권한·중복 작업 통제)은 6.9.1·6.9.13의 공통 서버 의무(NFS001/003, aiJobs)로 이어진다. 담당은 원문 김도현 그대로이며 새 배정은 없다."
 commonWbs:
   "6.1.2": "API 명세 최종 검토·구현 기준 확정"
   "6.11.1": "API·스키마 계약 통합 점검"
@@ -105,16 +317,13 @@ userDecisions:
   modelConfiguration: "LLM 모델/추론 수준은 .env에서 명시 설정한다. 값 선택·유료 실호출·예산 승인은 별개이며 예산은 미정이다."
   conflictPermission: "원본 충돌은 작업자 가결정→시연→팀 최종 결정으로 처리하고 정정 요청을 보존한다. 요구 범위는 authority의 사용자 결정으로 이미 포함되지만 유료 호출 허가는 별개다."
 featureDecisions:
-  "FS???":
-    apiDisposition: "계약 미정"
-    reason: "브리핑 리뷰 상세의 잘못된 원본 ID다. 공통 평가 FS066-01과의 관계 및 목차 연결은 정정 요청으로 남기며 명세 번호를 임의 부여하지 않는다."
+  "ㅊ":
+    apiDisposition: "FS066-01에 정정 연결(원문 ID 오류 유지)"
+    reason: "브리핑 리뷰 상세의 기능 ID 셀이 `ㅊ`이며 같은 구획 제목은 `FS066-01 브리핑 리뷰`다. 원문 ID 오류는 고치지 않고 detailAuthority.rawIdCorrections로 FS066-01에 유효 연결한다. 목표 API는 FS066-01의 setFeedback/getMyFeedback이다."
   FS042:
     apiDisposition: "기존 API로 지원"
-    reason: "10-08 상세 FS042는 FS0?? 시점 그래프 ID를 승계해 getCompanyGraphAsOf에 연결한다. 목차/요구42/옛 판정은 재무·실적 의미를 유지하므로 getCompanyFinancials는 충돌 별도 추적한다. 재무 폐기·시점그래프 완료·팀 승인으로 승격하지 않는다."
+    reason: "목차·상세 FS042는 시점 기반 관계 그래프이며 getCompanyGraphAsOf에 연결한다. 목차의 요구 번호 42는 기준일 재무·실적(요구 42)이며 폐기 선언이 없어 reservedRequirements로 별도 유보한다. 재무 폐기·시점 그래프 완료·팀 승인으로 승격하지 않는다."
     wbsIds: ["6.7.5", "6.7.11", "6.7.12"]
-  FS050:
-    apiDisposition: "계약 미정"
-    reason: "AI v2 새 대화 정의와 기존 FS050-01/-02 의미가 다르다. 채택/이전 선언 없이 같은 번호로 통합하지 않는다."
   NFS010:
     apiDisposition: "API 불필요"
     reason: "브라우저·해상도·모바일 지원은 클라이언트/배포 검증 계약이다. 서버 동작 수치가 정해지면 관련 작업에 연결한다."
@@ -648,7 +857,7 @@ wbsConnections:
     title: "(FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동"
     role: "FE"
     specIds: ["FS032", "FS036", "FS066-01"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    reason: "15:05 WBS 재수집의 E136에서 과거 평가 FS037이 FS066-01로 정정되어 원문과 편집 연결이 일치한다. 제목·FE 역할은 동일하며 현재 종목 검색 FS037과 혼동하지 않는다. docs/evidence/api-source-refresh-2026-10-08.md의 전셀/의미 비교를 따른다."
   - wbsId: "6.8.15"
     title: "출퇴근 브리핑 통합 테스트"
     role: "공통/통합"
@@ -657,48 +866,48 @@ wbsConnections:
   - wbsId: "6.9.1"
     title: "(BE) AI 질문 진입·맥락 전달"
     role: "BE"
-    specIds: ["FS025", "FS045", "FS046"]
-    reason: "질문 진입·맥락 접수 시 FS046의 회원 권한·대화별 중복 작업 통제를 함께 적용한다. 원문 FS025/FS045와 편집 연결을 구분한다."
+    specIds: ["FS025", "FS045", "NFS001", "NFS003"]
+    reason: "질문 진입·맥락 접수 시 옛 FS046의 회원 권한·대화 소유·근거 권한·작업 ID 멱등·동시 접수 통제를 공통 서버 의무(NFS001/003, aiJobs)로 함께 적용한다. 현 FS046은 질문 해석이다."
   - wbsId: "6.9.2"
     title: "(BE) 질문 대상·기간 해석·되묻기"
     role: "BE"
-    specIds: ["FS047"]
-    reason: "질문 대상·기간 해석/되묻기는 현재 FS047 의미다. 옛 업무의 FS046 번호를 그대로 옮기지 않는다."
+    specIds: ["FS046"]
+    reason: "질문 대상·기간 해석/되묻기는 AI v2 FS046 의미다. 원문 산출물의 옛 FS047은 번호가 달라진 같은 업무다."
   - wbsId: "6.9.3"
     title: "(BE) 근거·관계 그래프 맥락 조회"
     role: "BE"
-    specIds: ["FS048"]
-    reason: "근거·관계 그래프 맥락 조회는 현재 FS048의 개인화 조건/근거 확보 의미와 대응한다."
+    specIds: ["FS047"]
+    reason: "근거·관계 그래프 맥락 조회는 AI v2 FS047 의미다. 원문 산출물의 옛 FS048(개인화 조건과 근거 확보)에서 번호가 이동했다."
   - wbsId: "6.9.4"
     title: "(BE) 근거 기반 답변 생성·안전 검증"
     role: "BE"
-    specIds: ["FS049"]
-    reason: "근거 기반 답변 생성·안전 검증은 현재 FS049 답변 검증/제공 의미와 대응한다."
+    specIds: ["FS048"]
+    reason: "근거 기반 답변 생성·안전 검증은 AI v2 FS048 의미다. 원문 산출물의 옛 FS049(답변 검증과 제공)에서 번호가 이동했다."
   - wbsId: "6.9.5"
     title: "(BE) 답변 근거·관련 그래프 탐색"
     role: "BE"
-    specIds: ["FS050-01", "FS050-02"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS049"]
+    reason: "답변 근거·관련 그래프 탐색은 AI v2 FS049 의미다. 원문 산출물의 옛 FS050-01/-02가 하나로 합쳐졌다."
   - wbsId: "6.9.6"
     title: "(BE) 새 대화·후속 질문"
     role: "BE"
-    specIds: ["FS051", "FS052-01"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS050"]
+    reason: "새 대화·후속 질문은 AI v2 FS050 의미다. 원문 산출물의 옛 FS051(새 대화)+FS052-01(후속 질문)이 하나로 합쳐졌다."
   - wbsId: "6.9.7"
     title: "(BE) 패널 상태 유지·결과 재조회"
     role: "BE"
-    specIds: ["FS052-02", "FS053"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS051", "NFS003", "NFS009"]
+    reason: "패널 상태 유지·결과 재조회는 AI v2 FS051 의미다. 원문 산출물의 옛 FS052-02+FS053에서 이동했고 복구 기준은 NFS003/009와 함께 본다."
   - wbsId: "6.9.8"
     title: "(BE) 대화와 내부 패널 유지"
     role: "BE"
-    specIds: ["FS052-02"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS051"]
+    reason: "대화·내부 패널 유지는 AI v2 FS051의 패널 상태 유지 의미다. 원문 산출물의 옛 FS052-02에서 이동했다."
   - wbsId: "6.9.9"
     title: "(BE) AI 결과 회수와 재시도"
     role: "BE"
-    specIds: ["FS053"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS051", "NFS003", "NFS009"]
+    reason: "결과 회수·재시도는 AI v2 FS051의 결과 재조회 의미다. 원문 산출물의 옛 FS053에서 이동했다."
   - wbsId: "6.9.10"
     title: "(BE) 대화와 질문 기록"
     role: "BE"
@@ -707,28 +916,28 @@ wbsConnections:
   - wbsId: "6.9.11"
     title: "(FE) D-AI-01 AI 챗봇 기본 화면 및 세션 API 연동"
     role: "FE"
-    specIds: ["FS025", "FS045", "FS051", "FS060"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS025", "FS045", "FS050", "FS060"]
+    reason: "기본 화면·세션 연동은 질문 진입(FS045)과 새 대화·후속 질문(FS050, 옛 FS051)을 소비한다. 원문 산출물의 번호는 옛 체계다."
   - wbsId: "6.9.12"
     title: "(FE) D-AI-01b 기업·이슈·간선 선택 맥락 질문 연동"
     role: "FE"
-    specIds: ["FS025", "FS045", "FS047"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS025", "FS045", "FS046"]
+    reason: "선택 맥락 질문 연동은 질문 진입과 맥락 해석(FS046, 옛 FS047)을 소비한다."
   - wbsId: "6.9.13"
     title: "(FE) D-AI-02 AI 비동기 작업 상태·결과·재시도 API 연동"
     role: "FE"
-    specIds: ["FS046", "FS049", "FS053", "NFS003"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS048", "FS051", "NFS001", "NFS003"]
+    reason: "작업 상태·결과·재시도 UI는 검증된 답변(FS048)과 결과 재조회(FS051), 권한·중복 통제 공통 의무(NFS001/003, 옛 FS046)를 소비한다."
   - wbsId: "6.9.14"
     title: "(FE) D-AI-02b 대화 이력·후속 질문·답변 재조회 API 연동"
     role: "FE"
-    specIds: ["FS050-01", "FS050-02", "FS051", "FS052-01", "FS052-02", "FS053", "FS060", "NFS003"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS049", "FS050", "FS051", "FS060", "NFS003"]
+    reason: "대화 이력·후속 질문·재조회는 근거 탐색(FS049)·새 대화/후속 질문(FS050)·결과 재조회(FS051)·질문 기록(FS060)을 소비한다."
   - wbsId: "6.9.15"
     title: "AI 챗봇 통합 테스트"
     role: "공통/통합"
-    specIds: ["FS025", "FS045", "FS046", "FS047", "FS048", "FS049", "FS050-01", "FS050-02", "FS051", "FS052-01", "FS052-02", "FS053", "FS060"]
-    reason: "현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다."
+    specIds: ["FS025", "FS045", "FS046", "FS047", "FS048", "FS049", "FS050", "FS051", "FS060", "NFS001", "NFS003"]
+    reason: "AI v2 FS045~051과 질문 기록, 권한·작업 일관성 공통 의무를 통합 시험 대상으로 연결한다. 원문 종료일이 시작일보다 앞서는 오류는 별도 경고로 보존한다."
   - wbsId: "6.10.1"
     title: "(BE) 관리자 인증·권한 관리 API 개발"
     role: "BE"
@@ -1096,32 +1305,12 @@ implementationLocations:
       - "prototype/bff/src/zoop_bff/routers/chat.py:17"
     evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
   -
-    specId: "FS050-01"
-    codeLocations:
-      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
-    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
-  -
-    specId: "FS050-02"
+    specId: "FS050"
     codeLocations:
       - "prototype/bff/src/zoop_bff/routers/chat.py:17"
     evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
   -
     specId: "FS051"
-    codeLocations:
-      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
-    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
-  -
-    specId: "FS052-01"
-    codeLocations:
-      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
-    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
-  -
-    specId: "FS052-02"
-    codeLocations:
-      - "prototype/bff/src/zoop_bff/routers/chat.py:17"
-    evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."
-  -
-    specId: "FS053"
     codeLocations:
       - "prototype/bff/src/zoop_bff/routers/chat.py:17"
     evidenceKind: "현재 라우트 선언 소스 열람. 수용 기준 충족/실행 검증을 뜻하지 않는다."

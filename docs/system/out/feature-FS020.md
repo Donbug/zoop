@@ -1,15 +1,16 @@
 # FS020 · 기업 노드 정보
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 확정 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 20 |
+| 요구사항 번호(원문) | 20 |
+| 의미 기준 요구사항 | 20 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 부분 |
@@ -17,12 +18,12 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:30 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:30 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv) — 기업 노드 정보: 사용자가 선택한 기업의 현황과 관련 이슈를 빠르게 이해할 수 있도록 기업 정보 패널을 제공.기업의 기본 정보, 시세, 주요 재무 정보, AI 요약, 직접·간접 이슈 및 관련 기업을 표시하고, 상세 정보는 기업 상세페이지에서 확인할 수 있어야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv:53 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv) — 기업 노드 정보: 사용자가 기업 노드를 선택하면 해당 기업의 기본 정보, 시세, 주요 재무, AI 요약, 관련 이슈, 관련 기업을 정보 패널에 표시한다. 관련 이슈에는 국내·국제 속성을 표시하고 관련 뉴스 요약 및 근거 자료로 이동할 수 있도록 한다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv) — 기업 노드 정보: 사용자가 선택한 기업의 현황과 관련 이슈를 빠르게 이해할 수 있도록 기업 정보 패널을 제공.기업의 기본 정보, 시세, 주요 재무 정보, AI 요약, 직접·간접 이슈 및 관련 기업을 표시하고, 상세 정보는 기업 상세페이지에서 확인할 수 있어야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:53 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 기업 노드 정보: 사용자가 기업 노드를 선택하면 해당 기업의 기본 정보, 시세, 주요 재무, AI 요약, 관련 이슈, 관련 기업을 정보 패널에 표시한다. 관련 이슈에는 국내·국제 속성을 표시하고 관련 뉴스 요약 및 근거 자료로 이동할 수 있도록 한다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:103 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:103 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 
@@ -46,4 +47,5 @@
 
 ## 확인 필요
 
-- MULTIPLE_SPEC_DEFINITIONS: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+- HISTORICAL_DETAIL_SUPERSEDED: 옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.
+- INDEX_DETAIL_RANGE_STALE: 목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [50]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.

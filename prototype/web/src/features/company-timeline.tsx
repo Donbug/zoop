@@ -78,8 +78,9 @@ export function CompanyTimeline(props: TimelineProps) {
   const support = { "1d": dayPrices, "1w": weekPrices };
   const availablePeriods = periodOptions.map(option => {
     const query = option.value === "1d" || option.value === "1w" ? support[option.value] : null;
+    // 200 unavailable은 출처가 이 기간을 줄 수 없다는 뜻이라 비활성. 출처 장애(503 조회 오류)는 기간을 막지 않는다.
     const unavailable = query?.data?.status === "unavailable" ? query.data : null;
-    return { ...option, disabled: Boolean(unavailable && unavailable.reasonCode !== "temporary_failure"), disabledReason: unavailable?.reason };
+    return { ...option, disabled: Boolean(unavailable), disabledReason: unavailable?.reason };
   });
 
   const relationOf = new Map<string, RelationType>([

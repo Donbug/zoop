@@ -55,6 +55,8 @@ runner는 `ubuntu-24.04`로 명시합니다. 공식 [runner image 도구 목록]
 | `ai-worker` | worker 자신의 manifest 설치, offline pytest, stdlib portable fixture validation | 없음 |
 | `required-ci` | 위 네 job이 모두 success인지 확인; skipped/cancelled/failure도 실패 | 없음 |
 
+2026-10-08 최초 원격 관측: [`69cc0067af1702dbd660869cecc3009543ad9030`의 CI 실행](https://github.com/Donbug/zoop/actions/runs/37734731230)에서 **public-config / web / ai-worker는 success**, **bff / required-ci는 failure**였습니다. BFF는 `POC_APP_ID`·`POC_APP_PRIVATE_KEY` 미등록을 preflight에서 거절했으며 테스트 단계에 진입하지 않았습니다. 종합 게이트도 이를 정상적으로 실패 처리했습니다. Main이 2026-10-10 새로 확인한 run 목록도 이 마지막 실행과 실패 상태가 그대로였습니다. 따라서 actionlint를 포함한 공개 검사는 원격 실행으로 확인됐지만 **전체 CI 통과·배포 완료는 아닙니다**. 이후 S2-1·API v2·현재 미커밋 변경을 이 원격 run이 검증했다고 보고하지 않습니다. 자격 증명이나 저장소 규칙을 자동 등록하지 않았습니다.
+
 기본 권한은 `contents: read`이고 checkout 인증을 남기지 않습니다. artifact job만 CI 증거 읽기를 위해 `actions: read`를 추가합니다. `pull_request_target`, untrusted privileged checkout, 모델 키, 자동 LLM 호출, 실제 외부 뉴스·시세·DB 조회를 사용하지 않습니다. 설치 도구·패키지·고정 private 의존성 fetch와 CI 증거 GitHub REST GET은 검증 bootstrap이며 데이터 분석 실행이 아닙니다. private token은 의존성 설치 step에만 전달하고 테스트 step에는 전달하지 않습니다. 캐시도 private dependency 공유를 피하려고 끕니다.
 
 `worker-contracts-check`는 worker의 기존 exporter를 임시 디렉터리에서 실행해 JSON Schema와 두 합성 fixture 그룹(`synthetic-document`, `synthetic-outlook`)의 `jobs.json`, `grants.json`, `replay.json`, `snapshot.json` **총 8개**를 바이트 비교합니다. 생성한 정확한 파일 경로 집합도 검사하므로 파일 수만 맞추거나 예상하지 않은 출력을 무시해 통과시키지 않습니다. exporter는 BFF의 `evidence_id`, private PoC의 Article 버전 규칙과 회차 입력 생성도 사용하므로 이 **생성 drift만 BFF job**에 둡니다. worker 실행·시험과 stdlib portable fixture validator는 private PoC 없이 독립 실행합니다. exporter에는 모델 키/설정을 상속하지 않으며 원본 fixture를 덮어쓰지 않습니다.
@@ -107,6 +109,8 @@ Fork PR은 private credential을 받을 수 없으므로 `bff` preflight가 명�
 3. 동일 커밋의 web을 frozen install/build합니다. CI 증거가 없으면 source-only 아티팩트로 우회하지 않습니다.
 4. allowlist로 prototype 소스·web dist·앱 manifest/lock·목표 OpenAPI·AI JSON Schema·토큰 원본만 ZIP에 담고 각 파일과 ZIP/manifest의 SHA-256을 생성합니다. `manifest.json`에 commit과 CI run ID를 기록합니다.
 5. 해당 ZIP, `manifest.json`, `SHA256SUMS`만 Actions artifact에 14일 보관합니다. cloud upload/deploy, GitHub Release 발행, DB migration, runtime 가동은 수행하지 않습니다.
+
+실제 릴리스 선택·F03/F05 API/UI 장애 사례·F06 설정 이행·F07 경로와 WBS 6.11.*의 인수 기준은 [배포·성능·장애 검증 계획](release-verification.md)에 있습니다. 현재 릴리스 후보나 운영 배포가 선택/완료됐다는 뜻은 아닙니다.
 
 로컬 패키징도 실제 web build가 이미 있어야 하며 git SHA를 명시합니다. 패키징은 repo 외부 디렉터리에만 씁니다.
 

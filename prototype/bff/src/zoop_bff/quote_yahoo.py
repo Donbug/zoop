@@ -19,6 +19,7 @@ from typing import Any, Literal
 import httpx
 
 from .market_data import (
+    ACCESS_DENIED,
     KST,
     SERIES_TTL,
     TEMPORARY,
@@ -42,6 +43,7 @@ from .market_data import (
 
 DELAY_NOTE = "비공식 공개 차트 자료예요. 지연된 시세일 수 있어요."
 NOT_LISTED = "야후 파이낸스에서 이 종목을 찾지 못했어요."
+FORMAT_CHANGED = "야후 파이낸스가 알 수 없는 형식으로 답했어요."
 _RANGES: dict[Period, tuple[str, str]] = {"1d": ("1d", "5m"), "1w": ("1mo", "1h"), "1m": ("1mo", "1d"), "1y": ("1y", "1wk")}
 
 
@@ -100,13 +102,19 @@ class YahooProvider:
                 continue
             if response.status_code in (400, 422):
                 raise QuoteUnavailable("no_data", "출처에 이 기간의 시세가 없어요. 장중 자료는 제공 기간이 제한돼요.")
+            if response.status_code in (401, 403):
+                raise QuoteUnavailable("auth_failed", ACCESS_DENIED)
             if not response.is_success:
                 raise QuoteUnavailable("temporary_failure", TEMPORARY)
             body = json_body(response)
             chart = body.get("chart") if isinstance(body, dict) else None
-            results = chart.get("result") if isinstance(chart, dict) else None
-            if not results or not isinstance(results[0], dict):
-                continue
+            if not isinstance(chart, dict):
+                raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
+            results = chart.get("result")
+            if not results:
+                continue  # ``result: null`` with an error object is how Yahoo says it does not know the symbol
+            if not isinstance(results, list) or not isinstance(results[0], dict):
+                raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
             with self._lock:
                 self._resolved[listing] = symbol
             return symbol, results[0]

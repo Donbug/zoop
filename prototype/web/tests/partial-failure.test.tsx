@@ -5,7 +5,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { describe, expect, test } from "vitest";
 import { openApp } from "./support/app";
-import { apiError, json, networkDown, type FakeBff, type Reply, type Where } from "./support/fake-bff";
+import { apiError, json, marketSourceFailure, networkDown, type FakeBff, type Reply, type Where } from "./support/fake-bff";
 import { ALPHA, BETA, disconnectedPortfolio, metricsOf } from "./support/fixtures";
 import { endpoint, eventsOf, pageOf } from "./support/routes";
 import { alertTitled, errorTitle, readCompanyScreen, retryIn, shown, traceOfCompany, type CompanyScreen } from "./support/screens";
@@ -21,12 +21,12 @@ interface Region {
   failure: Reply;
 }
 
-const temporaryFailure = (extra: object) => json({ status: "unavailable", reasonCode: "temporary_failure", reason: "출처 일시 장애", ...extra });
-
 const regions: Region[] = [
   { name: "기업 개요(503)", shows: "name", path: endpoint.company(ALPHA), title: errorTitle.overview, failure: apiError(503, "bff_unreachable") },
   { name: "시세(503)", shows: "quote", path: endpoint.quote(ALPHA), title: errorTitle.quote, failure: apiError(503, "bff_unreachable") },
-  { name: "시세(200 + 출처 일시 장애)", shows: "quote", path: endpoint.quote(ALPHA), title: errorTitle.quote, failure: temporaryFailure({ companyId: ALPHA.id }) },
+  { name: "시세(503 출처 일시 장애)", shows: "quote", path: endpoint.quote(ALPHA), title: errorTitle.quote, failure: marketSourceFailure("quote", "temporary_failure") },
+  { name: "주요 지표(503 출처 일시 장애)", shows: "metrics", path: endpoint.metrics(ALPHA), title: errorTitle.metrics, failure: marketSourceFailure("metrics", "temporary_failure") },
+  { name: "주가 차트(503 출처 일시 장애)", shows: "chart", path: endpoint.prices(ALPHA), title: errorTitle.chart, failure: marketSourceFailure("prices", "temporary_failure") },
   { name: "주요 지표(연결 끊김)", shows: "metrics", path: endpoint.metrics(ALPHA), title: errorTitle.metrics, failure: networkDown() },
   { name: "주가 차트(503)", shows: "chart", path: endpoint.prices(ALPHA), title: errorTitle.chart, failure: apiError(503, "bff_unreachable") },
   { name: "사건 목록(503)", shows: "events", path: endpoint.events, where: eventsOf(ALPHA, "1m"), title: errorTitle.events, failure: apiError(503, "bff_unreachable") },
@@ -54,6 +54,26 @@ describe("기업 상세에서 한 영역만 실패할 때", () => {
     expect(resent.length).toBeGreaterThan(0);
     expect(resent.map((r) => r.path)).toEqual(resent.map(() => region.path));
     expect(bff.writes).toEqual([]);
+  });
+
+  test("다시 해도 같은 출처 장애(503, retryable=false)는 자동으로 다시 보내지 않고 서버 사유만 보이며 [다시 시도]를 두지 않는다", async () => {
+    const { bff, settle } = await openApp(pageOf(ALPHA), (b) => b.on("GET", endpoint.quote(ALPHA), marketSourceFailure("quote", "auth_failed", "출처가 요청을 받아주지 않았어요.")));
+    await waitFor(() => expect(alertTitled(errorTitle.quote)).not.toBeNull());
+    await settle();
+    const alert = alertTitled(errorTitle.quote)!;
+    expect(within(alert).getByText("출처가 요청을 받아주지 않았어요.")).toBeTruthy();
+    expect(within(alert).queryByText(/일시/)).toBeNull();
+    expect(within(alert).queryByRole("button", { name: "다시 시도" })).toBeNull();
+    expect(bff.requests.filter((r) => r.path === endpoint.quote(ALPHA))).toHaveLength(1);
+    expect(readCompanyScreen().metrics).toEqual(shown(ALPHA, "1m").metrics);
+  });
+
+  test("일시 출처 장애(503, retryable=true)는 기존 규칙대로 한 번만 자동으로 다시 보낸다", async () => {
+    const { bff, settle } = await openApp(pageOf(ALPHA), (b) => b.on("GET", endpoint.quote(ALPHA), marketSourceFailure("quote", "temporary_failure")));
+    await waitFor(() => expect(alertTitled(errorTitle.quote)).not.toBeNull(), { timeout: 5000 });
+    await settle();
+    expect(bff.requests.filter((r) => r.path === endpoint.quote(ALPHA))).toHaveLength(2);
+    expect(retryIn(alertTitled(errorTitle.quote)!)).toBeTruthy();
   });
 
   test.each<[string, Reply]>([

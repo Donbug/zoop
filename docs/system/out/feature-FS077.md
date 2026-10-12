@@ -1,15 +1,16 @@
 # FS077 · 기업·이슈 Entity Linking 및 동일성 판정
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | 미정 · 추가 제안 · 검토 전 |
 | 원문 범위 분류 | proposal |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 68, 70 |
+| 요구사항 번호(원문) | 68, 70 |
+| 의미 기준 요구사항 | 68, 70 |
 | API 대응 | API 불필요 |
 | 사유 | 정규 ID와 동일성 판정은 오프라인 파이프라인 계약이므로 공개 HTTP API 불필요. 병합 승인/취소와 복수 이슈 연결 운영 계약은 미정. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다. |
 | 프로토타입 문서 판정 | 판정 없음 |
@@ -17,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:103 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv:210 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv) — 기업·이슈 Entity Linking 및 동일성 판정: 추출된 기업 표기를 기업 마스터 ID에 연결하고 사건·이슈 후보를 기존 사건·이슈와 비교하여 연결·신규 생성·보류를 결정한다. AI는 동일성 판정을, 백엔드 B는 안정적인 ID와 참조 정합성을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:210 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — 기업·이슈 Entity Linking 및 동일성 판정: 추출된 기업 표기를 기업 마스터 ID에 연결하고 사건·이슈 후보를 기존 사건·이슈와 비교하여 연결·신규 생성·보류를 결정한다. AI는 동일성 판정을, 백엔드 B는 안정적인 ID와 참조 정합성을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS056](feature-FS056.md) · [FS058](feature-FS058.md)
 
@@ -42,4 +43,4 @@
 
 - REQUIREMENT_TITLE_REVIEW: 명세 '기업·이슈 Entity Linking 및 동일성 판정' ↔ 요구사항 68 '사건과 문서 구분'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
 - REQUIREMENT_TITLE_REVIEW: 명세 '기업·이슈 Entity Linking 및 동일성 판정' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
-- RAW_SCOPE_STATUS_CORRECTION: 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-08-day의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.
+- RAW_SCOPE_STATUS_CORRECTION: 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.

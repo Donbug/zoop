@@ -317,3 +317,189 @@ def test_indicator_failure_does_not_touch_quotes():
     assert market.metrics("KRX:005930").code == "temporary_failure"
     quote = market.quote("KRX:005930")
     assert quote.quote is not None and quote.source.provider == "toss" and quote.quote.market_cap == 1005 * 1_000_000
+
+
+# --------------------------------------------------------------------------- absence vs failure at the HTTP boundary
+
+CID = "KRX:005930"
+
+
+def _api(tmp_path: Path, market: MarketData) -> TestClient:
+    payload = base_payload()
+    payload["zoop"] = {**payload.get("zoop", {}), "companies": [
+        {"company_id": CID, "name": "삼성전자", "ticker": "005930", "aliases": []}]}
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    settings = Settings(snapshot_path=snapshot, company_catalog=None, state_dir=tmp_path / "state", briefing_scheduler=False)
+    return TestClient(create_app(settings, quotes=market))
+
+
+def _yahoo(handler) -> YahooProvider:
+    return YahooProvider(base_url="https://y.test", timeout=1, cache=TtlCache(), transport=httpx.MockTransport(handler))
+
+
+def _chart_at(now: datetime, interval: str, *, with_time: bool = True) -> dict[str, Any]:
+    step = {"5m": timedelta(minutes=5), "1h": timedelta(hours=1), "1d": timedelta(days=1), "1wk": timedelta(weeks=1)}[interval]
+    now = now.replace(minute=now.minute - now.minute % 5, second=0, microsecond=0)  # bars sit on 5-minute marks
+    stamps = [int((now - step * i).timestamp()) for i in range(5, 0, -1)]
+    meta = {"currency": "KRW", "gmtoffset": 32400, "regularMarketPrice": 300.0, "previousClose": 250.0}
+    if with_time:
+        meta["regularMarketTime"] = int(now.timestamp())
+    col = [100.0 + i for i in range(5)]
+    return {"chart": {"result": [{"meta": meta, "timestamp": stamps, "indicators": {"quote": [
+        {"open": col, "high": col, "low": col, "close": col, "volume": [10] * 5}]}}], "error": None}}
+
+
+def _yahoo_serving(**fault: Any) -> YahooProvider:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if fault.get("response") is not None:
+            return fault["response"]
+        return httpx.Response(200, json=_chart_at(datetime.now(KST), request.url.params["interval"], with_time=fault.get("with_time", True)))
+    return _yahoo(handler)
+
+
+FAILED_SOURCES = [
+    # (id, market factory, reasonCode, retryable)
+    ("yahoo 503", lambda: MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(503))), "temporary_failure", True),
+    ("yahoo 429", lambda: MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(429))), "temporary_failure", True),
+    ("yahoo 401", lambda: MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(401))), "auth_failed", False),
+    ("yahoo 403", lambda: MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(403))), "auth_failed", False),
+    ("yahoo not JSON", lambda: MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(200, text="<html>x</html>"))), "format_changed", False),
+    ("yahoo wrong shape", lambda: MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(200, json={"chart": 5}))), "format_changed", False),
+    ("toss bad credentials", lambda: _toss_market(token_status=401), "auth_failed", False),
+]
+
+
+def _toss_market(**attrs: Any) -> MarketData:
+    fake = FakeToss()
+    for name, value in attrs.items():
+        setattr(fake, name, value)
+    return MarketData("toss", toss=toss(fake))
+
+
+@pytest.mark.parametrize("area", ["quote", "prices"])
+@pytest.mark.parametrize(("label", "factory", "code", "retryable"), FAILED_SOURCES, ids=[f[0] for f in FAILED_SOURCES])
+def test_a_failed_quote_source_is_503_source_unavailable_not_a_200_absence(tmp_path, area, label, factory, code, retryable):
+    response = _api(tmp_path, factory()).get(f"/api/companies/{CID}/{area}", params={"period": "1m"} if area == "prices" else {})
+    assert response.status_code == 503
+    error = response.json()["error"]
+    assert error["code"] == "source_unavailable" and error["message"]
+    assert error["details"] == {"source": "market", "area": area, "reasonCode": code, "retryable": retryable}
+    assert "retry-after" not in response.headers and "status" not in response.json()
+
+
+def test_metrics_source_failures_are_503_with_retryable_only_for_transient_ones(tmp_path):
+    for response, code, retryable in [
+        (httpx.Response(503), "temporary_failure", True),
+        (httpx.Response(403), "auth_failed", False),  # keyless access denied is not a transient fault
+        (httpx.Response(401), "auth_failed", False),
+        (httpx.Response(429), "temporary_failure", True),
+        (httpx.Response(200, json={"totalInfos": [{"code": "renamedA", "value": "1"}, {"code": "renamedB", "value": "2"}]}), "format_changed", False),
+        (httpx.Response(200, text="<html>blocked</html>"), "format_changed", False),
+        (httpx.Response(200, json={"renamed": []}), "format_changed", False),
+    ]:
+        reply = _api(tmp_path, MarketData("off", metrics=_naver(lambda _, r=response: r))).get(f"/api/companies/{CID}/metrics")
+        assert reply.status_code == 503
+        assert reply.json()["error"] == {
+            "code": "source_unavailable", "message": reply.json()["error"]["message"],
+            "details": {"source": "market", "area": "metrics", "reasonCode": code, "retryable": retryable},
+        }
+
+
+def test_normal_absence_stays_a_200_unavailable_on_all_three_endpoints(tmp_path):
+    cases = {
+        "not_connected": MarketData("off"),
+        "unsupported_symbol": MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(404, json={"chart": {"result": None, "error": {}}}))),
+        "no_data": MarketData("yahoo", yahoo=_yahoo_serving(response=httpx.Response(422, json={"chart": {"result": None, "error": {}}}))),
+    }
+    for code, market in cases.items():
+        client = _api(tmp_path, market)
+        for path in ("quote", "prices"):
+            body = client.get(f"/api/companies/{CID}/{path}").json()
+            assert body["status"] == "unavailable" and body["reasonCode"] == code and body["reason"], (code, path)
+    for response, code in [(httpx.Response(409), "unsupported_symbol")]:
+        body = _api(tmp_path, MarketData("off", metrics=_naver(lambda _: response))).get(f"/api/companies/{CID}/metrics").json()
+        assert body["status"] == "unavailable" and body["reasonCode"] == code
+    assert _api(tmp_path, MarketData("off")).get(f"/api/companies/{CID}/metrics").json()["reasonCode"] == "not_connected"
+
+
+def test_a_changed_response_shape_is_not_read_as_an_unsupported_symbol(tmp_path):
+    fake = FakeToss()
+    market = MarketData("toss", toss=toss(fake))
+    original = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v1/prices":
+            return httpx.Response(200, json={"result": {"symbol": "005930"}})
+        return original(request)
+
+    market.toss.client._client = httpx.Client(base_url="https://toss.test", transport=httpx.MockTransport(handler))
+    reply = _api(tmp_path, market).get(f"/api/companies/{CID}/quote")
+    assert reply.status_code == 503 and reply.json()["error"]["details"]["reasonCode"] == "format_changed"
+
+
+def test_partial_metrics_keep_the_valid_values_and_never_invent_zero(tmp_path):
+    rows = [
+        {"code": "marketValue", "key": "시총", "value": "1,609조"},
+        {"code": "per", "key": "PER", "value": "N/A"},
+        {"code": "pbr", "key": "PBR", "value": 3},  # unreadable value: absent, not 3 and not 0
+        {"code": "eps", "key": "EPS", "value": "", "valueDesc": "2026.06."},
+        {"code": "dividendYieldRatio", "key": "배당수익률", "value": "0.00%", "valueDesc": "2026.06."},  # a real zero stays
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"localTradedAt": "2026-10-01T14:36:21+09:00"} if request.url.path.endswith("/basic") else {"totalInfos": rows})
+
+    body = _api(tmp_path, MarketData("off", metrics=_naver(handler))).get(f"/api/companies/{CID}/metrics").json()
+    assert body["status"] == "available" and [m["code"] for m in body["items"]] == ["marketValue", "dividendYieldRatio"]
+    assert [m["value"] for m in body["items"]] == ["1,609조", "0.00%"] and set(body) == {"status", "companyId", "source", "asOf", "items"}
+
+
+def _metrics_rows(tmp_path, rows):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"localTradedAt": None} if request.url.path.endswith("/basic") else {"totalInfos": rows})
+
+    return _api(tmp_path, MarketData("off", metrics=_naver(handler))).get(f"/api/companies/{CID}/metrics")
+
+
+def test_metrics_with_recognised_indicators_but_no_value_are_no_data_not_an_empty_available(tmp_path):
+    na = [{"code": "marketValue", "value": "N/A"}, {"code": "per", "value": "-"}]
+    for rows in (na, [*na, {"code": "newName", "value": "1"}], []):  # explicit N/A, N/A beside unknown extras, valid empty list
+        reply = _metrics_rows(tmp_path, rows)
+        assert reply.status_code == 200 and reply.json()["status"] == "unavailable" and reply.json()["reasonCode"] == "no_data"
+
+
+def test_metrics_rows_of_only_unknown_codes_are_a_changed_format_not_absence(tmp_path):
+    for rows in ([{"code": "newName", "value": "1"}], [{"code": "newName", "value": "1"}, {"key": "no code at all", "value": "2"}]):
+        reply = _metrics_rows(tmp_path, rows)
+        assert reply.status_code == 503
+        assert reply.json()["error"]["details"] == {"source": "market", "area": "metrics", "reasonCode": "format_changed", "retryable": False}
+
+
+def test_unknown_extra_rows_beside_usable_known_ones_are_ignored(tmp_path):
+    body = _metrics_rows(tmp_path, [{"code": "newName", "value": "1"}, {"code": "per", "key": "PER", "value": "12.35배", "valueDesc": "2026.06."}]).json()
+    assert body["status"] == "available" and [(m["code"], m["value"]) for m in body["items"]] == [("per", "12.35배")]
+
+
+def test_latest_quote_keeps_a_null_observation_time_and_refuses_historical_selectors(tmp_path):
+    client = _api(tmp_path, MarketData("yahoo", yahoo=_yahoo_serving(with_time=False)))
+    ok = client.get(f"/api/companies/{CID}/quote").json()
+    assert ok["status"] == "available" and ok["quote"]["asOf"] is None and ok["quote"]["price"] == 300.0
+    for name in ("asOf", "graphVersion"):
+        refused = client.get(f"/api/companies/{CID}/quote", params={name: "2026-10-01T00:00:00+09:00"})
+        assert refused.status_code == 422 and refused.json()["error"]["code"] == "validation_error"
+        assert refused.json()["error"]["details"]["errors"][0]["loc"] == ["query", name]
+    both = client.get(f"/api/companies/{CID}/quote", params={"asOf": "x", "graphVersion": "v1"})
+    assert [e["loc"][1] for e in both.json()["error"]["details"]["errors"]] == ["asOf", "graphVersion"]
+    assert client.get("/api/companies/NOPE/quote", params={"asOf": "x"}).status_code == 422  # the selector is refused before the lookup
+
+
+@pytest.mark.parametrize(("period", "interval"), [("1d", "5m"), ("1w", "1h"), ("1m", "1d"), ("1y", "1wk")])
+def test_price_periods_use_the_intraday_hourly_daily_and_weekly_intervals(tmp_path, period, interval):
+    body = _api(tmp_path, MarketData("yahoo", yahoo=_yahoo_serving())).get(f"/api/companies/{CID}/prices", params={"period": period}).json()
+    assert body["status"] == "available" and body["period"] == period and body["interval"] == interval and body["points"]
+
+
+def test_the_year_chart_is_weekly_on_the_toss_provider_too(tmp_path):
+    body = _api(tmp_path, _toss_market()).get(f"/api/companies/{CID}/prices", params={"period": "1y"}).json()
+    assert body["status"] == "available" and body["interval"] == "1wk" and 50 <= len(body["points"]) <= 54

@@ -689,14 +689,14 @@
     },
     "fs": "FS012",
     "requirements": "12",
-    "entry": "추천 기업을 네 번 선택",
+    "entry": "검색 3회 실행 후 결과 행 네 번 선택",
     "states": "0개 · 선택·해제 · 검색·결과 없음 · 저장 실패",
     "capturedState": "4개 선택",
     "stateSource": "pages/onboarding-page.tsx · components/domain/company-search.tsx",
     "stateImages": [
       "docs/design/v6/search-explicit-390-light.png"
     ],
-    "note": "3개 상한을 두지 않는 것을 실제 4개 선택으로 확인했어요.",
+    "note": "3개 상한 없이 실제 검색으로 4개를 선택했어요.",
     "markers": [
       {
         "number": 1,
@@ -723,7 +723,7 @@
         },
         "box": {
           "x": 956,
-          "y": 268.25,
+          "y": 316.25,
           "width": 44,
           "height": 44
         },
@@ -735,21 +735,21 @@
         "number": 3,
         "selector": {
           "role": "button",
-          "name": "SK텔레콤 빼기"
+          "name": "삼성SDI 빼기"
         },
         "box": {
           "x": 956,
-          "y": 316.25,
+          "y": 364.25,
           "width": 44,
           "height": 44
         },
-        "result": "SK텔레콤을 선택 목록에서 빼요",
+        "result": "삼성SDI를 선택 목록에서 빼요",
         "destination": "D-WAT-01",
         "mode": "picked"
       }
     ],
     "image": "D-WAT-01b.png",
-    "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n4개\nNVIDIA\n삼성전자\nS\nSK텔레콤\nS\nSalesforce\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n선택됨\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n4개 종목으로 시작하기",
+    "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n4개\nNVIDIA\nS\nSK하이닉스\n삼성전자\n삼\n삼성SDI\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건 · 선택됨\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건 · 선택됨\n4개 종목으로 시작하기",
     "clickEvidence": [
       {
         "selector": {
@@ -758,7 +758,7 @@
         },
         "before": "/onboarding",
         "url": "/onboarding",
-        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nS\nSalesforce\n삼성전자\nS\nSK텔레콤\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n추가\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n선택됨\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n3개 종목으로 시작하기",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nS\nSK하이닉스\n삼성전자\n삼\n삼성SDI\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건 · 선택됨\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건 · 선택됨\n3개 종목으로 시작하기",
         "number": 1
       },
       {
@@ -768,17 +768,17 @@
         },
         "before": "/onboarding",
         "url": "/onboarding",
-        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nNVIDIA\nS\nSK텔레콤\nS\nSalesforce\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n추가\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n선택됨\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n3개 종목으로 시작하기",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nNVIDIA\nS\nSK하이닉스\n삼\n삼성SDI\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건 · 선택됨\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건\n3개 종목으로 시작하기",
         "number": 2
       },
       {
         "selector": {
           "role": "button",
-          "name": "SK텔레콤 빼기"
+          "name": "삼성SDI 빼기"
         },
         "before": "/onboarding",
         "url": "/onboarding",
-        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nNVIDIA\nS\nSalesforce\n삼성전자\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n선택됨\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n3개 종목으로 시작하기",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n3개\nNVIDIA\nS\nSK하이닉스\n삼성전자\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건 · 선택됨\n3개 종목으로 시작하기",
         "number": 3
       }
     ]
@@ -791,16 +791,16 @@
       "width": 1440,
       "height": 900
     },
-    "fs": "FS011-01·FS011-02·FS012·FS013",
+    "fs": "FS011-01·FS012·FS013",
     "requirements": "11·12·13",
-    "entry": "계좌 연결 후 관심 종목도 고르기",
+    "entry": "모의 보유 3개 연결 후 관심 종목 고르기",
     "states": "0개 · 선택·해제 · 검색·결과 없음 · 저장 실패",
-    "capturedState": "선택 0개 · 추천 목록",
+    "capturedState": "선택 0개 · 검색 결과",
     "stateSource": "pages/onboarding-page.tsx · components/domain/company-search.tsx",
     "stateImages": [
       "docs/design/v6/search-explicit-390-light.png"
     ],
-    "note": "개수 제한 없음. 추천 근거는 승인된 사건 수예요. 이 캡처에서는 모의 보유 3개가 연결되어 있어요.",
+    "note": "관심 0개여도 연결한 보유 종목을 기준으로 시작해요. 추천 목록 없이 검색으로만 골라요.",
     "markers": [
       {
         "number": 1,
@@ -815,7 +815,7 @@
           "width": 544,
           "height": 48
         },
-        "result": "관심 0개를 저장하고, 연결한 모의 보유 기준 내 종목 지도를 열어요.",
+        "result": "관심 0개를 저장하고 보유 종목 기준 내 종목 지도를 열어요.",
         "destination": "D-GRP-01b",
         "mode": "primary"
       },
@@ -823,37 +823,37 @@
         "number": 2,
         "selector": {
           "role": "css",
-          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(1) button"
+          "name": "form[role=\"search\"] input[placeholder=\"종목명이나 종목 코드\"]"
         },
         "box": {
-          "x": 432,
-          "y": 309.5,
-          "width": 576,
-          "height": 66.125
+          "x": 448,
+          "y": 302.25,
+          "width": 451.765625,
+          "height": 44
         },
-        "result": "추천 첫 기업을 선택·해제해요",
+        "result": "종목명·코드를 입력해요. 검색 버튼이나 Enter로만 조회해요",
         "destination": "D-WAT-01",
-        "mode": "toggle"
+        "mode": "input"
       },
       {
         "number": 3,
         "selector": {
           "role": "css",
-          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(2) button"
+          "name": "ul[aria-label=\"‘삼성’ 검색 결과\"] li:nth-child(1) button"
         },
         "box": {
           "x": 432,
-          "y": 375.625,
+          "y": 373.75,
           "width": 576,
           "height": 66.125
         },
-        "result": "추천 둘째 기업을 선택·해제해요",
+        "result": "검색 결과 첫 기업을 선택·해제해요",
         "destination": "D-WAT-01",
         "mode": "toggle"
       }
     ],
     "image": "D-WAT-01.png",
-    "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n0개\n\n고르지 않아도 보유 종목 기준 내 종목 지도로 시작할 수 있어요.\n\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n추가\n삼성전자\n005930 · 승인된 사건 27건\n추가\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n추가\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n고르지 않고 지도 보기",
+    "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n0개\n\n고르지 않아도 보유 종목 기준 내 종목 지도로 시작할 수 있어요.\n\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건\n고르지 않고 지도 보기",
     "clickEvidence": [
       {
         "selector": {
@@ -868,21 +868,22 @@
       {
         "selector": {
           "role": "css",
-          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(1) button"
+          "name": "form[role=\"search\"] input[placeholder=\"종목명이나 종목 코드\"]"
         },
-        "before": "/onboarding",
         "url": "/onboarding",
-        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n1개\nNVIDIA\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n선택됨\n삼성전자\n005930 · 승인된 사건 27건\n추가\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n추가\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n1개 종목으로 시작하기",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n0개\n\n고르지 않아도 보유 종목 기준 내 종목 지도로 시작할 수 있어요.\n\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건\n고르지 않고 지도 보기",
+        "inputType": "search",
+        "inputWasEntered": true,
         "number": 2
       },
       {
         "selector": {
           "role": "css",
-          "name": "ul[aria-label=\"추천 종목\"] li:nth-child(2) button"
+          "name": "ul[aria-label=\"‘삼성’ 검색 결과\"] li:nth-child(1) button"
         },
         "before": "/onboarding",
         "url": "/onboarding",
-        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n1개\n삼성전자\n승인된 사건이 많은 기업\nNVIDIA\nNVDA · 승인된 사건 46건\n추가\n삼성전자\n005930 · 승인된 사건 27건\n선택됨\nS\nSK텔레콤\n017670 · 승인된 사건 6건\n추가\nS\nSalesforce\nCRM · 승인된 사건 6건\n추가\n삼\n삼성SDI\n006400 · 승인된 사건 6건\n추가\nGoogle\nGOOGL · 승인된 사건 5건\n추가\nC\nCoreWeave\nCRWV · 승인된 사건 3건\n추가\nK\nKT\n030200 · 승인된 사건 3건\n추가\n종목 검색\n검색\n1개 종목으로 시작하기",
+        "visibleText": "본문으로 건너뛰기\n줍\nZoop\n화면계획 시연님\n이전 단계\n관심 있는 종목을 골라 주세요\n고른 종목\n1개\n삼\n삼성SDI\n종목 검색\n검색\n\n‘삼성’ 검색 결과 5개\n\n삼\n삼성SDI\n006400 · 사건 6건 · 선택됨\n삼\n삼성물산\n028260 · 사건 2건\n삼\n삼성에스디에스\n018260 · 사건 2건\n삼\n삼성전기\n009150 · 사건 1건\n삼성전자\n005930 · 사건 27건\n1개 종목으로 시작하기",
         "number": 3
       }
     ]

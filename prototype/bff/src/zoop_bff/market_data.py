@@ -11,9 +11,11 @@ A provider value is passed through as received. Values the BFF computes from pro
 (change, market cap, 52-week range from daily candles, ...) are listed in ``Quote.derived``.
 A missing value stays ``None``; nothing is estimated from another source.
 
-Failures are classified, never shown as empty data: ``not_connected`` (provider off or keys
-missing), ``unsupported_symbol``, ``no_data`` (provider answered but has nothing for the period),
-``auth_failed`` and ``temporary_failure`` (timeout, network, 429, 5xx).
+Failures are classified, never shown as empty data. Normal absence -- ``not_connected`` (provider off or keys
+missing), ``unsupported_symbol``, ``no_data`` (provider answered but has nothing for the period) -- is an answer
+(``ABSENCE_CODES``). Everything else is a failure of the source: ``auth_failed``, ``temporary_failure`` (timeout,
+network, 429, 5xx) and ``format_changed`` (not JSON, or not the shape the adapter reads). Only
+``temporary_failure`` is worth retrying unchanged (``RETRYABLE_CODES``).
 """
 
 from __future__ import annotations
@@ -40,6 +42,9 @@ ReasonCode = Literal[
     "not_connected", "unsupported_symbol", "no_data", "auth_failed", "temporary_failure", "format_changed"
 ]
 
+ABSENCE_CODES = frozenset({"not_connected", "unsupported_symbol", "no_data"})
+RETRYABLE_CODES = frozenset({"temporary_failure"})
+
 KST = timezone(timedelta(hours=9))
 US_EXCHANGES = frozenset({"NASDAQ", "NYSE", "AMEX"})
 _KRX_CODE = re.compile(r"^[0-9A-Z]{6}$")
@@ -59,6 +64,7 @@ class QuoteUnavailable(Exception):
 # Shared by the quote and indicator sources; the screen's title says which area failed.
 TEMPORARY = "출처에 잠시 연결하지 못했어요. 잠시 후 다시 시도해 주세요."
 RATE_LIMITED = "출처의 요청 한도에 걸렸어요. 잠시 후 다시 시도해 주세요."
+ACCESS_DENIED = "출처가 접근을 거부했어요. 키 문제가 아닐 수도 있어요."
 
 
 @dataclass(frozen=True)

@@ -1,15 +1,16 @@
 # NFS008 · 운영 추적
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 보완 제안 · 검토 전 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 61 |
+| 요구사항 번호(원문) | 61 |
+| 의미 기준 요구사항 | 61 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 부분 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:99 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:95 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv) — 운영 추적: 시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.
+- [docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv) — 운영 추적: 시스템은 AI 답변 및 브리핑 생성 작업마다 작업 식별자를 부여하고, 대기·실행 중·완료·실패·취소 상태를 기록해야 한다. 시작 시각, 종료 시각, 재시도 횟수 및 오류 코드를 확인할 수 있어야 한다. 운영 로그에는 인증정보와 불필요한 개인정보를 기록해서는 안 된다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:302 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:302 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

@@ -13,8 +13,15 @@ export type Reply = { kind: "response"; status: number; body?: unknown } | { kin
 
 export const json = (body: unknown, status = 200): Reply => ({ kind: "response", status, body });
 export const noContent = (): Reply => ({ kind: "response", status: 204 });
-/** BFF의 오류 형식 {error:{code,message}} */
-export const apiError = (status: number, code: string, message = code): Reply => ({ kind: "response", status, body: { error: { code, message } } });
+/** BFF의 오류 형식 {error:{code,message,details?}} */
+export const apiError = (status: number, code: string, message = code, details?: Record<string, unknown>): Reply => ({
+  kind: "response",
+  status,
+  body: { error: details ? { code, message, details } : { code, message } },
+});
+/** 시세·지표·차트 출처 장애: 503 source_unavailable. retryable은 일시 장애(temporary_failure)만 true. */
+export const marketSourceFailure = (area: "quote" | "metrics" | "prices", reasonCode: "temporary_failure" | "auth_failed" | "format_changed", message = "출처 일시 장애") =>
+  apiError(503, "source_unavailable", message, { source: "market", area, reasonCode, retryable: reasonCode === "temporary_failure" });
 /** 연결이 끊겨 응답이 오지 않음. 서버가 요청을 처리했는지는 클라이언트가 알 수 없다. */
 export const networkDown = (): Reply => ({ kind: "network-down" });
 

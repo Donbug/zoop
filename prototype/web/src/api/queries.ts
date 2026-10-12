@@ -7,14 +7,14 @@
 //    화면은 현재 선택된 B의 칸만 읽으므로 A 결과가 B 화면을 덮어쓸 수 없다(요청 순번 비교와 같은 효과).
 //
 // 로그아웃 뒤 늦은 개인 응답(FS007):
-//  - 개인 조회(설정·보유·가상 계좌·추천·대화·평가)의 키에는 세션 세대(personalEpoch)가 들어간다. 로그인·가입·비회원 시작·로그아웃마다
+//  - 개인 조회(설정·보유·가상 계좌·대화·평가)의 키에는 세션 세대(personalEpoch)가 들어간다. 로그인·가입·비회원 시작·로그아웃마다
 //    세대가 바뀌므로, 이전 회원의 요청이 늦게 끝나도 그 응답은 지금 화면이 읽지 않는 이전 세대 칸에만 들어간다.
 //  - 로그아웃은 누르는 즉시 개인 캐시를 비우고(진행 중인 요청은 취소된다) 세션을 미로그인으로 표시해 개인 조회를 멈춘다.
 //    서버 처리가 끝나면 그 사이에 받은 응답까지 한 번 더 비우고 세션을 서버에서 다시 확인한다.
 //  - 로그아웃은 화면 캐시만 비운다. 서버의 대화 기록은 지우지 않는다(삭제가 아니다).
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
-import { api, type Schemas } from "./client";
+import { api, ApiError, type Schemas } from "./client";
 import { useSearchParams } from "react-router";
 import type { DetailRange } from "@/lib/company-timeline";
 import type { GraphMode } from "@/lib/labels";
@@ -61,7 +61,6 @@ export const queryKeys = {
   briefingGraphBasis: (round: string) => ["briefing", "graph", round] as const,
   terms: ["terms"] as const,
   socialProviders: ["social-providers"] as const,
-  recommendations: (epoch = personalEpoch) => ["recommendations", epoch] as const,
 };
 
 export function useHealth() {
@@ -123,16 +122,6 @@ export function useSocialProviders() {
   });
 }
 
-/** 관심 종목 추천: 승인된 사건이 많은 기업(근거 문구 포함). 산업·테마 추천은 데이터가 없어 두지 않는다. */
-export function useRecommendations(enabled = true) {
-  const epoch = usePersonalEpoch();
-  return useQuery({
-    queryKey: queryKeys.recommendations(epoch),
-    queryFn: ({ signal }) => api<Schemas["RecommendationResponse"]>("/api/me/recommendations", { signal }),
-    enabled,
-  });
-}
-
 /** 종목 메뉴(FS037): 검색어가 없으면 전체 카탈로그. 검색 컴포넌트와 같은 키를 공유한다. */
 export function useCompanyList(q: string) {
   return useQuery({
@@ -178,12 +167,18 @@ export function useCompanies(ids: string[], asOfOverride?: string | null) {
 export type QuoteResponse = Schemas["CompanyQuote"] | Schemas["CompanyQuoteUnavailable"];
 export type PriceResponse = Schemas["PriceSeries"] | Schemas["PriceSeriesUnavailable"];
 
+/** 시세·지표·차트 조회의 자동 재시도. 기본 규칙(5xx·연결 실패만 한 번)을 따르되, 출처 장애 중 다시 해도 같은 것
+ *  (503 source_unavailable, details.retryable=false: 인증 거절·형식 변경)은 자동으로 다시 보내지 않는다. */
+const marketRetry = (count: number, error: unknown) =>
+  error instanceof ApiError && (error.status === 0 || error.status >= 500) && error.details?.retryable !== false && count < 1;
+
 /** 기업 상세 시세(현재가·지표). 기업 개요와 따로 조회해 늦거나 실패해도 다른 영역을 막지 않는다(요구 54). 보유 영역도 같은 칸을 쓴다. */
 export function useCompanyQuote(id: string) {
   return useQuery({
     queryKey: queryKeys.quote(id),
     queryFn: ({ signal }) => api<QuoteResponse>(`/api/companies/${encodeURIComponent(id)}/quote`, { signal }),
     staleTime: 30_000,
+    retry: marketRetry,
   });
 }
 
@@ -195,6 +190,7 @@ export function useCompanyMetrics(id: string) {
     queryKey: queryKeys.metrics(id),
     queryFn: ({ signal }) => api<MetricsResponse>(`/api/companies/${encodeURIComponent(id)}/metrics`, { signal }),
     staleTime: 10 * 60_000,
+    retry: marketRetry,
   });
 }
 
@@ -205,6 +201,7 @@ export function useCompanyPrices(id: string, range: DetailRange) {
     queryFn: ({ signal }) =>
       api<PriceResponse>(`/api/companies/${encodeURIComponent(id)}/prices`, { query: { period: range.period, from: range.from, to: range.to }, signal }),
     staleTime: 60_000,
+    retry: marketRetry,
   });
 }
 
@@ -339,7 +336,7 @@ export function useBriefingGraphBasis(round: string | null) {
 
 // ---- 변경(mutation)
 
-// 개인 데이터 캐시(보유·관심·대화·추천 등)를 비우고 세션 세대를 바꾼다. 공용 데이터(health)와 헤더가 구독 중인 session만 남긴다.
+// 개인 데이터 캐시(보유·관심·대화 등)를 비우고 세션 세대를 바꾼다. 공용 데이터(health)와 헤더가 구독 중인 session만 남긴다.
 // 지우는 조회의 진행 중인 요청은 취소되고, 그 응답이 늦게 와도 캐시에 다시 들어가지 않는다.
 export function clearPersonalCache(client: QueryClient) {
   personalEpoch += 1;

@@ -4,7 +4,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import { openApp } from "./support/app";
-import { apiError, json, networkDown, type FakeBff, type Hold, type Reply } from "./support/fake-bff";
+import { apiError, json, marketSourceFailure, networkDown, type FakeBff, type Hold, type Reply } from "./support/fake-bff";
 import { ALPHA, BETA, companyDetail, eventList, metricsOf, pricesOf, quoteOf, type TestCompany } from "./support/fixtures";
 import { endpoint, eventsOf, pageOf, pricesInPeriod } from "./support/routes";
 import { periodButton, readCompanyScreen, shown, traceOfCompany, traceOfPeriod } from "./support/screens";
@@ -32,21 +32,19 @@ function releaseWithData(h: WholeScreen, c: TestCompany) {
   h.events.respond(json(eventList(c.events["1m"])));
 }
 
-const temporaryFailure = (reasonCode = "temporary_failure") => ({ status: "unavailable", reasonCode, reason: "출처 일시 장애" });
-
-/** 붙잡아 둔 응답을 영역마다 다른 종류의 오류로 한꺼번에 푼다: HTTP 5xx, 연결 끊김, 200 + 일시 장애 사유. */
-function releaseWithErrors(h: WholeScreen, c: TestCompany) {
+/** 붙잡아 둔 응답을 영역마다 다른 종류의 오류로 한꺼번에 푼다: HTTP 5xx, 연결 끊김, 503 출처 장애. */
+function releaseWithErrors(h: WholeScreen) {
   h.company.respond(apiError(503, "bff_unreachable"));
-  h.quote.respond(json({ ...temporaryFailure(), companyId: c.id }));
+  h.quote.respond(marketSourceFailure("quote", "temporary_failure"));
   h.metrics.respond(networkDown());
-  h.prices.respond(json({ ...temporaryFailure(), companyId: c.id, period: "1m" }));
+  h.prices.respond(marketSourceFailure("prices", "format_changed"));
   h.events.respond(apiError(503, "bff_unreachable"));
 }
 
 describe("기업 A에서 B로 빠르게 바꿀 때", () => {
   test.each<[string, (h: WholeScreen) => void]>([
     ["정상 응답", (h) => releaseWithData(h, ALPHA)],
-    ["오류 응답", (h) => releaseWithErrors(h, ALPHA)],
+    ["오류 응답", (h) => releaseWithErrors(h)],
   ])("A의 %s이 B 화면 뒤에 도착해도 B의 개요·시세·지표·차트·사건이 그대로다", async (_, releaseAlpha) => {
     const { held, navigate, settle } = await openApp(pageOf(ALPHA), (bff) => holdWholeScreen(bff, ALPHA));
     await arrived(held);
@@ -94,7 +92,7 @@ describe("조회 기간을 1년에서 1일로 바꿀 때", () => {
 
   test.each<[string, Record<"prices" | "events", Reply>]>([
     ["정상 응답", { prices: json(pricesOf(ALPHA, "1y")), events: json(eventList(ALPHA.events["1y"])) }],
-    ["오류 응답", { prices: json({ ...temporaryFailure(), companyId: ALPHA.id, period: "1y" }), events: apiError(503, "bff_unreachable") }],
+    ["오류 응답", { prices: marketSourceFailure("prices", "temporary_failure"), events: apiError(503, "bff_unreachable") }],
   ])("1년 %s이 1일 화면 뒤에 도착해도 1일의 차트·사건만 남는다", async (_, late) => {
     const { held, user, settle } = await openApp(pageOf(ALPHA, "?period=1y"), holdYear);
     await arrived(held);

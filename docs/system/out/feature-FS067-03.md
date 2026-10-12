@@ -1,15 +1,16 @@
 # FS067-03 · 실패한 이슈 분석·반영 작업 재시도
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 미기재 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 79 |
+| 요구사항 번호(원문) | 79 |
+| 의미 기준 요구사항 | 79 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 구현 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:82 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:78 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv) — 실패한 이슈 분석·반영 작업 재시도: 관리자가 실패한 이슈 분석·저장·공개 반영 작업의 재시도를 요청하면 현재 상태·실패 단계·재시도 허용 여부를 확인하고 허용된 실패 단계만 복구한다. 상태 조회나 중복 요청을 새 분석·공개 실행으로 처리하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 실패한 이슈 분석·반영 작업 재시도: 관리자가 실패한 이슈 분석·저장·공개 반영 작업의 재시도를 요청하면 현재 상태·실패 단계·재시도 허용 여부를 확인하고 허용된 실패 단계만 복구한다. 상태 조회나 중복 요청을 새 분석·공개 실행으로 처리하지 않는다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:69 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:69 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

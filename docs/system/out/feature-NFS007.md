@@ -1,15 +1,16 @@
 # NFS007 · 성능 측정 기준
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P2 · 추가 제안 · 검토 전 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 60 |
+| 요구사항 번호(원문) | 60 |
+| 의미 기준 요구사항 | 60 |
 | API 대응 | 계약 미정 |
 | 사유 | 측정 부하·데이터 규모·표본·성능 목표값이 미정이다. 계약 검증 WBS에 연결하고 서버 성능 수치를 만들어내지 않는다. |
 | 프로토타입 문서 판정 | 부분 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:98 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:94 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv) — 성능 측정 기준: 시스템은 동일한 네트워크 및 테스트 환경에서 화면 초기 표시, 일반 영역 조회, AI 질문 및 브리핑 생성 시간을 측정할 수 있어야 한다. 백분위 응답시간을 기준으로 측정하며, 측정 환경과 표본 수를 함께 기록해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv) — 성능 측정 기준: 시스템은 동일한 네트워크 및 테스트 환경에서 화면 초기 표시, 일반 영역 조회, AI 질문 및 브리핑 생성 시간을 측정할 수 있어야 한다. 백분위 응답시간을 기준으로 측정하며, 측정 환경과 표본 수를 함께 기록해야 한다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:301 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:301 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

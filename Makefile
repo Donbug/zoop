@@ -26,6 +26,7 @@ tooling-test:
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s scripts/tests -v
 public-check:
 	$(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) scripts/repo_checks.py public
+	PYTHONDONTWRITEBYTECODE=1 $(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) -m unittest discover -s scripts/tests -p test_doc_system.py -v
 contracts-check:
 	$(if $(CONTRACT_PYTHON),$(CONTRACT_PYTHON),$(UV) run --no-project --with pyyaml --with openapi-spec-validator $(PYTHON)) scripts/repo_checks.py contracts
 worker-contracts-check:

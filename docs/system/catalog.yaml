@@ -1,40 +1,40 @@
 schemaVersion: 1
 sources:
-  specDir: docs/evidence/raw/functional-spec_2026-10-08
-  wbsDir: docs/evidence/raw/wbs_2026-10-08
+  specDir: docs/evidence/raw/functional-spec_2026-10-10
+  wbsDir: docs/evidence/raw/wbs_2026-10-10
   requirementsDir: docs/evidence/raw/requirements-sheet_2026-10-06
   screens: docs/screen-plan/captures/slide-index.json
   gap: docs/evidence/spec-v1.2-gap.md
 fingerprints:
-  docs/evidence/spec-v1.2-gap.md: 8e9e87b7dca6169d7c0bd8e42ede6652c85be46909dc91f2f28a366867d125ab
-  docs/screen-plan/captures/slide-index.json: b41f5b5eda36d478eed80164415db923d0ae4338d848d5aa82603c64a9391d10
-  docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv: ddfbc265de0b96cebba637f804de65a471de3f6b37b0b57e136579c88a6bde8f
-  docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv: c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74
-  docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv: 6791468a7182c719146b5b7db966bbc0f8246c956d33edd85a22f75dec228c8a
-  docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv: f12f4de4e9987c3e7ff3a001786f823bad0695c37e82f05c7d5ca6d27daff67d
-  docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv: 76a315e56e1a2fd018b347da2fee3eac5c563c077bad437d6bc3510cebeed53d
-  docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv: f3bf6e8a6643af054b62c3ff645fd507cb34c4aeabadbed3fd1c00d444ea646f
-  docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv: 8e19b90a9c107bdc479e9595f0e307d818bba857199ad8b9a83e8ae06053619f
-  docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv: c17d26d4d6f3f868b81db406fbb13a2dda9f172c584fc3a8b5a771c9c31c07c6
-  docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv: 5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90
-  docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv: a8cb1cb80b359eb5cc187450bcdbb96ca9c0fcfc1d9f2b8b7e436fbcbd973560
-  docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv: 8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6
-  docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv: d214f780afcf3e01d3cafc43fc4e006f87ed98d7c54beabc8073c9c20d41363a
-  docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv: fc03c7cc08a7f78e17a4608b4e70654e9374473f865497bb5a6cdbb634de5dba
-  docs/evidence/raw/functional-spec_2026-10-08/13-변경-내역.csv: 22ffe90153049049f4f3610512d7b1cd598bd184dd863fda0782fc2a848e3897
-  docs/evidence/raw/functional-spec_2026-10-08/14-제안-확인-사항.csv: a5d50ff2500e2382eb7470109fa2acac13114572419a40001a43e4f7c4c51089
-  docs/evidence/raw/functional-spec_2026-10-08/_collection-manifest.json: 8ba0aef9a5c45d1a9b769da8d77c3f20a2c24c5a743c35859764472103923c7f
-  docs/evidence/raw/functional-spec_2026-10-08/zoop-functional-spec_2026-10-08.xlsx: ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175
+  docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv: 4d5505aad267724a958436db9304e4fb62ccaf49bedfcce0aa2c4dd80ab045a2
+  docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv: c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74
+  docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv: 6791468a7182c719146b5b7db966bbc0f8246c956d33edd85a22f75dec228c8a
+  docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv: f12f4de4e9987c3e7ff3a001786f823bad0695c37e82f05c7d5ca6d27daff67d
+  docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv: 76a315e56e1a2fd018b347da2fee3eac5c563c077bad437d6bc3510cebeed53d
+  docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv: f4fb1dba953592adec13d8391825462f84a97941800182581c75c8175a305e85
+  docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv: 8e19b90a9c107bdc479e9595f0e307d818bba857199ad8b9a83e8ae06053619f
+  docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv: c17d26d4d6f3f868b81db406fbb13a2dda9f172c584fc3a8b5a771c9c31c07c6
+  docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv: 5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90
+  docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv: a8cb1cb80b359eb5cc187450bcdbb96ca9c0fcfc1d9f2b8b7e436fbcbd973560
+  docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv: 8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6
+  docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv: d214f780afcf3e01d3cafc43fc4e006f87ed98d7c54beabc8073c9c20d41363a
+  docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv: fc03c7cc08a7f78e17a4608b4e70654e9374473f865497bb5a6cdbb634de5dba
+  docs/evidence/raw/functional-spec_2026-10-10/13-변경-내역.csv: 22ffe90153049049f4f3610512d7b1cd598bd184dd863fda0782fc2a848e3897
+  docs/evidence/raw/functional-spec_2026-10-10/14-제안-확인-사항.csv: a5d50ff2500e2382eb7470109fa2acac13114572419a40001a43e4f7c4c51089
+  docs/evidence/raw/functional-spec_2026-10-10/_collection-manifest.json: ccb4bde4b7148bb04cc1e94903a0b0dc55a14558b6891e30b0f166e5fc0237a5
+  docs/evidence/raw/functional-spec_2026-10-10/zoop-functional-spec_2026-10-10.xlsx: a780ecc189ac3c23a6d4aebab8cc935db0aa86869fa3a37290f52c1f9a944282
   docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv: 79661cfc0bc2643f7222158c1fdc4c5652216954892e622b34f0de6ceb637d23
   docs/evidence/raw/requirements-sheet_2026-10-06/2-검증-기준.csv: 03202210c85c90d837225fce10888257a0566856ac920ad52719ac586711252b
   docs/evidence/raw/requirements-sheet_2026-10-06/3-정책-결정.csv: 3dc355e4d3204ab8a42a838e6d28e91665bb0910170956c28eebebdccb1ab4ed
   docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json: c2f62cdc931ebcbc4fe674847864eb30a9003b1a3350768037156c5078448e90
   docs/evidence/raw/requirements-sheet_2026-10-06/zoop-requirements_2026-10-06.xlsx: cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18
-  docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv: 2e77b9c5f9a797278bba1fd0a799dad88558e03acf918dddb1ece001bb4b678d
-  docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv: 07b539cae41bbe50c23270a5e20456c00913cf26146327e0aefd80624037e3a5
-  docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv: f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3
-  docs/evidence/raw/wbs_2026-10-08/_collection-manifest.json: aa455240334cf6a87332bad120960b9bd37deeed1d373450c67cd5c6d970c91f
-  docs/evidence/raw/wbs_2026-10-08/zoop-wbs_2026-10-08.xlsx: d101159b81b0a52ca53552f6bbd1986e33ec7ea5e2d94443eb50b8a4fb27d320
+  docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv: 2e77b9c5f9a797278bba1fd0a799dad88558e03acf918dddb1ece001bb4b678d
+  docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv: fc835f1f90a81e3b19113b2fafc177ce633fe0b5bc672ac0258e9e64e99b1523
+  docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv: f2432fb1f0fa626536f637e1727a56c87d51cde60317df703134286a8273c1c3
+  docs/evidence/raw/wbs_2026-10-10/_collection-manifest.json: e43c2b4ce94a7fef87fc687e3080ca3d55753f58e9cc58a5869a0ef378815712
+  docs/evidence/raw/wbs_2026-10-10/zoop-wbs_2026-10-10.xlsx: e3eeab150457e5d6d7fa9d737b8c2271d1f261f15151430edbb16c9182b7e801
+  docs/evidence/spec-v1.2-gap.md: 8e9e87b7dca6169d7c0bd8e42ede6652c85be46909dc91f2f28a366867d125ab
+  docs/screen-plan/captures/slide-index.json: b41f5b5eda36d478eed80164415db923d0ae4338d848d5aa82603c64a9391d10
 specs:
 - id: FS001
   title: 서비스 시작 방식 선택
@@ -44,14 +44,14 @@ specs:
   requirementIds:
   - '1'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 10
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -86,6 +86,10 @@ specs:
 
         ③ 비회원 시작 시 회원가입·계좌 연결·관심종목 설정을 완료해야만 진입할 수 있도록 막지 않는다.'
       확인 필요 사항: '-'
+    heading:
+      row: 7
+      text: FS001  서비스 시작 방식 선택
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 1   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS002
   title: 이메일 로그인
@@ -95,14 +99,14 @@ specs:
   requirementIds:
   - '2'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 11
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -148,6 +152,10 @@ specs:
 
         ⑤ 초기 설정 완료 사용자는 기존 보유·관심종목을 기준으로 메인 화면에 진입한다.'
       확인 필요 사항: '-'
+    heading:
+      row: 21
+      text: FS002  이메일 로그인
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 2   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS003
   title: 이메일 회원가입
@@ -157,14 +165,14 @@ specs:
   requirementIds:
   - '3'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 12
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -221,6 +229,10 @@ specs:
       확인 필요 사항: '[확인 필요] 가입 필드 목록과 필수·선택 구분.
 
         [확인 필요] 계정 생성 실패·응답 미수신 시 복구 방식.'
+    heading:
+      row: 35
+      text: FS003  이메일 회원가입
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 3   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS004
   title: 소셜 로그인과 회원가입
@@ -230,14 +242,14 @@ specs:
   requirementIds:
   - '4'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 13
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -323,6 +335,10 @@ specs:
 
         ⑩ 로그인 완료 후 초기 설정 미완료 사용자는 초기 설정 화면으로, 완료 사용자는 메인 화면으로 이동한다.'
       확인 필요 사항: '-'
+    heading:
+      row: 49
+      text: FS004  소셜 로그인과 회원가입
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 4   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS005
   title: 비회원 시작
@@ -332,14 +348,14 @@ specs:
   requirementIds:
   - '5'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 14
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -404,6 +420,10 @@ specs:
       확인 필요 사항: '확인 필요] 로그인 필요 안내 후 로그인 화면으로 즉시 이동할지, 사용자가 직접 로그인을 선택하도록 할지 결정 필요.
 
         [확인 필요] 로그인 완료 후 비회원 상태에서 보던 그래프 또는 기능 요청 위치로 복귀할지 여부 결정 필요.'
+    heading:
+      row: 63
+      text: FS005  비회원 시작
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 5   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS006
   title: 로그인 후 화면 이동
@@ -413,14 +433,14 @@ specs:
   requirementIds:
   - '6'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 15
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -450,6 +470,10 @@ specs:
         종목 없음 분기는 기존 초기 그래프 제공 및 개인화 그래프 규칙을 함께 적용한다.
 
         [확인 필요: 실패 안내와 재조회·이동 방식 결정 필요]'
+    heading:
+      row: 77
+      text: FS006  로그인 후 화면 이동
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 6   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS007
   title: 로그아웃
@@ -459,14 +483,14 @@ specs:
   requirementIds:
   - '7'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 16
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/01-회원가입-로그인.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -524,6 +548,10 @@ specs:
 
         ⑦ 로그아웃 후 다른 회원이 로그인하더라도 이전 회원의 개인화 정보가 새 회원 화면에 표시되지 않는다.'
       확인 필요 사항: '-'
+    heading:
+      row: 91
+      text: FS007  로그아웃
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 7   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS008
   title: 투자 여부 선택
@@ -533,14 +561,14 @@ specs:
   requirementIds:
   - '8'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 17
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -571,6 +599,10 @@ specs:
         [확인 필요: 저장 실패 안내 및 재시도 방식 결정 필요]
 
         [확인 필요: 선택 필수 여부와 미선택 진행 규칙 결정 필요]'
+    heading:
+      row: 7
+      text: FS008  투자 여부 선택
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 8   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS009
   title: 가상계좌 프로필 연결
@@ -580,14 +612,14 @@ specs:
   requirementIds:
   - '9'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 18
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -647,6 +679,10 @@ specs:
         [확인 필요: 모의 데이터 제공 방식·프로필 구성 및 교체·해제·빈 계좌 처리·평가 산식·연결 완료 판단과 재연결 정책 결정 필요]
 
         [확인 필요: 선택 해제·재선택·빈 보유 정보 표시 방식 결정 필요]'
+    heading:
+      row: 21
+      text: FS009  가상계좌 프로필 연결
+    meta: '원본 우선순위: P1   ·   원본 상태: 보류   ·   요구사항: 9   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS010
   title: 가상계좌 연결 재시도와 건너뛰기
@@ -656,14 +692,14 @@ specs:
   requirementIds:
   - '10'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 19
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -713,6 +749,10 @@ specs:
       확인 필요 사항: '[확인 필요: 재시도 허용 횟수·대기 시간·실패 시 연결 상태 정리 방식 결정 필요]
 
         [확인 필요: 재시도 접수 및 상태 확인 방식 결정 필요]'
+    heading:
+      row: 35
+      text: FS010  가상계좌 연결 재시도와 건너뛰기
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 10   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS011-01
   title: 관심종목 검색
@@ -722,14 +762,14 @@ specs:
   requirementIds:
   - '11'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 20
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 분리
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -782,6 +822,10 @@ specs:
       확인 필요 사항: 'v1.2 제안 기준: 명시적 검색 실행·일치 순서·빈 입력·독립 재시도.
 
         [확인 필요: 지원 시장과 종목 목록 공급 범위 확인 필요]'
+    heading:
+      row: 49
+      text: FS011-01  관심종목 검색
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 11   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS011-02
   title: 추천 종목·산업·테마 조회
@@ -791,14 +835,14 @@ specs:
   requirementIds:
   - '11'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 21
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 분리
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -833,6 +877,10 @@ specs:
       확인 필요 사항: 'v1.2 제안 기준: 공개 목록 기반 추천·개별 선택·검색과 독립 처리.
 
         [확인 필요: 실제 추천 목록, 관리 주체와 갱신 절차 확인 필요. 관리자 편집 화면을 새 기능으로 추가하지 않음]'
+    heading:
+      row: 63
+      text: FS011-02  추천 종목·산업·테마 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 11   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS012
   title: 초기 관심종목 선택
@@ -842,14 +890,14 @@ specs:
   requirementIds:
   - '12'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 22
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -880,6 +928,10 @@ specs:
 
         2. 비회원은 관심종목을 저장할 수 없다.'
       확인 필요 사항: 관심종목 선택 수 제한 없음·0개 진행 허용을 유지한다. 과거 최대 3개·최소 1개 정책을 적용하지 않는다.
+    heading:
+      row: 77
+      text: FS012  초기 관심종목 선택
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 12   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS013
   title: 초기 설정 저장
@@ -889,14 +941,14 @@ specs:
   requirementIds:
   - '13'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 23
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -937,6 +989,10 @@ specs:
 
         ⑤ 회원의 초기 설정 완료 여부와 튜토리얼 완료·건너뛰기 여부는 독립적으로 관리된다.'
       확인 필요 사항: '-'
+    heading:
+      row: 91
+      text: FS013  초기 설정 저장
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 13   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS014
   title: 초기 관계 그래프 제공
@@ -946,14 +1002,14 @@ specs:
   requirementIds:
   - '14'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 24
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -1007,6 +1063,10 @@ specs:
         개인화 모드를 직접 선택했으나 종목이 없는 경우의 설정 안내와 초기 진입의 전체 그래프 제공을 구분한다.
 
         [확인 필요: 빈 그래프 안내 방식 결정 필요]'
+    heading:
+      row: 105
+      text: FS014  초기 관계 그래프 제공
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 14   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS015
   title: 관계 그래프 튜토리얼
@@ -1016,14 +1076,14 @@ specs:
   requirementIds:
   - '15'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 25
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -1052,6 +1112,10 @@ specs:
         [확인 필요: 튜토리얼의 정확한 단계 수와 이슈 영향 경로 진입 문구 결정 필요]
 
         [확인 필요: 단계 생략·재시도·종료 방식 결정 필요]'
+    heading:
+      row: 119
+      text: FS015  관계 그래프 튜토리얼
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 15   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS016
   title: 튜토리얼 완료와 건너뛰기
@@ -1061,14 +1125,14 @@ specs:
   requirementIds:
   - '16'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 26
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/02-온보딩-튜토리얼.csv
       row: 135
       rowUnit: xlsx-row
     fields:
@@ -1144,23 +1208,27 @@ specs:
         [확인 필요: 건너뛰기 저장값과 비회원 완료 상태 보관 여부 결정 필요]
 
         [확인 필요: 저장 실패 안내 및 진행 상태 보관·재노출 방식 결정 필요]'
+    heading:
+      row: 133
+      text: FS016  튜토리얼 완료와 건너뛰기
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 16   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS017
   title: 개인화 관계 그래프
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '17'
   source: &id001
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 27
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -1251,8 +1319,12 @@ specs:
 
         ⑦ 비회원은 개인화 그래프를 조회할 수 없다.'
       확인 필요 사항: '-'
+    heading:
+      row: 7
+      text: FS017  개인화 관계 그래프
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 17   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -1342,23 +1414,27 @@ specs:
         않는다.
 
         확정: 그래프 조회 실패 시 기존 정상 그래프를 제거하지 않고 재시도를 제공한다.'
+    heading:
+      row: 7
+      text: FS017 개인화 관계 그래프
+    meta: 원본 우선순위
   scopeClass: existing
 - id: FS018
   title: 전체 관계 그래프
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '18'
   source: &id002
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 28
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -1386,8 +1462,12 @@ specs:
         [확인 필요: 빈 그래프 안내 방식 결정 필요]
 
         [확인 필요: 기존 화면 유지 및 재시도 방식 결정 필요]'
+    heading:
+      row: 21
+      text: FS018  전체 관계 그래프
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 18   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -1441,23 +1521,27 @@ specs:
         사용한다.
 
         확정: 초기 노드 수 및 관계 깊이 등 성능 관련 수치는 실제 그래프 라이브러리 부하 테스트 결과에 따라 비기능명세에서 관리한다.'
+    heading:
+      row: 21
+      text: FS018  전체 관계 그래프
+    meta: 항목
   scopeClass: existing
 - id: FS019
   title: 그래프 모드 전환
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '19'
   source: &id003
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 29
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -1491,8 +1575,12 @@ specs:
       확인 필요 사항: '이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
 
         브라우저 새로고침·다른 기기까지 탐색 상태를 유지하는 정책은 이번 제안 범위에 포함하지 않는다.'
+    heading:
+      row: 35
+      text: FS019  그래프 모드 전환
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 19   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 39
       rowUnit: xlsx-row
     fields:
@@ -1532,23 +1620,27 @@ specs:
         확정: 같은 로그인 세션에서는 개인화 모드를 다시 선택했을 때 마지막 개인화 필터를 복원한다.
 
         확정: 브라우저 새로고침 후 탐색 위치·확대 상태는 복원하지 않으며 그래프를 다시 조회한다.'
+    heading:
+      row: 36
+      text: FS019 그래프 모드 전환
+    meta: 항목
   scopeClass: existing
 - id: FS020
   title: 기업 노드 정보
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '20'
   source: &id004
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 30
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -1578,8 +1670,12 @@ specs:
         필요]
 
         [확인 필요: 패널 안내와 재시도 방식 결정 필요]'
+    heading:
+      row: 49
+      text: FS020  기업 노드 정보
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 20   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 53
       rowUnit: xlsx-row
     fields:
@@ -1631,23 +1727,27 @@ specs:
         관리한다.
 
         확정: 일부 항목 조회 실패는 전체 패널 실패로 처리하지 않는다.'
+    heading:
+      row: 50
+      text: FS20  기업 노드 정보
+    meta: 항목
   scopeClass: existing
 - id: FS021
   title: 이슈 노드 정보
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '21'
   source: &id005
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 31
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -1676,8 +1776,12 @@ specs:
         [확인 필요: 영향 해석의 판단 기준·불확실성 표현과 갱신 정책 결정 필요]
 
         [확인 필요: 미제공 안내 및 재시도 방식 결정 필요]'
+    heading:
+      row: 63
+      text: FS021  이슈 노드 정보
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 21   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 67
       rowUnit: xlsx-row
     fields:
@@ -1735,23 +1839,27 @@ specs:
         확정: 관련 뉴스 정렬은 관련도 → 최신성 순으로 한다.
 
         확정: 이슈 또는 관련기업 일부 조회 실패 시 다른 정상 데이터를 유지하고 실패 영역만 다시 조회한다.'
+    heading:
+      row: 64
+      text: FS021  이슈 노드 정보
+    meta: 항목
   scopeClass: existing
 - id: FS022
   title: 기업 패널에서 이슈 영향 경로 확인
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 검토 중
   requirementIds:
   - '22'
   source: &id006
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 32
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -1788,8 +1896,12 @@ specs:
 
         4. 확인되지 않은 인과관계를 사실로 단정하지 않는다.'
       확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 77
+      text: FS022  기업 패널에서 이슈 영향 경로 확인
+    meta: '원본 우선순위: P1   ·   원본 상태: 검토 중   ·   요구사항: 22   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 80
       rowUnit: xlsx-row
     fields:
@@ -1826,23 +1938,27 @@ specs:
 
         4. 확인되지 않은 인과관계를 사실로 단정하지 않는다.'
       확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 78
+      text: FS022  기업 패널에서 이슈 영향 경로 확인
+    meta: '원본 우선순위: P1   ·   원본 상태: 검토 중   ·   요구사항: 22   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS023
   title: 기업 간 관계 확인(기업 간 간선 클릭)
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '23'
   source: &id007
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 33
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -1863,8 +1979,12 @@ specs:
         근거가 부족한 관계를 확인된 사실로 임의 보완하지 않는다.'
       수용 기준: 1. 선택한 기업 쌍의 관계만 표시되며 유형·방향·범위·상태·확인 시점을 확인할 수 있다.
       확인 필요 사항: '[확인 필요: 미제공 안내와 재조회 방식 결정 필요]'
+    heading:
+      row: 91
+      text: FS023  기업 간 관계 확인(기업 간 간선 클릭)
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 23   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 94
       rowUnit: xlsx-row
     fields:
@@ -1885,23 +2005,27 @@ specs:
         근거가 부족한 관계를 확인된 사실로 임의 보완하지 않는다.'
       수용 기준: 1. 선택한 기업 쌍의 관계만 표시되며 유형·방향·범위·상태·확인 시점을 확인할 수 있다.
       확인 필요 사항: '[확인 필요: 미제공 안내와 재조회 방식 결정 필요]'
+    heading:
+      row: 92
+      text: FS023  기업 간 관계 확인(기업 간 간선 클릭)
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 23   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS024
   title: 관계 근거 확인
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '24'
   source: &id008
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 34
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -1929,8 +2053,12 @@ specs:
 
         2. 원문이 없는데 인용을 생성하지 않고 접근 실패 안내가 나온다.'
       확인 필요 사항: '[확인 필요: 장애 안내와 재시도 방식 결정 필요]'
+    heading:
+      row: 105
+      text: FS024  관계 근거 확인
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 24   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 112
       rowUnit: xlsx-row
     fields:
@@ -1971,23 +2099,27 @@ specs:
         확정: 정상 조회된 일부 근거는 그대로 표시하고 실패 항목만 오류 상태로 표시한다.
 
         확정: 뉴스·공시의 정렬 기본값은 관련도 순이며 동률이면 최신순으로 한다.'
+    heading:
+      row: 109
+      text: FS024  관계 근거 확인
+    meta: 항목
   scopeClass: existing
 - id: FS025
   title: 선택한 노드로 AI 질문
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '25'
   source: &id009
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 35
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -2021,8 +2153,12 @@ specs:
 
         3. 선택한 대상·기간·근거 참조가 화면에 보이는 조건과 실제 전송 조건에서 일치한다.'
       확인 필요 사항: 기존 문서에서 추가로 지정한 미결정 사항 없음. 기능의 승인 상태는 상단 원본 상태를 따른다.
+    heading:
+      row: 119
+      text: FS025  선택한 노드로 AI 질문
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 25   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 125
       rowUnit: xlsx-row
     fields:
@@ -2056,23 +2192,27 @@ specs:
 
         3. 선택한 대상·기간·근거 참조가 화면에 보이는 조건과 실제 전송 조건에서 일치한다.'
       확인 필요 사항: 기존 문서에서 추가로 지정한 미결정 사항 없음. 기능의 승인 상태는 상단 원본 상태를 따른다.
+    heading:
+      row: 123
+      text: FS025  선택한 노드로 AI 질문
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 25   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS026
   title: 사이드바 기업 선택
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '26'
   source: &id010
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 36
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 135
       rowUnit: xlsx-row
     fields:
@@ -2094,8 +2234,12 @@ specs:
         [확인 필요: 추가 조회·필터 변경·안내 방식 결정 필요]
 
         [확인 필요: 오류 안내 방식 결정 필요]'
+    heading:
+      row: 133
+      text: FS026  사이드바 기업 선택
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 26   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 139
       rowUnit: xlsx-row
     fields:
@@ -2140,23 +2284,27 @@ specs:
         확정: 그래프 이동 실패 시 기존 화면을 유지하고 재시도를 제공한다.
 
         확정: 확대 배율은 고정 숫자가 아니라 선택 기업과 직접 연결 관계가 식별 가능한 범위로 자동 계산한다.'
+    heading:
+      row: 137
+      text: FS026  사이드바 기업 선택
+    meta: 항목
   scopeClass: existing
 - id: FS027
   title: 관심 종목 수정
-  section: 메인 그래프
+  section: 메인그래프 v2
   priority: P1
   status: 확정
   requirementIds:
   - '27'
   source: &id011
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 37
     rowUnit: xlsx-row
   detailRange: A147:B159
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/03-메인-그래프.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/03-메인-그래프.csv
       row: 149
       rowUnit: xlsx-row
     fields:
@@ -2190,8 +2338,12 @@ specs:
 
         3. 그래프 조회 재시도가 이미 성공한 관심 변경을 반복 실행하지 않는다.'
       확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 147
+      text: FS027  관심 종목 수정
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 27   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 154
       rowUnit: xlsx-row
     fields:
@@ -2225,6 +2377,10 @@ specs:
 
         3. 그래프 조회 재시도가 이미 성공한 관심 변경을 반복 실행하지 않는다.'
       확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 152
+      text: FS027  관심 종목 수정
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 27   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS028
   title: 출근 브리핑 생성
@@ -2234,14 +2390,14 @@ specs:
   requirementIds:
   - '28'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 38
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -2267,6 +2423,10 @@ specs:
       수용 기준: '1. 원본 시각 07:40에 생성이 시작되고 이전 퇴근 회차 이후의 자료 범위를 사용한다.
 
         2. 핵심 이슈는 최대 3개이다.'
+    heading:
+      row: 7
+      text: FS028  출근 브리핑 생성
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 28   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS029
   title: 퇴근 브리핑 생성
@@ -2276,14 +2436,14 @@ specs:
   requirementIds:
   - '29'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 39
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -2310,6 +2470,10 @@ specs:
       수용 기준: '1. 18:10에 생성이 시작되고 해당 출근 회차 이후 범위를 사용한다.
 
         2. 출근용 자료 범위와 혼동하지 않는다.'
+    heading:
+      row: 21
+      text: FS029  퇴근 브리핑 생성
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 29   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS030
   title: 핵심 이슈 선정 및 제공
@@ -2319,14 +2483,14 @@ specs:
   requirementIds:
   - '30'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 40
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -2347,23 +2511,27 @@ specs:
       수용 기준: '1. 적격 이슈가 1개이면 1개만, 4개 이상이면 최대 3개만 제공한다.
 
         2. 선정 이유가 실제 선정 근거와 연결된다.'
+    heading:
+      row: 35
+      text: FS030  핵심 이슈 선정 및 제공
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 30   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS031
-  title: 시장 변수 제공
+  title: 주요 시장 지표 제공
   section: 출퇴근 브리핑
   priority: P1
   status: 미기재
   requirementIds:
   - '31'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 41
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -2387,23 +2555,27 @@ specs:
         2. 지연·미제공을 정상값처럼 표시하지 않는다.
 
         3. 핵심 이슈·확인할 사항과 주요 시장 지표가 화면에서 구분된다.'
+    heading:
+      row: 49
+      text: FS031  주요 시장 지표 제공
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 31   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS032
-  title: 관계 그래프 조회
+  title: 브리핑 관계 그래프 조회
   section: 출퇴근 브리핑
   priority: P1
   status: 확정
   requirementIds:
   - '32'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 42
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -2433,6 +2605,10 @@ specs:
       수용 기준: '1. 다른 시점의 관계가 과거 브리핑에 섞이지 않는다.
 
         2. 선택 대상과 연결 이유·근거가 일치한다.'
+    heading:
+      row: 63
+      text: FS032  브리핑 관계 그래프 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 32   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS033
   title: 공통 브리핑 조회
@@ -2442,14 +2618,14 @@ specs:
   requirementIds:
   - '33'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 43
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -2475,6 +2651,10 @@ specs:
       수용 기준: '1. 서로 다른 사용자에게 같은 회차의 동일 본문이 제공된다.
 
         2. 날짜·회차 변경과 준비 중·실패 상태가 구분된다.'
+    heading:
+      row: 77
+      text: FS033  공통 브리핑 조회
+    meta: '원본 우선순위: P2   ·   원본 상태: 확정   ·   요구사항: 33   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS034
   title: 중복 발행 방지
@@ -2484,14 +2664,14 @@ specs:
   requirementIds:
   - '34'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 44
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -2522,6 +2702,10 @@ specs:
         2. 이미 발행된 본문이 재실행으로 덮이지 않는다.
 
         3. 출근 회차와 퇴근 회차는 같은 날짜라도 별개 회차로 유지된다.'
+    heading:
+      row: 91
+      text: FS034  중복 발행 방지
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 34   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS035
   title: 브리핑 회차 저장 및 이력 보존
@@ -2534,14 +2718,14 @@ specs:
   - '35'
   - '69'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 45
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -2588,6 +2772,12 @@ specs:
         4. 외부 원문을 열 수 없어도 확보된 참조와 메타데이터가 유지된다.
 
         5. 저장 실패가 정상 저장 완료로 표시되지 않는다.'
+    heading:
+      row: 105
+      text: FS035  브리핑 회차 저장 및 이력 보존
+    meta: '원본 우선순위: P1   ·   원본 상태: FS035: 미기재
+
+      FS057: 팀 검토 전   ·   요구사항: 35, 69   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS036
   title: 개인화 브리핑 조회
@@ -2597,14 +2787,14 @@ specs:
   requirementIds:
   - '36'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 46
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -2637,6 +2827,10 @@ specs:
       수용 기준: '1. 보유만·관심만·둘 다·둘 다 없음에서 요구된 분기가 동작한다.
 
         2. 다른 회원의 보유 정보가 포함되지 않는다.'
+    heading:
+      row: 119
+      text: FS036  개인화 브리핑 조회
+    meta: '원본 우선순위: P2   ·   원본 상태: 검토 중   ·   요구사항: 36   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS037
   title: 종목 목록·검색 및 상세 진입
@@ -2645,14 +2839,14 @@ specs:
   status: ''
   requirementIds: []
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 47
     rowUnit: xlsx-row
   detailRange: ''
   change: ''
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -2696,6 +2890,10 @@ specs:
         4. 목록 조회 중 검색어를 변경해도 이전 검색 결과가 현재 결과를 덮어쓰지 않는다.
 
         5. 비회원도 목록과 상세는 조회할 수 있지만, 개인화 기능은 로그인 안내가 표시된다.'
+    heading:
+      row: 7
+      text: FS037  종목 목록·검색 및 상세 진입
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 38   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS038
   title: 기업 상세 조회
@@ -2705,14 +2903,14 @@ specs:
   requirementIds:
   - '38'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 48
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -2747,6 +2945,10 @@ specs:
         2. 재무·관계 그래프 영역이 실패해도 개요·차트·문서 영역은 유지된다.
 
         3. 다른 기업으로 이동한 뒤 이전 기업 응답이 현재 화면을 덮어쓰지 않는다.'
+    heading:
+      row: 21
+      text: FS038  기업 상세 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 38   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS039
   title: 가상 보유 정보 표시
@@ -2756,14 +2958,14 @@ specs:
   requirementIds:
   - '39'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 49
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -2797,6 +2999,10 @@ specs:
         3. 계좌 조회 실패가 미보유 또는 값 0으로 표시되지 않는다.
 
         4. 타인 수치나 다른 기업의 지연 응답이 표시되지 않는다.'
+    heading:
+      row: 35
+      text: FS039  가상 보유 정보 표시
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 39   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS040
   title: 차트와 타임라인 기간 조회
@@ -2806,14 +3012,14 @@ specs:
   requirementIds:
   - '40'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 50
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -2847,23 +3053,27 @@ specs:
         4. 1개월에서 1년으로 변경한 뒤 늦게 도착한 1개월 응답이 현재 결과를 덮지 않는다.'
       확인 필요 사항: 시세 공급사의 거래소별 장중 5분 시세 제공 여부를 구현 전 확인한다. 미지원 시장은 1일 버튼을 비활성화하고 사유를
         안내한다.
+    heading:
+      row: 49
+      text: FS040  차트와 타임라인 기간 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 검토 중   ·   요구사항: 40   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS041
-  title: 동일 날짜 사건 구분
+  title: 동일 시점 이슈 구분
   section: 기업 상세·타임라인
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '41'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 51
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -2890,23 +3100,27 @@ specs:
         3. 복수 이슈에서 사용자가 선택하기 전 특정 이슈의 상세를 자동 확정하지 않는다.
 
         4. 문서 공개 전 시점을 선택하면 해당 문서로 생성된 이슈가 표시되지 않는다.'
+    heading:
+      row: 63
+      text: FS041  동일 시점 이슈 구분
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 41   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS042
-  title: 재무와 실적 조회
+  title: 시점 기반 관계 그래프 조회
   section: 기업 상세·타임라인
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '42'
-  source: &id012
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 52
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -2941,6 +3155,10 @@ specs:
         4. 그래프는 중심 기업 기준 최대 2-hop을 넘지 않는다.'
       확인 필요 사항: 구조 관계의 유효 시작·종료 시각을 초기 데이터 구축 시 입력한다. 이슈 관계의 유효 종료 시각을 아직 알 수 없으면
         유효 종료 미정으로 유지하며, 새 이슈가 생겼다고 기존 관계를 자동 삭제하지 않는다.
+    heading:
+      row: 77
+      text: FS042  시점 기반 관계 그래프 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 41   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS043
   title: 뉴스와 공시 조회
@@ -2950,14 +3168,14 @@ specs:
   requirementIds:
   - '43'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 53
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -2994,6 +3212,10 @@ specs:
       수용 기준: '1. 문서 수가 연결된 문서와 일치한다.
 
         2. 링크 미제공 안내가 나오며 링크 접근 실패에도 확보된 정보는 유지된다.'
+    heading:
+      row: 91
+      text: FS043  뉴스와 공시 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 43   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS044
   title: 기업 상세와 관계 그래프 이동·상태 복원
@@ -3003,14 +3225,14 @@ specs:
   requirementIds:
   - '44'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 54
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -3037,23 +3259,27 @@ specs:
         2. 존재하지 않는 경로는 강조하지 않는다.
 
         3. 직접 URL 진입 후에도 기업 중심 그래프 이동이 가능하다.'
+    heading:
+      row: 105
+      text: FS044  기업 상세와 관계 그래프 이동·상태 복원
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 44   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS045
-  title: AI 질문 진입과 전송
-  section: AI 챗봇
+  title: AI 질문 진입과 맥락 전달
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '45'
-  source: &id013
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source: &id012
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 55
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -3087,8 +3313,12 @@ specs:
 
         2. 빈 입력·비회원·동일 대화 처리 중 추가 질문이 차단된다.'
       확인 필요 사항: '[확인 필요: 질문 유형·길이·전체 이용 한도 결정 필요]'
+    heading:
+      row: 7
+      text: FS045  AI 질문 진입과 전송
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 45   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -3116,23 +3346,27 @@ specs:
 
         3. 빈 입력·비회원·동일 대화 처리 중 추가 전송이 차단된다.'
       확인 필요 사항: 질문 글자 수와 사용자별 일일 이용 한도는 운영 정책 확정 후 적용한다.
+    heading:
+      row: 7
+      text: FS045  AI 질문 진입과 맥락 전달
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 45   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS046
-  title: AI 권한과 중복 작업 통제
-  section: AI 챗봇
+  title: 질문 대상·기간 해석 및 되묻기
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '46'
-  source: &id014
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source: &id013
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 56
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -3177,8 +3411,12 @@ specs:
 
         4. 타인의 대화·근거 요청과 동일 작업 ID의 요청 내용 변경은 거절된다.'
       확인 필요 사항: 'v1.2 제안 기준: 접수 거절·작업 내용 충돌의 입력 유지와 안내. 작업 ID는 통신 추적 ID와 구분한다.'
+    heading:
+      row: 21
+      text: FS046  AI 권한과 중복 작업 통제
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 46   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -3206,23 +3444,27 @@ specs:
 
         3. 과거 기준 시점 질문에 그 이후 공개된 문서가 사용되지 않는다.'
       확인 필요 사항: 최근의 기본 범위는 1개월로 적용하되, UI에서 실제 적용 기간을 항상 표시한다.
+    heading:
+      row: 21
+      text: FS046 질문 대상·기간 해석 및 되묻기
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 46   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS047
-  title: 질문 해석과 되묻기
-  section: AI 챗봇
+  title: 근거·관계 그래프 맥락 조회
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '47'
-  source: &id015
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source: &id014
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 57
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -3257,8 +3499,12 @@ specs:
 
         2. 되묻기 결과는 저장된 정상 종료 결과로 회수된다.'
       확인 필요 사항: 'v1.2 제안 기준: 한국 시간·작년의 달력 연도·최근 1개월 기본 해석. 응답마다 실제 적용 기간을 표시한다.'
+    heading:
+      row: 35
+      text: FS047  질문 해석과 되묻기
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 47   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -3286,23 +3532,27 @@ specs:
 
         3. 타인의 보유·관심 정보는 조회·모델 입력·답변에 포함되지 않는다.'
       확인 필요 사항: P1의 그래프 조회 범위는 중심 대상 기준 최대 2-hop으로 제한한다.
+    heading:
+      row: 35
+      text: FS047  근거·관계 그래프 맥락 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 47   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS048
-  title: 개인화 조건과 근거 확보
-  section: AI 챗봇
+  title: 근거 기반 답변 생성 및 안전 검증
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '48'
-  source: &id016
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source: &id015
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 58
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -3343,8 +3593,12 @@ specs:
       확인 필요 사항: 'v1.2 제안 기준: 안내 결과와 기술 실패의 상태 구분·권한 재검증.
 
         [확인 필요: 근거 문서 버전의 보존 기간과 실제 조회 가능한 범위 확인 필요]'
+    heading:
+      row: 49
+      text: FS048  개인화 조건과 근거 확보
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 48   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -3372,23 +3626,27 @@ specs:
 
         3. 매수·매도 권유, 가격·수익 보장, 단일 원인 단정 문구가 없다.'
       확인 필요 사항: 인용 구간 자동 검증은 제목·출처·문서 ID 일치 검증부터 구현하고, 세부 문장 단위 사실성 평가는 P2로 둔다.
+    heading:
+      row: 49
+      text: FS048  근거 기반 답변 생성 및 안전 검증
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 48   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS049
-  title: 답변 검증과 제공
-  section: AI 챗봇
+  title: 답변 근거와 관련 그래프 탐색
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '49'
-  source: &id017
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source: &id016
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 59
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -3441,8 +3699,12 @@ specs:
         형식·인용·참조 검증 통과가 답변 전체의 사실 정확성을 보장하지 않는다.
 
         [확인 필요: 검증 결과 보존 기간·저장 매체·보존 실패 감지 방식 결정 필요]'
+    heading:
+      row: 63
+      text: FS049  답변 검증과 제공
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 49   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -3461,122 +3723,67 @@ specs:
       수용 기준: 1. 표시되는 근거는 선택 답변과 연결된 문서다.2. 그래프 강조 대상은 실제 존재하는 공개 대상이다.3. 원문 접근 실패가
         AI 답변 재생성을 유발하지 않는다.
       확인 필요 사항: 뉴스 원문은 링크로 이동하며 서비스 내 기사 전문 재배포는 하지 않는다.
+    heading:
+      row: 63
+      text: FS049  답변 근거와 관련 그래프 탐색
+    meta: '원본 우선순위: P1 · 원본 상태: 팀 검토 전 · v1.3: MVP 기준 확정'
   scopeClass: existing
-- id: FS050-01
-  title: AI 답변 근거·원문 확인
-  section: AI 챗봇
+- id: FS050
+  title: 새 대화와 후속 질문
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '50'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 60
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 79
       rowUnit: xlsx-row
     fields:
-      기능명: AI 답변 근거·원문 확인
-      기능 설명: 회원이 AI 답변에서 근거 또는 원문을 선택하면 해당 답변에 연결된 출처·확보된 인용·외부 원문을 확인할 수 있다.
-      선행조건: 회원에게 근거 참조가 연결된 AI 답변이 제공되어 있고, 회원이 근거 또는 원문 확인을 요청한다.
-      입력값: 답변 식별 정보, 선택한 근거 참조, 출처 정보, 확보된 인용, 외부 원문 참조.
-      입력·검증 규칙: '선택한 답변에 연결된 근거와 출처를 제공한다.
-
-        확보되지 않은 원문이나 인용을 임의로 생성하지 않는다.
-
-        외부 원문을 열지 못해도 이미 확보한 출처와 인용은 유지한다.'
-      처리 절차 및 분기: '1. 회원이 답변의 근거를 선택한다.
-
-        2. 해당 답변에 연결되고 현재 조회 권한이 있는 출처·확보된 인용·원문 참조를 제공한다.
-
-        3. 원문 링크를 선택하면 외부 원문을 연다.
-
-        4. 원문 접근에 실패하면 확보된 출처·인용을 유지하고 접근 실패를 안내한다. 근거 조회 실패는 해당 조회만 다시 시도하며 답변을 다시
-        생성하지 않는다.'
-      정상 결과: 회원이 해당 답변의 출처·확보된 인용을 확인하고, 접근 가능한 외부 원문을 확인할 수 있다.
-      예외 처리: '근거 조회 실패: 해당 근거 영역에 오류와 다시 시도를 표시하고 답변을 유지한다.
-
-        원문 링크 없음: 원문 미제공을 안내한다.
-
-        외부 원문 접근 실패: 확보된 제목·출처·인용을 유지하고 접근 실패를 안내한다. 외부 원문 재열기는 AI 답변 재생성을 실행하지 않는다.
-
-        대상 근거 삭제·권한 없음: 해당 내용을 반환하지 않고 제공 불가를 안내한다.'
-      수용 기준: '1. 선택한 답변과 제공된 근거 참조가 일치한다.
-
-        2. 확보되지 않은 원문이나 인용을 새로 만들어 표시하지 않는다.
-
-        3. 외부 원문 접근이 실패해도 확보된 출처·인용은 유지된다.'
-      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+      기능명: 새 대화와 후속 질문
+      기능 설명: 사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에
+        새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.
+      선행조건: 로그인 회원이 AI 패널을 사용한다.
+      입력값: 현재 대화 ID, 후속 질문 또는 새 대화 요청, 선택 맥락(선택)
+      입력·검증 규칙: 후속 질문은 직전 대화의 확정 맥락을 참고할 수 있으나, 새 질문에 직접 적은 대상·기간이 우선한다. 새 대화는 이전
+        질문·답변·선택 조건을 자동 승계하지 않는다. 새 대화 시작은 기존 대화를 삭제·취소하지 않는다. 같은 대화에서 처리 중인 질문이 있으면
+        후속 질문 전송은 제한한다.
+      처리 절차 및 분기: 1. 후속 질문 선택 시 현재 대화에 새 질문 작업을 추가한다.2. 새 대화 선택 시 새로운 대화 ID와 빈 맥락을
+        생성한다.3. 새 질문은 FS046~FS049 절차로 처리한다.4. 이전 대화의 지연 응답은 원래 대화에만 저장한다.
+      정상 결과: 사용자는 동일 주제를 이어 질문하거나, 독립된 새 주제로 대화를 시작할 수 있다.
+      예외 처리: '새 대화 생성 실패: 기존 대화·입력 유지 및 재시도. 처리 중 후속 질문: 입력 유지 및 처리 중 안내. 이전 대화 지연
+        응답: 새 대화 화면에 표시하지 않음.'
+      수용 기준: 1. 새 대화에는 이전 질문·답변·선택 맥락이 자동 표시되지 않는다.2. 후속 질문은 같은 대화에 새 질문으로 저장된다.3.
+        이전 대화의 늦은 답변이 새 대화에 표시되지 않는다.
+      확인 필요 사항: 대화 목록·보존 기간·삭제 기능은 P2로 이동한다.
+    heading:
+      row: 77
+      text: FS050  새 대화와 후속 질문
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 50   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
-- id: FS050-02
-  title: AI 답변 관련 그래프 탐색
-  section: AI 챗봇
+- id: FS051
+  title: AI 패널 상태 유지와 결과 재조회
+  section: AI 챗봇 v2
   priority: P1
   status: 팀 검토 전
   requirementIds:
   - '50'
-  source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
+  source: &id017
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
     row: 61
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
-      row: 93
-      rowUnit: xlsx-row
-    fields:
-      기능명: AI 답변 관련 그래프 탐색
-      기능 설명: 회원이 AI 답변의 관련 기업·이슈·관계를 선택하면 실제 존재하고 조회 권한이 있는 대상을 그래프에서 강조하여 탐색할 수 있다.
-      선행조건: 회원에게 관련 기업·이슈·관계가 연결된 AI 답변이 제공되어 있고, 회원이 그래프 탐색 대상을 선택한다.
-      입력값: 답변에 연결된 기업·이슈·관계 식별자, 선택 대상, 현재 접근 권한.
-      입력·검증 규칙: '선택 대상이 실제 그래프에 존재하는지와 현재 조회 권한을 확인한다.
-
-        실제로 존재하고 조회 권한이 있는 대상만 강조한다.
-
-        AI 문장만을 근거로 새로운 관계선을 만들지 않는다.'
-      처리 절차 및 분기: '1. 회원이 답변의 관련 기업·이슈·관계를 선택한다.
-
-        2. 시스템은 선택 대상의 존재 여부와 현재 조회 권한을 확인한다.
-
-        3. 유효한 대상이면 그래프에서 해당 대상을 강조하여 탐색할 수 있게 한다.
-
-        4. 대상이 없거나 권한이 없으면 강조하지 않는다.'
-      정상 결과: 회원이 답변과 연결된 유효한 기업·이슈·관계를 그래프에서 확인할 수 있다.
-      예외 처리: '그래프 대상 없음·권한 없음: 대상 이용 불가를 안내하고 새 관계선이나 보호 정보를 표시하지 않는다.
-
-        조회 장애: 답변을 유지하고 그래프 조회만 다시 시도한다.
-
-        대상이 현재 그래프 범위 밖: 조회 권한과 존재가 확인된 대상 중심으로 그래프를 조회하되 AI 문장으로 관계를 생성하지 않는다.'
-      수용 기준: '1. 없는 그래프 식별자나 조회 권한이 없는 대상은 강조되지 않는다.
-
-        2. 강조되는 대상은 회원이 선택한 답변의 관련 대상과 일치한다.
-
-        3. AI 답변 문장만으로 새로운 관계선이 생성되지 않는다.'
-      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
-  scopeClass: existing
-- id: FS051
-  title: 새 대화 시작
-  section: AI 챗봇
-  priority: P1
-  status: 확정
-  requirementIds:
-  - '51'
-  source: &id018
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 62
-    rowUnit: xlsx-row
-  detailRange: A105:B117
-  change: 동작 보완
-  definitions:
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -3612,8 +3819,12 @@ specs:
       확인 필요 사항: 'v1.2 제안 기준: 새 대화 실패 시 기존 대화 유지·응답 미수신 결과 확인.
 
         [확인 필요: 대화 보존 기간과 이전 대화 목록 제공 범위 결정 필요]'
+    heading:
+      row: 105
+      text: FS051  새 대화 시작
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 51   ·   v1.2: 제안 기준 반영'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv
       row: 94
       rowUnit: xlsx-row
     fields:
@@ -3634,189 +3845,10 @@ specs:
       수용 기준: 1. 패널을 닫은 동안 완료된 질문은 재열기 시 저장 답변으로 확인된다.2. 응답 미수신 후 상태 조회만으로 중복 모델 호출이
         발생하지 않는다.3. 상세 기업 변경이 기존 대화의 적용 대상·기간을 자동 변경하지 않는다.
       확인 필요 사항: 처리 상태 자동 확인 간격과 최대 대기 시간은 구현 환경에서 측정 후 결정한다.
-  scopeClass: existing
-- id: FS052-01
-  title: 같은 대화에서 후속 질문 전송
-  section: AI 챗봇
-  priority: P1
-  status: 팀 검토 전
-  requirementIds:
-  - '52'
-  source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 63
-    rowUnit: xlsx-row
-  detailRange: A119:B131
-  change: 분리
-  definitions:
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
-      row: 121
-      rowUnit: xlsx-row
-    fields:
-      기능명: 같은 대화에서 후속 질문 전송
-      기능 설명: 회원이 기존 답변에 이어 질문하면 같은 대화에 새 질문 작업을 생성한다. 최초 작업의 상태 조회·결과 회수와 구분한다.
-      선행조건: 회원에게 현재 대화가 있고 후속 질문을 전송하려 한다.
-      입력값: 현재 대화 ID, 후속 질문, 새로운 작업 ID, 질문 시점의 대상·기간·근거 참조와 대화 맥락.
-      입력·검증 규칙: '빈 입력과 권한 없는 요청을 받지 않는다.
-
-        같은 대화에 처리 중 작업이 있으면 다른 작업 ID의 질문도 서버에서 접수를 거절한다.
-
-        후속 질문은 새 작업 ID를 사용하고 질문 시점의 맥락을 고정한다. 질문에 명시된 대상·기간이 기존 맥락보다 우선한다.
-
-        기존 작업 ID의 재전송은 새 후속 질문으로 만들지 않고 기존 상태·결과 조회로 처리한다.'
-      처리 절차 및 분기: '1. 회원이 후속 질문을 작성하고 전송한다.
-
-        2. 서버가 권한과 동일 대화의 처리 중 작업을 확인한다.
-
-        3. 접수 가능하면 같은 대화의 새 작업으로 등록하여 질문 시점의 맥락을 고정한다.
-
-        4. 답변 또는 정상 종료 안내를 원래 질문 작업에 연결하고 실제 적용 조건을 표시한다.'
-      정상 결과: 같은 대화 안에 별개의 질문·답변 작업이 순서대로 연결된다.
-      예외 처리: '동일 대화 처리 중: 기존 작업의 진행 상태를 안내하고 입력 내용을 유지한다.
-
-        응답 미수신: 해당 작업 상태를 확인하며 새 질문으로 복제하지 않는다.
-
-        새 대상이 불명확: 확인 질문을 저장하여 완료하고 보충 입력은 새 작업으로 받는다.'
-      수용 기준: '1. 같은 대화로 서로 다른 작업 ID를 동시에 보내도 신규 작업 하나만 접수된다.
-
-        2. 후속 질문마다 새 작업 ID가 있고 기존 작업 재요청으로 질문 수가 증가하지 않는다.
-
-        3. 이후 대화 대상이 바뀌어도 과거 작업 재시도의 원래 조건이 유지된다.'
-      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
-  scopeClass: existing
-- id: FS052-02
-  title: AI 내부 패널 닫기·재열기와 대화 유지
-  section: AI 챗봇
-  priority: P1
-  status: 팀 검토 전
-  requirementIds:
-  - '52'
-  source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 64
-    rowUnit: xlsx-row
-  detailRange: A133:B145
-  change: 분리
-  definitions:
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
-      row: 135
-      rowUnit: xlsx-row
-    fields:
-      기능명: AI 내부 패널 닫기·재열기와 대화 유지
-      기능 설명: 회원이 상세페이지의 AI 내부 패널을 닫아도 상세 상태·대화 기록·서버 작업을 유지한다. 새 대화로 바꾸지 않았다면 다시 열
-        때 같은 대화의 상태와 완료 결과를 회수한다.
-      선행조건: 로그인 회원이 기업 상세의 AI 내부 패널을 사용 중이거나 다시 연다.
-      입력값: 현재 회원·대화 ID, 질문별 작업 ID·상태, 상세 기업·차트 기간·재무 기간·사건·탭·스크롤, 저장된 답변.
-      입력·검증 규칙: '패널 닫기를 대화 삭제·질문 취소·상세 화면 이탈로 처리하지 않는다.
-
-        닫혀 있는 동안에도 서버 작업 완료 결과를 해당 대화·질문에 연결한다.
-
-        재열기는 기존 상태 조회이며 새 질문이나 새 AI 생성을 실행하지 않는다.
-
-        기존 대화의 대상·기간을 패널에 표시한다. 상세 기업이 바뀌었다는 이유만으로 기존 대화 맥락을 덮어쓰지 않는다.
-
-        다른 사용자·새 대화로 전환된 경우 이전 대화 응답을 현재 화면에 표시하지 않는다.'
-      처리 절차 및 분기: '1. 패널 닫기 시 상세 탐색 상태를 그대로 유지한다.
-
-        2. 재열기 시 현재 대화와 작업의 서버 상태를 조회한다.
-
-        3. 완료는 저장된 결과를, 처리 중은 진행 상태를 표시한다. 처리 중에는 상태 확인을 이어 가고 같은 대화의 신규 전송을 제한한다.
-
-        4. 상태 확인 후 작업이 완료되면 추가 질문 없이 결과를 회수한다.'
-      정상 결과: 패널을 닫고 다시 열어도 같은 대화와 상세 탐색 상태를 이어 본다.
-      예외 처리: '상태 조회 실패: 확인 실패와 다시 확인을 안내하며 미등록·실패 확정으로 간주하지 않는다.
-
-        로그아웃·권한 변경: 개인 대화 내용을 숨기고 현재 권한을 다시 확인한다.
-
-        새 대화 전환: 이전 답변은 원래 작업 기록에만 연결한다.'
-      수용 기준: '1. 패널을 닫은 동안 작업이 완료되어도 재열기 시 추가 모델 호출 없이 저장 답변을 확인한다.
-
-        2. 재열기 직후 처리 중이면 후속 상태 확인을 통해 완료 답변을 회수한다.
-
-        3. 닫기·재열기가 상세 기업·차트 기간·재무 기간·사건·탭·스크롤을 바꾸지 않는다.
-
-        4. 상세 기업만 변경해도 기존 대화의 적용 대상이 자동 변경되지 않는다.'
-      확인 필요 사항: 'v1.2 제안 기준: 패널 상태와 질문 작업 분리·기업 변경 시 기존 대화 맥락 유지.
-
-        [확인 필요: 상태 확인 주기·중단 판정 시간은 운영 환경 측정 후 결정 필요]'
-  scopeClass: existing
-- id: FS053
-  title: AI 결과 회수와 재시도
-  section: AI 챗봇
-  priority: P1
-  status: 팀 검토 전
-  requirementIds:
-  - '53'
-  source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 65
-    rowUnit: xlsx-row
-  detailRange: A147:B159
-  change: 동작 보완
-  definitions:
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv
-      row: 149
-      rowUnit: xlsx-row
-    fields:
-      기능명: AI 결과 회수와 재시도
-      기능 설명: 응답을 받지 못하면 새 답변 생성 전에 기존 질문 작업의 상태를 확인해야 한다. 완료 작업은 저장된 결과를 받고, 처리 중이면
-        대기하며, 서버가 확인한 실패만 허용된 방식으로 재실행해야 한다. 상태 조회 장애를 작업 미등록으로 취급하지 않고 같은 작업 재시도는
-        원래 질문 맥락을 유지해야 한다.
-      선행조건: 클라이언트가 질문 응답을 받지 못했거나 사용자가 다시 시도를 선택한다.
-      입력값: 기존 대화·작업 식별자, 최초 질문 내용과 고정 맥락·대상·기간·근거, 서버 상태, 현재 유효한 실행 정보, 보존된 검증 결과
-        여부.
-      입력·검증 규칙: '클라이언트의 응답 미수신과 서버 작업 실패를 구분한다.
-
-        새 생성 전에 서버의 기존 작업 상태를 확인한다.
-
-        완료 결과 회수 시에도 현재 접근 권한을 확인한다.
-
-        같은 작업의 재시도에는 최초 요청 내용과 맥락을 유지한다.
-
-        저장만 재시도하는 경우와 AI를 다시 실행하는 경우를 오류 유형별 정책에 따라 구분한다.
-
-        늦게 끝난 이전 실행이 현재 유효한 결과를 덮어쓰지 못하게 한다.'
-      처리 절차 및 분기: '1. 현재 권한으로 기존 작업의 서버 상태를 확인한다.
-
-        2. 완료이면 저장 결과를 반환한다. 처리 중이면 새 작업을 만들지 않고 상태 확인을 이어 간다.
-
-        3. 상태 확인 후 완료가 되면 저장 결과를 회수한다. 패널 닫힘·오프라인 동안 화면 확인은 멈출 수 있지만 서버 작업을 취소한 것으로
-        보지 않는다.
-
-        4. 확정된 일시적 조회·모델 호출 장애는 이전 실행 종료와 실행 권한을 확인한 뒤 사용자의 재시도로 같은 작업·최초 맥락을 재실행한다.
-
-        5. 저장 실패는 보존된 검증 결과가 있을 때 저장만 다시 시도한다. 검증 실패·결과 소실·권한 오류는 동일 작업 재생성을 허용하지
-        않는다.
-
-        6. 서버가 작업 저장소를 정상 조회하여 미등록을 확인한 경우에만 기존 작업 ID와 최초 요청으로 다시 접수한다.'
-      정상 결과: 완료 작업의 저장 결과를 회수하거나 처리 중 상태를 확인한다. 허용된 실패 재시도 또는 미등록 재접수는 동일 작업의 원래 조건으로
-        진행된다.
-      예외 처리: '상태 조회 실패·시간초과: 미등록·실패로 단정하지 않고 다시 확인을 안내한다.
-
-        서버 처리 중: 기존 작업 상태를 확인하고 추가 생성하지 않는다.
-
-        완료 안내 결과: 되묻기·설정 안내·판단 보류도 저장된 결과로 반환한다.
-
-        중단 여부 불명확: 이전 실행 종료를 확인하기 전에는 재실행하지 않는다.
-
-        권한 오류·입력 오류·검증 실패: 동일 작업 재실행을 제한한다.
-
-        이전 실행의 늦은 저장: 유효 실행 확인을 통과하지 못하면 반영하지 않는다.'
-      수용 기준: '1. 최초 연결이 끊긴 뒤 처리 중 안내를 받아도 후속 상태 확인으로 완료 결과를 회수한다.
-
-        2. 상태 조회 실패만으로 미등록 접수·새 생성이 일어나지 않는다.
-
-        3. 같은 작업 재실행은 원래 질문·대상·기간·근거를 유지한다.
-
-        4. 보존 결과의 저장 복구에는 추가 모델 호출이 없다.
-
-        5. 검증 실패는 같은 작업으로 재생성하지 않고 이전 실행이 현재 결과를 덮지 않는다.'
-      확인 필요 사항: 'v1.2 제안 기준: 오류별 복구 경로·상태 확인 종료 조건·일시 장애의 사용자 재시도.
-
-        [확인 필요: 상태 확인 간격·일시 장애별 최대 재시도·서버 중단 판정 시간과 실행 권한 만료값은 측정 후 결정 필요]'
+    heading:
+      row: 92
+      text: FS051  AI 패널 상태 유지와 결과 재조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 51   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS054
   title: 사용자와 모의 보유
@@ -3826,14 +3858,14 @@ specs:
   requirementIds:
   - '66'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 66
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 62
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -3897,6 +3929,10 @@ specs:
         [확인 필요: 오류 안내와 재시도·기존 값 유지 방식 결정 필요]
 
         [확인 필요: 현재 설정·관심·모의 보유 정보의 보존·삭제를 회원 데이터 보존·삭제 정책과 연계하는 방식 결정 필요]'
+    heading:
+      row: 7
+      text: FS054  사용자와 모의 보유
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 66   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS055
   title: 관계와 근거 연결
@@ -3906,14 +3942,14 @@ specs:
   requirementIds:
   - '67'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 67
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 63
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -3992,6 +4028,10 @@ specs:
 
         별도 섹션의 일반 사용자 공개는 근거 연결·자동 검증을 통과하지 않은 관계를 공개하지 않는 현재 기준의 변경 여부와 함께 팀이 결정한다.
         결정 전에는 비공개 후보로만 보관하며 새 관리자 화면을 요구하지 않는다.'
+    heading:
+      row: 21
+      text: FS055  관계와 근거 연결
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 67   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS056
   title: 사건과 문서 구분
@@ -4001,14 +4041,14 @@ specs:
   requirementIds:
   - '68'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 68
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 64
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -4056,6 +4096,10 @@ specs:
         평가한다.
 
         [확인 필요: 판단 모델·정규화 세부 규칙·실제 검증 표본 및 품질 목표 수치는 실제 기사 검증 후 확정 필요]'
+    heading:
+      row: 35
+      text: FS056  사건과 문서 구분
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 68   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS058
   title: 신규 경제뉴스 정기 수집 및 이슈 분석
@@ -4065,14 +4109,14 @@ specs:
   requirementIds:
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 69
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 65
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -4167,6 +4211,10 @@ specs:
         [확인 필요: 원문 주소 정규화·내용 중복/수정 판정 및 자동 검증 상세 기준·품질 목표는 실제 자료 검증 후 확정 필요]
 
         [확인 필요: 오류별 재처리 허용 범위·횟수·간격은 운영 정책으로 결정 필요]'
+    heading:
+      row: 49
+      text: FS058  신규 경제뉴스 정기 수집 및 이슈 분석
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 70   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS059
   title: 분석 결과 저장 및 조회 반영
@@ -4176,14 +4224,14 @@ specs:
   requirementIds:
   - '71'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 70
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 66
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -4270,6 +4318,10 @@ specs:
         [확인 필요: 캐시 갱신 구현·두 조회 경로의 공통 공개 버전 전환 방식은 개발 환경에서 검증 필요]
 
         [확인 필요: 이미 열린 화면의 자동 갱신 여부·시점과 미반영 유효 결과의 후속 반영 운영 방식 결정 필요]'
+    heading:
+      row: 63
+      text: FS059  분석 결과 저장 및 조회 반영
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 71   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS060
   title: 대화와 질문 기록
@@ -4279,14 +4331,14 @@ specs:
   requirementIds:
   - '72'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 71
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 67
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/09-데이터-관리.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -4361,6 +4413,10 @@ specs:
         [확인 필요: 대화·작업·검증 결과·근거 버전의 보존 기간과 실제 조회 가능한 범위 결정 필요]
 
         [확인 필요: 대화 삭제·회원 탈퇴 등과 연계한 기록·근거 참조의 삭제 절차 및 삭제 후 진행 중 작업·결과 회수 처리 결정 필요]'
+    heading:
+      row: 77
+      text: FS060  대화와 질문 기록
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 72   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS061
   title: 소셜 인증 연동
@@ -4370,14 +4426,14 @@ specs:
   requirementIds:
   - '73'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 72
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 68
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -4449,6 +4505,10 @@ specs:
         [팀 협의 필요] 기존 소셜 로그인·회원가입 명세는 동일 이메일 계정에 바로 연결하는 흐름으로 되어 있어, 연결 권한 확인을 요구하는
         이 기능의 안전 조건과 적용 조건을 맞춰야 한다. 해당 담당자와 확인 기준·실패 시 흐름을 합의하기 전에는 이메일 일치 또는 제공자의
         이메일 확인만으로 기존 계정 연결을 완료하지 않는다.'
+    heading:
+      row: 7
+      text: FS061  소셜 인증 연동
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 73   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS062
   title: 가상계좌 데이터 연동
@@ -4458,14 +4518,14 @@ specs:
   requirementIds:
   - '74'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 73
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 69
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -4522,6 +4582,10 @@ specs:
         [확인 필요: 가상계좌 연결 기능 채택 여부와 선택·교체·해제의 최종 제공 범위 결정 필요]
 
         [확인 필요: 재조회·연결 재시도의 허용 횟수·간격·상태 확인 운영 기준 결정 필요]'
+    heading:
+      row: 21
+      text: FS062  가상계좌 데이터 연동
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 74   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS063
   title: 뉴스와 시장 데이터 연동
@@ -4531,14 +4595,14 @@ specs:
   requirementIds:
   - '75'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 74
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 70
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -4607,6 +4671,10 @@ specs:
         않은 지연 등록·수정까지 누락 없이 발견한다고 보장하지 않는다]
 
         [확인 필요: 재시도 횟수·간격·제한 및 장애 시 기존 자료 제공 범위 결정 필요]'
+    heading:
+      row: 35
+      text: FS063  뉴스와 시장 데이터 연동
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 75   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS064
   title: AI 분석 연동
@@ -4616,14 +4684,14 @@ specs:
   requirementIds:
   - '76'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 75
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 71
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/10-외부-연동.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -4689,6 +4757,10 @@ specs:
         [확인 필요: 검증 결과 보존 범위·기간·저장 복구 시 실제 가용성 확인 필요]
 
         [확인 필요: 개인화 정보의 전달 허용 필드·사용 목적·제공자별 처리 조건 확정 필요. 미확정 항목은 필요성만으로 전달하지 않는다]'
+    heading:
+      row: 49
+      text: FS064  AI 분석 연동
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 76   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS065
   title: 기업 및 사용자 통계 조사 및 확인
@@ -4698,14 +4770,14 @@ specs:
   requirementIds:
   - '77'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 76
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 72
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -4763,6 +4835,10 @@ specs:
         [확인 필요: 지표별 집계 목적·기간·시간대·기준 시각·경계, 집계 단위·중복 사용자 기준·분자·분모 결정 필요]
 
         [확인 필요: 통계 원천 기록의 허용 수집 범위·보존/삭제 연계와 소수 집계의 재식별 방지 등 익명성 범위 결정 필요]'
+    heading:
+      row: 7
+      text: FS065  기업 및 사용자 통계 조사 및 확인
+    meta: '원본 우선순위: P2   ·   원본 상태: 미기재   ·   요구사항: 77   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS066-01
   title: AI 답변·뉴스 요약·브리핑 평가 등록
@@ -4773,14 +4849,14 @@ specs:
   - '37'
   - '78'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 77
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 73
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 통합
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -4838,6 +4914,11 @@ specs:
         [확인 필요: 브리핑 원본 우선순위 미기재와 AI 평가 원본 P2의 통합 개발 우선순위 결정 필요]
 
         [확인 필요: 평가 데이터의 보존·삭제 연계 및 소수 집계의 재식별 방지 등 익명성 세부 범위 결정 필요]'
+    heading:
+      row: 21
+      text: FS066-01  AI 답변·뉴스 요약·브리핑 평가 등록
+    meta: '원본 우선순위: FS037: 미기재 / FS066: P2   ·   원본 상태: FS037: 미기재 / FS066: 미기재   ·   요구사항:
+      37, 78   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS066-02
   title: AI 기능별 선호도 조회
@@ -4847,14 +4928,14 @@ specs:
   requirementIds:
   - '78'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 78
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 74
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -4914,6 +4995,10 @@ specs:
         [확인 필요: 조회 시작·종료일의 포함 경계 확정 필요]
 
         [확인 필요: 평가 이력 보존·삭제 연계와 소수 집계의 재식별 방지 등 익명성 세부 범위 승인 필요]'
+    heading:
+      row: 35
+      text: FS066-02  AI 기능별 선호도 조회
+    meta: '원본 우선순위: P2   ·   원본 상태: 미기재   ·   요구사항: 78   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS066-03
   title: 마스킹된 AI 대화록 조회
@@ -4923,14 +5008,14 @@ specs:
   requirementIds:
   - '78'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 79
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 75
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -4987,6 +5072,10 @@ specs:
         [확인 필요: 실제 권한 배정·허용 열람 목적·대상 범위·필드별 마스킹 목록 승인 필요]
 
         [확인 필요: 대화록과 열람/운영 기록의 보존·삭제 정책 및 필요한 승인 절차 결정 필요]'
+    heading:
+      row: 49
+      text: FS066-03  마스킹된 AI 대화록 조회
+    meta: '원본 우선순위: P2   ·   원본 상태: 미기재   ·   요구사항: 78   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS067-01
   title: 이슈 분석·공개 반영 상태 조회
@@ -4996,14 +5085,14 @@ specs:
   requirementIds:
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 80
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 76
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -5059,6 +5148,10 @@ specs:
         [확인 필요: 관제 갱신 방식·주기와 오래된 상태를 구분하는 운영 기준 결정 필요]
 
         [확인 필요: 운영 로그의 허용 노출 범위·보존 정책 및 재조회 방식의 세부 구현 결정 필요]'
+    heading:
+      row: 63
+      text: FS067-01  이슈 분석·공개 반영 상태 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 79   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS067-02
   title: 보류 이슈 검수 및 허용·거부
@@ -5068,14 +5161,14 @@ specs:
   requirementIds:
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 81
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 77
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -5134,6 +5227,10 @@ specs:
         [확인 필요: 검수 관리자 권한 배정·대상 범위와 필요한 승인 단계 결정 필요]
 
         [확인 필요: 검수 사유·변경 이력의 보존·삭제 연계 정책 승인 필요]'
+    heading:
+      row: 77
+      text: FS067-02  보류 이슈 검수 및 허용·거부
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 79   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS067-03
   title: 실패한 이슈 분석·반영 작업 재시도
@@ -5143,14 +5240,14 @@ specs:
   requirementIds:
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 82
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 78
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -5210,6 +5307,10 @@ specs:
         [확인 필요: 오류 유형별 재시도 허용 범위·재실행 단계·운영 권한과 최대 횟수·간격 결정 필요]
 
         [확인 필요: 보존 결과가 없거나 반복 실패한 경우의 수동 복구·종료 기준 결정 필요]'
+    heading:
+      row: 91
+      text: FS067-03  실패한 이슈 분석·반영 작업 재시도
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 79   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS068
   title: AI 사용량·비용·오류 통계
@@ -5219,14 +5320,14 @@ specs:
   requirementIds:
   - '80'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 83
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 79
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -5285,6 +5386,10 @@ specs:
         [확인 필요: 실제 비용 자료의 범위, 가격 적용 시점·통화·추정 산식·필요한 환산 방식 결정 필요]
 
         [확인 필요: 운영 기록의 허용 범위·보존 정책 및 부분 누락 복구 방식 결정 필요]'
+    heading:
+      row: 105
+      text: FS068  AI 사용량·비용·오류 통계
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 80   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS069-01
   title: 회원 활동 조회
@@ -5294,14 +5399,14 @@ specs:
   requirementIds:
   - '81'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 84
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 80
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -5356,6 +5461,10 @@ specs:
         [확인 필요: 회원 활동 조회의 허용 목적·관리자 권한/대상 범위·표시 항목·조회 기간과 지표별 단위/기준 시점 결정 필요]
 
         [확인 필요: 허용된 활동 기록의 보존·삭제 연계와 조회 실패 재조회 방식의 세부 정책 결정 필요]'
+    heading:
+      row: 119
+      text: FS069-01  회원 활동 조회
+    meta: '원본 우선순위: P2   ·   원본 상태: 미기재   ·   요구사항: 81   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS069-02
   title: 회원 차단·차단 해제
@@ -5365,14 +5474,14 @@ specs:
   requirementIds:
   - '81'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 85
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 81
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 135
       rowUnit: xlsx-row
     fields:
@@ -5433,6 +5542,10 @@ specs:
         필수 여부와 이력 보존 기간은 미정]
 
         [확인 필요: 차단·해제 권한 배정·대상 범위 및 이미 같은 상태에 대한 별도 반복 조치의 허용 여부/효과 결정 필요]'
+    heading:
+      row: 133
+      text: FS069-02  회원 차단·차단 해제
+    meta: '원본 우선순위: P2   ·   원본 상태: 미기재   ·   요구사항: 81   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS070-01
   title: 브리핑 회차별 생성·검증·발행 상태 조회
@@ -5442,14 +5555,14 @@ specs:
   requirementIds:
   - '82'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 86
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 82
     rowUnit: xlsx-row
   detailRange: A147:B159
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 149
       rowUnit: xlsx-row
     fields:
@@ -5510,6 +5623,10 @@ specs:
         [확인 필요: 상태 갱신 주기·오래된 상태 표시와 재조회 방식의 세부 정책 결정 필요]
 
         [확인 필요: 기존 생성 시각의 시간대·회차별 데이터 마감 시점과 지연 판정의 연결 기준 명료화 필요]'
+    heading:
+      row: 147
+      text: FS070-01  브리핑 회차별 생성·검증·발행 상태 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 82   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS070-02
   title: 미발행 브리핑 회차 재처리
@@ -5519,14 +5636,14 @@ specs:
   requirementIds:
   - '82'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 87
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 83
     rowUnit: xlsx-row
   detailRange: A161:B173
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 163
       rowUnit: xlsx-row
     fields:
@@ -5600,6 +5717,10 @@ specs:
 
         [팀 협의 필요: 기존 생성/중복 발행 방지 명세의 상태 확인 불가 시 ‘발행 실패 처리’ 문구를 담당자와 정합화해야 한다. 이번 재처리
         요청의 확인 실패·미실행과 실제 회차의 발행 실패를 구분하며 조회 장애만으로 기존 발행 상태를 변경하지 않는다]'
+    heading:
+      row: 161
+      text: FS070-02  미발행 브리핑 회차 재처리
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 82   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS071-01
   title: 발행 브리핑 정정 등록
@@ -5609,14 +5730,14 @@ specs:
   requirementIds:
   - '83'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 88
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 84
     rowUnit: xlsx-row
   detailRange: A175:B187
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 177
       rowUnit: xlsx-row
     fields:
@@ -5676,6 +5797,10 @@ specs:
         연계를 담당자와 확정·검증해야 구현 완료로 인정한다. 구체적인 안내·차단·재생성 방식은 미정]
 
         [확인 필요: 정정 이력 보존·삭제 정책 및 반영 실패 복구 방식의 세부 운영 기준 결정 필요]'
+    heading:
+      row: 175
+      text: FS071-01  발행 브리핑 정정 등록
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 83   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS071-02
   title: 발행 브리핑 제공 중단
@@ -5685,14 +5810,14 @@ specs:
   requirementIds:
   - '83'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 89
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 85
     rowUnit: xlsx-row
   detailRange: A189:B201
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 191
       rowUnit: xlsx-row
     fields:
@@ -5756,6 +5881,10 @@ specs:
         [확인 필요: 별도 반복 중단 요청의 사유·이력 처리 및 조치 정보 보존·삭제 정책 결정 필요]
 
         [확인 필요: 저장/조회 반영 실패의 재확인·복구 운영 기준 결정 필요]'
+    heading:
+      row: 189
+      text: FS071-02  발행 브리핑 제공 중단
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 83   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS072
   title: 대시보드
@@ -5765,14 +5894,14 @@ specs:
   requirementIds:
   - '84'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 90
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 86
     rowUnit: xlsx-row
   detailRange: A203:B215
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 205
       rowUnit: xlsx-row
     fields:
@@ -5832,23 +5961,27 @@ specs:
         [확인 필요: 대시보드 항목·관리자별 허용 범위·갱신 주기·지연/장애 표시 기준 결정 필요]
 
         [확인 필요: 영역별 이전 값 허용 여부/범위·재조회 방식과 상세 이동 조건의 세부 구성 결정 필요]'
+    heading:
+      row: 203
+      text: FS072  대시보드
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 84   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS073
-  title: 관리자 로그인(SSO, ID/PW)
+  title: 관리자 인증 및 접근 제어
   section: AI 평가·관리자
   priority: P1
   status: 미기재
   requirementIds:
   - '85'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 91
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 87
     rowUnit: xlsx-row
   detailRange: A217:B229
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv
       row: 219
       rowUnit: xlsx-row
     fields:
@@ -5905,6 +6038,10 @@ specs:
         [확인 필요: SSO·ID/PW 실제 지원 방식과 인증 제공자, 권한 등급·배정/회수 절차·세션 반영 방식 결정 필요]
 
         [확인 필요: 관리자 인증·권한 확인의 감사 기록 범위/보존 정책과 오류 안내·재확인 방식 결정 필요]'
+    heading:
+      row: 217
+      text: FS073  관리자 인증 및 접근 제어
+    meta: '원본 우선순위: P1   ·   원본 상태: 미기재   ·   요구사항: 85   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS001
   title: 접근 통제
@@ -5914,14 +6051,14 @@ specs:
   requirementIds:
   - '54'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 92
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 88
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -5969,6 +6106,10 @@ specs:
 
         타인의 개인화 결과 평가가 거절되고 마스킹·열람 기록 실패 시 대화록 내용이 제공되지 않는다.'
       확인 필요 사항: '-'
+    heading:
+      row: 7
+      text: NFS001  접근 통제
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 54   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS002
   title: 응답과 화면 정합성
@@ -5978,14 +6119,14 @@ specs:
   requirementIds:
   - '55'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 93
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 89
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -6043,6 +6184,10 @@ specs:
       확인 필요 사항: 'v1.2 제안 기준: 영역별 무효화와 화면 복원 규칙을 기능 명세에 반영했다.
 
         조회 식별자의 내부 형식은 구현에서 정하되 조건 일치 검증은 생략할 수 없다.'
+    heading:
+      row: 21
+      text: NFS002  응답과 화면 정합성
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 55   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS003
   title: 작업 일관성과 복구
@@ -6052,14 +6197,14 @@ specs:
   requirementIds:
   - '56'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 94
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 90
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -6119,6 +6264,10 @@ specs:
         미등록은 작업 저장소 정상 조회로 기록 없음을 확인한 경우이다. 상태 조회 장애는 해당하지 않는다.
 
         [확인 필요: 작업 식별자 보관 유효 기간·중단 판정값은 운영 승인 필요]'
+    heading:
+      row: 35
+      text: NFS003  작업 일관성과 복구
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 56   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS004
   title: 부분 실패 내성
@@ -6128,14 +6277,14 @@ specs:
   requirementIds:
   - '57'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 95
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 91
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -6183,6 +6332,10 @@ specs:
 
         독립 조회 영역 장애가 다른 정상 영역과 편집 입력을 초기화하지 않는다. 조회 재시도가 저장·AI 생성을 다시 실행하지 않는다.'
       확인 필요 사항: '-'
+    heading:
+      row: 49
+      text: NFS004  부분 실패 내성
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 57   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS005
   title: 근거와 해석의 품질
@@ -6192,14 +6345,14 @@ specs:
   requirementIds:
   - '58'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 96
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 92
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -6258,6 +6411,10 @@ specs:
       확인 필요 사항: '[확인 필요: 사실성·해석 품질의 정량 목표, 검증 표본 구성과 평가 기준 결정 필요]
 
         인용·형식·참조 검증 통과는 답변 전체의 사실 정확성을 보장하지 않는다.'
+    heading:
+      row: 63
+      text: NFS005  근거와 해석의 품질
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 58   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS006
   title: 모델 전달 데이터 최소화
@@ -6267,14 +6424,14 @@ specs:
   requirementIds:
   - '59'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 97
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 93
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -6320,6 +6477,10 @@ specs:
 
         3. 개인화가 필요 없는 질문에 개인 보유·관심 정보가 불필요하게 포함되지 않는다.'
       확인 필요 사항: '[확인 필요: 모델별 허용·제거·마스킹 필드와 로그 보관 기간 승인 필요]'
+    heading:
+      row: 77
+      text: NFS006  모델 전달 데이터 최소화
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 59   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: NFS007
   title: 성능 측정 기준
@@ -6329,14 +6490,14 @@ specs:
   requirementIds:
   - '60'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 98
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 94
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -6387,6 +6548,11 @@ specs:
       확인 필요 사항: '[확인 필요: 목표 응답시간·동시 요청 수·데이터 규모·표본 수는 실제 서비스 측정 후 승인 필요]
 
         측정 방법 정의는 성능 목표 통과를 의미하지 않는다.'
+    heading:
+      row: 91
+      text: NFS007  성능 측정 기준
+    meta: '원본 우선순위: P2   ·   원본 상태: 추가 제안 · 검토 전   ·   요구사항: 60   ·   v1.2: 제안 기준
+      반영'
   scopeClass: existing
 - id: NFS008
   title: 운영 추적
@@ -6396,14 +6562,14 @@ specs:
   requirementIds:
   - '61'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 99
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 95
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -6454,6 +6620,11 @@ specs:
 
         작업 로그에서 재실행·저장 복구·완료 결과 회수가 구분되며 확인되지 않은 완료를 기록하지 않는다.'
       확인 필요 사항: '[확인 필요: 로그 보존 기간·열람 권한·기록 장애 복구 방식과 취소 전이 조건 승인 필요]'
+    heading:
+      row: 105
+      text: NFS008  운영 추적
+    meta: '원본 우선순위: P1   ·   원본 상태: 보완 제안 · 검토 전   ·   요구사항: 61   ·   v1.2: 제안 기준
+      반영'
   scopeClass: existing
 - id: NFS009
   title: 중단 작업 복구
@@ -6463,14 +6634,14 @@ specs:
   requirementIds:
   - '62'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 100
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 96
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -6542,6 +6713,11 @@ specs:
 
         [팀 협의 필요: 브리핑의 상태 확인 불가 시 ‘발행 실패’ 표기와 실제 발행 여부 미확인·조회 장애의 상태 매핑을 명료화한다. 조회
         장애만으로 실제 실행 실패를 확정하거나 재생성하지 않는다.]'
+    heading:
+      row: 119
+      text: NFS009  중단 작업 복구
+    meta: '원본 우선순위: P1   ·   원본 상태: 추가 제안 · 검토 전   ·   요구사항: 62   ·   v1.2: 제안 기준
+      반영'
   scopeClass: existing
 - id: NFS010
   title: 지원 환경
@@ -6551,14 +6727,14 @@ specs:
   requirementIds:
   - '63'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 101
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 97
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 135
       rowUnit: xlsx-row
     fields:
@@ -6607,6 +6783,11 @@ specs:
         [확인 필요: 미지원 환경의 안내·진입 제한 여부 결정 필요]
 
         브라우저명·버전·화면 크기 수치를 임의로 정하지 않는다.'
+    heading:
+      row: 133
+      text: NFS010  지원 환경
+    meta: '원본 우선순위: P1   ·   원본 상태: 추가 제안 · 검토 전   ·   요구사항: 63   ·   v1.2: 기존 기준
+      유지'
   scopeClass: existing
 - id: NFS011
   title: 웹 접근성
@@ -6616,14 +6797,14 @@ specs:
   requirementIds:
   - '64'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 102
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 98
     rowUnit: xlsx-row
   detailRange: A147:B159
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 149
       rowUnit: xlsx-row
     fields:
@@ -6673,6 +6854,11 @@ specs:
       확인 필요 사항: '[확인 필요: 실제 지원 환경·보조기술 조합·접근성 세부 점검표 승인 필요]
 
         '
+    heading:
+      row: 147
+      text: NFS011  웹 접근성
+    meta: '원본 우선순위: P2   ·   원본 상태: 추가 제안 · 검토 전   ·   요구사항: 64   ·   v1.2: 제안 기준
+      반영'
   scopeClass: existing
 - id: NFS012
   title: 정기 갱신 반영 시간 보장
@@ -6682,14 +6868,14 @@ specs:
   requirementIds:
   - '65'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 103
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 99
     rowUnit: xlsx-row
   detailRange: A161:B173
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/12-비기능-상세.csv
       row: 163
       rowUnit: xlsx-row
     fields:
@@ -6766,6 +6952,11 @@ specs:
         검증 조건으로 확정 필요. 처리량 수치를 임의로 정하거나 기한을 완화하지 않는다]
 
         [확인 필요: 실제 확인 간격·대상 표본 범위·회차별 공개 대상 확정 시점·장애 분류·경보 및 복구 운영 기준 검증 필요]'
+    heading:
+      row: 161
+      text: NFS012  정기 갱신 반영 시간 보장
+    meta: '원본 우선순위: P1   ·   원본 상태: 추가 제안 · 검토 전   ·   요구사항: 65   ·   v1.2: 제안 기준
+      반영'
   scopeClass: existing
 - id: FS074
   title: 뉴스·공시 수집 및 수집 회차 관리
@@ -6776,14 +6967,14 @@ specs:
   - '70'
   - '75'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 104
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 100
     rowUnit: xlsx-row
   detailRange: A166:B178
   change: 파이프라인 상세 추가 · FS058·FS063 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 168
       rowUnit: xlsx-row
     fields:
@@ -6819,6 +7010,10 @@ specs:
       확인 필요 사항: '공급처·이용 조건·페이지/커서 지원·겹침 재조회 범위는 기존 FS058·FS063의 미정 사항을 유지한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 166
+      text: FS074  뉴스·공시 수집 및 수집 회차 관리
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS058·FS063 · 담당: AI (주), 백엔드 B (협업)'
   scopeClass: proposal
 - id: FS075
   title: 원천 문서 정제·중복 제거 및 버전 관리
@@ -6829,14 +7024,14 @@ specs:
   - '68'
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 105
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 101
     rowUnit: xlsx-row
   detailRange: A180:B192
   change: 파이프라인 상세 추가 · FS056·FS058 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 182
       rowUnit: xlsx-row
     fields:
@@ -6871,6 +7066,10 @@ specs:
       확인 필요 사항: '주소 정규화·내용 중복 판정·문서 보존 정책은 실자료 검증 후 결정한다. FS056의 사건/문서 구분을 유지한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 180
+      text: FS075  원천 문서 정제·중복 제거 및 버전 관리
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS056·FS058 · 담당: AI (주), 백엔드 B (협업)'
   scopeClass: proposal
 - id: FS076
   title: AI 사건·이슈 추출 및 이슈 후보 생성
@@ -6882,14 +7081,14 @@ specs:
   - '70'
   - '76'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 106
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 102
     rowUnit: xlsx-row
   detailRange: A194:B206
   change: 파이프라인 상세 추가 · FS056·FS058·FS064 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 196
       rowUnit: xlsx-row
     fields:
@@ -6924,6 +7123,10 @@ specs:
       확인 필요 사항: '추출 모델·평가 표본·신뢰도 기준은 검증 후 확정한다. 수치 목표나 승인 상태를 임의 확정하지 않는다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 194
+      text: FS076  AI 사건·이슈 추출 및 이슈 후보 생성
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS056·FS058·FS064 · 담당: AI (주), 백엔드 B (협업)'
   scopeClass: proposal
 - id: FS077
   title: 기업·이슈 Entity Linking 및 동일성 판정
@@ -6934,14 +7137,14 @@ specs:
   - '68'
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 107
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 103
     rowUnit: xlsx-row
   detailRange: A208:B220
   change: 파이프라인 상세 추가 · FS056·FS058 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 210
       rowUnit: xlsx-row
     fields:
@@ -6978,6 +7181,10 @@ specs:
       확인 필요 사항: '동일 이슈 기준·복수 이슈 연결 허용 범위·병합 승인/취소 정책은 FS058의 미정 사항과 함께 확정한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 208
+      text: FS077  기업·이슈 Entity Linking 및 동일성 판정
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS056·FS058 · 담당: AI (주), 백엔드 B (협업)'
   scopeClass: proposal
 - id: FS078
   title: 기업–이슈·기업–기업 관계 추출
@@ -6988,14 +7195,14 @@ specs:
   - '67'
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 108
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 104
     rowUnit: xlsx-row
   detailRange: A222:B234
   change: 파이프라인 상세 추가 · FS055·FS058 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 224
       rowUnit: xlsx-row
     fields:
@@ -7034,6 +7241,10 @@ specs:
       확인 필요 사항: '지원 관계 유형·유형별 필수 속성·관계 키와 대칭성 규칙은 FS055와 공통 계약으로 확정한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 222
+      text: FS078  기업–이슈·기업–기업 관계 추출
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS055·FS058 · 담당: AI (주), 백엔드 B (협업)'
   scopeClass: proposal
 - id: FS079
   title: 영향 방향·근거 검증 및 공개 적격 판정
@@ -7046,14 +7257,14 @@ specs:
   - '70'
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 109
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 105
     rowUnit: xlsx-row
   detailRange: A236:B248
   change: 파이프라인 상세 추가 · FS021·FS055·FS058·FS067-02 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 238
       rowUnit: xlsx-row
     fields:
@@ -7093,6 +7304,11 @@ specs:
       확인 필요 사항: '자동 검증 세부 정책·신뢰도 활용 기준·품질 목표는 실제 표본으로 확정한다. 운영자 검수 UI는 기존 FS067을 사용한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 236
+      text: FS079  영향 방향·근거 검증 및 공개 적격 판정
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS021·FS055·FS058·FS067-02 · 담당: AI (주), 백엔드
+      B (협업)'
   scopeClass: proposal
 - id: FS080
   title: GraphDB 노드·간선 upsert 및 공개 버전 반영
@@ -7103,14 +7319,14 @@ specs:
   - '67'
   - '71'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 110
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 106
     rowUnit: xlsx-row
   detailRange: A250:B262
   change: 파이프라인 상세 추가 · FS055·FS059 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 252
       rowUnit: xlsx-row
     fields:
@@ -7153,6 +7369,10 @@ specs:
         등 동등한 멱등 동작을 적용한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 250
+      text: FS080  GraphDB 노드·간선 upsert 및 공개 버전 반영
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS055·FS059 · 담당: 백엔드 B (주), AI (협업)'
   scopeClass: proposal
 - id: FS081
   title: 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구
@@ -7165,14 +7385,14 @@ specs:
   - '71'
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv
-    row: 111
+    path: docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv
+    row: 107
     rowUnit: xlsx-row
   detailRange: A264:B276
   change: 파이프라인 상세 추가 · FS055·FS058·FS059·FS067-03 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv
       row: 266
       rowUnit: xlsx-row
     fields:
@@ -7216,22 +7436,27 @@ specs:
         시작, 10·40분 반영 기준은 유지한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
+    heading:
+      row: 264
+      text: FS081  그래프 증분 갱신·관계 비활성화 및 실패 단계 복구
+    meta: '추가 제안 · 검토 전 / 우선순위 미정 · 연계: FS055·FS058·FS059·FS067-03 · 담당: 백엔드 B (주),
+      AI (협업)'
   scopeClass: proposal
-- id: FS???
+- id: ㅊ
   title: 브리핑 리뷰
   section: 05-출퇴근-브리핑
   priority: P2
   status: 목차 없음
   requirementIds: []
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
     row: 134
     rowUnit: xlsx-row
   detailRange: ''
   change: 목차 밖 정의
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
       row: 134
       rowUnit: xlsx-row
     fields:
@@ -7252,41 +7477,307 @@ specs:
       수용 기준: '1. 로그인한 사용자가 반응을 선택할 수 있다.
 
         2. 브리핑별 반응 통계를 확인할 수 있다.'
+    heading:
+      row: 132
+      text: FS066-01  브리핑 리뷰
+    meta: '원본 우선순위: P2   ·   원본 상태: 검토 중   ·   요구사항: 36   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
-- id: FS050
-  title: 새 대화와 후속 질문
-  section: 08-AI-챗봇-v2
+- id: FS050-01
+  title: AI 답변 근거·원문 확인
+  section: 07-AI-챗봇
   priority: P1
   status: 목차 없음
   requirementIds: []
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
     row: 79
     rowUnit: xlsx-row
   detailRange: ''
   change: 목차 밖 정의
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
       row: 79
       rowUnit: xlsx-row
     fields:
-      기능명: 새 대화와 후속 질문
-      기능 설명: 사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에
-        새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.
-      선행조건: 로그인 회원이 AI 패널을 사용한다.
-      입력값: 현재 대화 ID, 후속 질문 또는 새 대화 요청, 선택 맥락(선택)
-      입력·검증 규칙: 후속 질문은 직전 대화의 확정 맥락을 참고할 수 있으나, 새 질문에 직접 적은 대상·기간이 우선한다. 새 대화는 이전
-        질문·답변·선택 조건을 자동 승계하지 않는다. 새 대화 시작은 기존 대화를 삭제·취소하지 않는다. 같은 대화에서 처리 중인 질문이 있으면
-        후속 질문 전송은 제한한다.
-      처리 절차 및 분기: 1. 후속 질문 선택 시 현재 대화에 새 질문 작업을 추가한다.2. 새 대화 선택 시 새로운 대화 ID와 빈 맥락을
-        생성한다.3. 새 질문은 FS046~FS049 절차로 처리한다.4. 이전 대화의 지연 응답은 원래 대화에만 저장한다.
-      정상 결과: 사용자는 동일 주제를 이어 질문하거나, 독립된 새 주제로 대화를 시작할 수 있다.
-      예외 처리: '새 대화 생성 실패: 기존 대화·입력 유지 및 재시도. 처리 중 후속 질문: 입력 유지 및 처리 중 안내. 이전 대화 지연
-        응답: 새 대화 화면에 표시하지 않음.'
-      수용 기준: 1. 새 대화에는 이전 질문·답변·선택 맥락이 자동 표시되지 않는다.2. 후속 질문은 같은 대화에 새 질문으로 저장된다.3.
-        이전 대화의 늦은 답변이 새 대화에 표시되지 않는다.
-      확인 필요 사항: 대화 목록·보존 기간·삭제 기능은 P2로 이동한다.
+      기능명: AI 답변 근거·원문 확인
+      기능 설명: 회원이 AI 답변에서 근거 또는 원문을 선택하면 해당 답변에 연결된 출처·확보된 인용·외부 원문을 확인할 수 있다.
+      선행조건: 회원에게 근거 참조가 연결된 AI 답변이 제공되어 있고, 회원이 근거 또는 원문 확인을 요청한다.
+      입력값: 답변 식별 정보, 선택한 근거 참조, 출처 정보, 확보된 인용, 외부 원문 참조.
+      입력·검증 규칙: '선택한 답변에 연결된 근거와 출처를 제공한다.
+
+        확보되지 않은 원문이나 인용을 임의로 생성하지 않는다.
+
+        외부 원문을 열지 못해도 이미 확보한 출처와 인용은 유지한다.'
+      처리 절차 및 분기: '1. 회원이 답변의 근거를 선택한다.
+
+        2. 해당 답변에 연결되고 현재 조회 권한이 있는 출처·확보된 인용·원문 참조를 제공한다.
+
+        3. 원문 링크를 선택하면 외부 원문을 연다.
+
+        4. 원문 접근에 실패하면 확보된 출처·인용을 유지하고 접근 실패를 안내한다. 근거 조회 실패는 해당 조회만 다시 시도하며 답변을 다시
+        생성하지 않는다.'
+      정상 결과: 회원이 해당 답변의 출처·확보된 인용을 확인하고, 접근 가능한 외부 원문을 확인할 수 있다.
+      예외 처리: '근거 조회 실패: 해당 근거 영역에 오류와 다시 시도를 표시하고 답변을 유지한다.
+
+        원문 링크 없음: 원문 미제공을 안내한다.
+
+        외부 원문 접근 실패: 확보된 제목·출처·인용을 유지하고 접근 실패를 안내한다. 외부 원문 재열기는 AI 답변 재생성을 실행하지 않는다.
+
+        대상 근거 삭제·권한 없음: 해당 내용을 반환하지 않고 제공 불가를 안내한다.'
+      수용 기준: '1. 선택한 답변과 제공된 근거 참조가 일치한다.
+
+        2. 확보되지 않은 원문이나 인용을 새로 만들어 표시하지 않는다.
+
+        3. 외부 원문 접근이 실패해도 확보된 출처·인용은 유지된다.'
+      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 77
+      text: FS050-01  AI 답변 근거·원문 확인
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 50   ·   v1.2: 제안 기준 반영'
+  scopeClass: existing
+- id: FS050-02
+  title: AI 답변 관련 그래프 탐색
+  section: 07-AI-챗봇
+  priority: P1
+  status: 목차 없음
+  requirementIds: []
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 93
+    rowUnit: xlsx-row
+  detailRange: ''
+  change: 목차 밖 정의
+  definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+      row: 93
+      rowUnit: xlsx-row
+    fields:
+      기능명: AI 답변 관련 그래프 탐색
+      기능 설명: 회원이 AI 답변의 관련 기업·이슈·관계를 선택하면 실제 존재하고 조회 권한이 있는 대상을 그래프에서 강조하여 탐색할 수 있다.
+      선행조건: 회원에게 관련 기업·이슈·관계가 연결된 AI 답변이 제공되어 있고, 회원이 그래프 탐색 대상을 선택한다.
+      입력값: 답변에 연결된 기업·이슈·관계 식별자, 선택 대상, 현재 접근 권한.
+      입력·검증 규칙: '선택 대상이 실제 그래프에 존재하는지와 현재 조회 권한을 확인한다.
+
+        실제로 존재하고 조회 권한이 있는 대상만 강조한다.
+
+        AI 문장만을 근거로 새로운 관계선을 만들지 않는다.'
+      처리 절차 및 분기: '1. 회원이 답변의 관련 기업·이슈·관계를 선택한다.
+
+        2. 시스템은 선택 대상의 존재 여부와 현재 조회 권한을 확인한다.
+
+        3. 유효한 대상이면 그래프에서 해당 대상을 강조하여 탐색할 수 있게 한다.
+
+        4. 대상이 없거나 권한이 없으면 강조하지 않는다.'
+      정상 결과: 회원이 답변과 연결된 유효한 기업·이슈·관계를 그래프에서 확인할 수 있다.
+      예외 처리: '그래프 대상 없음·권한 없음: 대상 이용 불가를 안내하고 새 관계선이나 보호 정보를 표시하지 않는다.
+
+        조회 장애: 답변을 유지하고 그래프 조회만 다시 시도한다.
+
+        대상이 현재 그래프 범위 밖: 조회 권한과 존재가 확인된 대상 중심으로 그래프를 조회하되 AI 문장으로 관계를 생성하지 않는다.'
+      수용 기준: '1. 없는 그래프 식별자나 조회 권한이 없는 대상은 강조되지 않는다.
+
+        2. 강조되는 대상은 회원이 선택한 답변의 관련 대상과 일치한다.
+
+        3. AI 답변 문장만으로 새로운 관계선이 생성되지 않는다.'
+      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 91
+      text: FS050-02  AI 답변 관련 그래프 탐색
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 50   ·   v1.2: 제안 기준 반영'
+  scopeClass: existing
+- id: FS052-01
+  title: 같은 대화에서 후속 질문 전송
+  section: 07-AI-챗봇
+  priority: P1
+  status: 목차 없음
+  requirementIds: []
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 121
+    rowUnit: xlsx-row
+  detailRange: ''
+  change: 목차 밖 정의
+  definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+      row: 121
+      rowUnit: xlsx-row
+    fields:
+      기능명: 같은 대화에서 후속 질문 전송
+      기능 설명: 회원이 기존 답변에 이어 질문하면 같은 대화에 새 질문 작업을 생성한다. 최초 작업의 상태 조회·결과 회수와 구분한다.
+      선행조건: 회원에게 현재 대화가 있고 후속 질문을 전송하려 한다.
+      입력값: 현재 대화 ID, 후속 질문, 새로운 작업 ID, 질문 시점의 대상·기간·근거 참조와 대화 맥락.
+      입력·검증 규칙: '빈 입력과 권한 없는 요청을 받지 않는다.
+
+        같은 대화에 처리 중 작업이 있으면 다른 작업 ID의 질문도 서버에서 접수를 거절한다.
+
+        후속 질문은 새 작업 ID를 사용하고 질문 시점의 맥락을 고정한다. 질문에 명시된 대상·기간이 기존 맥락보다 우선한다.
+
+        기존 작업 ID의 재전송은 새 후속 질문으로 만들지 않고 기존 상태·결과 조회로 처리한다.'
+      처리 절차 및 분기: '1. 회원이 후속 질문을 작성하고 전송한다.
+
+        2. 서버가 권한과 동일 대화의 처리 중 작업을 확인한다.
+
+        3. 접수 가능하면 같은 대화의 새 작업으로 등록하여 질문 시점의 맥락을 고정한다.
+
+        4. 답변 또는 정상 종료 안내를 원래 질문 작업에 연결하고 실제 적용 조건을 표시한다.'
+      정상 결과: 같은 대화 안에 별개의 질문·답변 작업이 순서대로 연결된다.
+      예외 처리: '동일 대화 처리 중: 기존 작업의 진행 상태를 안내하고 입력 내용을 유지한다.
+
+        응답 미수신: 해당 작업 상태를 확인하며 새 질문으로 복제하지 않는다.
+
+        새 대상이 불명확: 확인 질문을 저장하여 완료하고 보충 입력은 새 작업으로 받는다.'
+      수용 기준: '1. 같은 대화로 서로 다른 작업 ID를 동시에 보내도 신규 작업 하나만 접수된다.
+
+        2. 후속 질문마다 새 작업 ID가 있고 기존 작업 재요청으로 질문 수가 증가하지 않는다.
+
+        3. 이후 대화 대상이 바뀌어도 과거 작업 재시도의 원래 조건이 유지된다.'
+      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 119
+      text: FS052-01  같은 대화에서 후속 질문 전송
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 52   ·   v1.2: 제안 기준 반영'
+  scopeClass: existing
+- id: FS052-02
+  title: AI 내부 패널 닫기·재열기와 대화 유지
+  section: 07-AI-챗봇
+  priority: P1
+  status: 목차 없음
+  requirementIds: []
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 135
+    rowUnit: xlsx-row
+  detailRange: ''
+  change: 목차 밖 정의
+  definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+      row: 135
+      rowUnit: xlsx-row
+    fields:
+      기능명: AI 내부 패널 닫기·재열기와 대화 유지
+      기능 설명: 회원이 상세페이지의 AI 내부 패널을 닫아도 상세 상태·대화 기록·서버 작업을 유지한다. 새 대화로 바꾸지 않았다면 다시 열
+        때 같은 대화의 상태와 완료 결과를 회수한다.
+      선행조건: 로그인 회원이 기업 상세의 AI 내부 패널을 사용 중이거나 다시 연다.
+      입력값: 현재 회원·대화 ID, 질문별 작업 ID·상태, 상세 기업·차트 기간·재무 기간·사건·탭·스크롤, 저장된 답변.
+      입력·검증 규칙: '패널 닫기를 대화 삭제·질문 취소·상세 화면 이탈로 처리하지 않는다.
+
+        닫혀 있는 동안에도 서버 작업 완료 결과를 해당 대화·질문에 연결한다.
+
+        재열기는 기존 상태 조회이며 새 질문이나 새 AI 생성을 실행하지 않는다.
+
+        기존 대화의 대상·기간을 패널에 표시한다. 상세 기업이 바뀌었다는 이유만으로 기존 대화 맥락을 덮어쓰지 않는다.
+
+        다른 사용자·새 대화로 전환된 경우 이전 대화 응답을 현재 화면에 표시하지 않는다.'
+      처리 절차 및 분기: '1. 패널 닫기 시 상세 탐색 상태를 그대로 유지한다.
+
+        2. 재열기 시 현재 대화와 작업의 서버 상태를 조회한다.
+
+        3. 완료는 저장된 결과를, 처리 중은 진행 상태를 표시한다. 처리 중에는 상태 확인을 이어 가고 같은 대화의 신규 전송을 제한한다.
+
+        4. 상태 확인 후 작업이 완료되면 추가 질문 없이 결과를 회수한다.'
+      정상 결과: 패널을 닫고 다시 열어도 같은 대화와 상세 탐색 상태를 이어 본다.
+      예외 처리: '상태 조회 실패: 확인 실패와 다시 확인을 안내하며 미등록·실패 확정으로 간주하지 않는다.
+
+        로그아웃·권한 변경: 개인 대화 내용을 숨기고 현재 권한을 다시 확인한다.
+
+        새 대화 전환: 이전 답변은 원래 작업 기록에만 연결한다.'
+      수용 기준: '1. 패널을 닫은 동안 작업이 완료되어도 재열기 시 추가 모델 호출 없이 저장 답변을 확인한다.
+
+        2. 재열기 직후 처리 중이면 후속 상태 확인을 통해 완료 답변을 회수한다.
+
+        3. 닫기·재열기가 상세 기업·차트 기간·재무 기간·사건·탭·스크롤을 바꾸지 않는다.
+
+        4. 상세 기업만 변경해도 기존 대화의 적용 대상이 자동 변경되지 않는다.'
+      확인 필요 사항: 'v1.2 제안 기준: 패널 상태와 질문 작업 분리·기업 변경 시 기존 대화 맥락 유지.
+
+        [확인 필요: 상태 확인 주기·중단 판정 시간은 운영 환경 측정 후 결정 필요]'
+    heading:
+      row: 133
+      text: FS052-02  AI 내부 패널 닫기·재열기와 대화 유지
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 52   ·   v1.2: 제안 기준 반영'
+  scopeClass: existing
+- id: FS053
+  title: AI 결과 회수와 재시도
+  section: 07-AI-챗봇
+  priority: P1
+  status: 목차 없음
+  requirementIds: []
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 149
+    rowUnit: xlsx-row
+  detailRange: ''
+  change: 목차 밖 정의
+  definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+      row: 149
+      rowUnit: xlsx-row
+    fields:
+      기능명: AI 결과 회수와 재시도
+      기능 설명: 응답을 받지 못하면 새 답변 생성 전에 기존 질문 작업의 상태를 확인해야 한다. 완료 작업은 저장된 결과를 받고, 처리 중이면
+        대기하며, 서버가 확인한 실패만 허용된 방식으로 재실행해야 한다. 상태 조회 장애를 작업 미등록으로 취급하지 않고 같은 작업 재시도는
+        원래 질문 맥락을 유지해야 한다.
+      선행조건: 클라이언트가 질문 응답을 받지 못했거나 사용자가 다시 시도를 선택한다.
+      입력값: 기존 대화·작업 식별자, 최초 질문 내용과 고정 맥락·대상·기간·근거, 서버 상태, 현재 유효한 실행 정보, 보존된 검증 결과
+        여부.
+      입력·검증 규칙: '클라이언트의 응답 미수신과 서버 작업 실패를 구분한다.
+
+        새 생성 전에 서버의 기존 작업 상태를 확인한다.
+
+        완료 결과 회수 시에도 현재 접근 권한을 확인한다.
+
+        같은 작업의 재시도에는 최초 요청 내용과 맥락을 유지한다.
+
+        저장만 재시도하는 경우와 AI를 다시 실행하는 경우를 오류 유형별 정책에 따라 구분한다.
+
+        늦게 끝난 이전 실행이 현재 유효한 결과를 덮어쓰지 못하게 한다.'
+      처리 절차 및 분기: '1. 현재 권한으로 기존 작업의 서버 상태를 확인한다.
+
+        2. 완료이면 저장 결과를 반환한다. 처리 중이면 새 작업을 만들지 않고 상태 확인을 이어 간다.
+
+        3. 상태 확인 후 완료가 되면 저장 결과를 회수한다. 패널 닫힘·오프라인 동안 화면 확인은 멈출 수 있지만 서버 작업을 취소한 것으로
+        보지 않는다.
+
+        4. 확정된 일시적 조회·모델 호출 장애는 이전 실행 종료와 실행 권한을 확인한 뒤 사용자의 재시도로 같은 작업·최초 맥락을 재실행한다.
+
+        5. 저장 실패는 보존된 검증 결과가 있을 때 저장만 다시 시도한다. 검증 실패·결과 소실·권한 오류는 동일 작업 재생성을 허용하지
+        않는다.
+
+        6. 서버가 작업 저장소를 정상 조회하여 미등록을 확인한 경우에만 기존 작업 ID와 최초 요청으로 다시 접수한다.'
+      정상 결과: 완료 작업의 저장 결과를 회수하거나 처리 중 상태를 확인한다. 허용된 실패 재시도 또는 미등록 재접수는 동일 작업의 원래 조건으로
+        진행된다.
+      예외 처리: '상태 조회 실패·시간초과: 미등록·실패로 단정하지 않고 다시 확인을 안내한다.
+
+        서버 처리 중: 기존 작업 상태를 확인하고 추가 생성하지 않는다.
+
+        완료 안내 결과: 되묻기·설정 안내·판단 보류도 저장된 결과로 반환한다.
+
+        중단 여부 불명확: 이전 실행 종료를 확인하기 전에는 재실행하지 않는다.
+
+        권한 오류·입력 오류·검증 실패: 동일 작업 재실행을 제한한다.
+
+        이전 실행의 늦은 저장: 유효 실행 확인을 통과하지 못하면 반영하지 않는다.'
+      수용 기준: '1. 최초 연결이 끊긴 뒤 처리 중 안내를 받아도 후속 상태 확인으로 완료 결과를 회수한다.
+
+        2. 상태 조회 실패만으로 미등록 접수·새 생성이 일어나지 않는다.
+
+        3. 같은 작업 재실행은 원래 질문·대상·기간·근거를 유지한다.
+
+        4. 보존 결과의 저장 복구에는 추가 모델 호출이 없다.
+
+        5. 검증 실패는 같은 작업으로 재생성하지 않고 이전 실행이 현재 결과를 덮지 않는다.'
+      확인 필요 사항: 'v1.2 제안 기준: 오류별 복구 경로·상태 확인 종료 조건·일시 장애의 사용자 재시도.
+
+        [확인 필요: 상태 확인 간격·일시 장애별 최대 재시도·서버 중단 판정 시간과 실행 권한 만료값은 측정 후 결정 필요]'
+    heading:
+      row: 147
+      text: FS053  AI 결과 회수와 재시도
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 53   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 requirements:
 - id: '1'
@@ -8339,7 +8830,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 11
     rowUnit: xlsx-row
 - id: '1.1'
@@ -8354,7 +8845,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 12
     rowUnit: xlsx-row
 - id: '1.2'
@@ -8369,7 +8860,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 13
     rowUnit: xlsx-row
 - id: '1.3'
@@ -8384,7 +8875,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 14
     rowUnit: xlsx-row
 - id: '1.4'
@@ -8399,7 +8890,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 15
     rowUnit: xlsx-row
 - id: '2'
@@ -8414,7 +8905,7 @@ wbs:
   progress: '1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 16
     rowUnit: xlsx-row
 - id: '2.1'
@@ -8429,7 +8920,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 17
     rowUnit: xlsx-row
 - id: '2.2'
@@ -8444,7 +8935,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 18
     rowUnit: xlsx-row
 - id: '2.3'
@@ -8459,7 +8950,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 19
     rowUnit: xlsx-row
 - id: '3'
@@ -8474,7 +8965,7 @@ wbs:
   progress: '0.9666666667'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 20
     rowUnit: xlsx-row
 - id: '3.1'
@@ -8489,7 +8980,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 21
     rowUnit: xlsx-row
 - id: '3.2'
@@ -8504,7 +8995,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 22
     rowUnit: xlsx-row
 - id: '3.3'
@@ -8519,7 +9010,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 23
     rowUnit: xlsx-row
 - id: '3.4'
@@ -8534,7 +9025,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 24
     rowUnit: xlsx-row
 - id: '3.5'
@@ -8549,7 +9040,7 @@ wbs:
   progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 25
     rowUnit: xlsx-row
 - id: '3.6'
@@ -8564,7 +9055,7 @@ wbs:
   progress: '0.5'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 26
     rowUnit: xlsx-row
 - id: '4'
@@ -8579,7 +9070,7 @@ wbs:
   progress: '0.1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 27
     rowUnit: xlsx-row
 - id: '4.1'
@@ -8594,7 +9085,7 @@ wbs:
   progress: '0.1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 28
     rowUnit: xlsx-row
 - id: '4.2'
@@ -8609,7 +9100,7 @@ wbs:
   progress: '0.1'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 29
     rowUnit: xlsx-row
 - id: '5'
@@ -8624,7 +9115,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 30
     rowUnit: xlsx-row
 - id: '5.1'
@@ -8639,7 +9130,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 31
     rowUnit: xlsx-row
 - id: '5.2'
@@ -8654,7 +9145,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 32
     rowUnit: xlsx-row
 - id: '5.3'
@@ -8669,7 +9160,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 33
     rowUnit: xlsx-row
 - id: '6'
@@ -8679,12 +9170,12 @@ wbs:
   deliverable: ''
   owners: ''
   start: '2026-09-21'
-  end: '2026-11-27'
+  end: '2026-11-06'
   weight: '0.5'
-  progress: '0'
+  progress: '0.008'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 34
     rowUnit: xlsx-row
 - id: '6.1'
@@ -8693,13 +9184,13 @@ wbs:
   role: 공통/통합
   deliverable: 전체 기능 공통 기반
   owners: ''
-  start: '2026-10-07'
+  start: '2026-10-06'
   end: '2026-10-08'
   weight: '0.02'
-  progress: '0'
+  progress: '0.2'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 35
     rowUnit: xlsx-row
 - id: 6.1.1
@@ -8714,7 +9205,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 36
     rowUnit: xlsx-row
 - id: 6.1.2
@@ -8726,10 +9217,10 @@ wbs:
   start: '2026-10-06'
   end: '2026-10-08'
   weight: '0.004'
-  progress: '0.0'
+  progress: '1.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 37
     rowUnit: xlsx-row
 - id: 6.1.3
@@ -8744,7 +9235,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 38
     rowUnit: xlsx-row
 - id: 6.1.4
@@ -8759,7 +9250,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 39
     rowUnit: xlsx-row
 - id: 6.1.5
@@ -8774,7 +9265,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 40
     rowUnit: xlsx-row
 - id: '6.2'
@@ -8783,13 +9274,13 @@ wbs:
   role: 공통/통합
   deliverable: 공통 API·인증 구조
   owners: ''
-  start: '2026-10-13'
+  start: '2026-10-12'
   end: '2026-10-15'
   weight: '0.015'
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 41
     rowUnit: xlsx-row
 - id: 6.2.1
@@ -8806,7 +9297,7 @@ wbs:
   - FS002
   - FS003
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 42
     rowUnit: xlsx-row
 - id: 6.2.2
@@ -8823,7 +9314,7 @@ wbs:
   - FS004
   - FS061
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 43
     rowUnit: xlsx-row
 - id: 6.2.3
@@ -8840,7 +9331,7 @@ wbs:
   - FS005
   - NFS001
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 44
     rowUnit: xlsx-row
 - id: 6.2.4
@@ -8857,7 +9348,7 @@ wbs:
   - FS001
   - FS006
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 45
     rowUnit: xlsx-row
 - id: 6.2.5
@@ -8873,7 +9364,7 @@ wbs:
   rawSpecIds:
   - FS007
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 46
     rowUnit: xlsx-row
 - id: 6.2.6
@@ -8892,7 +9383,7 @@ wbs:
   - FS005
   - FS006
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 47
     rowUnit: xlsx-row
 - id: 6.2.7
@@ -8909,7 +9400,7 @@ wbs:
   - FS003
   - FS006
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 48
     rowUnit: xlsx-row
 - id: 6.2.8
@@ -8924,7 +9415,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 49
     rowUnit: xlsx-row
 - id: '6.3'
@@ -8939,7 +9430,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 50
     rowUnit: xlsx-row
 - id: 6.3.1
@@ -8956,7 +9447,7 @@ wbs:
   - FS008
   - FS013
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 51
     rowUnit: xlsx-row
 - id: 6.3.2
@@ -8974,7 +9465,7 @@ wbs:
   - FS010
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 52
     rowUnit: xlsx-row
 - id: 6.3.3
@@ -8990,7 +9481,7 @@ wbs:
   rawSpecIds:
   - FS011-01
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 53
     rowUnit: xlsx-row
 - id: 6.3.4
@@ -9006,7 +9497,7 @@ wbs:
   rawSpecIds:
   - FS012
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 54
     rowUnit: xlsx-row
 - id: 6.3.5
@@ -9022,7 +9513,7 @@ wbs:
   rawSpecIds:
   - FS013
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 55
     rowUnit: xlsx-row
 - id: 6.3.6
@@ -9038,7 +9529,7 @@ wbs:
   rawSpecIds:
   - FS014
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 56
     rowUnit: xlsx-row
 - id: 6.3.7
@@ -9055,7 +9546,7 @@ wbs:
   - FS015
   - FS016
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 57
     rowUnit: xlsx-row
 - id: 6.3.8
@@ -9071,7 +9562,7 @@ wbs:
   rawSpecIds:
   - FS008
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 58
     rowUnit: xlsx-row
 - id: 6.3.9
@@ -9089,7 +9580,7 @@ wbs:
   - FS010
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 59
     rowUnit: xlsx-row
 - id: 6.3.10
@@ -9106,7 +9597,7 @@ wbs:
   - FS015
   - FS016
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 60
     rowUnit: xlsx-row
 - id: 6.3.11
@@ -9121,7 +9612,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 61
     rowUnit: xlsx-row
 - id: '6.4'
@@ -9130,13 +9621,13 @@ wbs:
   role: 공통/통합
   deliverable: ''
   owners: ''
-  start: ''
-  end: ''
+  start: '2026-10-13'
+  end: '2026-10-20'
   weight: '0.025'
-  progress: ''
+  progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 62
     rowUnit: xlsx-row
 - id: 6.4.1
@@ -9153,7 +9644,7 @@ wbs:
   - FS054
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 63
     rowUnit: xlsx-row
 - id: 6.4.2
@@ -9169,7 +9660,7 @@ wbs:
   rawSpecIds:
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 64
     rowUnit: xlsx-row
 - id: 6.4.3
@@ -9186,7 +9677,7 @@ wbs:
   - FS039
   - FS054
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 65
     rowUnit: xlsx-row
 - id: 6.4.4
@@ -9203,7 +9694,7 @@ wbs:
   - FS009
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 66
     rowUnit: xlsx-row
 - id: 6.4.5
@@ -9219,7 +9710,7 @@ wbs:
   rawSpecIds:
   - FS012
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 67
     rowUnit: xlsx-row
 - id: 6.4.6
@@ -9237,7 +9728,7 @@ wbs:
   - FS054
   - FS062
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 68
     rowUnit: xlsx-row
 - id: 6.4.7
@@ -9254,7 +9745,7 @@ wbs:
   - FS037
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 69
     rowUnit: xlsx-row
 - id: 6.4.8
@@ -9269,7 +9760,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 70
     rowUnit: xlsx-row
 - id: '6.5'
@@ -9284,7 +9775,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 71
     rowUnit: xlsx-row
 - id: 6.5.1
@@ -9302,7 +9793,7 @@ wbs:
   - FS078
   - FS080
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 72
     rowUnit: xlsx-row
 - id: 6.5.2
@@ -9320,7 +9811,7 @@ wbs:
   - FS075
   - FS077
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 73
     rowUnit: xlsx-row
 - id: 6.5.3
@@ -9336,7 +9827,7 @@ wbs:
   rawSpecIds:
   - FS057
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 74
     rowUnit: xlsx-row
 - id: 6.5.4
@@ -9355,7 +9846,7 @@ wbs:
   - FS079
   - FS081
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 75
     rowUnit: xlsx-row
 - id: 6.5.5
@@ -9373,7 +9864,7 @@ wbs:
   - FS080
   - FS081
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 76
     rowUnit: xlsx-row
 - id: 6.5.6
@@ -9390,7 +9881,7 @@ wbs:
   - FS063
   - FS074
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 77
     rowUnit: xlsx-row
 - id: 6.5.7
@@ -9408,7 +9899,7 @@ wbs:
   - FS076
   - FS079
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 78
     rowUnit: xlsx-row
 - id: 6.5.8
@@ -9423,7 +9914,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 79
     rowUnit: xlsx-row
 - id: '6.6'
@@ -9438,7 +9929,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 80
     rowUnit: xlsx-row
 - id: 6.6.1
@@ -9454,7 +9945,7 @@ wbs:
   rawSpecIds:
   - FS017
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 81
     rowUnit: xlsx-row
 - id: 6.6.2
@@ -9470,7 +9961,7 @@ wbs:
   rawSpecIds:
   - FS018
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 82
     rowUnit: xlsx-row
 - id: 6.6.3
@@ -9486,7 +9977,7 @@ wbs:
   rawSpecIds:
   - FS019
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 83
     rowUnit: xlsx-row
 - id: 6.6.4
@@ -9502,7 +9993,7 @@ wbs:
   rawSpecIds:
   - FS020
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 84
     rowUnit: xlsx-row
 - id: 6.6.5
@@ -9518,7 +10009,7 @@ wbs:
   rawSpecIds:
   - FS021
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 85
     rowUnit: xlsx-row
 - id: 6.6.6
@@ -9535,7 +10026,7 @@ wbs:
   - FS022
   - FS079
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 86
     rowUnit: xlsx-row
 - id: 6.6.7
@@ -9551,7 +10042,7 @@ wbs:
   rawSpecIds:
   - FS022
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 87
     rowUnit: xlsx-row
 - id: 6.6.8
@@ -9567,7 +10058,7 @@ wbs:
   rawSpecIds:
   - FS023
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 88
     rowUnit: xlsx-row
 - id: 6.6.9
@@ -9583,7 +10074,7 @@ wbs:
   rawSpecIds:
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 89
     rowUnit: xlsx-row
 - id: 6.6.10
@@ -9599,7 +10090,7 @@ wbs:
   rawSpecIds:
   - FS025
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 90
     rowUnit: xlsx-row
 - id: 6.6.11
@@ -9615,7 +10106,7 @@ wbs:
   rawSpecIds:
   - FS026
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 91
     rowUnit: xlsx-row
 - id: 6.6.12
@@ -9623,7 +10114,7 @@ wbs:
   type: P1
   role: BE
   deliverable: FS027 구현·단위테스트
-  owners: 정세빈
+  owners: 임현
   start: '2026-10-14'
   end: '2026-10-15'
   weight: '0.004'
@@ -9631,7 +10122,7 @@ wbs:
   rawSpecIds:
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 92
     rowUnit: xlsx-row
 - id: 6.6.13
@@ -9653,7 +10144,7 @@ wbs:
   - FS058
   - FS063
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 93
     rowUnit: xlsx-row
 - id: 6.6.14
@@ -9674,7 +10165,7 @@ wbs:
   - FS056
   - FS058
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 94
     rowUnit: xlsx-row
 - id: 6.6.15
@@ -9697,7 +10188,7 @@ wbs:
   - FS058
   - FS064
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 95
     rowUnit: xlsx-row
 - id: 6.6.16
@@ -9720,7 +10211,7 @@ wbs:
   - FS056
   - FS058
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 96
     rowUnit: xlsx-row
 - id: 6.6.17
@@ -9743,7 +10234,7 @@ wbs:
   - FS055
   - FS058
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 97
     rowUnit: xlsx-row
 - id: 6.6.18
@@ -9765,7 +10256,7 @@ wbs:
   - FS078
   - FS022
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 98
     rowUnit: xlsx-row
 - id: 6.6.19
@@ -9788,7 +10279,7 @@ wbs:
   - FS055
   - FS059
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 99
     rowUnit: xlsx-row
 - id: 6.6.20
@@ -9812,7 +10303,7 @@ wbs:
   - FS059
   - FS067-03
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 100
     rowUnit: xlsx-row
 - id: 6.6.21
@@ -9831,7 +10322,7 @@ wbs:
   - FS019
   - FS026
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 101
     rowUnit: xlsx-row
 - id: 6.6.22
@@ -9848,7 +10339,7 @@ wbs:
   - FS021
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 102
     rowUnit: xlsx-row
 - id: 6.6.23
@@ -9866,7 +10357,7 @@ wbs:
   - FS026
   - FS027
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 103
     rowUnit: xlsx-row
 - id: 6.6.24
@@ -9883,7 +10374,7 @@ wbs:
   - FS023
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 104
     rowUnit: xlsx-row
 - id: 6.6.25
@@ -9899,7 +10390,7 @@ wbs:
   rawSpecIds:
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 105
     rowUnit: xlsx-row
 - id: 6.6.26
@@ -9917,7 +10408,7 @@ wbs:
   - FS022
   - FS024
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 106
     rowUnit: xlsx-row
 - id: 6.6.27
@@ -9932,7 +10423,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 107
     rowUnit: xlsx-row
 - id: '6.7'
@@ -9947,7 +10438,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 108
     rowUnit: xlsx-row
 - id: 6.7.1
@@ -9963,7 +10454,7 @@ wbs:
   rawSpecIds:
   - FS037
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 109
     rowUnit: xlsx-row
 - id: 6.7.2
@@ -9979,7 +10470,7 @@ wbs:
   rawSpecIds:
   - FS038
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 110
     rowUnit: xlsx-row
 - id: 6.7.3
@@ -9995,7 +10486,7 @@ wbs:
   rawSpecIds:
   - FS040
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 111
     rowUnit: xlsx-row
 - id: 6.7.4
@@ -10011,7 +10502,7 @@ wbs:
   rawSpecIds:
   - FS041
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 112
     rowUnit: xlsx-row
 - id: 6.7.5
@@ -10027,7 +10518,7 @@ wbs:
   rawSpecIds:
   - FS042
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 113
     rowUnit: xlsx-row
 - id: 6.7.6
@@ -10043,7 +10534,7 @@ wbs:
   rawSpecIds:
   - FS043
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 114
     rowUnit: xlsx-row
 - id: 6.7.7
@@ -10059,7 +10550,7 @@ wbs:
   rawSpecIds:
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 115
     rowUnit: xlsx-row
 - id: 6.7.8
@@ -10079,7 +10570,7 @@ wbs:
   - FS041
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 116
     rowUnit: xlsx-row
 - id: 6.7.9
@@ -10097,7 +10588,7 @@ wbs:
   - FS041
   - FS043
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 117
     rowUnit: xlsx-row
 - id: 6.7.10
@@ -10114,7 +10605,7 @@ wbs:
   - FS038
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 118
     rowUnit: xlsx-row
 - id: 6.7.11
@@ -10132,7 +10623,7 @@ wbs:
   - FS040
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 119
     rowUnit: xlsx-row
 - id: 6.7.12
@@ -10150,7 +10641,7 @@ wbs:
   - FS041
   - FS044
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 120
     rowUnit: xlsx-row
 - id: 6.7.13
@@ -10165,7 +10656,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 121
     rowUnit: xlsx-row
 - id: '6.8'
@@ -10180,7 +10671,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 122
     rowUnit: xlsx-row
 - id: 6.8.1
@@ -10196,7 +10687,7 @@ wbs:
   rawSpecIds:
   - FS028
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 123
     rowUnit: xlsx-row
 - id: 6.8.2
@@ -10212,7 +10703,7 @@ wbs:
   rawSpecIds:
   - FS029
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 124
     rowUnit: xlsx-row
 - id: 6.8.3
@@ -10228,7 +10719,7 @@ wbs:
   rawSpecIds:
   - FS030
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 125
     rowUnit: xlsx-row
 - id: 6.8.4
@@ -10244,7 +10735,7 @@ wbs:
   rawSpecIds:
   - FS031
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 126
     rowUnit: xlsx-row
 - id: 6.8.5
@@ -10260,7 +10751,7 @@ wbs:
   rawSpecIds:
   - FS032
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 127
     rowUnit: xlsx-row
 - id: 6.8.6
@@ -10276,7 +10767,7 @@ wbs:
   rawSpecIds:
   - FS033
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 128
     rowUnit: xlsx-row
 - id: 6.8.7
@@ -10291,7 +10782,7 @@ wbs:
   progress: ''
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 129
     rowUnit: xlsx-row
 - id: 6.8.8
@@ -10307,7 +10798,7 @@ wbs:
   rawSpecIds:
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 130
     rowUnit: xlsx-row
 - id: 6.8.9
@@ -10323,7 +10814,7 @@ wbs:
   rawSpecIds:
   - FS036
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 131
     rowUnit: xlsx-row
 - id: 6.8.10
@@ -10339,7 +10830,7 @@ wbs:
   rawSpecIds:
   - FS066-01
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 132
     rowUnit: xlsx-row
 - id: 6.8.11
@@ -10359,7 +10850,7 @@ wbs:
   - FS033
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 133
     rowUnit: xlsx-row
 - id: 6.8.12
@@ -10379,7 +10870,7 @@ wbs:
   - FS033
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 134
     rowUnit: xlsx-row
 - id: 6.8.13
@@ -10396,14 +10887,14 @@ wbs:
   - FS032
   - FS035
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 135
     rowUnit: xlsx-row
 - id: 6.8.14
   title: (FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동
   type: P2
   role: FE
-  deliverable: FS032 · FS036 · FS037
+  deliverable: FS032 · FS036 · FS066-01
   owners: 박주형
   start: '2026-10-13'
   end: '2026-10-15'
@@ -10412,9 +10903,9 @@ wbs:
   rawSpecIds:
   - FS032
   - FS036
-  - FS037
+  - FS066-01
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 136
     rowUnit: xlsx-row
 - id: 6.8.15
@@ -10429,7 +10920,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 137
     rowUnit: xlsx-row
 - id: '6.9'
@@ -10444,7 +10935,7 @@ wbs:
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 138
     rowUnit: xlsx-row
 - id: 6.9.1
@@ -10461,7 +10952,7 @@ wbs:
   - FS025
   - FS045
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 139
     rowUnit: xlsx-row
 - id: 6.9.2
@@ -10477,7 +10968,7 @@ wbs:
   rawSpecIds:
   - FS047
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 140
     rowUnit: xlsx-row
 - id: 6.9.3
@@ -10493,7 +10984,7 @@ wbs:
   rawSpecIds:
   - FS048
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 141
     rowUnit: xlsx-row
 - id: 6.9.4
@@ -10509,7 +11000,7 @@ wbs:
   rawSpecIds:
   - FS049
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 142
     rowUnit: xlsx-row
 - id: 6.9.5
@@ -10526,7 +11017,7 @@ wbs:
   - FS050-01
   - FS050-02
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 143
     rowUnit: xlsx-row
 - id: 6.9.6
@@ -10543,7 +11034,7 @@ wbs:
   - FS051
   - FS052-01
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 144
     rowUnit: xlsx-row
 - id: 6.9.7
@@ -10560,7 +11051,7 @@ wbs:
   - FS052-02
   - FS053
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 145
     rowUnit: xlsx-row
 - id: 6.9.8
@@ -10576,7 +11067,7 @@ wbs:
   rawSpecIds:
   - FS052-02
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 146
     rowUnit: xlsx-row
 - id: 6.9.9
@@ -10592,7 +11083,7 @@ wbs:
   rawSpecIds:
   - FS053
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 147
     rowUnit: xlsx-row
 - id: 6.9.10
@@ -10608,7 +11099,7 @@ wbs:
   rawSpecIds:
   - FS060
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 148
     rowUnit: xlsx-row
 - id: 6.9.11
@@ -10627,7 +11118,7 @@ wbs:
   - FS047
   - FS048
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 149
     rowUnit: xlsx-row
 - id: 6.9.12
@@ -10643,7 +11134,7 @@ wbs:
   rawSpecIds:
   - FS047
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 150
     rowUnit: xlsx-row
 - id: 6.9.13
@@ -10664,7 +11155,7 @@ wbs:
   - FS053
   - NFS003
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 151
     rowUnit: xlsx-row
 - id: 6.9.14
@@ -10681,7 +11172,7 @@ wbs:
   - FS053
   - NFS003
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 152
     rowUnit: xlsx-row
 - id: 6.9.15
@@ -10696,7 +11187,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 153
     rowUnit: xlsx-row
 - id: '6.10'
@@ -10706,12 +11197,12 @@ wbs:
   deliverable: 운영 데이터·권한·검토 워크플로
   owners: ''
   start: '2026-10-12'
-  end: '2026-10-22'
+  end: '2026-10-24'
   weight: '0.035'
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 154
     rowUnit: xlsx-row
 - id: 6.10.1
@@ -10728,7 +11219,7 @@ wbs:
   - FS073
   - NFS001
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 155
     rowUnit: xlsx-row
 - id: 6.10.2
@@ -10744,7 +11235,7 @@ wbs:
   rawSpecIds:
   - FS072
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 156
     rowUnit: xlsx-row
 - id: 6.10.3
@@ -10761,7 +11252,7 @@ wbs:
   - FS069-01
   - FS069-02
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 157
     rowUnit: xlsx-row
 - id: 6.10.4
@@ -10777,7 +11268,7 @@ wbs:
   rawSpecIds:
   - FS065
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 158
     rowUnit: xlsx-row
 - id: 6.10.5
@@ -10785,7 +11276,7 @@ wbs:
   type: P2
   role: BE
   deliverable: FS066-01 · FS066-02 구현·단위테스트
-  owners: 임현
+  owners: 김도현/홍정현
   start: '2026-10-20'
   end: '2026-10-22'
   weight: '0.0012'
@@ -10794,7 +11285,7 @@ wbs:
   - FS066-01
   - FS066-02
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 159
     rowUnit: xlsx-row
 - id: 6.10.6
@@ -10810,7 +11301,7 @@ wbs:
   rawSpecIds:
   - FS067-01
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 160
     rowUnit: xlsx-row
 - id: 6.10.7
@@ -10827,7 +11318,7 @@ wbs:
   - FS067-02
   - FS067-03
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 161
     rowUnit: xlsx-row
 - id: 6.10.8
@@ -10843,7 +11334,7 @@ wbs:
   rawSpecIds:
   - FS068
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 162
     rowUnit: xlsx-row
 - id: 6.10.9
@@ -10860,7 +11351,7 @@ wbs:
   - FS070-01
   - FS070-02
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 163
     rowUnit: xlsx-row
 - id: 6.10.10
@@ -10877,7 +11368,7 @@ wbs:
   - FS071-01
   - FS071-02
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 164
     rowUnit: xlsx-row
 - id: 6.10.11
@@ -10893,7 +11384,7 @@ wbs:
   rawSpecIds:
   - FS066-03
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 165
     rowUnit: xlsx-row
 - id: 6.10.12
@@ -10910,7 +11401,7 @@ wbs:
   - FS072
   - NFS008
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 166
     rowUnit: xlsx-row
 - id: 6.10.13
@@ -10927,7 +11418,7 @@ wbs:
   - FS073
   - NFS001
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 167
     rowUnit: xlsx-row
 - id: 6.10.14
@@ -10943,7 +11434,7 @@ wbs:
   rawSpecIds:
   - FS072
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 168
     rowUnit: xlsx-row
 - id: 6.10.15
@@ -10961,7 +11452,7 @@ wbs:
   - FS066-02
   - FS066-03
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 169
     rowUnit: xlsx-row
 - id: 6.10.16
@@ -10979,7 +11470,7 @@ wbs:
   - FS067-02
   - FS067-03
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 170
     rowUnit: xlsx-row
 - id: 6.10.17
@@ -10999,7 +11490,7 @@ wbs:
   - FS071-02
   - FS068
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 171
     rowUnit: xlsx-row
 - id: 6.10.18
@@ -11018,7 +11509,7 @@ wbs:
   - FS073
   - NFS008
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 172
     rowUnit: xlsx-row
 - id: 6.10.19
@@ -11033,7 +11524,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 173
     rowUnit: xlsx-row
 - id: '6.11'
@@ -11043,12 +11534,12 @@ wbs:
   deliverable: 각 영역 기능 완료
   owners: ''
   start: '2026-10-12'
-  end: '2026-11-27'
+  end: '2026-10-28'
   weight: '0.04'
   progress: '0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 174
     rowUnit: xlsx-row
 - id: 6.11.1
@@ -11063,7 +11554,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 175
     rowUnit: xlsx-row
 - id: 6.11.2
@@ -11078,7 +11569,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 176
     rowUnit: xlsx-row
 - id: 6.11.3
@@ -11093,7 +11584,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 177
     rowUnit: xlsx-row
 - id: 6.11.4
@@ -11108,7 +11599,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 178
     rowUnit: xlsx-row
 - id: 6.11.5
@@ -11118,12 +11609,12 @@ wbs:
   deliverable: 질문·브리핑·재시도·오류 상태 정상
   owners: 김도현
   start: '2026-10-12'
-  end: '2026-11-27'
+  end: '2026-10-27'
   weight: '0.0045'
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 179
     rowUnit: xlsx-row
 - id: 6.11.6
@@ -11138,7 +11629,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 180
     rowUnit: xlsx-row
 - id: 6.11.7
@@ -11148,12 +11639,12 @@ wbs:
   deliverable: Critical/Major 결함 해결 및 재검증
   owners: 팀원 전원
   start: '2026-10-25'
-  end: '2026-11-02'
+  end: '2026-10-28'
   weight: '0.0045'
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 181
     rowUnit: xlsx-row
 - id: 6.11.8
@@ -11168,7 +11659,7 @@ wbs:
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 182
     rowUnit: xlsx-row
 - id: 6.11.9
@@ -11178,18 +11669,18 @@ wbs:
   deliverable: 영상·PPT·발표본
   owners: 팀원 전원
   start: '2026-10-26'
-  end: '2026-11-05'
+  end: '2026-10-28'
   weight: '0.004'
   progress: '0.0'
   rawSpecIds: []
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 183
     rowUnit: xlsx-row
 wbsSources:
   bodyHeader:
     source:
-      path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+      path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
       row: 10
       rowUnit: xlsx-row
     columns:
@@ -11204,9 +11695,9 @@ wbsSources:
       가중치: 8
       진행률: 9
   ancillaryRows:
-    docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv:
+    docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv:
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 4
         rowUnit: xlsx-row
       cells:
@@ -11218,7 +11709,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 6
         rowUnit: xlsx-row
       cells:
@@ -11230,7 +11721,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 7
         rowUnit: xlsx-row
       cells:
@@ -11242,7 +11733,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 8
         rowUnit: xlsx-row
       cells:
@@ -11254,7 +11745,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 9
         rowUnit: xlsx-row
       cells:
@@ -11266,7 +11757,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 10
         rowUnit: xlsx-row
       cells:
@@ -11278,7 +11769,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 11
         rowUnit: xlsx-row
       cells:
@@ -11290,7 +11781,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 12
         rowUnit: xlsx-row
       cells:
@@ -11302,7 +11793,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 13
         rowUnit: xlsx-row
       cells:
@@ -11314,7 +11805,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 15
         rowUnit: xlsx-row
       cells:
@@ -11326,7 +11817,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 16
         rowUnit: xlsx-row
       cells:
@@ -11338,7 +11829,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 17
         rowUnit: xlsx-row
       cells:
@@ -11350,7 +11841,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 18
         rowUnit: xlsx-row
       cells:
@@ -11361,8 +11852,8 @@ wbsSources:
       - 기능 명세 기반 기능별 개발 WBS와 일정 추가
       - ''
       - ''
-    - source: &id019
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+    - source: &id018
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 19
         rowUnit: xlsx-row
       cells:
@@ -11375,7 +11866,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 32
         rowUnit: xlsx-row
       cells:
@@ -11387,7 +11878,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 33
         rowUnit: xlsx-row
       cells:
@@ -11399,7 +11890,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 34
         rowUnit: xlsx-row
       cells:
@@ -11411,7 +11902,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 35
         rowUnit: xlsx-row
       cells:
@@ -11423,7 +11914,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/00-표지-변경이력.csv
+        path: docs/evidence/raw/wbs_2026-10-10/00-표지-변경이력.csv
         row: 36
         rowUnit: xlsx-row
       cells:
@@ -11434,9 +11925,9 @@ wbsSources:
       - ''
       - ''
       - ''
-    docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv:
+    docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv:
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 1
         rowUnit: xlsx-row
       cells:
@@ -11447,7 +11938,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 2
         rowUnit: xlsx-row
       cells:
@@ -11458,7 +11949,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 4
         rowUnit: xlsx-row
       cells:
@@ -11469,7 +11960,7 @@ wbsSources:
       - 핵심 선행조건
       - 일정 배치 원칙
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 5
         rowUnit: xlsx-row
       cells:
@@ -11480,7 +11971,7 @@ wbsSources:
       - 공통 API·인증 구조
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 6
         rowUnit: xlsx-row
       cells:
@@ -11491,7 +11982,7 @@ wbsSources:
       - 회원 상태·가상계좌·관심종목 API
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 7
         rowUnit: xlsx-row
       cells:
@@ -11502,7 +11993,7 @@ wbsSources:
       - 스키마·수집 정책·AI 분석 계약
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 8
         rowUnit: xlsx-row
       cells:
@@ -11513,7 +12004,7 @@ wbsSources:
       - FS074~FS081 분석·검증·GraphDB 반영 + 기존 조회 API
       - 기존 조회 11개 + 상세 8개. 신규 일정 산정 전; 6.4 연계 업무와 공수 중복 제거 후 확정.
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 9
         rowUnit: xlsx-row
       cells:
@@ -11524,7 +12015,7 @@ wbsSources:
       - 기업·시장·근거 조회 API
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 10
         rowUnit: xlsx-row
       cells:
@@ -11535,7 +12026,7 @@ wbsSources:
       - 이슈 선정·시장 데이터·관계 그래프
       - P1 우선 구현 후 P2·우선순위 미정 3건 후반 배치
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 11
         rowUnit: xlsx-row
       cells:
@@ -11546,7 +12037,7 @@ wbsSources:
       - 질의 분기 거버넌스·그래프/근거 조회
       - 선행 API 완료와 동시에 병렬 착수
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 12
         rowUnit: xlsx-row
       cells:
@@ -11557,7 +12048,7 @@ wbsSources:
       - 운영 데이터·권한·검토 워크플로
       - P1 우선 구현 후 P2·우선순위 미정 3건 후반 배치
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 16
         rowUnit: xlsx-row
       cells:
@@ -11568,7 +12059,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 17
         rowUnit: xlsx-row
       cells:
@@ -11579,7 +12070,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 18
         rowUnit: xlsx-row
       cells:
@@ -11590,7 +12081,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 19
         rowUnit: xlsx-row
       cells:
@@ -11601,7 +12092,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 20
         rowUnit: xlsx-row
       cells:
@@ -11612,7 +12103,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 21
         rowUnit: xlsx-row
       cells:
@@ -11623,7 +12114,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 23
         rowUnit: xlsx-row
       cells:
@@ -11634,7 +12125,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 24
         rowUnit: xlsx-row
       cells:
@@ -11645,7 +12136,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 25
         rowUnit: xlsx-row
       cells:
@@ -11656,7 +12147,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 26
         rowUnit: xlsx-row
       cells:
@@ -11667,7 +12158,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 27
         rowUnit: xlsx-row
       cells:
@@ -11678,7 +12169,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 28
         rowUnit: xlsx-row
       cells:
@@ -11688,8 +12179,8 @@ wbsSources:
       - ''
       - ''
       - ''
-    - source: &id020
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+    - source: &id019
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 29
         rowUnit: xlsx-row
       cells:
@@ -11701,7 +12192,7 @@ wbsSources:
       - ''
       - ''
     - source:
-        path: docs/evidence/raw/wbs_2026-10-08/02-개발-일정-요약.csv
+        path: docs/evidence/raw/wbs_2026-10-10/02-개발-일정-요약.csv
         row: 30
         rowUnit: xlsx-row
       cells:
@@ -13229,25 +13720,53 @@ implementation:
   evidenceKind: 문서 판정 인용(이번 생성기의 실행 검증 아님)
 warnings:
 - code: SPEC_NOT_IN_INDEX
-  id: FS???
+  id: ㅊ
   message: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
     row: 134
     rowUnit: xlsx-row
 - code: MALFORMED_SPEC_ID
-  id: FS???
+  id: ㅊ
   message: 명세 ID 형식 오류. 번호를 추정하거나 고치지 않는다.
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv
     row: 134
     rowUnit: xlsx-row
 - code: SPEC_NOT_IN_INDEX
-  id: FS050
+  id: FS050-01
   message: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
     row: 79
+    rowUnit: xlsx-row
+- code: SPEC_NOT_IN_INDEX
+  id: FS050-02
+  message: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 93
+    rowUnit: xlsx-row
+- code: SPEC_NOT_IN_INDEX
+  id: FS052-01
+  message: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 121
+    rowUnit: xlsx-row
+- code: SPEC_NOT_IN_INDEX
+  id: FS052-02
+  message: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 135
+    rowUnit: xlsx-row
+- code: SPEC_NOT_IN_INDEX
+  id: FS053
+  message: 상세 시트에만 있는 ID를 원문 그대로 보존했다.
+  source:
+    path: docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv
+    row: 149
     rowUnit: xlsx-row
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS017
@@ -13293,49 +13812,44 @@ warnings:
   id: FS027
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
   source: *id011
-- code: SPEC_ID_MEANING_CONFLICT
-  id: FS042
-  message: 목차 FS042는 재무·실적, 상세 FS042는 FS0??를 승계한 시점 관계 그래프다. ID 정리는 완료됐지만 재무 폐기 선언은
-    없다. 두 의미를 별도로 추적한다.
-  source: *id012
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS045
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
-  source: *id013
+  source: *id012
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS046
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
-  source: *id014
+  source: *id013
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS047
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
-  source: *id015
+  source: *id014
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS048
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
-  source: *id016
+  source: *id015
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS049
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
-  source: *id017
+  source: *id016
 - code: MULTIPLE_SPEC_DEFINITIONS
   id: FS051
   message: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
-  source: *id018
+  source: *id017
 - code: WBS_TITLE_MISSING
   id: 6.8.7
   message: 업무명이 비어 있다. 옛 번호의 업무를 현재 의미로 승계하지 않는다.
   source:
-    path: docs/evidence/raw/wbs_2026-10-08/01-프로젝트-WBS.csv
+    path: docs/evidence/raw/wbs_2026-10-10/01-프로젝트-WBS.csv
     row: 129
     rowUnit: xlsx-row
 - code: WBS_COVER_BODY_CONFLICT
   id: FS074~FS081
   message: 표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문
     충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.
-  source: *id019
+  source: *id018
 - code: WBS_COVER_BODY_CONFLICT
   id: FS074~FS081
   message: 표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문
     충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다.
-  source: *id020
+  source: *id019

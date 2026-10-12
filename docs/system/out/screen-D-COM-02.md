@@ -9,9 +9,9 @@
 | 기능 | 목표 API | 경로 | 우선순위 |
 | --- | --- | --- | --- |
 | [FS021](feature-FS021.md) · [FS043](feature-FS043.md) · [FS056](feature-FS056.md) · [FS063](feature-FS063.md) · [FS064](feature-FS064.md) | [listCompanyDocuments](../../api/out/zoop-api-spec.md#listcompanydocuments) | GET /api/v1/companies/{id}/documents | P1 |
-| [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) | [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | P1 |
+| [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) · [FS055](feature-FS055.md) | [listEvents](../../api/out/zoop-api-spec.md#listevents) | GET /api/v1/events | P1 |
 | [FS021](feature-FS021.md) · [FS041](feature-FS041.md) · [FS056](feature-FS056.md) | [getEvent](../../api/out/zoop-api-spec.md#getevent) | GET /api/v1/events/{id} | P1 |
-| [FS024](feature-FS024.md) · [FS043](feature-FS043.md) · [FS050-01](feature-FS050-01.md) · [FS055](feature-FS055.md) | [getEvidence](../../api/out/zoop-api-spec.md#getevidence) | GET /api/v1/evidence/{id} | P1 |
+| [FS024](feature-FS024.md) · [FS043](feature-FS043.md) · [FS049](feature-FS049.md) · [FS055](feature-FS055.md) | [getEvidence](../../api/out/zoop-api-spec.md#getevidence) | GET /api/v1/evidence/{id} | P1 |
 | [FS066-01](feature-FS066-01.md) | [getMyFeedback](../../api/out/zoop-api-spec.md#getmyfeedback) | GET /api/v1/feedback | P2 |
 | [FS066-01](feature-FS066-01.md) | [setFeedback](../../api/out/zoop-api-spec.md#setfeedback) | PUT /api/v1/feedback | P2 |
 | [FS038](feature-FS038.md) · [FS040](feature-FS040.md) · [FS041](feature-FS041.md) · [FS042](feature-FS042.md) · [FS055](feature-FS055.md) | [getCompanyGraphAsOf](../../api/out/zoop-api-spec.md#getcompanygraphasof) | GET /api/v1/companies/{id}/graph | P1 |

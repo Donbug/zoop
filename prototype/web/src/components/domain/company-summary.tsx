@@ -1,8 +1,8 @@
 // 지도 기업 패널의 요약. 기업 상세와 같은 조회 훅·키를 사용하고 각 영역은 독립적으로 실패한다.
 import { Newspaper, Star, Wallet } from "lucide-react";
-import { ApiError, type Schemas } from "@/api/client";
+import type { Schemas } from "@/api/client";
 import { useAsOfRound, useCompany, useCompanyDocuments, useCompanyPrices } from "@/api/queries";
-import { CompanyQuote } from "@/features/company-quote";
+import { CompanyQuote, MarketErrorState } from "@/features/company-quote";
 import { CompanyMetrics } from "@/features/company-metrics";
 import { CompanyHolding } from "@/features/company-holding";
 import { ErrorState, SkeletonRows } from "@/components/ui/feedback";
@@ -43,9 +43,8 @@ export function CompanyPanelSummary({ companyId, range }: { companyId: string; r
 function CompanyPanelPriceChart({ companyId, range }: { companyId: string; range: DetailRange }) {
   const prices = useCompanyPrices(companyId, range);
   if (prices.isPending) return <SkeletonRows count={1} label="시세 추이를 불러오고 있어요" />;
-  if (prices.isError) return <ErrorState compact title="시세 추이를 불러오지 못했어요" error={prices.error} onRetry={() => void prices.refetch()} />;
+  if (prices.isError) return <MarketErrorState title="시세 추이를 불러오지 못했어요" error={prices.error} onRetry={() => void prices.refetch()} />;
   const data = prices.data;
-  if (data.status === "unavailable" && data.reasonCode === "temporary_failure") return <ErrorState compact title="시세 추이를 불러오지 못했어요" error={new ApiError(200, data.reasonCode, data.reason)} onRetry={() => void prices.refetch()} />;
   if (data.status !== "available" || data.points.length === 0) return null;
   const values = data.points.map((p) => p.close);
   const low = Math.min(...values);

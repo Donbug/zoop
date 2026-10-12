@@ -23,6 +23,7 @@ from typing import Any
 import httpx
 
 from .market_data import (
+    ACCESS_DENIED,
     KST,
     REFERENCE_TTL,
     TEMPORARY,
@@ -41,6 +42,7 @@ from .market_data import (
 DELAY_NOTE = "비공식 공개 자료예요. 지연되거나 바뀔 수 있어요."
 NOT_LISTED = "네이버 증권에서 이 종목의 지표를 찾지 못했어요."
 FORMAT_CHANGED = "지표 출처의 응답 형식을 읽지 못했어요."
+NO_VALUES = "네이버 증권에 이 종목의 지표 값이 없어요."
 
 # Rows kept, in display order, with our label. Anything else the source sends is ignored.
 LABELS: dict[str, str] = {
@@ -81,10 +83,19 @@ def _time(value: Any) -> datetime | None:
 
 
 def parse_rows(rows: Any, basis_key: str) -> tuple[Metric, ...]:
+    """The usable rows in display order. A row that is N/A, empty or of the wrong type is simply absent from the
+    result -- never 0 and never a reason to drop the others.
+
+    ``no_data`` only when the adapter recognised the expected indicators and the source explicitly left them without a
+    value, or sent a valid empty list. Rows of which none is an indicator this adapter knows (renamed or unknown codes
+    only) mean it cannot interpret the structure the source advertises: ``format_changed``. Unknown extras next to
+    known rows are ignored."""
     if not isinstance(rows, list):
         raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
-    by_code = {r.get("code"): r for r in rows if isinstance(r, dict)}
-    items = []
+    by_code = {r["code"]: r for r in rows if isinstance(r, dict) and isinstance(r.get("code"), str)}
+    if rows and not any(code in by_code for code in LABELS):
+        raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
+    items: list[Metric] = []
     for code, label in LABELS.items():
         row = by_code.get(code)
         value = row.get("value") if row else None
@@ -92,6 +103,8 @@ def parse_rows(rows: Any, basis_key: str) -> tuple[Metric, ...]:
             continue
         basis = row.get(basis_key)
         items.append(Metric(code, label, value.strip(), basis.strip() if isinstance(basis, str) and basis.strip() else None))
+    if not items:
+        raise QuoteUnavailable("no_data", NO_VALUES)
     return tuple(items)
 
 
@@ -125,6 +138,8 @@ class NaverMetricsProvider:
         response = request_json(client, "GET", path, params=params)
         if response.status_code in (400, 404, 409):
             raise QuoteUnavailable("unsupported_symbol", NOT_LISTED)
+        if response.status_code in (401, 403):
+            raise QuoteUnavailable("auth_failed", ACCESS_DENIED)
         if not response.is_success:
             raise QuoteUnavailable("temporary_failure", TEMPORARY)
         body = json_body(response)

@@ -1,46 +1,55 @@
-# FS049 · 답변 검증과 제공
+# FS049 · 답변 근거와 관련 그래프 탐색
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 팀 검토 전 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 49 |
+| 요구사항 번호(원문) | 49 |
+| 의미 기준 요구사항 | 50 |
 | API 대응 | 연결됨 |
 | 사유 |  |
-| 프로토타입 문서 판정 | 구현 |
+| 프로토타입 문서 판정 | 옛 FS050-01: 구현 / 옛 FS050-02: 구현 |
 | 코드 위치(실행 증거 아님) | prototype/bff/src/zoop_bff/routers/chat.py:17 |
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:59 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:59 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/07-AI-챗봇.csv) — 답변 검증과 제공: AI 답변의 형식, 인용이 가리키는 문서·원문 구간, 답변에 포함된 그래프 대상의 유효성을 확인해야 한다. 현재 유효한 실행의 검증된 결과를 저장한 후 답변을 제공해야 한다. 실제 적용 기업·이슈·기간을 표시하고 검증 실패 시 답변을 자동으로 다시 생성하지 않아야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv) — 답변 근거와 관련 그래프 탐색: 사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다. AI 답변 자체는 새 관계를 생성하지 않는다.
+- [이력 정의] [docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv) — 답변 검증과 제공: AI 답변의 형식, 인용이 가리키는 문서·원문 구간, 답변에 포함된 그래프 대상의 유효성을 확인해야 한다. 현재 유효한 실행의 검증된 결과를 저장한 후 답변을 제공해야 한다. 실제 적용 기업·이슈·기간을 표시하고 검증 실패 시 답변을 자동으로 다시 생성하지 않아야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/08-AI-챗봇-v2.csv) — 답변 근거와 관련 그래프 탐색: 사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다. AI 답변 자체는 새 관계를 생성하지 않는다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:42 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+## 상세 권한과 의미 이행
+
+- 이 번호의 옛 AI 탭 정의는 현재 FS048, NFS003로 이행된다(다른 번호로 이동). 보존: 인용·원문 구간·그래프 참조 검증, 현재 유효 실행만 저장, 저장 후 완료, 검증 실패의 자동 재생성 금지, 보존 결과는 모델 재호출 없는 저장 복구.
+- 옛 FS050-01 AI 답변 근거·원문 확인에서 이행됨(병합·번호 이동). 보존: 답변에 실제 연결된 출처·인용·원문 링크만 제공, 접근 실패는 답변 재생성이 아님, 기사 전문 재배포 안 함.
+- 옛 FS050-02 AI 답변 관련 그래프 탐색에서 이행됨(병합·번호 이동). 보존: 존재·공개 권한이 있는 대상만 기존 그래프에서 강조, 이슈–기업 간선 제외, AI가 새 관계를 만들지 않음.
+
+문서 판정 출처: 옛 FS050-01 [docs/evidence/spec-v1.2-gap.md:83 (text-line)](../../../docs/evidence/spec-v1.2-gap.md) / 옛 FS050-02 [docs/evidence/spec-v1.2-gap.md:44 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 
 | WBS | 역할 | 현재 업무 | 연결 근거 |
 | --- | --- | --- | --- |
-| 6.9.4 | BE | (BE) 근거 기반 답변 생성·안전 검증 | 근거 기반 답변 생성·안전 검증은 현재 FS049 답변 검증/제공 의미와 대응한다. |
-| 6.9.13 | FE | (FE) D-AI-02 AI 비동기 작업 상태·결과·재시도 API 연동 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
-| 6.9.15 | 공통/통합 | AI 챗봇 통합 테스트 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
+| 6.9.5 | BE | (BE) 답변 근거·관련 그래프 탐색 | 답변 근거·관련 그래프 탐색은 AI v2 FS049 의미다. 원문 산출물의 옛 FS050-01/-02가 하나로 합쳐졌다. |
+| 6.9.14 | FE | (FE) D-AI-02b 대화 이력·후속 질문·답변 재조회 API 연동 | 대화 이력·후속 질문·재조회는 근거 탐색(FS049)·새 대화/후속 질문(FS050)·결과 재조회(FS051)·질문 기록(FS060)을 소비한다. |
+| 6.9.15 | 공통/통합 | AI 챗봇 통합 테스트 | AI v2 FS045~051과 질문 기록, 권한·작업 일관성 공통 의무를 통합 시험 대상으로 연결한다. 원문 종료일이 시작일보다 앞서는 오류는 별도 경고로 보존한다. |
 
 ## 화면·목표 API
 
-[D-AI-01](screen-D-AI-01.md) · [D-AI-01b](screen-D-AI-01b.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02](screen-D-AI-02.md)
+[D-GRP-05](screen-D-GRP-05.md) · [D-COM-02](screen-D-COM-02.md) · [D-AI-01](screen-D-AI-01.md) · [D-SEN-01](screen-D-SEN-01.md) · [D-AI-01b](screen-D-AI-01b.md) · [M-AI-01](screen-M-AI-01.md) · [D-AI-02](screen-D-AI-02.md)
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
+| [getEvidence](../../api/out/zoop-api-spec.md#getevidence) | GET /api/v1/evidence/{id} | 6.1.2, 6.11.1, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.7.6, 6.7.9, 6.9.5, 6.9.14, 6.5.1 | 공개 |
 | [submitQuestion](../../api/out/zoop-api-spec.md#submitquestion) | POST /api/v1/chat/sessions/{id}/jobs | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 | 회원(본인) |
 | [getQuestionJob](../../api/out/zoop-api-spec.md#getquestionjob) | GET /api/v1/chat/jobs/{job_id} | 6.1.2, 6.11.1, 6.9.4, 6.9.5, 6.9.7, 6.9.9, 6.9.13, 6.9.14 | 회원(본인) |
 
 ## 확인 필요
 
-- MULTIPLE_SPEC_DEFINITIONS: 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다.
+- HISTORICAL_DETAIL_SUPERSEDED: 옛 시트 07-AI-챗봇.csv의 정의는 이력으로 보존한다. 현행 상세는 08-AI-챗봇-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다.
+- REQUIREMENT_BINDING_BY_MEANING: 명세 '답변 근거와 관련 그래프 탐색' ↔ 원문 요구 번호 49 '답변 검증과 제공'. 의미 기준 연결은 요구 ['50']이다(의미 기준 재연결): 현 FS049(답변 근거·관련 그래프 탐색)는 요구 50이다. 상세 메타에는 요구 번호가 없다.

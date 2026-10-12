@@ -1,0 +1,43 @@
+{
+  "capturedOn": "2026-10-10",
+  "scope": "desktop market UI correctness, not live provider quality or load/capacity",
+  "cssViewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "files": [
+    {
+      "case": "partial-metrics",
+      "file": "market-proof-2026-10-10-partial-metrics.png",
+      "sha256": "75bb9087b264828a70fdd514ae0496e8c3926db3cc7931a368c25ed5b163f11c",
+      "provenance": "authored synthetic companies and loopback fake external provider; actual BFF and browser"
+    },
+    {
+      "case": "weekly-year",
+      "file": "market-proof-2026-10-10-weekly-year.png",
+      "sha256": "4c7634d3aa1750d8b8aae36979f371d25c285217cdfef4e894b9c7f83c3390d7",
+      "provenance": "authored synthetic companies and loopback fake external provider; actual BFF and browser"
+    },
+    {
+      "case": "auth-failure",
+      "file": "market-proof-2026-10-10-auth-failure.png",
+      "sha256": "dc75a984b6c7513da57f5e626b6ef79d2bea20290eec42c51e576c39d0e026b2",
+      "provenance": "authored synthetic companies and loopback fake external provider; actual BFF and browser"
+    },
+    {
+      "case": "no-data",
+      "file": "market-proof-2026-10-10-no-data.png",
+      "sha256": "da6c12dbc54b779df0dc3de267f5b81fa546c56fc6576660da2698b7fdff711d",
+      "provenance": "authored synthetic companies and loopback fake external provider; actual BFF and browser"
+    },
+    {
+      "case": "temporary-failure",
+      "file": "market-proof-2026-10-10-temporary-failure.png",
+      "sha256": "e3a5939b5aee6a13760f5189d13657e45c846e5758abf1a65f1be303db9a2eb3",
+      "provenance": "authored synthetic companies and loopback fake external provider; actual BFF and browser"
+    }
+  ],
+  "onboarding": "Separate D-WAT-01/D-WAT-01b screen-plan captures plus observed desktop/mobile DOM/network/settings; earlier temporary onboarding screenshot paths did not persist",
+  "correction": "Earlier browser screenshot path options produced inline observations only. These five files were re-captured using Puppeteer and verified on disk before copying.",
+  "cleanup": "Owned BFF/fake-provider/Vite servers and temporary runtime state were stopped/removed by the frontend owner."
+}

@@ -74,9 +74,15 @@ def import_specs(folder: Path, warnings: list[dict]) -> list[dict]:
             end = starts[index + 1][0] - 2 if index + 1 < len(starts) else len(rows)
             fields = {r[0].strip(): r[1] for r in rows[row_no:end]
                       if len(r) > 1 and r[0].strip() and r[1].strip()}
+            # 상세 구획 제목 행(원본 ID와 이름만 있는 행)과 그 아래 메타 행을 보존한다. 목차의 상세 위치·요구 번호와 대조하는 근거다.
+            heading_row = next((n for n in range(row_no - 1, max(row_no - 6, 0), -1)
+                                if re.match(r"(?:NFS|FS)\S*\s", rows[n - 1][0].strip() + " ")
+                                and not any(c.strip() for c in rows[n - 1][1:])), None)
+            heading = {"row": heading_row, "text": rows[heading_row - 1][0].strip()} if heading_row else None
+            meta = " ".join(rows[n][0].strip() for n in range(heading_row, row_no - 1) if rows[n][0].strip()) if heading_row else ""
             if raw not in by_id:
-                meta = " ".join(" ".join(r) for r in rows[max(0, row_no - 3):row_no - 1])
-                priority = re.search(r"우선순위:\s*(P[12])", meta)
+                near = " ".join(" ".join(r) for r in rows[max(0, row_no - 3):row_no - 1])
+                priority = re.search(r"우선순위:\s*(P[12])", near)
                 rec = {"id": raw, "title": fields.get("기능명", fields.get("요구사항명", raw)),
                        "section": path.stem, "priority": priority[1] if priority else "미기재",
                        "status": "목차 없음", "requirementIds": [], "source": origin(path, row_no),
@@ -84,7 +90,8 @@ def import_specs(folder: Path, warnings: list[dict]) -> list[dict]:
                 records.append(rec)
                 by_id[raw] = rec
                 warnings.append({"code": "SPEC_NOT_IN_INDEX", "id": raw, "message": "상세 시트에만 있는 ID를 원문 그대로 보존했다.", "source": origin(path, row_no)})
-            by_id[raw]["definitions"].append({"source": origin(path, row_no), "fields": fields})
+            by_id[raw]["definitions"].append({"source": origin(path, row_no), "fields": fields,
+                                              "heading": heading, "meta": meta})
             if not VALID_ID.fullmatch(raw):
                 warnings.append({"code": "MALFORMED_SPEC_ID", "id": raw, "message": "명세 ID 형식 오류. 번호를 추정하거나 고치지 않는다.", "source": origin(path, row_no)})
     for rec in records:
@@ -209,9 +216,9 @@ def import_implementation(path: Path) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--spec-dir", type=Path, required=True)
-    parser.add_argument("--wbs-dir", type=Path, required=True)
-    parser.add_argument("--requirements-dir", type=Path, required=True)
+    parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-10")
+    parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-10-10")
+    parser.add_argument("--requirements-dir", type=Path, default=ROOT / "docs/evidence/raw/requirements-sheet_2026-10-06")
     parser.add_argument("--screens", type=Path, default=ROOT / "docs/screen-plan/captures/slide-index.json")
     parser.add_argument("--gap", type=Path, default=ROOT / "docs/evidence/spec-v1.2-gap.md")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)

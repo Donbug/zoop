@@ -2,14 +2,14 @@
 //  1) 투자 여부(저장): 투자 중 → 가상 계좌 연결, 아니면 → 관심 종목 고르기
 //  2) 가상 계좌(요구 9 보류 중이지만 모의 프로필 연결은 유지): 모의 데이터임을 밝히고, 연결하면 보유 종목을 보여 준다.
 //     건너뛰기 → 관심 종목. 실패하면 다시 시도하거나 관심 종목으로 넘어간다.
-//  3) 관심 종목: 개수 제한 없음. 검색(이름·티커)과 추천(승인된 사건이 많은 기업, 근거 문구 포함). 0개여도 지도로 간다.
+//  3) 관심 종목: 개수 제한 없음. 검색(이름·티커)을 실행해 직접 고른다. 0개여도 지도로 간다.
 //  저장에 실패하면 완료로 처리하지 않고 고른 내용을 그대로 둔 채 다시 시도한다(요구 13).
 //  설정이 끝나면 메인 지도로 가고, 튜토리얼은 메인 지도 위에서 진행한다(features/graph-tutorial.tsx).
-import { ArrowLeft, Briefcase, FlaskConical, Landmark, Lightbulb, Sprout, Star, X } from "lucide-react";
+import { ArrowLeft, Briefcase, FlaskConical, Landmark, Sprout, Star, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { ApiError, type Schemas } from "@/api/client";
-import { useConnectPortfolio, useMockPortfolios, usePortfolio, useRecommendations, useSettings, useUpdateSettings } from "@/api/queries";
+import { useConnectPortfolio, useMockPortfolios, usePortfolio, useSettings, useUpdateSettings } from "@/api/queries";
 import { CompanyMark } from "@/components/domain/company-mark";
 import { CompanySearch } from "@/components/domain/company-search";
 import { Button } from "@/components/ui/button";
@@ -251,7 +251,6 @@ function AccountStep({ settings, onBack, onWatchlist }: { settings: Schemas["Set
 function WatchlistStep({ settings, onBack }: { settings: Schemas["SettingsResponse"]; onBack: () => void }) {
   const navigate = useNavigate();
   const { save, update } = useSaveSettings(settings);
-  const recommendations = useRecommendations();
   const portfolio = usePortfolio();
   const [picked, setPicked] = useState<PickedCompany[]>([]);
   const pickedIds = picked.map((p) => p.id);
@@ -305,34 +304,6 @@ function WatchlistStep({ settings, onBack }: { settings: Schemas["SettingsRespon
                 <Button variant="ghost" size="icon" aria-label={`${p.name} 빼기`} onClick={() => setPicked((prev) => prev.filter((x) => x.id !== p.id))}>
                   <X aria-hidden="true" />
                 </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="onboarding-recommended">
-        <SectionHeader id="onboarding-recommended" icon={Lightbulb} title="승인된 사건이 많은 기업" />
-        {recommendations.isPending && <SkeletonRows count={2} label="추천 종목을 불러오고 있어요" />}
-        {recommendations.isError && (
-          <ErrorState className="px-4" error={recommendations.error} title="추천 종목을 불러오지 못했어요" onRetry={() => void recommendations.refetch()} compact />
-        )}
-        {recommendations.data && recommendations.data.items.length === 0 && (
-          <p className="px-4 py-3 text-base text-text-secondary">추천할 만큼 사건이 쌓인 기업이 아직 없어요. 아래에서 검색해 주세요.</p>
-        )}
-        {recommendations.data && recommendations.data.items.length > 0 && (
-          <ul aria-label="추천 종목">
-            {recommendations.data.items.map(({ company, reason }) => (
-              <li key={company.id}>
-                <ListRow
-                  onClick={() => toggle(company)}
-                  disabled={update.isPending}
-                  selected={pickedIds.includes(company.id)}
-                  leading={<CompanyMark id={company.id} name={company.name} brandColor={company.brandColor} logoUrl={company.logoUrl} />}
-                  title={company.name}
-                  description={<span className="tabular-nums">{company.ticker ? `${company.ticker} · ` : ""}{reason}</span>}
-                  trailing={pickedIds.includes(company.id) ? <span className="font-medium text-brand-primary">선택됨</span> : <span>추가</span>}
-                />
               </li>
             ))}
           </ul>

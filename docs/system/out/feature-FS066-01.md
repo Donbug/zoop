@@ -1,15 +1,16 @@
 # FS066-01 · AI 답변·뉴스 요약·브리핑 평가 등록
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | FS037: 미기재 / FS066: P2 · FS037: 미기재 / FS066: 미기재 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 37, 78 |
+| 요구사항 번호(원문) | 37, 78 |
+| 의미 기준 요구사항 | 37, 78 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 구현 |
@@ -17,18 +18,22 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:77 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:73 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv) — AI 답변·뉴스 요약·브리핑 평가 등록: 로그인 회원이 제공받은 AI 답변·뉴스 요약·브리핑 결과에 좋아요 또는 싫어요를 등록·변경·취소한다. 평가를 결과 종류와 해당 결과 버전에 연결한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — AI 답변·뉴스 요약·브리핑 평가 등록: 로그인 회원이 제공받은 AI 답변·뉴스 요약·브리핑 결과에 좋아요 또는 싫어요를 등록·변경·취소한다. 평가를 결과 종류와 해당 결과 버전에 연결한다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:49 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+## 상세 권한과 의미 이행
+
+- 정정 연결 정의: 원문 ID `ㅊ`의 05-출퇴근-브리핑.csv 134행(제목 132행).
+
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:49 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 
 | WBS | 역할 | 현재 업무 | 연결 근거 |
 | --- | --- | --- | --- |
 | 6.8.10 | BE | (BE) 좋아요/싫어요 등록 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
-| 6.8.14 | FE | (FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
+| 6.8.14 | FE | (FE) 브리핑 관계 그래프·개인화·평가 UI 및 API 연동 | 15:05 WBS 재수집의 E136에서 과거 평가 FS037이 FS066-01로 정정되어 원문과 편집 연결이 일치한다. 제목·FE 역할은 동일하며 현재 종목 검색 FS037과 혼동하지 않는다. docs/evidence/api-source-refresh-2026-10-08.md의 전셀/의미 비교를 따른다. |
 | 6.8.15 | 공통/통합 | 출퇴근 브리핑 통합 테스트 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
 | 6.10.5 | BE | (BE) AI 결과 평가·선호도 통계 API 개발 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |
 | 6.10.19 | 공통/통합 | 관리자 권한·운영 기능 통합 테스트 | 현재 업무명·역할·FS 내용을 대조한 편집 연결이다. 원문 산출물의 ID/의존 참조는 rawSpecIds와 분리한다. |

@@ -3,12 +3,12 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Path, Query, Request
 
 from ..dataset import ARTICLE_LINKS, COMPANY_LINKS, CompanyRec, Dataset, IssueRec, edge_id, sort_recent, time_precision
 from ..deps import OptionalPrincipal, State
-from ..errors import ApiError, not_found
-from ..market_data import Source
+from ..errors import ApiError, SourceUnavailable, not_found
+from ..market_data import ABSENCE_CODES, RETRYABLE_CODES, QuoteResult, Source
 from ..company_history import as_of_dataset, company_neighborhood
 from ..graph import edge_detail, select_graph
 from ..summaries import role_display
@@ -30,6 +30,7 @@ from ..schemas import (
     EventListMetadata,
     EventListResponse,
     EvidenceArticle,
+    ErrorResponse,
     EvidenceResponse,
     FieldDecisionOut,
     FieldOutcomeOut,
@@ -42,6 +43,7 @@ from ..schemas import (
     PriceResponse,
     PriceSeries,
     PriceSeriesUnavailable,
+    QuoteAbsenceCode,
     QuoteResponse,
     QuoteSourceOut,
     QuoteValues,
@@ -74,6 +76,30 @@ RoundQuery = Annotated[
         "published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph.",
     ),
 ]
+
+MARKET_ERROR_RESPONSES: dict[int | str, dict] = {
+    **ERROR_RESPONSES,
+    503: {
+        "model": ErrorResponse,
+        "description": "source_unavailable: the market data source itself failed (auth, network, timeout, 429/5xx, "
+        "changed format) -- not a normal absence. details.reasonCode names the provider failure and "
+        "details.retryable is true only for a transient one (temporary_failure); otherwise retrying unchanged will "
+        "not help. Normal absence (not_connected, unsupported_symbol, no_data) is a 200 with status unavailable.",
+    },
+}
+
+
+def _absence(result: QuoteResult, area: Literal["quote", "metrics", "prices"]) -> QuoteAbsenceCode:
+    """Normal absence is an answer (200 ``unavailable``); a failed source never is (503 ``source_unavailable``).
+
+    ``details.reasonCode`` keeps the provider's classification; ``retryable`` is true only for a transient failure.
+    No retry delay or cost is invented: the providers do not report one."""
+    if result.code in ABSENCE_CODES:
+        return result.code  # type: ignore[return-value]
+    raise SourceUnavailable(
+        result.reason or "시세 출처를 읽지 못했어요.",
+        {"source": "market", "area": area, "reasonCode": result.code, "retryable": result.code in RETRYABLE_CODES},
+    )
 
 
 def _require_company(ds: Dataset, company_id: str) -> None:
@@ -262,16 +288,30 @@ def get_company(
     )
 
 
-@router.get("/companies/{id}/quote", response_model=QuoteResponse)
-def get_quote(company_id: Annotated[str, Path(alias="id")], state: State) -> CompanyQuote | CompanyQuoteUnavailable:
+@router.get("/companies/{id}/quote", response_model=QuoteResponse, responses=MARKET_ERROR_RESPONSES)
+def get_quote(
+    company_id: Annotated[str, Path(alias="id")], request: Request, state: State
+) -> CompanyQuote | CompanyQuoteUnavailable:
     """Current price and indicators from the configured quote provider, with source and as-of time.
 
     Separate from ``/companies/{id}`` so a slow or failing quote never blocks the company overview.
-    Missing values stay null; ``quote.derived`` lists values the BFF computed (e.g. market cap)."""
+    Missing values stay null; ``quote.derived`` lists values the BFF computed (e.g. market cap). ``quote.asOf`` is the
+    provider's observation time and stays null when the provider gives none.
+
+    Always the latest value the provider has: ``asOf`` and ``graphVersion`` are not accepted (422, never read as a
+    historical lookup). Normal absence is 200 ``unavailable``; a failed provider is 503 ``source_unavailable``."""
+    rejected = [name for name in ("asOf", "graphVersion") if name in request.query_params]
+    if rejected:
+        raise ApiError(
+            422,
+            "validation_error",
+            "요청 값이 올바르지 않습니다.",
+            {"errors": [{"loc": ["query", name], "message": "The latest quote takes no historical selector"} for name in rejected]},
+        )
     _require_company(state.provider.get(), company_id)
     result = state.market.quote(company_id)
     if result.quote is None or result.source is None:
-        return CompanyQuoteUnavailable(company_id=company_id, reason_code=result.code, reason=result.reason)
+        return CompanyQuoteUnavailable(company_id=company_id, reason_code=_absence(result, "quote"), reason=result.reason)
     q = result.quote
     return CompanyQuote(
         company_id=company_id,
@@ -295,14 +335,17 @@ def get_quote(company_id: Annotated[str, Path(alias="id")], state: State) -> Com
     )
 
 
-@router.get("/companies/{id}/metrics", response_model=MetricsResponse)
+@router.get("/companies/{id}/metrics", response_model=MetricsResponse, responses=MARKET_ERROR_RESPONSES)
 def get_metrics(company_id: Annotated[str, Path(alias="id")], state: State) -> CompanyMetrics | CompanyMetricsUnavailable:
     """General indicators (시가총액·PER·PBR·EPS·배당·외국인 소진율) from a separate public source, passed through as
-    given with each value's reference period. Independent of the price provider: a failure here leaves quotes alone."""
+    given with each value's reference period. Independent of the price provider: a failure here leaves quotes alone.
+
+    A value the source does not give is absent from ``items`` (never 0); the others are kept. Normal absence is
+    200 ``unavailable``; a failed source is 503 ``source_unavailable``."""
     _require_company(state.provider.get(), company_id)
     result = state.market.metrics(company_id)
     if result.metrics is None or result.source is None:
-        return CompanyMetricsUnavailable(company_id=company_id, reason_code=result.code, reason=result.reason)
+        return CompanyMetricsUnavailable(company_id=company_id, reason_code=_absence(result, "metrics"), reason=result.reason)
     return CompanyMetrics(
         company_id=company_id,
         source=_source_out(result.source),
@@ -390,7 +433,7 @@ def get_company_graph(
     )
 
 
-@router.get("/companies/{id}/prices", response_model=PriceResponse)
+@router.get("/companies/{id}/prices", response_model=PriceResponse, responses=MARKET_ERROR_RESPONSES)
 def get_prices(
     company_id: Annotated[str, Path(alias="id")],
     state: State,
@@ -402,14 +445,14 @@ def get_prices(
     or daily bars from the timeline's period start (1m, 1y).
 
     With ``from``/``to`` (the timeline's common KST range, FS040) only bars inside it are returned: intraday bars
-    by their time, daily bars by their KST day. A closed market leaves a gap; no price is ever filled in, so a
-    range without any session (a holiday ``1d``) is ``no_data``."""
+    range without any session (a holiday ``1d``) is ``no_data``. Bars are 5m (1d), 1h (1w), 1d (1m), 1wk (1y).
+    Normal absence is 200 ``unavailable``; a failed provider is 503 ``source_unavailable``."""
     _require_company(state.provider.get(), company_id)
     window = _Range.parse(from_, to)
     result = state.market.series(company_id, period, start=window.start, end=window.end)
     if result.series is None or result.source is None:
         return PriceSeriesUnavailable(
-            company_id=company_id, period=period, reason_code=result.code, reason=result.reason
+            company_id=company_id, period=period, reason_code=_absence(result, "prices"), reason=result.reason
         )
     series = result.series
     daily = series.interval in ("1d", "1wk")

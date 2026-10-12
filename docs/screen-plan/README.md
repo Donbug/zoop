@@ -101,3 +101,7 @@ open docs/screen-plan/zoop-screen-plan-v2.1.pdf
 ### 최종 번호 설명 정정
 
 Main이 발견한 D-GRP-03 번호 3의 설명을 **‘기업의 다른 이름을 펼쳐요’**로 바로잡았어요. 실제 클릭 기록의 열린 내용은 `Samsung Electronics · Samsung`이며 주요 지표가 아니에요. `screen-details.json`·개별 캡처 JSON·manifest를 함께 정정하고 덱을 다시 생성했어요. 이미지·번호 위치·CSS는 바꾸지 않았고 별도 재캡처나 API 요청도 하지 않았어요.
+
+## 10-10 관심 종목 추천 제거
+
+사용자 피드백(10-10)으로 초기 설정의 추천 종목 목록을 없앴어요. `/api/me/recommendations`는 보존하지만 화면은 요청하지 않아요. `capture.py`는 추천 행 대신 실제 검색(NVIDIA·SK·삼성)을 실행해 결과 행으로 4개를 고르고, 추천 영역이나 추천 요청이 보이면 실패해요. `--slides D-WAT-01 D-WAT-01b`로 두 화면만 다시 캡처했어요. `D-WAT-01`의 명세는 `FS011-01·FS012·FS013`이에요. 이 실행의 로컬 API 요청 26건 중 추천 요청은 0건이며 `targeted-capture.json`은 이 실행 기록으로 바뀌었어요. 10-08 실행 수치는 위 본문과 `verification.json`에 남아 있어요. 덱은 77쪽·186개 번호 그대로 다시 만들었고 21·22쪽(D-WAT-01/01b)에 새 캡처가 들어가요.

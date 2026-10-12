@@ -1,0 +1,101 @@
+[
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 4,
+    "column": 10,
+    "cell": "J4",
+    "before": "0.355",
+    "after": "0.359"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 34,
+    "column": 10,
+    "cell": "J34",
+    "before": "0",
+    "after": "0.008"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 35,
+    "column": 7,
+    "cell": "G35",
+    "before": "2026-10-07 00:00:00",
+    "after": "2026-10-06 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 35,
+    "column": 10,
+    "cell": "J35",
+    "before": "0",
+    "after": "0.2"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 37,
+    "column": 10,
+    "cell": "J37",
+    "before": "0.0",
+    "after": "1.0"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 41,
+    "column": 7,
+    "cell": "G41",
+    "before": "2026-10-13 00:00:00",
+    "after": "2026-10-12 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 7,
+    "cell": "G62",
+    "before": "",
+    "after": "2026-10-13 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 8,
+    "cell": "H62",
+    "before": "",
+    "after": "2026-10-20 00:00:00"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 62,
+    "column": 10,
+    "cell": "J62",
+    "before": "",
+    "after": "0"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 136,
+    "column": 5,
+    "cell": "E136",
+    "before": "FS032 · FS036 · FS037",
+    "after": "FS032 · FS036 · FS066-01"
+  },
+  {
+    "workbook": "wbs",
+    "sheet": "프로젝트 WBS",
+    "row": 154,
+    "column": 8,
+    "cell": "H154",
+    "before": "2026-10-22 00:00:00",
+    "after": "2026-10-24 00:00:00"
+  }
+]

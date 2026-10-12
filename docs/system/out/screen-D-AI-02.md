@@ -8,8 +8,8 @@
 
 | 기능 | 목표 API | 경로 | 우선순위 |
 | --- | --- | --- | --- |
-| [FS046](feature-FS046.md) · [FS049](feature-FS049.md) · [FS050-01](feature-FS050-01.md) · [FS050-02](feature-FS050-02.md) · [FS053](feature-FS053.md) | [getQuestionJob](../../api/out/zoop-api-spec.md#getquestionjob) | GET /api/v1/chat/jobs/{job_id} | P1 |
-| [FS053](feature-FS053.md) | [retryQuestionJob](../../api/out/zoop-api-spec.md#retryquestionjob) | POST /api/v1/chat/jobs/{job_id}/retry | P1 |
-| [FS046](feature-FS046.md) · [FS053](feature-FS053.md) | [cancelQuestionJob](../../api/out/zoop-api-spec.md#cancelquestionjob) | POST /api/v1/chat/jobs/{job_id}/cancel | P1 |
+| [FS048](feature-FS048.md) · [FS049](feature-FS049.md) · [FS051](feature-FS051.md) | [getQuestionJob](../../api/out/zoop-api-spec.md#getquestionjob) | GET /api/v1/chat/jobs/{job_id} | P1 |
+| [FS051](feature-FS051.md) | [retryQuestionJob](../../api/out/zoop-api-spec.md#retryquestionjob) | POST /api/v1/chat/jobs/{job_id}/retry | P1 |
+| [FS051](feature-FS051.md) | [cancelQuestionJob](../../api/out/zoop-api-spec.md#cancelquestionjob) | POST /api/v1/chat/jobs/{job_id}/cancel | P1 |
 
 공통 품질: [NFS001](feature-NFS001.md) · [NFS002](feature-NFS002.md) · [NFS004](feature-NFS004.md) · [NFS008](feature-NFS008.md) · [NFS003](feature-NFS003.md) · [NFS009](feature-NFS009.md) · [NFS005](feature-NFS005.md) · [NFS006](feature-NFS006.md)

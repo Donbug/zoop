@@ -50,6 +50,7 @@ from .market_data import (
 AUTH_FAILED = "토스증권 인증에 실패했어요. 시세 키를 확인해 주세요."
 NOT_LISTED = "토스증권에서 이 종목을 찾지 못했어요."
 PAGE_SIZE = 200
+FORMAT_CHANGED = "토스증권이 알 수 없는 형식으로 답했어요."
 
 
 def _parse_time(value: Any) -> datetime | None:
@@ -60,6 +61,15 @@ def _parse_time(value: Any) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=KST)
+
+
+def _rows(result: Any) -> list[Any]:
+    """A list ``result``; ``null`` is an empty one. Any other shape is a changed format, not an absent symbol."""
+    if result is None:
+        return []
+    if not isinstance(result, list):
+        raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
+    return result
 
 
 def _bar(item: Any) -> Bar | None:
@@ -112,7 +122,7 @@ class TossClient:
             token = body.get("access_token") if isinstance(body, dict) else None
             expires_in = number(body.get("expires_in")) if isinstance(body, dict) else None
             if not isinstance(token, str) or not token or not expires_in:
-                raise QuoteUnavailable("temporary_failure", "토스증권이 알 수 없는 형식으로 답했어요.")
+                raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
             self._token = token
             self._expires = self._clock() + max(expires_in - 60, expires_in / 2)
             return token
@@ -134,7 +144,7 @@ class TossClient:
                 raise QuoteUnavailable("temporary_failure", TEMPORARY)
             body = json_body(response)
             if not isinstance(body, dict) or "result" not in body:
-                raise QuoteUnavailable("temporary_failure", "토스증권이 알 수 없는 형식으로 답했어요.")
+                raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
             return body["result"]
         raise AssertionError("unreachable")
 
@@ -171,7 +181,7 @@ class TossProvider:
     def _info(self, symbol: str) -> dict[str, Any]:
         def load() -> dict[str, Any]:
             items = self.client.get("/api/v1/stocks", {"symbols": symbol})
-            match = next((i for i in items or [] if isinstance(i, dict) and i.get("symbol") == symbol), None)
+            match = next((i for i in _rows(items) if isinstance(i, dict) and i.get("symbol") == symbol), None)
             if match is None:
                 raise QuoteUnavailable("unsupported_symbol", NOT_LISTED)
             return match
@@ -187,15 +197,17 @@ class TossProvider:
             if before:
                 params["before"] = before
             page = self.client.get("/api/v1/candles", params)
-            items = page.get("candles") if isinstance(page, dict) else None
-            for item in items or []:
+            if not isinstance(page, dict):
+                raise QuoteUnavailable("format_changed", FORMAT_CHANGED)
+            items = _rows(page.get("candles"))
+            for item in items:
                 bar = _bar(item)
                 if bar is None:
                     continue
                 if not keep(bar):
                     return bars
                 bars.append(bar)
-            before = page.get("nextBefore") if isinstance(page, dict) else None
+            before = page.get("nextBefore")
             if not items or not before:
                 break
         return bars
@@ -211,7 +223,7 @@ class TossProvider:
     def quote(self, listing: Listing) -> tuple[Source, Quote]:
         symbol = listing.code
         prices = self.client.get("/api/v1/prices", {"symbols": symbol})
-        item = next((p for p in prices or [] if isinstance(p, dict) and p.get("symbol") == symbol), None)
+        item = next((p for p in _rows(prices) if isinstance(p, dict) and p.get("symbol") == symbol), None)
         if item is None:
             raise QuoteUnavailable("unsupported_symbol", NOT_LISTED)
         last = number(item.get("lastPrice"))

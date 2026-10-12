@@ -1,15 +1,16 @@
 # FS044 · 기업 상세와 관계 그래프 이동·상태 복원
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 팀 검토 전 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 44 |
+| 요구사항 번호(원문) | 44 |
+| 의미 기준 요구사항 | 44 |
 | API 대응 | 기존 API로 지원 |
 | 사유 | 카메라·선택·탭·스크롤 복원은 클라이언트 상태다. 기업/그래프 API가 필요한 조회 조건과 버전을 제공하며 복원 전용 서버 API는 만들지 않는다. |
 | 프로토타입 문서 판정 | 구현 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:54 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:54 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/06-기업-상세-타임라인.csv) — 기업 상세와 관계 그래프 이동·상태 복원: 사용자가 기업 상세와 관계 그래프를 오갈 때 선택 기업, 차트 기간, 기준 시점, 선택 탭, 선택 이슈를 유지한다. 사건에서 그래프로 이동하면 해당 기업·이슈의 실제 영향 경로만 강조한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/06-기업-상세-타임라인.csv) — 기업 상세와 관계 그래프 이동·상태 복원: 사용자가 기업 상세와 관계 그래프를 오갈 때 선택 기업, 차트 기간, 기준 시점, 선택 탭, 선택 이슈를 유지한다. 사건에서 그래프로 이동하면 해당 기업·이슈의 실제 영향 경로만 강조한다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:101 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:101 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 
@@ -45,4 +46,5 @@
 
 ## 확인 필요
 
+- INDEX_DETAIL_RANGE_STALE: 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [105]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다.
 - REQUIREMENT_TITLE_REVIEW: 명세 '기업 상세와 관계 그래프 이동·상태 복원' ↔ 요구사항 44 '상세 화면 상태와 이동'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).

@@ -1,0 +1,2936 @@
+[
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 27,
+    "column": 2,
+    "cell": "B27",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 28,
+    "column": 2,
+    "cell": "B28",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 29,
+    "column": 2,
+    "cell": "B29",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 30,
+    "column": 2,
+    "cell": "B30",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 31,
+    "column": 2,
+    "cell": "B31",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 32,
+    "column": 2,
+    "cell": "B32",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 33,
+    "column": 2,
+    "cell": "B33",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 34,
+    "column": 2,
+    "cell": "B34",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 35,
+    "column": 2,
+    "cell": "B35",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 36,
+    "column": 2,
+    "cell": "B36",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 37,
+    "column": 2,
+    "cell": "B37",
+    "before": "메인 그래프",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 41,
+    "column": 3,
+    "cell": "C41",
+    "before": "시장 변수 제공",
+    "after": "주요 시장 지표 제공"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 42,
+    "column": 3,
+    "cell": "C42",
+    "before": "관계 그래프 조회",
+    "after": "브리핑 관계 그래프 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 51,
+    "column": 3,
+    "cell": "C51",
+    "before": "동일 날짜 사건 구분",
+    "after": "동일 시점 이슈 구분"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 52,
+    "column": 3,
+    "cell": "C52",
+    "before": "재무와 실적 조회",
+    "after": "시점 기반 관계 그래프 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 55,
+    "column": 2,
+    "cell": "B55",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 55,
+    "column": 3,
+    "cell": "C55",
+    "before": "AI 질문 진입과 전송",
+    "after": "AI 질문 진입과 맥락 전달"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 56,
+    "column": 2,
+    "cell": "B56",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 56,
+    "column": 3,
+    "cell": "C56",
+    "before": "AI 권한과 중복 작업 통제",
+    "after": "질문 대상·기간 해석 및 되묻기"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 57,
+    "column": 2,
+    "cell": "B57",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 57,
+    "column": 3,
+    "cell": "C57",
+    "before": "질문 해석과 되묻기",
+    "after": "근거·관계 그래프 맥락 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 58,
+    "column": 2,
+    "cell": "B58",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 58,
+    "column": 3,
+    "cell": "C58",
+    "before": "개인화 조건과 근거 확보",
+    "after": "근거 기반 답변 생성 및 안전 검증"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 59,
+    "column": 2,
+    "cell": "B59",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 59,
+    "column": 3,
+    "cell": "C59",
+    "before": "답변 검증과 제공",
+    "after": "답변 근거와 관련 그래프 탐색"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 60,
+    "column": 1,
+    "cell": "A60",
+    "before": "FS050-01",
+    "after": "FS050"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 60,
+    "column": 2,
+    "cell": "B60",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 60,
+    "column": 3,
+    "cell": "C60",
+    "before": "AI 답변 근거·원문 확인",
+    "after": "새 대화와 후속 질문"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 61,
+    "column": 1,
+    "cell": "A61",
+    "before": "FS050-02",
+    "after": "FS051"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 61,
+    "column": 2,
+    "cell": "B61",
+    "before": "AI 챗봇",
+    "after": "AI 챗봇 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 61,
+    "column": 3,
+    "cell": "C61",
+    "before": "AI 답변 관련 그래프 탐색",
+    "after": "AI 패널 상태 유지와 결과 재조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 1,
+    "cell": "A62",
+    "before": "FS051",
+    "after": "FS054"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 2,
+    "cell": "B62",
+    "before": "AI 챗봇",
+    "after": "데이터 관리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 3,
+    "cell": "C62",
+    "before": "새 대화 시작",
+    "after": "사용자와 모의 보유"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 5,
+    "cell": "E62",
+    "before": "확정",
+    "after": "팀 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 6,
+    "cell": "F62",
+    "before": "51",
+    "after": "66"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 7,
+    "cell": "G62",
+    "before": "A105:B117",
+    "after": "A7:B19"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 62,
+    "column": 8,
+    "cell": "H62",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 63,
+    "column": 1,
+    "cell": "A63",
+    "before": "FS052-01",
+    "after": "FS055"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 63,
+    "column": 2,
+    "cell": "B63",
+    "before": "AI 챗봇",
+    "after": "데이터 관리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 63,
+    "column": 3,
+    "cell": "C63",
+    "before": "같은 대화에서 후속 질문 전송",
+    "after": "관계와 근거 연결"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 63,
+    "column": 6,
+    "cell": "F63",
+    "before": "52",
+    "after": "67"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 63,
+    "column": 7,
+    "cell": "G63",
+    "before": "A119:B131",
+    "after": "A21:B33"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 63,
+    "column": 8,
+    "cell": "H63",
+    "before": "분리",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 64,
+    "column": 1,
+    "cell": "A64",
+    "before": "FS052-02",
+    "after": "FS056"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 64,
+    "column": 2,
+    "cell": "B64",
+    "before": "AI 챗봇",
+    "after": "데이터 관리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 64,
+    "column": 3,
+    "cell": "C64",
+    "before": "AI 내부 패널 닫기·재열기와 대화 유지",
+    "after": "사건과 문서 구분"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 64,
+    "column": 6,
+    "cell": "F64",
+    "before": "52",
+    "after": "68"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 64,
+    "column": 7,
+    "cell": "G64",
+    "before": "A133:B145",
+    "after": "A35:B47"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 64,
+    "column": 8,
+    "cell": "H64",
+    "before": "분리",
+    "after": "동작 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 65,
+    "column": 1,
+    "cell": "A65",
+    "before": "FS053",
+    "after": "FS058"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 65,
+    "column": 2,
+    "cell": "B65",
+    "before": "AI 챗봇",
+    "after": "데이터 관리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 65,
+    "column": 3,
+    "cell": "C65",
+    "before": "AI 결과 회수와 재시도",
+    "after": "신규 경제뉴스 정기 수집 및 이슈 분석"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 65,
+    "column": 6,
+    "cell": "F65",
+    "before": "53",
+    "after": "70"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 65,
+    "column": 7,
+    "cell": "G65",
+    "before": "A147:B159",
+    "after": "A49:B61"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 66,
+    "column": 1,
+    "cell": "A66",
+    "before": "FS054",
+    "after": "FS059"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 66,
+    "column": 3,
+    "cell": "C66",
+    "before": "사용자와 모의 보유",
+    "after": "분석 결과 저장 및 조회 반영"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 66,
+    "column": 6,
+    "cell": "F66",
+    "before": "66",
+    "after": "71"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 66,
+    "column": 7,
+    "cell": "G66",
+    "before": "A7:B19",
+    "after": "A63:B75"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 66,
+    "column": 8,
+    "cell": "H66",
+    "before": "유지",
+    "after": "동작 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 67,
+    "column": 1,
+    "cell": "A67",
+    "before": "FS055",
+    "after": "FS060"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 67,
+    "column": 3,
+    "cell": "C67",
+    "before": "관계와 근거 연결",
+    "after": "대화와 질문 기록"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 67,
+    "column": 6,
+    "cell": "F67",
+    "before": "67",
+    "after": "72"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 67,
+    "column": 7,
+    "cell": "G67",
+    "before": "A21:B33",
+    "after": "A77:B89"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 68,
+    "column": 1,
+    "cell": "A68",
+    "before": "FS056",
+    "after": "FS061"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 68,
+    "column": 2,
+    "cell": "B68",
+    "before": "데이터 관리",
+    "after": "외부 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 68,
+    "column": 3,
+    "cell": "C68",
+    "before": "사건과 문서 구분",
+    "after": "소셜 인증 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 68,
+    "column": 6,
+    "cell": "F68",
+    "before": "68",
+    "after": "73"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 68,
+    "column": 7,
+    "cell": "G68",
+    "before": "A35:B47",
+    "after": "A7:B19"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 68,
+    "column": 8,
+    "cell": "H68",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 69,
+    "column": 1,
+    "cell": "A69",
+    "before": "FS058",
+    "after": "FS062"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 69,
+    "column": 2,
+    "cell": "B69",
+    "before": "데이터 관리",
+    "after": "외부 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 69,
+    "column": 3,
+    "cell": "C69",
+    "before": "신규 경제뉴스 정기 수집 및 이슈 분석",
+    "after": "가상계좌 데이터 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 69,
+    "column": 6,
+    "cell": "F69",
+    "before": "70",
+    "after": "74"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 69,
+    "column": 7,
+    "cell": "G69",
+    "before": "A49:B61",
+    "after": "A21:B33"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 69,
+    "column": 8,
+    "cell": "H69",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 70,
+    "column": 1,
+    "cell": "A70",
+    "before": "FS059",
+    "after": "FS063"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 70,
+    "column": 2,
+    "cell": "B70",
+    "before": "데이터 관리",
+    "after": "외부 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 70,
+    "column": 3,
+    "cell": "C70",
+    "before": "분석 결과 저장 및 조회 반영",
+    "after": "뉴스와 시장 데이터 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 70,
+    "column": 6,
+    "cell": "F70",
+    "before": "71",
+    "after": "75"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 70,
+    "column": 7,
+    "cell": "G70",
+    "before": "A63:B75",
+    "after": "A35:B47"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 70,
+    "column": 8,
+    "cell": "H70",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 71,
+    "column": 1,
+    "cell": "A71",
+    "before": "FS060",
+    "after": "FS064"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 71,
+    "column": 2,
+    "cell": "B71",
+    "before": "데이터 관리",
+    "after": "외부 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 71,
+    "column": 3,
+    "cell": "C71",
+    "before": "대화와 질문 기록",
+    "after": "AI 분석 연동"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 71,
+    "column": 6,
+    "cell": "F71",
+    "before": "72",
+    "after": "76"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 71,
+    "column": 7,
+    "cell": "G71",
+    "before": "A77:B89",
+    "after": "A49:B61"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 72,
+    "column": 1,
+    "cell": "A72",
+    "before": "FS061",
+    "after": "FS065"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 72,
+    "column": 2,
+    "cell": "B72",
+    "before": "외부 연동",
+    "after": "AI 평가·관리자"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 72,
+    "column": 3,
+    "cell": "C72",
+    "before": "소셜 인증 연동",
+    "after": "기업 및 사용자 통계 조사 및 확인"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 72,
+    "column": 4,
+    "cell": "D72",
+    "before": "P1",
+    "after": "P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 72,
+    "column": 5,
+    "cell": "E72",
+    "before": "팀 검토 전",
+    "after": "미기재"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 72,
+    "column": 6,
+    "cell": "F72",
+    "before": "73",
+    "after": "77"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 1,
+    "cell": "A73",
+    "before": "FS062",
+    "after": "FS066-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 2,
+    "cell": "B73",
+    "before": "외부 연동",
+    "after": "AI 평가·관리자"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 3,
+    "cell": "C73",
+    "before": "가상계좌 데이터 연동",
+    "after": "AI 답변·뉴스 요약·브리핑 평가 등록"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 4,
+    "cell": "D73",
+    "before": "P1",
+    "after": "FS037: 미기재 / FS066: P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 5,
+    "cell": "E73",
+    "before": "팀 검토 전",
+    "after": "FS037: 미기재 / FS066: 미기재"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 6,
+    "cell": "F73",
+    "before": "74",
+    "after": "37, 78"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 73,
+    "column": 8,
+    "cell": "H73",
+    "before": "유지",
+    "after": "통합"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 1,
+    "cell": "A74",
+    "before": "FS063",
+    "after": "FS066-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 2,
+    "cell": "B74",
+    "before": "외부 연동",
+    "after": "AI 평가·관리자"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 3,
+    "cell": "C74",
+    "before": "뉴스와 시장 데이터 연동",
+    "after": "AI 기능별 선호도 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 4,
+    "cell": "D74",
+    "before": "P1",
+    "after": "P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 5,
+    "cell": "E74",
+    "before": "팀 검토 전",
+    "after": "미기재"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 6,
+    "cell": "F74",
+    "before": "75",
+    "after": "78"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 74,
+    "column": 8,
+    "cell": "H74",
+    "before": "유지",
+    "after": "동작 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 1,
+    "cell": "A75",
+    "before": "FS064",
+    "after": "FS066-03"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 2,
+    "cell": "B75",
+    "before": "외부 연동",
+    "after": "AI 평가·관리자"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 3,
+    "cell": "C75",
+    "before": "AI 분석 연동",
+    "after": "마스킹된 AI 대화록 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 4,
+    "cell": "D75",
+    "before": "P1",
+    "after": "P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 5,
+    "cell": "E75",
+    "before": "팀 검토 전",
+    "after": "미기재"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 6,
+    "cell": "F75",
+    "before": "76",
+    "after": "78"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 75,
+    "column": 8,
+    "cell": "H75",
+    "before": "유지",
+    "after": "동작 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 76,
+    "column": 1,
+    "cell": "A76",
+    "before": "FS065",
+    "after": "FS067-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 76,
+    "column": 3,
+    "cell": "C76",
+    "before": "기업 및 사용자 통계 조사 및 확인",
+    "after": "이슈 분석·공개 반영 상태 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 76,
+    "column": 4,
+    "cell": "D76",
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 76,
+    "column": 6,
+    "cell": "F76",
+    "before": "77",
+    "after": "79"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 76,
+    "column": 7,
+    "cell": "G76",
+    "before": "A7:B19",
+    "after": "A63:B75"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 1,
+    "cell": "A77",
+    "before": "FS066-01",
+    "after": "FS067-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 3,
+    "cell": "C77",
+    "before": "AI 답변·뉴스 요약·브리핑 평가 등록",
+    "after": "보류 이슈 검수 및 허용·거부"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 4,
+    "cell": "D77",
+    "before": "FS037: 미기재 / FS066: P2",
+    "after": "P1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 5,
+    "cell": "E77",
+    "before": "FS037: 미기재 / FS066: 미기재",
+    "after": "미기재"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 6,
+    "cell": "F77",
+    "before": "37, 78",
+    "after": "79"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 7,
+    "cell": "G77",
+    "before": "A21:B33",
+    "after": "A77:B89"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 77,
+    "column": 8,
+    "cell": "H77",
+    "before": "통합",
+    "after": "동작 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 78,
+    "column": 1,
+    "cell": "A78",
+    "before": "FS066-02",
+    "after": "FS067-03"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 78,
+    "column": 3,
+    "cell": "C78",
+    "before": "AI 기능별 선호도 조회",
+    "after": "실패한 이슈 분석·반영 작업 재시도"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 78,
+    "column": 4,
+    "cell": "D78",
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 78,
+    "column": 6,
+    "cell": "F78",
+    "before": "78",
+    "after": "79"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 78,
+    "column": 7,
+    "cell": "G78",
+    "before": "A35:B47",
+    "after": "A91:B103"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 78,
+    "column": 8,
+    "cell": "H78",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 79,
+    "column": 1,
+    "cell": "A79",
+    "before": "FS066-03",
+    "after": "FS068"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 79,
+    "column": 3,
+    "cell": "C79",
+    "before": "마스킹된 AI 대화록 조회",
+    "after": "AI 사용량·비용·오류 통계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 79,
+    "column": 4,
+    "cell": "D79",
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 79,
+    "column": 6,
+    "cell": "F79",
+    "before": "78",
+    "after": "80"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 79,
+    "column": 7,
+    "cell": "G79",
+    "before": "A49:B61",
+    "after": "A105:B117"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 79,
+    "column": 8,
+    "cell": "H79",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 80,
+    "column": 1,
+    "cell": "A80",
+    "before": "FS067-01",
+    "after": "FS069-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 80,
+    "column": 3,
+    "cell": "C80",
+    "before": "이슈 분석·공개 반영 상태 조회",
+    "after": "회원 활동 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 80,
+    "column": 4,
+    "cell": "D80",
+    "before": "P1",
+    "after": "P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 80,
+    "column": 6,
+    "cell": "F80",
+    "before": "79",
+    "after": "81"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 80,
+    "column": 7,
+    "cell": "G80",
+    "before": "A63:B75",
+    "after": "A119:B131"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 81,
+    "column": 1,
+    "cell": "A81",
+    "before": "FS067-02",
+    "after": "FS069-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 81,
+    "column": 3,
+    "cell": "C81",
+    "before": "보류 이슈 검수 및 허용·거부",
+    "after": "회원 차단·차단 해제"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 81,
+    "column": 4,
+    "cell": "D81",
+    "before": "P1",
+    "after": "P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 81,
+    "column": 6,
+    "cell": "F81",
+    "before": "79",
+    "after": "81"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 81,
+    "column": 7,
+    "cell": "G81",
+    "before": "A77:B89",
+    "after": "A133:B145"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 81,
+    "column": 8,
+    "cell": "H81",
+    "before": "동작 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 82,
+    "column": 1,
+    "cell": "A82",
+    "before": "FS067-03",
+    "after": "FS070-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 82,
+    "column": 3,
+    "cell": "C82",
+    "before": "실패한 이슈 분석·반영 작업 재시도",
+    "after": "브리핑 회차별 생성·검증·발행 상태 조회"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 82,
+    "column": 6,
+    "cell": "F82",
+    "before": "79",
+    "after": "82"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 82,
+    "column": 7,
+    "cell": "G82",
+    "before": "A91:B103",
+    "after": "A147:B159"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 83,
+    "column": 1,
+    "cell": "A83",
+    "before": "FS068",
+    "after": "FS070-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 83,
+    "column": 3,
+    "cell": "C83",
+    "before": "AI 사용량·비용·오류 통계",
+    "after": "미발행 브리핑 회차 재처리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 83,
+    "column": 6,
+    "cell": "F83",
+    "before": "80",
+    "after": "82"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 83,
+    "column": 7,
+    "cell": "G83",
+    "before": "A105:B117",
+    "after": "A161:B173"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 84,
+    "column": 1,
+    "cell": "A84",
+    "before": "FS069-01",
+    "after": "FS071-01"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 84,
+    "column": 3,
+    "cell": "C84",
+    "before": "회원 활동 조회",
+    "after": "발행 브리핑 정정 등록"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 84,
+    "column": 4,
+    "cell": "D84",
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 84,
+    "column": 6,
+    "cell": "F84",
+    "before": "81",
+    "after": "83"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 84,
+    "column": 7,
+    "cell": "G84",
+    "before": "A119:B131",
+    "after": "A175:B187"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 85,
+    "column": 1,
+    "cell": "A85",
+    "before": "FS069-02",
+    "after": "FS071-02"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 85,
+    "column": 3,
+    "cell": "C85",
+    "before": "회원 차단·차단 해제",
+    "after": "발행 브리핑 제공 중단"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 85,
+    "column": 4,
+    "cell": "D85",
+    "before": "P2",
+    "after": "P1"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 85,
+    "column": 6,
+    "cell": "F85",
+    "before": "81",
+    "after": "83"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 85,
+    "column": 7,
+    "cell": "G85",
+    "before": "A133:B145",
+    "after": "A189:B201"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 86,
+    "column": 1,
+    "cell": "A86",
+    "before": "FS070-01",
+    "after": "FS072"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 86,
+    "column": 3,
+    "cell": "C86",
+    "before": "브리핑 회차별 생성·검증·발행 상태 조회",
+    "after": "대시보드"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 86,
+    "column": 6,
+    "cell": "F86",
+    "before": "82",
+    "after": "84"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 86,
+    "column": 7,
+    "cell": "G86",
+    "before": "A147:B159",
+    "after": "A203:B215"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 87,
+    "column": 1,
+    "cell": "A87",
+    "before": "FS070-02",
+    "after": "FS073"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 87,
+    "column": 3,
+    "cell": "C87",
+    "before": "미발행 브리핑 회차 재처리",
+    "after": "관리자 인증 및 접근 제어"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 87,
+    "column": 6,
+    "cell": "F87",
+    "before": "82",
+    "after": "85"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 87,
+    "column": 7,
+    "cell": "G87",
+    "before": "A161:B173",
+    "after": "A217:B229"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 1,
+    "cell": "A88",
+    "before": "FS071-01",
+    "after": "NFS001"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 2,
+    "cell": "B88",
+    "before": "AI 평가·관리자",
+    "after": "비기능 상세"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 3,
+    "cell": "C88",
+    "before": "발행 브리핑 정정 등록",
+    "after": "접근 통제"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 5,
+    "cell": "E88",
+    "before": "미기재",
+    "after": "확정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 6,
+    "cell": "F88",
+    "before": "83",
+    "after": "54"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 7,
+    "cell": "G88",
+    "before": "A175:B187",
+    "after": "A7:B19"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 88,
+    "column": 8,
+    "cell": "H88",
+    "before": "유지",
+    "after": "검증 기준 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 1,
+    "cell": "A89",
+    "before": "FS071-02",
+    "after": "NFS002"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 2,
+    "cell": "B89",
+    "before": "AI 평가·관리자",
+    "after": "비기능 상세"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 3,
+    "cell": "C89",
+    "before": "발행 브리핑 제공 중단",
+    "after": "응답과 화면 정합성"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 5,
+    "cell": "E89",
+    "before": "미기재",
+    "after": "확정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 6,
+    "cell": "F89",
+    "before": "83",
+    "after": "55"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 7,
+    "cell": "G89",
+    "before": "A189:B201",
+    "after": "A21:B33"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 89,
+    "column": 8,
+    "cell": "H89",
+    "before": "유지",
+    "after": "검증 기준 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 1,
+    "cell": "A90",
+    "before": "FS072",
+    "after": "NFS003"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 2,
+    "cell": "B90",
+    "before": "AI 평가·관리자",
+    "after": "비기능 상세"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 3,
+    "cell": "C90",
+    "before": "대시보드",
+    "after": "작업 일관성과 복구"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 5,
+    "cell": "E90",
+    "before": "미기재",
+    "after": "확정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 6,
+    "cell": "F90",
+    "before": "84",
+    "after": "56"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 7,
+    "cell": "G90",
+    "before": "A203:B215",
+    "after": "A35:B47"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 90,
+    "column": 8,
+    "cell": "H90",
+    "before": "유지",
+    "after": "검증 기준 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 1,
+    "cell": "A91",
+    "before": "FS073",
+    "after": "NFS004"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 2,
+    "cell": "B91",
+    "before": "AI 평가·관리자",
+    "after": "비기능 상세"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 3,
+    "cell": "C91",
+    "before": "관리자 로그인(SSO, ID/PW)",
+    "after": "부분 실패 내성"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 5,
+    "cell": "E91",
+    "before": "미기재",
+    "after": "팀 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 6,
+    "cell": "F91",
+    "before": "85",
+    "after": "57"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 7,
+    "cell": "G91",
+    "before": "A217:B229",
+    "after": "A49:B61"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 91,
+    "column": 8,
+    "cell": "H91",
+    "before": "유지",
+    "after": "검증 기준 보완"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 92,
+    "column": 1,
+    "cell": "A92",
+    "before": "NFS001",
+    "after": "NFS005"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 92,
+    "column": 3,
+    "cell": "C92",
+    "before": "접근 통제",
+    "after": "근거와 해석의 품질"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 92,
+    "column": 5,
+    "cell": "E92",
+    "before": "확정",
+    "after": "팀 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 92,
+    "column": 6,
+    "cell": "F92",
+    "before": "54",
+    "after": "58"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 92,
+    "column": 7,
+    "cell": "G92",
+    "before": "A7:B19",
+    "after": "A63:B75"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 93,
+    "column": 1,
+    "cell": "A93",
+    "before": "NFS002",
+    "after": "NFS006"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 93,
+    "column": 3,
+    "cell": "C93",
+    "before": "응답과 화면 정합성",
+    "after": "모델 전달 데이터 최소화"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 93,
+    "column": 5,
+    "cell": "E93",
+    "before": "확정",
+    "after": "팀 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 93,
+    "column": 6,
+    "cell": "F93",
+    "before": "55",
+    "after": "59"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 93,
+    "column": 7,
+    "cell": "G93",
+    "before": "A21:B33",
+    "after": "A77:B89"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 94,
+    "column": 1,
+    "cell": "A94",
+    "before": "NFS003",
+    "after": "NFS007"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 94,
+    "column": 3,
+    "cell": "C94",
+    "before": "작업 일관성과 복구",
+    "after": "성능 측정 기준"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 94,
+    "column": 4,
+    "cell": "D94",
+    "before": "P1",
+    "after": "P2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 94,
+    "column": 5,
+    "cell": "E94",
+    "before": "확정",
+    "after": "추가 제안 · 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 94,
+    "column": 6,
+    "cell": "F94",
+    "before": "56",
+    "after": "60"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 94,
+    "column": 7,
+    "cell": "G94",
+    "before": "A35:B47",
+    "after": "A91:B103"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 95,
+    "column": 1,
+    "cell": "A95",
+    "before": "NFS004",
+    "after": "NFS008"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 95,
+    "column": 3,
+    "cell": "C95",
+    "before": "부분 실패 내성",
+    "after": "운영 추적"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 95,
+    "column": 5,
+    "cell": "E95",
+    "before": "팀 검토 전",
+    "after": "보완 제안 · 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 95,
+    "column": 6,
+    "cell": "F95",
+    "before": "57",
+    "after": "61"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 95,
+    "column": 7,
+    "cell": "G95",
+    "before": "A49:B61",
+    "after": "A105:B117"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 96,
+    "column": 1,
+    "cell": "A96",
+    "before": "NFS005",
+    "after": "NFS009"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 96,
+    "column": 3,
+    "cell": "C96",
+    "before": "근거와 해석의 품질",
+    "after": "중단 작업 복구"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 96,
+    "column": 5,
+    "cell": "E96",
+    "before": "팀 검토 전",
+    "after": "추가 제안 · 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 96,
+    "column": 6,
+    "cell": "F96",
+    "before": "58",
+    "after": "62"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 96,
+    "column": 7,
+    "cell": "G96",
+    "before": "A63:B75",
+    "after": "A119:B131"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 97,
+    "column": 1,
+    "cell": "A97",
+    "before": "NFS006",
+    "after": "NFS010"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 97,
+    "column": 3,
+    "cell": "C97",
+    "before": "모델 전달 데이터 최소화",
+    "after": "지원 환경"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 97,
+    "column": 5,
+    "cell": "E97",
+    "before": "팀 검토 전",
+    "after": "추가 제안 · 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 97,
+    "column": 6,
+    "cell": "F97",
+    "before": "59",
+    "after": "63"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 97,
+    "column": 7,
+    "cell": "G97",
+    "before": "A77:B89",
+    "after": "A133:B145"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 97,
+    "column": 8,
+    "cell": "H97",
+    "before": "검증 기준 보완",
+    "after": "유지"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 98,
+    "column": 1,
+    "cell": "A98",
+    "before": "NFS007",
+    "after": "NFS011"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 98,
+    "column": 3,
+    "cell": "C98",
+    "before": "성능 측정 기준",
+    "after": "웹 접근성"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 98,
+    "column": 6,
+    "cell": "F98",
+    "before": "60",
+    "after": "64"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 98,
+    "column": 7,
+    "cell": "G98",
+    "before": "A91:B103",
+    "after": "A147:B159"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 99,
+    "column": 1,
+    "cell": "A99",
+    "before": "NFS008",
+    "after": "NFS012"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 99,
+    "column": 3,
+    "cell": "C99",
+    "before": "운영 추적",
+    "after": "정기 갱신 반영 시간 보장"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 99,
+    "column": 5,
+    "cell": "E99",
+    "before": "보완 제안 · 검토 전",
+    "after": "추가 제안 · 검토 전"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 99,
+    "column": 6,
+    "cell": "F99",
+    "before": "61",
+    "after": "65"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 99,
+    "column": 7,
+    "cell": "G99",
+    "before": "A105:B117",
+    "after": "A161:B173"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 1,
+    "cell": "A100",
+    "before": "NFS009",
+    "after": "FS074"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 2,
+    "cell": "B100",
+    "before": "비기능 상세",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 3,
+    "cell": "C100",
+    "before": "중단 작업 복구",
+    "after": "뉴스·공시 수집 및 수집 회차 관리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 4,
+    "cell": "D100",
+    "before": "P1",
+    "after": "미정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 6,
+    "cell": "F100",
+    "before": "62",
+    "after": "70, 75"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 7,
+    "cell": "G100",
+    "before": "A119:B131",
+    "after": "A166:B178"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 100,
+    "column": 8,
+    "cell": "H100",
+    "before": "검증 기준 보완",
+    "after": "파이프라인 상세 추가 · FS058·FS063 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 1,
+    "cell": "A101",
+    "before": "NFS010",
+    "after": "FS075"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 2,
+    "cell": "B101",
+    "before": "비기능 상세",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 3,
+    "cell": "C101",
+    "before": "지원 환경",
+    "after": "원천 문서 정제·중복 제거 및 버전 관리"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 4,
+    "cell": "D101",
+    "before": "P1",
+    "after": "미정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 6,
+    "cell": "F101",
+    "before": "63",
+    "after": "68, 70"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 7,
+    "cell": "G101",
+    "before": "A133:B145",
+    "after": "A180:B192"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 101,
+    "column": 8,
+    "cell": "H101",
+    "before": "유지",
+    "after": "파이프라인 상세 추가 · FS056·FS058 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 1,
+    "cell": "A102",
+    "before": "NFS011",
+    "after": "FS076"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 2,
+    "cell": "B102",
+    "before": "비기능 상세",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 3,
+    "cell": "C102",
+    "before": "웹 접근성",
+    "after": "AI 사건·이슈 추출 및 이슈 후보 생성"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 4,
+    "cell": "D102",
+    "before": "P2",
+    "after": "미정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 6,
+    "cell": "F102",
+    "before": "64",
+    "after": "68, 70, 76"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 7,
+    "cell": "G102",
+    "before": "A147:B159",
+    "after": "A194:B206"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 102,
+    "column": 8,
+    "cell": "H102",
+    "before": "검증 기준 보완",
+    "after": "파이프라인 상세 추가 · FS056·FS058·FS064 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 1,
+    "cell": "A103",
+    "before": "NFS012",
+    "after": "FS077"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 2,
+    "cell": "B103",
+    "before": "비기능 상세",
+    "after": "메인그래프 v2"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 3,
+    "cell": "C103",
+    "before": "정기 갱신 반영 시간 보장",
+    "after": "기업·이슈 Entity Linking 및 동일성 판정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 4,
+    "cell": "D103",
+    "before": "P1",
+    "after": "미정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 6,
+    "cell": "F103",
+    "before": "65",
+    "after": "68, 70"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 7,
+    "cell": "G103",
+    "before": "A161:B173",
+    "after": "A208:B220"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 103,
+    "column": 8,
+    "cell": "H103",
+    "before": "검증 기준 보완",
+    "after": "파이프라인 상세 추가 · FS056·FS058 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 104,
+    "column": 1,
+    "cell": "A104",
+    "before": "FS074",
+    "after": "FS078"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 104,
+    "column": 3,
+    "cell": "C104",
+    "before": "뉴스·공시 수집 및 수집 회차 관리",
+    "after": "기업–이슈·기업–기업 관계 추출"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 104,
+    "column": 6,
+    "cell": "F104",
+    "before": "70, 75",
+    "after": "67, 70"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 104,
+    "column": 7,
+    "cell": "G104",
+    "before": "A166:B178",
+    "after": "A222:B234"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 104,
+    "column": 8,
+    "cell": "H104",
+    "before": "파이프라인 상세 추가 · FS058·FS063 연계",
+    "after": "파이프라인 상세 추가 · FS055·FS058 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 105,
+    "column": 1,
+    "cell": "A105",
+    "before": "FS075",
+    "after": "FS079"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 105,
+    "column": 3,
+    "cell": "C105",
+    "before": "원천 문서 정제·중복 제거 및 버전 관리",
+    "after": "영향 방향·근거 검증 및 공개 적격 판정"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 105,
+    "column": 6,
+    "cell": "F105",
+    "before": "68, 70",
+    "after": "21, 67, 70, 79"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 105,
+    "column": 7,
+    "cell": "G105",
+    "before": "A180:B192",
+    "after": "A236:B248"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 105,
+    "column": 8,
+    "cell": "H105",
+    "before": "파이프라인 상세 추가 · FS056·FS058 연계",
+    "after": "파이프라인 상세 추가 · FS021·FS055·FS058·FS067-02 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 106,
+    "column": 1,
+    "cell": "A106",
+    "before": "FS076",
+    "after": "FS080"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 106,
+    "column": 3,
+    "cell": "C106",
+    "before": "AI 사건·이슈 추출 및 이슈 후보 생성",
+    "after": "GraphDB 노드·간선 upsert 및 공개 버전 반영"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 106,
+    "column": 6,
+    "cell": "F106",
+    "before": "68, 70, 76",
+    "after": "67, 71"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 106,
+    "column": 7,
+    "cell": "G106",
+    "before": "A194:B206",
+    "after": "A250:B262"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 106,
+    "column": 8,
+    "cell": "H106",
+    "before": "파이프라인 상세 추가 · FS056·FS058·FS064 연계",
+    "after": "파이프라인 상세 추가 · FS055·FS059 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 107,
+    "column": 1,
+    "cell": "A107",
+    "before": "FS077",
+    "after": "FS081"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 107,
+    "column": 3,
+    "cell": "C107",
+    "before": "기업·이슈 Entity Linking 및 동일성 판정",
+    "after": "그래프 증분 갱신·관계 비활성화 및 실패 단계 복구"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 107,
+    "column": 6,
+    "cell": "F107",
+    "before": "68, 70",
+    "after": "67, 70, 71, 79"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 107,
+    "column": 7,
+    "cell": "G107",
+    "before": "A208:B220",
+    "after": "A264:B276"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 107,
+    "column": 8,
+    "cell": "H107",
+    "before": "파이프라인 상세 추가 · FS056·FS058 연계",
+    "after": "파이프라인 상세 추가 · FS055·FS058·FS059·FS067-03 연계"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 1,
+    "cell": "A108",
+    "before": "FS078",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 2,
+    "cell": "B108",
+    "before": "메인그래프 v2",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 3,
+    "cell": "C108",
+    "before": "기업–이슈·기업–기업 관계 추출",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 4,
+    "cell": "D108",
+    "before": "미정",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 5,
+    "cell": "E108",
+    "before": "추가 제안 · 검토 전",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 6,
+    "cell": "F108",
+    "before": "67, 70",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 7,
+    "cell": "G108",
+    "before": "A222:B234",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 108,
+    "column": 8,
+    "cell": "H108",
+    "before": "파이프라인 상세 추가 · FS055·FS058 연계",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 1,
+    "cell": "A109",
+    "before": "FS079",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 2,
+    "cell": "B109",
+    "before": "메인그래프 v2",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 3,
+    "cell": "C109",
+    "before": "영향 방향·근거 검증 및 공개 적격 판정",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 4,
+    "cell": "D109",
+    "before": "미정",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 5,
+    "cell": "E109",
+    "before": "추가 제안 · 검토 전",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 6,
+    "cell": "F109",
+    "before": "21, 67, 70, 79",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 7,
+    "cell": "G109",
+    "before": "A236:B248",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 109,
+    "column": 8,
+    "cell": "H109",
+    "before": "파이프라인 상세 추가 · FS021·FS055·FS058·FS067-02 연계",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 1,
+    "cell": "A110",
+    "before": "FS080",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 2,
+    "cell": "B110",
+    "before": "메인그래프 v2",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 3,
+    "cell": "C110",
+    "before": "GraphDB 노드·간선 upsert 및 공개 버전 반영",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 4,
+    "cell": "D110",
+    "before": "미정",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 5,
+    "cell": "E110",
+    "before": "추가 제안 · 검토 전",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 6,
+    "cell": "F110",
+    "before": "67, 71",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 7,
+    "cell": "G110",
+    "before": "A250:B262",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 110,
+    "column": 8,
+    "cell": "H110",
+    "before": "파이프라인 상세 추가 · FS055·FS059 연계",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 1,
+    "cell": "A111",
+    "before": "FS081",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 2,
+    "cell": "B111",
+    "before": "메인그래프 v2",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 3,
+    "cell": "C111",
+    "before": "그래프 증분 갱신·관계 비활성화 및 실패 단계 복구",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 4,
+    "cell": "D111",
+    "before": "미정",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 5,
+    "cell": "E111",
+    "before": "추가 제안 · 검토 전",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 6,
+    "cell": "F111",
+    "before": "67, 70, 71, 79",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 7,
+    "cell": "G111",
+    "before": "A264:B276",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "명세 목차",
+    "row": 111,
+    "column": 8,
+    "cell": "H111",
+    "before": "파이프라인 상세 추가 · FS055·FS058·FS059·FS067-03 연계",
+    "after": ""
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "출퇴근 브리핑",
+    "row": 132,
+    "column": 1,
+    "cell": "A132",
+    "before": "FS036  브리핑 리뷰",
+    "after": "FS066-01  브리핑 리뷰"
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "출퇴근 브리핑",
+    "row": 134,
+    "column": 2,
+    "cell": "B134",
+    "before": "FS???",
+    "after": "ㅊ"
+  }
+]

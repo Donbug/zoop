@@ -1,8 +1,8 @@
 # 줍 정식 서버 목표 API 명세서
 
-생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 API 명세 최종 검토·구현 기준 확정**, **6.11.1 API·스키마 계약 통합 점검**에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 정식 구현 완료가 아니다. 전체 명세/WBS(FS074~081 포함)의 현재 범위는 팀합의요구/설계대상이며 원문 승인 표기·구현 증거·유료 실행 승인은 별개다. 프로토타입 관측과 구현 목표를 구분한다.
+생성물이다. 정본은 [openapi.yaml](../openapi.yaml)이다. WBS **6.1.2 API 명세 최종 검토·구현 기준 확정**, **6.11.1 API·스키마 계약 통합 점검**에 연결한다. API 공통 규칙은 사용자 **잠정 채택/시연 기준**이며 정식 구현 완료가 아니다. 전체 명세/WBS(FS074~081 포함)의 현재 범위는 팀합의요구/설계대상이며 원문 승인 표기·구현 증거·유료 실행 승인은 별개다. 추천 종목·산업·테마(FS011-02)는 활성 사용자 기능에서 제외하되 작업을 유보하며 요구 42의 재무·실적은 폐기되지 않았다(기록된 예외). 프로토타입 관측과 구현 목표를 구분한다.
 
-[현재 사용자 결정](../../share/day-work-2026-10-08.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)
+[현재 사용자 결정(10-10)](../../share/day-work-2026-10-10.md) · [이전 결정(10-08)](../../share/day-work-2026-10-08.md) · [API v2 검토·채택/정정 목록](../../evidence/api-v2-review-2026-10-08.md) · [10-10 원문 갱신 근거](../../evidence/doc-delta-2026-10-10.md) · [유효 기준 JSON](../../system/out/effective-authority.json) · [범위 예외·상세 권한](../../system/out/detail-authority.md) · [추적표](../../system/out/index.md) · [현재 검사 결과](../../system/out/warnings.md) · [WBS 내용 기반 이행](../../system/out/wbs-migration.md) · [BFF 차이](../../system/out/api-differences.md)
 
 ## 공통 규칙
 
@@ -12,7 +12,7 @@
 
 ### authentication
 
-회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. 로그인·가입·비회원 시작·외부 인증 콜백에는 세션 생성 전 Origin/state 검증을 적용한다.
+회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. 로그인·가입·비회원 시작·외부 인증 콜백에는 세션 생성 전 Origin/state 검증을 적용한다. 회원/관리자 로그아웃에서 해당 활성 세션이 있으면 같은 쿠키·Origin·세션 결합 CSRF를 반드시 검증하며 실패는 403 ACCESS_DENIED다. CSRF가 없거나 틀렸다고 무세션 분기로 우회하지 않는다. 해당 세션이 없거나 무효/만료이면 다른 세션을 변경하지 않고 204와 해당 쿠키만 제거한다. OpenAPI의 선택 인증/선택 헤더는 이 조건부 런타임 검증을 자동 강제하지 않는다.
 
 ### sessionLifecycle
 
@@ -28,7 +28,7 @@
 
 ### idempotency
 
-부작용을 발생시키는 POST는 필수 Idempotency-Key를 받는다(세션 생성과 소셜 인증은 제외). 같은 주체·메서드·경로·키·본문은 기존 저장 결과 또는 같은 진행 작업을 반환한다. 내용 불일치는 409 IDEMPOTENCY_CONFLICT다. PUT/DELETE는 목표 상태·리소스 ID로 멱등 처리하며 추가 키 없이 재전송할 수 있다. 키 보존 기간은 팀 확인 필요다. 응답 미수신은 기존 작업/상태 조회가 우선이며 새로운 키로 재실행하지 않는다.
+부작용을 발생시키는 POST는 필수 Idempotency-Key를 받는다(세션 생성·소셜 인증·회원/관리자 로그아웃은 제외). 로그아웃은 같은 세션의 반복 폐기가 같은 상태에 도달하는 자연 멱등 작업이며 추가 키 저장 계약 없이 반복 204를 반환한다. 같은 주체·메서드·경로·키·본문은 기존 저장 결과 또는 같은 진행 작업을 반환한다. 내용 불일치는 409 IDEMPOTENCY_CONFLICT다. PUT/DELETE는 목표 상태·리소스 ID로 멱등 처리하며 추가 키 없이 재전송할 수 있다. 키 보존 기간은 팀 확인 필요다. 응답 미수신은 기존 작업/상태 조회가 우선이며 새로운 키로 재실행하지 않는다.
 
 ### pagination
 
@@ -37,6 +37,10 @@
 ### timeAndAsOf
 
 정확한 시각은 RFC 3339 date-time으로 UTC Z 또는 명시적 오프셋을 쓴다. 오프셋 없는 시각은 거절한다. 날짜는 YYYY-MM-DD이고 날짜 경계는 Asia/Seoul이다. asOf는 자료 기준 시점이며 응답 생성 시각과 다르다. 사건의 year/month/day/unknown 정밀도는 timePrecision과 함께 제공하고 미상 날짜를 정확한 시각으로 만들지 않는다. 차트와 타임라인에는 같은 from/to를 전달하고 재무 기간은 별도다.
+
+### chartResolution
+
+가격 차트의 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). PriceSeries.interval은 공급된 해상도를 그대로 담으며 목표 해상도를 제공하지 못하면 다른 해상도의 값을 이름만 바꾸거나 집계·보간해 채우지 않고 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이다. 이 값은 목표 계약이며 공급자 출력을 만들어내지 않는다. 기계 판독용 매핑은 x-zoop-approvals.chartResolution이다.
 
 ### publicationVersions
 
@@ -48,7 +52,7 @@
 
 ### aiJobs
 
-질문은 대화 ID·작업 ID·질문·대상·기간·asOf·graphVersion을 최초 접수 시 고정한다. 202는 접수, completed는 검증 및 결과 저장 완료다. queued/running/completed/failed/cancelled와 실패 종류·retryable·저장 결과를 회수한다. 되묻기·조건 부족·근거 부족은 기술 오류와 다르다. 생성 중 대화당 추가 질문을 거절한다. 검증 실패는 재생성하지 않고, 보존된 검증 결과의 저장 실패는 저장만 복구한다. 창 닫기는 취소가 아니다.
+질문은 대화 ID·작업 ID·질문·대상·기간·asOf·graphVersion을 최초 접수 시 고정한다. 202는 접수, completed는 검증 및 결과 저장 완료다. queued/running/completed/failed/cancelled와 실패 종류·retryable·저장 결과를 회수한다. 되묻기·조건 부족·근거 부족은 기술 오류와 다르다. 생성 중 대화당 추가 질문을 거절한다. 검증 실패는 재생성하지 않고, 보존된 검증 결과의 저장 실패는 저장만 복구한다. 창 닫기는 취소가 아니다. AI v2 FS045~051이 현재 상세이며 옛 FS046(권한·중복 작업 통제)에는 대응하는 단일 신규 FS가 없다. 로그인·대화 소유·근거 접근 권한은 접수·상태 조회·결과 회수마다 재검증하고, 같은 작업 ID의 내용 불일치는 409로 거절하며, 서로 다른 작업 ID가 동시에 와도 같은 대화에는 처리 중 신규 작업을 하나만 접수한다. 상태 조회·결과 회수는 신규 접수와 구분한다(FS045·FS047·FS051·FS060과 NFS001/003의 공통 서버 의무).
 
 ### sentiment
 
@@ -58,13 +62,17 @@ DocumentSentiment는 문서×기업, BriefingOutlook은 발행 회차 판정이�
 
 명세/WBS의 모든 내용은 현재 사용자 결정에 따라 팀합의요구/설계대상이며 FS074~081도 포함한다. 원문의 검토 전 표기는 갱신되지 않은 상태로 보존한다. 요구 범위 포함과 구현 완료·유료 모델 실행 승인·본개발 채택은 별개다. API 공통 규칙은 기존 잠정 채택/시연 기준이고 원본 충돌·운영 수치·정식 배포 인증 선택은 teamQuestions와 추적표에 보존한다.
 
+### scopeExceptions
+
+2026-10-10 사용자 결정으로 추천 종목·산업·테마(FS011-02)는 활성 사용자 기능에서 제외하되 GET /me/recommendations 계약은 유보한다. 삭제·무동작·가짜 응답으로 바꾸지 않으며 제외는 활성 사용 허용이 아님을 뜻한다. 요구 42의 재무·실적은 폐기되지 않았고 전용 FS/WBS 없이 getCompanyFinancials로만 출처 한정 연결한다. 정본은 docs/system/links.yaml authority.implementationScope.exceptions다.
+
 ### modelConfiguration
 
-LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결정과 실제 모델/공급자 선택·실행 승인은 구분하며 예산은 추후 결정이다. 판정 CLI의 ZOOP_SENTIMENT_MODEL/ZOOP_SENTIMENT_REASONING_EFFORT와 외부 PoC의 미지원 추론 전송 경계를 구분한다. 공개 API에서 비밀 설정값을 반환하지 않는다.
+LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 판정은 ZOOP_AI_DOCUMENT_SENTIMENT_MODEL/ZOOP_AI_DOCUMENT_SENTIMENT_REASONING_EFFORT, 회차 판정은 ZOOP_AI_BRIEFING_OUTLOOK_MODEL/ZOOP_AI_BRIEFING_OUTLOOK_REASONING_EFFORT를 사용한다. 요약은 ZOOP_AI_DOCUMENT_SUMMARY_*, 의미 검증은 ZOOP_AI_VERIFY_*로 분리한다. docs/design/ai-system.md의 설정 이행을 따르며 옛 ZOOP_SENTIMENT_* 런타임 alias는 없다. 설정 위치 결정과 실제 모델/공급자 선택·실행 승인은 구분하며 예산은 미정이다. 외부 PoC의 미지원 추론 전송 경계를 구분하고 공개 API에서 비밀 설정값을 반환하지 않는다.
 
 ### conflictPermission
 
-프로토타입은 전권 범위로 끝까지 완성하며 본개발 채택은 담당자가 선택한다. 원본 충돌은 근거 있는 작업자 안과 정정 요청을 남겨 팀이 정정한다. 확정 일정은 WBS이고 Notion 일정은 오래된 자료다. 원문 날짜·우선순위·승인 상태를 덮어쓰지 않는다.
+프로토타입은 전권 범위로 끝까지 완성하며 본개발 채택은 담당자가 선택한다. 원본 충돌은 근거 있는 작업자 안과 정정 요청을 남겨 팀이 정정한다. 확정 일정은 WBS이며 옛 Notion 일정은 비권위다. 갱신된 Notion 회의·API 결정은 사례별 증거로만 쓴다. 원문 날짜·우선순위·승인 상태를 덮어쓰지 않는다.
 
 ## 오류 코드
 
@@ -74,7 +82,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | INVALID_CREDENTIALS | 401 | 로그인 인증 실패 | 입력을 다시 확인한다 |
 | AUTH_REQUIRED | 401 | 유효 세션 없음 | 로그인한다 |
 | MEMBER_REQUIRED | 403 | 회원 전용 기능에 비회원 접근 | 회원 로그인 후 요청한다 |
-| ACCESS_DENIED | 403 | 소유권 또는 관리자 권한 없음 | 보호 내용 없이 거절한다 |
+| ACCESS_DENIED | 403 | 소유권·관리자 권한 없음 또는 Origin/CSRF 검증 실패 | 보호 내용 없이 거절한다 |
 | MEMBER_BLOCKED | 403 | 차단 회원 | 차단 상태를 안내한다 |
 | EMAIL_TAKEN | 409 | 이미 등록된 이메일 | 다른 이메일 또는 로그인 선택 |
 | TERMS_REQUIRED | 422 | 필수 약관 미동의 | 동의 항목을 확인한다 |
@@ -326,20 +334,20 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## logOut · 회원 로그아웃
 
-회원 로그아웃.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_session 쿠키만 제거하며 관리자 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/auth/logout` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 204: 본문 없음, 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
+| 응답 | 204: 본문 없음, 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, ACCESS_DENIED, RATE_LIMITED |
 | FS/NFS | [FS007](../../system/out/feature-FS007.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-MY-01](../../system/out/screen-D-MY-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.2.5 |
 | 프로토타입 대응 | /api/auth/logout |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 활성 회원 세션의 Origin/조건부 CSRF 검증, 무세션 반복204 및 회원/관리자 쿠키 분리를 요구한다. 현재 BFF의 목표 보안 구현 완료를 뜻하지 않는다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -347,6 +355,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 선택 | string | 활성 zoop_session이 있으면 필수이며 해당 세션에 결합된 토큰이어야 한다. 누락/불일치는 403 ACCESS_DENIED이고 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 필요하지 않다. Origin도 검증한다. |
 
 <a id="settutorialstate"></a>
 
@@ -381,7 +390,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## listSocialProviders · 소셜 인증 제공자 조회
 
-소셜 인증 제공자 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 소셜 인증 제공자는 google과 kakao다. 커서 전체를 순회한 결과에 두 제공자가 ID별로 한 번씩 포함되며 개별 페이지에는 limit에 맞는 일부만 있을 수 있다. 관리자 SSO 선택과 실제 OAuth 연동 완료를 뜻하지 않는다. 공통 인증·페이지 규칙을 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -395,7 +404,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/providers |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
+| 팀 확인 필요 | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |
 
 ### 요청 필드
 
@@ -409,7 +418,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## authorizeSocialLogin · 소셜 인증 시작
 
-소셜 인증 시작.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+google 또는 kakao 회원 소셜 인증을 시작한다. 지원하지 않는 provider는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 연결 권한 확인을 유지한다. 실제 OAuth 등록·연동 완료는 별도다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -423,13 +432,13 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/{provider}/authorize |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
+| 팀 확인 필요 | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |
 
 ### 요청 필드
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| provider | path | 필수 | string |  |
+| provider | path | 필수 | string {google, kakao} |  |
 | returnTo | query | 선택 | string / null |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
@@ -437,7 +446,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## completeSocialLogin · 소셜 인증 콜백
 
-소셜 인증 콜백.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 않는 provider와 유효하지 않은 state는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 본인/연결권한 확인 없이 계정 연결을 완료하지 않는 보안 경계를 유지한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -451,13 +460,13 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/{provider}/callback |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
+| 팀 확인 필요 | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |
 
 ### 요청 필드
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| provider | path | 필수 | string |  |
+| provider | path | 필수 | string {google, kakao} |  |
 | state | query | 선택 | string / null |  |
 | code | query | 선택 | string / null |  |
 | error | query | 선택 | string / null |  |
@@ -552,7 +561,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## listRecommendations · 추천 종목·산업·테마 조회
 
-추천 종목·산업·테마 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+추천 종목·산업·테마 조회. 2026-10-10 사용자 결정으로 활성 사용자 기능·여정·수용 범위에서 제외했고 이 계약은 이후 다시 반환할 수 있도록 유보한다. 삭제·무동작·가짜 응답으로 바꾸지 않으며 현재 BFF는 기존 동작(승인 이슈 수 기준 기업 순위)을 그대로 제공한다. 제외는 활성 사용 허용이 아니다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -562,11 +571,13 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 응답 | 200: [RecommendationResponse](#schema-recommendationresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, INVALID_CURSOR |
 | FS/NFS | [FS011-02](../../system/out/feature-FS011-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
-| 화면 | [D-WAT-01](../../system/out/screen-D-WAT-01.md) |
+| 화면 |  |
 | WBS | 6.1.2, 6.11.1, 6.3.3, 6.4.5 |
 | 프로토타입 대응 | /api/me/recommendations |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., 추천 종목·산업·테마는 활성 사용자 기능에서 제외됐다. 작업은 삭제하지 않고 현재 BFF 동작을 유지한다. 산업·테마 추천의 생산자는 BFF에 없다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+기능 상태: `excluded-user-facing-endpoint-retained` · user-2026-10-10-feedback · FS011-02는 활성 기능에서 제외하고 이 목표 작업은 유보한다. 현재 활성 화면은 이 작업을 호출하지 않으므로 screenIds는 비어 있다. formerScreenIds는 과거 연결의 이력일 뿐 현행 화면→API 추적이 아니다.
 
 ### 요청 필드
 
@@ -733,7 +744,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | WBS | 6.1.2, 6.11.1, 6.3.6, 6.4.7, 6.6.1, 6.6.2, 6.6.3, 6.6.11, 6.6.21, 6.6.23, 6.7.3, 6.7.7, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.8.5, 6.8.14, 6.5.1 |
 | 프로토타입 대응 | /api/graph |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF의 개인화 범위 필터는 화면 처리다. 목표는 personalFilter·asOf·graphVersion과 검증된 국내/국제 속성을 서버에서 제공한다. |
-| 팀 확인 필요 | 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
+| 팀 확인 필요 | 메인그래프 v2(04 시트)가 현행 상세이고 옛 메인 그래프 탭(03)은 이력으로 보존한다. 목차 FS019~027의 상세 위치(range)와 v2 시트의 실제 구획 행 불일치는 명세 담당자가 정정해야 한다. |
 
 ### 요청 필드
 
@@ -742,7 +753,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | mode | query | 선택 | string {all, personal} |  |
 | companyId | query | 선택 | string / null |  |
 | depth | query | 선택 | integer / null | Hops from the focus; omit for the whole connected component. |
-| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. |
+| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -773,7 +784,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
-| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. |
+| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -813,20 +824,20 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## getCompany · 기업 기본 정보·관계·요약 조회
 
-기업 기본 정보·관계·요약 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 기본 정보·관계·요약을 조회한다. 표시용 name과 정식 법인명 legalName을 구분한다. legalName·market·sector·representative·foundedDate·websiteUrl 여섯 프로필 키는 항상 반환하고 확인되지 않은 값은 null이다. 공식 기업 마스터 자료를 확보하기 전 표시명 복사·날짜/URL 추정·빈 문자열로 보충하지 않는다. 관계/요약의 공개 시점과 기업 마스터의 자료 시점은 별개다. 공통 규칙을 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/companies/{id}` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 200: [CompanyDetail](#schema-companydetail), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| 응답 | 200: [CompanyDetail](#schema-companydetail), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE |
 | FS/NFS | [FS020](../../system/out/feature-FS020.md) · [FS038](../../system/out/feature-FS038.md) · [FS044](../../system/out/feature-FS044.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-03](../../system/out/screen-D-COM-03.md) · [D-COM-04](../../system/out/screen-D-COM-04.md) · [M-COM-02](../../system/out/screen-M-COM-02.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.6.26, 6.7.2, 6.7.7, 6.7.8, 6.7.10, 6.7.11, 6.7.12 |
 | 프로토타입 대응 | /api/companies/{id} |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표의 필수 nullable 프로필 legalName/market/representative/foundedDate/websiteUrl은 현재 BFF CompanyDetail에 없다. sector는 기존 필드를 유지한다. 공식 기업 마스터 공급원·자료 기준 확인과 DTO 이행이 필요하다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -834,7 +845,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
-| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. |
+| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -843,7 +854,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## getCompanyQuote · 기업 시세 조회
 
-기업 시세 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+차트 기간·조회 asOf·graphVersion과 독립적으로 공급자가 가장 최근 제공한 기업 시세를 조회한다. latest는 실시간·당일 보장이 아니다. 요청에 asOf/graphVersion이 제공되면 422 INVALID_REQUEST로 거절하며 역사 조회처럼 보이는 요청을 조용히 최신값으로 처리하지 않는다. quote.asOf는 공급자의 가격 관측시각 또는 null을 유지한다. 출처·가격 종류·통화·단위·지연을 보존하고 과거 차트값을 최신 시세로 대신하지 않는다. 활성 그래프 부재만으로 VERSION_UNAVAILABLE을 반환하지 않는다. 정상 자료 부재는 200 unavailable이고 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 원인에 맞춘다. 공통 오류·요청 ID 규칙을 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -856,7 +867,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 화면 | [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-STK-01](../../system/out/screen-D-STK-01.md) · [M-STK-01](../../system/out/screen-M-STK-01.md) · [D-COM-03](../../system/out/screen-D-COM-03.md) · [M-COM-02](../../system/out/screen-M-COM-02.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.6.26, 6.7.2, 6.7.8, 6.7.10, 6.7.11, 6.5.6 |
 | 프로토타입 대응 | /api/companies/{id}/quote |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표의 최신 시세는 차트/타임라인 및 공개 그래프 선택과 독립적이다. 현재 BFF의 기업 존재 확인·출처 조회와 그래프 상태 의존 여부를 별도로 확인하고 공급자 관측시각을 보존해야 한다., 목표는 asOf/graphVersion 전달을 422 INVALID_REQUEST로 거절하고 정상 자료 부재200(not_connected/unsupported_symbol/no_data)과 실제 공급자 장애503 SOURCE_UNAVAILABLE을 구분하며 quote.asOf는 공급자 관측시각 또는 null을 유지한다. 10-10 로컬 BFF는 같은 경계를 구현했다(가짜 공급자 HTTP 40건 정확성 스모크, 성능 시험 아님). 남은 차이는 기존 소문자 snake_case 오류 코드(source_unavailable/validation_error)와 details.retryable·requestId 위치이며 저장된 BFF OpenAPI 관측본은 아직 갱신하지 않았다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -865,14 +876,12 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
-| asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="getcompanymetrics"></a>
 
 ## getCompanyMetrics · 기업 주요 지표 조회
 
-기업 주요 지표 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 주요 지표 조회. 공급자가 제공한 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -885,7 +894,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 화면 | [D-GRP-03](../../system/out/screen-D-GRP-03.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.4, 6.6.23, 6.7.2, 6.7.10 |
 | 프로토타입 대응 | /api/companies/{id}/metrics |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 정상 자료 부재 200 unavailable의 reasonCode를 not_connected/unsupported_symbol/no_data로 제한하고 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE로 구분한다. status 값(available/unavailable)은 변경하지 않는다. 10-10 로컬 BFF는 부분 지표를 있는 값만 반환하고 값이 없으면 200 no_data, 읽을 수 없는 응답은 503으로 구분한다. 남은 차이는 기존 소문자 snake_case 오류 코드와 details.retryable·requestId 위치이며 저장된 BFF OpenAPI 관측본은 아직 갱신하지 않았다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -901,7 +910,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## getCompanyPrices · 기간별 가격 차트 조회
 
-기간별 가격 차트 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 해당 해상도를 제공하지 않으면 다른 해상도의 값을 이름만 바꾸거나 집계·보간해 채우지 않고 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -914,7 +923,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 화면 | [D-COM-01b](../../system/out/screen-D-COM-01b.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-05](../../system/out/screen-D-COM-05.md) · [D-COM-06](../../system/out/screen-D-COM-06.md) |
 | WBS | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.8, 6.7.10, 6.7.11, 6.7.12 |
 | 프로토타입 대응 | /api/companies/{id}/prices |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 기간별 봉 해상도를 1d=5m, 1w=1h, 1m=1d, 1y=1wk로 고정하고 해상도를 제공하지 못하면 가짜 봉 없이 200 unavailable(no_data)로 표현한다. 정상 자료 부재 reasonCode는 3개로 제한하고 공급자 장애는 503 SOURCE_UNAVAILABLE로 구분한다. 10-10 로컬 BFF는 Yahoo 가짜 공급자에서 5m/1h/1d/1wk를 확인했고 Toss 1d/1w는 5분·시간 봉이 없어 200 no_data로 둔다. 남은 차이는 기존 소문자 snake_case 오류 코드와 details.retryable·requestId 위치이며 저장된 BFF OpenAPI 관측본은 아직 갱신하지 않았다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -968,20 +977,20 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## listEvents · 기업·기간별 사건 타임라인 조회
 
-기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다.
+기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/events` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 200: [EventListResponse](#schema-eventlistresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR |
-| FS/NFS | [FS040](../../system/out/feature-FS040.md) · [FS041](../../system/out/feature-FS041.md) · [FS056](../../system/out/feature-FS056.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 응답 | 200: [EventListResponse](#schema-eventlistresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, INVALID_CURSOR, VERSION_UNAVAILABLE |
+| FS/NFS | [FS040](../../system/out/feature-FS040.md) · [FS041](../../system/out/feature-FS041.md) · [FS056](../../system/out/feature-FS056.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01b](../../system/out/screen-D-COM-01b.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) · [D-COM-05](../../system/out/screen-D-COM-05.md) · [D-COM-06](../../system/out/screen-D-COM-06.md) |
-| WBS | 6.1.2, 6.11.1, 6.7.3, 6.7.4, 6.7.8, 6.7.11, 6.7.12, 6.5.2 |
+| WBS | 6.1.2, 6.11.1, 6.7.3, 6.7.4, 6.7.8, 6.7.11, 6.7.12, 6.5.2, 6.5.1 |
 | 프로토타입 대응 | /api/events |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다., 현재 BFF EventSummary에는 요청 companyId 맥락의 relationTypes가 없다. items/unknownTimeItems 양쪽을 같은 승인 간선·공개 버전/asOf로 변환해야 하며 간접 2-hop을 직접 관계로 승격하지 않는다. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
@@ -1023,7 +1032,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
-| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. |
+| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -1041,7 +1050,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 200: [EvidenceResponse](#schema-evidenceresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE |
-| FS/NFS | [FS024](../../system/out/feature-FS024.md) · [FS043](../../system/out/feature-FS043.md) · [FS050-01](../../system/out/feature-FS050-01.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| FS/NFS | [FS024](../../system/out/feature-FS024.md) · [FS043](../../system/out/feature-FS043.md) · [FS049](../../system/out/feature-FS049.md) · [FS055](../../system/out/feature-FS055.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-GRP-05](../../system/out/screen-D-GRP-05.md) · [D-COM-02](../../system/out/screen-D-COM-02.md) · [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-SEN-01](../../system/out/screen-D-SEN-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.9, 6.6.22, 6.6.24, 6.6.25, 6.6.26, 6.7.6, 6.7.9, 6.9.5, 6.9.14, 6.5.1 |
 | 프로토타입 대응 | /api/evidence/{id} |
@@ -1053,7 +1062,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
-| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/briefings/{id}/graph. |
+| round | query | 선택 | string / null | Briefing round id (e.g. brf-2026-09-17-morning): read the graph as it stood when that round was published. Never falls back to the newest graph; see GET /api/v1/briefings/{id}/graph. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
 | asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
@@ -1155,12 +1164,12 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 201: [ChatSessionResponse](#schema-chatsessionresponse), 200: [ChatSessionResponse](#schema-chatsessionresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
-| FS/NFS | [FS051](../../system/out/feature-FS051.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
+| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
 
 ### 요청 필드
 
@@ -1183,7 +1192,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 200: [ChatConversation](#schema-chatconversation), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
-| FS/NFS | [FS052-01](../../system/out/feature-FS052-01.md) · [FS052-02](../../system/out/feature-FS052-02.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-AI-02b](../../system/out/screen-D-AI-02b.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
@@ -1210,7 +1219,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 200: [ChatCurrentResponse](#schema-chatcurrentresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
-| FS/NFS | [FS052-02](../../system/out/feature-FS052-02.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS051](../../system/out/feature-FS051.md) · [FS060](../../system/out/feature-FS060.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02b](../../system/out/screen-D-AI-02b.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/current |
@@ -1236,12 +1245,12 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | [ChatJobRequest](#schema-chatjobrequest) |
 | 응답 | 202: [ChatJob](#schema-chatjob), 200: [ChatJob](#schema-chatjob), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, VERSION_UNAVAILABLE, EVIDENCE_UNAVAILABLE, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
-| FS/NFS | [FS025](../../system/out/feature-FS025.md) · [FS045](../../system/out/feature-FS045.md) · [FS046](../../system/out/feature-FS046.md) · [FS047](../../system/out/feature-FS047.md) · [FS048](../../system/out/feature-FS048.md) · [FS049](../../system/out/feature-FS049.md) · [FS050-02](../../system/out/feature-FS050-02.md) · [FS052-01](../../system/out/feature-FS052-01.md) · [FS060](../../system/out/feature-FS060.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS025](../../system/out/feature-FS025.md) · [FS045](../../system/out/feature-FS045.md) · [FS046](../../system/out/feature-FS046.md) · [FS047](../../system/out/feature-FS047.md) · [FS048](../../system/out/feature-FS048.md) · [FS049](../../system/out/feature-FS049.md) · [FS050](../../system/out/feature-FS050.md) · [FS051](../../system/out/feature-FS051.md) · [FS060](../../system/out/feature-FS060.md) · [FS064](../../system/out/feature-FS064.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-01](../../system/out/screen-D-AI-01.md) · [D-AI-01b](../../system/out/screen-D-AI-01b.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
 
 ### 요청 필드
 
@@ -1267,12 +1276,12 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 200: [ChatJob](#schema-chatjob), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
-| FS/NFS | [FS046](../../system/out/feature-FS046.md) · [FS049](../../system/out/feature-FS049.md) · [FS050-01](../../system/out/feature-FS050-01.md) · [FS050-02](../../system/out/feature-FS050-02.md) · [FS053](../../system/out/feature-FS053.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS048](../../system/out/feature-FS048.md) · [FS049](../../system/out/feature-FS049.md) · [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.9.4, 6.9.5, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
+| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
 
 ### 요청 필드
 
@@ -1294,7 +1303,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 202: [ChatJob](#schema-chatjob), 200: [ChatJob](#schema-chatjob), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
-| FS/NFS | [FS053](../../system/out/feature-FS053.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/retry |
@@ -1323,12 +1332,12 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 요청 본문 | 없음 |
 | 응답 | 200: [ChatJob](#schema-chatjob), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, MODEL_UNAVAILABLE, VALIDATION_FAILED |
-| FS/NFS | [FS046](../../system/out/feature-FS046.md) · [FS053](../../system/out/feature-FS053.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| FS/NFS | [FS051](../../system/out/feature-FS051.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
 | 화면 | [D-AI-02](../../system/out/screen-D-AI-02.md) · [M-AI-01](../../system/out/screen-M-AI-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/cancel |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., 동일 FS ID의 기존/v2 상세 시트가 공존한다. 의미가 달라지는 항목의 채택본은 추적표 원본 행을 보고 팀이 확인해야 한다. |
+| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
 
 ### 요청 필드
 
@@ -1397,20 +1406,20 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 
 ## logOutAdmin · 관리자 로그아웃
 
-관리자 로그아웃.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_admin_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_admin_session 쿠키만 제거하며 회원 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/auth/logout` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 204: 본문 없음, 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
+| 응답 | 204: 본문 없음, 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, ACCESS_DENIED, RATE_LIMITED |
 | FS/NFS | [FS073](../../system/out/feature-FS073.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [A-ADM-05c](../../system/out/screen-A-ADM-05c.md) · [A-ADM-01](../../system/out/screen-A-ADM-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.1, 6.10.13 |
 | 프로토타입 대응 | /api/admin/auth/logout |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 활성 관리자 세션의 Origin/조건부 CSRF 검증, 무세션 반복204 및 관리자/회원 쿠키 분리를 요구한다. 현재 BFF의 목표 보안 구현 완료를 뜻하지 않는다. |
 | 팀 확인 필요 | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1418,6 +1427,7 @@ LLM 모델·추론 수준은 .env에서 명시 설정한다. 설정 위치 결�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| X-CSRF-Token | header | 선택 | string | 활성 zoop_admin_session이 있으면 필수이며 해당 세션에 결합된 토큰이어야 한다. 누락/불일치는 403 ACCESS_DENIED이고 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 필요하지 않다. Origin도 검증한다. |
 
 <a id="getadmindashboard"></a>
 
@@ -2516,14 +2526,14 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 요청 본문 | 없음 |
 | 응답 | 200: [FinancialResponse](#schema-financialresponse), 409: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, VERSION_UNAVAILABLE, SOURCE_UNAVAILABLE |
-| FS/NFS | [FS042](../../system/out/feature-FS042.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| FS/NFS | [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-COM-01](../../system/out/screen-D-COM-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
 | WBS | 6.1.2, 6.11.1 |
 | 프로토타입 대응 | 없음 |
 | 목표와 차이 | 직접 대응 API 없음. 재무는 기업 지표와 구분한다. |
-| 팀 확인 필요 | 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다., 현재 WBS 6.7.5는 시점 관계 그래프다. 옛 6.6.5 재무 의미를 그 번호로 이행하지 않는다. 재무 유지/분리 ID·담당/일정은 팀 최종 결정 대상이며 API는 기존 목표만 보존한다. |
+| 팀 확인 필요 | 재무 제공 항목·회계 기간·개인화 브리핑 생성 조건/재사용/대상 수 또는 영향 경로 데이터 모델은 해당 명세의 확인 필요 사항을 팀이 확정해야 한다., 요구 42의 재무·실적은 폐기되지 않았고 목차 FS042(시점 그래프)와 번호만 겹친다. 전용 FS ID·담당 WBS·공급자·허용 기간/항목·회계 기준은 팀 최종 결정 대상이며 API는 기존 목표만 보존한다. |
 
-명세 의미 구분: FS042: 목차·요구42의 기존 재무/실적 의미를 보존한 목표다. 새 상세 FS042 시점 그래프와 다르며 현재 WBS에 대응 재무 업무가 없어 공통 계약검토만 연결한다. 폐기·구현·배정 완료가 아니다.
+요구사항 번호 연결(FS 없음): 42: 요구사항 정의서 42(기준일 재무·실적)의 목표다. 10-10 목차 FS042는 시점 기반 관계 그래프이며 번호만 같다. 새 FS 번호·도메인 WBS를 만들지 않았고 폐기·구현·배정 완료가 아니다. 현재 WBS에는 대응 재무 업무가 없어 공통 계약 점검만 연결한다.
 
 ### 요청 필드
 
@@ -2608,9 +2618,9 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | WBS | 6.1.2, 6.11.1, 6.7.2, 6.7.3, 6.7.4, 6.7.5, 6.7.8, 6.7.10, 6.7.11, 6.7.12, 6.5.1 |
 | 프로토타입 대응 | /api/companies/{id}/graph |
 | 목표와 차이 | /api → /api/v1 경로 버전 및 공통 오류·요청 ID 적용., BFF는 현재 저장된 승인 자료를 문서 공개 시각으로 거른다. 목표는 asOf와 실제 사용한 불변 공개 버전을 함께 고정한다. |
-| 팀 확인 필요 | 10-08 상세 FS042는 FS0?? 시점 관계 그래프를 승계했지만 목차/요구42의 기존 재무·실적 의미와 충돌한다. 재무 폐기 선언 없이 시점 그래프 의미로 연결하며 의미별 승인 범위는 팀 최종 확인이 필요하다., 날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다. |
+| 팀 확인 필요 | 목차의 요구 번호 42는 기준일 재무·실적(요구 42)이며 FS042 시점 그래프와 의미가 다르다. 재무 폐기 선언이 없어 별도 유보하며 시점 그래프 의미의 승인 범위는 팀 최종 확인이 필요하다., 날짜 정밀도만 있는 사건을 정확한 조회 asOf로 바꾸는 기준과 이력 보존 기간을 팀이 확인해야 한다. |
 
-명세 의미 구분: FS042: 기업 상세 77/79행의 FS0??→FS042 ID 승계. 시점 관계 그래프 의미이며 기존 재무/실적 공급을 뜻하지 않는다.
+명세 의미 구분: FS042: 목차·상세 FS042의 시점 기반 관계 그래프 의미다. 요구 42의 재무·실적 공급을 뜻하지 않으며 그 요구는 getCompanyFinancials에 요구 번호로만 연결한다.
 
 ### 요청 필드
 
@@ -3464,10 +3474,15 @@ The selection frozen when the question was first received.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
-| name | 필수 | string |  |
+| name | 필수 | string | 화면 표시용 기업명이다. 확인된 정식 법인명 legalName을 대신하지 않는다. |
+| legalName | 필수 | string, null | 확인된 정식 법인명. 자료가 없으면 null이며 표시용 name을 복사하지 않는다. |
+| market | 필수 | string, null | 확인된 상장 시장. 자료가 없으면 null이다. |
+| representative | 필수 | string, null | 공식 기업 기준 자료에서 확인한 대표자명. 자료가 없으면 null이다. |
+| foundedDate | 필수 | string, null (date) | 확인된 설립일(YYYY-MM-DD). 연도/월만 알려진 자료를 정확한 날짜로 추정하지 않으며 미확인 값은 null이다. |
+| websiteUrl | 필수 | string, null (uri) | 확인된 공식 웹사이트의 절대 URI. 자료가 없으면 null이며 검색 결과 URL을 공식 주소로 추정하지 않는다. |
 | ticker | 필수 | string / null |  |
 | aliases | 필수 | string[] |  |
-| sector | 필수 | string / null |  |
+| sector | 필수 | string / null | 확인된 업종. 기존 sector 필드를 여섯 프로필 키 중 하나로 유지하며 자료가 없으면 null이다. |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB`; null when the catalog has none. |
 | logoUrl | 필수 | string / null | Same-origin logo path (`/logos/<file>`); null when the catalog has none. |
 | directIssues | 필수 | [CompanyIssueRef](#schema-companyissueref)[] |  |
@@ -3579,7 +3594,7 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | status | 필수 | string |  |
 | companyId | 필수 | string |  |
-| reasonCode | 필수 | string {not_connected, unsupported_symbol, no_data, auth_failed, temporary_failure, format_changed} |  |
+| reasonCode | 필수 | string {not_connected, unsupported_symbol, no_data} | 정상 자료 부재만 표현한다. 실제 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 unavailable 성공으로 숨기지 않는다. |
 | reason | 필수 | string |  |
 
 <a id="schema-companyquote"></a>
@@ -3605,7 +3620,7 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | status | 필수 | string |  |
 | companyId | 필수 | string |  |
-| reasonCode | 필수 | string {not_connected, unsupported_symbol, no_data, auth_failed, temporary_failure, format_changed} | not_connected: provider off or keys missing; unsupported_symbol; no_data: provider has nothing; auth_failed; temporary_failure: timeout, network, 429 or 5xx (retry later). |
+| reasonCode | 필수 | string {not_connected, unsupported_symbol, no_data} | 정상 자료 부재만 표현한다. not_connected: 공급자가 의도적으로 비활성/미설정됨; unsupported_symbol: 지원하지 않는 종목; no_data: 공급자에 관측값 없음. 실제 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 unavailable 성공으로 숨기지 않는다. |
 | reason | 필수 | string |  |
 
 <a id="schema-companyseriespoint"></a>
@@ -4109,6 +4124,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | timePrecision | 필수 | string {year, month, day, datetime, unknown} |  |
 | period | 필수 | string / null |  |
 | companyIds | 필수 | string[] |  |
+| relationTypes | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO}[] (uniqueItems) | 이 응답의 요청 companyId와 사건 사이의 직접 승인 간선 유형만 포함한다. items/unknownTimeItems 모두 같은 공개 graphVersion/asOf를 사용한다. 두 유형이 함께 있으면 각각 한 번 포함한다. companyId 없음·직접 승인 간선 없음·간접 2-hop 전용 사건은 []다. companyIds 전체의 관계 합집합, 감성/영향 방향, 기업 간 공급/경쟁 유형이 아니다. |
 | articleCount | 필수 | integer |  |
 | reportedAt | 필수 | string (date-time) / null | Latest publication time among the event's articles; never used as the event time |
 
@@ -5256,7 +5272,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | period | 필수 | string {1d, 1w, 1m, 1y} |  |
 | source | 필수 | [QuoteSourceOut](#schema-quotesourceout) |  |
 | currency | 필수 | string |  |
-| interval | 필수 | string | 실제 공급된 가격 봉 해상도다. 조회 기간과 구분하고 from/to 및 자료 기준 시각을 함께 표시한다. 정확한 해상도 정책은 팀 확인 필요다. |
+| interval | 필수 | string {5m, 1h, 1d, 1wk} | 공급된 가격 봉 해상도다. 기간별로 고정이며 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉)다. 조회 기간과 구분하고 from/to 및 자료 기준 시각을 함께 표시한다. 목표 해상도를 제공하지 못하면 다른 해상도를 이 필드로 위장하지 않고 unavailable을 반환한다. |
 | points | 필수 | [PricePoint](#schema-pricepoint)[] | Oldest first. |
 
 <a id="schema-priceseriesunavailable"></a>
@@ -5270,7 +5286,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | status | 필수 | string |  |
 | companyId | 필수 | string |  |
 | period | 필수 | string {1d, 1w, 1m, 1y} |  |
-| reasonCode | 필수 | string {not_connected, unsupported_symbol, no_data, auth_failed, temporary_failure, format_changed} |  |
+| reasonCode | 필수 | string {not_connected, unsupported_symbol, no_data} | 정상 자료 부재만 표현한다. no_data는 목표 봉 해상도(1d=5m, 1w=1h, 1m=1d, 1y=1wk)의 관측값이 공급자에 없는 경우를 포함한다. 실제 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 unavailable 성공으로 숨기지 않는다. |
 | reason | 필수 | string |  |
 
 <a id="schema-publicationstate"></a>
@@ -5768,7 +5784,7 @@ Key issues of an evening round compared with the same day's published morning ro
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| items | 필수 | [SocialProvider](#schema-socialprovider)[] |  |
+| items | 필수 | [SocialProvider](#schema-socialprovider)[] | 개별 페이지의 회원 인증 제공자 목록이다. 전체 커서 순회 결과는 google/kakao 각각 한 번이며 페이지마다 두 항목 모두를 강제하지 않는다. |
 | nextCursor | 필수 | string, null |  |
 
 <a id="schema-sourcesupportout"></a>
@@ -6287,7 +6303,7 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| id | 필수 | string |  |
+| id | 필수 | string {google, kakao} |  |
 | name | 필수 | string |  |
 
 <a id="schema-financialvalue"></a>

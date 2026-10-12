@@ -1,0 +1,58 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k",
+  "export_url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k/export?format=xlsx",
+  "request_started_at_utc": "2026-10-10T07:47:01.755842+00:00",
+  "collected_at_utc": "2026-10-10T07:47:03.571201+00:00",
+  "collected_at_kst": "2026-10-10T16:47:03.571201+09:00",
+  "auth": "none",
+  "http_status": 200,
+  "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "response_bytes": 49004,
+  "response_sha256": "bb39677d8a95635538c751087e68e6e5dccafe7bead619fee46c6338acb05886",
+  "baseline": "requirements-sheet_2026-10-06",
+  "baseline_xlsx_sha256": "cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18",
+  "content_identical": true,
+  "meaningful_cell_content_changed": false,
+  "data_only": true,
+  "csv_encoding": "utf-8-sig",
+  "xlsx": "zoop-requirements-sheet_2026-10-10.xlsx",
+  "sha256": "bb39677d8a95635538c751087e68e6e5dccafe7bead619fee46c6338acb05886",
+  "sheets": {
+    "요구사항 정의서": "1-요구사항-정의서.csv",
+    "검증 기준": "2-검증-기준.csv",
+    "정책 결정": "3-정책-결정.csv"
+  },
+  "sheet_ranges": {
+    "요구사항 정의서": {
+      "rows": 1022,
+      "columns": 11
+    },
+    "검증 기준": {
+      "rows": 91,
+      "columns": 4
+    },
+    "정책 결정": {
+      "rows": 30,
+      "columns": 5
+    }
+  },
+  "files": {
+    "zoop-requirements-sheet_2026-10-10.xlsx": "bb39677d8a95635538c751087e68e6e5dccafe7bead619fee46c6338acb05886",
+    "2-검증-기준.csv": "03202210c85c90d837225fce10888257a0566856ac920ad52719ac586711252b",
+    "3-정책-결정.csv": "3dc355e4d3204ab8a42a838e6d28e91665bb0910170956c28eebebdccb1ab4ed",
+    "1-요구사항-정의서.csv": "79661cfc0bc2643f7222158c1fdc4c5652216954892e622b34f0de6ceb637d23"
+  },
+  "baseline_sheet_order": [
+    "요구사항 정의서",
+    "검증 기준",
+    "정책 결정"
+  ],
+  "current_sheet_order": [
+    "요구사항 정의서",
+    "검증 기준",
+    "정책 결정"
+  ],
+  "cell_delta_count": 0,
+  "formula_delta_count": 0,
+  "structural_delta_count": 0
+}

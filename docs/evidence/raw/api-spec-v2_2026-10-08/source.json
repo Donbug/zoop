@@ -1,0 +1,28 @@
+{
+  "sourceFile": "zoop-api-spec-v2.md",
+  "sourceKind": "user-supplied teammate Markdown",
+  "receivedAt": "2026-10-08T15:02:00.173506+09:00",
+  "sha256": "458a51bbdf7dfa3b417ad9c41882208be88d6e91eaec3d7ad3d1973969b9667a",
+  "bytes": 327701,
+  "originalModified": false,
+  "canonicalTarget": "docs/api/openapi.yaml",
+  "declaredChanges": [
+    "company information fields",
+    "event-company relation types",
+    "latest quote query conditions",
+    "Google and Kakao social providers"
+  ],
+  "upstreamOpenApiProvided": false,
+  "notionLinkageVerified": false,
+  "wbsSpecRecheck": {
+    "status": "completed",
+    "evidence": "../refresh_2026-10-08-api-review/_source-recheck.json",
+    "wbsInput": "../wbs_2026-10-08-api-review",
+    "specInput": "../functional-spec_2026-10-08",
+    "wbsValueChanges": 11,
+    "wbsFormulaChanges": 34,
+    "wbsIdTitleRoleChanges": 0,
+    "specCellChanges": 0,
+    "adoptionRule": "Select declared intent only; retain current S1 schemas and semantic WBS/FS mappings. Upstream Notion linkage is unverified."
+  }
+}

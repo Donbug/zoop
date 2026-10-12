@@ -1,15 +1,16 @@
 # FS080 · GraphDB 노드·간선 upsert 및 공개 버전 반영
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | 미정 · 추가 제안 · 검토 전 |
 | 원문 범위 분류 | proposal |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 67, 71 |
+| 요구사항 번호(원문) | 67, 71 |
+| 의미 기준 요구사항 | 67, 71 |
 | API 대응 | API 불필요 |
 | 사유 | 기존 공통 공개/저장 계약 재사용. GraphDB 멱등 upsert·기대 버전·공개 전환은 오프라인 저장 단계이므로 공개 HTTP API 불필요; 목표 운영 연동은 미정. 저장 재시도는 모델 재호출 허가가 아니다. 명세 우선순위 미정과 WBS 본문 P1의 충돌은 정정 요청으로 보존하고 현재 팀합의 설계대상에 포함한다. |
 | 프로토타입 문서 판정 | 판정 없음 |
@@ -17,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:110 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:106 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv:252 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/04-메인그래프-v2.csv) — GraphDB 노드·간선 upsert 및 공개 버전 반영: 기업·이슈 노드와 기업–기업·기업–이슈 간선을 GraphDB에 멱등 upsert하고 근거·분석 버전·검증 상태를 연결한다. 백엔드 B가 저장·트랜잭션·조회 반영을, AI가 분석 결과 계약과 검증 결과 제공을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv:252 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/04-메인그래프-v2.csv) — GraphDB 노드·간선 upsert 및 공개 버전 반영: 기업·이슈 노드와 기업–기업·기업–이슈 간선을 GraphDB에 멱등 upsert하고 근거·분석 버전·검증 상태를 연결한다. 백엔드 B가 저장·트랜잭션·조회 반영을, AI가 분석 결과 계약과 검증 결과 제공을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS055](feature-FS055.md) · [FS059](feature-FS059.md)
 
@@ -42,4 +43,4 @@
 
 - REQUIREMENT_TITLE_REVIEW: 명세 'GraphDB 노드·간선 upsert 및 공개 버전 반영' ↔ 요구사항 67 '관계와 근거 연결'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
 - REQUIREMENT_TITLE_REVIEW: 명세 'GraphDB 노드·간선 upsert 및 공개 버전 반영' ↔ 요구사항 71 '분석 결과 저장 및 조회 반영'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음).
-- RAW_SCOPE_STATUS_CORRECTION: 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-08-day의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.
+- RAW_SCOPE_STATUS_CORRECTION: 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다.

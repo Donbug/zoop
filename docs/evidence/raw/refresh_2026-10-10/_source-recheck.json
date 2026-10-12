@@ -1,0 +1,134 @@
+{
+  "result": "passed",
+  "method": {
+    "python": "3.13.14 (main, Jun 11 2026, 03:58:32) [Clang 22.1.3 ]",
+    "openpyxl": "3.1.5",
+    "data_only": true,
+    "csv_encoding": "utf-8-sig",
+    "empty_cell": "",
+    "other_values": "str(value)",
+    "all_worksheets": true,
+    "comparison": "exact string cell values, sheet names/order and rectangular ranges; formula and hyperlink target deltas recorded",
+    "network": "three unauthenticated public XLSX GET requests; no external writes; no package installs"
+  },
+  "workbooks": [
+    {
+      "source_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c",
+      "export_url": "https://docs.google.com/spreadsheets/d/1aHJbxjXmvzgTXAlBd4mWTRDkcvD1S9vtHl1PR_bxn5c/export?format=xlsx",
+      "request_started_at_utc": "2026-10-10T07:47:01.755479+00:00",
+      "collected_at_utc": "2026-10-10T07:47:03.509296+00:00",
+      "collected_at_kst": "2026-10-10T16:47:03.509296+09:00",
+      "auth": "none",
+      "http_status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "response_bytes": 86541,
+      "response_sha256": "e3eeab150457e5d6d7fa9d737b8c2271d1f261f15151430edbb16c9182b7e801",
+      "workbook": "wbs",
+      "baseline": "docs/evidence/raw/wbs_2026-10-08-api-review",
+      "capture": "docs/evidence/raw/wbs_2026-10-10",
+      "recommended_importer_input": "docs/evidence/raw/wbs_2026-10-10",
+      "content_identical": false,
+      "baseline_xlsx_sha256": "28daf3437092e34b11351328ae6ee314574a19f00483356df796eb7f1348719a",
+      "sheet_count": 3,
+      "cell_delta_count": 7,
+      "formula_delta_count": 0,
+      "structural_deltas": [],
+      "mapping_relevant_row_count": 7,
+      "hyperlink_delta_count": 0,
+      "current_hyperlink_count": 0,
+      "cells_checked": 102532,
+      "baseline_cells_checked": 102532,
+      "baseline_csv_readback": "passed",
+      "current_csv_readback": "passed"
+    },
+    {
+      "source_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs",
+      "export_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs/export?format=xlsx",
+      "request_started_at_utc": "2026-10-10T07:47:01.755767+00:00",
+      "collected_at_utc": "2026-10-10T07:47:04.151051+00:00",
+      "collected_at_kst": "2026-10-10T16:47:04.151051+09:00",
+      "auth": "none",
+      "http_status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "response_bytes": 226188,
+      "response_sha256": "a780ecc189ac3c23a6d4aebab8cc935db0aa86869fa3a37290f52c1f9a944282",
+      "workbook": "functional-spec",
+      "baseline": "docs/evidence/raw/functional-spec_2026-10-08",
+      "capture": "docs/evidence/raw/functional-spec_2026-10-10",
+      "recommended_importer_input": "docs/evidence/raw/functional-spec_2026-10-10",
+      "content_identical": false,
+      "baseline_xlsx_sha256": "ee44123b0074909d09539046c6d1f887827efe4b791a374bf6c25e169362b175",
+      "sheet_count": 15,
+      "cell_delta_count": 326,
+      "formula_delta_count": 0,
+      "structural_deltas": [
+        {
+          "sheet": "명세 목차",
+          "before": [
+            111,
+            8
+          ],
+          "after": [
+            107,
+            8
+          ]
+        }
+      ],
+      "mapping_relevant_row_count": 73,
+      "hyperlink_delta_count": 0,
+      "current_hyperlink_count": 0,
+      "cells_checked": 33348,
+      "baseline_cells_checked": 33380,
+      "baseline_csv_readback": "passed",
+      "current_csv_readback": "passed"
+    },
+    {
+      "source_url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k",
+      "export_url": "https://docs.google.com/spreadsheets/d/1zehuZhPlDNoC3g7EMNqlzmzUPyb9kiu31j0wO0udG4k/export?format=xlsx",
+      "request_started_at_utc": "2026-10-10T07:47:01.755842+00:00",
+      "collected_at_utc": "2026-10-10T07:47:03.571201+00:00",
+      "collected_at_kst": "2026-10-10T16:47:03.571201+09:00",
+      "auth": "none",
+      "http_status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "response_bytes": 49004,
+      "response_sha256": "bb39677d8a95635538c751087e68e6e5dccafe7bead619fee46c6338acb05886",
+      "workbook": "requirements-sheet",
+      "baseline": "docs/evidence/raw/requirements-sheet_2026-10-06",
+      "capture": "docs/evidence/raw/refresh_2026-10-10/requirements-sheet",
+      "recommended_importer_input": "docs/evidence/raw/requirements-sheet_2026-10-06",
+      "content_identical": true,
+      "baseline_xlsx_sha256": "cc91b251b5b930cfc005c0aa533b5fe873ac29f6ad85e086f29a9a5293c26d18",
+      "sheet_count": 3,
+      "cell_delta_count": 0,
+      "formula_delta_count": 0,
+      "structural_deltas": [],
+      "mapping_relevant_row_count": 0,
+      "hyperlink_delta_count": 0,
+      "current_hyperlink_count": 0,
+      "cells_checked": 11756,
+      "baseline_cells_checked": 11756,
+      "baseline_csv_readback": "passed",
+      "current_csv_readback": "passed"
+    }
+  ],
+  "counts": {
+    "workbooks": 3,
+    "sheets": 21,
+    "current_cells_checked": 147636,
+    "cell_deltas": 333,
+    "formula_deltas": 0,
+    "mapping_relevant_rows": 80
+  },
+  "invariants": {
+    "all_tabs_captured": true,
+    "full_workbook_to_csv_readback": "passed",
+    "original_frozen_files_unchanged": true,
+    "original_files_hash_checked": 34
+  },
+  "recommended_importer_inputs": {
+    "wbs": "docs/evidence/raw/wbs_2026-10-10",
+    "functional-spec": "docs/evidence/raw/functional-spec_2026-10-10",
+    "requirements-sheet": "docs/evidence/raw/requirements-sheet_2026-10-06"
+  }
+}

@@ -1,11 +1,16 @@
 {
   "authority": {
-    "decisionId": "user-2026-10-08-day",
-    "source": "docs/share/day-work-2026-10-08.md",
-    "authority": "사용자 결정(팀 합의 요구의 현재 해석)",
+    "decisionId": "user-2026-10-10-feedback",
+    "source": "docs/share/day-work-2026-10-10.md",
+    "authority": "사용자 결정(팀 합의 요구의 현재 해석) — 2026-10-10 피드백 동기화. 팀원 보고와 실제 원본 변경을 구분해 반영한다.",
+    "inherits": {
+      "decisionId": "user-2026-10-08-day",
+      "source": "docs/share/day-work-2026-10-08.md",
+      "note": "10-08 결정은 전 범위·프로토타입 권한·일정·디자인·마이그레이션·AI 순서의 근거로 유지한다. 이번 결정은 범위 예외와 상세 시트 권한만 추가·갱신한다."
+    },
     "rawPolicy": "원문 상태·우선순위·scopeClass·WBS 충돌은 보존한다. 유효 기준을 원문 승인 상태로 덮어쓰지 않는다.",
     "implementationScope": {
-      "appliesTo": "all-specs-and-wbs",
+      "appliesTo": "all-specs-and-wbs-except-recorded-exceptions",
       "status": "팀합의요구/설계대상",
       "includeRawProposalIds": [
         "FS074",
@@ -18,7 +23,45 @@
         "FS081"
       ],
       "implementationComplete": false,
-      "paidExecutionApproved": false
+      "paidExecutionApproved": false,
+      "exceptions": [
+        {
+          "id": "RECOMMENDATION_FEATURE_EXCLUDED",
+          "specIds": [
+            "FS011-02"
+          ],
+          "requirementIds": [
+            "11"
+          ],
+          "effectiveStatus": "사용자 기능 제외 · API 유보",
+          "userFacing": false,
+          "retainedOperationIds": [
+            "listRecommendations"
+          ],
+          "basis": "user-2026-10-10-feedback 항목 2. 원문 목차·요구 11·NFS004 사례는 변경되지 않았고 이번 팀 원본 diff에도 제거가 없다. 최신 사용자 지시가 활성 사용자 플로우만 대체한다.",
+          "reason": "추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations 계약과 현재 BFF 동작은 삭제·무동작 대체·가짜 응답 없이 유보하며 이후 다시 반환할 수 있다. 유보는 활성 사용 허용을 뜻하지 않는다."
+        },
+        {
+          "id": "FINANCE_REQUIREMENT_RESERVED",
+          "specIds": [],
+          "requirementIds": [
+            "42"
+          ],
+          "effectiveStatus": "요구 유지 · 전용 FS/WBS 미대응(유보)",
+          "userFacing": true,
+          "retainedOperationIds": [
+            "getCompanyFinancials"
+          ],
+          "basis": "10-10 목차의 FS042는 시점 기반 관계 그래프다. 최신 요구사항 정의서 42(기준일 재무·실적)와 20·38·75 및 NFS002·004의 재무 독립 기간/부분 실패는 그대로 남아 있고 재무 제외 결정은 없다.",
+          "reason": "재무·실적은 삭제·완료로 보고하지 않는다. 새 FS 번호나 도메인 WBS를 만들지 않고 요구사항 번호와 목표 작업 getCompanyFinancials로만 출처 한정 연결한다. 담당·일정은 팀 결정 전까지 미대응이다."
+        }
+      ]
+    },
+    "chartResolution": {
+      "1d": "5m",
+      "1w": "1h",
+      "1m": "1d",
+      "1y": "1wk"
     },
     "prototype": {
       "permission": "전권 범위·끝까지 완성",
@@ -26,7 +69,7 @@
     },
     "schedule": {
       "authority": "WBS",
-      "notion": "outdated",
+      "notion": "옛 일정은 비권위. 갱신된 Notion 회의·API 결정은 사례별 증거로만 사용하며 WBS 일정을 대체하지 않는다",
       "internalConflicts": "정정 요청으로 수집"
     },
     "design": {
@@ -50,7 +93,219 @@
     }
   },
   "valid": true,
-  "sourceSha256": "57a0e9c7f0c4e5731582100ad815e1d20665d30e812aeebdbb5479f46223d730",
+  "sourceSha256": "7e7c9e5b954db06a775946ca244fef3cefe4e7ddd780595158f401bb85165086",
+  "scopeExceptions": [
+    {
+      "id": "RECOMMENDATION_FEATURE_EXCLUDED",
+      "specIds": [
+        "FS011-02"
+      ],
+      "requirementIds": [
+        "11"
+      ],
+      "effectiveStatus": "사용자 기능 제외 · API 유보",
+      "userFacing": false,
+      "retainedOperationIds": [
+        "listRecommendations"
+      ],
+      "basis": "user-2026-10-10-feedback 항목 2. 원문 목차·요구 11·NFS004 사례는 변경되지 않았고 이번 팀 원본 diff에도 제거가 없다. 최신 사용자 지시가 활성 사용자 플로우만 대체한다.",
+      "reason": "추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations 계약과 현재 BFF 동작은 삭제·무동작 대체·가짜 응답 없이 유보하며 이후 다시 반환할 수 있다. 유보는 활성 사용 허용을 뜻하지 않는다."
+    },
+    {
+      "id": "FINANCE_REQUIREMENT_RESERVED",
+      "specIds": [],
+      "requirementIds": [
+        "42"
+      ],
+      "effectiveStatus": "요구 유지 · 전용 FS/WBS 미대응(유보)",
+      "userFacing": true,
+      "retainedOperationIds": [
+        "getCompanyFinancials"
+      ],
+      "basis": "10-10 목차의 FS042는 시점 기반 관계 그래프다. 최신 요구사항 정의서 42(기준일 재무·실적)와 20·38·75 및 NFS002·004의 재무 독립 기간/부분 실패는 그대로 남아 있고 재무 제외 결정은 없다.",
+      "reason": "재무·실적은 삭제·완료로 보고하지 않는다. 새 FS 번호나 도메인 WBS를 만들지 않고 요구사항 번호와 목표 작업 getCompanyFinancials로만 출처 한정 연결한다. 담당·일정은 팀 결정 전까지 미대응이다."
+    }
+  ],
+  "reservedRequirements": [
+    {
+      "requirementId": "42",
+      "effectiveStatus": "요구 유지 · 전용 FS/WBS 미대응(유보)",
+      "rawIndexSpecId": "FS042",
+      "rawIndexNote": "목차 FS042의 요구 번호 42는 번호만 남은 연결이다. 목차명·상세 의미는 시점 기반 관계 그래프다.",
+      "relatedRequirementIds": [
+        "20",
+        "38",
+        "75"
+      ],
+      "operationIds": [
+        "getCompanyFinancials"
+      ],
+      "wbsIds": [],
+      "reason": "요구 42는 시가총액·PER·PBR·부채비율·매출·영업이익 추이 등을 요구하며 폐기 선언이 없다. 새 FS 번호·도메인 WBS를 만들지 않고 목표 작업의 요구 번호 연결로만 남긴다. 구현 주체·일정은 팀 결정 전까지 미정이다."
+    }
+  ],
+  "detailAuthority": {
+    "historicalSheets": [
+      {
+        "file": "03-메인-그래프.csv",
+        "sheet": "메인 그래프",
+        "supersededBy": "04-메인그래프-v2.csv",
+        "sameIdMeaning": true,
+        "specIds": [
+          "FS017",
+          "FS018",
+          "FS019",
+          "FS020",
+          "FS021",
+          "FS022",
+          "FS023",
+          "FS024",
+          "FS025",
+          "FS026",
+          "FS027"
+        ],
+        "reason": "목차가 FS017~027의 영역을 `메인그래프 v2`로 가리키므로 04를 유효 상세로, 03을 보존된 이력 정의로 둔다. 원문 탭을 지우거나 수정하지 않는다."
+      },
+      {
+        "file": "07-AI-챗봇.csv",
+        "sheet": "AI 챗봇",
+        "supersededBy": "08-AI-챗봇-v2.csv",
+        "specIds": [
+          "FS045",
+          "FS046",
+          "FS047",
+          "FS048",
+          "FS049",
+          "FS050-01",
+          "FS050-02",
+          "FS051",
+          "FS052-01",
+          "FS052-02",
+          "FS053"
+        ],
+        "reason": "목차의 AI 행이 v2 FS045~051 7개로 바뀌었다. ID 046~051은 옛 의미와 다르므로 번호 일치로 옛 정의를 현재 정의의 대체 증거로 쓰지 않는다. 옛 11개 정의는 의미별 이행표로 보존한다."
+      }
+    ],
+    "historicalOnlySpecIds": [
+      "FS050-01",
+      "FS050-02",
+      "FS052-01",
+      "FS052-02",
+      "FS053"
+    ],
+    "rawIdCorrections": [
+      {
+        "rawId": "ㅊ",
+        "effectiveSpecId": "FS066-01",
+        "file": "05-출퇴근-브리핑.csv",
+        "headingRow": 132,
+        "idRow": 134,
+        "observed": "상세 A132 제목이 `FS036 브리핑 리뷰`→`FS066-01 브리핑 리뷰`로 바뀌었다. 같은 구획의 실제 기능 ID 셀 B134는 `FS???`→`ㅊ`로 바뀌었다.",
+        "reported": "팀 피드백은 FS???→FS066-01 정정을 보고했다. 그러나 현재 원문에서 기능 ID 셀은 정정되지 않았다.",
+        "status": "원문 기능 ID 셀은 오류로 보존한다. 제목 행과 목차 FS066-01 통합 선언에 근거한 유효 연결만 별도로 기록하며 원문 오류가 해소됐다고 보고하지 않는다."
+      }
+    ],
+    "activeIndexSpecIds": [
+      "FS001",
+      "FS002",
+      "FS003",
+      "FS004",
+      "FS005",
+      "FS006",
+      "FS007",
+      "FS008",
+      "FS009",
+      "FS010",
+      "FS011-01",
+      "FS011-02",
+      "FS012",
+      "FS013",
+      "FS014",
+      "FS015",
+      "FS016",
+      "FS017",
+      "FS018",
+      "FS019",
+      "FS020",
+      "FS021",
+      "FS022",
+      "FS023",
+      "FS024",
+      "FS025",
+      "FS026",
+      "FS027",
+      "FS028",
+      "FS029",
+      "FS030",
+      "FS031",
+      "FS032",
+      "FS033",
+      "FS034",
+      "FS035",
+      "FS036",
+      "FS037",
+      "FS038",
+      "FS039",
+      "FS040",
+      "FS041",
+      "FS042",
+      "FS043",
+      "FS044",
+      "FS045",
+      "FS046",
+      "FS047",
+      "FS048",
+      "FS049",
+      "FS050",
+      "FS051",
+      "FS054",
+      "FS055",
+      "FS056",
+      "FS058",
+      "FS059",
+      "FS060",
+      "FS061",
+      "FS062",
+      "FS063",
+      "FS064",
+      "FS065",
+      "FS066-01",
+      "FS066-02",
+      "FS066-03",
+      "FS067-01",
+      "FS067-02",
+      "FS067-03",
+      "FS068",
+      "FS069-01",
+      "FS069-02",
+      "FS070-01",
+      "FS070-02",
+      "FS071-01",
+      "FS071-02",
+      "FS072",
+      "FS073",
+      "FS074",
+      "FS075",
+      "FS076",
+      "FS077",
+      "FS078",
+      "FS079",
+      "FS080",
+      "FS081",
+      "NFS001",
+      "NFS002",
+      "NFS003",
+      "NFS004",
+      "NFS005",
+      "NFS006",
+      "NFS007",
+      "NFS008",
+      "NFS009",
+      "NFS010",
+      "NFS011",
+      "NFS012"
+    ]
+  },
   "specs": {
     "FS001": {
       "raw": {
@@ -58,13 +313,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 10,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS001"
+      ],
+      "effectiveRequirementIds": [
+        "1"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS002": {
@@ -73,13 +335,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 11,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS002"
+      ],
+      "effectiveRequirementIds": [
+        "2"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS003": {
@@ -88,13 +357,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 12,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS003"
+      ],
+      "effectiveRequirementIds": [
+        "3"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS004": {
@@ -103,13 +379,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 13,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS004"
+      ],
+      "effectiveRequirementIds": [
+        "4"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS005": {
@@ -118,13 +401,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 14,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS005"
+      ],
+      "effectiveRequirementIds": [
+        "5"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS006": {
@@ -133,13 +423,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 15,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS006"
+      ],
+      "effectiveRequirementIds": [
+        "6"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS007": {
@@ -148,13 +445,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 16,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS007"
+      ],
+      "effectiveRequirementIds": [
+        "7"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS008": {
@@ -163,13 +467,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 17,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS008"
+      ],
+      "effectiveRequirementIds": [
+        "8"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS009": {
@@ -178,13 +489,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 18,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS009"
+      ],
+      "effectiveRequirementIds": [
+        "9"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS010": {
@@ -193,13 +511,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 19,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS010"
+      ],
+      "effectiveRequirementIds": [
+        "10"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS011-01": {
@@ -208,13 +533,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 20,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS011-01"
+      ],
+      "effectiveRequirementIds": [
+        "11"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS011-02": {
@@ -223,13 +555,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 21,
           "rowUnit": "xlsx-row"
         }
       },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationScope": "사용자 기능 제외 · API 유보",
+      "scopeState": "excluded-retained",
+      "effectiveSpecIds": [
+        "FS011-02"
+      ],
+      "effectiveRequirementIds": [
+        "11"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS012": {
@@ -238,13 +577,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 22,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS012"
+      ],
+      "effectiveRequirementIds": [
+        "12"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS013": {
@@ -253,13 +599,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS013"
+      ],
+      "effectiveRequirementIds": [
+        "13"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS014": {
@@ -268,13 +621,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 24,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS014"
+      ],
+      "effectiveRequirementIds": [
+        "14"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS015": {
@@ -283,13 +643,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 25,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS015"
+      ],
+      "effectiveRequirementIds": [
+        "15"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS016": {
@@ -298,13 +665,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 26,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS016"
+      ],
+      "effectiveRequirementIds": [
+        "16"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS017": {
@@ -313,13 +687,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 27,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS017"
+      ],
+      "effectiveRequirementIds": [
+        "17"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS018": {
@@ -328,13 +709,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 28,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS018"
+      ],
+      "effectiveRequirementIds": [
+        "18"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS019": {
@@ -343,13 +731,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 29,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS019"
+      ],
+      "effectiveRequirementIds": [
+        "19"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS020": {
@@ -358,13 +753,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 30,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS020"
+      ],
+      "effectiveRequirementIds": [
+        "20"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS021": {
@@ -373,13 +775,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 31,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS021"
+      ],
+      "effectiveRequirementIds": [
+        "21"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS022": {
@@ -388,13 +797,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 32,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS022"
+      ],
+      "effectiveRequirementIds": [
+        "22"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS023": {
@@ -403,13 +819,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 33,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS023"
+      ],
+      "effectiveRequirementIds": [
+        "23"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS024": {
@@ -418,13 +841,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 34,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS024"
+      ],
+      "effectiveRequirementIds": [
+        "24"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS025": {
@@ -433,13 +863,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 35,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS025"
+      ],
+      "effectiveRequirementIds": [
+        "25"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS026": {
@@ -448,13 +885,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 36,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS026"
+      ],
+      "effectiveRequirementIds": [
+        "26"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS027": {
@@ -463,13 +907,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS027"
+      ],
+      "effectiveRequirementIds": [
+        "27"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS028": {
@@ -478,13 +929,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 38,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS028"
+      ],
+      "effectiveRequirementIds": [
+        "28"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS029": {
@@ -493,13 +951,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 39,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS029"
+      ],
+      "effectiveRequirementIds": [
+        "29"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS030": {
@@ -508,13 +973,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 40,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS030"
+      ],
+      "effectiveRequirementIds": [
+        "30"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS031": {
@@ -523,13 +995,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 41,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS031"
+      ],
+      "effectiveRequirementIds": [
+        "31"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS032": {
@@ -538,13 +1017,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 42,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS032"
+      ],
+      "effectiveRequirementIds": [
+        "32"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS033": {
@@ -553,13 +1039,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 43,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS033"
+      ],
+      "effectiveRequirementIds": [
+        "33"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS034": {
@@ -568,13 +1061,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 44,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS034"
+      ],
+      "effectiveRequirementIds": [
+        "34"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS035": {
@@ -583,13 +1083,21 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS035"
+      ],
+      "effectiveRequirementIds": [
+        "35",
+        "69"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS036": {
@@ -598,13 +1106,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 46,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS036"
+      ],
+      "effectiveRequirementIds": [
+        "36"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS037": {
@@ -613,13 +1128,18 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 47,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS037"
+      ],
+      "effectiveRequirementIds": [],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS038": {
@@ -628,13 +1148,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 48,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS038"
+      ],
+      "effectiveRequirementIds": [
+        "38"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS039": {
@@ -643,13 +1170,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 49,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS039"
+      ],
+      "effectiveRequirementIds": [
+        "39"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS040": {
@@ -658,13 +1192,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 50,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS040"
+      ],
+      "effectiveRequirementIds": [
+        "40"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS041": {
@@ -673,13 +1214,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS041"
+      ],
+      "effectiveRequirementIds": [
+        "41"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS042": {
@@ -688,13 +1236,18 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 52,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS042"
+      ],
+      "effectiveRequirementIds": [],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS043": {
@@ -703,13 +1256,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 53,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS043"
+      ],
+      "effectiveRequirementIds": [
+        "43"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS044": {
@@ -718,13 +1278,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 54,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS044"
+      ],
+      "effectiveRequirementIds": [
+        "44"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS045": {
@@ -733,13 +1300,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 55,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS045"
+      ],
+      "effectiveRequirementIds": [
+        "45"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS046": {
@@ -748,13 +1322,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 56,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS046"
+      ],
+      "effectiveRequirementIds": [
+        "47"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS047": {
@@ -763,13 +1344,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 57,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS047"
+      ],
+      "effectiveRequirementIds": [
+        "48"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS048": {
@@ -778,13 +1366,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 58,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS048"
+      ],
+      "effectiveRequirementIds": [
+        "49"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS049": {
@@ -793,104 +1388,67 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS049"
+      ],
+      "effectiveRequirementIds": [
+        "50"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님); 문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
-    "FS050-01": {
+    "FS050": {
       "raw": {
         "status": "팀 검토 전",
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS050"
+      ],
+      "effectiveRequirementIds": [
+        "51",
+        "52"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님); 문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
-    "FS050-02": {
+    "FS051": {
       "raw": {
         "status": "팀 검토 전",
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
-    },
-    "FS051": {
-      "raw": {
-        "status": "확정",
-        "priority": "P1",
-        "scopeClass": "existing",
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 62,
-          "rowUnit": "xlsx-row"
-        }
-      },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
-    },
-    "FS052-01": {
-      "raw": {
-        "status": "팀 검토 전",
-        "priority": "P1",
-        "scopeClass": "existing",
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 63,
-          "rowUnit": "xlsx-row"
-        }
-      },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
-    },
-    "FS052-02": {
-      "raw": {
-        "status": "팀 검토 전",
-        "priority": "P1",
-        "scopeClass": "existing",
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 64,
-          "rowUnit": "xlsx-row"
-        }
-      },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
-    },
-    "FS053": {
-      "raw": {
-        "status": "팀 검토 전",
-        "priority": "P1",
-        "scopeClass": "existing",
-        "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 65,
-          "rowUnit": "xlsx-row"
-        }
-      },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS051"
+      ],
+      "effectiveRequirementIds": [
+        "52",
+        "53"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님); 문서 판정 인용(이번 생성기의 실행 검증 아님); 문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS054": {
       "raw": {
@@ -898,13 +1456,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 66,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 62,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS054"
+      ],
+      "effectiveRequirementIds": [
+        "66"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS055": {
@@ -913,13 +1478,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 67,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 63,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS055"
+      ],
+      "effectiveRequirementIds": [
+        "67"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS056": {
@@ -928,13 +1500,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 68,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 64,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS056"
+      ],
+      "effectiveRequirementIds": [
+        "68"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS058": {
@@ -943,13 +1522,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 69,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 65,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS058"
+      ],
+      "effectiveRequirementIds": [
+        "70"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS059": {
@@ -958,13 +1544,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 70,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 66,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS059"
+      ],
+      "effectiveRequirementIds": [
+        "71"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS060": {
@@ -973,13 +1566,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 71,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 67,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS060"
+      ],
+      "effectiveRequirementIds": [
+        "72"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS061": {
@@ -988,13 +1588,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 72,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 68,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS061"
+      ],
+      "effectiveRequirementIds": [
+        "73"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS062": {
@@ -1003,13 +1610,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 73,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 69,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS062"
+      ],
+      "effectiveRequirementIds": [
+        "74"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS063": {
@@ -1018,13 +1632,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 74,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 70,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS063"
+      ],
+      "effectiveRequirementIds": [
+        "75"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS064": {
@@ -1033,13 +1654,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 75,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 71,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS064"
+      ],
+      "effectiveRequirementIds": [
+        "76"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS065": {
@@ -1048,13 +1676,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 76,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 72,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS065"
+      ],
+      "effectiveRequirementIds": [
+        "77"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS066-01": {
@@ -1063,13 +1698,21 @@
         "priority": "FS037: 미기재 / FS066: P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 77,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 73,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS066-01"
+      ],
+      "effectiveRequirementIds": [
+        "37",
+        "78"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS066-02": {
@@ -1078,13 +1721,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 78,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 74,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS066-02"
+      ],
+      "effectiveRequirementIds": [
+        "78"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS066-03": {
@@ -1093,13 +1743,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 79,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 75,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS066-03"
+      ],
+      "effectiveRequirementIds": [
+        "78"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS067-01": {
@@ -1108,13 +1765,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 80,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 76,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS067-01"
+      ],
+      "effectiveRequirementIds": [
+        "79"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS067-02": {
@@ -1123,13 +1787,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 81,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 77,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS067-02"
+      ],
+      "effectiveRequirementIds": [
+        "79"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS067-03": {
@@ -1138,13 +1809,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 82,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 78,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS067-03"
+      ],
+      "effectiveRequirementIds": [
+        "79"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS068": {
@@ -1153,13 +1831,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 83,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 79,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS068"
+      ],
+      "effectiveRequirementIds": [
+        "80"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS069-01": {
@@ -1168,13 +1853,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 84,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 80,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS069-01"
+      ],
+      "effectiveRequirementIds": [
+        "81"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS069-02": {
@@ -1183,13 +1875,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 85,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 81,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS069-02"
+      ],
+      "effectiveRequirementIds": [
+        "81"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS070-01": {
@@ -1198,13 +1897,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 86,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 82,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS070-01"
+      ],
+      "effectiveRequirementIds": [
+        "82"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS070-02": {
@@ -1213,13 +1919,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 87,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 83,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS070-02"
+      ],
+      "effectiveRequirementIds": [
+        "82"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS071-01": {
@@ -1228,13 +1941,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 88,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 84,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS071-01"
+      ],
+      "effectiveRequirementIds": [
+        "83"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS071-02": {
@@ -1243,13 +1963,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 89,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 85,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS071-02"
+      ],
+      "effectiveRequirementIds": [
+        "83"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS072": {
@@ -1258,13 +1985,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 90,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 86,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS072"
+      ],
+      "effectiveRequirementIds": [
+        "84"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS073": {
@@ -1273,13 +2007,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 91,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 87,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS073"
+      ],
+      "effectiveRequirementIds": [
+        "85"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS001": {
@@ -1288,13 +2029,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 92,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 88,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS001"
+      ],
+      "effectiveRequirementIds": [
+        "54"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS002": {
@@ -1303,13 +2051,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 93,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 89,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS002"
+      ],
+      "effectiveRequirementIds": [
+        "55"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS003": {
@@ -1318,13 +2073,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 94,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 90,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS003"
+      ],
+      "effectiveRequirementIds": [
+        "56"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS004": {
@@ -1333,13 +2095,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 95,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 91,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS004"
+      ],
+      "effectiveRequirementIds": [
+        "57"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS005": {
@@ -1348,13 +2117,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 96,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 92,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS005"
+      ],
+      "effectiveRequirementIds": [
+        "58"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS006": {
@@ -1363,13 +2139,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 97,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 93,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS006"
+      ],
+      "effectiveRequirementIds": [
+        "59"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS007": {
@@ -1378,13 +2161,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 98,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 94,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS007"
+      ],
+      "effectiveRequirementIds": [
+        "60"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS008": {
@@ -1393,13 +2183,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 99,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 95,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS008"
+      ],
+      "effectiveRequirementIds": [
+        "61"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS009": {
@@ -1408,13 +2205,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 100,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 96,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS009"
+      ],
+      "effectiveRequirementIds": [
+        "62"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS010": {
@@ -1423,13 +2227,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 101,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 97,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS010"
+      ],
+      "effectiveRequirementIds": [
+        "63"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS011": {
@@ -1438,13 +2249,20 @@
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 102,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 98,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS011"
+      ],
+      "effectiveRequirementIds": [
+        "64"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "NFS012": {
@@ -1453,13 +2271,20 @@
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 103,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 99,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "NFS012"
+      ],
+      "effectiveRequirementIds": [
+        "65"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     },
     "FS074": {
@@ -1468,13 +2293,21 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 104,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 100,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS074"
+      ],
+      "effectiveRequirementIds": [
+        "70",
+        "75"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS075": {
@@ -1483,13 +2316,21 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 105,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 101,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS075"
+      ],
+      "effectiveRequirementIds": [
+        "68",
+        "70"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS076": {
@@ -1498,13 +2339,22 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 106,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 102,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS076"
+      ],
+      "effectiveRequirementIds": [
+        "68",
+        "70",
+        "76"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS077": {
@@ -1513,13 +2363,21 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 107,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 103,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS077"
+      ],
+      "effectiveRequirementIds": [
+        "68",
+        "70"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS078": {
@@ -1528,13 +2386,21 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 108,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 104,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS078"
+      ],
+      "effectiveRequirementIds": [
+        "67",
+        "70"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS079": {
@@ -1543,13 +2409,23 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 109,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 105,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS079"
+      ],
+      "effectiveRequirementIds": [
+        "21",
+        "67",
+        "70",
+        "79"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS080": {
@@ -1558,13 +2434,21 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 110,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 106,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS080"
+      ],
+      "effectiveRequirementIds": [
+        "67",
+        "71"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
     "FS081": {
@@ -1573,44 +2457,157 @@
         "priority": "미정",
         "scopeClass": "proposal",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv",
-          "row": 111,
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv",
+          "row": 107,
           "rowUnit": "xlsx-row"
         }
       },
       "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "scopeState": "active",
+      "effectiveSpecIds": [
+        "FS081"
+      ],
+      "effectiveRequirementIds": [
+        "67",
+        "70",
+        "71",
+        "79"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
-    "FS???": {
+    "ㅊ": {
       "raw": {
         "status": "목차 없음",
         "priority": "P2",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/05-출퇴근-브리핑.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/05-출퇴근-브리핑.csv",
           "row": 134,
           "rowUnit": "xlsx-row"
         }
       },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
+      "implementationScope": "원문 ID 오류 · FS066-01에 유효 연결",
+      "scopeState": "raw-malformed-id",
+      "effectiveSpecIds": [
+        "FS066-01"
+      ],
+      "effectiveRequirementIds": [],
+      "authorityDecisionId": "user-2026-10-10-feedback",
       "implementationEvidence": "문서 판정 없음"
     },
-    "FS050": {
+    "FS050-01": {
       "raw": {
         "status": "목차 없음",
         "priority": "P1",
         "scopeClass": "existing",
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-08/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
           "row": 79,
           "rowUnit": "xlsx-row"
         }
       },
-      "implementationScope": "팀합의요구/설계대상",
-      "authorityDecisionId": "user-2026-10-08-day",
-      "implementationEvidence": "문서 판정 없음"
+      "implementationScope": "이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조",
+      "scopeState": "historical-only",
+      "effectiveSpecIds": [
+        "FS049"
+      ],
+      "effectiveRequirementIds": [
+        "50"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS050-02": {
+      "raw": {
+        "status": "목차 없음",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "row": 93,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조",
+      "scopeState": "historical-only",
+      "effectiveSpecIds": [
+        "FS049"
+      ],
+      "effectiveRequirementIds": [
+        "50"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS052-01": {
+      "raw": {
+        "status": "목차 없음",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "row": 121,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조",
+      "scopeState": "historical-only",
+      "effectiveSpecIds": [
+        "FS050"
+      ],
+      "effectiveRequirementIds": [
+        "52"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS052-02": {
+      "raw": {
+        "status": "목차 없음",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "row": 135,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조",
+      "scopeState": "historical-only",
+      "effectiveSpecIds": [
+        "FS051",
+        "FS060"
+      ],
+      "effectiveRequirementIds": [
+        "52"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
+    },
+    "FS053": {
+      "raw": {
+        "status": "목차 없음",
+        "priority": "P1",
+        "scopeClass": "existing",
+        "source": {
+          "path": "docs/evidence/raw/functional-spec_2026-10-10/07-AI-챗봇.csv",
+          "row": 149,
+          "rowUnit": "xlsx-row"
+        }
+      },
+      "implementationScope": "이력 상세(현행 목차 밖) · 현재 의미는 의미 이행표 참조",
+      "scopeState": "historical-only",
+      "effectiveSpecIds": [
+        "FS051",
+        "NFS003",
+        "NFS009"
+      ],
+      "effectiveRequirementIds": [
+        "53"
+      ],
+      "authorityDecisionId": "user-2026-10-10-feedback",
+      "implementationEvidence": "문서 판정 인용(이번 생성기의 실행 검증 아님)"
     }
   },
   "wbsImplementationScope": {

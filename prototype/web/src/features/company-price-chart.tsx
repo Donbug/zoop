@@ -3,15 +3,14 @@
 // 클릭·화살표/Enter·시세 표 버튼으로 시점을 고를 수 있고 인과를 단정하지 않는다.
 import { Table, Zap } from "lucide-react";
 import { useId, useState } from "react";
-import { ApiError } from "@/api/client";
 import { useCompanyPrices } from "@/api/queries";
-import { ErrorState, LoadingBlock, Skeleton } from "@/components/ui/feedback";
+import { LoadingBlock, Skeleton } from "@/components/ui/feedback";
 import { Tooltip } from "@/components/ui/tooltip";
 import { periodLabel, type DetailRange, type EventGroup } from "@/lib/company-timeline";
 import { formatCompact, formatPrice, placeMarkers, pointLabel, toneOf, type Tone } from "@/lib/market";
 import { cn } from "@/lib/utils";
 import { DisclaimerNote, PriceChange } from "@/components/domain/status-labels";
-import { QuoteSourceHint, UnavailableLine } from "./company-quote";
+import { MarketErrorState, QuoteSourceHint, UnavailableLine } from "./company-quote";
 import { formatKst } from "@/lib/labels";
 
 const W = 1000;
@@ -45,13 +44,10 @@ export function CompanyPriceChart({ companyId, range, groups, onPick, selectedKe
         <Skeleton className="h-40 w-full md:h-48" />
       </LoadingBlock>
     );
-  if (prices.isError) return <ErrorState compact error={prices.error} title="주가 차트를 불러오지 못했어요" onRetry={() => void prices.refetch()} />;
+  if (prices.isError) return <MarketErrorState error={prices.error} title="주가 차트를 불러오지 못했어요" onRetry={() => void prices.refetch()} />;
   const data = prices.data;
-  if (data.status === "unavailable") {
-    if (data.reasonCode === "temporary_failure")
-      return <ErrorState compact title="주가 차트를 불러오지 못했어요" error={new ApiError(200, data.reasonCode, data.reason)} message={data.reason} onRetry={() => void prices.refetch()} />;
-    return data.reasonCode === "no_data" ? <UnavailableLine>{data.reason}</UnavailableLine> : null;
-  }
+  // 출처 장애는 503 조회 오류(위)로 온다. 200 unavailable은 자료 없음만 사유를 적는다.
+  if (data.status === "unavailable") return data.reasonCode === "no_data" ? <UnavailableLine>{data.reason}</UnavailableLine> : null;
 
   const { points, currency, source } = data;
   const intraday = data.interval === "5m" || data.interval === "1h";

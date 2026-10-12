@@ -1,12 +1,12 @@
 // 기업 상세 주요 지표(요구 39 중 출처가 주는 범위). 시세와 다른 출처(네이버 증권)라 따로 조회하고 출처·기준을 따로 적는다.
 //  - 값은 출처가 적은 그대로(1,609조 1,882억 · 12.35배 · 0.61%), 지표마다 출처의 기준 기간(2026.06.)을 붙인다. 계산·추정·환산하지 않는다.
 //  - 토스증권 시세에 시가총액(현재가 × 발행주식수)이 있으면 그 값을 쓰고, 이 영역의 시가총액은 숨긴다.
-//  - 일시 장애는 이 영역만 [다시 시도], 미지원·형식 변경 등은 사유 한 줄. 시세 영역은 그대로다(요구 54).
-import { ApiError } from "@/api/client";
+//  - 출처 장애는 503 source_unavailable로 이 영역만 서버 사유와(일시 장애면) [다시 시도], 미지원·자료 없음(200)은 사유 한 줄. 시세 영역은 그대로다(요구 54).
+//  - 출처가 일부 지표만 주면 받은 지표만 보인다(빠진 지표를 0으로 채우지 않는다).
 import { useCompanyMetrics, useCompanyQuote } from "@/api/queries";
-import { ErrorState, LoadingBlock, Skeleton } from "@/components/ui/feedback";
+import { LoadingBlock, Skeleton } from "@/components/ui/feedback";
 import { formatKst } from "@/lib/labels";
-import { QuoteSourceHint, UnavailableLine } from "./company-quote";
+import { MarketErrorState, QuoteSourceHint, UnavailableLine } from "./company-quote";
 
 export function CompanyMetrics({ companyId }: { companyId: string }) {
   const metrics = useCompanyMetrics(companyId);
@@ -22,15 +22,9 @@ export function CompanyMetrics({ companyId }: { companyId: string }) {
       </LoadingBlock>
     );
   } else if (metrics.isError) {
-    body = <ErrorState compact error={metrics.error} title="주요 지표를 불러오지 못했어요" onRetry={() => void metrics.refetch()} />;
+    body = <MarketErrorState error={metrics.error} title="주요 지표를 불러오지 못했어요" onRetry={() => void metrics.refetch()} />;
   } else if (metrics.data.status === "unavailable") {
-    const data = metrics.data;
-    body =
-      data.reasonCode === "temporary_failure" ? (
-        <ErrorState compact title="주요 지표를 불러오지 못했어요" error={new ApiError(200, data.reasonCode, data.reason)} message={data.reason} onRetry={() => void metrics.refetch()} />
-      ) : (
-        <UnavailableLine>{data.reason}</UnavailableLine>
-      );
+    body = <UnavailableLine>{metrics.data.reason}</UnavailableLine>;
   } else {
     const { source, asOf } = metrics.data;
     const items = metrics.data.items.filter((m) => !(tossMarketCap && m.code === "marketValue"));

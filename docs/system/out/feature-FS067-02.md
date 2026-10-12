@@ -1,15 +1,16 @@
 # FS067-02 · 보류 이슈 검수 및 허용·거부
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P1 · 미기재 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 79 |
+| 요구사항 번호(원문) | 79 |
+| 의미 기준 요구사항 | 79 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 충돌 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:81 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:77 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv) — 보류 이슈 검수 및 허용·거부: 검수 권한이 있는 관리자가 보류 이슈의 근거와 사유를 확인하여 허용 또는 거부한다. 허용은 재검증 대상 전환이며 자동 검증과 필수 근거 확인을 통과한 경우에만 공개 후보가 된다.
+- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — 보류 이슈 검수 및 허용·거부: 검수 권한이 있는 관리자가 보류 이슈의 근거와 사유를 확인하여 허용 또는 거부한다. 허용은 재검증 대상 전환이며 자동 검증과 필수 근거 확인을 통과한 경우에만 공개 후보가 된다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:279 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:279 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

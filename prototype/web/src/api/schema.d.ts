@@ -511,7 +511,11 @@ export interface paths {
          * @description Current price and indicators from the configured quote provider, with source and as-of time.
          *
          *     Separate from ``/companies/{id}`` so a slow or failing quote never blocks the company overview.
-         *     Missing values stay null; ``quote.derived`` lists values the BFF computed (e.g. market cap).
+         *     Missing values stay null; ``quote.derived`` lists values the BFF computed (e.g. market cap). ``quote.asOf`` is the
+         *     provider's observation time and stays null when the provider gives none.
+         *
+         *     Always the latest value the provider has: ``asOf`` and ``graphVersion`` are not accepted (422, never read as a
+         *     historical lookup). Normal absence is 200 ``unavailable``; a failed provider is 503 ``source_unavailable``.
          */
         get: operations["get_quote_api_companies__id__quote_get"];
         put?: never;
@@ -533,6 +537,9 @@ export interface paths {
          * Get Metrics
          * @description General indicators (시가총액·PER·PBR·EPS·배당·외국인 소진율) from a separate public source, passed through as
          *     given with each value's reference period. Independent of the price provider: a failure here leaves quotes alone.
+         *
+         *     A value the source does not give is absent from ``items`` (never 0); the others are kept. Normal absence is
+         *     200 ``unavailable``; a failed source is 503 ``source_unavailable``.
          */
         get: operations["get_metrics_api_companies__id__metrics_get"];
         put?: never;
@@ -573,8 +580,8 @@ export interface paths {
          *     or daily bars from the timeline's period start (1m, 1y).
          *
          *     With ``from``/``to`` (the timeline's common KST range, FS040) only bars inside it are returned: intraday bars
-         *     by their time, daily bars by their KST day. A closed market leaves a gap; no price is ever filled in, so a
-         *     range without any session (a holiday ``1d``) is ``no_data``.
+         *     range without any session (a holiday ``1d``) is ``no_data``. Bars are 5m (1d), 1h (1w), 1d (1m), 1wk (1y).
+         *     Normal absence is 200 ``unavailable``; a failed provider is 503 ``source_unavailable``.
          */
         get: operations["get_prices_api_companies__id__prices_get"];
         put?: never;
@@ -2980,7 +2987,10 @@ export interface components {
              * @description Source time of the page the values came from; null when not given.
              */
             asOf: string | null;
-            /** Items */
+            /**
+             * Items
+             * @description Only the indicators the source gave a usable value for; one it left out (N/A, empty) is simply absent, never 0. An empty list is `no_data`, not available.
+             */
             items: components["schemas"]["MetricOut"][];
         };
         /** CompanyMetricsUnavailable */
@@ -2994,9 +3004,10 @@ export interface components {
             companyId: string;
             /**
              * Reasoncode
+             * @description not_connected: provider intentionally off or not configured; unsupported_symbol: the provider does not cover this symbol; no_data: the provider answered with nothing for it. Source failures are 503, not this.
              * @enum {string}
              */
-            reasonCode: "not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed";
+            reasonCode: "not_connected" | "unsupported_symbol" | "no_data";
             /** Reason */
             reason: string;
         };
@@ -3023,10 +3034,10 @@ export interface components {
             companyId: string;
             /**
              * Reasoncode
-             * @description not_connected: provider off or keys missing; unsupported_symbol; no_data: provider has nothing; auth_failed; temporary_failure: timeout, network, 429 or 5xx (retry later).
+             * @description not_connected: provider intentionally off or not configured; unsupported_symbol: the provider does not cover this symbol; no_data: the provider answered with nothing for it. Source failures are 503, not this.
              * @enum {string}
              */
-            reasonCode: "not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed";
+            reasonCode: "not_connected" | "unsupported_symbol" | "no_data";
             /** Reason */
             reason: string;
         };
@@ -5107,9 +5118,10 @@ export interface components {
             period: "1d" | "1w" | "1m" | "1y";
             /**
              * Reasoncode
+             * @description not_connected: provider intentionally off or not configured; unsupported_symbol: the provider does not cover this symbol; no_data: the provider answered with nothing for it. Source failures are 503, not this.
              * @enum {string}
              */
-            reasonCode: "not_connected" | "unsupported_symbol" | "no_data" | "auth_failed" | "temporary_failure" | "format_changed";
+            reasonCode: "not_connected" | "unsupported_symbol" | "no_data";
             /** Reason */
             reason: string;
         };
@@ -8086,7 +8098,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description source_unavailable: the approved-issue source could not be read */
+            /** @description source_unavailable: the market data source itself failed (auth, network, timeout, 429/5xx, changed format) -- not a normal absence. details.reasonCode names the provider failure and details.retryable is true only for a transient one (temporary_failure); otherwise retrying unchanged will not help. Normal absence (not_connected, unsupported_symbol, no_data) is a 200 with status unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8162,7 +8174,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description source_unavailable: the approved-issue source could not be read */
+            /** @description source_unavailable: the market data source itself failed (auth, network, timeout, 429/5xx, changed format) -- not a normal absence. details.reasonCode names the provider failure and details.retryable is true only for a transient one (temporary_failure); otherwise retrying unchanged will not help. Normal absence (not_connected, unsupported_symbol, no_data) is a 200 with status unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8323,7 +8335,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description source_unavailable: the approved-issue source could not be read */
+            /** @description source_unavailable: the market data source itself failed (auth, network, timeout, 429/5xx, changed format) -- not a normal absence. details.reasonCode names the provider failure and details.retryable is true only for a transient one (temporary_failure); otherwise retrying unchanged will not help. Normal absence (not_connected, unsupported_symbol, no_data) is a 200 with status unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;

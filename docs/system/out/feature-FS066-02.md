@@ -1,15 +1,16 @@
 # FS066-02 · AI 기능별 선호도 조회
 
-[전체 목록](index.md) · [검사 결과](warnings.md)
+[전체 목록](index.md) · [검사 결과](warnings.md) · [범위 예외·상세 권한](detail-authority.md)
 
 | 항목 | 원본/연결 |
 | --- | --- |
 | 원본 우선순위·상태 | P2 · 미기재 |
 | 원문 범위 분류 | existing |
 | 유효 구현 범위 | 팀합의요구/설계대상 |
-| 유효 기준 | user-2026-10-08-day · docs/share/day-work-2026-10-08.md |
+| 유효 기준 | user-2026-10-10-feedback · docs/share/day-work-2026-10-10.md |
 | 완료·실행 경계 | 요구 범위 포함은 구현 완료·유료 실행 승인·본개발 채택이 아님 |
-| 요구사항 번호 | 78 |
+| 요구사항 번호(원문) | 78 |
+| 의미 기준 요구사항 | 78 |
 | API 대응 | 연결됨 |
 | 사유 |  |
 | 프로토타입 문서 판정 | 구현 |
@@ -17,11 +18,11 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv:78 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv:74 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-08/11-AI-평가-관리자.csv) — AI 기능별 선호도 조회: 관리자가 AI 답변·뉴스 요약·브리핑별로 현재 유효한 좋아요·싫어요 건수와 좋아요 비율을 조회한다. 결과는 평가에 참여한 회원의 해당 결과 버전별 선호도이며, 전체 이용자의 의견이나 모델의 사실 정확도·성능을 직접 나타내는 수치로 해석하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-10/11-AI-평가-관리자.csv) — AI 기능별 선호도 조회: 관리자가 AI 답변·뉴스 요약·브리핑별로 현재 유효한 좋아요·싫어요 건수와 좋아요 비율을 조회한다. 결과는 평가에 참여한 회원의 해당 결과 버전별 선호도이며, 전체 이용자의 의견이나 모델의 사실 정확도·성능을 직접 나타내는 수치로 해석하지 않는다.
 
-문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:50 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 이번 생성기의 실행 검증은 아니다.
+문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:50 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
 ## WBS 편집 연결
 

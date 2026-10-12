@@ -10,7 +10,6 @@
 | --- | --- | --- | --- |
 | [FS008](feature-FS008.md) · [FS012](feature-FS012.md) · [FS013](feature-FS013.md) · [FS054](feature-FS054.md) | [getMySettings](../../api/out/zoop-api-spec.md#getmysettings) | GET /api/v1/me/settings | P1 |
 | [FS008](feature-FS008.md) · [FS010](feature-FS010.md) · [FS012](feature-FS012.md) · [FS013](feature-FS013.md) | [updateMySettings](../../api/out/zoop-api-spec.md#updatemysettings) | PUT /api/v1/me/settings | P1 |
-| [FS011-02](feature-FS011-02.md) | [listRecommendations](../../api/out/zoop-api-spec.md#listrecommendations) | GET /api/v1/me/recommendations | P1 |
 | [FS011-01](feature-FS011-01.md) · [FS026](feature-FS026.md) · [FS037](feature-FS037.md) | [searchCompanies](../../api/out/zoop-api-spec.md#searchcompanies) | GET /api/v1/companies | P1 |
 
 공통 품질: [NFS001](feature-NFS001.md) · [NFS002](feature-NFS002.md) · [NFS004](feature-NFS004.md) · [NFS008](feature-NFS008.md) · [NFS003](feature-NFS003.md) · [NFS009](feature-NFS009.md)

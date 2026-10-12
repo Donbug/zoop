@@ -464,9 +464,13 @@ class CompanyDetail(CamelModel):
     metadata: Metadata
 
 
-QuoteReasonCode = Literal[
-    "not_connected", "unsupported_symbol", "no_data", "auth_failed", "temporary_failure", "format_changed"
-]
+# Normal absence only. A source that failed (auth, network, timeout, 429/5xx, changed format) is never a 200
+# "unavailable": it is a 503 `source_unavailable` (see routers/market.py).
+QuoteAbsenceCode = Literal["not_connected", "unsupported_symbol", "no_data"]
+_ABSENCE_HELP = (
+    "not_connected: provider intentionally off or not configured; unsupported_symbol: the provider does not cover "
+    "this symbol; no_data: the provider answered with nothing for it. Source failures are 503, not this."
+)
 
 
 class QuoteSourceOut(CamelModel):
@@ -507,10 +511,7 @@ class CompanyQuote(CamelModel):
 class CompanyQuoteUnavailable(CamelModel):
     status: Literal["unavailable"] = "unavailable"
     company_id: str
-    reason_code: QuoteReasonCode = Field(
-        description="not_connected: provider off or keys missing; unsupported_symbol; no_data: provider has nothing; "
-        "auth_failed; temporary_failure: timeout, network, 429 or 5xx (retry later)."
-    )
+    reason_code: QuoteAbsenceCode = Field(description=_ABSENCE_HELP)
     reason: str
 
 
@@ -540,7 +541,7 @@ class PriceSeriesUnavailable(CamelModel):
     status: Literal["unavailable"] = "unavailable"
     company_id: str
     period: Literal["1d", "1w", "1m", "1y"]
-    reason_code: QuoteReasonCode
+    reason_code: QuoteAbsenceCode = Field(description=_ABSENCE_HELP)
     reason: str
 
 
@@ -559,13 +560,16 @@ class CompanyMetrics(CamelModel):
     company_id: str
     source: QuoteSourceOut
     as_of: str | None = Field(description="Source time of the page the values came from; null when not given.")
-    items: list[MetricOut]
+    items: list[MetricOut] = Field(
+        description="Only the indicators the source gave a usable value for; one it left out (N/A, empty) is simply "
+        "absent, never 0. An empty list is `no_data`, not available."
+    )
 
 
 class CompanyMetricsUnavailable(CamelModel):
     status: Literal["unavailable"] = "unavailable"
     company_id: str
-    reason_code: QuoteReasonCode
+    reason_code: QuoteAbsenceCode = Field(description=_ABSENCE_HELP)
     reason: str
 
 
