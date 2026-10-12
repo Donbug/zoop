@@ -60,7 +60,7 @@ def test_the_child_command_line_holds_only_configured_values_and_no_named_reques
     assert gate.entered.wait(30)
     pids = wait_for(lambda: runtime_processes(workspace.worker), 10, 0.1, "the run child")
     assert len(pids) == 1
-    command = subprocess.run(["ps", "-o", "command=", "-p", str(pids[0])], capture_output=True, text=True).stdout.strip()
+    command = subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pids[0])], capture_output=True, text=True, check=True).stdout.strip()
     argv = shlex.split(command)
     assert argv[1:] == [str(ZOOP_AI), "run", "--state-dir", str(workspace.worker), "--grants", str(workspace.grants_path)]
     # Request data travels in an anonymous stdin file: nothing named exists under the transport directory.
