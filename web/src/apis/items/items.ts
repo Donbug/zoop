@@ -1,21 +1,6 @@
 import { call } from '@/apis/auth/ApiService';
 import type { ApiResponse, PageResponse } from '@/apis/commonType';
-
-export type Item = {
-  id: number;
-  title: string;
-  createdAt: string;
-};
-
-export type ItemListParams = {
-  page?: number;
-  size?: number;
-  keyword?: string;
-};
-
-export type CreateItemRequest = {
-  title: string;
-};
+import type { CreateItemRequest, Item, ItemListParams } from '@/types/stocks';
 
 const ITEMS_BASE = '/api/v1/items';
 
