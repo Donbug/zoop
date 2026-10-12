@@ -92,8 +92,8 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | `components/onboarding/WatchlistSelector.tsx`       | 관심 종목 선택    | D-WAT-01                    | 종목 검색·추가·제거와 저장을 연결한다. 0개 선택을 허용한다.                              |
 | `components/stocks/StockSearchForm.tsx`             | 종목 검색         | PDF 실제 4페이지            | 기업명·영문명·티커 검색을 연결한다.                                                      |
 | `components/stocks/StockList.tsx`                   | 종목 목록         | PDF 실제 4페이지            | 목록 결과와 기업 상세·지도 이동을 연결한다.                                              |
-| `components/my/HoldingsSection.tsx`                 | 보유 종목         | D-MY-01 참조만 존재         | 내 종목 화면은 독립 프레임이 없어 세부 UI 확정이 필요하다.                               |
-| `components/my/WatchlistSection.tsx`                | 관심 종목         | D-MY-01 참조만 존재         | 서버에 저장된 관심 종목을 조회한다. 온보딩 초안과 구분한다.                              |
+| `components/my/HoldingsSection.tsx`                 | 보유 종목         | D-MY-01 / 01b               | 연결 상태·모의 보유 표시, 확인 창을 거친 연결 끊기와 실패 시 다시 시도                   |
+| `components/my/WatchlistSection.tsx`                | 관심 종목         | D-MY-01 / 01b               | 서버 관심 목록, 추가·빼기 즉시 저장, 실패 시 되돌림과 다시 시도                          |
 | `components/graph/GraphCanvas.tsx`                  | 관계 지도         | D-GRP-01 / 01b              | 시장·개인·회차 지도와 확대 상태를 하나의 캔버스로 처리한다. 그래프 엔진은 추후 연결한다. |
 | `components/graph/EventDetailPanel.tsx`             | 사건 상세         | D-GRP-02                    | 사건·직접 관련 기업·근거와 AI 진입 동작을 연결한다.                                      |
 | `components/graph/CompanyDetailPanel.tsx`           | 기업 요약         | D-GRP-03                    | 시세·1개월 추이·모의 보유·직접 이슈·기업 상세 이동을 연결한다.                           |

@@ -1,4 +1,5 @@
 import type { MemberSettings } from '@/types/settings';
+import type { CompanySummary } from '@/types/company';
 import type {
   Holding,
   MockPortfolioOption,
@@ -15,7 +16,9 @@ export const metadata = {
 };
 
 /** SettingsResponse 본문(목표 계약 그대로, ApiResponse 래퍼 없음) */
-export function settingsBody(overrides: Partial<MemberSettings> = {}) {
+export function settingsBody(
+  overrides: Partial<MemberSettings> = {},
+): MemberSettings & { metadata: typeof metadata } {
   return {
     mode: 'watchlist',
     watchlistIds: [],
@@ -121,6 +124,54 @@ export function connectionBody(mockPortfolioId = 'mock-2') {
     cash: { amount: 3000000, currency: 'KRW' },
     status: 'connected',
     holdingsCount: option?.holdingsCount ?? 0,
+    metadata,
+  };
+}
+
+export function companySummary(
+  id: string,
+  name: string,
+  ticker: string | null,
+  issueCount: number,
+): CompanySummary {
+  return {
+    id,
+    name,
+    ticker,
+    aliases: [],
+    sector: null,
+    brandColor: null,
+    logoUrl: null,
+    issueCount,
+  };
+}
+
+export const SAMSUNG = companySummary('cmp-samsung', '삼성전자', '005930', 27);
+export const SAMSUNG_SDI = companySummary('cmp-sdi', '삼성SDI', '006400', 6);
+export const NVIDIA = companySummary('cmp-nvidia', 'NVIDIA', 'NVDA', 46);
+
+/** CompanyListResponse 본문 */
+export function companyListBody(items: CompanySummary[]) {
+  return { items, nextCursor: null, metadata };
+}
+
+/** CompanyDetail 본문 중 화면이 읽는 값(승인된 사건은 issueCount만큼 만든다) */
+export function companyDetailBody(company: CompanySummary) {
+  return {
+    ...company,
+    legalName: company.name,
+    market: null,
+    representative: null,
+    foundedDate: null,
+    websiteUrl: null,
+    directIssues: Array.from({ length: company.issueCount }, (_, index) => ({
+      issueId: `${company.id}-issue-${index}`,
+      title: `사건 ${index}`,
+    })),
+    structuralIssues: [],
+    summary: null,
+    holding: null,
+    watch: null,
     metadata,
   };
 }
