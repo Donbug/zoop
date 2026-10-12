@@ -1,12 +1,7 @@
 import type { FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { setAccessToken } from '@/apis/auth/auth';
-
-type LoginLocationState = {
-  from?: {
-    pathname?: string;
-  };
-};
+import type { LoginLocationState } from '@/types/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -14,10 +9,17 @@ export default function LoginPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!import.meta.env.DEV) return;
     setAccessToken('development-access-token');
 
     const state = location.state as LoginLocationState | null;
-    navigate(state?.from?.pathname ?? '/home', { replace: true });
+    const from = state?.from;
+    navigate(
+      from
+        ? `${from.pathname ?? '/'}${from.search ?? ''}${from.hash ?? ''}`
+        : '/',
+      { replace: true },
+    );
   }
 
   return (
@@ -33,14 +35,24 @@ export default function LoginPage() {
           실제 인증 API가 연결되기 전까지 개발용 로그인으로 보호 라우트를 확인할
           수 있습니다.
         </p>
-        <form className="mt-8" onSubmit={handleSubmit}>
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-gray-950 px-4 py-3 font-semibold text-white transition hover:bg-gray-800"
-          >
-            개발용으로 시작하기
-          </button>
-        </form>
+        {import.meta.env.DEV && (
+          <form className="mt-8" onSubmit={handleSubmit}>
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-gray-950 px-4 py-3 font-semibold text-white transition hover:bg-gray-800"
+            >
+              개발용으로 시작하기
+            </button>
+          </form>
+        )}
+        <div className="mt-6 flex flex-col gap-3">
+          <Link to="/signup" className="text-emerald-700 underline">
+            이메일로 회원가입
+          </Link>
+          <Link to="/?mode=all" className="text-emerald-700 underline">
+            로그인 없이 둘러보기
+          </Link>
+        </div>
       </section>
     </main>
   );
