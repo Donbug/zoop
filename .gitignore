@@ -3,6 +3,15 @@
 
 # SpringBoot
 .idea/
+/api/.gradle/
+/api/build/
+/api/out/
+/api/logs/
+/api/*.log
+/api/.classpath
+/api/.project
+/api/.settings/
+/api/*.iml
 
 # Python
 .venv/

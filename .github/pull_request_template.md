@@ -1,6 +1,6 @@
 ## Summary
 
-해결하는 문제와 변경하지 않은 범위를 적으세요. PR 제목은 `feat(web): 기업 문서 조회 구현`처럼 [CONTRIBUTING](../CONTRIBUTING.md)의 Conventional Commits 형식을 사용합니다. 본개발은 루트 `web/`, `api/`, `ai/`, `contracts/`, `infra/`를 사용하며 새 경로는 실제 기능과 검사기를 함께 추가할 때만 만듭니다. [본개발 시작 안내](../docs/share/production-start-2026-10-12.md)를 참고하세요.
+해결하는 문제와 변경하지 않은 범위를 적으세요. PR 제목은 `feat(web): 기업 문서 조회 구현`처럼 [CONTRIBUTING](../CONTRIBUTING.md)의 Conventional Commits 형식을 사용합니다. 본개발은 루트 `web/`, `api/`, `ai/`, `contracts/`, `infra/`를 사용합니다. `api/` 최소 기반 PR은 업무 API·CI 연결보다 먼저 병합할 수 있으며, 다른 새 앱은 첫 기능과 검사기를 함께 추가합니다. [본개발 시작 안내](../docs/share/production-start-2026-10-12.md)를 참고하세요.
 
 ## Traceability
 
@@ -20,7 +20,7 @@
 - [ ] 생성물은 원본에서 재생성했으며 원본 경고를 숨기지 않았습니다.
 - [ ] 실패·부분 실패·복구·회귀 조건을 검증했거나 미검증 이유를 명시했습니다.
 - [ ] 실제 데이터와 합성 입력, 실제 AI 결과와 예시를 구분했습니다.
-- [ ] 본개발 새 앱을 추가했다면 manifest·실제 진입점·동작·테스트·루트 명령·CI required gate 연결을 포함했습니다. 해당 없으면 사유를 적었습니다.
+- [ ] 새 앱의 manifest·진입점·테스트와 검증 결과를 포함했습니다. `api/` 최소 기반 PR이라면 업무 API·CI 연결이 후속인 이유와 완료 시점을 적고, 다른 새 앱이라면 첫 기능·루트 명령·CI required gate 연결을 확인했습니다.
 - [ ] 본개발은 `prototype/` runtime import와 DB 공유 없이 동작하며 계약 정본을 중복 생성하지 않았습니다.
 
 ## Rights and privacy
