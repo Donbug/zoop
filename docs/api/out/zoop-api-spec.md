@@ -446,7 +446,7 @@ google 또는 kakao 회원 소셜 인증을 시작한다. 지원하지 않는 pr
 
 ## completeSocialLogin · 소셜 인증 콜백
 
-google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 않는 provider와 유효하지 않은 state는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 본인/연결권한 확인 없이 계정 연결을 완료하지 않는 보안 경계를 유지한다.
+google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 않는 provider와 유효하지 않은 state는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 본인/연결권한 확인 없이 계정 연결을 완료하지 않는 보안 경계를 유지한다. 제공자와 사용자 식별값으로 이미 연동된 회원은 이메일이 다시 제공되지 않아도 기존 계정으로 로그인할 수 있다. 신규 가입·연동에 필요한 이메일이 없거나 사용할 수 없으면 회원 생성·자동 연동을 하지 않고 이메일 제공 재동의 또는 다른 로그인 방법을 안내한다. 이메일 일치만으로 자동 연결하지 않는 기존 보안 경계는 유지한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2111,7 +2111,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 
 ## getMyFeedback · 본인의 유효 평가 상태 조회
 
-본인의 유효 평가 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+본인의 유효 평가 상태 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. feature별 대상: chatbot_answer는 본인이 질문한 답변의 messageId, briefing_round는 발행 회차의 BriefingResponse.id, briefing_issue는 {회차 ID}/{이슈 ID}(BriefingResponse.id + "/" + BriefingItem.eventId)다. briefing_issue는 회차별 항목 평가이므로 같은 이슈라도 출근·퇴근 회차가 다르면 별도 대상이다. GET targetIds와 PUT targetId는 동일한 문자열을 사용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2132,7 +2132,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | feature | query | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
-| targetIds | query | 필수 | string | Comma separated |
+| targetIds | query | 필수 | string | Comma separated. 각 targetId는 선택한 feature의 FeedbackVote.targetId 규칙을 따른다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
@@ -2141,7 +2141,7 @@ AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필
 
 ## setFeedback · AI 결과 평가 목표 상태 설정
 
-AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. feature별 대상: chatbot_answer는 본인이 질문한 답변의 messageId, briefing_round는 발행 회차의 BriefingResponse.id, briefing_issue는 {회차 ID}/{이슈 ID}(BriefingResponse.id + "/" + BriefingItem.eventId)다. briefing_issue는 회차별 항목 평가이므로 같은 이슈라도 출근·퇴근 회차가 다르면 별도 대상이다. GET targetIds와 PUT targetId는 동일한 문자열을 사용한다. 서버는 회차가 published이고 이슈가 그 회차에 실제 발행된 항목인지 검사한 뒤 저장한다. 버전 비교 기준은 그 회차의 고정 graphVersion이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4233,8 +4233,8 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
-| targetId | 필수 | string |  |
-| targetVersion | 필수 | string / null | Result version the rating is linked to; null for chatbot answers (an answer never changes) |
+| targetId | 필수 | string | feature별 대상: chatbot_answer는 본인이 질문한 답변의 messageId, briefing_round는 발행 회차의 BriefingResponse.id, briefing_issue는 {회차 ID}/{이슈 ID}(BriefingResponse.id + "/" + BriefingItem.eventId)다. briefing_issue는 회차별 항목 평가이므로 같은 이슈라도 출근·퇴근 회차가 다르면 별도 대상이다. GET targetIds와 PUT targetId는 동일한 문자열을 사용한다. |
+| targetVersion | 필수 | string / null | 브리핑은 해당 대상 발행 회차의 고정 graphVersion이다. 현재 활성 그래프 버전이나 별도 브리핑 결과 개정 번호가 아니다. chatbot_answer는 null이다. |
 | value | 필수 | string {up, down, none} |  |
 | reason | 필수 | string / null |  |
 
@@ -4276,9 +4276,9 @@ same request again never toggles anything.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | feature | 필수 | string {chatbot_answer, briefing_round, briefing_issue} |  |
-| targetId | 필수 | string |  |
+| targetId | 필수 | string | feature별 대상: chatbot_answer는 본인이 질문한 답변의 messageId, briefing_round는 발행 회차의 BriefingResponse.id, briefing_issue는 {회차 ID}/{이슈 ID}(BriefingResponse.id + "/" + BriefingItem.eventId)다. briefing_issue는 회차별 항목 평가이므로 같은 이슈라도 출근·퇴근 회차가 다르면 별도 대상이다. GET targetIds와 PUT targetId는 동일한 문자열을 사용한다. |
 | value | 필수 | string {up, down, none} |  |
-| targetVersion | 선택 | string / null | Result version the voter saw (a briefing's graphVersion). A different current version is 409. |
+| targetVersion | 선택 | string / null | 브리핑 대상 발행본의 graphVersion이다. 별도의 브리핑 결과 개정 번호나 현재 활성 그래프 버전이 아니다. briefing_issue는 targetId의 회차가 발행된 그래프 버전과 비교한다. 제공한 non-null 값이 해당 발행본 graphVersion과 다르면 409이며, 발행본 NULL에 non-null 요청도 불일치다. 생략/null이면 버전 비교를 생략하고 대상 검증은 유지한다. chatbot_answer는 null(변경되지 않는 답변)이다. |
 | reason | 선택 | string / null | Optional, only with a dislike |
 
 <a id="schema-fielddecisionout"></a>

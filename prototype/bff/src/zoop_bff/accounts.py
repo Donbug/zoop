@@ -313,7 +313,8 @@ class AccountStore:
 
     def social_login(self, identity: SocialIdentity) -> tuple[str, bool]:
         """(token, created). A known (provider, subject) logs in; a new one creates a member. An e-mail
-        already used by another member is not linked automatically (409)."""
+        already used by another member is not linked automatically (409). New identities need a usable
+        e-mail; an already linked identity does not need the provider to send it again."""
         row = self._db.one(
             "SELECT m.id, m.status FROM member_identities i JOIN members m ON m.id = i.member_id "
             "WHERE i.provider = ? AND i.subject = ?",
@@ -323,7 +324,13 @@ class AccountStore:
             if row["status"] == "blocked":
                 raise ApiError(403, "member_blocked", blocked_error().message)
             return self._open_member(row["id"]), False
-        email = identity.email.strip().lower()
+        email, email_error = check_email(identity.email or "")
+        if email_error:
+            raise ApiError(
+                422,
+                "social_email_required",
+                "소셜 계정의 이메일을 받을 수 없어요. 이메일 제공에 동의하고 다시 시도하거나 다른 로그인 방법을 선택해 주세요.",
+            )
         if self._db.one("SELECT 1 FROM members WHERE email = ?", (email,)) is not None:
             raise ApiError(409, "social_email_in_use", "이미 다른 방법으로 가입된 이메일입니다.")
         member_id = f"user-{secrets.token_hex(8)}"

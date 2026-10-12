@@ -29,7 +29,7 @@ from .statedb import StateDb, utc_iso
 class SocialIdentity:
     provider: str
     subject: str
-    email: str
+    email: str | None
     display_name: str
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import pytest
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -11,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from zoop_bff.app import create_app
 from zoop_bff.config import Settings
+from zoop_bff.social import SocialIdentity, STATE_COOKIE
 
 from .conftest import DEMO, base_payload, with_companies
 
@@ -228,6 +230,59 @@ def test_social_login_creates_then_logs_in_and_checks_state(tmp_path):
 
     # The e-mail of an e-mail member is not taken over by a social identity.
     assert _social(TestClient(client.app), DEMO["email"]).headers["location"] == "/login?social=email_in_use"
+
+
+def _identity_callback(client, monkeypatch, identity):
+    """Exercise the real browser-bound callback with a synthetic provider exchange."""
+    start = client.get("/api/auth/social/mock/authorize?returnTo=/briefing", follow_redirects=False)
+    query = parse_qs(urlparse(start.headers["location"]).query)
+    provider = client.app.state.zoop.accounts.social.provider("mock")
+    monkeypatch.setattr(provider, "exchange", lambda code, redirect_uri: identity)
+    return client.get(
+        query["redirect_uri"][0],
+        params={"state": query["state"][0], "code": "synthetic-identity"},
+        follow_redirects=False,
+    )
+
+
+@pytest.mark.parametrize("email", [None, "", "  \t", "not-an-email", "a" * 255 + "@example.com"])
+def test_social_new_identity_without_usable_email_creates_nothing(tmp_path, monkeypatch, email):
+    client = _client(tmp_path)
+    db = client.app.state.zoop.accounts._db
+    tables = ("members", "member_identities", "member_sessions")
+    before = {table: db.one(f"SELECT COUNT(*) AS n FROM {table}")["n"] for table in tables}
+    response = _identity_callback(client, monkeypatch, SocialIdentity("mock", "new-subject", email, "새 회원"))
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login?social=email_required"
+    assert STATE_COOKIE not in client.cookies
+    assert client.get("/api/auth/session").json()["kind"] == "anonymous"
+    assert {table: db.one(f"SELECT COUNT(*) AS n FROM {table}")["n"] for table in tables} == before
+    # A new attempt with consent/e-mail can complete; the failed attempt left no account/link behind.
+    retried = _identity_callback(client, monkeypatch, SocialIdentity("mock", "new-subject", "new-social@example.com", "새 회원"))
+    assert retried.headers["location"] == "/onboarding"
+    assert client.get("/api/auth/session").json()["user"]["email"] == "new-social@example.com"
+
+
+@pytest.mark.parametrize("email", [None, "", " \t", "not-an-email"])
+def test_social_linked_identity_logs_in_without_provider_email(tmp_path, monkeypatch, email):
+    client = _client(tmp_path)
+    assert _social(client, "linked@example.com").headers["location"] == "/onboarding"
+    user = client.get("/api/auth/session").json()["user"]
+    client.post("/api/auth/logout")
+    response = _identity_callback(client, monkeypatch, SocialIdentity("mock", "mock|linked@example.com", email, "다른 이름"))
+    assert response.headers["location"] == "/briefing"
+    assert client.get("/api/auth/session").json()["user"] == user
+
+
+def test_social_linked_blocked_identity_stays_blocked_without_email(tmp_path, monkeypatch):
+    client = _client(tmp_path)
+    _social(client, "blocked-social@example.com")
+    user = client.get("/api/auth/session").json()["user"]
+    client.post("/api/auth/logout")
+    client.app.state.zoop.accounts.set_status(user["id"], "blocked")
+    response = _identity_callback(client, monkeypatch, SocialIdentity("mock", "mock|blocked-social@example.com", None, "차단 회원"))
+    assert response.headers["location"] == "/login?social=blocked"
+    assert client.get("/api/auth/session").json()["kind"] == "anonymous"
 
 
 def test_guest_tutorial_is_kept_on_the_guest_session_only(tmp_path):

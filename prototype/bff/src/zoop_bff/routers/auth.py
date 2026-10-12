@@ -176,6 +176,7 @@ _SOCIAL_REASONS = {
     "social_state_invalid": "failed",
     "social_failed": "failed",
     "social_email_in_use": "email_in_use",
+    "social_email_required": "email_required",
     "member_blocked": "blocked",
 }
 
