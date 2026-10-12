@@ -8,11 +8,14 @@ DOC_PYTHON ?=
 CONTRACT_PYTHON ?=
 PUBLIC_PYTHON ?=
 BFF_PYTHON ?= prototype/bff/.venv/bin/python
-WORKER_PYTHON ?= $(BFF_PYTHON)
+WORKER_PYTHON ?= ai/worker/.venv/bin/python
+PIPELINE_PYTHON ?= ai/pipeline/.venv/bin/python
+SERVICE_PYTHON ?= ai/service/.venv/bin/python
+API_GRADLE ?= ./api/gradlew -p api --console=plain
 ARTIFACT_DIR ?= /tmp/zoop-release-artifacts
 COMMIT ?=
 
-.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-contracts-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build bff-install bff-test bff-build worker-install worker-test worker-build package-artifacts
+.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-openapi-check service-build api-test api-ai-smoke api-build package-artifacts
 help:
 	@$(PYTHON) scripts/repo_checks.py help
 projects:
@@ -29,6 +32,8 @@ public-check:
 	PYTHONDONTWRITEBYTECODE=1 $(if $(PUBLIC_PYTHON),$(PUBLIC_PYTHON),$(UV) run --no-project --with pyyaml --with openpyxl --with openapi-spec-validator $(PYTHON)) -m unittest discover -s scripts/tests -p test_doc_system.py -v
 contracts-check:
 	$(if $(CONTRACT_PYTHON),$(CONTRACT_PYTHON),$(UV) run --no-project --with pyyaml --with openapi-spec-validator $(PYTHON)) scripts/repo_checks.py contracts
+worker-schema-check:
+	$(WORKER_PYTHON) scripts/repo_checks.py worker-schema
 worker-contracts-check:
 	$(BFF_PYTHON) scripts/repo_checks.py worker-contracts
 bff-types-check:
@@ -54,11 +59,38 @@ bff-test:
 	$(UV) run --project prototype/bff --no-sync python -m pytest prototype/bff/tests
 bff-build:
 	$(UV) build --project prototype/bff --out-dir /tmp/zoop-bff-build
-worker-test:
-	PYTHONPATH=prototype/ai-worker/src $(WORKER_PYTHON) -m pytest prototype/ai-worker/tests
 worker-install:
-	$(UV) sync --project prototype/ai-worker --frozen --group dev --no-install-project
+	$(UV) sync --project ai/worker --frozen --group dev
+worker-test:
+	$(WORKER_PYTHON) -m pytest ai/worker/tests
 worker-build:
-	$(UV) build --project prototype/ai-worker --out-dir /tmp/zoop-ai-build
+	$(UV) build --project ai/worker --out-dir /tmp/zoop-ai-build
+pipeline-install:
+	$(UV) sync --project ai/pipeline --frozen --group dev
+pipeline-test:
+	$(PIPELINE_PYTHON) -m pytest ai/pipeline/tests
+pipeline-smoke:
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/ingestion_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
+pipeline-build:
+	$(UV) build --project ai/pipeline --out-dir /tmp/zoop-ai-pipeline-build
+service-install:
+	$(UV) sync --project ai/service --frozen --group dev
+service-test:
+	$(SERVICE_PYTHON) -m pytest ai/service/tests
+service-smoke:
+	$(SERVICE_PYTHON) ai/service/scripts/service_smoke.py
+service-openapi-check:
+	$(SERVICE_PYTHON) ai/service/scripts/export_openapi.py --check
+service-build:
+	$(UV) build --project ai/service --out-dir /tmp/zoop-ai-service-build
+# Spring Boot app (api/): needs JDK 21 (JAVA_HOME). Names carry the api- prefix so they are never confused with prototype/bff-* targets.
+api-test:
+	$(API_GRADLE) test
+api-ai-smoke:
+	$(SERVICE_PYTHON) api/scripts/ai_contract_gate.py
+api-build:
+	$(API_GRADLE) assemble
 package-artifacts:
 	$(PYTHON) scripts/package_artifacts.py --root . --output "$(ARTIFACT_DIR)" --commit "$(COMMIT)"

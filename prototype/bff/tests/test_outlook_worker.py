@@ -16,7 +16,7 @@ from zoop_bff.ai_worker import AiWorkerClient
 from zoop_bff.audit import Actor
 from zoop_bff.config import BFF_ROOT
 
-FIXTURE = BFF_ROOT.parent / "ai-worker/fixtures/contracts/synthetic-outlook"
+FIXTURE = BFF_ROOT.parents[1] / "ai/worker/fixtures/contracts/synthetic-outlook"
 MOMENT = datetime.fromisoformat("2026-10-08T18:15:00+09:00")
 RID = "brf-2026-10-08-evening"
 
@@ -149,7 +149,7 @@ def test_authored_outlook_is_not_applied_to_actual_source(make_admin, tmp_path):
 
 def test_actual_outlook_cli_publishes_nonempty_and_empty_rounds_without_live_calls(tmp_path):
     env = {"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"}
-    command = [sys.executable, str(BFF_ROOT.parent / "ai-worker/scripts/replay_outlook_fixture.py"),
+    command = [sys.executable, str(BFF_ROOT / "scripts/replay_outlook_fixture.py"),
                "--worker-state", str(tmp_path / "cli-worker"), "--bff-state", str(tmp_path / "cli-bff"),
                "--empty-bff-state", str(tmp_path / "cli-empty")]
     process = subprocess.run(command, env=env, capture_output=True, text=True, timeout=120)

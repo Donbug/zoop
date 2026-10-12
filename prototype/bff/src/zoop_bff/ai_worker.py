@@ -6,12 +6,11 @@ import json
 import re
 import os
 import signal
-import sys
 import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from .admin_jobs import LaunchSpec, Launcher, popen_launcher
 from .config import BFF_ROOT
@@ -22,7 +21,9 @@ from .statedb import StateDb, dumps, utc_iso
 SCHEMA_VERSION = "zoop-ai-s1-1"
 DOCUMENT_POLICY_VERSION = "zoop-document-gate-2"
 
-WORKER_ROOT = BFF_ROOT.parent / "ai-worker"
+# The S1 worker is a separately installed process (ai/worker, `make worker-install`); the BFF never imports it.
+WORKER_ROOT = BFF_ROOT.parents[1] / "ai" / "worker"
+WORKER_COMMAND = (str(WORKER_ROOT / ".venv" / "bin" / "zoop-ai"),)
 _LEGACY_OUTLOOK_PREDICTION = re.compile(r"예측|전망|오를|내릴|호재|악재|매수|매도|추천|목표가|수익률")
 _OUTLOOK_PROHIBITED = re.compile(
     r"매수|매도|추천|목표가|주가|수익.{0,8}보장|지수.{0,16}(상승|하락)|"
@@ -61,11 +62,20 @@ class AnalysisImportError(ValueError):
 class AiWorkerClient:
     """Uses the established LaunchSpec/process-group supervision seam; never reads a worker DB."""
     def __init__(self, *, state_dir: Path, worker_state: Path, grants: Path | None = None,
-                 replay: Path | None = None, env: dict[str, str] | None = None, launcher: Launcher = popen_launcher):
-        self.state_dir, self.worker_state = state_dir, worker_state
-        self.grants, self.replay, self.env, self.launcher = grants, replay, env, launcher
+                 replay: Path | None = None, env: dict[str, str] | None = None, launcher: Launcher = popen_launcher,
+                 worker_command: Sequence[str] = WORKER_COMMAND):
+        # The worker runs in a throwaway request folder, so every caller path is made absolute here, against the
+        # caller's working directory, before any launch.
+        def absolute(path):
+            return None if path is None else Path(os.path.abspath(path))
+        self.state_dir, self.worker_state = absolute(state_dir), absolute(worker_state)
+        self.grants, self.replay, self.env, self.launcher = absolute(grants), absolute(replay), env, launcher
+        self.worker_command = tuple(os.path.abspath(part) if index == 0 and os.sep in part else part
+                                    for index, part in enumerate(worker_command))
 
     def command(self, command: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if not self.worker_command or not os.access(self.worker_command[0], os.X_OK):
+            raise AnalysisImportError("worker_unavailable")
         private = self.state_dir / "ai-transport"
         private.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(private, 0o700)
@@ -74,18 +84,17 @@ class AiWorkerClient:
             incoming, outgoing, errors = folder / "input.json", folder / "output.json", folder / "stderr.txt"
             incoming.write_text(dumps(payload), encoding="utf-8")
             os.chmod(incoming, 0o600)
-            argv = [sys.executable, "-m", "zoop_ai.cli", command, "--state-dir", str(self.worker_state)]
+            argv = [*self.worker_command, command, "--state-dir", str(self.worker_state)]
             if self.grants:
                 argv += ["--grants", str(self.grants)]
             if self.replay:
                 argv += ["--replay", str(self.replay)]
             # Caller explicitly selects stage settings. No .env, PoC private probe, or automatic model opt-in.
             env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()),
-                   "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1",
-                   "PYTHONPATH": str(WORKER_ROOT / "src")}
+                   "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"}
             if self.env:
                 env.update(self.env)
-            spec = LaunchSpec(argv=argv, cwd=WORKER_ROOT, env=env, stdin=incoming, stdout=outgoing, stderr=errors)
+            spec = LaunchSpec(argv=argv, cwd=folder, env=env, stdin=incoming, stdout=outgoing, stderr=errors)
             process = self.launcher(spec)
             deadline = time.monotonic() + 120
             while process.poll() is None:

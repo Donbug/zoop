@@ -3,19 +3,20 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
-from zoop_bff.ai_worker import AiWorkerClient, AnalysisImportError, _digest
+from zoop_bff.ai_worker import WORKER_COMMAND, AiWorkerClient, AnalysisImportError, _digest
 from zoop_bff.config import BFF_ROOT
 from zoop_bff.schemas import DocumentSentiment
 from zoop_bff.sentiment import document_input, input_hash
 from zoop_bff.statedb import dumps
 
-FIXTURE = BFF_ROOT.parent / "ai-worker/fixtures/contracts/synthetic-document"
+FIXTURE = BFF_ROOT.parents[1] / "ai/worker/fixtures/contracts/synthetic-document"
 
 
 def fixture(name):
@@ -284,7 +285,6 @@ def test_current_deny_blocks_direct_evidence_and_document_outputs_but_keeps_immu
 
 
 def test_semantic_hold_and_failed_summary_do_not_hide_independent_valid_sentiment(make_admin, tmp_path):
-    sys.path.insert(0, str(BFF_ROOT.parent / "ai-worker/src"))
     from zoop_ai.contracts import SourceGrant, Submit
     from zoop_ai.provider import ReplayProvider, request_identity, stage_config
     from zoop_ai.runner import Runner
@@ -360,3 +360,17 @@ def test_import_requires_the_frozen_company_name_to_match_its_master_id(make_adm
     wrong_company["input"]["input"]["company"]["name"] = "합성 베타"
     with pytest.raises(AnalysisImportError, match="company_context_mismatch"):
         kit.services.sentiment.analysis_store.import_job(kit.services.provider.get(), wrong_company)
+
+
+def test_client_resolves_relative_caller_paths_before_the_worker_changes_directory(tmp_path, monkeypatch):
+    """The worker runs in a throwaway request folder; relative worker state/grants/replay must still be the caller's."""
+    monkeypatch.chdir(tmp_path)
+    relative = lambda path: Path(os.path.relpath(path, tmp_path))
+    client = AiWorkerClient(state_dir=Path("app-state"), worker_state=Path("worker-ledger"),
+                            grants=relative(FIXTURE / "grants.json"), replay=relative(FIXTURE / "replay.json"),
+                            worker_command=[os.path.relpath(WORKER_COMMAND[0], tmp_path)])
+    request = fixture("jobs")["jobs"][0]
+    assert client.command("submit", request)["state"] == "queued"
+    assert client.command("run", {"schemaVersion": "zoop-ai-s1-1", "jobId": request["jobId"]})["state"] == "ready"
+    assert client.get(request["jobId"])["state"] == "ready"
+    assert (tmp_path / "worker-ledger").is_dir() and (tmp_path / "app-state/ai-transport").is_dir()

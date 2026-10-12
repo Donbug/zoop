@@ -183,7 +183,7 @@ ZOOP_BFF_URL=http://127.0.0.1:8874 pnpm exec vite --host 127.0.0.1 --port 5244 -
 |---|---|---|
 | `prototype/web` | React 화면, Router, TanStack Query, 공용 overlay, SUIT/토큰, 그래프·차트 | HTTP JSON, URL의 기업/기간/asOf/선택, 생성 OpenAPI 타입 |
 | `prototype/bff` | FastAPI `/api`, 세션/소유권, 공개 자료 조회, SQLite 앱 상태, 검수·게시·브리핑, worker transport/import | `/openapi.json`, 공개 GET, 명시적 쓰기·관리 명령 |
-| `prototype/ai-worker` | 별도 프로세스 CLI, versioned JSON, 자체 job/receipt/artifact 저장, 생성·정확/의미 검증 | stdin JSON → stdout JSON, `submit/run/get/resume/cancel`; 별도 HTTP 서버 아님 |
+| `ai/worker` (S1), `ai/pipeline` (S2/S3 오프라인) | 별도 프로세스 CLI, versioned JSON, 자체 job/receipt/artifact 저장, 생성·정확/의미 검증 | stdin JSON → stdout JSON, `submit/run/get/resume/cancel`; 별도 HTTP 서버 아님 |
 | 기존 PoC 패키지/CLI | 뉴스 분석·검증과 승인/감사 원장, 기존 공개 port | 고정 패키지의 공개 API·CLI, `PostgresRepository.inspect()`; private 구현/테이블 공유를 이식 seam으로 삼지 않음 |
 | 게시 snapshot | 공개 그래프 버전과 문서·근거의 고정 조회 입력 | 불변 JSON + graphVersion/asOf |
 | SQLite 앱 상태 | 회원/세션/설정/검수/회차/분석 import와 현재 visibility | BFF를 통해 접근. FE/다른 런타임이 DB를 직접 공유하지 않음 |
@@ -207,13 +207,11 @@ ZOOP_BFF_URL=http://127.0.0.1:8874 pnpm exec vite --host 127.0.0.1 --port 5244 -
 
 S1은 **문서 요약과 문서×기업 판정**의 독립 생산 경계입니다. 일반 채팅은 여전히 규칙 기반입니다. 기존 원본 PoC는 읽기 전용으로 유지하며 새 worker를 PoC HTTP 서버처럼 설명하지 않습니다.
 
-worker 공개 명령은 다음 help로 확인할 수 있습니다. 프로젝트가 설치되지 않은 현재 checkout에서는 기존 BFF interpreter와 `PYTHONPATH`를 사용할 수 있습니다. help는 모델/원장을 호출하지 않습니다.
+worker 공개 명령은 다음 help로 확인할 수 있습니다. 먼저 `make worker-install`로 `ai/worker`의 독립 환경을 설치합니다. help는 모델/원장을 호출하지 않습니다.
 
 ```sh
-PYTHONPATH="$PWD/prototype/ai-worker/src" \
-  prototype/bff/.venv/bin/python -m zoop_ai.cli --help
-PYTHONPATH="$PWD/prototype/bff/src" \
-  prototype/bff/.venv/bin/python prototype/bff/scripts/document_analysis.py --help
+ai/worker/.venv/bin/zoop-ai --help
+prototype/bff/.venv/bin/python prototype/bff/scripts/document_analysis.py --help
 ```
 
 | 단계/상태 | 의미 | 복구 원칙 |
@@ -235,13 +233,13 @@ PYTHONPATH="$PWD/prototype/bff/src" \
 ```sh
 env -i PATH=/usr/bin:/bin HOME=/tmp PYTHONDONTWRITEBYTECODE=1 \
   PYTHONPATH="$PWD/prototype/bff/src" \
-  ZOOP_SNAPSHOT_PATH="$PWD/prototype/ai-worker/fixtures/contracts/synthetic-document/snapshot.json" \
-  ZOOP_COMPANY_CATALOG="$PWD/prototype/ai-worker/fixtures/contracts/synthetic-document/snapshot.json" \
+  ZOOP_SNAPSHOT_PATH="$PWD/ai/worker/fixtures/contracts/synthetic-document/snapshot.json" \
+  ZOOP_COMPANY_CATALOG="$PWD/ai/worker/fixtures/contracts/synthetic-document/snapshot.json" \
   ZOOP_BRIEFING_SCHEDULER=off ZOOP_QUOTE_PROVIDER=off ZOOP_METRICS_PROVIDER=off \
   "$PWD/prototype/bff/.venv/bin/python" prototype/bff/scripts/document_analysis.py import \
   --state-dir /tmp/zoop-manual-s1-bff-20261008 \
   --worker-state /tmp/zoop-manual-s1-worker-20261008 \
-  --grants "$PWD/prototype/ai-worker/fixtures/contracts/synthetic-document/grants.json" \
+  --grants "$PWD/ai/worker/fixtures/contracts/synthetic-document/grants.json" \
   --job-id synthetic-SYNTH-A-document-summary
 ```
 
@@ -252,14 +250,14 @@ env -i PATH=/usr/bin:/bin HOME=/tmp PYTHONDONTWRITEBYTECODE=1 \
 기본 알파전자 fixture와 S1의 두 기업 fixture는 서로 다릅니다. 아래 명령은 **별도 worker 상태와 별도 앱 상태에 쓰는 합성 재현 명령**이며, 공유 상태에 실행하지 않습니다. helper의 `--help`는 이 설명서에서 확인했고 실제 submit/run/import 성공은 담당 S1 실행 증거와 구분합니다.
 
 ```sh
-prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py \
+prototype/bff/.venv/bin/python prototype/bff/scripts/replay_fixture.py \
   --worker-state /tmp/zoop-manual-s1-worker-20261008 \
   --bff-state /tmp/zoop-manual-s1-bff-20261008
 ```
 
 worker JSON은 `zoop-ai-s1-1` schema version을 사용하고 fixture의 job 4개는 `SYNTH-A/SYNTH-B × document-summary/document-sentiment`입니다. 문서는 `doc-synthetic-s1`입니다. 이 fixture의 synthetic grant는 작성된 합성 자료에 대한 테스트 권한이지 실제 뉴스 전송 승인으로 옮겨 쓸 수 없습니다. helper는 live 설정·비밀·실제 뉴스·기본 BFF 상태를 전달하지 않습니다.
 
-helper 실행 뒤 §5의 BFF 명령에서 `ZOOP_STATE_DIR`을 위 앱 상태로, `ZOOP_SNAPSHOT_PATH`와 `ZOOP_COMPANY_CATALOG`를 모두 `prototype/ai-worker/fixtures/contracts/synthetic-document/snapshot.json`의 절대 경로로 바꿉니다. 기본 합성 상태를 덮지 말고, 기존 8874/5244 소유 서버를 정상 종료한 뒤 같은 포트를 다시 사용합니다. 기업 경로는 `/companies/SYNTH-A?tab=documents` 또는 `/companies/SYNTH-B?tab=documents`이며 저장본 공개 시점 이후를 조회합니다.
+helper 실행 뒤 §5의 BFF 명령에서 `ZOOP_STATE_DIR`을 위 앱 상태로, `ZOOP_SNAPSHOT_PATH`와 `ZOOP_COMPANY_CATALOG`를 모두 `ai/worker/fixtures/contracts/synthetic-document/snapshot.json`의 절대 경로로 바꿉니다. 기본 합성 상태를 덮지 말고, 기존 8874/5244 소유 서버를 정상 종료한 뒤 같은 포트를 다시 사용합니다. 기업 경로는 `/companies/SYNTH-A?tab=documents` 또는 `/companies/SYNTH-B?tab=documents`이며 저장본 공개 시점 이후를 조회합니다.
 
 실제 public seam은 `GET /api/companies/{id}/documents`, `GET /api/evidence/{id}?companyId=...`입니다. 직렬화 필드는 `documentSummary`, `analysisStatus`, `analysisProvenance`, `documentVersion`, `resultVersion`입니다. 기업을 바꿔 같은 문서의 기업별 판정이 다르게 유지되는지, claim별 근거 버튼이 해당 문서/버전/resultVersion의 exact citation을 여는지 확인합니다. 이 두 GET는 생성 작업이 아닙니다. 전체 재현·import/deny·권리 복구 명령은 [AI 실행 계약](../design/ai-system.md)을 따릅니다.
 
@@ -269,7 +267,7 @@ helper 실행 뒤 §5의 BFF 명령에서 `ZOOP_STATE_DIR`을 위 앱 상태로,
 
 ```sh
 # 저장소 루트. 문서 분석 시연과 다른, 처음 쓰는 세 상태 경로를 선택합니다.
-prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixture.py \
+prototype/bff/.venv/bin/python prototype/bff/scripts/replay_outlook_fixture.py \
   --worker-state /tmp/zoop-manual-outlook-worker-20261008 \
   --bff-state /tmp/zoop-manual-outlook-bff-20261008 \
   --empty-bff-state /tmp/zoop-manual-outlook-empty-20261008
@@ -318,7 +316,7 @@ FS074~081을 포함한 전체 명세·WBS는 **팀 합의 요구/설계 대상**
 
 ## 11. 개발 명령과 증거를 읽는 법
 
-[root Makefile](../../Makefile)은 앱별 도구로 넘기는 진입점입니다. `make help`, `make projects`, `make available-checks`로 현재 대상과 설치 상태를 확인합니다. `web-typecheck/web-test/web-build`, `bff-test`, `worker-test`, `worker-contracts-check`, `contracts-check`, `docs-check`는 담당자가 최종 통합 때 실행할 게이트입니다. 설치 환경을 재사용하려면 `CONFIG_PYTHON`, `DOC_PYTHON`, `CONTRACT_PYTHON`, `WORKER_PYTHON` override를 참고합니다. 기본 `uv --with` 경로는 도구 bootstrap을 할 수 있으므로 새 의존성 설치가 금지된 환경에서는 기존 interpreter를 지정합니다. 구체적인 로컬/원격 구분은 [CONTRIBUTING](../../CONTRIBUTING.md)과 [GitHub 로컬 준비 가이드](../development/github-setup.md)를 읽습니다. 이 설명서 작성에서 테스트/빌드/린터를 실행하지 않았습니다. 명령이 있다는 사실을 통과 결과로 적지 않습니다.
+[root Makefile](../../Makefile)은 앱별 도구로 넘기는 진입점입니다. `make help`, `make projects`, `make available-checks`로 현재 대상과 설치 상태를 확인합니다. `web-typecheck/web-test/web-build`, `bff-test`, `worker-test`, `worker-schema-check`, `worker-contracts-check`, `pipeline-test`, `pipeline-smoke`, `contracts-check`, `docs-check`는 담당자가 최종 통합 때 실행할 게이트입니다. 설치 환경을 재사용하려면 `CONFIG_PYTHON`, `DOC_PYTHON`, `CONTRACT_PYTHON`, `WORKER_PYTHON`·`PIPELINE_PYTHON` override를 참고합니다. 기본 `uv --with` 경로는 도구 bootstrap을 할 수 있으므로 새 의존성 설치가 금지된 환경에서는 기존 interpreter를 지정합니다. 구체적인 로컬/원격 구분은 [CONTRIBUTING](../../CONTRIBUTING.md)과 [GitHub 로컬 준비 가이드](../development/github-setup.md)를 읽습니다. 이 설명서 작성에서 테스트/빌드/린터를 실행하지 않았습니다. 명령이 있다는 사실을 통과 결과로 적지 않습니다.
 
 웹 타입 생성 `pnpm api:types`는 현재 스크립트가 8787의 OpenAPI를 읽으므로 8874 smoke와 섞지 않습니다. 별도 포트의 타입을 갱신해야 할 때는 현재 스크립트/루트 tooling 계약을 확인하고 담당자가 새 schema와 모든 consumer를 함께 갱신합니다. 문서 생성·schema 검증은 [system 생성기 설명](../system/README.md)의 source freeze 경로와 목표/관측 구분을 따릅니다. `--check` 종료값뿐 아니라 hard error와 warning을 따로 읽습니다.
 
@@ -352,7 +350,7 @@ FS074~081을 포함한 전체 명세·WBS는 **팀 합의 요구/설계 대상**
 
 | 증거 종류 | 명령/입력과 관측 | 근거·제약 |
 |---|---|---|
-| backend의 실제 CLI·앱 반영 | `prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py --worker-state /tmp/zoop-ai-doc-backend-worker --bff-state /tmp/zoop-ai-doc-backend`: 4 job ready, job별 replayCalls 2/providerAttempts 0/cost null, import 4 available. 별도 8871의 두 기업 문서 GET 200, A positive/B negative와 요약 claim/citation 제공 | 담당 backend의 관측을 인용합니다. [AI 시스템 계약·실행 기록](../design/ai-system.md)이 최신 정본입니다. 설명서 담당이 같은 전체 흐름을 재실행하지 않았습니다. |
+| backend의 실제 CLI·앱 반영 | `prototype/bff/.venv/bin/python prototype/bff/scripts/replay_fixture.py --worker-state /tmp/zoop-ai-doc-backend-worker --bff-state /tmp/zoop-ai-doc-backend`: 4 job ready, job별 replayCalls 2/providerAttempts 0/cost null, import 4 available. 별도 8871의 두 기업 문서 GET 200, A positive/B negative와 요약 claim/citation 제공 | 담당 backend의 관측을 인용합니다. [AI 시스템 계약·실행 기록](../design/ai-system.md)이 최신 정본입니다. 설명서 담당이 같은 전체 흐름을 재실행하지 않았습니다. |
 | backend의 기존 outlook 보존 | fresh 3상태의 `replay_outlook_fixture.py`: 저녁 이슈 1개 published/undetermined·worker 1 ready/replay 1/provider 0. 같은 회차는 동일 값·workerJobs=[]; 출근 0이슈는 published/outlook null·workerJobs=[]. 실제 8871 briefing GET도 같은 값을 제공 | [최종 backend 실행 기록](../design/ai-system.md#실행으로-확인한-결과)과 `test_outlook_worker.py`를 인용합니다. 최초 wrong-state mismatch 실패와 최종 fresh-state 성공을 구분합니다. 기존 exact 정책이며 별도 semantic 검증은 null입니다. |
 | 공개 계약 수정 후 로컬 확인 | 수정 담당자의 worker 42 passed/BFF 310 passed(기존 warning 1), validator 16 records 및 실제 document/outlook helper 관측을 인용. 문서 helper 4 ready/replay 8/provider 0·4 available; 현재 grant snapshot을 artifact와 별도로 등록 | [현재 AI 실행 기록](../design/ai-system.md#실행으로-확인한-결과). 이전 37/304는 수정 전 baseline입니다. 독립 소스 재검토는 해당 7개 지적과 직접 회귀만 resolved/findings=[]로 보고했으며 UI·S2–7·전체 권한 감사는 범위 밖입니다. 설명서 담당은 이 시험들을 재실행하지 않았습니다. |
 | frontend의 실제 BFF·UI 소비 | 초기 8872/5242 관측은 수정 전 이력입니다. `gate2LimitationFollowup`은 수정된 실제 replay helper와 필수 grants import 4 available → UI 1440/390에서 제한 claim 1회 표시, SYNTH-A positive/SYNTH-B negative 및 정확 citation 문맥을 관측. 읽기 후 provider 0/replay 8 유지 | [구조화 실행 기록의 gate2LimitationFollowup](../design/v10/ai-document-runtime-evidence.json), [갱신된 합성 기업 화면](../design/v10/ai-document-company-a-1440-light.png), [기존 실제 기사 null 화면](../design/v10/ai-document-actual-null-1440-light.png). 공개 DTO는 동일하며 actual-null/deny-empty 예전 증거와 DS 정적 예시를 현재 runtime 관측과 구분합니다. |

@@ -33,15 +33,15 @@ def fixture(root: Path) -> None:
         path.write_text("synthetic allowed input\n", encoding="utf-8")
     for folder in artifacts.TREES:
         (root / folder).mkdir(parents=True, exist_ok=True)
-    for name in ("prototype/web/src/main.tsx", "prototype/bff/src/app.py", "prototype/ai-worker/src/worker.py"):
+    for name in ("prototype/web/src/main.tsx", "prototype/bff/src/app.py", "ai/worker/src/worker.py", "ai/pipeline/src/pipeline.py"):
         (root / name).write_text("synthetic source\n", encoding="utf-8")
     (root / "prototype/web/dist/assets").mkdir()
     (root / "prototype/web/dist/assets/app.js").write_text("synthetic bundle\n")
     (root / "prototype/web/dist/assets/font.woff2").write_bytes(b"synthetic font")
     for name in (
-        ".env", "prototype/bff/.env", "prototype/ai-worker/.env.local", "prototype/web/dist/.env",
+        ".env", "prototype/bff/.env", "ai/worker/.env.local", "ai/pipeline/.env.local", "prototype/web/dist/.env",
         "prototype/web/dist/assets/.env.production", "prototype/bff/var/members.sqlite",
-        "prototype/ai-worker/src/var/jobs.db", "prototype/web/src/private/recording.ts",
+        "ai/worker/src/var/jobs.db", "ai/pipeline/var/ingestion.sqlite3", "prototype/web/src/private/recording.ts",
         "prototype/web/dist/logs/session.js", "prototype/web/dist/assets/server.key",
         "prototype/web/dist/assets/trace.log", "prototype/web/dist/assets/app.js.map",
         "prototype/web/src/node_modules/cache.ts", "prototype/bff/src/__pycache__/app.pyc",
@@ -67,7 +67,8 @@ class PackagingTests(unittest.TestCase):
                 self.assertIn("prototype/web/dist/index.html", entries)
                 self.assertIn("prototype/web/dist/assets/font.woff2", entries)
                 self.assertIn("prototype/bff/src/app.py", entries)
-                self.assertIn("prototype/ai-worker/src/worker.py", entries)
+                self.assertIn("ai/worker/src/worker.py", entries)
+                self.assertIn("ai/pipeline/src/pipeline.py", entries)
                 self.assertFalse(any(artifacts.denied(Path(name)) for name in entries))
                 self.assertFalse(any(".env" in name or "node_modules" in name or "recordings" in name for name in entries))
                 manifest = json.loads((output / "manifest.json").read_text())
@@ -141,11 +142,20 @@ class CiGateTests(unittest.TestCase):
             with self.subTest(status=status, conclusion=conclusion), self.assertRaisesRegex(ValueError, "Latest CI"):
                 require_ci.select_run({"workflow_runs": [self.run_record(), self.run_record(id=8, status=status, conclusion=conclusion)]}, SHA, REPO)
 
-    def test_missing_or_skipped_worker_fails(self):
-        for jobs in ([], [{"name": name, "conclusion": "skipped" if name == "ai-worker" else "success"}
-                          for name in require_ci.REQUIRED_JOBS]):
-            with self.assertRaisesRegex(ValueError, "CI job evidence"):
-                require_ci.require_jobs(jobs)
+    def test_missing_or_skipped_job_fails_for_every_required_job(self):
+        self.assertIn("ai-pipeline", require_ci.REQUIRED_JOBS)
+        self.assertIn("ai-worker", require_ci.REQUIRED_JOBS)
+        self.assertIn("ai-service", require_ci.REQUIRED_JOBS)
+        self.assertIn("api", require_ci.REQUIRED_JOBS)
+        self.assertEqual(len(require_ci.REQUIRED_JOBS), 8)
+        for skipped in sorted(require_ci.REQUIRED_JOBS):
+            with self.subTest(skipped=skipped), self.assertRaisesRegex(ValueError, "CI job evidence"):
+                require_ci.require_jobs([{"name": name, "conclusion": "skipped" if name == skipped else "success"}
+                                         for name in require_ci.REQUIRED_JOBS])
+            with self.subTest(missing=skipped), self.assertRaisesRegex(ValueError, "CI job evidence"):
+                require_ci.require_jobs([{"name": name, "conclusion": "success"} for name in require_ci.REQUIRED_JOBS - {skipped}])
+        with self.assertRaisesRegex(ValueError, "CI job evidence"):
+            require_ci.require_jobs([])
 
 
 class SecretAndCredentialTests(unittest.TestCase):
@@ -190,8 +200,14 @@ class SecretAndCredentialTests(unittest.TestCase):
             self.assertIn("tracked and nonignored untracked files passed", output.getvalue())
 
     def test_missing_private_token_fails_without_network(self):
-        with patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(SystemExit, "cannot be skipped"):
-            private_poc_sync.main()
+        for project in private_poc_sync.PROJECTS:
+            with self.subTest(project=project), patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(SystemExit, "cannot be skipped"):
+                private_poc_sync.main(["--project", project])
+
+    def test_private_sync_rejects_unregistered_project(self):
+        with patch.dict(os.environ, {"POC_READ_TOKEN": "synthetic-fixture"}, clear=True), self.assertRaises(SystemExit) as raised:
+            private_poc_sync.main(["--project", "ai/worker"])
+        self.assertEqual(raised.exception.code, 2)
 
     def test_private_preflight_fails_closed_and_cleans_askpass(self):
         observed = []
@@ -207,7 +223,7 @@ class SecretAndCredentialTests(unittest.TestCase):
             return reject(command, **kwargs)
         with patch.dict(os.environ, {"POC_READ_TOKEN": "synthetic-fixture"}, clear=True), patch.object(private_poc_sync.subprocess, "run", side_effect=intercepted):
             with self.assertRaisesRegex(SystemExit, "read preflight failed"):
-                private_poc_sync.main()
+                private_poc_sync.main(["--project", "ai/pipeline"])
         self.assertTrue(observed)
         self.assertTrue(all(not helper.exists() for helper in observed))
 

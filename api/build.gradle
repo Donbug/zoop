@@ -28,6 +28,27 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Default `test`: foundation tests and the AI client tests against in-process stub servers. No Python, no network.
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'ai-contract'
+	}
+}
+
+// Real cross-language gate: this JVM talks to a running ai/service and the installed zoop-ai CLI (replay only).
+// Run it through `make api-ai-smoke`; that script starts the service and exports ZOOP_AI_CONTRACT_MANIFEST.
+// Without the manifest the tests fail; they never skip.
+tasks.register('aiContractTest', Test) {
+	group = 'verification'
+	description = 'Runs the cross-language AI transport contract tests against a live ai/service (see make api-ai-smoke).'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'ai-contract'
+	}
+	outputs.upToDateWhen { false }
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
 }

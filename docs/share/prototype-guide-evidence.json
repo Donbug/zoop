@@ -27,7 +27,7 @@
       "exit": 0
     },
     {
-      "command": "PYTHONPATH=prototype/ai-worker/src prototype/bff/.venv/bin/python -m zoop_ai.cli --help",
+      "command": "ai/worker/.venv/bin/zoop-ai --help",
       "exit": 0,
       "commands": [
         "submit",
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "command": "prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py --help",
+      "command": "prototype/bff/.venv/bin/python prototype/bff/scripts/replay_fixture.py --help",
       "exit": 0,
       "flags": [
         "--worker-state",
@@ -66,7 +66,7 @@
       "exit": 0
     },
     {
-      "command": "prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixture.py --help",
+      "command": "prototype/bff/.venv/bin/python prototype/bff/scripts/replay_outlook_fixture.py --help",
       "exit": 0
     }
   ],

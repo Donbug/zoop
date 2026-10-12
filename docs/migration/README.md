@@ -19,7 +19,7 @@
 | [`external-api-candidates-2026-10-08.md`](../evidence/external-api-candidates-2026-10-08.md) | 공급원·권리·등록 조건 조사. 실제 공급자 연결 시험은 아니다. | 데이터 표시/보관/모델 전송 권한과 계약 종료 시 삭제 조건을 함께 이전한다. |
 | [`docs/design/tokens.json`](../design/tokens.json), [`prototype/web/DESIGN.md`](../../prototype/web/DESIGN.md), [`components/README.md`](../../prototype/web/src/components/README.md), [`docs/screen-plan/README.md`](../screen-plan/README.md) | 읽은 컴포넌트 규칙이 가리키는 토큰/디자인 원문과 77쪽 화면 관측 안내다. 최종 목표는 Figma(폰트 제외), SUIT 유지다. | 기존 화면을 최종 디자인으로 동결하지 않는다. 다른 FE도 상태·접근성·토큰·목표 디자인을 재현한다. |
 | [`wireframe-correspondence.md`](../screen-plan/wireframe-correspondence.md), [`wireframe_2026-10-08/coverage.json`](../evidence/raw/wireframe_2026-10-08/coverage.json) 및 프레임 PNG | 대응 부록의 raw node·화면 ID 연결을 읽었다. 원본 이미지를 이번에 재조사하거나 Figma 동작을 검증하지 않았다. 부록의 ‘1:1 개선안/검토 전 범위’ 해석은 현재 사용자 결정으로 대체됐다. | 10-08 고정 raw는 폰트 제외 최종 목표 디자인이다. 정적 배치를 구현/동작 완료나 수치의 사실성으로 승격하지 않는다. |
-| [`docs/design/ai-system.md`](../design/ai-system.md), [`docs/api/ai-contract.schema.json`](../api/ai-contract.schema.json), [문서 fixture](../../prototype/ai-worker/fixtures/contracts/synthetic-document/), [회차 fixture](../../prototype/ai-worker/fixtures/contracts/synthetic-outlook/) | 현재 S1 문서 세 stage와 기존 briefing-outlook 생성 능력을 보존한 worker 이행 자료다. source/표본 검사와 backend 실행 보고를 구분한다. S2–S7 전체 완료가 아니다. 팀 배포에는 이 저장소 자료를 사용한다. | 불변 산출물·현재 visibility·실행 receipt·회차 pin과 발행 고정을 보존한다. 확정 schema/fixture·worker lock·관측 범위는 [계약 인계](contract-handoff.md)를 우선한다. |
+| [`docs/design/ai-system.md`](../design/ai-system.md), [`docs/api/ai-contract.schema.json`](../api/ai-contract.schema.json), [문서 fixture](../../ai/worker/fixtures/contracts/synthetic-document/), [회차 fixture](../../ai/worker/fixtures/contracts/synthetic-outlook/) | 현재 S1 문서 세 stage와 기존 briefing-outlook 생성 능력을 보존한 worker 이행 자료다. source/표본 검사와 backend 실행 보고를 구분한다. S2–S7 전체 완료가 아니다. 팀 배포에는 이 저장소 자료를 사용한다. | 불변 산출물·현재 visibility·실행 receipt·회차 pin과 발행 고정을 보존한다. 확정 schema/fixture·worker lock·관측 범위는 [계약 인계](contract-handoff.md)를 우선한다. |
 
 ### 본개발 경로에 채택하는 방법
 
@@ -39,7 +39,7 @@ React를 바꾼다고 BFF나 worker도 바꿀 필요는 없다. Spring을 선택
 | 앱 BE: FastAPI / Java·Spring | 현재 라우터·서비스·저장 로직은 같은 Python 의존성과 의미에서 재사용 가능하다. `/api/v1` gap은 별도 수정 대상이다. | Controller/DTO/Service/Repository/WorkerClient로 책임을 옮기고 서버의 세션·CSRF·권한·멱등 처리를 구현한다. Python import는 전환 계약이 아니다. | HTTP/OpenAPI, 소유권, 상태 전이, decimal 계산, 불변 발행과 현재 visibility, 고정 버전 조회. |
 | AI: Python worker / 다른 런타임 | 기존 PoC 고정 버전의 공개 port와 worker adapter를 활용한다. 원본 PoC는 읽기 전용이다. | JSON 입력·receipt·결과를 동일하게 처리하는 runner와 provider adapter를 다시 구현한다. 추출/동일성/근거/fence/outbox 동작도 재증명해야 한다. | 같은 worker JSON fixture와 정확 인용, 단계 실패·복구, 중복 요청, 실제 usage/unknown, 공개 gate. |
 
-**이식 가능한 것은 직렬화된 경계와 불변식이다.** 앱·worker·PoC의 물리 DB 테이블 공유, Python 객체 import, React hooks 공유를 portability 근거로 사용하지 않는다. worker는 자기 실행 저장소를 소유하며 앱은 transport를 통해 제출·조회·회수한다. 미래 HTTP worker transport는 설계 선택이지 현재 별도 HTTP 서비스가 있다는 뜻이 아니다.
+**이식 가능한 것은 직렬화된 경계와 불변식이다.** 앱·worker·PoC의 물리 DB 테이블 공유, Python 객체 import, React hooks 공유를 portability 근거로 사용하지 않는다. worker는 자기 실행 저장소를 소유하며 앱은 transport를 통해 제출·조회·회수한다. S1용 앱→AI 내부 HTTP transport는 `ai/service`로 **로컬에 구현**했고 계약은 [`internal-ai-openapi.yaml`](../api/internal-ai-openapi.yaml)이다. 그러나 배포·보안 그룹·TLS 프록시는 확인하지 않았고 승인되지 않았으며 현재 BFF는 이를 소비하지 않고 설치된 CLI를 직접 호출한다. Spring 앱의 Java 전송 클라이언트(`api/`의 `com.zoop.ai`, 5개 operation, [설명](../../api/docs/AI_INTEGRATION.md))는 같은 계약에 대해 구현·검증했지만 인증·도메인 소비자와 결과 import는 아직 없다. S2/S3는 등록 전용 CLI가 없어 HTTP 대상이 아니다.
 
 ## 3. 자산별 채택 분류
 
@@ -55,9 +55,10 @@ React를 바꾼다고 BFF나 worker도 바꿀 필요는 없다. Spring을 선택
 | BE | 계약·fixture·디자인 토큰만 이식 | 목표/관측 OpenAPI, `prototype/bff/fixtures/poc-synthetic-inspect.json`, 합성 regression 자료, 회차·버전·소유권의 테스트 시나리오 | DTO wire와 도메인 의미를 옮긴다. actual-news fixture는 별도 권리·공개 여부 확인 대상이며 golden 합성 fixture와 섞지 않는다. |
 | BE | 다시 구현 | 세션/CSRF/error/idempotency HTTP adapter, Repository, clock/scheduler, `graph_versions.py`, `briefing_rounds.py`, worker transport | Spring 등 다른 언어에서는 transaction·concurrency·쓰기 호환성을 새 저장 구현에서 증명한다. SQLite 테이블 이름을 공개 계약으로 삼지 않는다. |
 | BE | prototype-only 폐기 | 모의 계정 seed/IdP, 데모 회차 재생, sandbox 경로, 임시 무키 공급원 전제 | 가상 보유 기능의 요구 자체를 폐기하지 않는다. 모의 데이터를 본인 실계좌로 승격하지 않는다. Yahoo/Naver 임시 연결을 운영 권리로 채택하지 않는다. |
-| worker | 그대로 복사 가능(동일 스택만) | `prototype/ai-worker/src/zoop_ai/`의 확정 구현과 고정 PoC 공개 port adapter | Python 유지 시만 해당한다. S1 병행 구현 범위와 future stage를 구분한다. |
+| worker | 그대로 복사 가능(동일 스택만) | `ai/worker/src/zoop_ai/`의 확정 구현과 고정 PoC 공개 port adapter | Python 유지 시만 해당한다. S1 병행 구현 범위와 future stage를 구분한다. |
+| worker | 그대로 복사 가능(동일 스택만) | `ai/pipeline/src/zoop_ai_pipeline/`(S2-1/S2-2/S3 오프라인 CLI)와 고정 private PoC 의존 | Python·동일 PoC 접근이 있을 때만 해당한다. S1 worker와 서로 import하지 않는 별도 프로젝트이며 replay 전용이다. |
 | worker | 계약·fixture·디자인 토큰만 이식 | versioned JSON Schema, 합성 입력/출력, evidence offset·grant·artifact·receipt 의미 | 다른 런타임이 소비하는 wire 계약. 모델/프롬프트/정책 revision과 input digest도 보존한다. |
-| worker | 다시 구현 | CLI/선택 transport, provider, job/fence/receipt/budget storage, exact/semantic validation adapter | 다른 런타임 선택 시 필요한 책임이다. public API read에서 분석을 재실행하지 않는다. |
+| worker | 다시 구현 | CLI와 그 위의 선택 HTTP transport(`ai/service`는 같은 Python 스택 한정 참고 구현), provider, job/fence/receipt/budget storage, exact/semantic validation adapter | 다른 런타임 선택 시 필요한 책임이다. HTTP를 다시 구현하면 소유자 결속(owner reservation→등록→accept), 현재 grant 재확인 후 결과 전달, 명시적 recover와 reconciling 정산 분리를 재증명한다. public API read에서 분석을 재실행하지 않는다. |
 | worker | prototype-only 폐기 | authored replay 실행 설정, 로컬 경로 가정, 임시 테스트 policy | replay fixture는 회귀 검증 자료로 보존한다. replay 결과·0 paid call을 실제 provider 품질/과금 보장으로 표시하지 않는다. |
 
 ## 4. Java/Spring 참고 매핑 — 구현이나 버전 선택 아님
@@ -81,7 +82,7 @@ flowchart LR
 | `schemas.py`, `admin_schemas.py`, worker schema | DTO | camelCase, enum, missing/null, decimal, 오프셋의 의미를 그대로 전달한다. DB entity를 직접 직렬화하지 않는다. |
 | `chat_jobs.py`, `briefing_rounds.py`, `admin_pipeline.py` | Service | 최초 context 고정, active job 제약, 검증 후 저장, 불변 회차, revalidation→publish 순서. |
 | `statedb.py`, `accounts.py`, `graph_versions.py` | Repository + artifact storage adapter | atomic 앱 commit, 예상 버전 CAS, 버전별 읽기, 데이터 손실 없는 write cutover. |
-| worker transport seam | WorkerClient | worker DB 직접 접근 금지. submit 재전송 멱등, ready와 앱 공개 완료 분리, 저장만 복구 시 provider 재호출 금지. |
+| worker transport seam (로컬 구현: `ai/service` 내부 HTTP, [계약](../api/internal-ai-openapi.yaml)) | WorkerClient | worker DB 직접 접근 금지. submit 재전송 멱등(`Idempotency-Key`=jobId, 소유자 결속), ready와 앱 공개 완료 분리, 저장만 복구 시 provider 재호출 금지, `operator_reconcile`는 중단·에스컬레이션. |
 
 ## 5. 전환 수용 순서와 롤백
 

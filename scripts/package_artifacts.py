@@ -15,19 +15,22 @@ TREES = {
     "prototype/web/public": {".svg", ".png", ".ico", ".woff", ".woff2", ".webmanifest"},
     "prototype/web/dist": {".html", ".js", ".css", ".svg", ".png", ".ico", ".woff", ".woff2", ".webmanifest"},
     "prototype/bff/src": {".py"},
-    "prototype/ai-worker/src": {".py"},
+    "ai/worker/src": {".py"},
+    "ai/pipeline/src": {".py"},
 }
 FILES = (
     "prototype/README.md", "prototype/web/package.json", "prototype/web/pnpm-lock.yaml",
     "prototype/web/index.html", "prototype/web/tsconfig.json", "prototype/web/tsconfig.app.json",
     "prototype/web/tsconfig.node.json", "prototype/web/vite.config.ts", "prototype/web/DESIGN.md",
     "prototype/bff/pyproject.toml", "prototype/bff/uv.lock", "prototype/bff/README.md",
-    "prototype/ai-worker/pyproject.toml", "prototype/ai-worker/uv.lock", "prototype/ai-worker/README.md",
+    "ai/README.md", "ai/worker/pyproject.toml", "ai/worker/uv.lock", "ai/worker/README.md",
+    "ai/pipeline/pyproject.toml", "ai/pipeline/uv.lock", "ai/pipeline/README.md",
     "docs/api/openapi.yaml", "docs/api/ai-contract.schema.json", "docs/design/tokens.json",
 )
 REQUIRED = (
     "prototype/web/package.json", "prototype/web/pnpm-lock.yaml", "prototype/web/dist/index.html",
-    "prototype/bff/pyproject.toml", "prototype/bff/uv.lock", "prototype/ai-worker/pyproject.toml", "prototype/ai-worker/uv.lock",
+    "prototype/bff/pyproject.toml", "prototype/bff/uv.lock", "ai/worker/pyproject.toml", "ai/worker/uv.lock",
+    "ai/pipeline/pyproject.toml", "ai/pipeline/uv.lock",
     "docs/api/openapi.yaml", "docs/api/ai-contract.schema.json", "docs/design/tokens.json",
 )
 FORBIDDEN_DIRS = {"var", "node_modules", "__pycache__", "recordings", "logs", "cache", "private", "fixtures"}
@@ -69,7 +72,7 @@ def selected_files(root: Path) -> list[Path]:
     missing = set(REQUIRED) - {path.as_posix() for path in selected}
     if missing:
         raise ValueError("required allowlisted files missing: " + ", ".join(sorted(missing)))
-    for folder in ("prototype/web/src", "prototype/bff/src", "prototype/ai-worker/src"):
+    for folder in ("prototype/web/src", "prototype/bff/src", "ai/worker/src", "ai/pipeline/src"):
         if not any(path.as_posix().startswith(folder + "/") for path in selected):
             raise ValueError(f"source tree empty: {folder}")
     return selected

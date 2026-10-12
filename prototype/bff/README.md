@@ -27,7 +27,7 @@ ZOOP_SNAPSHOT_PATH=$PWD/fixtures/synthetic-stress-300.json ZOOP_COMPANY_CATALOG=
 
 ### S1 문서 AI worker와 수입
 
-기존 BFF sentiment provider/client의 중복 live 분기는 제거하고 `prototype/ai-worker`로 이행했다. 새 문서 producer는 `document-summary`, `document-sentiment`, `semantic-verification`이며 기존 `briefing-outlook` 생산 능력도 보존한다. `submit/run/get/resume/cancel`은 stdin/stdout JSON을 주고받고 worker state는 앱 state와 분리한다. BFF는 worker DB를 직접 읽거나 쓰지 않는다. 문서 수입은 `scripts/document_analysis.py import`, source deny는 `deny`, 미발행 회차 생성은 `scripts/judge_outlook.py`가 담당한다.
+기존 BFF sentiment provider/client의 중복 live 분기는 제거하고 `ai/worker`로 이행했다. 새 문서 producer는 `document-summary`, `document-sentiment`, `semantic-verification`이며 기존 `briefing-outlook` 생산 능력도 보존한다. `submit/run/get/resume/cancel`은 stdin/stdout JSON을 주고받고 worker state는 앱 state와 분리한다. BFF는 worker DB를 직접 읽거나 쓰지 않는다. 문서 수입은 `scripts/document_analysis.py import`, source deny는 `deny`, 미발행 회차 생성은 `scripts/judge_outlook.py`가 담당한다.
 
 stage별 모델·effort와 명시적 live/budget gate는 [`.env.example`](.env.example)을 따른다. 옛 `ZOOP_SENTIMENT_*`의 문서 선택은 `ZOOP_AI_DOCUMENT_SENTIMENT_*`, 회차 선택은 `ZOOP_AI_BRIEFING_OUTLOOK_*`로 옮긴 뒤 옛 export를 제거한다. summary와 VERIFY는 별도 변수다. runtime alias나 모델 fallback은 없다. 실제 모델·운영 예산·단가는 미정이며 예시 파일은 live 승인이 아니다.
 
@@ -36,7 +36,7 @@ stage별 모델·effort와 명시적 live/budget gate는 [`.env.example`](.env.e
 기존 환경만으로 저장 상태가 분리된 합성 문서 두 기업을 재현할 수 있다. 저장소 루트에서 다음을 실행한다. driver는 실제 CLI와 BFF import를 사용하고 모델/시장 네트워크 설정을 전달하지 않는다.
 
 ```sh
-prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py \
+prototype/bff/.venv/bin/python prototype/bff/scripts/replay_fixture.py \
   --worker-state /tmp/zoop-ai-doc-worker-demo --bff-state /tmp/zoop-ai-doc-bff-demo
 ```
 
@@ -45,7 +45,7 @@ prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_fixture.py \
 기존 회차의 실제 생성·발행 고정·빈 회차 무호출 재현은 다음 명령을 사용한다. 문서와 별도인 합성 snapshot/state이며 원래 발행 권한·정책을 통과한다.
 
 ```sh
-prototype/bff/.venv/bin/python prototype/ai-worker/scripts/replay_outlook_fixture.py \
+prototype/bff/.venv/bin/python prototype/bff/scripts/replay_outlook_fixture.py \
   --worker-state /tmp/zoop-outlook-worker --bff-state /tmp/zoop-outlook-bff --empty-bff-state /tmp/zoop-outlook-empty
 ```
 
@@ -401,31 +401,9 @@ uv run python scripts/make_stress_fixture.py --check   # 커밋된 파일과 다
 - 작업 기록은 상태 디렉터리에 영속한다. BFF가 재시작될 때 `queued|running`이던 작업은 남은 프로세스를 정리하고 `failed` + `recovered:true` + `interrupted_by_restart`로 확정한다(출력된 보고서가 있으면 첨부).
 - 작업이 끝나도 **사용자 그래프는 바뀌지 않는다.** 원장이 바뀐 것을 반영하려면 관리자가 버전을 게시해야 한다.
 
-### 독립 오프라인 원문 준비 (S2-1, FS074·FS075 일부)
+### 오프라인 원문 준비·후보 파이프라인 (S2-1/S2-2/S3)
 
-`zoop_bff.ingestion_cli`의 `run/resume/inspect`는 위 admin `ingest-run`과 **다른 내부 실행 경계**다. 설치된 BFF의 pinned PoC parser만 재사용하고 네트워크·모델·PoC 원장·앱/S1 DB에는 연결하지 않는다. 명시한 전용 `--state-dir`의 private `ingestion.sqlite3`에 원래 response/raw BLOB, source-local 문서 ID, raw/text version, HTML node/PDF page span과 연속 checkpoint를 저장한다. 현재 operator `--sources`는 매번 완전한 snapshot으로 읽고, fixture manifest는 hash-pinned 파일 입력일 뿐 권한을 발급하지 않는다.
-
-저장소 루트에서 다음 명령으로 합성 HTML/PDF와 실제 subprocess CLI를 재현한다. driver는 fresh 임시 입력/상태를 만들고 검사 후 모두 제거한다.
-
-```sh
-PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/ingestion_smoke.py
-```
-
-실제 결과는 `status=passed, preparedDocuments=2, providerCalls=0, modelCalls=0`이었다. receipt/raw/version/checkpoint 저장 뒤 프로세스 중단·resume, 같은 cursor replay, 변경 body의 새 버전, zero/failure/partial/parse hold, stale checkpoint, registry 철회/누락, entity·tail·반복 한글/emoji와 PDF page 좌표, S1 exact의 생성 separator 거부를 확인했다. review 회귀까지 포함한 focused `tests/test_ingestion.py`는 **43 passed, 기존 Starlette warning 1개**였다. 실제 scope A 철회 뒤 scope B의 XPath에 맞는 text/hold 분리와, 첫 supplier의 raw commit 뒤 파일이 없어도 공유 body로 둘째 supplier를 준비하는 복구도 통과했다.
-
-wire schema는 `zoop-ingestion-s2-1`이며 공용 OpenAPI나 S1 schema를 바꾸지 않았다. 정확한 문서/version을 고른 `inspect`만 현재 read 권한으로 내부 S1 `Document` projection을 반환한다. 원문 span 해석에는 quote-display도 요구한다. S2-2가 쓰도록 정확한 관측(round/source/page/ordinal/document/rawVersion/documentVersion)의 서버 소유 URL·title·publishedAt과 grant를 반환하는 읽기 전용 `ingestion_cli export`를 추가했다. HTML 위치는 decoded DOM text/tail 좌표이고 PDF 위치는 frozen page-extracted text 좌표이지 raw byte·glyph geometry가 아니다. 이 문서는 앱 Dataset에 등록되거나 게시되지 않는다. 실제 공급원/정기 수집·기업/이슈 연결·S3·공개 등록/게시·유료 의미 검증은 구현 완료로 주장하지 않는다. 명령·registry·manifest·한계와 실행 증거는 [AI 실행 계약의 S2-1 절](../../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)을 따른다.
-
-### 독립 오프라인 이벤트·SAME·주제 후보 (S2-2)
-
-`zoop_bff.extraction_cli`의 `run/resume/inspect/cancel`은 S2-1 ingestion 상태를 **읽기 전용**으로 소비하고 전용 `--state-dir`의 `extraction.sqlite3`에만 쓴다. 설치된 pinned PoC의 `Article`·`ReplayModel.extract/compare`·`incompatible` 순수 계약만 쓰며 Postgres·Neo4j·Pipeline·네트워크·모델·앱/S1 상태에는 연결하지 않는다. authored replay는 독립 AI 추론이 아니고, 결과는 승인·게시가 아닌 event/topic **후보**다. 이벤트 후보는 정확한 인용(S1 exact와 같은 mapped-run 규칙 + ingestion resolver), whole-event 비교(all-member 충돌·근거 부재·multi-SAME hold), 문서/mention/event 별도 ID를 갖고 topic 후보는 별도 `zoop-topic-*` 계약·영수증으로 만든다. 저장소 루트에서 재현한다.
-
-```sh
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=prototype/bff/src \
-  prototype/bff/.venv/bin/python -m pytest prototype/bff/tests/test_extraction.py prototype/bff/tests/test_ingestion.py -q -p no:cacheprovider
-PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/extraction_smoke.py
-```
-
-실제 결과는 **89 passed, 1 warning**(extraction 46 + ingestion 43, 기존 Starlette warning)과 smoke `status=passed, providerCalls=0, modelCalls=0`이었다. smoke는 실제 ingestion/extraction subprocess에 socket audit hook을 걸고 same/distinct event·topic, 충돌·누락 날짜, multi-SAME, 한글/emoji/separator/반복 quote, raw-only 변경, 위조 입력, 철회 grant, receipt/stage 중단 복구, 잘못된 fixture의 receipt 미생성, separator snapshot member 거부, ingestion 읽기 쪽 mode/bytes/파일 불변을 검사한다. ingestion `export`와 extraction의 ingestion 접근은 shared flock과 `immutable=1` 읽기 전용 열기이며 중단된 writer가 남긴 비어 있지 않은 WAL은 `ingestion_recovery_required`로 거부한다. live 전송·retrieval·cross-job cache·앱 등록·승인 topic은 구현하지 않았다. wire/binding/복구 규칙은 [AI 실행 계약의 S2-2 절](../../docs/design/ai-system.md#s2-2-오프라인-이벤트same주제-후보-준비)을 따른다.
+`ingestion`/`extraction`/`relation` CLI와 smoke는 BFF 소유가 아니며 독립 프로젝트 [`ai/pipeline`](../../ai/pipeline/README.md)로 이동했다(`zoop_ai_pipeline`, 콘솔 명령 `zoop-ai-ingest`/`-extract`/`-relation`). BFF는 이 원장·상태를 읽거나 import하지 않는다.
 
 ### 샌드박스 (`ZOOP_POC_SANDBOX`, 기본 `~/.local/share/zoop/investmate-sandbox`)
 

@@ -1,6 +1,6 @@
 # Zoop API 실행 환경
 
-Spring Boot 실행 기반과 최소 공통 오류 처리가 있습니다. 업무 API·인증·CI는 아직 구현하지 않았습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
+Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트가 있습니다. 업무 API·인증은 아직 구현하지 않았습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
 
@@ -36,6 +36,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `DB_USERNAME` | DB 계정 |
 | `DB_PASSWORD` | DB 비밀번호 |
 | `SERVER_PORT` | 애플리케이션 포트 (기본값 8080) |
+| `ZOOP_AI_CLIENT_*` | 선택. 내부 AI transport 클라이언트(기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정) |
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
@@ -49,13 +50,25 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 ./api/gradlew -p api test
 ```
 
-현재 빌드와 공통 오류 테스트는 DB 없이 실행할 수 있습니다. 실행 JAR은 `api/build/libs/`에 생성됩니다.
+현재 빌드와 기본 테스트(공통 오류 6개 + AI 클라이언트 시험)는 DB·Python 없이 실행할 수 있습니다. 실행 JAR은 `api/build/libs/`에 생성됩니다. 루트에서는 아래 이름을 씁니다(`prototype/bff`의 `bff-*`와 구분됩니다).
+
+```sh
+make api-test                        # ./api/gradlew -p api test
+make api-build                       # ./api/gradlew -p api assemble
+make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai replay gate (./gradlew aiContractTest)
+```
+
+`aiContractTest`는 기본 `test`에서 제외되며 `make api-ai-smoke`가 서비스를 띄워 매니페스트를 넘길 때만 통과합니다. 매니페스트가 없으면 skip이 아니라 실패합니다.
 
 ## 공통 오류 처리
 
 `CustomException`에 명세의 `ErrorCode`를 전달하면 `GlobalExceptionHandler`가 `{ "error": { "code", "message", "requestId", "retryable" } }` 형식으로 반환합니다. 현재는 `INVALID_REQUEST`, `RESOURCE_NOT_FOUND`, `INTERNAL_ERROR`만 구현되어 있습니다. 나머지 오류 코드는 해당 기능 구현 시 [목표 OpenAPI](../docs/api/openapi.yaml)에 맞춰 추가합니다. 성공 응답은 공통 래퍼로 감싸지 않습니다.
 
 모든 요청의 `X-Request-ID`를 응답 헤더에 반환하며, 생략하면 서버가 새 ID를 생성합니다. 오류 본문의 `requestId`는 해당 응답 헤더와 같습니다. 요청 ID를 멱등성 키로 사용하지 마세요. 인증 필터의 오류는 추후 인증 구현 시 같은 형식으로 연결해야 합니다.
+
+## AI 분석 transport
+
+`com.zoop.ai`는 `ai/service`의 5개 internal operation(submit/status/result/cancel/recover)을 호출하는 클라이언트입니다. 서비스 principal로 호출하며 사용자 격리·결과 import·공개 인증은 포함하지 않습니다. 설정, 의미(202≠완료, withheld, 결과 불명 복구), 요청 ID, 검증 범위와 인계 사항은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
 
 ## 스키마와 DB 종료
 
@@ -125,11 +138,10 @@ null·자료 없음·실패의 의미:
 
 본인 기능 패키지를 중심으로 변경하고, `common`, `build.gradle`, `application.yml`, Flyway migration 등 공유 파일의 변경은 PR에 이유와 영향을 적고 관련 담당자에게 알립니다. 계약 변경은 `docs/api/` 정본과 영향을 받는 consumer·fixture·시험을 함께 수정합니다. PR에는 실행한 `./api/gradlew -p api test` 및 `build` 결과와, DB가 필요한 기능이라면 적용 시험 결과를 기록합니다.
 
-현재 API 앱 검사기는 CI·루트 Makefile에 연결되지 않았습니다. 이 연결은 **첫 업무 기능 PR 병합 전**에 완료할 후속 작업이며, 기능 담당자는 기다리지 않고 각자 구현과 로컬 검증을 진행합니다. 인증·CSRF, 커서, 멱등성, 공개 버전, AI 연동, 감사 기록은 각각 필요한 기능의 완료 기준에 포함합니다. 공통 코드 구현을 모두 선행 조건으로 만들지는 않습니다.
+API 앱 검사기는 루트 Makefile(`api-test`/`api-build`/`api-ai-smoke`)과 CI job `api`(required gate 포함)에 연결돼 있습니다. 첫 업무 기능 PR은 이 job에서 자신의 시험이 실제로 실행되는지 확인합니다. 인증·CSRF, 커서, 멱등성, 공개 버전, AI 결과 import(전송 클라이언트는 `com.zoop.ai`), 감사 기록은 각각 필요한 기능의 완료 기준에 포함합니다. 공통 코드 구현을 모두 선행 조건으로 만들지는 않습니다.
 
 | 후속 작업 | 책임 역할 | 완료 시점 |
 |---|---|---|
-| Gradle 검사 명령을 루트 Makefile·CI job·required gate에 연결 | API 담당 + 저장소 자동화 담당 | 첫 업무 기능 PR 병합 전 |
 | 회원·관리자 세션, 권한·Origin·CSRF 오류 처리 | 인증 담당 | 보호가 필요한 업무 API 완료 전 |
 | 불투명 커서·공개 버전 고정 | 해당 조회 기능 담당 + 데이터 소유 담당 | 해당 조회 API 완료 전 |
 | 쓰기 멱등성·AI 작업 계약·감사 기록 | 해당 쓰기·AI·관리자 기능 담당 | 해당 기능 완료 전 |

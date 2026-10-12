@@ -6,13 +6,13 @@
 
 | 항목 | 현재 확인한 상태 | 배포 인수에서 필요한 증거 |
 |---|---|---|
-| 마지막 원격 CI | Main이 2026-10-10 새로 확인한 목록에서도 [run 37734731230](https://github.com/Donbug/zoop/actions/runs/37734731230)이 마지막이다. 실제 관측 commit은 `69cc0067af1702dbd660869cecc3009543ad9030`이다. public-config / web / ai-worker success, bff / required-ci failure다. | 후보의 **전체 40자리 commit**, 같은 main SHA의 최신 완료 CI run·attempt·각 required job 결과 |
-| 미해결 CI | BFF는 `POC_APP_ID`·`POC_APP_PRIVATE_KEY` 미등록으로 preflight에서 실패했다. 그 run의 BFF 시험은 시작되지 않았다. | private PoC 접근·App key 접근 trust 승인 후 전체 CI success. 실패/skip을 green으로 바꾸지 않는다. |
+| 마지막 원격 CI | 2026-10-12 읽기 전용 GitHub 조회의 [run 38193448624](https://github.com/Donbug/zoop/actions/runs/38193448624)은 main push, commit `6272d3c7a7f7128bb8260e54a98c488f4f44bca8`, completed/failure다. public-config / web / ai-worker success, bff / required-ci failure다. | 후보의 **전체 40자리 commit**, 같은 main SHA의 최신 완료 CI run·attempt·각 required job 결과 |
+| 미해결 CI / 승인 구분 | **2026-10-12 사용자가 현재 admin 7명 전원의 private PoC/App private key/token 접근 trust와 Donbug 전용 App 준비를 승인했다.** 정확한 handles·대상은 [등록 승인 기록](github-setup.md#private-poc-읽기-등록)에 있다. repository secret/variable 이름 목록은 각각 비어 있었고 최신 run의 BFF 등록 preflight는 실패, token 발급·설치·시험은 skipped였다. 실제 App 생성·key 발급·등록은 미실행이며 별도 승인 대상이다. | 사람이 등록·회수·회전 담당을 지정하고 승인된 `Donbug/investmate-poc` 단일 설치·Contents/Metadata read-only 및 zoop의 `POC_APP_ID`/`POC_APP_PRIVATE_KEY` 등록을 수행한 뒤 같은 SHA의 전체 CI success를 관측한다. 실패/skip을 green으로 바꾸지 않는다. |
 | 현재 로컬 | Main 인계 기준 HEAD는 `69cc006`이며 S2-1·API v2 등 미커밋 변경과 이번 병행 작업이 있다. 이 문서의 소스 확인도 로컬 working tree 기준이다. 별도 Git 명령으로 재관측하지 않았다. | 선택 시점의 정확한 변경 목록과 commit. 미커밋 파일은 해당 원격 run의 검증 대상이 아니다. |
 | 릴리스 버전·배포 대상 | 릴리스 번호, artifact, 운영 대상, 배포 실행은 미선택/미관측이다. 제안된 production 아키텍처 그림은 운영 승인이나 실제 가동 증거가 아니다. | 승인된 버전→commit→artifact hash→실행 대상→관측 결과의 연속된 인수 기록 |
 | 선행 로컬 증거 | [API v2 검토](../evidence/api-v2-review-2026-10-08.md) 마지막 절은 contracts/docs 및 합성 스키마 소비 검사를 기록한다. [AI 실행 기록](../design/ai-system.md#실행으로-확인한-결과)은 S1·S2-1의 로컬 합성 실행을 기록한다. | 후보 소스에서 다시 실행한 해당 API·UI·회귀 결과. 과거 353 passed는 이번 로컬 변경 전체의 합격 증거가 아니다. |
 
-위 전체 SHA는 Main의 원격 관측 인계값이며 이 문서 작성자가 별도 원격 명령으로 재확인한 값은 아니다. 원격 운영 등록·키 열람·새 의존성·유료 호출·배포·커밋/푸시는 이 계획의 실행 권한에 포함되지 않는다.
+최신 CI SHA/job 결과와 repository credential 이름 목록은 2026-10-12 읽기 전용 GitHub REST 조회로 확인했다. 현재 로컬 행과 아래 과거 실행 기록은 작성 당시의 인계값이며 최신 원격 CI와 구분한다. trust·App 준비 승인은 원격 운영 등록·key 발급/열람·CI 재실행·새 의존성·유료 호출·배포 권한을 포함하지 않는다.
 
 ### 증거 유형과 상태 표기
 
@@ -53,8 +53,8 @@ F03 도메인 구현은 회원 `6.2.5` 및 관리자 `6.10.1/6.10.13`, F05는 �
 | 최신 시세 | `GET /api/companies/{id}/quote`, `routers/market.py::get_quote` | `GET /api/v1/companies/{id}/quote`, `getCompanyQuote` |
 | 회차 그래프 근거 | `/api/briefings/{id}/graph` | `/api/v1/briefings/{id}/graph`, `getBriefingGraphBasis`. F07은 목표 설명의 helper 경로를 이 버전으로 정정한 것이다. |
 | 상태 확인 | `GET /api/health`, `routers/system.py::health` | production health/readiness 경로는 대상 구현에서 확정한다. 현 BFF 경로를 Spring에서 가동한다고 가정하지 않는다. |
-| AI 실행 | `prototype/ai-worker/src/zoop_ai/{contracts,cli,runner,store,provider}.py`, BFF `zoop_bff.ai_worker.AiWorkerClient` | 언어 독립 JSON seam. Spring 후보도 Python import/worker DB 공유 쓰기 대신 schema·transport·오류/복구 계약을 구현해야 한다. |
-| 오프라인 원문 준비 | `zoop_bff.ingestion_cli`, `ingestion{,_contracts,_parsers}.py` | 내부 `zoop-ingestion-s2-1` 프로세스다. `/api/v1` 공개 수집 API나 이미 연결된 admin job이 아니다. |
+| AI 실행 | `ai/worker/src/zoop_ai/{contracts,cli,runner,store,provider}.py`, BFF `zoop_bff.ai_worker.AiWorkerClient`, 로컬 내부 HTTP `ai/service/src/zoop_ai_service/` ([계약](../api/internal-ai-openapi.yaml)) | 언어 독립 JSON seam. Spring 후보도 Python import/worker DB 공유 쓰기 대신 schema·transport·오류/복구 계약을 구현해야 한다. 내부 HTTP는 같은 CLI를 감싼 로컬 구현이며 BFF는 아직 이를 소비하지 않는다. Spring 쪽 전송 클라이언트는 `api/src/main/java/com/zoop/ai/`([설명](../../api/docs/AI_INTEGRATION.md))에 5개 operation 전부 구현·실제 서비스로 검증했지만 인증·도메인·결과 import 소비자는 아직 없다. |
+| 오프라인 원문 준비 | `ai/pipeline`의 `zoop_ai_pipeline.ingestion_cli`, `ingestion{,_contracts,_parsers}.py` | 내부 `zoop-ingestion-s2-1` 프로세스다. `/api/v1` 공개 수집 API나 이미 연결된 admin job이 아니다. |
 
 목표 경로 정정은 현재 BFF의 prefix cutover나 운영 가동을 뜻하지 않는다. F07 확인은 다섯 operation(`getGraph/getCompanyRelation/getCompany/getEvent/getEvidence`) 설명의 회차 helper, 실제 배포 router·프록시·FE client 요청을 각각 대조한다. 목표는 `/api/v1`, 현 프로토타입 consumer는 `/api`라는 사실을 숨기는 alias를 만들지 않는다. 본개발 선택은 [이식 경계](../migration/README.md)를 따른다.
 
@@ -73,7 +73,7 @@ F03 도메인 구현은 회원 `6.2.5` 및 관리자 `6.10.1/6.10.13`, F05는 �
 | 격리 합성 smoke | AI 문서 예시의 `ZOOP_QUOTE_PROVIDER=off`, `ZOOP_METRICS_PROVIDER=off`, `ZOOP_BRIEFING_SCHEDULER=0` 및 별도 `ZOOP_STATE_DIR/ZOOP_SNAPSHOT_PATH/ZOOP_COMPANY_CATALOG`를 사용한다. 실제 운영 설정이라고 옮기지 않는다. |
 | 인증·배포 설정 | `ZOOP_CORS_ORIGINS`, `ZOOP_COOKIE_SECURE`, 회원/관리자 session 정책·DB/상태 경로는 앱/운영 책임자가 환경별로 확정한다. localhost의 기본값·데모 계정·로컬 DSN을 production 값으로 사용하지 않는다. |
 
-**작업자 책임안:** 윤서진은 stage별 payload·권리·모델 설정 요구와 무호출 복구를 인계하고, 앱 구현 담당자는 세션/오류/consumer mapping을 소유한다. WBS `6.11.2/8` 담당 안재현은 승인된 실행 환경의 설정 주입·기동·배포/rollback 증거를 통합한다. secret 등록·예산·자료권리·배포 권한 승인자는 아직 미정이며 팀이 실재 담당자를 지정해야 한다. 이 책임안은 새로운 팀 합의나 타인의 재배정이 아니다. 옛 export를 명시적으로 제거하고 stage를 분리한다. 런타임 alias·미지원 effort 자동 제거·다른 provider 자동 전송으로 설정 오류를 숨기지 않는다.
+**작업자 책임안:** 윤서진은 stage별 payload·권리·모델 설정 요구와 무호출 복구를 인계하고, 앱 구현 담당자는 세션/오류/consumer mapping을 소유한다. WBS `6.11.2/8` 담당 안재현은 승인된 실행 환경의 설정 주입·기동·배포/rollback 증거를 통합한다. **CI App 접근 trust는 2026-10-12 사용자가 승인했지만 실제 등록·key 보관/회수·회전 담당은 남은 수동 입력 항목**이다. 모델 예산·자료권리·배포 권한 승인자는 미정이며 CI trust 승인에 포함되지 않는다. 이 책임안은 새로운 팀 합의나 타인의 재배정이 아니다. 옛 export를 명시적으로 제거하고 stage를 분리한다. 런타임 alias·미지원 effort 자동 제거·다른 provider 자동 전송으로 설정 오류를 숨기지 않는다.
 
 ### 10/10에 채택한 작업 설계 — 실제 AWS 설정은 미관측
 
@@ -82,7 +82,7 @@ Main은 production 그림의 내부 검토를 바탕으로 다음을 **작업 �
 | 작업 설계 | 6.11.2/8에서 필요한 운영 증거·위험 |
 |---|---|
 | 같은 origin CloudFront, private S3 OAC, API cache off | 승인 도메인/TLS와 실제 behavior/origin·cookie/Origin/CSRF 전달을 확인한다. API cache로 개인 응답이 공유되지 않아야 한다. 같은 origin도 F03 Origin/CSRF를 면제하지 않는다. |
-| 앱→AI 내부 HTTP, App SG만 허용, AI 포트 인터넷 비노출 | production transport의 멱등 submit/status/result와 재접수·timeout/reconcile·receipt 복구를 확인한다. 현재 JSON CLI는 이 내부 HTTP 구현 완료가 아니다. SG/route/host port 실관측이 필요하다. MCP는 선택적 내부 읽기 도구이며 공개 필수 서비스가 아니다. |
+| 앱→AI 내부 HTTP, App SG만 허용, AI 포트 인터넷 비노출 | `ai/service`가 **loopback 전용** 멱등 submit/status/result/cancel/recover와 재접수·timeout/reconcile·receipt 복구를 로컬에 구현했고 실제 uvicorn+설치된 `zoop-ai` 시험·smoke로 확인했다([design](../design/ai-system.md#내부-http-transport-s1)). **SG/route/host port/TLS 프록시는 실관측하지 않았고 배포하지 않았다.** 운영 transport는 `ZOOP_AI_SERVICE_*` 운영 설정·토큰 digest 발급·프록시(본문 한도·`Authorization` 비로깅)와 App SG 격리를 승인된 환경에서 인수해야 한다. 앱 백엔드는 아직 이 HTTP를 소비하지 않는다. MCP는 선택적 내부 읽기 도구이며 공개 필수 서비스가 아니다. |
 | DB schema·쓰기 소유권 분리, RDS session 권위·Redis 선택 cache | app/worker/ingestion/원장의 역할별 권한과 서로의 DB 직접 쓰기 금지를 인수한다. Redis 장애/재시작으로 폐기된 session·철회 자료가 복원되지 않아야 한다. |
 | HOLD만 사람 검수→재검증, 브리핑 자동 생성→방식에 맞는 검증→불변 발행 | 매 기사·매 회차 사람 승인 대기를 의무로 넣지 않는다. 검수 허용은 공개가 아니다. 현재 outlook의 exact-only 한계를 강화된 production 검증 통과로 바꾸어 보고하지 않는다. |
 | 버전 projection→양쪽 readiness→active pointer CAS + 현재 withdrawal gate | 부분 투영·한쪽 준비 실패·늦은 회차·rollback에서 새/옛 버전 혼합과 철회 재노출을 막는 실행 증거를 확인한다. NFS012 마감은 이 단계들을 포함한다. |
@@ -171,8 +171,8 @@ Main은 production 그림의 내부 검토를 바탕으로 다음을 **작업 �
 다음 순서는 계획이며 완료 기록이 아니다. 기존 [GitHub 수동 등록](github-setup.md#private-poc-읽기-등록)의 권한 경계를 그대로 사용한다.
 
 1. **운영 선행조건을 확정한다.** FE/앱 BE/AI 스택·실행기/버전, 계정·지역·서비스·도메인/TLS, 역할/승인자, 자료/모델 권리·비용, 로그 보존/열람, DB·GraphDB·worker/ingestion 상태 분리와 백업 보존 정책을 기록한다. Docker·Spring·Neo4j 그림만으로 선택/기동 완료라고 쓰지 않는다.
-2. **private PoC trust를 먼저 승인한다.** same-repository PR 작성자 전원의 PoC/App private key 접근 허용과 회수/회전 책임을 실재 handles로 기록한다. 미승인자는 CODEOWNERS/merge review만으로 credential 접근이 격리된다고 가정하지 않는다. 관리자만 필요한 App/secret·ruleset 등록을 수행하며 CI App에 배포 권한을 추가하지 않는다.
-3. **불변 후보를 고정한다.** 릴리스 이름과 full commit을 정하고 같은 SHA의 최신 CI push run/attempt에서 public-config/web/bff/ai-worker/required-ci가 모두 success인지 확인한다. 로컬 미커밋 결과·다른 SHA·과거 success·skipped는 대체 증거가 아니다.
+2. **승인된 private PoC trust와 실제 등록을 구분한다.** 2026-10-12 사용자가 승인한 same-repository admin 7명의 PoC/App private key/token 접근 범위와 Donbug 전용 App 준비 범위를 [승인 기록](github-setup.md#private-poc-읽기-등록)에서 확인한다. 등록 시 handles 변경은 재승인하고 등록·회수·회전 담당을 지정한다. 실제 App 생성·설치·key 발급·zoop credential 등록·CI 실행은 별도 승인을 받아 사람이 수행한다. CI App의 설치는 `Donbug/investmate-poc` 하나, Contents/Metadata read-only이며 LLM/AWS·배포 권한을 추가하지 않는다. CODEOWNERS/merge review는 key 접근 격리가 아니다. ruleset 등록은 별도 권한 결정이다.
+3. **불변 후보를 고정한다.** 릴리스 이름과 full commit을 정하고 같은 SHA의 최신 CI push run/attempt에서 public-config/web/bff/ai-pipeline/ai-worker/ai-service/api/required-ci가 모두 success인지 확인한다. 로컬 미커밋 결과·다른 SHA·과거 success·skipped는 대체 증거가 아니다.
 4. **artifact를 검증한다.** [release-artifacts](github-setup.md#release-artifacts는-배포가-아닙니다)의 실제 run, manifest commit/CI run, ZIP·manifest·파일별 SHA-256을 대조한다. 그 ZIP은 운영 설정·데이터·PoC/venv를 포함하지 않는 준비 산출물이다. 배포 대상별 실행 이미지/wheel/static 자산과 runtime/lock provenance를 별도로 고정해야 한다. 이 문서에서 임의 artifact hash를 만들지 않는다.
 5. **승인된 테스트 환경에 기동·migration·복구를 인수한다.** DB별 사전 backup hash/시각·schema version, restore 시험 결과와 migration 전후 값/참조를 기록한다. 서비스 역할별 접근과 최소 권한, state volume/permissions, env 이름·공개값 변경·secret version 식별자(값 아님), health/readiness와 실제 `/api` 또는 `/api/v1` 요청을 확인한다. BFF `/api/health`는 실패도200이므로 HTTP200만 보지 않고 `status/source.connected/graphVersion`과 필수 조회를 확인한다. production readiness 기준은 대상에 맞춰 별도 확정한다.
 6. **API/UI/fault/measurement 증거를 묶는다.** F03/F05 번호별 실행 입력·expected/actual·timestamp·sanitized request/response·로그와 UI 관측을 연결한다. F06 stage env와 grant가 실제 승인 boundary 안에서 주입되었는지, F07 프록시/client/router 요청 경로가 일치하는지 확인한다. 안재현의 6.11.6 원장과 윤서진/김도현의 데이터·AI 복구 증거를 같은 commit으로 연결한다.

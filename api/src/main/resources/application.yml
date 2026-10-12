@@ -14,5 +14,17 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+zoop:
+  ai:
+    client:
+      # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.
+      # When enabled, every value below is validated at startup and an invalid one fails startup (see api/docs/AI_INTEGRATION.md).
+      enabled: ${ZOOP_AI_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_CLIENT_REQUEST_TIMEOUT:30s}
+      max-response-bytes: ${ZOOP_AI_CLIENT_MAX_RESPONSE_BYTES:8388608}
+
 server:
   port: ${SERVER_PORT:8080}

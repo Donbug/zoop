@@ -17,7 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = (
     ("web", "prototype/web", "React/Vite prototype", "pnpm install --frozen-lockfile", "pnpm typecheck; pnpm test; pnpm build"),
     ("bff", "prototype/bff", "FastAPI prototype (private pinned PoC)", "uv sync --frozen --group dev", "uv run --no-sync python -m pytest; uv build"),
-    ("ai-worker", "prototype/ai-worker", "Python CLI JSON worker (not an HTTP service)", "uv sync --frozen --group dev --no-install-project", "PYTHONPATH=src .venv/bin/python -m pytest tests; uv build"),
+    ("ai-worker", "ai/worker", "S1 Python CLI JSON worker (public dependencies only, not an HTTP service)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; uv build"),
+    ("ai-service", "ai/service", "S1 internal loopback HTTP transport to the installed zoop-ai CLI (public dependencies only; local preparation, not deployed)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/service_smoke.py; scripts/export_openapi.py --check; uv build"),
+    ("ai-pipeline", "ai/pipeline", "S2-1/S2-2/S3 offline CLI processes (private pinned PoC)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/*_smoke.py; uv build"),
+    ("api", "api", "Spring Boot 4.1.1 / Java 21 app backend foundation plus the internal S1 AI transport client (no auth or domain endpoints yet; needs JDK 21)", "JAVA_HOME=<JDK 21>; ./api/gradlew -p api --version", "make api-test api-build; make service-install api-ai-smoke"),
     ("contracts", "docs/api", "Language-neutral target contract", "existing PyYAML/OpenAPI validator", "make contracts-check docs-check"),
 )
 HELP = """Polyglot monorepo: app code stays in its current directories.
@@ -25,11 +28,14 @@ Discovery: make help | projects | available-checks
 Public/offline: make config-check | contracts-check | docs-check | tokens-check | secret-check | tooling-test | public-check
 Web only: make web-install | web-typecheck | web-test | web-build
 BFF only: make bff-install | bff-test | bff-build
-Worker only: make worker-install | worker-test WORKER_PYTHON=<existing-python> | worker-build
-Worker/BFF contract drift: make worker-contracts-check (existing BFF Python)
+Worker only: make worker-install | worker-test | worker-schema-check | worker-build
+Pipeline only (private PoC): make pipeline-install | pipeline-test | pipeline-smoke | pipeline-build
+Service only (internal HTTP over the S1 CLI, public deps): make service-install | service-test | service-smoke | service-openapi-check | service-build
+API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate)
+Worker fixture drift: make worker-contracts-check (installed BFF Python)
 BFF/web type drift: make bff-types-check (installed BFF Python + web tool)
 Artifacts: make package-artifacts COMMIT=<40-char-sha> ARTIFACT_DIR=<outside-repo>
-Override tools with PYTHON=, UV=, PNPM=. No root JS workspace or Java scaffold.
+Override tools with PYTHON=, UV=, PNPM=. No root JS workspace; the Java app lives in api/ with its own pinned Gradle wrapper.
 Install targets fetch dependencies. Tests do not request live data/model access.
 See CONTRIBUTING.md and docs/development/github-setup.md for prerequisites.
 """
@@ -135,6 +141,12 @@ def contracts() -> None:
     from jsonschema import FormatChecker
     contract = yaml.safe_load((ROOT / "docs/api/openapi.yaml").read_text())
     validate(contract)
+    internal = ROOT / "docs/api/internal-ai-openapi.json"
+    internal_spec = json.loads(internal.read_text(encoding="utf-8"))
+    # The S1 wire schemas are referenced from ai-contract.schema.json, so validation needs the document's own location.
+    validate(internal_spec, base_uri=internal.as_uri())
+    if yaml.safe_load((ROOT / "docs/api/internal-ai-openapi.yaml").read_text(encoding="utf-8")) != internal_spec:
+        raise ValueError("Internal AI OpenAPI: YAML and JSON differ; regenerate with ai/service/scripts/export_openapi.py (make service-openapi-check).")
     paths = sorted((ROOT / "docs/api").rglob("*.json"))
     paths += [ROOT / "prototype/web/package.json", ROOT / "docs/design/tokens.json",
               ROOT / "docs/screen-plan/captures/slide-index.json"]
@@ -154,7 +166,7 @@ def contracts() -> None:
                "semantic-verification": "VerificationAnswer", "briefing-outlook": "OutlookAnswer"}
     records_checked = 0
     for name in ("synthetic-document", "synthetic-outlook"):
-        fixture = ROOT / "prototype/ai-worker/fixtures/contracts" / name
+        fixture = ROOT / "ai/worker/fixtures/contracts" / name
         records = [("Submit", value) for value in json.loads((fixture / "jobs.json").read_text())["jobs"]]
         records += [("SourceGrant", value) for value in json.loads((fixture / "grants.json").read_text())["grants"]]
         records += [(answers[value["stage"]], value["response"])
@@ -163,9 +175,9 @@ def contracts() -> None:
             validator({"$defs": schema["$defs"], "$ref": f"#/$defs/{definition}"},
                       format_checker=FormatChecker()).validate(value)
             records_checked += 1
-    for path in ROOT.glob("prototype/*/pyproject.toml"):
+    for path in (*ROOT.glob("prototype/*/pyproject.toml"), *ROOT.glob("ai/*/pyproject.toml")):
         tomllib.loads(path.read_text(encoding="utf-8"))
-    print(f"OpenAPI, {len(paths)} JSON documents/schemas, {records_checked} portable fixture records with format checks, app TOML: passed.")
+    print(f"OpenAPI (public target + internal AI transport, YAML equals JSON), {len(paths)} JSON documents/schemas, {records_checked} portable fixture records with format checks, app TOML: passed.")
 
 
 def copy_file(root: Path, target: Path, relative: str) -> None:
@@ -260,35 +272,45 @@ def tokens() -> None:
     print("Generated token drift: passed (worktree unchanged).")
 
 
+def worker_schema() -> None:
+    with tempfile.TemporaryDirectory(prefix="zoop-worker-schema-") as folder:
+        target = Path(folder)
+        script = "ai/worker/scripts/export_schema.py"
+        copy_file(ROOT, target, script)
+        env = {key: os.environ[key] for key in ("PATH", "HOME") if key in os.environ}
+        run([sys.executable, script], cwd=target, env=env)
+        relative = Path("docs/api/ai-contract.schema.json")
+        outputs = {result.relative_to(target) for result in (target / "docs/api").rglob("*") if result.is_file()}
+        if outputs != {relative}:
+            raise ValueError("Worker schema exporter output set changed: " + ", ".join(sorted(map(str, outputs))))
+        if (target / relative).read_bytes() != (ROOT / relative).read_bytes():
+            raise ValueError(f"Generated worker contract drift: {relative}")
+    print("Worker generated S1 schema: exact output and content drift passed (worktree unchanged).")
+
+
 def worker_contracts() -> None:
+    """BFF-owned fixture exporter; needs the installed BFF environment (zoop_bff, pinned PoC, test-only zoop_ai)."""
     with tempfile.TemporaryDirectory(prefix="zoop-worker-contracts-") as folder:
         target = Path(folder)
-        script = "prototype/ai-worker/scripts/export_contracts.py"
+        script = "prototype/bff/scripts/export_contracts.py"
         copy_file(ROOT, target, script)
-        (target / "docs/api").mkdir(parents=True, exist_ok=True)
         env = {key: os.environ[key] for key in ("PATH", "HOME") if key in os.environ}
-        env["PYTHONPATH"] = os.pathsep.join(str(ROOT / name) for name in ("prototype/ai-worker/src", "prototype/bff/src"))
         run([sys.executable, script], cwd=target, env=env)
-        expected = {Path("docs/api/ai-contract.schema.json")}
-        expected.update(
-            Path("prototype/ai-worker/fixtures/contracts") / group / filename
-            for group in ("synthetic-document", "synthetic-outlook")
-            for filename in ("jobs.json", "grants.json", "replay.json", "snapshot.json")
-        )
-        outputs = {
-            result.relative_to(target)
-            for root in (target / "docs/api", target / "prototype/ai-worker/fixtures/contracts")
-            for result in root.rglob("*") if result.is_file()
-        }
+        fixtures = Path("ai/worker/fixtures/contracts")
+        expected = {fixtures / group / filename
+                    for group in ("synthetic-document", "synthetic-outlook")
+                    for filename in ("jobs.json", "grants.json", "replay.json", "snapshot.json")}
+        outputs = {result.relative_to(target) for result in (target / fixtures).rglob("*") if result.is_file()}
+        outputs |= {result.relative_to(target) for result in (target / "docs").rglob("*") if result.is_file()}
         if outputs != expected:
             missing = ", ".join(str(path) for path in sorted(expected - outputs))
             unexpected = ", ".join(str(path) for path in sorted(outputs - expected))
-            raise ValueError(f"Worker exporter output set changed; missing: {missing or 'none'}; unexpected: {unexpected or 'none'}")
+            raise ValueError(f"Worker fixture exporter output set changed; missing: {missing or 'none'}; unexpected: {unexpected or 'none'}")
         for relative in sorted(expected):
             original = ROOT / relative
             if not original.is_file() or (target / relative).read_bytes() != original.read_bytes():
                 raise ValueError(f"Generated worker contract drift: {relative}")
-    print("Worker generated schema and eight portable document/outlook fixtures: exact output set and content drift passed (worktree unchanged).")
+    print("Worker portable document/outlook fixtures: exact output set and content drift passed (worktree unchanged).")
 
 
 def bff_types() -> None:
@@ -368,7 +390,7 @@ def secrets() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["help", "projects", "available", "config", "contracts", "worker-contracts", "bff-types", "docs", "tokens", "secrets", "public", "pr-title"])
+    parser.add_argument("command", choices=["help", "projects", "available", "config", "contracts", "worker-schema", "worker-contracts", "bff-types", "docs", "tokens", "secrets", "public", "pr-title"])
     command = parser.parse_args().command
     try:
         if command == "help":
@@ -384,7 +406,7 @@ def main() -> None:
                 raise ValueError("PR title must use Conventional Commits: type(web|api|ai|contracts|docs|infra): summary")
             print("PR title convention: passed.")
         else:
-            {"available": available, "config": config, "contracts": contracts, "worker-contracts": worker_contracts, "bff-types": bff_types, "docs": docs, "tokens": tokens, "secrets": secrets}[command]()
+            {"available": available, "config": config, "contracts": contracts, "worker-schema": worker_schema, "worker-contracts": worker_contracts, "bff-types": bff_types, "docs": docs, "tokens": tokens, "secrets": secrets}[command]()
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         raise SystemExit(str(error)) from None
 

@@ -111,10 +111,10 @@ S1 구현 소유자 AiDocumentBackend가 최종 계약과 실행 결과를 전�
 
 | 자료/경계 | 현재 확인 상태 | 후속 인계 기준 |
 |---|---|---|
-| `prototype/ai-worker/src/zoop_ai/contracts.py` | 소스 검사. `EvidenceRef`의 code point, provenance mode 일치, grant expiry timezone, immutable text digest/raw locator 검사 정의를 읽었다. | wire schema는 이 구현과 일치해야 한다. sourceHash는 canonical JSON UTF-8 SHA256이므로 raw text hash나 Java 기본 직렬화 hash로 바꾸지 않는다. |
+| `ai/worker/src/zoop_ai/contracts.py` | 소스 검사. `EvidenceRef`의 code point, provenance mode 일치, grant expiry timezone, immutable text digest/raw locator 검사 정의를 읽었다. | wire schema는 이 구현과 일치해야 한다. sourceHash는 canonical JSON UTF-8 SHA256이므로 raw text hash나 Java 기본 직렬화 hash로 바꾸지 않는다. |
 | [`docs/api/ai-contract.schema.json`](../api/ai-contract.schema.json) | JSON Schema 2020-12 생성 파일을 읽었다. Submit의 네 kind, EvidenceRef/Provenance/Failure와 OutlookInput/OutlookAnswer, nullable Validation.semantic을 확인했다. | backend는 최종 `validate_contracts.py` 16 records passed를 보고했다. 생성 keyword 부분집합 validator이며 임의 JSON Schema 전체 구현이 아니다. 이 담당자는 재실행하지 않았다. |
-| [`synthetic-document/`](../../prototype/ai-worker/fixtures/contracts/synthetic-document/)의 `jobs.json`, `replay.json`, `snapshot.json`, `grants.json` | 확정 경로를 전달받고 jobs/replay/grants를 읽었다. snapshot은 실행 입력 경로로 인계하며 이번에 내용을 다시 검증하지 않았다. | authored synthetic/replay provenance와 explicit grant를 유지한다. 정상 provider 품질이나 실제 기사 라이선스 근거로 사용하지 않는다. |
-| [`synthetic-outlook/`](../../prototype/ai-worker/fixtures/contracts/synthetic-outlook/)의 `jobs.json`, `replay.json`, `snapshot.json`, `grants.json` | 확정 네 파일 경로와 첫 job/replay 응답을 읽었다. 문서 네 fixture와 schema 하나를 합쳐 총 9개 계약 파일이다. | documentSentiments를 포함한 정확 입력/pin/config digest를 보존한다. 문서 판정이 추가된 상태를 빈 documentSentiments 표본에 재사용하면 replay_input_mismatch이며 fixture를 임의 완화하지 않는다. |
+| [`synthetic-document/`](../../ai/worker/fixtures/contracts/synthetic-document/)의 `jobs.json`, `replay.json`, `snapshot.json`, `grants.json` | 확정 경로를 전달받고 jobs/replay/grants를 읽었다. snapshot은 실행 입력 경로로 인계하며 이번에 내용을 다시 검증하지 않았다. | authored synthetic/replay provenance와 explicit grant를 유지한다. 정상 provider 품질이나 실제 기사 라이선스 근거로 사용하지 않는다. |
+| [`synthetic-outlook/`](../../ai/worker/fixtures/contracts/synthetic-outlook/)의 `jobs.json`, `replay.json`, `snapshot.json`, `grants.json` | 확정 네 파일 경로와 첫 job/replay 응답을 읽었다. 문서 네 fixture와 schema 하나를 합쳐 총 9개 계약 파일이다. | documentSentiments를 포함한 정확 입력/pin/config digest를 보존한다. 문서 판정이 추가된 상태를 빈 documentSentiments 표본에 재사용하면 replay_input_mismatch이며 fixture를 임의 완화하지 않는다. |
 | BFF document/evidence consumer | `ai-system.md`와 backend 보고: 네 결과 import가 available, CLI 네 작업 ready, replay 8회/live 0회. `documentSummary`, `analysisStatus`, `analysisProvenance`, `resultVersion`, `documentVersion`을 저장 결과 GET에 제공한다. 이번 담당자가 서버/consumer를 재실행한 관측은 아니다. | 기존 sentiment DTO 유지. S1은 문서 두 consumer의 deny/version/hash gate이며 전체 과거 채팅/회차/pin 의존성 closure는 S4 계획이다. |
 | 후속 S2–S7 | 설계 범위다. | 수집/주제/관계/영향/챗봇/기업·시장 요약/개인화 전체 완료로 확대 해석하지 않는다. |
 
@@ -122,14 +122,14 @@ worker 오류의 code/state/resumeMode는 worker JSON 정본을 그대로 대조
 
 **gate-2 수정 뒤 권한·캐시·공개·receipt 이식 계약:** 현재 `zoop-document-gate-2`/`zoop-document-2026-10-08-2`는 공개 limitations와 `assertionKind=limitation` claim을 순서까지 1:1로 묶어 의미 검증 coverage에 넣으며, 본문·rationale은 non-limitation claim으로만 조립한다. gate-1 raw 이력은 삭제하지 않지만 `document_policy_outdated`로 cache/publication을 보류하므로 새 gate-2 job이 필요하다. BFF current grant는 서버 소유 **전체 registry snapshot**으로 별도 갱신하고, artifact의 과거 grant는 실행 영수증일 뿐 현재 authority를 쓰거나 철회를 되돌릴 수 없다. 부분 registry는 누락 grant를 fail-closed로 제거하며 opaque revision을 정렬해 최신을 추측하지 않는다. live grant recipient/cache identity는 승인 endpoint의 `providerRevision`에 결합하고 제출 endpoint와 실제 endpoint가 다르면 송신하지 않는다. 동일 attempt는 고정 identity·불변값을 보존한 채 `started→received→validated`와 처음 알려진 usage만 전진하며, terminal job 재수입은 no-op여서 A→B→A 재수입이 B의 공개 선택을 바꾸지 않는다. standalone semantic 응답 뒤에도 current grant를 다시 확인하고 철회 시 receipt만 보존하며 artifact/cache는 만들지 않는다. HOLD/REJECT artifact 저장 뒤 ready 저장 실패는 current grant·fence 아래 같은 artifact를 재사용하는 save_only 복구이며 provider를 다시 호출하지 않는다. 기존 outlook의 한국어 금지 예측어는 공백 정규화 후 검사하지만 여전히 legacy exact 정책이고 `semantic=null`이다. 근거는 [`ai-system.md` §호출/권한/공개 gate](../design/ai-system.md), `zoop_bff/ai_worker.py::replace_current_grants`, `document_analysis.py`의 필수 `--grants`다. 공개 wire DTO 모양은 바뀌지 않았으며 독립 review 재확인 완료를 주장하지 않는다.
 
-수입 CLI는 `--grants`가 필수다. 다음은 `replay_fixture.py`로 이미 만든 격리 합성 상태에 결과를 **수입만** 하는 예시이며 이 담당자가 새로 실행하지 않았다. 실제 출처에 합성 grant를 적용하지 않는다.
+수입 CLI는 `--grants`가 필수다. 다음은 BFF 소유 `prototype/bff/scripts/replay_fixture.py`로 이미 만든 격리 합성 상태에 결과를 **수입만** 하는 예시이며 이 담당자가 새로 실행하지 않았다. 실제 출처에 합성 grant를 적용하지 않는다.
 
 ```sh
-ZOOP_SNAPSHOT_PATH="$PWD/prototype/ai-worker/fixtures/contracts/synthetic-document/snapshot.json" \
-ZOOP_COMPANY_CATALOG="$PWD/prototype/ai-worker/fixtures/contracts/synthetic-document/snapshot.json" \
-PYTHONPATH=prototype/bff/src prototype/bff/.venv/bin/python prototype/bff/scripts/document_analysis.py import \
+ZOOP_SNAPSHOT_PATH="$PWD/ai/worker/fixtures/contracts/synthetic-document/snapshot.json" \
+ZOOP_COMPANY_CATALOG="$PWD/ai/worker/fixtures/contracts/synthetic-document/snapshot.json" \
+prototype/bff/.venv/bin/python prototype/bff/scripts/document_analysis.py import \
   --state-dir /tmp/zoop-ai-doc-bff-demo --worker-state /tmp/zoop-ai-doc-worker-demo \
-  --grants prototype/ai-worker/fixtures/contracts/synthetic-document/grants.json \
+  --grants ai/worker/fixtures/contracts/synthetic-document/grants.json \
   --job-id synthetic-SYNTH-A-document-summary
 ```
 
@@ -148,11 +148,12 @@ PYTHONPATH=prototype/bff/src prototype/bff/.venv/bin/python prototype/bff/script
 | FE 다른 framework | 같은 HTTP golden·토큰·화면 상태·Figma 목표 | 해당 framework의 실제 타입/단위/consumer/브라우저 target. framework 이름·명령·버전을 지금 추정하지 않는다. |
 | FastAPI 유지 | `prototype/bff/pyproject.toml`의 pytest testpaths=`tests`, 기존 합성 fixture | 인증/CSRF·오류·owner·idempotency·job·read/write/version 검증. 공유 var/실데이터/외부 API가 아닌 격리 상태 사용. |
 | Java/Spring 선택 | 같은 OpenAPI/HTTP golden/worker JSON/불변식 | 실제 선택 build tool로 compile/test 및 HTTP contract/transaction/concurrency 검증. Gradle/Maven·JDK/Spring 버전을 미리 강제하지 않는다. |
-| Python worker 유지 | `prototype/ai-worker/pyproject.toml`, `uv.lock`, 문서/outlook schema·fixture, `zoop-ai` CLI entrypoint | 고정 lock의 offline/frozen 환경과 실제 tests/validator/wheel target을 사용한다. 문서 semantic gate와 기존 outlook exact policy를 구분하고 published 반복/0이슈 무호출을 포함한다. 합성 provenance·disabled live를 유지한다. |
+| Python worker 유지 | `ai/worker/pyproject.toml`, `uv.lock`, 문서/outlook schema·fixture, `zoop-ai` CLI entrypoint | 고정 lock의 offline/frozen 환경과 실제 tests/validator/wheel target을 사용한다. 문서 semantic gate와 기존 outlook exact policy를 구분하고 published 반복/0이슈 무호출을 포함한다. 합성 provenance·disabled live를 유지한다. |
+| Python 내부 HTTP transport 유지 | `ai/service/pyproject.toml`, `uv.lock`, 생성된 [`internal-ai-openapi.{json,yaml}`](../api/internal-ai-openapi.yaml)(S1 wire는 `ai-contract.schema.json` 참조), 설치된 `zoop-ai`(test 의존성) | `make service-install service-test service-smoke service-openapi-check`. 실제 uvicorn+설치된 CLI+authored replay, 소유자·멱등·재시작·취소·현재 grant 전달·비밀 부재를 검증하며 토큰 없음. 로컬 준비이며 배포/프록시/SG는 실관측 전까지 인수 증거가 아니다. CI job 이름은 `ai-service`이고 required-ci에 포함한다. Spring 쪽 소비자 transport는 `api/`의 `com.zoop.ai`(CI `api`, `make api-ai-smoke`가 실제 Java→이 서비스→`zoop-ai` replay를 검증)이며 사용자 격리·앱 문서 버전/인용 검증·단일 transaction import는 소비 기능의 책임으로 남아 있다. |
 | worker 다른 runtime | 동일 schema/fixtures/recovery 시나리오 | 해당 runtime의 schema/parser/runner/provider-adapter contract 검증. 원장/DB 공유 없이 producer 비교. |
 | 통합·rollback | schema/manifest/receipt/frozen artifact + identity/job/write migration 결정 | README의 1→6 게이트. 새 쓰기 보존·구 decoder·권한/visibility의 복구 결과를 인수 증거로 남긴다. |
 
-이 이식 담당자는 의존성·lockfile·workspace·GitHub workflow를 변경하지 않았다. 현재 worker lock은 backend가 확정한 `prototype/ai-worker/uv.lock`이다. manifest는 Python >=3.12, Pydantic 2.13.5·HTTPX 0.28.1과 dev pytest 9.1.1, `zoop-ai` entrypoint 및 tests 경로를 명시한다. RepoPrep는 이미 있는 lock/manifest와 [`ai-system.md` §잠금 파일](../design/ai-system.md)의 offline/frozen 검증 명령을 기준으로 CI를 연결한다. 이 관측 버전을 Java/Spring 등 미선택 스택의 버전으로 일반화하지 않는다. 실제 `.env`, secret, 실회원 데이터, 원본 PoC의 읽기 전용 상태를 CI input으로 수집하지 않는다. paid/provider integration target은 명시적 별도 승인 없이는 실행하지 않는다.
+이 이식 담당자는 의존성·lockfile·workspace·GitHub workflow를 변경하지 않았다. 현재 worker lock은 backend가 확정한 `ai/worker/uv.lock`이다. manifest는 Python >=3.12, Pydantic 2.13.5·HTTPX 0.28.1과 dev pytest 9.1.1, `zoop-ai` entrypoint 및 tests 경로를 명시한다. RepoPrep는 이미 있는 lock/manifest와 [`ai-system.md` §잠금 파일](../design/ai-system.md)의 offline/frozen 검증 명령을 기준으로 CI를 연결한다. S2-1/S2-2/S3(`zoop_ai_pipeline`)는 private PoC에 묶여 별도 프로젝트 `ai/pipeline`이며 이 worker lock에 포함되지 않는다([ai/README.md](../../ai/README.md)). 이 관측 버전을 Java/Spring 등 미선택 스택의 버전으로 일반화하지 않는다. 실제 `.env`, secret, 실회원 데이터, 원본 PoC의 읽기 전용 상태를 CI input으로 수집하지 않는다. paid/provider integration target은 명시적 별도 승인 없이는 실행하지 않는다.
 
 ## 6. 확인 기록
 

@@ -1,0 +1,2481 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Zoop internal AI analysis transport",
+    "version": "1.0.0",
+    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority."
+  },
+  "paths": {
+    "/internal/v1/analysis-jobs": {
+      "post": {
+        "tags": [
+          "analysis-jobs"
+        ],
+        "summary": "Register and queue an S1 analysis job",
+        "operationId": "submitAnalysisJob",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]{1,120}$"
+            },
+            "description": "Must equal body.jobId."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Newly accepted: the runtime registered the job and the owner binding and dispatch intent are durable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "queuedJob": {
+                    "summary": "Newly accepted: registered in the runtime, dispatch pending",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "queued",
+                      "phase": "input.persisted",
+                      "resumeMode": "unsent_only",
+                      "failure": null,
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "pending",
+                        "command": "run",
+                        "dispatchCount": 0,
+                        "lastOutcome": null,
+                        "lastRuntimeCode": null,
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "wait",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Status URL of the job.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before polling; present while next is wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Principal lacks the route's scope",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime validation of the submitted input",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "input_or_configuration_invalid",
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, service_configuration_invalid, service_busy or queue_full (retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime unavailable: retry with the same key and body",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay of an already accepted job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "readyReplay": {
+                    "summary": "Same key and body sent again: the actual current state",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "ready",
+                      "phase": "artifact.persisted",
+                      "resumeMode": "none",
+                      "failure": null,
+                      "artifactIds": [
+                        "artifact-0001",
+                        "artifact-0002"
+                      ],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 2,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "idle",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "exited",
+                        "lastRuntimeCode": null,
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "fetch_result",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Status URL of the job.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before polling; present while next is wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "idempotency_conflict, job_id_unavailable, job_input_conflict or execution_unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "idempotencyConflict": {
+                    "summary": "Same key, different body; the runtime was not called",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "idempotency_conflict",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  },
+                  "jobIdUnavailable": {
+                    "summary": "The jobId is owned by another principal",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_id_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "request_too_large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_media_type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "analysis.submit"
+            ]
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "ai-contract.schema.json#/$defs/Submit"
+              },
+              "examples": {
+                "documentSummary": {
+                  "summary": "document-summary job (synthetic fixture text); Idempotency-Key must equal jobId",
+                  "value": {
+                    "schemaVersion": "zoop-ai-s1-1",
+                    "jobId": "synthetic-SYNTH-A-document-summary",
+                    "kind": "document-summary",
+                    "input": {
+                      "document": {
+                        "documentId": "doc-synthetic-s1",
+                        "documentVersion": "dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+                        "sourceId": "authored-synthetic",
+                        "textArtifactId": "text-synthetic-s1-dbb0e5cf12a24caba42c041b32a27744bbc7f972ba1f493db4b87d2bb4a26b0d",
+                        "inputKind": "body",
+                        "cleanerVersion": "synthetic-identity-1",
+                        "text": "🚀 합성 알파의 매출이 늘었다. 합성 베타의 비용이 늘었다.",
+                        "sourceHash": "5fae8474f64dceae744f30e943a81d248a53e6b355d8fc18cd00b6ebb8b66548",
+                        "rawLocators": [
+                          {
+                            "locatorId": "raw-synthetic-s1",
+                            "start": 0,
+                            "end": 33
+                          }
+                        ]
+                      },
+                      "company": {
+                        "companyId": "SYNTH-A",
+                        "name": "합성 알파"
+                      },
+                      "grantId": "grant-synthetic-s1",
+                      "grantRevision": "grant-synthetic-s1-1",
+                      "candidate": null
+                    },
+                    "mode": "replay",
+                    "provenance": {
+                      "sourceKind": "synthetic",
+                      "executionMode": "replay",
+                      "recordingKind": "authored-test"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/analysis-jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "analysis-jobs"
+        ],
+        "summary": "Current job status (no content fields)",
+        "operationId": "getAnalysisJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Runtime job id; equals the Idempotency-Key used at submit.",
+              "pattern": "^[A-Za-z0-9_.-]{1,120}$",
+              "title": "Jobid"
+            },
+            "description": "Runtime job id; equals the Idempotency-Key used at submit."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job status read from the runtime during this request. It never carries input, artifacts, grants or calls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "ready": {
+                    "summary": "Finished: fetch the result",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "ready",
+                      "phase": "artifact.persisted",
+                      "resumeMode": "none",
+                      "failure": null,
+                      "artifactIds": [
+                        "artifact-0001",
+                        "artifact-0002"
+                      ],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 2,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "idle",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "exited",
+                        "lastRuntimeCode": null,
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "fetch_result",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "blockedByRuntimeConfiguration": {
+                    "summary": "Registered but blocked (for example the replay fixture is missing): not a background success. Fix the server input, then call recover",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "queued",
+                      "phase": "input.persisted",
+                      "resumeMode": "unsent_only",
+                      "failure": null,
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "idle",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "runtime_error",
+                        "lastRuntimeCode": "replay_fixture_required",
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "recover",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "reconciling": {
+                    "summary": "An attempt has an unknown provider outcome that may have been charged: stop and escalate",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "live",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "reconciling",
+                      "phase": "provider.response_unknown",
+                      "resumeMode": "reconcile_only",
+                      "failure": {
+                        "code": "provider_response_unknown",
+                        "stage": "document-summary"
+                      },
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 1,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 1,
+                      "dispatch": {
+                        "state": "idle",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "exited",
+                        "lastRuntimeCode": null,
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "operator_reconcile",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "budgetExhausted": {
+                    "summary": "Failed before sending the verify stage: recover re-sends only under the durable ceiling",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "live",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "failed",
+                      "phase": "authorization_or_budget.failed",
+                      "resumeMode": "unsent_only",
+                      "failure": {
+                        "code": "global_budget_exhausted",
+                        "stage": "semantic-verification"
+                      },
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 1,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "idle",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "exited",
+                        "lastRuntimeCode": null,
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "recover",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Principal lacks the route's scope",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "job_not_found: unknown job, another principal's job, or a reservation that was never accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Unknown job, another principal's job, or never accepted",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime validation of the submitted input",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "input_or_configuration_invalid",
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, service_configuration_invalid, service_busy or queue_full (retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime unavailable: retry with the same key and body",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "analysis.read"
+            ]
+          }
+        ]
+      }
+    },
+    "/internal/v1/analysis-jobs/{jobId}/result": {
+      "get": {
+        "tags": [
+          "analysis-jobs"
+        ],
+        "summary": "Job result for the importer, gated by current source rights",
+        "operationId": "getAnalysisJobResult",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Runtime job id; equals the Idempotency-Key used at submit.",
+              "pattern": "^[A-Za-z0-9_.-]{1,120}$",
+              "title": "Jobid"
+            },
+            "description": "Runtime job id; equals the Idempotency-Key used at submit."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job result for the importer; content is withheld when current source rights no longer permit delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultEnvelope"
+                },
+                "examples": {
+                  "withheld": {
+                    "summary": "Current source rights no longer cover delivery: no content, accounting receipts only",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "status": {
+                        "schemaVersion": "zoop-ai-internal-1",
+                        "jobId": "synthetic-SYNTH-A-document-summary",
+                        "kind": "document-summary",
+                        "mode": "replay",
+                        "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "state": "ready",
+                        "phase": "artifact.persisted",
+                        "resumeMode": "none",
+                        "failure": null,
+                        "artifactIds": [
+                          "artifact-0001",
+                          "artifact-0002"
+                        ],
+                        "usage": {
+                          "providerAttempts": 0,
+                          "replayCalls": 2,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "cachedTokens": null,
+                          "reasoningTokens": null,
+                          "cost": null
+                        },
+                        "unreceiptedAttempts": 0,
+                        "dispatch": {
+                          "state": "idle",
+                          "command": "run",
+                          "dispatchCount": 1,
+                          "lastOutcome": "exited",
+                          "lastRuntimeCode": null,
+                          "updatedAt": "2026-10-12T03:00:00Z"
+                        },
+                        "next": "fetch_result",
+                        "acceptedAt": "2026-10-12T03:00:00Z",
+                        "observedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "source_rights_unknown_or_denied"
+                      },
+                      "job": null,
+                      "receipts": [
+                        {
+                          "attemptId": "attempt-0001",
+                          "stage": "document-summary",
+                          "state": "received",
+                          "mode": "live",
+                          "startedAt": "2026-10-12T03:00:00Z",
+                          "receivedAt": "2026-10-12T03:00:00Z",
+                          "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                          "config": {
+                            "provider": "openai-compatible",
+                            "providerRevision": "0000000000000000000000000000000000000000000000000000000000000000",
+                            "model": "example-model",
+                            "reasoningEffort": null,
+                            "promptVersion": "zoop-document-2026-10-08-2",
+                            "schemaVersion": "zoop-ai-s1-1",
+                            "policyVersion": "zoop-document-gate-2"
+                          },
+                          "usage": {
+                            "inputTokens": 11,
+                            "outputTokens": 7,
+                            "cachedTokens": 0,
+                            "reasoningTokens": 0
+                          },
+                          "error": null,
+                          "durationMs": 412.5
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Principal lacks the route's scope",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "job_not_found: unknown job, another principal's job, or a reservation that was never accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Unknown job, another principal's job, or never accepted",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime validation of the submitted input",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "input_or_configuration_invalid",
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, service_configuration_invalid, service_busy or queue_full (retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime unavailable: retry with the same key and body",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "analysis.read"
+            ]
+          }
+        ]
+      }
+    },
+    "/internal/v1/analysis-jobs/{jobId}/cancel": {
+      "post": {
+        "tags": [
+          "analysis-jobs"
+        ],
+        "summary": "Cancel a job (idempotent)",
+        "operationId": "cancelAnalysisJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Runtime job id; equals the Idempotency-Key used at submit.",
+              "pattern": "^[A-Za-z0-9_.-]{1,120}$",
+              "title": "Jobid"
+            },
+            "description": "Runtime job id; equals the Idempotency-Key used at submit."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job is cancelled (also when it already was).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "cancelled": {
+                    "summary": "Cancelled; an in-flight child is not killed, so its late receipt is still recorded",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "cancelled",
+                      "phase": "cancel.requested",
+                      "resumeMode": "none",
+                      "failure": null,
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "idle",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "cancelled",
+                        "lastRuntimeCode": null,
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "none",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Principal lacks the route's scope",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "job_not_found: unknown job, another principal's job, or a reservation that was never accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Unknown job, another principal's job, or never accepted",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime validation of the submitted input",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "input_or_configuration_invalid",
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, service_configuration_invalid, service_busy or queue_full (retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime unavailable: retry with the same key and body",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "job_already_terminal: the job is ready or failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "jobAlreadyTerminal": {
+                    "summary": "Cancel of a ready or failed job",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_already_terminal",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": {
+                        "schemaVersion": "zoop-ai-internal-1",
+                        "jobId": "synthetic-SYNTH-A-document-summary",
+                        "kind": "document-summary",
+                        "mode": "replay",
+                        "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "state": "ready",
+                        "phase": "artifact.persisted",
+                        "resumeMode": "none",
+                        "failure": null,
+                        "artifactIds": [
+                          "artifact-0001",
+                          "artifact-0002"
+                        ],
+                        "usage": {
+                          "providerAttempts": 0,
+                          "replayCalls": 2,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "cachedTokens": null,
+                          "reasoningTokens": null,
+                          "cost": null
+                        },
+                        "unreceiptedAttempts": 0,
+                        "dispatch": {
+                          "state": "idle",
+                          "command": "run",
+                          "dispatchCount": 1,
+                          "lastOutcome": "exited",
+                          "lastRuntimeCode": null,
+                          "updatedAt": "2026-10-12T03:00:00Z"
+                        },
+                        "next": "fetch_result",
+                        "acceptedAt": "2026-10-12T03:00:00Z",
+                        "observedAt": "2026-10-12T03:00:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "analysis.cancel"
+            ]
+          }
+        ]
+      }
+    },
+    "/internal/v1/analysis-jobs/{jobId}/recover": {
+      "post": {
+        "tags": [
+          "analysis-jobs"
+        ],
+        "summary": "Explicitly re-dispatch a recoverable job (idempotent)",
+        "operationId": "recoverAnalysisJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Runtime job id; equals the Idempotency-Key used at submit.",
+              "pattern": "^[A-Za-z0-9_.-]{1,120}$",
+              "title": "Jobid"
+            },
+            "description": "Runtime job id; equals the Idempotency-Key used at submit."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "A dispatch was enqueued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "enqueued": {
+                    "summary": "A dispatch was enqueued",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "queued",
+                      "phase": "input.persisted",
+                      "resumeMode": "unsent_only",
+                      "failure": null,
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "pending",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "runtime_error",
+                        "lastRuntimeCode": "replay_fixture_required",
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "wait",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks this route's scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Principal lacks the route's scope",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "job_not_found: unknown job, another principal's job, or a reservation that was never accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Unknown job, another principal's job, or never accepted",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: header, path, JSON envelope or runtime input validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime validation of the submitted input",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "input_or_configuration_invalid",
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, service_configuration_invalid, service_busy or queue_full (retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Runtime unavailable: retry with the same key and body",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "A dispatch is already pending or in flight; the request was coalesced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                },
+                "examples": {
+                  "coalesced": {
+                    "summary": "A dispatch is already pending or in flight",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "jobId": "synthetic-SYNTH-A-document-summary",
+                      "kind": "document-summary",
+                      "mode": "replay",
+                      "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "state": "queued",
+                      "phase": "input.persisted",
+                      "resumeMode": "unsent_only",
+                      "failure": null,
+                      "artifactIds": [],
+                      "usage": {
+                        "providerAttempts": 0,
+                        "replayCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "cachedTokens": null,
+                        "reasoningTokens": null,
+                        "cost": null
+                      },
+                      "unreceiptedAttempts": 0,
+                      "dispatch": {
+                        "state": "pending",
+                        "command": "run",
+                        "dispatchCount": 1,
+                        "lastOutcome": "runtime_error",
+                        "lastRuntimeCode": "replay_fixture_required",
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "next": "wait",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "reconcile_required or job_not_recoverable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "reconcileRequired": {
+                    "summary": "Recover of a reconciling job",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "reconcile_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": {
+                        "schemaVersion": "zoop-ai-internal-1",
+                        "jobId": "synthetic-SYNTH-A-document-summary",
+                        "kind": "document-summary",
+                        "mode": "live",
+                        "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "state": "reconciling",
+                        "phase": "provider.response_unknown",
+                        "resumeMode": "reconcile_only",
+                        "failure": {
+                          "code": "provider_response_unknown",
+                          "stage": "document-summary"
+                        },
+                        "artifactIds": [],
+                        "usage": {
+                          "providerAttempts": 1,
+                          "replayCalls": 0,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "cachedTokens": null,
+                          "reasoningTokens": null,
+                          "cost": null
+                        },
+                        "unreceiptedAttempts": 1,
+                        "dispatch": {
+                          "state": "idle",
+                          "command": "run",
+                          "dispatchCount": 1,
+                          "lastOutcome": "exited",
+                          "lastRuntimeCode": null,
+                          "updatedAt": "2026-10-12T03:00:00Z"
+                        },
+                        "next": "operator_reconcile",
+                        "acceptedAt": "2026-10-12T03:00:00Z",
+                        "observedAt": "2026-10-12T03:00:00Z"
+                      }
+                    }
+                  },
+                  "jobNotRecoverable": {
+                    "summary": "Recover of a finished or cancelled job",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-1",
+                      "error": {
+                        "code": "job_not_recoverable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": {
+                        "schemaVersion": "zoop-ai-internal-1",
+                        "jobId": "synthetic-SYNTH-A-document-summary",
+                        "kind": "document-summary",
+                        "mode": "replay",
+                        "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "state": "ready",
+                        "phase": "artifact.persisted",
+                        "resumeMode": "none",
+                        "failure": null,
+                        "artifactIds": [
+                          "artifact-0001",
+                          "artifact-0002"
+                        ],
+                        "usage": {
+                          "providerAttempts": 0,
+                          "replayCalls": 2,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "cachedTokens": null,
+                          "reasoningTokens": null,
+                          "cost": null
+                        },
+                        "unreceiptedAttempts": 0,
+                        "dispatch": {
+                          "state": "idle",
+                          "command": "run",
+                          "dispatchCount": 1,
+                          "lastOutcome": "exited",
+                          "lastRuntimeCode": null,
+                          "updatedAt": "2026-10-12T03:00:00Z"
+                        },
+                        "next": "fetch_result",
+                        "acceptedAt": "2026-10-12T03:00:00Z",
+                        "observedAt": "2026-10-12T03:00:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "analysis.recover"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CallConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "providerRevision": {
+            "type": "string",
+            "title": "Providerrevision"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "reasoningEffort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoningeffort"
+          },
+          "promptVersion": {
+            "type": "string",
+            "title": "Promptversion"
+          },
+          "schemaVersion": {
+            "type": "string",
+            "title": "Schemaversion"
+          },
+          "policyVersion": {
+            "type": "string",
+            "title": "Policyversion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "providerRevision",
+          "model",
+          "reasoningEffort",
+          "promptVersion",
+          "schemaVersion",
+          "policyVersion"
+        ],
+        "title": "CallConfig"
+      },
+      "CallReceipt": {
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "title": "Attemptid"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "document-summary",
+              "document-sentiment",
+              "semantic-verification",
+              "briefing-outlook"
+            ],
+            "title": "Stage"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "started",
+              "received",
+              "validated",
+              "failed",
+              "unknown"
+            ],
+            "title": "State"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replay",
+              "live"
+            ],
+            "title": "Mode"
+          },
+          "startedAt": {
+            "type": "string",
+            "title": "Startedat"
+          },
+          "receivedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receivedat"
+          },
+          "inputDigest": {
+            "type": "string",
+            "title": "Inputdigest"
+          },
+          "config": {
+            "$ref": "#/components/schemas/CallConfig"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "durationMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Durationms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attemptId",
+          "stage",
+          "state",
+          "mode",
+          "startedAt",
+          "receivedAt",
+          "inputDigest",
+          "config",
+          "usage",
+          "error",
+          "durationMs"
+        ],
+        "title": "CallReceipt",
+        "description": "Per-attempt accounting metadata. It carries no provider receipt, response content, request payload or fixture identity."
+      },
+      "CallUsage": {
+        "properties": {
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputtokens"
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputtokens"
+          },
+          "cachedTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cachedtokens"
+          },
+          "reasoningTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoningtokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inputTokens",
+          "outputTokens",
+          "cachedTokens",
+          "reasoningTokens"
+        ],
+        "title": "CallUsage"
+      },
+      "Delivery": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "withheld"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "Delivery"
+      },
+      "Dispatch": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_flight",
+              "idle"
+            ],
+            "title": "State"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "run",
+                  "resume"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "dispatchCount": {
+            "type": "integer",
+            "title": "Dispatchcount"
+          },
+          "lastOutcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "exited",
+                  "busy",
+                  "runtime_error",
+                  "transport_unknown",
+                  "runtime_unavailable",
+                  "service_restarted",
+                  "cancelled",
+                  "needs_recover"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastoutcome"
+          },
+          "lastRuntimeCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastruntimecode"
+          },
+          "updatedAt": {
+            "type": "string",
+            "title": "Updatedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "command",
+          "dispatchCount",
+          "lastOutcome",
+          "lastRuntimeCode",
+          "updatedAt"
+        ],
+        "title": "Dispatch"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable"
+          },
+          "requestId": {
+            "type": "string",
+            "title": "Requestid"
+          },
+          "runtimeCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtimecode"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "retryable",
+          "requestId"
+        ],
+        "title": "ErrorBody"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-1"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope"
+      },
+      "Failure": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "document-summary",
+                  "document-sentiment",
+                  "semantic-verification",
+                  "briefing-outlook"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "stage"
+        ],
+        "title": "Failure"
+      },
+      "JobStatus": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-1"
+          },
+          "jobId": {
+            "type": "string",
+            "title": "Jobid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "document-summary",
+              "document-sentiment",
+              "semantic-verification",
+              "briefing-outlook"
+            ],
+            "title": "Kind"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replay",
+              "live"
+            ],
+            "title": "Mode"
+          },
+          "inputDigest": {
+            "type": "string",
+            "title": "Inputdigest"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "reconciling",
+              "persisting",
+              "ready",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "resumeMode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "validate_only",
+              "save_only",
+              "unsent_only",
+              "reconcile_only"
+            ],
+            "title": "Resumemode"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Failure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifactIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifactids"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "unreceiptedAttempts": {
+            "type": "integer",
+            "title": "Unreceiptedattempts"
+          },
+          "dispatch": {
+            "$ref": "#/components/schemas/Dispatch"
+          },
+          "next": {
+            "type": "string",
+            "enum": [
+              "wait",
+              "fetch_result",
+              "operator_reconcile",
+              "recover",
+              "none"
+            ],
+            "title": "Next"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "title": "Acceptedat"
+          },
+          "observedAt": {
+            "type": "string",
+            "title": "Observedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "jobId",
+          "kind",
+          "mode",
+          "inputDigest",
+          "state",
+          "phase",
+          "resumeMode",
+          "failure",
+          "artifactIds",
+          "usage",
+          "unreceiptedAttempts",
+          "dispatch",
+          "next",
+          "acceptedAt",
+          "observedAt"
+        ],
+        "title": "JobStatus"
+      },
+      "ResultEnvelope": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-1"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/Delivery"
+          },
+          "job": {
+            "description": "The runtime `get` payload for the importer, present only when delivery.state is available.",
+            "oneOf": [
+              {
+                "$ref": "ai-contract.schema.json#/$defs/JobResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/CallReceipt"
+            },
+            "type": "array",
+            "title": "Receipts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "delivery",
+          "job",
+          "receipts"
+        ],
+        "title": "ResultEnvelope"
+      },
+      "Usage": {
+        "properties": {
+          "providerAttempts": {
+            "type": "integer",
+            "title": "Providerattempts"
+          },
+          "replayCalls": {
+            "type": "integer",
+            "title": "Replaycalls"
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputtokens"
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputtokens"
+          },
+          "cachedTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cachedtokens"
+          },
+          "reasoningTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoningtokens"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "providerAttempts",
+          "replayCalls",
+          "inputTokens",
+          "outputTokens",
+          "cachedTokens",
+          "reasoningTokens",
+          "cost"
+        ],
+        "title": "Usage"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8797",
+      "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."
+    }
+  ],
+  "tags": [
+    {
+      "name": "analysis-jobs",
+      "description": "S1 analysis jobs over the installed zoop-ai runtime."
+    }
+  ]
+}

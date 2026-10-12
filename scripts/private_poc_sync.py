@@ -1,13 +1,20 @@
 """CI-only credential scope: authenticate dependency fetch, then discard helper."""
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import tempfile
 from pathlib import Path
 
 
-def main() -> int:
+PROJECTS = ("prototype/bff", "ai/pipeline")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--project", choices=PROJECTS, required=True)
+    project = parser.parse_args(argv).project
     if not os.environ.get("POC_READ_TOKEN"):
         raise SystemExit("Missing POC_READ_TOKEN; private PoC installation cannot be skipped.")
     # No token in arguments, remote URLs, git config, logs, or persistent files.
@@ -22,7 +29,7 @@ def main() -> int:
                                    env=env, capture_output=True, timeout=30)
         if preflight.returncode or not preflight.stdout.strip():
             raise SystemExit("Private PoC read preflight failed. Check App installation/repository Contents: read permission.")
-        return subprocess.run(["uv", "sync", "--project", "prototype/bff", "--frozen", "--group", "dev"], env=env).returncode
+        return subprocess.run(["uv", "sync", "--project", project, "--frozen", "--group", "dev"], env=env).returncode
 
 
 if __name__ == "__main__":
