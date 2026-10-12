@@ -12,7 +12,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import ingestion_parsers as parsers
-from .ingestion_contracts import (SCHEMA, MAX_INPUT, Authority, IngestionFailure, Inspect, Item,
+from .ingestion_contracts import (SCHEMA, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
     Manifest, Run, byte_hash, canonical, digest, now, read_file, timestamp)
 
 _SQL = """
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS candidates(round TEXT, source TEXT, page INTEGER, ord
 
 
 class Store:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, existing: bool = False):
         # Explicit dedicated namespace, not merely another filename in app/S1 state.
         root = Path(os.path.abspath(root))
         project = Path(__file__).resolve().parents[4]
@@ -60,6 +60,9 @@ class Store:
         for parent in [*reversed(root.parents), root]:
             if parent.exists() and parent.is_symlink():
                 raise IngestionFailure("state_namespace_invalid")
+        if existing:
+            self._open_existing(root)
+            return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in {"ingestion.sqlite3", "ingestion.sqlite3-wal", "ingestion.sqlite3-shm", "ingestion.lock"} or p.is_symlink() for p in root.iterdir()):
             raise IngestionFailure("state_namespace_conflict")
@@ -90,6 +93,40 @@ class Store:
             self.db.execute("""CREATE TRIGGER IF NOT EXISTS immutable_page_receipt BEFORE UPDATE OF raw_hash,status,observed_at,page_id ON pages BEGIN SELECT RAISE(ABORT,'immutable'); END""")
             for p in root.iterdir():
                 os.chmod(p, 0o600)
+        except BaseException:
+            self.close()
+            raise
+
+    def _open_existing(self, root: Path):
+        """Read-only consumer access: no mkdir/chmod/ownership repair, no create, no schema/WAL/PRAGMA writes.
+
+        Lock policy: a shared non-blocking flock on the existing lock file. Readers coexist; an active writer (exclusive) makes
+        the reader fail with ingestion_busy and a reader makes a starting writer fail with ingestion_busy, so the file cannot change under
+        an immutable read. A non-empty -wal means committed data a reader must not ignore or recover (that needs a write), so the
+        operator runs the ingestion writer (resume) first.
+        """
+        database, lock = root / "ingestion.sqlite3", root / "ingestion.lock"
+        if not root.is_dir() or not database.is_file() or not lock.is_file():
+            raise IngestionFailure("ingestion_state_missing")
+        if any(p.name not in {"ingestion.sqlite3", "ingestion.sqlite3-wal", "ingestion.sqlite3-shm", "ingestion.lock"} or p.is_symlink() for p in root.iterdir()):
+            raise IngestionFailure("state_namespace_conflict")
+        self.lock = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            fcntl.flock(self.lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            self.close()
+            raise IngestionFailure("ingestion_busy") from exc
+        try:
+            wal = root / "ingestion.sqlite3-wal"
+            if wal.exists() and wal.stat().st_size > 0:
+                raise IngestionFailure("ingestion_recovery_required")
+            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+            self.db.row_factory = sqlite3.Row
+            self.db.execute("PRAGMA query_only=ON")
+            self.db.execute("SELECT 1 FROM rounds LIMIT 1")
+        except sqlite3.DatabaseError as exc:
+            self.close()
+            raise IngestionFailure("ingestion_state_invalid") from exc
         except BaseException:
             self.close()
             raise
@@ -400,23 +437,9 @@ class Ingestor:
         if not request.document_id:
             return result
         operations = ("read", "quote-display") if request.locator_id else ("read",)
-        self._authorize(row, operations)
-        version = self.store.one("""SELECT v.* FROM versions v WHERE v.id=? AND v.document=? AND EXISTS
-            (SELECT 1 FROM candidates c WHERE c.round=? AND c.source=? AND c.version=v.id)""", (request.document_version, request.document_id, request.round_id, request.source_id))
-        if version is None:
-            raise IngestionFailure("document_version_not_in_round")
-        content = json.loads(version["content"])
-        selector = json.loads(row["config"])["scope"]["articleXPath"]
-        if "articleXPath" not in content["parserProfile"] or content["parserProfile"]["articleXPath"] != selector or content["parserProfile"] != json.loads(row["parser"]):
-            raise IngestionFailure("preparation_profile_unbound")
-        projection = {"documentId": version["document"], "documentVersion": version["id"], "sourceId": request.source_id,
-            "textArtifactId": "text-" + version["id"], "inputKind": "body", "cleanerVersion": content["cleanerVersion"],
-            "text": content["text"], "sourceHash": content["textHash"], "rawLocators": content["rawLocators"]}
+        source, version, content, projection, metadata = self._prepared(row, request.round_id, request.source_id, request.document_id, request.document_version, operations)
         result["document"] = projection
-        result["locatorMetadata"] = {k: content[k] for k in ("rawArtifactId", "rawHash", "rawVersion", "representationHash", "mappingHash", "parserProfile", "limitations")}
-        for name in ("pageCount", "emptyPageCount"):
-            if name in content:
-                result["locatorMetadata"][name] = content[name]
+        result["locatorMetadata"] = metadata
         if request.locator_id:
             locator = next((r for r in content["rawLocators"] if r["locatorId"] == request.locator_id), None)
             if locator is None or not locator["start"] <= request.start < request.end <= locator["end"]:
@@ -435,5 +458,46 @@ class Ingestor:
             if "".join(s["text"] for s in resolved) != content["text"][request.start:request.end]:
                 raise IngestionFailure("source_mapping_invalid")
             result["resolvedLocator"] = {"locatorId": locator["locatorId"], "start": request.start, "end": request.end, "segments": resolved}
+        self._authorize(row, operations)
+        return result
+
+    def _prepared(self, row, round_id, source_id, document_id, document_version, operations):
+        source, _ = self._authorize(row, operations)
+        version = self.store.one("""SELECT v.* FROM versions v WHERE v.id=? AND v.document=? AND EXISTS
+            (SELECT 1 FROM candidates c WHERE c.round=? AND c.source=? AND c.version=v.id)""", (document_version, document_id, round_id, source_id))
+        if version is None:
+            raise IngestionFailure("document_version_not_in_round")
+        content = json.loads(version["content"])
+        selector = json.loads(row["config"])["scope"]["articleXPath"]
+        if "articleXPath" not in content["parserProfile"] or content["parserProfile"]["articleXPath"] != selector or content["parserProfile"] != json.loads(row["parser"]):
+            raise IngestionFailure("preparation_profile_unbound")
+        projection = {"documentId": version["document"], "documentVersion": version["id"], "sourceId": source_id,
+            "textArtifactId": "text-" + version["id"], "inputKind": "body", "cleanerVersion": content["cleanerVersion"],
+            "text": content["text"], "sourceHash": content["textHash"], "rawLocators": content["rawLocators"]}
+        metadata = {k: content[k] for k in ("rawArtifactId", "rawHash", "rawVersion", "representationHash", "mappingHash", "parserProfile", "limitations")}
+        for name in ("pageCount", "emptyPageCount"):
+            if name in content:
+                metadata[name] = content[name]
+        return source, version, content, projection, metadata
+
+    def export(self, request: Export):
+        """Exact observation + server-owned metadata for a downstream consumer; read-only on all ingestion state."""
+        row = self._round(request.round_id, request.source_id)
+        operations = ("read", "quote-display")
+        candidate = self.store.one("SELECT * FROM candidates WHERE round=? AND source=? AND page=? AND ordinal=?", (request.round_id, request.source_id, request.page, request.ordinal))
+        if candidate is None or candidate["hold"] or candidate["error"] or (candidate["document"], candidate["raw_version"], candidate["version"]) != (request.document_id, request.raw_version, request.document_version):
+            raise IngestionFailure("observation_not_found")
+        source, version, content, projection, metadata = self._prepared(row, request.round_id, request.source_id, request.document_id, request.document_version, operations)
+        if content["rawVersion"] != request.raw_version:
+            raise IngestionFailure("observation_not_found")
+        item = Item.model_validate_json(candidate["data"])
+        page = self.store.one("SELECT page_id,observed_at FROM pages WHERE round=? AND source=? AND ordinal=?", (request.round_id, request.source_id, request.page))
+        grant = source.grant
+        result = {"schemaVersion": SCHEMA, "observation": {"roundId": request.round_id, "sourceId": request.source_id, "page": request.page,
+            "ordinal": request.ordinal, "pageId": page["page_id"], "observedAt": page["observed_at"], "documentId": request.document_id,
+            "rawVersion": request.raw_version, "documentVersion": request.document_version,
+            "url": parsers.normalize_url(item.url, source.allowed_hosts), "title": item.title, "publishedAt": item.published_at,
+            "modifiedAt": item.modified_at, "sourceRevision": item.source_revision, "mediaType": item.media_type},
+            "grant": {"grantId": grant.grant_id, "revision": grant.revision}, "document": projection, "locatorMetadata": metadata}
         self._authorize(row, operations)
         return result

@@ -1,25 +1,33 @@
 # 본개발 이식 가이드 · 스택 독립 실행 계약
 
-> 2026-10-08 작성. 프론트엔드와 백엔드 모두 변경 가능하며 Java/Spring은 유력 후보일 뿐 확정 스택이 아니다. 이 문서는 담당자의 채택 판단 자료이지 본개발 앱, 배포 완료 보고, 현재 기능의 수용 기준 통과 보고가 아니다. 새 의존성은 추가하지 않았다.
+> 2026-10-08에 작성한 이식 기준에 2026-10-12 본개발 경로·최신 원문 안내를 반영했다. 프론트엔드와 백엔드 모두 변경 가능하며 Java/Spring은 유력 후보일 뿐 확정 스택이 아니다. 이 문서는 담당자의 채택 판단 자료이지 본개발 앱, 배포 완료 보고, 현재 기능의 수용 기준 통과 보고가 아니다. 새 의존성은 추가하지 않았다.
 
 ## 1. 읽는 순서와 근거의 지위
 
-1. [현재 사용자 결정](../share/day-work-2026-10-08.md)을 읽는다. 프로토타입 전체 요구 구현 권한과 본개발 채택·유료 호출 승인은 별개다.
-2. [계약·표본·차이 인계](contract-handoff.md)에서 현재 `/api`, 목표 `/api/v1`, worker JSON을 구분한다.
-3. 아래 독립 선택축과 자산 분류를 선택한 뒤, 전환 수용 순서를 적용한다.
+1. [최신 명세·WBS 갱신 기록](../evidence/doc-delta-2026-10-12.md)과 [현재 작업 결정](../share/day-work-2026-10-10.md)을 읽는다. 10-08 결정은 이어서 유효하며 프로토타입 전체 요구 구현 권한과 본개발 채택·유료 호출 승인은 별개다.
+2. [본개발 시작 안내](../share/production-start-2026-10-12.md)와 [개발 참여 규약](../../CONTRIBUTING.md#본개발-경로와-생성-조건)에서 루트의 예정 경로·이름·첫 실제 기능의 생성/CI 조건을 확인한다. 경로를 선언했다는 사실은 앱을 구현했다는 뜻이 아니다.
+3. [계약·표본·차이 인계](contract-handoff.md)에서 현재 `/api`, 목표 `/api/v1`, worker JSON을 구분한 뒤 아래 선택축·자산 분류·전환 순서를 적용한다.
 
 | 참고 경로 | 실제로 확인한 자료와 지위 | 이식할 때의 용도 |
 |---|---|---|
 | [`prototype/README.md`](../../prototype/README.md), [`prototype/bff/README.md`](../../prototype/bff/README.md), [`프로토타입 설명서`](../share/prototype-guide.md) | 현재 실행/시연/개발 연동 안내. 최종 실행 README와 설명서는 문서 S1 및 기존 outlook 생성 이행을 반영한다. 설명서 담당의 합성 smoke와 backend 실행 인용은 구분한다. | 현행 앱 재현·조회/생산 분리·오류 복구. [HTML](../share/prototype-guide.html)/[PDF](../share/prototype-guide.pdf)는 팀 전달용이며 전체 수용 기준 통과를 대신하지 않는다. |
 | [`docs/system/out/bff-openapi.json`](../system/out/bff-openapi.json), [`bff-observation.json`](../system/out/bff-observation.json) | 저장된 실제 BFF OpenAPI 관측. 관측 시각 `2026-10-07T19:20:15.550609+00:00`; 이번에 서버를 다시 실행하지 않았다. | **현재 관측 기준선**. 새 S1 필드가 자동 포함된 것으로 보지 않는다. |
 | [`docs/api/openapi.yaml`](../api/openapi.yaml), [`docs/system/README.md`](../system/README.md), [API v2 검토](../evidence/api-v2-review-2026-10-08.md) | 목표 OpenAPI 3.1과 잠정 API 공통 규칙. API v2 네 의도만 번역하고 현재 WBS·사용자 결정·S1 계약은 보존했다. 구현 완료·팀 최종 승인이 아니다. | 목표 요청·응답·오류·FS/화면/WBS 연결의 정본. 프로필 null/형식, 사건 맥락 관계, 최신 시세 독립성, 회원 제공자 enum을 consumer 이식 시 적용한다. |
-| [`acceptance-matrix.md`](../system/out/acceptance-matrix.md), [`source-corrections.md`](../system/out/source-corrections.md) | 104 ID·121 상세 정의 및 원문 정정 요청. 현행 실행 검증은 미실행이다. | ID가 같아도 다른 상세 정의를 합치지 않고 수용 기준을 옮긴다. |
-| [`links.yaml`](../system/links.yaml), [`wbs-migration.md`](../system/out/wbs-migration.md), [15:05 원문 재확인](../evidence/api-source-refresh-2026-10-08.md) | 최신 `wbs_2026-10-08-api-review`의 역할·제목·FS 의미를 대조한 WBS 편집 연결. 원문 번호/상태와 구분한다. | 새 담당 배정의 근거. 옛 `6.10.1`을 통합 점검으로 재사용하지 않는다. `6.8.14`의 과거 평가 FS037→FS066-01 raw 정정은 반영하고 FS042 재무/시점그래프 충돌은 보존한다. |
+| [`acceptance-matrix.md`](../system/out/acceptance-matrix.md), [`source-corrections.md`](../system/out/source-corrections.md), [10-12 갱신 기록](../evidence/doc-delta-2026-10-12.md) | 현재 10-12 입력의 103 ID·121 상세 정의 및 원문 정정 요청이다. 10-08의 104 ID는 브리핑 오타 정정 전 관측이다. 현행 실행 검증은 이 문서에서 수행하지 않았다. | ID가 같아도 다른 상세 정의를 합치지 않는다. 기능명·정의 파일/시트/행으로 수용 기준을 옮긴다. |
+| [`links.yaml`](../system/links.yaml), [`wbs-migration.md`](../system/out/wbs-migration.md), [10-12 갱신 기록](../evidence/doc-delta-2026-10-12.md) | 최신 `wbs_2026-10-12`의 역할·제목·FS 의미를 대조한 WBS 편집 연결이다. 아래 10-08 매핑과 과거 근거는 당시 기록이며 현재 배정·진척을 대신하지 않는다. | 옛 번호만으로 연결하지 않는다. AI BE 번호는 현행 v2로 정정됐지만 FE 복합 참조·요구 메타·재무 요구42의 전용 FS/WBS 등 충돌은 남아 있다. |
 | [`system-architecture/README.md`](../share/system-architecture/README.md) | 최종 S1 구조도. 사용자 조회·문서 worker·기존 outlook producer·별도 앱/worker 저장소를 구분한다. 그림의 구현 실선과 합성 실행 증거·유료 호출 승인도 분리한다. | React→BFF→공개 snapshot 및 JSON CLI 경계를 참고한다. 현재 실행 도식이지 본개발 스택·/api/v1·클라우드 배포 완료 도식이 아니다. |
 | [`external-api-candidates-2026-10-08.md`](../evidence/external-api-candidates-2026-10-08.md) | 공급원·권리·등록 조건 조사. 실제 공급자 연결 시험은 아니다. | 데이터 표시/보관/모델 전송 권한과 계약 종료 시 삭제 조건을 함께 이전한다. |
 | [`docs/design/tokens.json`](../design/tokens.json), [`prototype/web/DESIGN.md`](../../prototype/web/DESIGN.md), [`components/README.md`](../../prototype/web/src/components/README.md), [`docs/screen-plan/README.md`](../screen-plan/README.md) | 읽은 컴포넌트 규칙이 가리키는 토큰/디자인 원문과 77쪽 화면 관측 안내다. 최종 목표는 Figma(폰트 제외), SUIT 유지다. | 기존 화면을 최종 디자인으로 동결하지 않는다. 다른 FE도 상태·접근성·토큰·목표 디자인을 재현한다. |
 | [`wireframe-correspondence.md`](../screen-plan/wireframe-correspondence.md), [`wireframe_2026-10-08/coverage.json`](../evidence/raw/wireframe_2026-10-08/coverage.json) 및 프레임 PNG | 대응 부록의 raw node·화면 ID 연결을 읽었다. 원본 이미지를 이번에 재조사하거나 Figma 동작을 검증하지 않았다. 부록의 ‘1:1 개선안/검토 전 범위’ 해석은 현재 사용자 결정으로 대체됐다. | 10-08 고정 raw는 폰트 제외 최종 목표 디자인이다. 정적 배치를 구현/동작 완료나 수치의 사실성으로 승격하지 않는다. |
 | [`docs/design/ai-system.md`](../design/ai-system.md), [`docs/api/ai-contract.schema.json`](../api/ai-contract.schema.json), [문서 fixture](../../prototype/ai-worker/fixtures/contracts/synthetic-document/), [회차 fixture](../../prototype/ai-worker/fixtures/contracts/synthetic-outlook/) | 현재 S1 문서 세 stage와 기존 briefing-outlook 생성 능력을 보존한 worker 이행 자료다. source/표본 검사와 backend 실행 보고를 구분한다. S2–S7 전체 완료가 아니다. 팀 배포에는 이 저장소 자료를 사용한다. | 불변 산출물·현재 visibility·실행 receipt·회차 pin과 발행 고정을 보존한다. 확정 schema/fixture·worker lock·관측 범위는 [계약 인계](contract-handoff.md)를 우선한다. |
+
+### 본개발 경로에 채택하는 방법
+
+본개발 작업 위치는 저장소 루트의 `web/`(클라이언트), `api/`(앱 BE), `ai/`(AI 실행)로 정한다. 루트 `contracts/`는 실제 consumer와 생성·검증 명령을 갖춘 언어 중립 생성물·합성 fixture 배포가 필요할 때만 만들며 목표 OpenAPI와 JSON Schema의 정본은 계속 `docs/api/`다. 배포 생성물을 수동 편집한 두 번째 계약 원본을 두지 않는다. `infra/`는 별도 승인된 배포·운영 설정을 넣는 예정 경로다. 이 경로들은 아직 실제 앱이나 배포를 뜻하지 않으며 첫 실제 수직 기능에서 manifest·진입점·동작·테스트와 실제 runner 연결을 함께 추가한다. 전체 규칙과 리뷰 역할은 [CONTRIBUTING.md](../../CONTRIBUTING.md)에 있다.
+
+이 문서의 ‘그대로 복사 가능’은 동일 스택에서의 채택 판단이지 `prototype/` import를 허용한다는 뜻이 아니다. 본개발은 채택한 코드의 소유권·실행 설정·테스트를 새 경로에 두고 prototype 앱/worker DB를 공유하지 않는다. PoC도 별도 읽기 전용 원천으로 유지하고 vendoring하지 않는다. `docs/api/` 정본을 옮기려면 모든 생성기·consumer·문서 링크를 같은 변경에서 옮기고 두 계약 원본을 남기지 않는다.
+
+현재 루트 명령과 CI는 프로토타입·문서/계약을 검사한다. 본개발 새 앱에는 실제 실행기와 테스트·required gate 연결을 완료하기 전까지 그 검사 성공을 적용할 수 없다. credentials의 trust 승인, 유료 호출, 운영 배포 승인은 각각 별도다.
 
 ## 2. 서로 독립인 세 가지 선택축
 
@@ -94,9 +102,9 @@ flowchart LR
 
 ## 6. 담당 선택표와 WBS 연결
 
-새 담당자나 날짜를 임의로 배정하지 않는다. 아래 역할의 실제 수행인력은 10-08 WBS 원문과 [`links.yaml`](../system/links.yaml)에서 확인한다. 원문 표지 `6.5.13~20` 대신 본문 `6.6.13~20`을 의미 연결에 사용하며 충돌은 정정 요청으로 보존한다.
+새 담당자나 날짜를 임의로 배정하지 않는다. **아래 WBS 번호는 10-08 작성 당시 의미 연결의 참고표**다. 실제 배정·일정·진척과 작업 연결은 최신 [10-12 갱신 기록](../evidence/doc-delta-2026-10-12.md), [`links.yaml`](../system/links.yaml), [`wbs-migration.md`](../system/out/wbs-migration.md)에서 기능명·역할·출처까지 확인한다. 표지 `6.5.13~20` 대신 본문 `6.6.13~20`을 사용한 과거 판단과 원문 충돌은 기록으로 보존한다.
 
-| 결정/인계 | 선택권·책임 역할 | 선택 가능한 자료 | 현재 WBS 의미 연결 |
+| 결정/인계 | 선택권·책임 역할 | 선택 가능한 자료 | 10-08 작성 당시 WBS 의미 연결 |
 |---|---|---|---|
 | FE 스택과 UI 채택 | 본개발 FE 담당 | React 구현 유지 / 다른 FE에 HTTP fixture·토큰·상태 계약 이식. Figma 목표는 동일, 폰트 SUIT 유지. | 인증 FE `6.2.6~7`, 그래프 FE `6.6.21~26`, 기업 FE `6.7.8~12`, 질문 FE `6.9.11~14` |
 | 앱 BE 스택·저장소 | 본개발 BE/공통 기반 담당 | FastAPI 재사용 / Spring 참고 매핑. 보안·오류·쓰기 불변식을 모두 구현. | 공통 `6.1.2~5`, 인증 BE `6.2.1~5`, 데이터 `6.5.1~7`, 질문 BE `6.9.1~10` |

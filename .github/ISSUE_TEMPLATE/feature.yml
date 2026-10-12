@@ -9,14 +9,14 @@ body:
     id: traceability
     attributes:
       label: FS / NFS / WBS / screen IDs
-      description: '관련 ID와 업무명을 함께 적으세요. 해당 사항이 없으면 사유를 적으세요.'
+      description: 'ID·현재 기능/업무명·BE/FE 역할·최신 고정본 파일/시트/행을 함께 적으세요. 재사용된 번호는 현행/이력 의미를 구분하고, 해당 사항이 없으면 사유를 적으세요.'
     validations:
       required: true
   - type: textarea
     id: problem
     attributes:
       label: Problem and scope
-      description: '사용자가 겪는 문제, 변경 범위, 변경하지 않을 범위를 적으세요.'
+      description: '사용자 문제, 본개발/프로토타입/계약/문서 중 작업 범위, 실제 변경 경로와 제외 범위를 적으세요. 본개발은 루트 web/, api/, ai/, contracts/, infra/를 사용하며 첫 실제 기능에서 CONTRIBUTING의 생성 조건을 충족합니다.'
     validations:
       required: true
   - type: textarea
@@ -30,7 +30,7 @@ body:
     id: contracts
     attributes:
       label: Contract and affected apps
-      description: 'docs/api 목표 계약, web/BFF/AI consumer, 마이그레이션·호환성 영향을 적으세요.'
+      description: 'docs/api 정본, stable operationId, web/API/AI producer·consumer·생성물의 영향을 적으세요. 루트 contracts/는 향후 생성물 배포용이며 두 번째 정본이 아닙니다. 현재 /api와 목표 /api/v1을 구분하고 전환 시 전체 caller를 이행합니다.'
     validations:
       required: true
   - type: dropdown
@@ -55,6 +55,6 @@ body:
     id: delivery
     attributes:
       label: Tests, reviewer and rollback
-      description: '테스트 계획, 필요한 리뷰 역할, 실패 시 되돌릴 방법을 적으세요. 실제 담당 handle은 팀 확인 뒤 지정합니다.'
+      description: '검증 명령·입력·결과, 리뷰 역할, 롤백 기준을 적으세요. 새 본개발 앱은 실제 테스트·루트 runner·CI gate 연결을 포함하며 prototype import/DB 공유를 하지 않습니다. 실제 handle은 팀 확인 뒤 지정합니다.'
     validations:
       required: true

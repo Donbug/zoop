@@ -9,12 +9,12 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .ingestion import Ingestor, Store
-from .ingestion_contracts import SCHEMA, MAX_INPUT, Authority, IngestionFailure, Inspect, Resume, Run, canonical
+from .ingestion_contracts import SCHEMA, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Resume, Run, canonical
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "resume", "inspect"))
+    parser.add_argument("command", choices=("run", "resume", "inspect", "export"))
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--sources", required=True, type=Path)
     parser.add_argument("--fixture-manifest", type=Path)
@@ -26,18 +26,20 @@ def main() -> int:
             raise IngestionFailure("command_input_limit")
         incoming = json.loads(raw)
         authority = Authority(args.sources)
-        model = {"run": Run, "resume": Resume, "inspect": Inspect}[args.command]
+        model = {"run": Run, "resume": Resume, "inspect": Inspect, "export": Export}[args.command]
         request = model.model_validate(incoming)
         if args.command == "run" and args.fixture_manifest is None:
             raise IngestionFailure("fixture_manifest_required")
         if args.command != "run" and args.fixture_manifest is not None:
             raise IngestionFailure("fixture_manifest_not_allowed")
-        store = Store(args.state_dir)
+        store = Store(args.state_dir, existing=args.command == "export")
         runner = Ingestor(store, authority)
         if args.command == "run":
             result = runner.run(request, args.fixture_manifest)
         elif args.command == "resume":
             result = runner.resume(request.round_id, request.source_id)
+        elif args.command == "export":
+            result = runner.export(request)
         else:
             result = runner.inspect(request)
         print(canonical(result))

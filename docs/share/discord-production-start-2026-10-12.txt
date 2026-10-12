@@ -1,0 +1,16 @@
+@everyone 본개발 작업 위치와 시작 절차를 공유합니다.
+
+본개발은 저장소 루트의 web/ · api/ · ai/ · contracts/ · infra/로 나눕니다. 각각 화면, 앱 백엔드, AI 실행, 생성 계약 배포, 배포·운영 설정을 맡습니다. 경로를 정한 것이며, 본개발 앱이 이미 만들어졌거나 기존 코드가 자동 이전되는 것은 아닙니다.
+
+빈 폴더를 미리 만들지 않습니다. 첫 실제 기능 PR에서 필요한 폴더와 실행 환경·진입점·동작·테스트를 함께 만들고 루트 실행 명령과 CI 검사에 연결합니다. 현재 CI는 프로토타입·문서/계약 검사이므로 새 앱의 검증을 대신하지 않습니다. FE·BE·AI 스택은 독립적으로 선택하며 Java/Spring도 아직 확정하지 않았습니다.
+
+API 정본은 docs/api/openapi.yaml에 유지합니다. 루트 contracts/는 실제 consumer와 생성·검증 명령이 생긴 뒤 배포용으로만 만들며 두 번째 명세 원본으로 쓰지 않습니다. 계약 변경은 관련 producer/consumer·생성물·테스트를 함께 갱신합니다.
+
+prototype/은 시연·회귀 재현·구현 참고용으로 유지합니다. 본개발에서 runtime import나 DB 공유를 하지 않으며, 채택할 코드는 권리·계약 확인과 독립 테스트가 필요합니다. 별도 원천 PoC는 읽기 전용입니다.
+
+각자 최신 WBS의 업무명·역할·출처를 확인하고, 중복 이슈 검색 후 첫 기능의 범위와 정상/실패/복구 기준을 이슈에 적어 주세요. 브랜치는 feat/123-document-view처럼 실제 이슈 번호를 쓰고, PR 제목은 feat(web): 기업 문서 조회 구현처럼 기존 규칙을 유지합니다. 새 앱의 첫 PR에는 runner·테스트·CI 연결까지 포함합니다. 배포·유료 호출·private PoC 인증 정보 등록은 별도 승인입니다.
+
+본개발 기준과 시작 절차는 아래 문서에서 확인하실 수 있습니다. 문서 공유는 원격 CI 통과나 배포 완료를 뜻하지 않습니다.
+• 시작 안내: https://github.com/Donbug/zoop/blob/main/docs/share/production-start-2026-10-12.md
+• 경로·이름·PR 규약: https://github.com/Donbug/zoop/blob/main/CONTRIBUTING.md
+• 저장소 안내: https://github.com/Donbug/zoop/blob/main/README.md

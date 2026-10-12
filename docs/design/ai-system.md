@@ -2,12 +2,12 @@
 
 ## 현재 구현 범위와 설계 논의 적용
 
-**현재 실행 단위는 S1 문서 요약·문서×기업 판정·별도 의미 검증과 기존 회차 outlook이며, S2-1의 독립 오프라인 원문 준비·검사도 구현했다. 전체 AI 기능이나 FS074–081 전체의 완료를 뜻하지 않는다.** 설계 보고서 `local://ai-contract-design.md`의 §3–6과 §8/S1에서 합의한 worker 소유 경계, camelCase JSON, 불변 영수증, 현재 공개 gate, 무호출 저장 복구를 적용한다. 기존 outlook 생산자를 삭제하지 않는다는 추가 합의도 반영했다. S2-1은 `local://s2-ingestion-contract.md`의 독립 저장소·현재 registry·정확한 원문 좌표 계약을 적용했다. 보고서는 설계 근거이며 실행 증거는 아래 별도로 기록한다.
+**현재 실행 단위는 S1 문서 요약·문서×기업 판정·별도 의미 검증과 기존 회차 outlook이며, S2-1의 독립 오프라인 원문 준비·검사와 S2-2의 독립 오프라인 이벤트·SAME·주제 후보 준비도 구현했다. 전체 AI 기능이나 FS074–081 전체의 완료를 뜻하지 않는다.** 설계 보고서 `local://ai-contract-design.md`의 §3–6과 §8/S1에서 합의한 worker 소유 경계, camelCase JSON, 불변 영수증, 현재 공개 gate, 무호출 저장 복구를 적용한다. 기존 outlook 생산자를 삭제하지 않는다는 추가 합의도 반영했다. S2-1은 `local://s2-ingestion-contract.md`의 독립 저장소·현재 registry·정확한 원문 좌표 계약을 적용했다. 보고서는 설계 근거이며 실행 증거는 아래 별도로 기록한다.
 
 | 실행 단위 | 현재 상태 | 소유 의미와 후속 범위 |
 |---|---|---|
 | S1 | 구현: 문서 세 stage + 기존 briefing-outlook 이행 + 실제 JSON CLI + BFF 수입 | 문서의 versioned claim/citation과 기업별 판정을 검증·저장하고, 기존 회차 판정의 생성·발행 고정을 유지한다. |
-| S2 | S2-1 구현: 오프라인 회차·raw·정제/map·불변 문서 버전·재개·검사 | 실제 공급원·정기 수집·앱 문서 등록은 미구현이다. PoC 추출/SAME 재사용과 별도 주제형 이슈는 S2-2에 남아 있다. |
+| S2 | S2-1 구현: 오프라인 회차·raw·정제/map·불변 문서 버전·재개·검사. S2-2 구현: 오프라인 이벤트·SAME·주제 후보 | 실제 공급원·정기 수집·앱 문서 등록은 미구현이다. S2-2는 authored replay만 실행하며 live 추출, retrieval, 승인·게시, 주제 승인은 후속이다. |
 | S3 | 계획, 미구현 | 공급/경쟁/투자 관계와 영향, 관계 적격성, HOLD 검수 후 재검증 |
 | S4 | 계획, 미구현 | 전체 의존성 철회, 과거 pin·채팅·회차·캐시까지 공개 barrier와 증분 복구 |
 | S5 | 계획, 미구현 | 기업·시장 요약, 중요도 선정, 공통 출퇴근 브리핑 강화. 이미 있는 outlook 생산 능력은 S1 이행으로 보존한다. |
@@ -134,7 +134,7 @@ uv build --project prototype/ai-worker --offline --wheel --out-dir /tmp/zoop-ai-
 | FS081 | 문서 두 consumer의 현재 deny/version/hash gate, 저장 복구 시 새 호출 없음 | 전체 dependency closure·옛 채팅/회차/pin 제외 | direct evidence deny·cache/model/effort/version 시험 |
 | FS066/068 연동 | 문서 요약·기업판정·의미검증의 actual/replay 영수증을 관리자 사용량에 분리 연결 | S7 전체 평가·개인 결과 통합 | 관리자 ai-usage 수입 중복/토큰 null 시험 |
 | FS074 | S2-1 합성 source-round·페이지 응답/raw 영속·연속 checkpoint·저장 복구 | 실제 공급원·05/35분 스케줄·지연 등록/조회 보장·앱 등록 | 독립 `ingestion_cli`, `test_ingestion.py`, `ingestion_smoke.py` |
-| FS076/077/078/079 | S1/S2-1에서 완료 주장하지 않음 | S2-2–4의 주제·관계·영향·검수 | 설계 scope 표 |
+| FS076/077/078/079 | S2-2: 오프라인 이벤트 추출·whole-event SAME/FOLLOWS/HOLD 후보와 별도 주제 후보(authored replay). 승인·게시·관계·영향·검수는 완료 주장 없음 | 실제 모델 품질·B0–B4 retrieval·S3–S4의 관계·영향·검수와 공개 | `extraction_cli`, `test_extraction.py`, `extraction_smoke.py` |
 
 이 문서의 구현 설명은 위 source와 합성 계약을 가리킨다. 실제 운영 모델의 의미 품질, 출처 라이선스 최종 승인, 금액 상한, S2–7 전체는 검증된 완료 항목이 아니다.
 
@@ -204,3 +204,47 @@ review에서 지적한 두 문제도 수정 전에 재현했다. A/B가 같은 s
 suite의 소유 임시 상태와 smoke의 모든 원문·DB·lock·sentinel은 실행 뒤 제거했다. `ingestion_smoke.py`는 매번 fresh `TemporaryDirectory`를 만들고 제거 여부를 출력한다. 남긴 것은 재현 가능한 authored helper와 behavioral tests뿐이다. 실제 공급원·네트워크·모델·새 서비스·원본 PoC 상태·앱/S1 상태에 연결하지 않았다. 실운영 공급원 pagination/late-registration 보장, 정기 수집, 회사/이슈 연결, 앱 등록·공개와 S2-2/S3/S4는 별도 범위다.
 
 Main의 최종 통합 실행에서도 BFF 전체 **353 passed, 1 warning**과 위 실제 CLI smoke의 전체 항목·review 회귀 3개 통과를 확인했다. 두 review 지적은 수정 후 해당 경로의 독립 소스 재검토에서 resolved로 확인됐다. OpenAPI/기존 합성 계약 검사와 생성 문서 drift **274개**, XLSX **9시트·45,428셀** 비교도 통과했고 원문 경고·목표/BFF 차이333건은 보존했다. 공개 OpenAPI·의미 연결·웹 생성 타입·S1 contracts/CLI·BFF manifest/lock의 SHA-256은 작업 시작 때와 동일하다. 이는 기존 팀 검토본과 S1 경계를 보존한 증거이며 전체 운영 보안이나 실수집 품질 인증이 아니다. 커밋·푸시·배포는 수행하지 않았다.
+
+
+## S2-2: 오프라인 이벤트·SAME·주제 후보 준비
+
+`prototype/bff/src/zoop_bff/extraction_cli.py`는 설치된 BFF interpreter로 실행하는 **내부 JSON 프로세스**다. FastAPI route, S1 명령, 앱 문서 등록·게시, 스케줄러, GraphDB writer가 아니다. wire schema는 `zoop-extraction-s2-2`이며 S1 schema의 alias가 아니다. 결과는 후보일 뿐 ALLOW·승인·게시가 아니고, **authored replay는 독립 AI 추론이 아니다.** replay는 사람이 작성한 응답을 pinned PoC parser로 검증하는 방법이며 의미 품질을 증명하지 않는다. live mode는 `live_mode_unsupported`로 거부하고 fake fallback을 두지 않는다.
+
+| 명령 | stdin | 파일 인자 |
+|---|---|---|
+| `run` | `{schemaVersion,jobId,provenance,promptVersion,incoming,catalogue,snapshot,topic}` | `--replay` 필수, `--topic-replay` 선택 |
+| `resume` | `{schemaVersion,jobId}` | 선택적 같은 `--replay`/`--topic-replay` |
+| `inspect`, `cancel` | `{schemaVersion,jobId}` | 없음 |
+
+공통 인자는 `--state-dir`(전용 `extraction.sqlite3`·`extraction.lock`만 허용), `--ingestion-state-dir`(읽기 전용 입력), `--sources`(S2-1과 같은 현재 완전한 registry)다. 알 수 없는 필드·schema/format/ledger 버전, app·S1·ingestion·원본 PoC 디렉터리, 겹치거나 알 수 없는 파일이 있는 mixed root는 거부한다. `incoming`과 snapshot member는 정확한 관측 `{roundId,sourceId,page,ordinal,documentId,rawVersion,documentVersion}`이다. snapshot은 운영자가 얼린 **whole-event 목록**이며 각 member는 원본 PoC `Mention` JSON(이전 결과의 `mention`)이다.
+
+### 정확한 입력 export와 binding
+
+S2-1에 좁은 additive 명령 `ingestion_cli export`와 `Ingestor.export`를 추가했다. 정확한 관측(round/source/page/ordinal/document/rawVersion/documentVersion)만 받아 현재 read·quote-display 권한을 확인하고 기존 S1 `Document` projection과 별도로 서버 소유 URL·title·publishedAt·modifiedAt·sourceRevision·mediaType·page observedAt·grant ID/revision을 반환한다. 클라이언트가 보낸 metadata는 신뢰하지 않는다. 이 소비자 접근(`Store(existing=True)`)은 **실제 읽기 전용**이다. 디렉터리·파일 mode/소유권 보정(chmod), 생성, schema/PRAGMA/WAL 쓰기 없이 `immutable=1` 읽기 전용 SQLite로 열고, 시험이 일부러 0750/0640/0440으로 바꾼 mode·bytes·mtime·파일 목록이 export와 extraction 실행 전후 같음을 확인한다. lock 정책은 기존 `ingestion.lock`에 대한 **shared non-blocking flock**이다. reader끼리는 공존하고, 활성 writer가 있으면 reader가 `ingestion_busy`, reader가 있으면 새 writer도 `ingestion_busy`다. 비어 있지 않은 `-wal`(중단된 writer가 남긴 commit)은 reader가 무시하거나 복구할 수 없으므로 `ingestion_recovery_required`로 거부하고, 운영자가 ingestion `resume`으로 복구한 뒤 다시 읽는다. 없는 namespace는 만들지 않고 `ingestion_state_missing`이다. 기존 `inspect` 결과는 같은 helper로 옮겼지만 출력이 같고 `test_ingestion.py` 43개가 통과한다.
+
+job은 replay 호출 전에 다음을 불변 binding으로 먼저 저장한다. 실제 `investmate.Article`(publisher는 알 수 없어 빈 값, origin_id null, language는 adapter 상수 `ko`)과 **진짜 계산된 `Article.version`**, 문서별 raw/representation/mapping/locator/metadata/parser digest, grant 이름·revision, pinned PoC commit `fa446e7c…`, 추출·비교 analysis contract fingerprint, replay 헤더와 파일 hash, 회사 catalogue digest, snapshot digest와 개별 event digest다. 같은 jobId에 다른 입력·replay bytes를 보내면 `job_input_conflict`, resume에서 다른 replay bytes를 보내면 `replay_fixture_changed`다. 누락된 extract/compare 응답은 실패이며 fixture를 고쳐 같은 job에 붙이지 않고 새 job을 만든다. `Article.version`은 documentVersion을 대체하지 않는다. raw만 바뀌어 `Article.version`이 같아도 documentVersion·mention/event candidate ID·job 입력이 달라진다. 같은 comparison에 같은 Article.version이 두 documentVersion으로 묶이면 SAME/FOLLOWS evidence는 최신/첫 항목을 고르지 않고 HOLD다.
+
+### 추출·비교·주제 stage
+
+- **추출/비교**: 설치된 `ReplayModel.extract/compare`와 도메인 parser만 호출한다. `Pipeline`, Repository, graph, B0–B4 retrieval은 import하지 않는다. whole-event 목록의 모든 event를 비교하며 이것이 retrieval 완전성이라고 주장하지 않는다. raw `PairDecision`은 보존하고, 별도 effective decision은 Pipeline의 guard를 다시 적용한다. SAME인데 member 하나라도 period/assertion/event_time이 알려진 값으로 충돌하면 DIFFERENT, SAME/FOLLOWS의 exact evidence 부재와 FOLLOWS의 incoming evidence 부재는 HOLD다. 알 수 없는 값은 날짜나 identity를 만들지 않는다. SAME 둘 이상이거나 HOLD/CONFLICT가 있으면 선택하지 않고 `held`이며 transitive union은 없다.
+- **ID**: `mentionCandidateId`(`mc-`)는 정확한 문서 binding·extract request key·fingerprint·로컬 mention ID에서, `eventCandidateId`(`evc-`)는 mention candidate에서 파생한 별도 ID다. documentId, snapshot의 event ID, mention ID, topic ID(`tp-`)는 서로 다른 namespace이며 snapshot event ID가 `mc-`/`evc-`/`tp-`로 시작하면 거부한다.
+- **인용**: PoC `Evidence.matches`만 믿지 않는다. 구간은 정확히 하나의 mapped locator run 안에 있어야 하고(S1 `exact`와 같은 규칙), ingestion inspect의 source resolver로 재구성한 원문 segment 합이 quote와 같아야 한다. 생성된 separator를 가로지르면 mention은 `rejected/raw_locator_mismatch`로 남고, 반복 quote에 정확한 span이 없으면 PoC parser가 응답을 거부한다. snapshot member의 모든 evidence도 job을 저장하기 전에 같은 규칙(mapped run + resolver)으로 검사하며 실패하면 `snapshot_member_unmapped`로 거부해 SAME 비교 입력이 되지 않는다. 비교 응답이 member 문서의 separator span을 인용하면 effective decision은 HOLD다. 시험은 실제 S1 `exact`로 accept/reject를 대조한다.
+- **주제**: PoC에는 topic 호출이 없으므로 별도 prototype producer 계약 `zoop-topic-request-1`/`zoop-topic-response-1`/`zoop-topic-replay-1`을 둔다. 요청은 event candidate와 snapshot event, 문서 목록이며 응답은 label·criteria·rationale·명시적 membership·정확한 문서 citation이다. 모든 member와 citation을 frozen 요청과 대조하고 알 수 없는 member, 중복 member, 요청에 없는 문서, 부정확한 quote는 received 영수증에 거부 verdict를 남기고 topic을 만들지 않는다. 사건이 없으면 producer 호출도 빈 topic도 만들지 않는다. topic은 `status=candidate, approved=false`다.
+
+### 영속성·복구·권한
+
+stage의 후보와 완료 marker는 한 transaction에서 commit한다. provider 영수증은 `started→received`로 분리하고 응답/request digest/fixture hash는 변경할 수 없다. replay fixture는 호출 예약 전에 전체를 설치된 `ReplayModel`로 검증하며(중복 record·key 불일치는 `replay_fixture_invalid`), 잘못된 fixture는 receipt가 되지 않는다. 순수 parser가 통과한 응답만 `received`로 저장하고, 계약을 위반한 응답은 영수증을 보존한 채 거부 verdict를 붙여 영구히 사용할 수 없다. topic membership/citation 같은 후속 검증의 응답 결함도 같은 방식이며 권한·환경 실패는 유효한 receipt를 그대로 두어 다음 resume이 다시 검증한다. resume은 저장된 receipt를 새 호출 없이 production parser로 다시 검증한다. 응답 저장 뒤·후보 저장 전 프로세스가 죽어도, stage commit 뒤에 죽어도 replay 파일 없이 재개하며 추가 호출은 0이다. `started`만 있고 receipt가 없으면 replay라도 `reconciling/reconcile_only`로 남기고 자동 재전송하지 않는다. 모든 문서는 read 전, 응답 뒤, stage commit 직전, 결과 전달 직전에 현재 registry를 다시 읽어 read+quote-display, exact binding을 확인한다. 철회·만료·registry 제거·grant revision 변경 뒤에는 `delivery=withheld`와 종료 코드 2이고 후보·인용·본문이 출력되지 않으며 이전 결과가 권한을 복구하지 않는다. `model-send`·recipient·purpose는 offline replay가 외부로 전송하지 않으므로 검사하지 않으며, live 전송을 도입하면 별도 검사가 필요하다. 이 단계는 cross-job 결과 cache를 두지 않는다. 재사용은 같은 job의 영수증뿐이다.
+
+### 실제 재현 결과
+
+저장소 루트에서 다음 명령을 실행했다.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=prototype/bff/src \
+  prototype/bff/.venv/bin/python -m pytest prototype/bff/tests/test_extraction.py prototype/bff/tests/test_ingestion.py -q -p no:cacheprovider
+PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/extraction_smoke.py
+```
+
+첫 명령은 **89 passed, 1 warning**(`test_extraction.py` 46 + 기존 `test_ingestion.py` 43)이었다. warning은 기존 Starlette HTTPX deprecation이다. 실제 `extraction_smoke.py`는 `status=passed, providerCalls=0, modelCalls=0`을 반환했다. authored HTML을 실제 ingestion/extraction JSON subprocess로 실행해 두 문서 same event, 서로 다른 event·같은 topic, 충돌 계약과 누락 날짜, multi-SAME hold, 한글·emoji·entity exact 인용, separator/반복 quote, raw-only version 변경, 위조 snapshot/citation, 잘못된 topic membership, 철회 grant, receipt/stage 뒤 중단·무호출 resume, started-without-receipt를 확인했다. 리뷰에서 재현한 세 문제도 수정 전 실패(중복 extract record가 receipt 저장 뒤에야 fixture 오류가 되고 fixture 없는 resume이 ready로 바뀜, separator를 가로지르는 snapshot member가 SAME 입력이 됨, `existing=True` ingestion 접근이 chmod/RW open을 함)를 확인한 뒤 같은 회귀 시험과 smoke로 고정했다. 모든 subprocess에 socket audit hook을 걸어 네트워크 시도를 오류로 만들었으며 발생하지 않았다. 임시 입력·DB·lock은 실행 뒤 제거한다. 실제 공급원·모델·원본 PoC DB·Postgres/Neo4j·앱/S1 상태에는 연결하지 않았다.
+
+남은 범위: 실제 모델 추출·SAME 품질, B0–B4 retrieval 연결과 현재 event/topic 저장소, 앱 등록·게시·GraphDB, S3 관계·영향, S4 전체 철회 closure, 사람 승인 topic은 구현·검증하지 않았다.

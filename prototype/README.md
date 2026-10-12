@@ -8,6 +8,8 @@
 
 S2-1의 독립 오프라인 source-round→raw→정제/map→불변 문서 버전→resume→inspect도 구현했습니다. 합성 재현은 저장소 루트에서 `PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/ingestion_smoke.py`로 실행하며, 실제 JSON subprocess·HTML/PDF 좌표·중단 복구를 검사한 뒤 임시 상태를 모두 제거합니다. 이 경로는 앱/S1 DB를 쓰거나 문서를 사용자 화면에 등록·게시하지 않습니다. 현재 source registry와 hash-pinned fixture가 필수이며 HTTP fallback·모델 호출은 없습니다. [BFF 안내](bff/README.md#독립-오프라인-원문-준비-s2-1-fs074fs075-일부)와 [AI 실행 계약](../docs/design/ai-system.md#s2-1-독립-오프라인-원문-준비와-검사)에서 실행 범위와 한계를 확인합니다. FS074·FS075 전체의 실제 공급원/정기 수집·앱 공개까지 완료했다는 뜻은 아닙니다.
 
+S2-2의 독립 오프라인 이벤트 추출·whole-event SAME·별도 주제 후보도 구현했습니다. `PYTHONDONTWRITEBYTECODE=1 prototype/bff/.venv/bin/python prototype/bff/scripts/extraction_smoke.py`는 실제 ingestion/extraction JSON subprocess를 authored HTML과 replay로 실행하고 임시 상태를 제거합니다. replay는 독립 AI 추론이 아니며 결과는 승인·게시가 아닌 후보입니다. 앱/S1/PoC DB와 네트워크·모델은 사용하지 않습니다. [BFF 안내](bff/README.md#독립-오프라인-이벤트same주제-후보-s2-2)와 [AI 실행 계약](../docs/design/ai-system.md#s2-2-오프라인-이벤트same주제-후보-준비)을 확인합니다.
+
 ## 1. 사전 준비
 
 - Node.js 22.12 이상, pnpm 11.9 계열, Python 3.12 이상, uv가 필요합니다.

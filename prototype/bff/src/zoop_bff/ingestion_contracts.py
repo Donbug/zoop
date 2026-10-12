@@ -108,6 +108,18 @@ class Resume(Wire):
     source_id: str = Field(min_length=1, max_length=200)
 
 
+class Export(Wire):
+    """Exact candidate observation selector for authorized downstream consumers (never a client metadata claim)."""
+    schema_version: Literal["zoop-ingestion-s2-1"]
+    round_id: str = Field(min_length=1, max_length=200)
+    source_id: str = Field(min_length=1, max_length=200)
+    page: int = Field(ge=0)
+    ordinal: int = Field(ge=0)
+    document_id: str = Field(min_length=1)
+    raw_version: str = Field(min_length=1)
+    document_version: str = Field(min_length=1)
+
+
 class Grant(Wire):
     grant_id: str = Field(min_length=1)
     revision: str = Field(min_length=1)
