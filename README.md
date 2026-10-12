@@ -4,25 +4,25 @@ LG CNS AM Inspire Camp 5기 2조 금융 도메인 프로젝트입니다. 내 종
 
 ## 본개발 시작하기
 
-**본개발 코드는 저장소 루트의 `web/`, `api/`, `ai/`, `contracts/`, `infra/`에 책임별로 구현합니다. 모두 예정 경로이며 현재 실행 가능한 앱은 `prototype/`에 있습니다. 본개발 앱이나 운영 배포가 이미 있다는 뜻은 아닙니다.** 프론트엔드·앱 백엔드·AI 런타임은 독립적으로 선택합니다. 현재 React/Python을 강제하지 않으며 Java/Spring은 유력 후보입니다.
+**본개발 코드는 저장소 루트의 `web/`, `api/`, `ai/`, `contracts/`, `infra/`에 책임별로 구현합니다. `api/`에는 Spring Boot 실행 기반과 공통 오류 처리가 있으며 업무 API는 아직 없습니다. 현재 기능을 실행할 수 있는 앱은 `prototype/`에 있고 운영 배포는 없습니다.** 앱 백엔드는 Java 21/Spring Boot를 선택했으며 프론트엔드와 AI 런타임은 독립적으로 선택합니다.
 
 | 본개발 예정 경로 | 책임 | 현재 참고 자료 |
 |---|---|---|
 | `web/` | 사용자·관리자 클라이언트 | [화면계획서](docs/screen-plan/README.md), `docs/design/`, 목표 HTTP 계약 |
-| `api/` | 인증·업무 규칙·앱 저장소·공개 HTTP API | [목표 OpenAPI](docs/api/openapi.yaml), [계약 인계](docs/migration/contract-handoff.md) |
+| `api/` — 실행 기반 있음 | 인증·업무 규칙·앱 저장소·공개 HTTP API | [API 실행·개발 안내](api/README.md), [목표 OpenAPI](docs/api/openapi.yaml), [계약 인계](docs/migration/contract-handoff.md) |
 | `ai/` | AI 실행·작업·산출물 저장소 | [AI 실행 계약](docs/design/ai-system.md), [이식 가이드](docs/migration/README.md) |
 | `contracts/` | 필요한 언어 중립 생성물·합성 fixture의 향후 배포 경계 | **정본은 현재 `docs/api/`**입니다. 생성·검증 명령과 실제 consumer가 생길 때 만들며 두 번째 명세 원본으로 사용하지 않습니다. |
 | `infra/` | 별도 승인된 배포·운영 설정 | [현재 구조와 목표/클라우드 초안](docs/share/system-architecture/README.md), [설정 선행조건](docs/development/github-setup.md) |
 | `docs/` — 현재 존재 | 원문 근거·설계·계약·인계 | [근거 목록](docs/evidence/README.md), [추적 체계](docs/system/README.md) |
 
-예정 경로는 빈 폴더나 가짜 앱으로 먼저 만들지 않습니다. 첫 실제 수직 기능의 PR에서 필요한 manifest·진입점·동작·테스트를 함께 추가하고, 앱별 실행기를 루트 명령과 CI에 연결합니다. 팀원이 지금 할 일은 [본개발 시작 안내](docs/share/production-start-2026-10-12.md), 자세한 생성 조건과 이름 규칙은 [개발 참여 규약](CONTRIBUTING.md)에 있습니다.
+`api/`는 팀의 병렬 개발을 위한 최소 기반 PR로 먼저 생성했습니다. Java 21·Gradle Wrapper·PostgreSQL/JPA/Flyway와 공통 오류 처리를 로컬에서 검증했으며 업무 API는 각 담당자의 기능 PR에서 추가합니다. 다른 예정 경로는 실제 기능이 생길 때 생성합니다. 첫 API 업무 기능 PR 병합 전에는 API 실행기를 루트 명령과 CI에 연결해야 합니다. 팀원이 지금 할 일은 [본개발 시작 안내](docs/share/production-start-2026-10-12.md), 자세한 생성 조건과 이름 규칙은 [개발 참여 규약](CONTRIBUTING.md)에 있습니다.
 
 1. [최신 원문 갱신 기록](docs/evidence/doc-delta-2026-10-12.md)과 [현재 작업 결정](docs/share/day-work-2026-10-10.md)을 읽고, 최신 명세·WBS의 **ID·업무명·출처**로 작업 범위를 정합니다.
 2. 중복 이슈를 확인한 뒤 정상·실패·복구 조건의 완료 기준을 작성하고, [branch·commit·PR 규약](CONTRIBUTING.md#작업-범위와-이슈부터-pr까지)에 따라 브랜치를 만듭니다.
 3. 계약이 바뀌면 `docs/api/` 원본과 영향을 받는 모든 consumer·생성물·시험을 함께 갱신합니다. 현재 BFF `/api`와 목표 `/api/v1`의 차이는 prefix 교체만으로 해소되지 않습니다.
-4. 선택한 본개발 경로에 실제 기능을 구현하고 검증 결과를 PR에 남깁니다. **기존 CI는 프로토타입과 문서/계약을 검사하며, 예정 본개발 앱의 검사기는 아직 연결하지 않았습니다.** 새 앱은 실제 runner 연결과 테스트 없이 merge하지 않습니다.
+4. 선택한 본개발 경로에 실제 기능을 구현하고 검증 결과를 PR에 남깁니다. **기존 CI는 프로토타입과 문서/계약을 검사하며, `api/` 검사기는 아직 연결하지 않았습니다.** API 첫 업무 기능 PR 병합 전 해당 runner·테스트를 루트 명령과 CI에 연결합니다. 다른 새 앱은 첫 기능 PR에서 연결합니다.
 
-루트에서 현재 명령과 설치된 도구를 확인할 수 있습니다. 이 명령은 본개발 앱을 생성하거나 배포하지 않습니다.
+루트에서 기존 명령과 설치된 도구를 확인할 수 있습니다. API의 현재 로컬 빌드·테스트·실행 명령은 [api/README.md](api/README.md)에 있습니다. 이 루트 명령은 본개발 앱을 생성하거나 배포하지 않습니다.
 
 ```sh
 make help projects available-checks
