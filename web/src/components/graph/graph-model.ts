@@ -59,6 +59,7 @@ export function toG6Data(
   data: GraphResponse,
   width: number,
   height: number,
+  expandedId?: string | null,
 ): GraphData {
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
@@ -74,6 +75,7 @@ export function toG6Data(
   const visible = data.nodes.filter(
     (n) =>
       n.kind === 'company' ||
+      n.id === expandedId ||
       (summary.incident.get(n.id)?.length ?? 0) > 1 ||
       followsIds.has(n.id),
   );
@@ -115,13 +117,17 @@ export function toG6Data(
         p?.x ??
         (planned
           ? planned[personal ? 2 : 0]
-          : neighbors.reduce((v, n) => v + n.x, 0) / (neighbors.length || 1) +
+          : (neighbors.length
+              ? neighbors.reduce((v, n) => v + n.x, 0) / neighbors.length
+              : 1000) +
             Math.cos(i) * 50);
       const y =
         p?.y ??
         (planned
           ? planned[personal ? 3 : 1]
-          : neighbors.reduce((v, n) => v + n.y, 0) / (neighbors.length || 1) +
+          : (neighbors.length
+              ? neighbors.reduce((v, n) => v + n.y, 0) / neighbors.length
+              : 400) +
             Math.sin(i) * 50);
       const size = p?.size ?? 7 * scale;
       const badges = [

@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
+import EventDetailPanel, {
+  type EventAction,
+} from '@/components/graph/EventDetailPanel';
+import '@/components/graph/event-panel.css';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useGraphUiStore } from '@/stores/useGraphUiStore';
+import { useAiChatStore } from '@/stores/useAiChatStore';
+import type { EventDetail } from '@/types/map/event';
+import type { GraphTarget } from '@/types/map';
 import type { MapMode, PersonalScope } from '@/types/map';
 
 const FILTER_KEY = 'zoop.graph.personal-filter';
@@ -18,7 +26,7 @@ function readFilter(value: string | null): PersonalScope {
   return value === 'holdings' || value === 'watchlist' ? value : 'all';
 }
 
-// WBS 6.6.21 · 김도현 · D-GRP-01/01b only. Detail/AI/tutorial/round panels excluded.
+// WBS 6.6.21 + 6.6.22 · D-GRP-01/01b + D-GRP-02. Other detail views remain separate.
 export default function MapPage() {
   const { params, updateQuery } = useRouteQuery();
   const token = useAuthStore((s) => s.accessToken);
@@ -37,6 +45,60 @@ export default function MapPage() {
     retry,
   );
   const appliedMode = data?.metadata.mode ?? 'all';
+  const rawSelection = params.get('select');
+  const selectedId = rawSelection?.startsWith('node:')
+    ? rawSelection.slice(5) || null
+    : null;
+  const selectedNode = data?.nodes.find((node) => node.id === selectedId);
+  const eventId =
+    selectedId && (data || !loading) && selectedNode?.kind !== 'company'
+      ? selectedId
+      : null;
+  const mapRegion = useRef<HTMLElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const previousEvent = useRef<string | null>(null);
+  useEffect(() => {
+    if (previousEvent.current && !eventId) {
+      (opener.current?.isConnected
+        ? opener.current
+        : mapRegion.current
+      )?.focus();
+    }
+    previousEvent.current = eventId;
+  }, [eventId]);
+  function selectNode(id: string | null) {
+    if (
+      id &&
+      document.activeElement instanceof HTMLElement &&
+      !document.activeElement.closest('.event-panel')
+    )
+      opener.current = mapRegion.current?.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+    updateQuery({ select: id ? `node:${id}` : null, id: null });
+  }
+  const eventContext = {
+    round: params.get('round') ?? undefined,
+    graphVersion:
+      params.get('graphVersion') ?? data?.metadata.graphVersion ?? undefined,
+    asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
+  };
+  function eventAction(action: EventAction, event: EventDetail) {
+    const target: GraphTarget = {
+      kind: 'issue',
+      id: event.id,
+      evidenceIds: event.evidenceIds,
+      mapContext: {
+        ...eventContext,
+        graphVersion: event.metadata.graphVersion ?? undefined,
+        asOf: event.metadata.asOf,
+        url: `/?${params}`,
+      },
+    };
+    if (action === 'evidence') useGraphUiStore.getState().openEvidence(target);
+    if (action === 'ai') useAiChatStore.getState().open(target);
+    if (action === 'focus') updateQuery({ focus: event.id, hops: '1' });
+  }
   const stats = data ? graphSummary(data) : null;
   const loginNeeded =
     !token && (desiredMode === 'personal' || notice === 'login');
@@ -66,6 +128,9 @@ export default function MapPage() {
   }
   return (
     <section
+      ref={mapRegion}
+      tabIndex={-1}
+      aria-label="관계 지도"
       className="relationship-view"
       data-screen-id={appliedMode === 'personal' ? 'D-GRP-01b' : 'D-GRP-01'}
     >
@@ -169,7 +234,12 @@ export default function MapPage() {
       </div>
       <div className="relationship-body" aria-busy={loading}>
         {data ? (
-          <GraphCanvas data={data} />
+          <GraphCanvas
+            data={data}
+            selectedId={selectedId}
+            onSelect={selectNode}
+            focusId={params.get('focus')}
+          />
         ) : (
           <div className="relationship-canvas">
             <p className="relationship-message" role="status">
@@ -178,6 +248,16 @@ export default function MapPage() {
                 : '관계 지도를 불러오지 못했습니다.'}
             </p>
           </div>
+        )}
+        {eventId && (
+          <EventDetailPanel
+            key={eventId}
+            id={eventId}
+            context={eventContext}
+            geography={selectedNode?.geography ?? null}
+            onClose={() => selectNode(null)}
+            onAction={eventAction}
+          />
         )}
         {(loading ||
           error ||
@@ -221,7 +301,8 @@ export default function MapPage() {
             {notice === 'help' && (
               <p>
                 빈 영역 드래그로 이동 · 휠 또는 +/−로 확대 · 맞춤 버튼으로 전체
-                보기 · 노드 선택으로 이름 확인. 상세 패널은 별도 WBS 범위입니다.
+                보기 · 사건 선택으로 상세 확인 · Tab으로 노드 이동 · Enter로
+                선택 · Escape로 상세 닫기.
               </p>
             )}
             {data?.metadata.partial && (
