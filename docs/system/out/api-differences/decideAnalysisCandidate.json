@@ -21,6 +21,16 @@
       "minimum": 0
     },
     "request:application/json.expectedRevision:required": true,
+    "request:application/json.expectedSourceRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.expectedSourceRevision:required": true,
+    "request:application/json.expectedSourceVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.expectedSourceVersion:required": true,
     "response:200:application/json.candidateId": {
       "type": "string"
     },

@@ -2111,7 +2111,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 115 · BFF만 30 · 형식/필수/권한 변경 11",
+      "message": "목표만 123 · BFF만 30 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -2125,7 +2125,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "decideAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 172 · BFF만 38 · 형식/필수/권한 변경 11",
+      "message": "목표만 176 · BFF만 38 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {

@@ -13,6 +13,22 @@
         "null"
       ]
     },
+    "response:200:application/json.relations[].sourceRevision": {
+      "type": "string"
+    },
+    "response:200:application/json.relations[].sourceRevision:required": true,
+    "response:200:application/json.relations[].sourceVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.relations[].sourceVersion:required": true,
+    "response:200:application/json.sourceRevision": {
+      "type": "string"
+    },
+    "response:200:application/json.sourceRevision:required": true,
+    "response:200:application/json.sourceVersion": {
+      "type": "string"
+    },
+    "response:200:application/json.sourceVersion:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

@@ -305,9 +305,9 @@
 | BFF_PATH_DIFFERENCE | difference | listAnalysisCandidates | 목표 /api/v1/admin/pipeline/candidates ↔ BFF /api/admin/pipeline/candidates |  |
 | BFF_FIELD_DIFFERENCE | difference | listAnalysisCandidates | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | getAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id} ↔ BFF /api/admin/pipeline/candidates/{candidate_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 115 · BFF만 30 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 123 · BFF만 30 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | decideAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id}/decision ↔ BFF /api/admin/pipeline/candidates/{candidate_id}/decision |  |
-| BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 172 · BFF만 38 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 176 · BFF만 38 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | listPublicationRules | 목표 /api/v1/admin/pipeline/rules ↔ BFF /api/admin/pipeline/rules |  |
 | BFF_FIELD_DIFFERENCE | difference | listPublicationRules | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | setPublicationRule | 목표 /api/v1/admin/pipeline/rules/{rule_id} ↔ BFF /api/admin/pipeline/rules/{rule_id} |  |
