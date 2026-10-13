@@ -20,7 +20,7 @@ from scripts.relation_smoke import (BAD, COMP, CO, EVT, GOOD, INV, QB, SUP, SUP2
     impact_reply, impact_verifier_reply, proposal, relation_reply, step, tp, verifier_reply, world_cite)
 from zoop_ai_pipeline import relation_rules as rules
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
-from zoop_ai_pipeline.relation import Store, next_attempt
+from zoop_ai_pipeline.relation import Engine, Store, next_attempt
 from zoop_ai_pipeline.relation_contracts import Revalidate, Review, Submit, digest
 
 
@@ -950,3 +950,147 @@ def test_wire_is_closed_versioned_and_review_cannot_name_a_publication_decision(
     assert w.kit.rel("inspect", w.kit.rsel("nope"), expected=2)["error"]["code"] == "job_not_found"
     assert w.kit.rel("inspect", {"nonsense": True}, expected=2)["error"]["code"] == "input_or_configuration_invalid"
     assert w.kit.rel("inspect", {**w.kit.rsel("j"), "pad": "x" * 2_000_100}, expected=2)["error"]["code"] == "command_input_limit"
+
+
+# ---------------------------------------------------------------- submit-only registration ----------------------------
+
+def jobs(w):
+    """Every stored job row verbatim (including fence/updated_at), to prove a repeated submit writes nothing."""
+    db = database(w)
+    try:
+        return [dict(r) for r in db.execute("SELECT * FROM jobs ORDER BY job_id")]
+    finally:
+        db.close()
+
+
+def no_execution(monkeypatch):
+    """Anything past registration (stage execution or a call reservation) fails the test."""
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a submit reached execution")
+
+    for name in ("_execute", "_receipted", "_reserve"):
+        monkeypatch.setattr(Engine, name, forbidden)
+
+
+def supplies(w):
+    return [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="p")]
+
+
+def authored(w, job):
+    """A completed reference job plus the producer/verifier files its authoring loop recorded, for a later resume of another job."""
+    reference = converge(w, job, supplies(w))
+    assert reference["state"] == "ready"
+    return reference, w.kit.fixture("producer", f"{job}-saved-p", reference["fixtures"][0]), w.kit.fixture("verifier", f"{job}-saved-v", reference["fixtures"][1])
+
+
+def test_submit_needs_a_ready_current_upstream_and_writes_no_job_otherwise(world):
+    w = world
+    pending = w.kit.job("run", w.kit.submit("s2-pending", w.refs["main"], [w.snapshot], topic=True), replay=w.s2_replay)
+    assert pending["state"] == "stopped"
+    early = {**w.kit.rsubmit("early", w.s2), "upstream": {"jobId": "s2-pending", "inputDigest": pending["inputDigest"]}}
+    with pytest.raises(ExtractionFailure, match="upstream_not_ready"):
+        w.kit.rel_job("submit", early)
+    assert w.kit.rel("submit", early, expected=2, forbid_execution=True)["error"]["code"] == "upstream_not_ready"
+    with pytest.raises(ExtractionFailure, match="upstream_input_mismatch"):
+        w.kit.rel_job("submit", {**early, "upstream": {"jobId": "s2-job", "inputDigest": "0" * 64}})
+    w.kit.registry["sources"][0]["grant"]["enabled"] = False
+    w.kit.save_registry()
+    with pytest.raises(ExtractionFailure, match="source_unauthorized"):
+        w.kit.rel_job("submit", w.kit.rsubmit("early", w.s2))
+    assert jobs(w) == []
+
+
+def test_submit_freezes_without_a_fixture_model_or_call_and_resume_completes_the_job_like_run(world, monkeypatch):
+    w = world
+    reference, producer, verifier = authored(w, "reference")
+    no_execution(monkeypatch)
+    queued = w.kit.rel_job("submit", w.kit.rsubmit("late", w.s2))
+    assert queued["state"] == "queued" and queued["phase"] == "relation" and queued["resumeMode"] == "resume" and queued["failure"] is None
+    assert queued["calls"] == [] and queued["usage"]["replayCalls"] == 0 and queued["relations"] == [] and queued["delivery"]["status"] == "current"
+    assert queued["stages"]["relation"] == {"state": "pending"} and queued["binding"] == reference["binding"]
+    assert database(w).execute("SELECT COUNT(*) FROM calls WHERE job_id='late'").fetchone()[0] == 0
+    monkeypatch.undo()
+    done = w.kit.rel_job("resume", w.kit.rsel("late"), replay=producer, verifier=verifier)
+    assert done["state"] == "ready" and done["counts"] == reference["counts"] and done["usage"]["replayCalls"] == reference["usage"]["replayCalls"] > 0
+    assert [r["relationCandidateId"] for r in done["relations"]] == [r["relationCandidateId"] for r in reference["relations"]]
+    assert sorted((x["stage"], x["requestDigest"]) for x in done["calls"]) == sorted((x["stage"], x["requestDigest"]) for x in reference["calls"])
+
+
+@pytest.mark.parametrize("state", ["queued", "stopped", "ready", "cancelled"])
+def test_same_submit_reports_the_stored_job_and_never_executes_resets_or_refreezes_it(world, monkeypatch, state):
+    w = world
+    request = w.kit.rsubmit("dup", w.s2)
+    if state == "ready":
+        converge(w, "dup", supplies(w))
+    elif state == "stopped":
+        w.kit.rel_job("run", request)  # no producer fixture: stops at generation
+    else:
+        w.kit.rel_job("submit", request)
+        if state == "cancelled":
+            w.kit.rel_job("cancel", w.kit.rsel("dup"))
+    stored, before = jobs(w), w.kit.rel_job("inspect", w.kit.rsel("dup"))
+    assert before["state"] == state
+    no_execution(monkeypatch)
+    monkeypatch.setattr(Engine, "_verify", lambda *a: pytest.fail("a repeated submit froze the job again"))
+    assert w.kit.rel_job("submit", request) == before and jobs(w) == stored
+
+
+def test_submit_conflict_and_cli_fixture_rules_leave_the_stored_job_untouched(world):
+    w = world
+    request = w.kit.rsubmit("sub", w.s2)
+    queued = w.kit.rel_job("submit", request)
+    stored = jobs(w)
+    pending = w.kit.job("run", w.kit.submit("s2-pending", w.refs["main"], [w.snapshot], topic=True), replay=w.s2_replay)
+    with pytest.raises(ExtractionFailure, match="job_input_conflict"):
+        w.kit.rel_job("submit", {**request, "upstream": {"jobId": "s2-pending", "inputDigest": pending["inputDigest"]}})
+    with pytest.raises(ExtractionFailure, match="job_input_conflict"):
+        w.kit.rel_job("run", w.kit.rsubmit("sub", w.s2, source_kind="actual"))
+    producer, verifier = w.kit.fixture("producer", "p", []), w.kit.fixture("verifier", "v", [])
+    for fixtures in ({"replay": producer}, {"verifier": verifier}, {"replay": producer, "verifier": verifier}):
+        assert w.kit.rel("submit", request, expected=2, **fixtures)["error"]["code"] == "fixture_not_allowed"
+    live = {**request, "provenance": {**request["provenance"], "executionMode": "live"}}
+    assert w.kit.rel("submit", live, expected=2)["error"]["code"] == "live_mode_unsupported"
+    assert w.kit.rel("submit", {**request, "unknown": 1}, expected=2)["error"]["code"] == "input_or_configuration_invalid"
+    assert jobs(w) == stored and w.kit.rel_job("inspect", w.kit.rsel("sub")) == queued
+    assert database(w).execute("SELECT COUNT(*) FROM calls").fetchone()[0] == 0
+
+
+def test_rights_change_between_submit_and_resume_stops_without_a_call_and_a_repeated_submit_never_restores_or_refreezes(world, monkeypatch):
+    w = world
+    reference, producer, verifier = authored(w, "reference")
+    request, selector = w.kit.rsubmit("late", w.s2), w.kit.rsel("late")
+    w.kit.rel_job("submit", request)
+    stored = jobs(w)
+    grant = w.kit.registry["sources"][0]["grant"]
+    grant["revision"] = "rights-2"
+    w.kit.save_registry()
+    moved = w.kit.rel_job("inspect", selector)
+    assert moved["state"] == "queued" and moved["delivery"] == {"status": "withheld", "code": "grant_revision_changed"} and "relations" not in moved
+    assert w.kit.rel_job("submit", request) == moved and jobs(w) == stored  # the frozen binding is never replaced by the changed grant
+    stopped = w.kit.rel_job("resume", selector, replay=producer, verifier=verifier)
+    assert stopped["state"] == "stopped" and stopped["failure"]["code"] == "grant_revision_changed" and stopped["calls"] == [] and stopped["usage"]["replayCalls"] == 0
+    grant["revision"] = "rights-1"
+    w.kit.save_registry()
+    no_execution(monkeypatch)
+    again = w.kit.rel_job("submit", request)
+    assert again["state"] == "stopped" and again["failure"]["code"] == "grant_revision_changed" and again["calls"] == [] and again["delivery"]["status"] == "current"
+    monkeypatch.undo()
+    done = w.kit.rel_job("resume", selector, replay=producer, verifier=verifier)
+    assert done["state"] == "ready" and done["usage"]["replayCalls"] == reference["usage"]["replayCalls"]
+    grant["enabled"] = False
+    w.kit.save_registry()
+    with pytest.raises(ExtractionFailure, match="source_unauthorized"):
+        w.kit.rel_job("submit", w.kit.rsubmit("late-2", w.s2))
+    assert [j["job_id"] for j in jobs(w)] == ["late", "reference"]
+
+
+def test_a_queued_relation_job_cancels_before_any_execution_and_neither_resume_nor_submit_revives_it(world, monkeypatch):
+    w = world
+    request = w.kit.rsubmit("qc", w.s2)
+    w.kit.rel_job("submit", request)
+    cancelled = w.kit.rel_job("cancel", w.kit.rsel("qc"))
+    assert cancelled["state"] == "cancelled" and cancelled["resumeMode"] == "none" and cancelled["calls"] == []
+    assert cancelled["delivery"] == {"status": "withheld", "code": "job_cancelled"} and "relations" not in cancelled
+    assert w.kit.rel_job("resume", w.kit.rsel("qc")) == cancelled
+    no_execution(monkeypatch)
+    assert w.kit.rel_job("submit", request) == cancelled and database(w).execute("SELECT COUNT(*) FROM calls").fetchone()[0] == 0

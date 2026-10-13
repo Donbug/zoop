@@ -19,6 +19,7 @@ from investmate.domain import Mention
 
 from . import extraction_poc as poc
 from . import extraction_topic as topics
+from .dependency_contracts import array, cites, invalid
 from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS,
     SCHEMA, CitationFailure, ExtractionFailure, ObservationRef, ReplyInvalid, Submit, canonical, digest)
 from .ingestion import Ingestor
@@ -128,7 +129,8 @@ class Store:
             self.db.row_factory = sqlite3.Row
             self.db.execute("PRAGMA query_only=ON")
             self.db.execute("SELECT 1 FROM jobs LIMIT 1")
-            if self.db.execute("SELECT value FROM meta WHERE key='ledger'").fetchone()["value"] != LEDGER_VERSION:
+            meta = self.db.execute("SELECT value FROM meta WHERE key='ledger'").fetchone()
+            if meta is None or meta["value"] != LEDGER_VERSION:
                 raise ExtractionFailure("ledger_version_unknown")
         except sqlite3.DatabaseError as exc:
             self.close()
@@ -379,14 +381,19 @@ class Extractor:
             raise ExtractionFailure("job_not_found")
         return row
 
-    def run(self, request: Submit, fixtures: Fixtures) -> dict:
+    def freeze(self, request: Submit, fixtures: Fixtures) -> None:
+        """The only registration path: durably freeze the exact bound input as `queued`, with no replay model, call or candidate effect.
+
+        The replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here but never
+        parsed into a model. A job that already exists is not touched at all: same input returns without re-freezing, resuming, resetting a
+        stopped job or reading authority; another input is `job_input_conflict` with nothing written. Execution is `resume`'s business."""
         identity = poc.fixture_identity(fixtures.require(), request.provenance, request.prompt_version)
         input_digest = digest({"request": request.wire(), "replayFixtureHash": fixtures.replay_hash})
         row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
         if row is not None:
             if row["input_digest"] != input_digest:
                 raise ExtractionFailure("job_input_conflict")
-            return self.resume(request.job_id, fixtures)
+            return
         ctx = self._context(request)
         self._ground_members(ctx)
         binding = self._binding(ctx, {**identity, "fixtureHash": fixtures.replay_hash})
@@ -394,6 +401,10 @@ class Extractor:
         with self.store.transaction(lambda: self._verify(ctx)):
             self.db.execute("INSERT INTO jobs(job_id,input_digest,request,binding,replay_hash,state,phase,resume_mode,created_at,updated_at) VALUES(?,?,?,?,?,'queued','extract','resume',?,?)",
                 (request.job_id, input_digest, canonical(request.wire()), canonical(binding), fixtures.replay_hash, now(), now()))
+
+    def run(self, request: Submit, fixtures: Fixtures) -> dict:
+        """Convenience: `freeze` then `resume` the same job."""
+        self.freeze(request, fixtures)
         return self.resume(request.job_id, fixtures)
 
     def resume(self, job_id: str, fixtures: Fixtures) -> dict:
@@ -691,10 +702,7 @@ class Extractor:
         binding = json.loads(row["binding"])
         stages = {s["stage"]: json.loads(s["summary"]) for s in self.store.all("SELECT * FROM stages WHERE job_id=?", (job_id,))}
         calls = self.store.all("SELECT * FROM calls WHERE job_id=? ORDER BY started_at,attempt_id", (job_id,))
-        events = self.store.all("SELECT * FROM event_candidates WHERE job_id=? ORDER BY event_candidate_id", (job_id,))
-        comparisons = [json.loads(c["payload"]) for c in self.store.all("SELECT * FROM comparisons WHERE job_id=? ORDER BY event_candidate_id,target_event_id", (job_id,))]
-        dispositions = {d["event_candidate_id"]: json.loads(d["payload"]) for d in self.store.all("SELECT * FROM dispositions WHERE job_id=?", (job_id,))}
-        topic_rows = [json.loads(t["payload"]) for t in self.store.all("SELECT * FROM topic_candidates WHERE job_id=? ORDER BY topic_candidate_id", (job_id,))]
+        events, comparisons, dispositions, topic_rows = candidate_rows(self.store, job_id)
         statuses: dict[str, int] = {}
         for d in dispositions.values():
             statuses[d["status"]] = statuses.get(d["status"], 0) + 1
@@ -721,13 +729,165 @@ class Extractor:
         except ExtractionFailure as exc:
             result["delivery"] = {"status": "withheld", "code": exc.code}
             return result
-        mine = {e["event_candidate_id"]: [] for e in events}
-        for comparison in comparisons:
-            mine[comparison["eventCandidateId"]].append(comparison)
-        result["eventCandidates"] = [{"eventCandidateId": e["event_candidate_id"], "mentionCandidateId": e["mention_candidate_id"], "localMentionId": e["local_mention_id"],
-            "document": {"documentId": e["document_id"], "documentVersion": e["document_version"], "rawVersion": e["raw_version"]},
-            "state": e["state"], "reason": e["reason"], "approved": False, **json.loads(e["payload"]),
-            "comparisons": mine[e["event_candidate_id"]], "disposition": dispositions.get(e["event_candidate_id"])} for e in events]
-        result["topicCandidates"] = topic_rows
+        result["eventCandidates"], result["topicCandidates"] = project_candidates(events, comparisons, dispositions, topic_rows)
         result["delivery"] = {"status": "current", "authority": "read+quote-display verified for every bound document at delivery"}
         return result
+
+
+def candidate_rows(store: Store, job_id: str) -> tuple:
+    """Stored candidate rows of one job exactly as the delivered result reads them: (event rows, comparison payloads, disposition payloads by
+    candidate, topic payloads). A pure database read: no authority, registry or delivery."""
+    events = store.all("SELECT * FROM event_candidates WHERE job_id=? ORDER BY event_candidate_id", (job_id,))
+    comparisons = [json.loads(c["payload"]) for c in store.all("SELECT * FROM comparisons WHERE job_id=? ORDER BY event_candidate_id,target_event_id", (job_id,))]
+    dispositions = {d["event_candidate_id"]: json.loads(d["payload"]) for d in store.all("SELECT * FROM dispositions WHERE job_id=?", (job_id,))}
+    topic_rows = [json.loads(t["payload"]) for t in store.all("SELECT * FROM topic_candidates WHERE job_id=? ORDER BY topic_candidate_id", (job_id,))]
+    return events, comparisons, dispositions, topic_rows
+
+
+def project_candidates(events, comparisons: list[dict], dispositions: dict, topic_rows: list[dict]) -> tuple[list, list]:
+    """The delivered `eventCandidates` (with their comparisons and disposition, never approved) and `topicCandidates`. Pure over stored rows, so
+    the normal result (after the authority gate) and the read-only S4 digest below cannot drift apart."""
+    mine = {e["event_candidate_id"]: [] for e in events}
+    for comparison in comparisons:
+        mine[comparison["eventCandidateId"]].append(comparison)
+    return [{"eventCandidateId": e["event_candidate_id"], "mentionCandidateId": e["mention_candidate_id"], "localMentionId": e["local_mention_id"],
+            "document": {"documentId": e["document_id"], "documentVersion": e["document_version"], "rawVersion": e["raw_version"]},
+            "state": e["state"], "reason": e["reason"], "approved": False, **json.loads(e["payload"]),
+            "comparisons": mine[e["event_candidate_id"]], "disposition": dispositions.get(e["event_candidate_id"])} for e in events], topic_rows
+
+
+def upstream_digest(result: dict) -> str:
+    """Identity of the exact upstream an S3 job consumes: the frozen binding (grants included) plus the delivered event/topic candidates.
+    Owned here, not in relation, so the S4 reader can recompute it from stored rows without importing the consumer."""
+    return digest({"jobId": result["jobId"], "inputDigest": result["inputDigest"], "binding": result["binding"],
+                   "eventCandidates": result["eventCandidates"], "topicCandidates": result["topicCandidates"]})
+
+
+# ---------------------------------------------------------------------- S4 dependents (read-only) -----------------------------------
+
+def dependents(store: Store, matches) -> tuple[dict, dict]:
+    """Identity-only S4 report over EVERY job of an `existing=True` store, from frozen bindings and stored candidate rows alone.
+
+    No Extractor, Sources, authority, registry or delivery is involved, so a revoked job is reported exactly like a current one. A job is
+    affected when one of its frozen bound observations (with the grant frozen beside it) satisfies `matches`: `_context` builds every
+    citable document from the incoming document and the snapshot members only, so no other job can depend on the seed. Returns
+    (ledger report, join index for S3). The index covers every scanned job, affected or not, so an S3 upstream is never silently dropped.
+    Any stored row that does not parse fails the whole report as `dependency_record_invalid`; nothing is skipped."""
+    jobs, index, scanned = [], {}, 0
+    try:
+        for row in store.all("SELECT job_id,input_digest,request,binding,state,phase,failure FROM jobs ORDER BY job_id"):
+            scanned += 1
+            try:
+                entry, found = _dependents_of(store, row, matches)
+            except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
+                raise invalid("extraction", row["job_id"]) from exc
+            index[row["job_id"]] = found
+            if entry is not None:
+                jobs.append(entry)
+    except sqlite3.DatabaseError as exc:
+        raise ExtractionFailure("extraction_state_invalid") from exc
+    return {"ledgerVersion": LEDGER_VERSION, "scannedJobs": scanned, "jobs": jobs}, index
+
+
+def _dependents_of(store: Store, row, matches) -> tuple[dict | None, dict]:
+    job_id = row["job_id"]
+    request = Submit.model_validate_json(row["request"])
+    binding = json.loads(row["binding"])
+    incoming = doc_key(request.incoming)
+    members = {event.event_id: {doc_key(m.observation) for m in event.members} for event in request.snapshot.events}
+    bound = {}
+    for key, document in binding["documents"].items():
+        ref, grant = ObservationRef.model_validate(document["observation"]), document["grant"]
+        if doc_key(ref) != key or not all(isinstance(grant[name], str) for name in ("grantId", "revision")):
+            raise ValueError("binding identity")
+        bound[key] = (ref, grant["grantId"], grant["revision"])
+    everyone = set().union(*members.values())
+    if binding["incoming"] != incoming or incoming in everyone or set(bound) != {incoming} | everyone:
+        raise ValueError("binding scope")
+
+    projection: list[str] = []
+
+    def projected() -> str:
+        """Digest of the delivered candidate projection that S3 pins as `upstream.digest`, recomputed from stored rows only (no delivery gate).
+        Evaluated lazily and once, and only for a job an S3 job names; a stored row that cannot be projected fails the whole report."""
+        if not projection:
+            try:
+                event_candidates, topic_candidates = project_candidates(*candidate_rows(store, job_id))
+                projection.append(upstream_digest({"jobId": job_id, "inputDigest": row["input_digest"], "binding": binding,
+                                                   "eventCandidates": event_candidates, "topicCandidates": topic_candidates}))
+            except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
+                raise invalid("extraction", job_id) from exc
+            except sqlite3.DatabaseError as exc:
+                raise ExtractionFailure("extraction_state_invalid") from exc
+        return projection[0]
+
+    hit = {key for key, (ref, grant_id, revision) in bound.items() if matches(ref, grant_id, revision)}
+    if not hit:
+        return None, {"inputDigest": row["input_digest"], "ready": row["state"] == "ready", "digest": projected, "affected": False,
+                      "documents": set(), "events": set(), "topics": set()}
+    documents = {(bound[key][0].document_id, bound[key][0].document_version) for key in hit}
+    from_incoming = incoming in hit
+
+    matched = sorted(({"role": "incoming" if key == incoming else "snapshot-member", "roundId": ref.round_id, "sourceId": ref.source_id, "page": ref.page,
+                       "ordinal": ref.ordinal, "documentId": ref.document_id, "rawVersion": ref.raw_version, "documentVersion": ref.document_version,
+                       "grant": {"grantId": grant_id, "revision": revision}} for key in hit for ref, grant_id, revision in [bound[key]]),
+                     key=lambda m: (m["documentId"], m["documentVersion"], m["rawVersion"], m["roundId"], m["sourceId"], m["page"], m["ordinal"], m["role"]))
+
+    snapshot_events, affected_events = [], set()
+    for event in sorted(request.snapshot.events, key=lambda e: e.event_id):
+        named = sorted({(bound[doc_key(m.observation)][0].document_id, bound[doc_key(m.observation)][0].document_version)
+                        for m in event.members if doc_key(m.observation) in hit})
+        if named:
+            affected_events.add(event.event_id)
+            snapshot_events.append({"eventId": event.event_id, "revision": event.revision,
+                                    "reasons": [{"code": "member_document", "documentId": d, "documentVersion": v} for d, v in named]})
+
+    candidates = store.all("SELECT event_candidate_id,document_id,document_version,raw_version,state FROM event_candidates WHERE job_id=? ORDER BY event_candidate_id", (job_id,))
+    comparisons = store.all("SELECT event_candidate_id,target_event_id,payload FROM comparisons WHERE job_id=? ORDER BY event_candidate_id,target_event_id", (job_id,))
+    topics = store.all("SELECT topic_candidate_id,payload FROM topic_candidates WHERE job_id=? ORDER BY topic_candidate_id", (job_id,))
+    origin = bound[incoming][0]
+    if any((c["document_id"], c["document_version"], c["raw_version"]) != (origin.document_id, origin.document_version, origin.raw_version) for c in candidates):
+        raise ValueError("candidate origin")
+
+    # The disposition of a candidate is computed over its comparison with EVERY snapshot event, so each affected target it was compared with is an input.
+    compared: dict[str, list[str]] = {}
+    for c in comparisons:
+        if c["target_event_id"] in affected_events:
+            compared.setdefault(c["event_candidate_id"], []).append(c["target_event_id"])
+    event_candidates = []
+    for c in candidates:
+        reasons = [*([{"code": "extracted_from"}] if from_incoming else []), *({"code": "disposition_input", "targetEventId": t} for t in compared.get(c["event_candidate_id"], []))]
+        if reasons:
+            event_candidates.append({"eventCandidateId": c["event_candidate_id"], "state": c["state"], "reasons": reasons})
+
+    compared_entries = []
+    for c in comparisons:
+        payload = json.loads(c["payload"])
+        if payload["eventCandidateId"] != c["event_candidate_id"] or payload["targetEventId"] != c["target_event_id"] or not isinstance(payload["targetRevision"], str):
+            raise ValueError("comparison identity")
+        reasons = [*([{"code": "incoming_document"}] if from_incoming else []), *([{"code": "target_event_member"}] if c["target_event_id"] in affected_events else []),
+                   *cites(payload["citations"], documents)]
+        if reasons:
+            compared_entries.append({"eventCandidateId": c["event_candidate_id"], "targetEventId": c["target_event_id"], "targetRevision": payload["targetRevision"], "reasons": reasons})
+
+    candidate_ids = {c["event_candidate_id"] for c in candidates}
+    topic_entries, affected_topics = [], set()
+    for t in topics:
+        payload = json.loads(t["payload"])
+        if payload["topicCandidateId"] != t["topic_candidate_id"]:
+            raise ValueError("topic identity")
+        reasons = [{"code": "member_event", "kind": m["kind"], "ref": m["ref"]} for m in sorted(array(payload["members"]), key=lambda m: (m["kind"], m["ref"]))
+                   if (m["kind"] == "event-candidate" and from_incoming and m["ref"] in candidate_ids) or (m["kind"] == "snapshot-event" and m["ref"] in affected_events)]
+        reasons += cites(payload["citations"], documents)
+        if reasons:
+            affected_topics.add(t["topic_candidate_id"])
+            topic_entries.append({"topicCandidateId": t["topic_candidate_id"], "reasons": reasons})
+
+    # Scope of the whole job: owner delivery re-verifies every bound document, so a rights or binding change withholds all of it.
+    entry = {"jobId": job_id, "inputDigest": row["input_digest"], "state": row["state"], "phase": row["phase"], "failureCode": row["failure"],
+             "matchedDocuments": matched,
+             "jobScope": {"boundDocuments": len(bound), "snapshotEvents": len(request.snapshot.events), "eventCandidates": len(candidates),
+                          "comparisons": len(comparisons), "topicCandidates": len(topics)},
+             "snapshotEvents": snapshot_events, "eventCandidates": event_candidates, "comparisons": compared_entries, "topicCandidates": topic_entries}
+    return entry, {"inputDigest": row["input_digest"], "ready": row["state"] == "ready", "digest": projected, "affected": True, "documents": documents,
+                   "events": (candidate_ids if from_incoming else set()) | affected_events, "topics": affected_topics}

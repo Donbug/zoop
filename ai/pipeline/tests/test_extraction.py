@@ -13,7 +13,8 @@ import pytest
 
 from scripts.extraction_smoke import (INGESTION_SCHEMA, PROMPT, Q3, Q3B, Kit, page, topic_citation, topic_replay, topic_response)
 from scripts.ingestion_smoke import exact_check
-from zoop_ai_pipeline.extraction import Store
+from zoop_ai_pipeline import extraction_poc as poc
+from zoop_ai_pipeline.extraction import Extractor, Fixtures, Store
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
 
 QB = "합성기업은 4분기 신규 공장 착공을 알렸다."
@@ -720,3 +721,154 @@ def test_downstream_export_seam_is_read_only_current_and_refuses_unfinished_or_r
     with pytest.raises(ExtractionFailure, match="extraction_state_missing"):
         Store(k.root / "not-created", k.root / "ingestion", existing=True)
     assert not (k.root / "not-created").exists()
+
+
+# ---------------------------------------------------------------- submit-only registration ----------------------------
+
+def rows(kit):
+    """Every stored job row verbatim (including fence/updated_at), to prove a repeated submit writes nothing."""
+    db = sqlite3.connect(kit.root / "extraction" / "extraction.sqlite3")
+    db.row_factory = sqlite3.Row
+    try:
+        return [dict(r) for r in db.execute("SELECT * FROM jobs ORDER BY job_id")]
+    finally:
+        db.close()
+
+
+def no_execution(monkeypatch):
+    """Anything past registration (stage execution, a replay model, a call reservation) fails the test."""
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a submit reached execution")
+
+    for owner, name in ((Extractor, "_execute"), (Extractor, "_receipted"), (Extractor, "_reserve"), (Fixtures, "model"), (poc, "replay_model")):
+        monkeypatch.setattr(owner, name, forbidden)
+
+
+def normalized(result):
+    """A result without its job identity, so the same work done under another job ID compares equal."""
+    return {**{k: v for k, v in result.items() if k not in {"jobId", "inputDigest", "usage"}}, "usage": {k: v for k, v in result["usage"].items() if k != "creatorJobId"}}
+
+
+def test_submit_freezes_a_queued_job_with_no_replay_model_call_or_candidate_and_resume_executes_it(world, monkeypatch):
+    k, w = world.kit, world
+    replay = same_of(w, "a2", "a1").write()
+    request = k.submit("job-sub", w.refs["a2"], [event(w, "event-1", "a1")])
+    no_execution(monkeypatch)
+    queued = k.job("submit", request, replay=replay)
+    assert queued["state"] == "queued" and queued["phase"] == "extract" and queued["resumeMode"] == "resume" and queued["failure"] is None
+    assert queued["calls"] == [] and queued["usage"]["replayCalls"] == 0 and queued["eventCandidates"] == [] and queued["topicCandidates"] == []
+    assert {s["state"] for s in queued["stages"].values()} == {"pending"} and queued["delivery"]["status"] == "current"
+    assert queued["binding"]["replay"]["fixtureHash"] == hashlib.sha256(replay.read_bytes()).hexdigest()
+    assert calls(k) == [] and [r["state"] for r in rows(k)] == ["queued"]
+    monkeypatch.undo()
+    done = k.job("resume", k.job_selector("job-sub"), replay=replay)
+    assert done["state"] == "ready" and done["usage"]["replayCalls"] == 2 and disposition(done)["status"] == "same-event-candidate"
+
+
+@pytest.mark.parametrize("second", ["resume", "run"])
+def test_submit_then_resume_or_run_is_the_same_work_as_a_one_shot_run(world, second):
+    k, w = world.kit, world
+    replay = same_of(w, "a2", "a1").write()
+    events = [event(w, "event-1", "a1")]
+    one_shot = k.job("run", k.submit("job-one", w.refs["a2"], events), replay=replay)
+    request = k.submit("job-two", w.refs["a2"], events)
+    assert k.job("submit", request, replay=replay)["state"] == "queued"
+    staged = k.job("resume", k.job_selector("job-two"), replay=replay) if second == "resume" else k.job("run", request, replay=replay)
+    assert one_shot["state"] == staged["state"] == "ready" and staged["jobId"] == "job-two" and one_shot["usage"]["replayCalls"] == 2
+    assert normalized(staged) == normalized(one_shot)
+
+
+@pytest.mark.parametrize("state", ["queued", "stopped", "ready", "cancelled"])
+def test_same_submit_reports_the_stored_job_and_never_executes_resets_or_refreezes_it(world, monkeypatch, state):
+    k, w = world.kit, world
+    replay = k.replay("r").extract(w.art["a1"], [w.mentions["a1"]]).write()
+    request = k.submit("job-dup", w.refs["a1"], topic=state == "stopped")
+    k.job("run" if state in {"stopped", "ready"} else "submit", request, replay=replay)
+    if state == "cancelled":
+        k.job("cancel", k.job_selector("job-dup"))
+    stored, used, before = rows(k), calls(k), k.job("inspect", k.job_selector("job-dup"))
+    assert before["state"] == state
+    no_execution(monkeypatch)
+    monkeypatch.setattr(Extractor, "_ground_members", lambda *a: pytest.fail("a repeated submit froze the job again"))
+    monkeypatch.setattr(Extractor, "_verify", lambda *a: pytest.fail("a repeated submit froze the job again"))
+    assert k.job("submit", request, replay=replay) == before
+    assert rows(k) == stored and calls(k) == used
+
+
+def test_submit_conflicts_with_a_changed_request_or_fixture_and_writes_nothing(world):
+    k, w = world.kit, world
+    replay = k.replay("r").extract(w.art["a1"], [w.mentions["a1"]]).write()
+    request = k.submit("job-conf", w.refs["a1"])
+    queued = k.job("submit", request, replay=replay)
+    stored = rows(k)
+    other = k.replay("other").extract(w.art["a1"], [w.mentions["a1"]])
+    other.doc["model_version"] = "authored-model-2"
+    for command, changed, fixture in (("submit", {**request, "snapshot": {"revision": "snapshot-2", "events": []}}, replay), ("submit", request, other.write()),
+                                      ("run", {**request, "incoming": w.refs["a2"]}, replay), ("run", request, other.write())):
+        with pytest.raises(ExtractionFailure, match="job_input_conflict"):
+            k.job(command, changed, replay=fixture)
+    with pytest.raises(ExtractionFailure, match="replay_fixture_changed"):
+        k.job("resume", k.job_selector("job-conf"), replay=other.write())
+    with pytest.raises(ExtractionFailure, match="replay_fixture_required"):
+        k.job("submit", request)
+    assert rows(k) == stored and k.job("inspect", k.job_selector("job-conf")) == queued and calls(k) == []
+
+
+def test_submit_cli_requires_the_replay_fixture_and_refuses_topic_fixture_and_live_before_touching_state(world):
+    k, w = world.kit, world
+    replay = k.replay("r").extract(w.art["a1"], [w.mentions["a1"]]).write()
+    request = k.submit("job-cli", w.refs["a1"])
+    live = {**request, "provenance": {**request["provenance"], "executionMode": "live", "recordingKind": "provider"}}
+    assert k.run("submit", request, expected=2)["error"]["code"] == "replay_fixture_required"
+    assert k.run("submit", request, replay=replay, topic=topic_replay(k, "t", {}), expected=2)["error"]["code"] == "fixture_not_allowed"
+    assert k.run("submit", live, replay=replay, expected=2)["error"]["code"] == "live_mode_unsupported"
+    assert k.run("submit", {**request, "unknown": 1}, replay=replay, expected=2)["error"]["code"] == "input_or_configuration_invalid"
+    assert not (k.root / "extraction").exists()
+    queued = k.run("submit", request, replay=replay, forbid_execution=True)
+    assert queued["state"] == "queued" and queued["calls"] == [] and queued["usage"]["replayCalls"] == 0
+    assert k.run("submit", request, replay=replay, forbid_execution=True) == k.run("inspect", k.job_selector("job-cli")) == queued
+    done = k.run("resume", k.job_selector("job-cli"), replay=replay)
+    assert done["state"] == "ready" and done["usage"]["replayCalls"] == 1
+    assert k.run("submit", request, replay=replay, forbid_execution=True) == done
+
+
+def test_rights_change_between_submit_and_resume_stops_without_a_call_and_a_repeated_submit_never_restores_or_refreezes(world, monkeypatch):
+    k, w = world.kit, world
+    replay = same_of(w, "a2", "a1").write()
+    request = k.submit("job-late", w.refs["a2"], [event(w, "event-1", "a1")])
+    k.job("submit", request, replay=replay)
+    stored = rows(k)
+    grant = k.registry["sources"][0]["grant"]
+    grant["revision"] = "rights-2"
+    k.save_registry()
+    moved = k.job("inspect", k.job_selector("job-late"))
+    assert moved["state"] == "queued" and moved["delivery"] == {"status": "withheld", "code": "grant_revision_changed"} and "eventCandidates" not in moved
+    assert k.job("submit", request, replay=replay) == moved and rows(k) == stored  # the frozen binding is never replaced by the changed grant
+    stopped = k.job("resume", k.job_selector("job-late"), replay=replay)
+    assert stopped["state"] == "stopped" and stopped["failure"]["code"] == "grant_revision_changed" and stopped["calls"] == [] and calls(k) == []
+    grant["revision"] = "rights-1"
+    k.save_registry()
+    no_execution(monkeypatch)
+    again = k.job("submit", request, replay=replay)
+    assert again["state"] == "stopped" and again["failure"]["code"] == "grant_revision_changed" and again["delivery"]["status"] == "current"
+    monkeypatch.undo()
+    done = k.job("resume", k.job_selector("job-late"), replay=replay)
+    assert done["state"] == "ready" and done["usage"]["replayCalls"] == 2
+    grant["enabled"] = False
+    k.save_registry()
+    with pytest.raises(ExtractionFailure, match="source_unauthorized"):
+        k.job("submit", k.submit("job-new", w.refs["a2"], [event(w, "event-1", "a1")]), replay=replay)
+    assert [r["job_id"] for r in rows(k)] == ["job-late"]
+
+
+def test_a_queued_job_cancels_before_any_execution_and_neither_resume_nor_submit_revives_it(world, monkeypatch):
+    k, w = world.kit, world
+    replay = k.replay("r").extract(w.art["a1"], [w.mentions["a1"]]).write()
+    request = k.submit("job-qc", w.refs["a1"])
+    k.job("submit", request, replay=replay)
+    cancelled = k.job("cancel", k.job_selector("job-qc"))
+    assert cancelled["state"] == "cancelled" and cancelled["resumeMode"] == "none" and cancelled["calls"] == []
+    assert cancelled["delivery"] == {"status": "withheld", "code": "job_cancelled"}
+    assert k.job("resume", k.job_selector("job-qc"), replay=replay) == cancelled
+    no_execution(monkeypatch)
+    assert k.job("submit", request, replay=replay) == cancelled and calls(k) == []

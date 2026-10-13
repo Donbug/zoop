@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import relation_rules as rules
-from .extraction import Extractor, Sources, cite_exact
+from .dependency_contracts import array, cites, invalid
+from .extraction import Extractor, Sources, cite_exact, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import ObservationRef
 from .ingestion_contracts import byte_hash, now, reserved_state_roots
@@ -52,7 +53,7 @@ _STAGES = ("relation", "verify-relation", "impact", "verify-impact")
 
 
 class Store:
-    def __init__(self, root: Path, *upstream_roots: Path):
+    def __init__(self, root: Path, *upstream_roots: Path, existing: bool = False):
         root = Path(os.path.abspath(root))
         forbidden = [*reserved_state_roots(),
                      *(Path(os.path.abspath(p)) for p in upstream_roots)]
@@ -61,6 +62,9 @@ class Store:
         for parent in [*reversed(root.parents), root]:
             if parent.exists() and parent.is_symlink():
                 raise ExtractionFailure("state_namespace_invalid")
+        if existing:
+            self._open_existing(root)
+            return
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
             raise ExtractionFailure("state_namespace_conflict")
@@ -97,6 +101,39 @@ class Store:
                 raise ExtractionFailure("ledger_version_unknown")
             for p in root.iterdir():
                 os.chmod(p, 0o600)
+        except BaseException:
+            self.close()
+            raise
+
+    def _open_existing(self, root: Path):
+        """Read-only access for the S4 dependents report (same policy as the extraction and ingestion readers): shared non-blocking flock
+        on the existing lock, no mkdir/chmod/create/PRAGMA/schema/WAL write, immutable read-only SQLite. A non-empty -wal is committed data a
+        reader must not ignore or recover, so the operator runs the relation writer (resume) first. An active writer makes the reader fail busy."""
+        database, lock = root / "relation.sqlite3", root / "relation.lock"
+        if not root.is_dir() or not database.is_file() or not lock.is_file():
+            raise ExtractionFailure("relation_state_missing")
+        if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
+            raise ExtractionFailure("state_namespace_conflict")
+        self.lock = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            fcntl.flock(self.lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            self.close()
+            raise ExtractionFailure("relation_busy") from exc
+        try:
+            wal = root / "relation.sqlite3-wal"
+            if wal.exists() and wal.stat().st_size > 0:
+                raise ExtractionFailure("relation_recovery_required")
+            self.db = sqlite3.connect(database.as_uri() + "?mode=ro&immutable=1", uri=True, isolation_level=None)
+            self.db.row_factory = sqlite3.Row
+            self.db.execute("PRAGMA query_only=ON")
+            self.db.execute("SELECT 1 FROM jobs LIMIT 1")
+            meta = self.db.execute("SELECT value FROM meta WHERE key='ledger'").fetchone()
+            if meta is None or meta["value"] != LEDGER_VERSION:
+                raise ExtractionFailure("ledger_version_unknown")
+        except sqlite3.DatabaseError as exc:
+            self.close()
+            raise ExtractionFailure("relation_state_invalid") from exc
         except BaseException:
             self.close()
             raise
@@ -181,16 +218,17 @@ def document_view(export: dict) -> dict:
             "title": export["observation"]["title"], "text": export["document"]["text"]}
 
 
-def upstream_digest(result: dict) -> str:
-    return digest({"jobId": result["jobId"], "inputDigest": result["inputDigest"], "binding": result["binding"],
-                   "eventCandidates": result["eventCandidates"], "topicCandidates": result["topicCandidates"]})
-
-
 def next_attempt(events: list[dict], kind: str) -> dict:
     """Distinct identity of the next verification attempt: kind, ordinal, its own policy, and the prior verdict it supersedes."""
     verdicts = [e for e in events if e["kind"] == "verdict"]
     prior = digest({k: v for k, v in verdicts[-1].items() if k not in {"seq", "createdAt"}}) if verdicts else None
     return rules.attempt_wire(kind, len(verdicts), REVALIDATION_POLICY if kind == "revalidation" else POLICY, prior)
+
+
+def chain(store: Store, job_id: str, rc: str) -> list[dict]:
+    """The append-only verdict/review events of one relation candidate in order (shared by the engine and the S4 read-only report)."""
+    return [{"seq": e["seq"], "kind": e["kind"], "createdAt": e["created_at"], **json.loads(e["payload"])}
+            for e in store.all("SELECT * FROM relation_events WHERE job_id=? AND relation_candidate_id=? ORDER BY seq", (job_id, rc))]
 
 
 def standing(events: list[dict]) -> dict:
@@ -302,17 +340,27 @@ class Engine:
             raise ExtractionFailure("job_not_found")
         return row
 
-    def run(self, request: Submit, fixtures: Fixtures) -> dict:
+    def freeze(self, request: Submit) -> None:
+        """The only registration path: durably freeze the exact upstream (a ready, currently authorized S2 job) as `queued`, with no replay
+        fixture, call or candidate effect. The producer/verifier fixtures are per-call inputs, not part of the frozen job.
+
+        A job that already exists is not touched at all: same input returns without re-freezing, resuming, resetting a stopped job or
+        reading the upstream; another input is `job_input_conflict` with nothing written. A new job needs a ready current upstream
+        (`upstream_not_ready` and the S2 failure codes otherwise). Execution is `resume`'s business."""
         input_digest = digest(request.wire())
         row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
         if row is not None:
             if row["input_digest"] != input_digest:
                 raise ExtractionFailure("job_input_conflict")
-            return self.resume(request.job_id, fixtures)
+            return
         ctx = self._context(request)
         with self.store.transaction(lambda: self._verify(ctx)):
             self.db.execute("INSERT INTO jobs(job_id,input_digest,request,binding,state,phase,resume_mode,created_at,updated_at) VALUES(?,?,?,?,'queued','relation','resume',?,?)",
                 (request.job_id, input_digest, canonical(request.wire()), canonical(self._binding(ctx)), now(), now()))
+
+    def run(self, request: Submit, fixtures: Fixtures) -> dict:
+        """Convenience: `freeze` then `resume` the same job."""
+        self.freeze(request)
         return self.resume(request.job_id, fixtures)
 
     def resume(self, job_id: str, fixtures: Fixtures) -> dict:
@@ -514,8 +562,7 @@ class Engine:
     # ------------------------------------------------------------------ stages -----------------------------------------
 
     def _events(self, job_id: str, rc: str) -> list[dict]:
-        return [{"seq": e["seq"], "kind": e["kind"], "createdAt": e["created_at"], **json.loads(e["payload"])}
-                for e in self.store.all("SELECT * FROM relation_events WHERE job_id=? AND relation_candidate_id=? ORDER BY seq", (job_id, rc))]
+        return chain(self.store, job_id, rc)
 
     def _has_saved_revalidation(self, job_id: str) -> bool:
         return any(self._saved_revalidation(job_id, c["relation_candidate_id"], self._events(job_id, c["relation_candidate_id"]))
@@ -702,3 +749,92 @@ class Engine:
         result["relations"] = relations
         result["delivery"] = {"status": "current", "authority": "S2 job, read+quote-display rights and exact candidate set verified at delivery"}
         return result
+
+
+# ---------------------------------------------------------------------- S4 dependents (read-only) -----------------------------------
+
+def dependents(store: Store, index: dict) -> dict:
+    """Identity-only S4 report over EVERY job of an `existing=True` relation store, joined to the S2 scan `index` by the upstream the S3 job froze:
+    (jobId, inputDigest) AND the pinned `upstream.digest` (frozen binding incl. grants + delivered candidates).
+
+    inputDigest covers only the request and replay, not the frozen grant, and a relation binding does not record which extraction ledger it read.
+    So an upstream that is absent from the scanned ledger, has another input digest, is not the ready job S3 can only originate from, or whose
+    recomputed digest differs from the pinned one (e.g. the same job under another frozen grant revision) is listed as `unresolved` BEFORE any
+    affected/unaffected decision, never omitted or attributed to a different binding. A job whose upstream is the exact pinned one and is affected
+    is listed, and its direct entries are the relation/impact candidates that name an affected event/topic endpoint (matching kind) or cite an
+    affected document. Eligibility is the pure `standing()` of the stored chain; no delivery, authority or registry is involved. A row that does
+    not parse, or a dependency container that is not an array, fails the whole report."""
+    buckets: dict[str, list] = {"jobs": [], "unresolved": []}
+    scanned = 0
+    try:
+        for row in store.all("SELECT job_id,input_digest,request,binding,state,phase,failure FROM jobs ORDER BY job_id"):
+            scanned += 1
+            try:
+                found = _dependents_of(store, row, index)
+            except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
+                raise invalid("relation", row["job_id"]) from exc
+            if found is not None:
+                buckets[found[0]].append(found[1])
+    except sqlite3.DatabaseError as exc:
+        raise ExtractionFailure("relation_state_invalid") from exc
+    return {"ledgerVersion": LEDGER_VERSION, "scannedJobs": scanned, **buckets}
+
+
+def _dependents_of(store: Store, row, index: dict) -> tuple[str, dict] | None:
+    job_id = row["job_id"]
+    request, upstream = Submit.model_validate_json(row["request"]), json.loads(row["binding"])["upstream"]
+    if (request.upstream.job_id, request.upstream.input_digest) != (upstream["jobId"], upstream["inputDigest"]):
+        raise ValueError("upstream identity")
+    pinned = {"jobId": upstream["jobId"], "inputDigest": upstream["inputDigest"]}
+    if not isinstance(upstream["digest"], str):
+        raise ValueError("upstream digest")
+    found = index.get(pinned["jobId"])
+    code = ("upstream_not_in_scanned_ledger" if found is None else "upstream_input_mismatch" if found["inputDigest"] != pinned["inputDigest"]
+            # Export is ready-only and ready is terminal, so any other state cannot be what S3 consumed; the digest settles the rest.
+            else "upstream_binding_mismatch" if not found["ready"] or found["digest"]() != upstream["digest"] else None)
+    if code is not None:
+        return "unresolved", {"jobId": job_id, "inputDigest": row["input_digest"], "state": row["state"], "upstream": pinned, "code": code}
+    if not found["affected"]:
+        return None
+    documents, events, topics = found["documents"], found["events"], found["topics"]
+    relations = store.all("SELECT relation_candidate_id,relation_key,payload FROM relation_candidates WHERE job_id=? ORDER BY relation_candidate_id", (job_id,))
+    impacts = store.all("SELECT impact_candidate_id,relation_candidate_id,payload FROM impact_candidates WHERE job_id=? ORDER BY impact_candidate_id", (job_id,))
+    relation_ids = {r["relation_candidate_id"] for r in relations}
+
+    relation_entries, listed = [], set()
+    for r in relations:
+        payload = json.loads(r["payload"])
+        if payload["relationKey"] != r["relation_key"]:
+            raise ValueError("relation identity")
+        reasons = []
+        for role in ("subject", "object"):
+            kind, ref = payload[role]["kind"], payload[role]["ref"]
+            # Event and topic are different endpoint kinds: a topic endpoint that spells an event ID is not a dependency on that event.
+            if (kind == "event" and ref in events) or (kind == "topic" and ref in topics):
+                reasons.append({"code": "endpoint_" + kind, "role": role, "ref": ref})
+        reasons += cites(payload["citations"], documents, at="citations")
+        reasons += cites(payload["validity"]["citations"], documents, at="validity")
+        for number, step in enumerate(array(payload["path"]), 1):
+            reasons += cites(step["citations"], documents, at=f"step:{number}")
+        if reasons:
+            listed.add(r["relation_candidate_id"])
+            relation_entries.append({"relationCandidateId": r["relation_candidate_id"], "relationKey": r["relation_key"],
+                                     "eligibility": standing(chain(store, job_id, r["relation_candidate_id"]))["eligibility"], "reasons": reasons})
+
+    impact_entries = []
+    for i in impacts:
+        payload = json.loads(i["payload"])
+        if payload["impactCandidateId"] != i["impact_candidate_id"] or payload["relationCandidateId"] != i["relation_candidate_id"] or i["relation_candidate_id"] not in relation_ids:
+            raise ValueError("impact identity")
+        reasons = [*([{"code": "relation", "relationCandidateId": i["relation_candidate_id"]}] if i["relation_candidate_id"] in listed else []),
+                   *cites(payload["proposal"]["supporting"], documents, at="supporting"), *cites(payload["proposal"]["opposing"], documents, at="opposing")]
+        if reasons:
+            verdict = store.one("SELECT payload FROM impact_verdicts WHERE job_id=? AND impact_candidate_id=?", (job_id, i["impact_candidate_id"]))
+            impact_entries.append({"impactCandidateId": i["impact_candidate_id"], "relationCandidateId": i["relation_candidate_id"],
+                                   "verdictStatus": json.loads(verdict["payload"])["status"] if verdict else None, "reasons": reasons})
+
+    return "jobs", {"jobId": job_id, "inputDigest": row["input_digest"], "state": row["state"], "phase": row["phase"], "failureCode": row["failure"],
+                    "upstream": pinned, "reasons": [{"code": "upstream"}],
+                    # The producer request carried every upstream document and delivery re-verifies the whole upstream: a change withholds all of the job.
+                    "jobScope": {"relationCandidates": len(relations), "impactCandidates": len(impacts)},
+                    "relationCandidates": relation_entries, "impactCandidates": impact_entries}

@@ -16,7 +16,7 @@ from .ingestion_contracts import Authority, IngestionFailure, read_file
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "resume", "inspect", "cancel"))
+    parser.add_argument("command", choices=("run", "submit", "resume", "inspect", "cancel"))
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--ingestion-state-dir", required=True, type=Path)
     parser.add_argument("--sources", required=True, type=Path)
@@ -29,7 +29,7 @@ def main() -> int:
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
         incoming = json.loads(raw)
-        if args.command == "run":
+        if args.command in {"run", "submit"}:
             provenance = incoming.get("provenance") if isinstance(incoming, dict) else None
             if isinstance(provenance, dict) and provenance.get("executionMode") == "live":
                 # No live path or fake fallback exists in the offline seam.
@@ -39,7 +39,10 @@ def main() -> int:
             request = Selector.model_validate(incoming)
         if args.command in {"inspect", "cancel"} and (args.replay or args.topic_replay):
             raise ExtractionFailure("fixture_not_allowed")
-        if args.command == "run" and args.replay is None:
+        if args.command == "submit" and args.topic_replay:
+            # The topic fixture is not part of the frozen job; only its stage-time `resume` may name it.
+            raise ExtractionFailure("fixture_not_allowed")
+        if args.command in {"run", "submit"} and args.replay is None:
             raise ExtractionFailure("replay_fixture_required")
         fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                             read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
@@ -48,6 +51,10 @@ def main() -> int:
         extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
         if args.command == "run":
             result = extractor.run(request, fixtures)
+        elif args.command == "submit":
+            # Registration only: freeze, then report the stored job. No execution, replay call or state change for an existing job.
+            extractor.freeze(request, fixtures)
+            result = extractor.inspect(request.job_id)
         elif args.command == "resume":
             result = extractor.resume(request.job_id, fixtures)
         elif args.command == "inspect":

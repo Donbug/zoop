@@ -129,7 +129,7 @@ class RelKit(Kit):
         return path
 
     def rel(self, command: str, request: dict, *, replay: Path | None = None, verifier: Path | None = None, state: str = "relation",
-            crash: str | None = None, expected: int = 0, raw: bool = False):
+            crash: str | None = None, expected: int = 0, raw: bool = False, forbid_execution: bool = False):
         """Actual relation JSON subprocess with a socket audit hook (any network attempt aborts the process)."""
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
         guard = ("import os, sys, runpy\n"
@@ -139,6 +139,9 @@ class RelKit(Kit):
                  "sys.addaudithook(_guard)\n"
                  "from zoop_ai_pipeline.relation import Engine\n")
         hook = ""
+        if forbid_execution:
+            # A submit-only process exits 76 if it reaches stage execution or a call reservation.
+            hook = "def _forbidden(*a, **k):\n os._exit(76)\nEngine._execute = Engine._reserve = Engine._receipted = _forbidden\n"
         if crash:
             kind, _, argument = crash.partition(":")
             hook = {
@@ -172,6 +175,10 @@ class RelKit(Kit):
             engine = Engine(store, Sources(self.root / "ingestion", Authority(self.registry_path)), self.root / "extraction", self.root / "ingestion")
             if command == "run":
                 return engine.run(Submit.model_validate(request), fixtures)
+            if command == "submit":
+                submit = Submit.model_validate(request)
+                engine.freeze(submit)
+                return engine.inspect(submit.job_id)
             if command == "review":
                 return engine.review(Review.model_validate(request))
             if command == "revalidate":
@@ -205,6 +212,7 @@ def build_world(root: Path, countries: tuple[str, ...] = ()) -> SimpleNamespace:
     done = kit.job("resume", kit.job_selector("s2-job"), topic=topic)
     assert done["state"] == "ready" and len(done["topicCandidates"]) == 1, done
     world.s2, world.tp = done, done["topicCandidates"][0]["topicCandidateId"]
+    world.s2_request, world.s2_topic = request, topic  # the exact authored S2 Submit and topic fixture, for the S2 HTTP service tests
     world.submit = kit.rsubmit("rel-main", done)
     return world
 
@@ -479,6 +487,55 @@ def smoke(root: Path) -> dict:
     kit.save_registry()
     assert kit.rel("inspect", kit.rsel("rel-main"))["delivery"]["status"] == "current"
     checks.append("forged upstream digest, invalid fixture, live mode and revoked rights fail closed; withheld output has no private text")
+
+    # 13. Submit-only registration (actual processes): a ready current S2 upstream and NO fixture freeze a durable queued job; execution and its per-call
+    #     producer/verifier fixtures belong to a later `resume`. A repeated submit only reports the stored job. `forbid_execution` ends a process with
+    #     76 if it reaches stage execution or a call reservation.
+    pending = kit.job("run", kit.submit("s2-pending", world.refs["main"], [world.snapshot], topic=True), replay=world.s2_replay)
+    assert pending["state"] == "stopped"
+    assert kit.rel("submit", kit.rsubmit("rel-premature", pending), expected=2, forbid_execution=True)["error"]["code"] == "upstream_not_ready"
+    assert kit.rel("inspect", kit.rsel("rel-premature"), expected=2)["error"]["code"] == "job_not_found"
+    request13, sel13 = kit.rsubmit("rel-submit", world.s2), kit.rsel("rel-submit")
+    for fixtures in ({"replay": mini}, {"verifier": verdict_file}, {"replay": mini, "verifier": verdict_file}):
+        assert kit.rel("submit", request13, expected=2, **fixtures)["error"]["code"] == "fixture_not_allowed"
+    live13 = {**request13, "provenance": {**request13["provenance"], "executionMode": "live"}}
+    assert kit.rel("submit", live13, expected=2)["error"]["code"] == "live_mode_unsupported"
+    assert kit.rel("inspect", sel13, expected=2)["error"]["code"] == "job_not_found"
+    queued = kit.rel("submit", request13, forbid_execution=True)
+    assert queued["state"] == "queued" and queued["phase"] == "relation" and queued["resumeMode"] == "resume" and queued["failure"] is None
+    assert queued["calls"] == [] and queued["usage"]["replayCalls"] == 0 and queued["relations"] == [] and queued["delivery"]["status"] == "current"
+    assert queued["stages"]["relation"] == {"state": "pending"} and queued["binding"]["upstream"]["jobId"] == "s2-job"
+    assert kit.rel("submit", request13, forbid_execution=True) == kit.rel("inspect", sel13) == queued
+    conflicting = {**request13, "upstream": {"jobId": "s2-pending", "inputDigest": pending["inputDigest"]}}
+    assert kit.rel("submit", conflicting, expected=2, forbid_execution=True)["error"]["code"] == "job_input_conflict"
+    assert kit.rel("inspect", sel13) == queued
+    reference = converge(world, "rel-submit-reference", [proposals[0]], process=True)
+    assert reference["state"] == "ready" and reference["relations"][0]["eligibility"]["status"] == "eligible"
+    producer13 = kit.fixture("producer", "rel-submit-p", reference["fixtures"][0])
+    verifier13 = kit.fixture("verifier", "rel-submit-v", reference["fixtures"][1])
+    grant = kit.registry["sources"][0]["grant"]
+    grant["revision"] = "rights-2"
+    kit.save_registry()
+    moved = kit.rel("inspect", sel13, expected=2)
+    assert moved["state"] == "queued" and moved["delivery"] == {"status": "withheld", "code": "grant_revision_changed"} and moved["calls"] == []
+    stopped13 = kit.rel("resume", sel13, replay=producer13, verifier=verifier13, expected=2)
+    assert stopped13["state"] == "stopped" and stopped13["failure"]["code"] == "grant_revision_changed" and stopped13["calls"] == [] and stopped13["usage"]["replayCalls"] == 0
+    grant["revision"] = "rights-1"
+    kit.save_registry()
+    again = kit.rel("submit", request13, forbid_execution=True)
+    assert again["state"] == "stopped" and again["failure"]["code"] == "grant_revision_changed" and again["calls"] == [] and again["delivery"]["status"] == "current"
+    done13 = kit.rel("resume", sel13, replay=producer13, verifier=verifier13)
+    assert done13["state"] == "ready" and done13["counts"] == reference["counts"] and done13["usage"]["replayCalls"] == reference["usage"]["replayCalls"]
+    assert done13["relations"][0]["relationCandidateId"] == reference["relations"][0]["relationCandidateId"]
+    assert kit.rel("submit", request13, forbid_execution=True) == done13
+    cancel13, cancel_selector = kit.rsubmit("rel-submit-cancel", world.s2), kit.rsel("rel-submit-cancel")
+    kit.rel("submit", cancel13, forbid_execution=True)
+    cancelled13 = kit.rel("cancel", cancel_selector, expected=2)
+    assert cancelled13["state"] == "cancelled" and cancelled13["resumeMode"] == "none" and cancelled13["calls"] == [] and cancelled13["delivery"] == {"status": "withheld", "code": "job_cancelled"}
+    assert kit.rel("resume", cancel_selector, replay=producer13, verifier=verifier13, expected=2) == cancelled13
+    assert kit.rel("submit", cancel13, expected=2, forbid_execution=True) == cancelled13
+    checks.append("submit-only: premature (non-ready) upstream refused without a job, fixtures refused, durable queued job with zero attempts, idempotent same submit, conflicting upstream, "
+                  "rights revision change before execution stops resume without calls, duplicate submit never resumes a stopped/ready/cancelled job, resume completes with per-call fixtures, queued cancel")
     return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerCalls": 0, "modelCalls": 0,
             "networkAttempts": "audit hook rejected socket use in every CLI subprocess; none occurred"}
 
