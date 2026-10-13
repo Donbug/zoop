@@ -199,6 +199,18 @@ jobs:
     name: api
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    services:
+      briefing-postgres:
+        image: postgres:16.13-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+        env:
+          POSTGRES_USER: briefing_test
+          POSTGRES_PASSWORD: briefing_test
+          POSTGRES_DB: briefing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U briefing_test -d briefing_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -218,6 +230,12 @@ jobs:
           enable-cache: false
       - name: Java tests (foundation + AI client against in-process stub servers; no DB, no Python, no secret) and application assemble
         run: make api-test api-build
+      - name: Briefing fresh/incremental migration, immutable snapshots and JDBC-to-HTTP (isolated synthetic DB)
+        env:
+          ZOOP_BRIEFING_TEST_DB_URL: jdbc:postgresql://127.0.0.1:5432/briefing_test
+          ZOOP_BRIEFING_TEST_DB_USERNAME: briefing_test
+          ZOOP_BRIEFING_TEST_DB_PASSWORD: briefing_test
+        run: make api-briefing-test
       - name: Bootstrap the ai/service runtime and installed zoop-ai for the real gate (public dependencies, no token)
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)

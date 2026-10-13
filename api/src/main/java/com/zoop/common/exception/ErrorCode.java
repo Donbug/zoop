@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.UNPROCESSABLE_CONTENT, "잘못된 요청입니다.", false),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다.", false),
+    INVALID_CURSOR(HttpStatus.UNPROCESSABLE_CONTENT, "잘못된 페이지 커서입니다.", false),
+    SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "자료를 일시적으로 제공할 수 없습니다.", true),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.", false);
 
     private final HttpStatus status;

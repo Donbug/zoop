@@ -1,6 +1,6 @@
 # Zoop API 실행 환경
 
-Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 업무 API·인증 로직은 아직 구현하지 않았습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
+Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 브리핑 공개 조회 외의 업무 API·인증 로직은 아직 구현하지 않았습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
 
@@ -40,7 +40,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
-업무 endpoint는 없으므로 `/`의 404는 정상입니다. 서버 로그의 `Started ZoopApplication`과 DB·Flyway 초기화를 확인하세요. 잘못된 DB 설정에서는 기동이 실패해야 합니다.
+브리핑 공개 GET endpoint 외에 `/`의 404는 정상입니다. 서버 로그의 `Started ZoopApplication`과 DB·Flyway 초기화를 확인하세요. 잘못된 DB 설정에서는 기동이 실패해야 합니다.
 
 ## 빌드
 
@@ -145,3 +145,7 @@ API 앱 검사기는 루트 Makefile(`api-test`/`api-build`/`api-ai-smoke`)과 C
 | 회원·관리자 세션, 권한·Origin·CSRF 오류 처리 | 인증 담당 | 보호가 필요한 업무 API 완료 전 |
 | 불투명 커서·공개 버전 고정 | 해당 조회 기능 담당 + 데이터 소유 담당 | 해당 조회 API 완료 전 |
 | 쓰기 멱등성·AI 작업 계약·감사 기록 | 해당 쓰기·AI·관리자 기능 담당 | 해당 기능 완료 전 |
+
+## 브리핑 저장·공개 조회 첫 단위
+
+브리핑 회차 저장과 `GET /api/v1/briefings`, `/api/v1/briefings/rounds`를 추가했다. 상세 구현/검증·미연결 경계는 [브리핑 저장 안내](docs/BRIEFING_STORAGE.md)에 있다. 회차가 없으면 not_ready이며 GET이 생성 작업을 만들지 않는다. 실제 발행 writer·개인화·graph·정정 흐름은 후속이다. 현재 권리 확인 adapter가 없으면 발행 내용 조회는503으로 차단된다. 기본 테스트는 DB 없이 실행하며 `make api-briefing-test`는 명시적인 독립 DB 설정이 필요하고 CI api job에서도 실행한다.

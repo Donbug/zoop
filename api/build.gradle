@@ -31,7 +31,7 @@ dependencies {
 // Default `test`: foundation tests and the AI client tests against in-process stub servers. No Python, no network.
 tasks.named('test') {
 	useJUnitPlatform {
-		excludeTags 'ai-contract'
+		excludeTags 'ai-contract', 'briefing-db'
 	}
 }
 
@@ -51,4 +51,15 @@ tasks.register('aiContractTest', Test) {
 		events 'passed', 'failed'
 		exceptionFormat 'full'
 	}
+}
+
+// Explicit isolated PostgreSQL verification; missing DB configuration fails, never skips.
+tasks.register('briefingStorageTest', Test) {
+    group = 'verification'
+    description = 'Verifies briefing migrations and JDBC/HTTP storage against an isolated PostgreSQL DB.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'briefing-db' }
+    outputs.upToDateWhen { false }
+    testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
 }
