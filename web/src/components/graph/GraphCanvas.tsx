@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import GraphIcon from './GraphIcon';
@@ -6,40 +6,69 @@ import { graphSummary, toG6Data } from './graph-model';
 
 export default function GraphCanvas({
   data,
-  selectedId = null,
+  selectedId: selected = null,
   onSelect,
+  focusId = null,
 }: {
   data: GraphResponse;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
+  focusId?: string | null;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<Graph | null>(null);
-  const selectedIdRef = useRef(selectedId);
-  const previousSelectedId = useRef<string | null>(null);
-  const onSelectRef = useRef(onSelect);
   const [zoom, setZoom] = useState(1);
+  const drawing = useRef(Promise.resolve());
+  const lastFocused = useRef<string | null>(null);
+  const selectNode = useEffectEvent((id: string | null) => onSelect?.(id));
   const [renderError, setRenderError] = useState(false);
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
   const center =
-    data.nodes.find((n) => n.id === selectedId && n.kind === 'company') ??
+    data.nodes.find((n) => n.id === selected && n.kind === 'company') ??
     data.nodes.find((n) => n.isFocus);
-  const selectedNode = data.nodes.find((n) => n.id === selectedId);
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-    onSelectRef.current = onSelect;
+  const selectedNode = data.nodes.find((n) => n.id === selected);
+  const syncSelection = useEffectEvent(() => {
     const graph = instance.current;
-    if (!graph || graph.destroyed) return;
-    const states: Record<string, string[]> = {};
-    if (previousSelectedId.current) states[previousSelectedId.current] = [];
-    if (selectedId) states[selectedId] = ['selected'];
-    previousSelectedId.current = selectedId;
-    void graph.setElementState(states).catch(() => {
-      /* a folded issue can be selected without a rendered G6 element */
-    });
-  }, [selectedId, onSelect]);
+    const host = container.current;
+    if (!graph || !host) return;
+    // Serialize G6 drawing; selecting/closing never recreates the graph or viewport.
+    drawing.current = drawing.current
+      .then(async () => {
+        if (graph.destroyed) return;
+        const rendered = toG6Data(
+          data,
+          host.clientWidth,
+          host.clientHeight,
+          selected ?? focusId,
+        );
+        graph.setData(rendered);
+        await graph.draw();
+        if (graph.destroyed) return;
+        await graph.setElementState(
+          Object.fromEntries(
+            (rendered.nodes ?? []).map((node) => [
+              node.id,
+              node.id === selected ? ['selected'] : [],
+            ]),
+          ),
+        );
+        if (
+          focusId &&
+          focusId !== lastFocused.current &&
+          rendered.nodes?.some((node) => node.id === focusId)
+        )
+          await graph.focusElement(focusId, false);
+        lastFocused.current = focusId;
+      })
+      .catch(() => {
+        if (!graph.destroyed) setRenderError(true);
+      });
+  });
+  useEffect(() => {
+    syncSelection();
+  }, [selected, focusId]);
   useEffect(() => {
     const host = container.current;
     if (!host) return;
@@ -51,13 +80,14 @@ export default function GraphCanvas({
       if (disposed || !host) return;
       setRenderError(false);
       setZoom(1);
+      lastFocused.current = null;
       graph = new Graph({
         container: host,
         width: host.clientWidth,
         height: host.clientHeight,
         animation: false,
         data: toG6Data(data, host.clientWidth, host.clientHeight),
-        behaviors: ['drag-canvas', 'zoom-canvas', 'click-select'],
+        behaviors: ['drag-canvas', 'zoom-canvas'],
         zoomRange: [0.25, 4],
         node: {
           state: {
@@ -70,13 +100,10 @@ export default function GraphCanvas({
           },
         },
       });
-      instance.current = graph;
-      graph.on('node:click', (event: IElementEvent) => {
-        onSelectRef.current?.(event.target.id);
-      });
-      graph.on('canvas:click', () => {
-        onSelectRef.current?.(null);
-      });
+      graph.on('node:click', (event: IElementEvent) =>
+        selectNode(event.target.id),
+      );
+      graph.on('canvas:click', () => selectNode(null));
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
@@ -87,16 +114,12 @@ export default function GraphCanvas({
       });
       try {
         await graph.render();
-        if (selectedIdRef.current) {
-          await graph.setElementState({
-            [selectedIdRef.current]: ['selected'],
-          });
-        }
-        previousSelectedId.current = selectedIdRef.current;
       } catch {
         if (!disposed) setRenderError(true);
       }
       if (disposed) return;
+      instance.current = graph;
+      syncSelection();
       observer = new ResizeObserver(() => {
         if (graph && !disposed)
           graph.setSize(host.clientWidth, host.clientHeight);
@@ -126,17 +149,6 @@ export default function GraphCanvas({
           ),
           false,
         );
-    } catch {
-      setRenderError(true);
-    }
-  }
-  async function focus(id: string) {
-    const graph = instance.current;
-    if (!graph || graph.destroyed) return;
-    try {
-      await graph.focusElement(id, false);
-      await graph.setElementState({ [id]: ['selected'] });
-      onSelectRef.current?.(id);
     } catch {
       setRenderError(true);
     }
@@ -261,10 +273,15 @@ export default function GraphCanvas({
       )}
       <div
         className="relationship-accessible-nodes"
-        aria-label="키보드로 기업 선택"
+        aria-label="키보드로 기업·사건 선택"
       >
-        {stats.companyNodes.map((node) => (
-          <button key={node.id} onClick={() => void focus(node.id)}>
+        {data.nodes.map((node) => (
+          <button
+            key={node.id}
+            aria-pressed={selected === node.id}
+            onClick={() => onSelect?.(node.id)}
+          >
+            {node.kind === 'issue' ? '사건: ' : '기업: '}
             {node.label}
             {node.holding ? ' · 보유' : ''}
             {node.watch ? ' · 관심' : ''}
