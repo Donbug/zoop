@@ -1,11 +1,14 @@
 package com.zoop.auth.entity;
 
 import java.time.Instant;
+import java.util.Map;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "member_sessions")
@@ -34,6 +37,10 @@ public class MemberSession {
 
     @Column(name = "tutorial_completed", nullable = false)
     private boolean tutorialCompleted;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "auth_flow", columnDefinition = "jsonb")
+    private Map<String, Object> authFlow;
 
     @Column(name = "created_at", nullable = false, columnDefinition = "timestamptz")
     private Instant createdAt;
