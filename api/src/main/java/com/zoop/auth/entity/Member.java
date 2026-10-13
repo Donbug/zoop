@@ -35,7 +35,7 @@ public class Member {
     @Column(name = "status", nullable = false, columnDefinition = "text")
     private String status;
 
-    @Column(name = "mode", nullable = false, columnDefinition = "text")
+    @Column(name = "mode", columnDefinition = "text")
     private String mode;
 
     @Column(name = "investor")

@@ -60,13 +60,13 @@ PostgreSQL은 회원·카탈로그·문서·결과·이력을 저장한다. Neo4
 id text PK; email text; email_key text UNIQUE; display_name text
 password_hash text?; signup_method text; status text
 analytics_key text UNIQUE
-mode text; investor boolean?; completed boolean; tutorial_completed boolean
+mode text?; investor boolean?; completed boolean; tutorial_completed boolean
 settings_version bigint; created_at timestamptz; updated_at timestamptz; blocked_at timestamptz?
 ```
 
 `member_credentials`, `member_settings`를 합친다. 이메일 가입은 password_hash 필수, 소셜 전용은 NULL 가능. 가입 완료 시 이메일은 필수다. 비밀번호 해시를 일반 회원 응답 DTO에 포함하지 않는다. `investor=NULL`은 미응답이다.
 
-가입 시 displayName 생략은 허용한다. 저장 정책은 생략 시 서버 기본 표시명 `회원`을 저장하는 것이다. 이메일/실명을 추정하지 않고 중복 표시명을 허용한다. 명시적으로 보낸 이름은 별도 이름 정책으로 검증한다. 이 기본값은 API 확정 사실이 아닌 구현 제안이다. members.id는 이메일/전화번호에서 유도하지 않는 암호학적 난수 기반 불투명 가명 ID로 발급하고 MemberRow.id와 TranscriptSummary.user에 사용한다. `M-3FA9C2D1` 같은 짧은 예시는 고정 형식이나 충분한 엔트로피의 근거가 아니다. analytics_key는 별도로 발급하며 공개하지 않는다.
+가입 시 displayName 생략은 허용한다. 저장 정책은 생략 시 서버 기본 표시명 `회원`을 저장하는 것이다. 이메일/실명을 추정하지 않고 중복 표시명을 허용한다. 명시적으로 보낸 이름은 별도 이름 정책으로 검증한다. 이 기본값은 API 확정 사실이 아닌 구현 제안이다. 가입 직후 온보딩 방식을 선택하지 않았다면 `mode=NULL`, `completed=false`로 저장한다. `mode`는 관심·보유 기업의 존재 여부가 아닌 선택한 방식이며, 선택 후에만 `assets` 또는 `watchlist`로 설정한다. 두 목록이 모두 비어 있는 상태는 각 관계/연결 행이 없는 것으로 표현한다. members.id는 이메일/전화번호에서 유도하지 않는 암호학적 난수 기반 불투명 가명 ID로 발급하고 MemberRow.id와 TranscriptSummary.user에 사용한다. `M-3FA9C2D1` 같은 짧은 예시는 고정 형식이나 충분한 엔트로피의 근거가 아니다. analytics_key는 별도로 발급하며 공개하지 않는다.
 
 설정 PUT은 요청의 지정 필드와 관심 목록을 현재 상태와 비교한다. 무변경 재전송이면 현재 응답을 반환한다. 실제 변경이면 `settings_version` 일치를 검사하고 관심 목록 변경과 함께 증가시킨다. 차단은 상태 변경과 회원 세션 폐기를 한 트랜잭션으로 수행한다.
 
@@ -723,7 +723,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 
 | 위치 | 허용값 또는 규칙 |
 | --- | --- |
-| members.signup_method / status / mode | email, google, kakao / active, blocked / assets, watchlist |
+| members.signup_method / status / mode | email, google, kakao / active, blocked / NULL(온보딩 방식 미선택), assets, watchlist |
 | social_identities.provider | google, kakao |
 | member_sessions.kind | member, guest, oauth_pending; pending은 내부 전용 |
 | admins.status / role | active, disabled / 배포 시 확정한 코드 role registry의 값; 일반 문자열 무제한 허용 금지 |

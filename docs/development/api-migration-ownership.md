@@ -9,7 +9,7 @@
 | 범위 | 소유 담당 | 처음 필요한 테이블 | 후속 테이블·조건 |
 | --- | --- | --- | --- |
 | 이메일 인증·회원 세션 | 임현 — WBS 6.2.1 | `members`, `member_sessions` | 비밀번호 해시·회원 설정은 `members` 컬럼에 둔다. 실제 회원가입에는 `terms`, `term_versions`, `term_agreements`와 승인된 약관 데이터가 필요하다. 비회원 세션은 `member_sessions`를 공유한다. |
-| 소셜 인증·온보딩·관리자 인증 | 임현 — 관련 WBS | 인증 기반 외 아직 미구현 | 기능 착수 시 `social_identities`, 약관 테이블, `admins`, `admin_sessions`를 추가한다. 관리자 role→permissions는 코드에서 관리한다. OAuth 진행 상태는 `member_sessions.auth_flow`를 사용한다. |
+| 소셜 인증·온보딩·관리자 인증 | 임현 — 관련 WBS | 약관 테이블·승인 본문까지 구현, 나머지 미구현 | 약관 `terms`, `term_versions`, `term_agreements`는 등록됐다. 기능 착수 시 `social_identities`, `admins`, `admin_sessions`를 추가한다. 관리자 role→permissions는 코드에서 관리한다. OAuth 진행 상태는 `member_sessions.auth_flow`를 사용한다. |
 | 기업 목록·검색 | 정세빈 — WBS 6.6.11·6.7.1 | `companies` | 별칭은 `companies.aliases`에 저장한다. 검색용 `search_text`·트리거와 `pg_trgm` 인덱스는 기업 담당자가 구현한다. |
 | 관심종목 | 임현 — WBS 6.3.4·6.4.1·6.4.2 | `watchlist` | `members.id`, `companies.id`에 의존한다. 두 소유자와 FK·삭제 정책·적용 순서를 합의한다. |
 

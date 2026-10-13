@@ -1,0 +1,7 @@
+# 약관 migration 검증 — 2026-10-13
+
+[`V20261013020000__create_terms.sql`](../../api/src/main/resources/db/migration/V20261013020000__create_terms.sql)은 ERD v6의 `terms`, `term_versions`, `term_agreements`와 `btree_gist` 기반 유효 기간 중복 금지를 추가한다. 대응 JPA Entity와 복합 키는 `api/src/main/java/com/zoop/auth/entity/`에 있다. 기존 Flyway 파일은 수정하지 않았다.
+
+PostgreSQL 16.13 Alpine의 격리된 빈 DB에서 Flyway migration 6개가 순서대로 적용됐고, Spring Boot 기동 시 JPA `ddl-auto: validate`가 통과했다. [`terms-verification.sql`](../../api/src/test/resources/sql/terms-verification.sql)은 합성 자료를 트랜잭션에 삽입한 뒤 롤백하며 인접한 약관 기간 허용, 기간 중복·소급 승인 거절, 회원·약관 버전 FK를 검증한다. migration에 저장하는 두 본문과 공개 Markdown 파일은 바이트 단위로 일치한다. 시행 시각 이후 실제 `GET /api/v1/auth/terms` 응답에서도 두 항목의 버전 `2026-10-13.1`, `bodyAvailable=true`, 시행일이 적힌 본문을 확인했다. `./gradlew test`도 통과했다. 실제 사용자·개발 DB는 사용하지 않았다.
+
+팀은 2026-10-13 17:00 KST에 약관 정책을 승인했고 운영 주체 돈벌래, OpenAI 수신 법인 OpenAI OpCo, LLC, 시행일 2026-10-13을 확인했다. [`V20261013030000__register_term_catalog.sql`](../../api/src/main/resources/db/migration/V20261013030000__register_term_catalog.sql)은 필수 `service`·`privacy` 마스터를, [`V20261013040000__register_approved_term_versions.sql`](../../api/src/main/resources/db/migration/V20261013040000__register_approved_term_versions.sql)은 [공개용 본문](../legal/README.md)을 버전 `2026-10-13.1`로 등록한다. 효력 시작은 2026-10-13 17:00 KST이며 그 전에는 필수 약관의 유효 본문이 없으므로 회원가입을 완료할 수 없다. 본문에 적힌 삭제·AI 전송·호스팅 정책은 실제 배포 전에 구현과 일치시켜야 한다.

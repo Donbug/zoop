@@ -1,6 +1,6 @@
 # Zoop API 실행 환경
 
-Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 업무 API·인증 로직은 아직 구현하지 않았습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
+Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회 API는 구현됐고 회원가입·로그인 로직은 아직 없습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
 
@@ -40,7 +40,9 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
-업무 endpoint는 없으므로 `/`의 404는 정상입니다. 서버 로그의 `Started ZoopApplication`과 DB·Flyway 초기화를 확인하세요. 잘못된 DB 설정에서는 기동이 실패해야 합니다.
+`/`의 404는 정상입니다. 서버 로그의 `Started ZoopApplication`과 DB·Flyway 초기화를 확인하세요. 잘못된 DB 설정에서는 기동이 실패해야 합니다.
+
+본개발 가입 화면은 공개 `GET /api/v1/auth/terms`로 현재 제공 가능한 약관을 조회해야 합니다. `limit`와 응답의 `nextCursor`로 다음 페이지를 요청할 수 있으며, `limit`을 생략하면 전체 목록을 반환합니다. 약관 시행 전에는 항목 자체는 조회되지만 `body`와 `version`이 `null`, `bodyAvailable`이 `false`입니다. 이번 승인 본문의 시행일은 2026-10-13 17:00 KST입니다. 가입 로직은 유효한 필수 약관 본문이 제공되기 전에는 완료되면 안 됩니다.
 
 ## 빌드
 
@@ -50,7 +52,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 ./api/gradlew -p api test
 ```
 
-현재 빌드와 기본 테스트(공통 오류 6개 + AI 클라이언트 시험)는 DB·Python 없이 실행할 수 있습니다. 실행 JAR은 `api/build/libs/`에 생성됩니다. 루트에서는 아래 이름을 씁니다(`prototype/bff`의 `bff-*`와 구분됩니다).
+현재 빌드와 단위·웹 계층 테스트는 DB·Python 없이 실행할 수 있습니다. 실행 JAR은 `api/build/libs/`에 생성됩니다. 루트에서는 아래 이름을 씁니다(`prototype/bff`의 `bff-*`와 구분됩니다).
 
 ```sh
 make api-test                        # ./api/gradlew -p api test
@@ -62,7 +64,7 @@ make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai repl
 
 ## 공통 오류 처리
 
-`CustomException`에 명세의 `ErrorCode`를 전달하면 `GlobalExceptionHandler`가 `{ "error": { "code", "message", "requestId", "retryable" } }` 형식으로 반환합니다. 현재는 `INVALID_REQUEST`, `RESOURCE_NOT_FOUND`, `INTERNAL_ERROR`만 구현되어 있습니다. 나머지 오류 코드는 해당 기능 구현 시 [목표 OpenAPI](../docs/api/openapi.yaml)에 맞춰 추가합니다. 성공 응답은 공통 래퍼로 감싸지 않습니다.
+`CustomException`에 명세의 `ErrorCode`를 전달하면 `GlobalExceptionHandler`가 `{ "error": { "code", "message", "requestId", "retryable" } }` 형식으로 반환합니다. 현재는 `INVALID_REQUEST`, `INVALID_CURSOR`, `RESOURCE_NOT_FOUND`, `SOURCE_UNAVAILABLE`, `INTERNAL_ERROR`가 구현되어 있습니다. 나머지 오류 코드는 해당 기능 구현 시 [목표 OpenAPI](../docs/api/openapi.yaml)에 맞춰 추가합니다. 성공 응답은 공통 래퍼로 감싸지 않습니다.
 
 모든 요청의 `X-Request-ID`를 응답 헤더에 반환하며, 생략하면 서버가 새 ID를 생성합니다. 오류 본문의 `requestId`는 해당 응답 헤더와 같습니다. 요청 ID를 멱등성 키로 사용하지 마세요. 인증 필터의 오류는 추후 인증 구현 시 같은 형식으로 연결해야 합니다.
 
@@ -72,7 +74,7 @@ make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai repl
 
 ## 스키마와 DB 종료
 
-JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 첫 migration은 당시 설계에 따라 `members`, `member_credentials`, `member_sessions`를 생성합니다. 이어지는 [`V20261013000000__align_auth_identity_with_erd_v6.sql`](src/main/resources/db/migration/V20261013000000__align_auth_identity_with_erd_v6.sql)이 비어 있는 인증 스키마를 [ERD v6](../docs/erd/zoop-core-erd-v6.md)에 맞춰 변경합니다. 적용 후 비밀번호 해시와 회원 설정은 `members`에 있고 `member_credentials`는 없습니다. 대응 Entity는 `com.zoop.auth.entity`에 있습니다. 회원가입·로그인 서비스와 약관·소셜·관리자 테이블은 아직 없습니다. 후속 스키마 변경은 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
+JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 첫 migration은 당시 설계에 따라 `members`, `member_credentials`, `member_sessions`를 생성합니다. 이어지는 [`V20261013000000__align_auth_identity_with_erd_v6.sql`](src/main/resources/db/migration/V20261013000000__align_auth_identity_with_erd_v6.sql)이 비어 있는 인증 스키마를 [ERD v6](../docs/erd/zoop-core-erd-v6.md)에 맞춰 변경합니다. [`V20261013010000__allow_unselected_member_mode.sql`](src/main/resources/db/migration/V20261013010000__allow_unselected_member_mode.sql)은 가입 직후 온보딩 방식을 고르지 않은 회원을 `members.mode=NULL`로 저장할 수 있도록 합니다. [`V20261013020000__create_terms.sql`](src/main/resources/db/migration/V20261013020000__create_terms.sql)은 약관 항목·버전·동의 기록 테이블과 기간 중복 방지 제약을 만듭니다. [`V20261013030000__register_term_catalog.sql`](src/main/resources/db/migration/V20261013030000__register_term_catalog.sql)은 필수 `service`·`privacy` 마스터만 등록합니다. [`V20261013040000__register_approved_term_versions.sql`](src/main/resources/db/migration/V20261013040000__register_approved_term_versions.sql)은 [공개용 약관](../docs/legal/README.md)의 두 본문을 버전 `2026-10-13.1`로 등록하고 2026-10-13 17:00 KST부터 효력이 생기게 합니다. 적용 후 비밀번호 해시와 회원 설정은 `members`에 있고 `member_credentials`는 없습니다. 대응 Entity는 `com.zoop.auth.entity`에 있습니다. 회원가입·로그인 서비스 및 소셜·관리자 테이블은 아직 없습니다. 후속 스키마 변경은 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
 
 DB를 종료하되 데이터를 유지하려면 다음을 실행합니다.
 
