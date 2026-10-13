@@ -1,6 +1,6 @@
 # Zoop API 실행 환경
 
-Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트가 있습니다. 업무 API·인증은 아직 구현하지 않았습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
+Spring Boot 실행 기반, 최소 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 인증의 첫 DB 스키마가 있습니다. 업무 API·인증 로직은 아직 구현하지 않았습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
 
@@ -72,7 +72,7 @@ make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai repl
 
 ## 스키마와 DB 종료
 
-JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 업무 Entity와 migration은 아직 없습니다. 첫 실제 스키마 변경부터 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
+JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 첫 migration은 ERD 이름의 `members`, `member_credentials`, `member_sessions`를 생성하며 대응 Entity는 `com.zoop.auth.entity`에 있습니다. 회원가입·로그인 서비스와 약관·소셜·관리자 테이블은 아직 없습니다. 후속 스키마 변경은 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
 
 DB를 종료하되 데이터를 유지하려면 다음을 실행합니다.
 
@@ -126,9 +126,9 @@ null·자료 없음·실패의 의미:
 
 ## DB 변경 규칙
 
-개발자마다 별도 로컬 DB와 Compose 프로젝트·볼륨을 사용합니다. 테이블과 컬럼은 소문자 `snake_case`, 테이블은 단수형으로 작성하고 JPA 매핑에 이름을 명시합니다. 업무별 테이블 소유자는 해당 기능 담당자입니다. 다른 기능의 테이블·제약·컬럼을 변경할 때는 소유 담당자와 변경 이유·호출 영향을 먼저 합의합니다. 기능 간 외래 키는 삭제 정책과 migration 순서를 함께 검토합니다.
+개발자마다 별도 로컬 DB와 Compose 프로젝트·볼륨을 사용합니다. 테이블·컬럼 이름은 [ERD v3.5](../docs/erd/zoop-core-erd-v3.5.md)에 명시된 이름을 우선하고, 새 이름은 소문자 `snake_case`로 작성하며 JPA 매핑에 명시합니다. 기능별 migration 범위와 소유권은 [API migration 담당 경계](../docs/development/api-migration-ownership.md)를 따릅니다. 업무별 테이블 소유자는 해당 기능 담당자입니다. 다른 기능의 테이블·제약·컬럼을 변경할 때는 소유 담당자와 변경 이유·호출 영향을 먼저 합의합니다. 기능 간 외래 키는 삭제 정책과 migration 순서를 함께 검토합니다.
 
-공유 스키마는 `src/main/resources/db/migration/`의 Flyway SQL로 변경합니다. 예: `V20261012153000__create_company.sql`. 타임스탬프는 중복을 피하기 위한 버전 표기이며 이미 적용된 migration을 수정하지 않습니다. 같은 버전의 파일이 병합됐다면 **아직 공유되지 않은** 자신의 migration 이름을 조정하고 새 DB와 기존 DB 양쪽에서 순서대로 적용되는지 확인합니다. 테이블 자동 생성으로 migration을 대신하지 않습니다.
+공유 스키마는 `src/main/resources/db/migration/`의 Flyway SQL로 변경합니다. 예: `V20261012153000__create_members.sql`. 타임스탬프는 중복을 피하기 위한 버전 표기이며 이미 적용된 migration을 수정하지 않습니다. 같은 버전의 파일이 병합됐다면 **아직 공유되지 않은** 자신의 migration 이름을 조정하고 새 DB와 기존 DB 양쪽에서 순서대로 적용되는지 확인합니다. 테이블 자동 생성으로 migration을 대신하지 않습니다.
 
 스키마가 바뀌는 PR에는 새 로컬 DB에서 기동되는지, 이전 스키마에 migration을 추가 적용해 기동되는지 적습니다. 기존 개발 데이터가 있는 DB를 테스트 전용 초기화 대상으로 사용하지 않습니다. `down --volumes`는 위의 로컬 개발 DB만 삭제할 때 사용합니다.
 
