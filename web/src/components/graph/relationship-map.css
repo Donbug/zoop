@@ -1,0 +1,484 @@
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource/instrument-serif/400-italic.css';
+
+/* Figma 619:1819 / 619:2374. Scoped to WBS 6.6.21, no global token rewrite. */
+.relationship-map {
+  font-family: 'Pretendard Variable', sans-serif;
+  color: #1a1a1a;
+  background: #fff;
+  min-width: 1024px;
+  height: 100dvh;
+  min-height: 640px;
+  display: flex;
+  flex-direction: column;
+}
+.relationship-main,
+.relationship-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.relationship-map button,
+.relationship-map a {
+  -webkit-tap-highlight-color: transparent;
+}
+.relationship-map button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.relationship-map button:focus-visible,
+.relationship-map a:focus-visible {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 2px;
+}
+.relationship-header {
+  height: 48px;
+  flex-shrink: 0;
+  border-bottom: 0.667px solid #d6d6d2;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.relationship-logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.relationship-logo strong {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 24px;
+  letter-spacing: -0.4px;
+}
+.relationship-logo span {
+  font-size: 11px;
+  color: #5f5f5b;
+  font-weight: 500;
+}
+.relationship-header nav {
+  display: flex;
+  gap: 4px;
+  height: 100%;
+}
+.relationship-header nav a,
+.relationship-header nav button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 19.5px;
+  font-weight: 600;
+  color: #5f5f5b;
+  white-space: nowrap;
+}
+.relationship-header nav a.active {
+  color: #1a1a1a;
+}
+.relationship-header nav a.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+.relationship-header nav button {
+  font-family: 'Inter Variable', sans-serif;
+  font-weight: 400;
+}
+.relationship-user-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.relationship-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: #5f5f5b;
+}
+.relationship-user > span {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f2f2f0;
+  display: grid;
+  place-items: center;
+}
+.relationship-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 16px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.relationship-toolbar button,
+.relationship-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 16.5px;
+}
+.relationship-sidebar-toggle {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 3px;
+  color: #5f5f5b;
+  font-weight: 600;
+}
+.relationship-mode {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f2f2f0;
+  border-radius: 4px;
+}
+.relationship-mode button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 3px;
+  color: #5f5f5b;
+  font-weight: 600;
+}
+.relationship-mode button[aria-pressed='true'] {
+  color: #1a1a1a;
+  background: #fff;
+  box-shadow: 0 0 0 0.5px #1a1a1a14;
+}
+.relationship-divider {
+  height: 20px;
+  width: 1px;
+  background: #d6d6d2;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.relationship-count {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 3px;
+  background: #f2f2f0;
+  font-weight: 500;
+}
+.relationship-count > span {
+  color: #94948f;
+}
+.relationship-filters {
+  display: flex;
+  gap: 8px;
+}
+.relationship-filters button {
+  height: 28px;
+  border: 0.667px solid #d6d6d2;
+  padding: 0 8px;
+  border-radius: 3px;
+}
+.relationship-filters button[aria-pressed='true'] {
+  background: #f2f2f0;
+  border-color: #1a1a1a;
+}
+.relationship-filters button > span {
+  color: #94948f;
+}
+.relationship-toolbar-help {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.relationship-toolbar-help button {
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+}
+.relationship-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px 16px;
+}
+.relationship-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  border: 0.667px solid #d6d6d2;
+  background: #dfdfdc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.relationship-g6 {
+  position: absolute;
+  inset: 0;
+}
+.relationship-g6 canvas {
+  display: block;
+}
+.relationship-legend {
+  position: absolute;
+  left: 20px;
+  top: 16px;
+  width: 188px;
+  pointer-events: none;
+  border-top: 1.333px solid #1a1a1a;
+  padding-top: 8px;
+}
+.relationship-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 26px;
+}
+.relationship-title i {
+  font:
+    italic 15px/20.625px 'Instrument Serif',
+    serif;
+}
+.relationship-title h1 {
+  font-size: 24px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.96px;
+}
+.relationship-subtitle {
+  font-size: 10.5px;
+  line-height: 14.438px;
+  font-weight: 500;
+  letter-spacing: -0.2625px;
+  padding-top: 4px;
+}
+.relationship-meta {
+  font:
+    9px/12.375px 'JetBrains Mono Variable',
+    monospace;
+  color: #94948f;
+  letter-spacing: 0.225px;
+  padding-top: 2px;
+  white-space: nowrap;
+}
+.relationship-legend-items {
+  display: grid;
+  grid-template-columns: 90px 90px;
+  gap: 5px 8px;
+  border-top: 0.667px solid #1a1a1a66;
+  margin-top: 12px;
+  padding-top: 8px;
+}
+.relationship-legend-items h2 {
+  grid-column: 1 / -1;
+  font:
+    9px/12.375px 'JetBrains Mono Variable',
+    monospace;
+  letter-spacing: 1.08px;
+  margin-bottom: 1px;
+}
+.relationship-legend-items span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  line-height: 13.75px;
+  color: #5f5f5b;
+}
+.legend-company,
+.legend-focus {
+  width: 10px;
+  height: 10px;
+  border: 0.667px solid #1a1a1a;
+  border-radius: 50%;
+  background: #fff;
+}
+.legend-focus {
+  border-width: 2px;
+}
+.legend-issue {
+  width: 6px;
+  height: 6px;
+  background: #1a1a1a;
+  transform: rotate(45deg);
+}
+.legend-folded {
+  font:
+    8px/11px 'JetBrains Mono Variable',
+    monospace;
+}
+.legend-line {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 1px;
+  background: #1a1a1a;
+}
+.legend-line.dashed {
+  background: none;
+  border-top: 0.667px dashed #94948f;
+}
+.legend-line.follows {
+  background: #c0362c;
+}
+.legend-line.arrow::after {
+  content: '';
+  display: block;
+  margin: -2px 0 0 13px;
+  border-left: 4px solid #1a1a1a;
+  border-top: 2.667px solid transparent;
+  border-bottom: 2.667px solid transparent;
+}
+.legend-size {
+  font-size: 10px;
+  font-weight: 400;
+}
+.relationship-disconnected {
+  position: absolute;
+  right: 20px;
+  top: 45.3%;
+  text-align: center;
+  pointer-events: none;
+}
+.relationship-disconnected span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0.667px solid #1a1a1a;
+  border-radius: 50%;
+  font:
+    13px/19.5px 'JetBrains Mono Variable',
+    monospace;
+}
+.relationship-disconnected p {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 15px;
+  letter-spacing: 0.25px;
+  color: #5f5f5b;
+}
+.relationship-source {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+  width: 208px;
+  border-top: 0.667px solid #1a1a1a66;
+  padding-top: 6px;
+  text-align: right;
+  pointer-events: none;
+  font:
+    8.5px/13.813px 'JetBrains Mono Variable',
+    monospace;
+  letter-spacing: 0.2125px;
+  color: #94948f;
+}
+.relationship-zoom {
+  position: absolute;
+  bottom: 16px;
+  left: 20px;
+  border: 0.667px solid #1a1a1ab3;
+  display: flex;
+  align-items: center;
+  background: #dfdfdc;
+}
+.relationship-zoom button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-right: 0.667px solid #d6d6d2;
+}
+.relationship-zoom output {
+  padding: 0 10px;
+  font-size: 10px;
+  line-height: 15px;
+  letter-spacing: 0.25px;
+}
+.relationship-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.relationship-message a,
+.relationship-message button,
+.relationship-notice a,
+.relationship-notice button {
+  text-decoration: underline;
+}
+.relationship-notice {
+  position: absolute;
+  z-index: 2;
+  right: 36px;
+  top: 16px;
+  max-width: 460px;
+  border: 0.667px solid #d6d6d2;
+  border-radius: 4px;
+  background: #fff;
+  padding: 12px 16px;
+  color: #5f5f5b;
+  font-size: 12px;
+  line-height: 18px;
+  box-shadow: 0 2px 8px #00000008;
+}
+.relationship-notice > button {
+  margin-top: 6px;
+}
+.relationship-selection,
+.relationship-empty-relations {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 4px 8px;
+  border: 0.667px solid #d6d6d2;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.relationship-accessible-nodes button {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.relationship-accessible-nodes button:focus-visible {
+  left: 240px;
+  top: 20px;
+  width: auto;
+  height: auto;
+  padding: 8px;
+  background: #fff;
+}
+.out-of-scope-page {
+  flex: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  background: #f7f7f5;
+  color: #5f5f5b;
+}
+.out-of-scope-page h1 {
+  color: #1a1a1a;
+  font-size: 18px;
+  font-weight: 600;
+}
+.out-of-scope-page p {
+  font-size: 12px;
+}

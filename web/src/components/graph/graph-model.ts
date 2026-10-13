@@ -1,0 +1,214 @@
+import type { GraphData } from '@antv/g6';
+import type { GraphResponse } from '@/types/map/graph';
+import layouts from './figma-layout.json';
+
+export function graphSummary(data: GraphResponse) {
+  const companyNodes = data.nodes.filter((n) => n.kind === 'company');
+  const incident = new Map<string, string[]>();
+  for (const node of data.nodes.filter((n) => n.kind === 'issue')) {
+    incident.set(
+      node.id,
+      data.edges
+        .filter(
+          (e) =>
+            (e.relationType === 'INVOLVES' ||
+              e.relationType === 'STRUCTURALLY_RELATED_TO') &&
+            (e.source === node.id || e.target === node.id),
+        )
+        .map((e) => (e.source === node.id ? e.target : e.source)),
+    );
+  }
+  const folded = new Map<string, number>();
+  incident.forEach((ids) => {
+    if (ids.length === 1) folded.set(ids[0], (folded.get(ids[0]) ?? 0) + 1);
+  });
+  return {
+    companyNodes,
+    incident,
+    folded,
+    company: companyNodes.length,
+    issue: incident.size,
+    holding: companyNodes.filter((n) => n.holding).length,
+    watch: companyNodes.filter((n) => n.watch).length,
+    direct: data.edges.filter(
+      (e) =>
+        e.relationType === 'INVOLVES' ||
+        e.relationType === 'STRUCTURALLY_RELATED_TO',
+    ).length,
+    follows: data.edges.filter((e) => e.relationType === 'FOLLOWS').length,
+    shared: data.edges.filter((e) => e.relationType === 'SHARES_ISSUE').length,
+    sharedIssues: [...incident.values()].filter((ids) => ids.length > 1).length,
+    disconnected: [...incident.values()].filter((ids) => ids.length === 0)
+      .length,
+  };
+}
+
+// Figma 619:1819 / 619:2374 presentation only; API DTOs never contain x/y.
+const issueLayout: Record<string, [number, number, number, number]> = {
+  'HBM4 공급 계약': [559, 218, 302, 301],
+  'HBM3E 12단 경쟁': [756, 113, 341, 261],
+  'ASML 제조 협력 확대': [773, 346, 367, 347],
+  '램프 10억 달러 투자': [951, 329, 527, 234],
+  'FSD 칩 위탁 생산': [832, 426, 334, 178],
+  'AI 통신망 MOU': [1120, 490, 706, 299],
+  'TSMC 2나노 증설': [497, 128, 200, 280],
+  '스냅드래곤 엑시노스 경쟁': [472, 211, 200, 300],
+  'Azure GPU 증설': [517, 543, 400, 400],
+};
+export function toG6Data(
+  data: GraphResponse,
+  width: number,
+  height: number,
+): GraphData {
+  const summary = graphSummary(data);
+  const personal = data.metadata.mode === 'personal';
+  const layout = personal ? layouts.personal : layouts.all;
+  const sx = width / 1245.33,
+    sy = height / 705.33,
+    scale = personal ? 0.69 : 1;
+  const followsIds = new Set(
+    data.edges
+      .filter((e) => e.relationType === 'FOLLOWS')
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const visible = data.nodes.filter(
+    (n) =>
+      n.kind === 'company' ||
+      (summary.incident.get(n.id)?.length ?? 0) > 1 ||
+      followsIds.has(n.id),
+  );
+  const nodeIds = new Set(visible.map((n) => n.id));
+  const positions = new Map<
+    string,
+    { x: number; y: number; size: number; symbol: string | null }
+  >();
+  summary.companyNodes.forEach((n, i) => {
+    const found = layout.find((p) => p.label === n.label);
+    // Real API companies outside the fixture use a deterministic ring layout.
+    positions.set(
+      n.id,
+      found ??
+        (n.label === 'KT'
+          ? {
+              x: personal ? 657 : 1029,
+              y: personal ? 384 : 405,
+              size: 22 * scale,
+              symbol: 'K',
+            }
+          : {
+              x: 623 + Math.cos(i * 2.4) * 360,
+              y: 353 + Math.sin(i * 2.4) * 250,
+              size: 26 * scale,
+              symbol: n.label.slice(0, 1),
+            }),
+    );
+  });
+  return {
+    nodes: visible.map((n, i) => {
+      const company = n.kind === 'company',
+        p = positions.get(n.id),
+        planned = issueLayout[n.label];
+      const neighbors = (summary.incident.get(n.id) ?? [])
+        .map((id) => positions.get(id))
+        .filter((v) => v !== undefined);
+      const x =
+        p?.x ??
+        (planned
+          ? planned[personal ? 2 : 0]
+          : neighbors.reduce((v, n) => v + n.x, 0) / (neighbors.length || 1) +
+            Math.cos(i) * 50);
+      const y =
+        p?.y ??
+        (planned
+          ? planned[personal ? 3 : 1]
+          : neighbors.reduce((v, n) => v + n.y, 0) / (neighbors.length || 1) +
+            Math.sin(i) * 50);
+      const size = p?.size ?? 7 * scale;
+      const badges = [
+        ...(company && summary.folded.has(n.id)
+          ? [
+              {
+                text: `ϟ${summary.folded.get(n.id)}`,
+                placement: 'right-top' as const,
+                fill: '#55554f',
+                background: false,
+                fontSize: 7.178 * scale,
+                fontFamily: 'JetBrains Mono Variable',
+              },
+            ]
+          : []),
+        ...(n.holding || n.watch
+          ? [
+              {
+                text: [n.holding ? '보유' : '', n.watch ? '관심' : '']
+                  .filter(Boolean)
+                  .join('·'),
+                placement: 'bottom' as const,
+                offsetY: 12,
+                fill: '#1a1a1a',
+                backgroundFill: '#f2f2f0',
+                fontSize: 8,
+              },
+            ]
+          : []),
+      ];
+      return {
+        id: n.id,
+        type: company ? 'circle' : 'diamond',
+        data: { kind: n.kind },
+        style: {
+          x: x * sx,
+          y: y * sy,
+          size,
+          fill: company ? '#ffffff' : '#1a1a1a',
+          stroke: '#1a1a1a',
+          lineWidth: n.isFocus ? 1.4 : 0.667,
+          halo: n.isFocus,
+          haloStroke: '#1a1a1a',
+          haloLineWidth: 0.667,
+          haloFill: 'transparent',
+          haloStrokeOpacity: 1,
+          icon: company,
+          iconSrc: n.logoUrl ?? undefined,
+          iconText: n.logoUrl ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
+          iconWidth: size * (n.label === '삼성전자' ? 0.8 : 0.52),
+          iconHeight: size * 0.52,
+          iconFontSize: size * 0.34,
+          iconFontFamily: 'Inter Variable',
+          iconFontWeight: 700,
+          iconFill: n.brandColor ?? '#1a1a1a',
+          labelText: company ? n.label : planned ? n.label : '',
+          labelPlacement: company ? 'bottom' : 'top',
+          labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
+          labelFontSize: (company ? 8.6 : 9.57) * scale,
+          labelFontWeight: company ? 400 : 700,
+          labelFill: company ? '#8a8a86' : '#1a1a1a',
+          labelOffsetY: company ? 6 : -5,
+          labelBackground: !company,
+          labelBackgroundFill: '#ffffff',
+          labelBackgroundStroke: '#1a1a1a',
+          labelBackgroundLineWidth: 0.5,
+          labelBackgroundRadius: 8,
+          labelPadding: [2, 7],
+          badges,
+          cursor: 'pointer',
+        },
+      };
+    }),
+    edges: data.edges
+      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        style: {
+          stroke: e.relationType === 'FOLLOWS' ? '#c0362c' : '#94948f',
+          lineWidth: 0.65,
+          strokeOpacity: e.relationType === 'SHARES_ISSUE' ? 0.5 : 0.75,
+          lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
+          endArrow: e.relationType === 'FOLLOWS',
+          endArrowSize: 4,
+        },
+      })),
+  };
+}

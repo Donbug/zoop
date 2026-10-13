@@ -43,36 +43,12 @@ const router = createBrowserRouter([
           Component: (await import('@/pages/map/MapPage')).default,
         }),
       },
-      {
-        path: '/stocks',
+      ...['/stocks', '/companies', '/briefing', '/my'].map((path) => ({
+        path,
         lazy: async () => ({
-          Component: (await import('@/pages/stocks/StocksPage')).default,
+          Component: (await import('@/pages/common/OutOfScopePage')).default,
         }),
-      },
-      {
-        path: '/companies/:id',
-        lazy: async () => ({
-          Component: (await import('@/pages/company/CompanyDetailPage'))
-            .default,
-        }),
-      },
-      {
-        path: '/briefing',
-        lazy: async () => ({
-          Component: (await import('@/pages/briefing/BriefingPage')).default,
-        }),
-      },
-      {
-        element: <ProtectedRoute />,
-        children: [
-          {
-            path: '/my',
-            lazy: async () => ({
-              Component: (await import('@/pages/my/MyStocksPage')).default,
-            }),
-          },
-        ],
-      },
+      })),
     ],
   },
   {
