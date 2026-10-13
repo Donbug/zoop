@@ -62,15 +62,18 @@ def wait_for(predicate: Callable[[], Any], timeout: float = 30.0, interval: floa
 
 
 class Credentials:
-    """Two principals with synthetic tokens built in memory; only SHA-256 digests reach the service environment."""
+    """Synthetic principals with tokens built in memory; only SHA-256 digests reach the service environment."""
 
     def __init__(self) -> None:
-        self.tokens = {name: "t" + secrets.token_urlsafe(36) for name in ("alpha", "beta", "reader", "submitter")}
+        self.tokens = {name: "t" + secrets.token_urlsafe(36) for name in ("alpha", "beta", "reader", "submitter", "viewer")}
+        relation = ["relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review"]
+        extraction = ["extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover"]
         self.scopes = {
-            "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover"],
-            "beta": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover"],
+            "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction],
+            "beta": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction],
             "reader": ["analysis.read"],
             "submitter": ["analysis.submit"],
+            "viewer": ["relation.read", "extraction.read"],  # may look jobs and operations up, but never write a review or an extraction
         }
 
     def digest(self, name: str) -> str:

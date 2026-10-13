@@ -19,7 +19,7 @@ PROJECTS = (
     ("bff", "prototype/bff", "FastAPI prototype (private pinned PoC)", "uv sync --frozen --group dev", "uv run --no-sync python -m pytest; uv build"),
     ("ai-worker", "ai/worker", "S1 Python CLI JSON worker (public dependencies only, not an HTTP service)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; uv build"),
     ("ai-service", "ai/service", "S1 internal loopback HTTP transport to the installed zoop-ai CLI (public dependencies only; local preparation, not deployed)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/service_smoke.py; scripts/export_openapi.py --check; uv build"),
-    ("ai-pipeline", "ai/pipeline", "S2-1/S2-2/S3 offline CLI processes (private pinned PoC)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/*_smoke.py; uv build"),
+    ("ai-pipeline", "ai/pipeline", "S2-1/S2-2/S3 offline CLI processes and the S4 read-only dependents report (private pinned PoC)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/*_smoke.py; uv build"),
     ("api", "api", "Spring Boot 4.1.1 / Java 21 app backend foundation plus the internal S1 AI transport client (no auth or domain endpoints yet; needs JDK 21)", "JAVA_HOME=<JDK 21>; ./api/gradlew -p api --version", "make api-test api-build; make service-install api-ai-smoke"),
     ("contracts", "docs/api", "Language-neutral target contract", "existing PyYAML/OpenAPI validator", "make contracts-check docs-check"),
 )
@@ -31,6 +31,7 @@ BFF only: make bff-install | bff-test | bff-build
 Worker only: make worker-install | worker-test | worker-schema-check | worker-build
 Pipeline only (private PoC): make pipeline-install | pipeline-test | pipeline-smoke | pipeline-build
 Service only (internal HTTP over the S1 CLI, public deps): make service-install | service-test | service-smoke | service-openapi-check | service-build
+Service + installed pipeline (S2 extraction jobs and S3 relation jobs; needs both make pipeline-install and make service-install, fails without them): make service-pipeline-test | service-pipeline-smoke
 API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate)
 Worker fixture drift: make worker-contracts-check (installed BFF Python)
 BFF/web type drift: make bff-types-check (installed BFF Python + web tool)

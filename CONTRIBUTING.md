@@ -38,8 +38,8 @@
 | api | `prototype/bff` | FastAPI 프로토타입 BFF, 읽기·세션·작업 consumer | `make bff-install bff-test`, `make bff-build` |
 | api 본개발 | `api/` | Spring Boot 실행·공통 오류 기반, 내부 AI transport 클라이언트, 업무 API는 후속 (JDK 21 필요) | `make api-test api-build`, `make service-install api-ai-smoke` (실제 Java→ai/service→zoop-ai replay gate) |
 | ai | `ai/worker` | S1 Python CLI JSON worker(공개 의존성만) | `make worker-install worker-test worker-schema-check`, `make worker-build` |
-| ai | `ai/pipeline` | S2-1/S2-2/S3 오프라인 CLI(private PoC 고정 커밋) | `make pipeline-install pipeline-test pipeline-smoke`, `make pipeline-build` |
-| ai | `ai/service` | S1 내부 HTTP transport(loopback 전용, 공개 의존성만, 설치된 `zoop-ai` CLI만 호출) | `make service-install service-test service-smoke service-openapi-check`, `make service-build` |
+| ai | `ai/pipeline` | S2-1/S2-2/S3 오프라인 CLI와 S4 읽기 전용 의존 대상 조회(private PoC 고정 커밋) | `make pipeline-install pipeline-test pipeline-smoke`, `make pipeline-build` |
+| ai | `ai/service` | 내부 HTTP transport: S1 분석과 별도 가족의 S2 추출·S3 관계 job(loopback 전용, 공개 의존성만, 설치된 `zoop-ai`·`zoop-ai-extract`·`zoop-ai-relation` CLI만 호출) | `make service-install service-test service-smoke service-openapi-check`, `make service-build`. S2·S3는 설치된 pipeline이 필요한 `make service-pipeline-test service-pipeline-smoke`(없으면 실패) |
 | contracts | `docs/api` | **언어와 독립적인 목표 계약** | `make contracts-check docs-check worker-schema-check worker-contracts-check` |
 | infra | `.github`, `scripts`, `Makefile` | CI, 로컬 검사, 소스 아티팩트 준비 | `make config-check tooling-test` |
 

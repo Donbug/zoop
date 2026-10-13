@@ -32,8 +32,10 @@ def test_every_route_is_documented_with_its_enforced_scope():
                   for path, item in spec()["paths"].items() for method, operation in item.items()}
     routes = {(method, route.path) for route in create_app().routes if hasattr(route, "methods") and route.path.startswith("/internal")
               for method in route.methods}
-    assert set(documented) == routes and len(routes) == 5
-    assert set(documented.values()) == {"analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover"}
+    assert set(documented) == routes and len(routes) == 18
+    assert set(documented.values()) == {"analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover",
+                                        "relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review",
+                                        "extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover"}
 
 
 def test_documented_scopes_are_what_the_service_enforces(start):
@@ -41,7 +43,7 @@ def test_documented_scopes_are_what_the_service_enforces(start):
     job_id = document_jobs()[0]["jobId"]
     for (method, path), scope in {(m.upper(), p): o["security"][0]["bearerAuth"][0]
                                    for p, i in spec()["paths"].items() for m, o in i.items()}.items():
-        url = path.replace("{jobId}", job_id)
+        url = path.replace("{jobId}", job_id).replace("{operationId}", "review-op-1")
         lacking = "submitter" if scope != "analysis.submit" else "reader"
         assert service.request(method, url, as_=lacking).status_code == 403, (method, path)
         assert service.request(method, url, as_=None).status_code == 401, (method, path)
