@@ -1,0 +1,1362 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-13",
+  "source": {
+    "fileName": "zoop-wireframe.pdf",
+    "sha256": "f9fd2483d9a31b04ad904e05098b946f209f2cfb8219b94237d291eb6448efe3",
+    "pageCount": 8,
+    "boardRender": "JPEG, 54 DPI, quality 85; overview only",
+    "individualFrames": "PNG copied from the repository wireframe evidence set"
+  },
+  "counts": {
+    "sections": 8,
+    "frames": 44,
+    "uniqueScreenIds": 41
+  },
+  "screenIds": [
+    "A-ADM-01",
+    "A-ADM-02",
+    "A-ADM-02b",
+    "A-ADM-03",
+    "A-ADM-04",
+    "A-ADM-04b",
+    "A-ADM-05",
+    "A-ADM-05b",
+    "A-ADM-05c",
+    "D-AI-01",
+    "D-AI-01b",
+    "D-AI-02",
+    "D-AI-02b",
+    "D-AUT-01",
+    "D-AUT-02",
+    "D-BRF-01",
+    "D-BRF-02",
+    "D-BRF-04",
+    "D-COM-01",
+    "D-COM-01b",
+    "D-COM-02",
+    "D-COM-05",
+    "D-COM-06",
+    "D-GRP-01",
+    "D-GRP-01b",
+    "D-GRP-02",
+    "D-GRP-03",
+    "D-GRP-04",
+    "D-GRP-05",
+    "D-GRP-06",
+    "D-GRP-07",
+    "D-GRP-07b",
+    "D-GRP-T",
+    "D-GRP-T2",
+    "D-GRP-T3",
+    "D-GRP-T4",
+    "D-GRP-T5",
+    "D-ONB-01",
+    "D-ONB-02",
+    "D-STK-01",
+    "D-WAT-01"
+  ],
+  "boards": [
+    {
+      "sourcePage": 1,
+      "wireframeSection": "01",
+      "key": "01-auth-onboarding",
+      "title": "회원가입·로그인·온보딩",
+      "image": "boards/01-auth-onboarding.jpg",
+      "frameCount": 5
+    },
+    {
+      "sourcePage": 2,
+      "wireframeSection": "02",
+      "key": "02-map-tutorial",
+      "title": "지도 튜토리얼",
+      "image": "boards/02-map-tutorial.jpg",
+      "frameCount": 5
+    },
+    {
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "key": "03-map-relationships-evidence",
+      "title": "지도·관계·근거",
+      "image": "boards/03-map-relationships-evidence.jpg",
+      "frameCount": 11
+    },
+    {
+      "sourcePage": 4,
+      "wireframeSection": "03.5",
+      "key": "03-5-stock-search",
+      "title": "종목 탐색",
+      "image": "boards/03-5-stock-search.jpg",
+      "frameCount": 1
+    },
+    {
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "key": "04-company-detail",
+      "title": "기업 상세·시점 탐색",
+      "image": "boards/04-company-detail.jpg",
+      "frameCount": 6
+    },
+    {
+      "sourcePage": 6,
+      "wireframeSection": "05",
+      "key": "05-briefing",
+      "title": "출퇴근 브리핑",
+      "image": "boards/05-briefing.jpg",
+      "frameCount": 3
+    },
+    {
+      "sourcePage": 7,
+      "wireframeSection": "06",
+      "key": "06-ai-chat",
+      "title": "AI 질문·대화 상태",
+      "image": "boards/06-ai-chat.jpg",
+      "frameCount": 4
+    },
+    {
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "key": "09-admin",
+      "title": "관리자 운영",
+      "image": "boards/09-admin.jpg",
+      "frameCount": 9
+    }
+  ],
+  "screens": [
+    {
+      "section": "01-auth-onboarding",
+      "sectionTitle": "회원가입·로그인·온보딩",
+      "sourcePage": 1,
+      "wireframeSection": "01",
+      "position": 1,
+      "screenIds": [
+        "D-AUT-01"
+      ],
+      "title": "D-AUT-01 · 시작·이메일 로그인",
+      "image": "screens/D-AUT-01--node-619-1080.png",
+      "node": "619-1080",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1080",
+      "routes": [
+        "/login"
+      ],
+      "baselinePages": [
+        16
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-AUT-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1080.png"
+    },
+    {
+      "section": "01-auth-onboarding",
+      "sectionTitle": "회원가입·로그인·온보딩",
+      "sourcePage": 1,
+      "wireframeSection": "01",
+      "position": 2,
+      "screenIds": [
+        "D-AUT-02"
+      ],
+      "title": "D-AUT-02 · 이메일 회원가입",
+      "image": "screens/D-AUT-02--node-619-1208.png",
+      "node": "619-1208",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1208",
+      "routes": [
+        "/signup"
+      ],
+      "baselinePages": [
+        17
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-AUT-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1208.png"
+    },
+    {
+      "section": "01-auth-onboarding",
+      "sectionTitle": "회원가입·로그인·온보딩",
+      "sourcePage": 1,
+      "wireframeSection": "01",
+      "position": 3,
+      "screenIds": [
+        "D-ONB-01"
+      ],
+      "title": "D-ONB-01 · 투자 여부 선택",
+      "image": "screens/D-ONB-01--node-619-1429.png",
+      "node": "619-1429",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1429",
+      "routes": [
+        "/onboarding"
+      ],
+      "baselinePages": [
+        19
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-ONB-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1429.png"
+    },
+    {
+      "section": "01-auth-onboarding",
+      "sectionTitle": "회원가입·로그인·온보딩",
+      "sourcePage": 1,
+      "wireframeSection": "01",
+      "position": 4,
+      "screenIds": [
+        "D-ONB-02"
+      ],
+      "title": "D-ONB-02 · 가상 계좌 연결",
+      "image": "screens/D-ONB-02--node-619-1509.png",
+      "node": "619-1509",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1509",
+      "routes": [
+        "/onboarding"
+      ],
+      "baselinePages": [
+        20
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-ONB-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1509.png"
+    },
+    {
+      "section": "01-auth-onboarding",
+      "sectionTitle": "회원가입·로그인·온보딩",
+      "sourcePage": 1,
+      "wireframeSection": "01",
+      "position": 5,
+      "screenIds": [
+        "D-WAT-01"
+      ],
+      "title": "D-WAT-01 · 관심 종목 선택",
+      "image": "screens/D-WAT-01--node-619-1615.png",
+      "node": "619-1615",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1615",
+      "routes": [
+        "/onboarding"
+      ],
+      "baselinePages": [
+        21
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-WAT-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1615.png"
+    },
+    {
+      "section": "02-map-tutorial",
+      "sectionTitle": "지도 튜토리얼",
+      "sourcePage": 2,
+      "wireframeSection": "02",
+      "position": 1,
+      "screenIds": [
+        "D-GRP-T"
+      ],
+      "title": "D-GRP-T · 지도 튜토리얼 1/5 — 지도 움직이기",
+      "image": "screens/D-GRP-T--node-619-3337.png",
+      "node": "619-3337",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-3337",
+      "routes": [
+        "/?mode=all&tour=1"
+      ],
+      "baselinePages": [
+        25
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-T.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-3337.png"
+    },
+    {
+      "section": "02-map-tutorial",
+      "sectionTitle": "지도 튜토리얼",
+      "sourcePage": 2,
+      "wireframeSection": "02",
+      "position": 2,
+      "screenIds": [
+        "D-GRP-T2"
+      ],
+      "title": "D-GRP-T2 · 지도 튜토리얼 2/5 — 기업·사건 선택",
+      "image": "screens/D-GRP-T2--node-619-3920.png",
+      "node": "619-3920",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-3920",
+      "routes": [
+        "/?mode=all&tour=1"
+      ],
+      "baselinePages": [
+        26
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-T2.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-3920.png"
+    },
+    {
+      "section": "02-map-tutorial",
+      "sectionTitle": "지도 튜토리얼",
+      "sourcePage": 2,
+      "wireframeSection": "02",
+      "position": 3,
+      "screenIds": [
+        "D-GRP-T3"
+      ],
+      "title": "D-GRP-T3 · 지도 튜토리얼 3/5 — 영향 경로",
+      "image": "screens/D-GRP-T3--node-619-4508.png",
+      "node": "619-4508",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-4508",
+      "routes": [
+        "/?mode=all&tour=1"
+      ],
+      "baselinePages": [
+        27
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-T3.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-4508.png"
+    },
+    {
+      "section": "02-map-tutorial",
+      "sectionTitle": "지도 튜토리얼",
+      "sourcePage": 2,
+      "wireframeSection": "02",
+      "position": 4,
+      "screenIds": [
+        "D-GRP-T4"
+      ],
+      "title": "D-GRP-T4 · 지도 튜토리얼 4/5 — 상세·근거",
+      "image": "screens/D-GRP-T4--node-619-5095.png",
+      "node": "619-5095",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-5095",
+      "routes": [
+        "/?mode=all&tour=1"
+      ],
+      "baselinePages": [
+        28
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-T4.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-5095.png"
+    },
+    {
+      "section": "02-map-tutorial",
+      "sectionTitle": "지도 튜토리얼",
+      "sourcePage": 2,
+      "wireframeSection": "02",
+      "position": 5,
+      "screenIds": [
+        "D-GRP-T5"
+      ],
+      "title": "D-GRP-T5 · 지도 튜토리얼 5/5 — AI 질문",
+      "image": "screens/D-GRP-T5--node-619-5682.png",
+      "node": "619-5682",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-5682",
+      "routes": [
+        "/?mode=all&tour=1"
+      ],
+      "baselinePages": [
+        29
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-T5.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-5682.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 1,
+      "screenIds": [
+        "D-GRP-01"
+      ],
+      "title": "D-GRP-01 · 시장 전체 지도",
+      "image": "screens/D-GRP-01--node-619-1819.png",
+      "node": "619-1819",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-1819",
+      "routes": [
+        "/?mode=all"
+      ],
+      "baselinePages": [
+        23
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-1819.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 2,
+      "screenIds": [
+        "D-GRP-01b"
+      ],
+      "title": "D-GRP-01b · 내 종목 지도·범위 필터",
+      "image": "screens/D-GRP-01b--node-619-2374.png",
+      "node": "619-2374",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-2374",
+      "routes": [
+        "/?mode=personal"
+      ],
+      "baselinePages": [
+        24
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-01b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-2374.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 3,
+      "screenIds": [
+        "D-GRP-01"
+      ],
+      "title": "D-GRP-01 · 시장 전체 지도 — 확대 상태",
+      "image": "screens/D-GRP-01--node-619-2769.png",
+      "node": "619-2769",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-2769",
+      "routes": [
+        "/?mode=all"
+      ],
+      "baselinePages": [
+        23
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-2769.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 4,
+      "screenIds": [
+        "D-GRP-02"
+      ],
+      "title": "D-GRP-02 · 사건 패널",
+      "image": "screens/D-GRP-02--node-619-6269.png",
+      "node": "619-6269",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-6269",
+      "routes": [
+        "/?mode=all&select=node%3Aissue-04153e2e4c2a1b58e40a0e57"
+      ],
+      "baselinePages": [
+        30
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-6269.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 5,
+      "screenIds": [
+        "D-GRP-03"
+      ],
+      "title": "D-GRP-03 · 기업 패널·시세·1개월 추이",
+      "image": "screens/D-GRP-03--node-619-6729.png",
+      "node": "619-6729",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-6729",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930"
+      ],
+      "baselinePages": [
+        31
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-03.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-6729.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 6,
+      "screenIds": [
+        "D-GRP-04"
+      ],
+      "title": "D-GRP-04 · 연결선 상세",
+      "image": "screens/D-GRP-04--node-619-7557.png",
+      "node": "619-7557",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-7557",
+      "routes": [
+        "/?mode=all&select=edge%3Aedge-f53400022fc7c812"
+      ],
+      "baselinePages": [
+        32
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-04.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-7557.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 7,
+      "screenIds": [
+        "D-GRP-05"
+      ],
+      "title": "D-GRP-05 · 근거 문서 창",
+      "image": "screens/D-GRP-05--node-619-8225.png",
+      "node": "619-8225",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-8225",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d"
+      ],
+      "baselinePages": [
+        33
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-05.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-8225.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 8,
+      "screenIds": [
+        "D-GRP-06"
+      ],
+      "title": "D-GRP-06 · 기업에서 여는 영향 경로",
+      "image": "screens/D-GRP-06--node-619-8880.png",
+      "node": "619-8880",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-8880",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930&impact=KRX%3A005930%2Cissue-25ac3f6d1288d2b7ffa5454d"
+      ],
+      "baselinePages": [
+        34
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-06.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-8880.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 9,
+      "screenIds": [
+        "D-GRP-07"
+      ],
+      "title": "D-GRP-07 · 두 기업 사이 경로",
+      "image": "screens/D-GRP-07--node-619-9575.png",
+      "node": "619-9575",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-9575",
+      "routes": [
+        "/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA"
+      ],
+      "baselinePages": [
+        35
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-07.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-9575.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 10,
+      "screenIds": [
+        "D-GRP-07b"
+      ],
+      "title": "D-GRP-07b · 선택 기업 포커스",
+      "image": "screens/D-GRP-07b--node-619-10306.png",
+      "node": "619-10306",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-10306",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930&focus=KRX%3A005930&hops=1"
+      ],
+      "baselinePages": [
+        36
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-GRP-07b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-10306.png"
+    },
+    {
+      "section": "03-map-relationships-evidence",
+      "sectionTitle": "지도·관계·근거",
+      "sourcePage": 3,
+      "wireframeSection": "03",
+      "position": 11,
+      "screenIds": [
+        "D-BRF-04"
+      ],
+      "title": "D-BRF-04 · 회차 기준 지도",
+      "image": "screens/D-BRF-04--node-619-10871.png",
+      "node": "619-10871",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=619-10871",
+      "routes": [
+        "/?round=brf-2026-09-17-evening"
+      ],
+      "baselinePages": [
+        48
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-BRF-04.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-619-10871.png"
+    },
+    {
+      "section": "03-5-stock-search",
+      "sectionTitle": "종목 탐색",
+      "sourcePage": 4,
+      "wireframeSection": "03.5",
+      "position": 1,
+      "screenIds": [
+        "D-STK-01"
+      ],
+      "title": "D-STK-01 · 종목 탐색",
+      "image": "screens/D-STK-01--node-692-2.png",
+      "node": "692-2",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=692-2",
+      "routes": [
+        "/companies?q=%EC%82%BC%EC%84%B1"
+      ],
+      "baselinePages": [
+        37
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-STK-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "검색 폼·5개 행·기업 상세/지도/관심 조작이 기존 화면과 대응",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-692-2.png"
+    },
+    {
+      "section": "04-company-detail",
+      "sectionTitle": "기업 상세·시점 탐색",
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "position": 1,
+      "screenIds": [
+        "D-COM-01"
+      ],
+      "title": "D-COM-01 · 기업 상세·시세·모의 보유",
+      "image": "screens/D-COM-01--node-637-2222.png",
+      "node": "637-2222",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=637-2222",
+      "routes": [
+        "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z"
+      ],
+      "baselinePages": [
+        38
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-COM-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "인접 설명과 기업·시세·모의 보유 화면",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-637-2222.png"
+    },
+    {
+      "section": "04-company-detail",
+      "sectionTitle": "기업 상세·시점 탐색",
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "position": 2,
+      "screenIds": [
+        "D-COM-01b"
+      ],
+      "title": "D-COM-01b · 차트·시간 버킷·인과관계 고지",
+      "image": "screens/D-COM-01b--node-637-6212.png",
+      "node": "637-6212",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=637-6212",
+      "routes": [
+        "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=events"
+      ],
+      "baselinePages": [
+        39
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-COM-01b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "인접 설명과 스크롤된 차트 화면",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-637-6212.png"
+    },
+    {
+      "section": "04-company-detail",
+      "sectionTitle": "기업 상세·시점 탐색",
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "position": 3,
+      "screenIds": [
+        "D-COM-02"
+      ],
+      "title": "D-COM-02 · 문서 탭 전환 — 상태 확인 필요",
+      "image": "screens/D-COM-02--node-658-7834.png",
+      "node": "658-7834",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=658-7834",
+      "routes": [
+        "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=documents"
+      ],
+      "baselinePages": [
+        40
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-COM-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "부분 확인 / 별도 상태 증거 필요",
+      "mappingBasis": "인접 설명은 D-COM-02지만 화면은 사건·차트",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-658-7834.png"
+    },
+    {
+      "section": "04-company-detail",
+      "sectionTitle": "기업 상세·시점 탐색",
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "position": 4,
+      "screenIds": [
+        "D-COM-05",
+        "D-COM-06"
+      ],
+      "title": "D-COM-05/06 · 버킷·차트·그래프 연동·주가 그래프 시점 선택",
+      "image": "screens/D-COM-05_D-COM-06--node-658-8442.png",
+      "node": "658-8442",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=658-8442",
+      "routes": [
+        "/companies/KRX%3A005930?period=1m&asOf=2026-09-30T23%3A59%3A59%2B09%3A00&tab=events"
+      ],
+      "baselinePages": [
+        43,
+        44
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-COM-05.md",
+        "docs/system/out/screen-D-COM-06.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "부분 확인 / 별도 상태 증거 필요",
+      "mappingBasis": "차트 화면. 선택 버킷·asOf 변경은 정적 화면으로 미확인",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-658-8442.png"
+    },
+    {
+      "section": "04-company-detail",
+      "sectionTitle": "기업 상세·시점 탐색",
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "position": 5,
+      "screenIds": [
+        "D-COM-02"
+      ],
+      "title": "문서 탭",
+      "image": "screens/D-COM-02--node-663-14180.png",
+      "node": "663-14180",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=663-14180",
+      "routes": [
+        "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z&tab=documents"
+      ],
+      "baselinePages": [
+        40
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-COM-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "문서 탭 선택과 근거 문서 목록을 시각 확인",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-663-14180.png"
+    },
+    {
+      "section": "04-company-detail",
+      "sectionTitle": "기업 상세·시점 탐색",
+      "sourcePage": 5,
+      "wireframeSection": "04",
+      "position": 6,
+      "screenIds": [
+        "D-COM-01"
+      ],
+      "title": "기업 정보 탭",
+      "image": "screens/D-COM-01--node-663-13515.png",
+      "node": "663-13515",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=663-13515",
+      "routes": [
+        "/companies/KRX%3A005930?asOf=2026-10-06T03%3A41%3A18.068Z"
+      ],
+      "baselinePages": [
+        38
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-COM-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "기업 정보 탭 상태. 공식 새 화면 ID 없음",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-663-13515.png"
+    },
+    {
+      "section": "05-briefing",
+      "sectionTitle": "출퇴근 브리핑",
+      "sourcePage": 6,
+      "wireframeSection": "05",
+      "position": 1,
+      "screenIds": [
+        "D-BRF-01"
+      ],
+      "title": "D-BRF-01 · 출근 브리핑",
+      "image": "screens/D-BRF-01--node-620-948.png",
+      "node": "620-948",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-948",
+      "routes": [
+        "/briefing?date=2026-09-17&edition=morning"
+      ],
+      "baselinePages": [
+        46
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-BRF-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-948.png"
+    },
+    {
+      "section": "05-briefing",
+      "sectionTitle": "출퇴근 브리핑",
+      "sourcePage": 6,
+      "wireframeSection": "05",
+      "position": 2,
+      "screenIds": [
+        "D-BRF-02"
+      ],
+      "title": "D-BRF-02 · 퇴근 브리핑·회차 비교",
+      "image": "screens/D-BRF-02--node-620-1278.png",
+      "node": "620-1278",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-1278",
+      "routes": [
+        "/briefing?date=2026-09-17&edition=evening"
+      ],
+      "baselinePages": [
+        47
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-BRF-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-1278.png"
+    },
+    {
+      "section": "05-briefing",
+      "sectionTitle": "출퇴근 브리핑",
+      "sourcePage": 6,
+      "wireframeSection": "05",
+      "position": 3,
+      "screenIds": [
+        "D-BRF-04"
+      ],
+      "title": "D-BRF-04 · 회차 기준 지도",
+      "image": "screens/D-BRF-04--node-730-278.png",
+      "node": "730-278",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=730-278",
+      "routes": [
+        "/?round=brf-2026-09-17-evening"
+      ],
+      "baselinePages": [
+        48
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-BRF-04.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "05 페이지의 회차 지도. 03 페이지 619-10871과 중복 후보",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-730-278.png"
+    },
+    {
+      "section": "06-ai-chat",
+      "sectionTitle": "AI 질문·대화 상태",
+      "sourcePage": 7,
+      "wireframeSection": "06",
+      "position": 1,
+      "screenIds": [
+        "D-AI-01"
+      ],
+      "title": "D-AI-01 · AI 질문·대상 연결",
+      "image": "screens/D-AI-01--node-620-1593.png",
+      "node": "620-1593",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-1593",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930"
+      ],
+      "baselinePages": [
+        49
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-AI-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-1593.png"
+    },
+    {
+      "section": "06-ai-chat",
+      "sectionTitle": "AI 질문·대화 상태",
+      "sourcePage": 7,
+      "wireframeSection": "06",
+      "position": 2,
+      "screenIds": [
+        "D-AI-01b"
+      ],
+      "title": "D-AI-01b · AI 되묻기",
+      "image": "screens/D-AI-01b--node-620-3770.png",
+      "node": "620-3770",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-3770",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930"
+      ],
+      "baselinePages": [
+        50
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-AI-01b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-3770.png"
+    },
+    {
+      "section": "06-ai-chat",
+      "sectionTitle": "AI 질문·대화 상태",
+      "sourcePage": 7,
+      "wireframeSection": "06",
+      "position": 3,
+      "screenIds": [
+        "D-AI-02"
+      ],
+      "title": "D-AI-02 · AI 작업 복구·대화 회수",
+      "image": "screens/D-AI-02--node-620-4314.png",
+      "node": "620-4314",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-4314",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930"
+      ],
+      "baselinePages": [
+        51
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-AI-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "부분 확인 / 별도 상태 증거 필요",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-4314.png"
+    },
+    {
+      "section": "06-ai-chat",
+      "sectionTitle": "AI 질문·대화 상태",
+      "sourcePage": 7,
+      "wireframeSection": "06",
+      "position": 4,
+      "screenIds": [
+        "D-AI-02b"
+      ],
+      "title": "D-AI-02b · 대화 조회 오류 — 상태 확인 필요",
+      "image": "screens/D-AI-02b--node-620-4859.png",
+      "node": "620-4859",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-4859",
+      "routes": [
+        "/?mode=all&select=node%3AKRX%3A005930"
+      ],
+      "baselinePages": [
+        52
+      ],
+      "specFiles": [
+        "docs/system/out/screen-D-AI-02b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "부분 확인 / 별도 상태 증거 필요",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-4859.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 1,
+      "screenIds": [
+        "A-ADM-05c"
+      ],
+      "title": "A-ADM-05c · 관리자 로그인",
+      "image": "screens/A-ADM-05c--node-620-8120.png",
+      "node": "620-8120",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8120",
+      "routes": [
+        "/admin/login"
+      ],
+      "baselinePages": [
+        61
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-05c.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8120.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 2,
+      "screenIds": [
+        "A-ADM-01"
+      ],
+      "title": "A-ADM-01 · 운영 대시보드",
+      "image": "screens/A-ADM-01--node-620-8166.png",
+      "node": "620-8166",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8166",
+      "routes": [
+        "/admin"
+      ],
+      "baselinePages": [
+        62
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-01.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8166.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 3,
+      "screenIds": [
+        "A-ADM-02"
+      ],
+      "title": "A-ADM-02 · 이용 통계·AI 품질",
+      "image": "screens/A-ADM-02--node-620-8616.png",
+      "node": "620-8616",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8616",
+      "routes": [
+        "/admin/stats"
+      ],
+      "baselinePages": [
+        63
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-02.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8616.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 4,
+      "screenIds": [
+        "A-ADM-02b"
+      ],
+      "title": "A-ADM-02b · 선호도·대화록",
+      "image": "screens/A-ADM-02b--node-620-8960.png",
+      "node": "620-8960",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-8960",
+      "routes": [
+        "/admin/feedback"
+      ],
+      "baselinePages": [
+        64
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-02b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-8960.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 5,
+      "screenIds": [
+        "A-ADM-03"
+      ],
+      "title": "A-ADM-03 · 그래프 관제·검수",
+      "image": "screens/A-ADM-03--node-620-9307.png",
+      "node": "620-9307",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-9307",
+      "routes": [
+        "/admin/pipeline"
+      ],
+      "baselinePages": [
+        65
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-03.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-9307.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 6,
+      "screenIds": [
+        "A-ADM-04"
+      ],
+      "title": "A-ADM-04 · AI·브리핑 운영",
+      "image": "screens/A-ADM-04--node-620-9769.png",
+      "node": "620-9769",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-9769",
+      "routes": [
+        "/admin/briefings"
+      ],
+      "baselinePages": [
+        66
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-04.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-9769.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 7,
+      "screenIds": [
+        "A-ADM-04b"
+      ],
+      "title": "A-ADM-04b · AI 사용량·오류",
+      "image": "screens/A-ADM-04b--node-620-10181.png",
+      "node": "620-10181",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-10181",
+      "routes": [
+        "/admin/ai"
+      ],
+      "baselinePages": [
+        67
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-04b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-10181.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 8,
+      "screenIds": [
+        "A-ADM-05"
+      ],
+      "title": "A-ADM-05 · 회원·접근 관리",
+      "image": "screens/A-ADM-05--node-620-10650.png",
+      "node": "620-10650",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-10650",
+      "routes": [
+        "/admin/members"
+      ],
+      "baselinePages": [
+        68
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-05.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-10650.png"
+    },
+    {
+      "section": "09-admin",
+      "sectionTitle": "관리자 운영",
+      "sourcePage": 8,
+      "wireframeSection": "09",
+      "position": 9,
+      "screenIds": [
+        "A-ADM-05b"
+      ],
+      "title": "A-ADM-05b · 관리자 감사 로그",
+      "image": "screens/A-ADM-05b--node-620-10924.png",
+      "node": "620-10924",
+      "figmaUrl": "https://www.figma.com/design/B1nkTuCLKWMohgXNdEB6un/돈벌레-최종-프로젝트?node-id=620-10924",
+      "routes": [
+        "/admin/audit"
+      ],
+      "baselinePages": [
+        69
+      ],
+      "specFiles": [
+        "docs/system/out/screen-A-ADM-05b.md"
+      ],
+      "staticVisual": "확인됨",
+      "interaction": "미확인",
+      "annotationState": "정적 배치만 확인",
+      "mappingBasis": "원본 레이어 이름의 화면 ID",
+      "sourceImage": "docs/evidence/raw/wireframe_2026-10-08/frame-620-10924.png"
+    }
+  ]
+}
