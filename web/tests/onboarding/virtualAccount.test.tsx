@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import VirtualAccountPage from '@/pages/onboarding/account/VirtualAccountPage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import {
@@ -49,6 +49,16 @@ const accountButton = (name: RegExp) =>
     'button',
     { name },
   );
+/** 지금까지 보낸 연결 요청의 Idempotency-Key */
+const connectKeys = () =>
+  vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([url, init]) =>
+        String(url).endsWith(CONNECTIONS) && init?.method === 'POST',
+    )
+    .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'));
+
 const connectButton = () =>
   screen.getByRole('button', {
     name: /선택한 가상 계좌 연결하기|다시 연결하기/,
@@ -161,12 +171,65 @@ describe('D-ONB-02 가상 계좌 연결', () => {
     );
 
     notConnectedMember(server);
+    // 실패 뒤 연결 상태를 다시 확인하는 동안에는 연결 버튼이 잠긴다.
+    await waitFor(() =>
+      expect(connectButton().hasAttribute('disabled')).toBe(false),
+    );
     await user.click(screen.getByRole('button', { name: '다시 연결하기' }));
 
     expect(await screen.findByText('삼성전자')).toBeTruthy();
     const posts = server.calls('POST', CONNECTIONS);
     expect(posts).toHaveLength(2);
     expect(posts[1].body).toEqual({ mockPortfolioId: 'mock-2' });
+    // 같은 연결 시도를 다시 보낼 때는 같은 Idempotency-Key를 쓴다.
+    const [first, retry] = connectKeys();
+    expect(first).toBeTruthy();
+    expect(retry).toBe(first);
+  });
+
+  test('다른 계좌로 바꿔 연결하면 새 Idempotency-Key를 쓴다', async () => {
+    const server = createFakeServer();
+    notConnectedMember(server);
+    server.on('POST', CONNECTIONS, () => apiError(503, 'SOURCE_UNAVAILABLE'));
+    const { user } = openAccountStep();
+
+    await screen.findByRole('list', { name: '가상 계좌 목록' });
+    await user.click(connectButton());
+    await screen.findByRole('alert');
+    await waitFor(() =>
+      expect(connectButton().hasAttribute('disabled')).toBe(false),
+    );
+    await user.click(accountButton(/배당주 계좌/));
+    await user.click(connectButton());
+    await waitFor(() => expect(connectKeys()).toHaveLength(2));
+
+    const [first, second] = connectKeys();
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
+  });
+
+  test('연결 요청이 실패했지만 실제로는 연결됐으면 연결 완료 화면으로 넘어간다', async () => {
+    const server = createFakeServer();
+    notConnectedMember(server);
+    // 응답은 실패로 왔지만 서버에는 연결이 반영된 경우(다른 탭·응답 유실)
+    let connected = false;
+    server.on('GET', PORTFOLIO, () =>
+      json(connected ? connectedPortfolioBody() : disconnectedPortfolioBody()),
+    );
+    server.on('POST', CONNECTIONS, () => {
+      connected = true;
+      return apiError(409, 'REVISION_CONFLICT');
+    });
+    const { user } = openAccountStep();
+
+    await screen.findByRole('list', { name: '가상 계좌 목록' });
+    await user.click(connectButton());
+
+    expect(
+      await screen.findByRole('heading', { name: '가상 계좌를 연결했어요' }),
+    ).toBeTruthy();
+    expect(screen.getByText('삼성전자')).toBeTruthy();
+    expect(server.calls('POST', CONNECTIONS)).toHaveLength(1);
   });
 
   test('연결 상태를 확인하지 못하면 연결을 막고, 다시 시도해 성공하면 연결할 수 있다', async () => {

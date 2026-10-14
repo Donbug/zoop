@@ -39,12 +39,28 @@ export function getPortfolio(): Promise<Portfolio> {
   return call<PortfolioResponse>(PORTFOLIO_API, 'GET');
 }
 
+/**
+ * 목표 계약은 연결 요청에 Idempotency-Key를 요구한다. 같은 연결 시도를 다시 보낼 때는
+ * 같은 키를 써서, 응답만 유실된 경우에도 서버가 중복 연결을 막게 한다.
+ */
 export function connectPortfolio(
   mockPortfolioId: string,
+  idempotencyKey: string,
 ): Promise<ConnectionResponse> {
-  return call<ConnectionResponse>(`${PORTFOLIO_API}/connections`, 'POST', {
-    mockPortfolioId,
-  });
+  return call<ConnectionResponse>(
+    `${PORTFOLIO_API}/connections`,
+    'POST',
+    { mockPortfolioId },
+    { headers: { 'Idempotency-Key': idempotencyKey } },
+  );
+}
+
+/** 연결 시도 하나를 식별하는 키 */
+export function createIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 /** 204 No Content */

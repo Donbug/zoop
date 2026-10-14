@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import ErrorNotice from '@/components/common/ErrorNotice';
 import OnboardingStep from '@/components/onboarding/OnboardingStep';
 import {
   connectPortfolio,
+  createIdempotencyKey,
   getMockPortfolios,
   getPortfolio,
 } from '@/apis/portfolio/portfolio';
@@ -90,6 +91,8 @@ export default function PortfolioConnect({
   const [connecting, setConnecting] = useState(false);
   const [connectFailed, setConnectFailed] = useState(false);
   const [connected, setConnected] = useState<PortfolioConnection | null>(null);
+  // 같은 계좌로 다시 시도하면 같은 Idempotency-Key를 보낸다(응답 유실 시 중복 연결 방지).
+  const attempt = useRef<{ accountId: string; key: string } | null>(null);
   const fromOnboarding = source === 'onboarding';
 
   const items = options.data?.items ?? [];
@@ -106,14 +109,24 @@ export default function PortfolioConnect({
     if (!lookupsReady || !selectedId || connecting) return;
     setConnecting(true);
     setConnectFailed(false);
+    if (attempt.current?.accountId !== selectedId) {
+      attempt.current = { accountId: selectedId, key: createIdempotencyKey() };
+    }
     try {
-      const connection = await connectPortfolio(selectedId);
+      const connection = await connectPortfolio(
+        selectedId,
+        attempt.current.key,
+      );
+      attempt.current = null;
       setConnected(connection);
       onConnected?.(connection);
       // 초기 설정은 이 화면에서 연결한 계좌의 보유 종목을 보여 준다.
       if (fromOnboarding) portfolio.reload();
     } catch {
       setConnectFailed(true);
+      // 이미 연결됐거나(다른 탭·응답 유실) 상태가 바뀌었을 수 있어 연결 상태를 다시 확인한다.
+      // 연결된 것으로 확인되면 연결 완료 화면으로 넘어간다.
+      portfolio.reload();
     } finally {
       setConnecting(false);
     }
