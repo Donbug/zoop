@@ -1,5 +1,5 @@
 import { call } from '@/apis/auth/ApiService';
-import { getAccessToken } from '@/apis/auth/auth';
+import { isMember } from '@/apis/auth/auth';
 import type { GraphRequest, GraphResponse } from '@/types/map/graph';
 import type { MockScenario } from '@/mocks/graph/response';
 
@@ -14,7 +14,7 @@ export function graphUrl(request: GraphRequest) {
   return `/api/v1/graph?${query}`;
 }
 export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
-  if (request.mode === 'personal' && !getAccessToken())
+  if (request.mode === 'personal' && !isMember())
     throw new Error('개인화 지도는 로그인이 필요합니다.');
   if (usesGraphMock) {
     const { createMockGraph } = await import('@/mocks/graph/response');

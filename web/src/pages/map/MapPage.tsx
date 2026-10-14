@@ -8,15 +8,16 @@ import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { useAuth } from '@/hooks/useAuth';
+import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import type { MapMode, PersonalScope } from '@/types/map';
 import '@/components/graph/relationship-map.css';
 
 const FILTER_KEY = 'zoop.graph.personal-filter';
-// Same-session preference only; cleared on sign-in/out, not access-token refresh.
+// Same-session preference only; cleared on sign-in/out.
 useAuthStore.subscribe((next, previous) => {
-  if (Boolean(next.accessToken) !== Boolean(previous.accessToken))
+  if (Boolean(next.member) !== Boolean(previous.member))
     sessionStorage.removeItem(FILTER_KEY);
 });
 function readFilter(value: string | null): PersonalScope {
@@ -26,7 +27,9 @@ function readFilter(value: string | null): PersonalScope {
 // WBS 6.6.21 · 김도현 · D-GRP-01/01b only. Detail/AI/tutorial/round panels excluded.
 export default function MapPage() {
   const { params, updateQuery } = useRouteQuery();
-  const token = useAuthStore((s) => s.accessToken);
+  // 회원 세션의 회원 ID(쿠키 세션). 비회원·세션 없음은 null
+  const { checking } = useAuth();
+  const token = useAuthStore(selectMemberId);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
   const openAi = useAiChatStore((state) => state.open);
@@ -81,7 +84,7 @@ export default function MapPage() {
     [updateQuery],
   );
   const loginNeeded =
-    !token && (desiredMode === 'personal' || notice === 'login');
+    !checking && !token && (desiredMode === 'personal' || notice === 'login');
   function changeMode(mode: MapMode) {
     if (mode === 'personal' && !token) {
       setNotice('login');
