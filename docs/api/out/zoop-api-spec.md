@@ -16,7 +16,15 @@
 
 ### sessionLifecycle
 
-로그아웃과 차단은 서버 세션을 폐기한다. 회원 세션 수명·관리자 유휴/절대 만료·SSO 제공자·CSRF 토큰 발급 형식은 팀 확인 필요이며 계약에 수치를 고정하지 않는다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
+로그아웃과 차단은 서버 세션을 폐기한다. 회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 회원 쿠키는 Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200이며 서버 만료가 최종 권위다. 회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
+
+### signupPolicy
+
+2026-10-14 사용자 확정: 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 15~128 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md.
+
+### authOriginAndRateLimit
+
+가입·로그인 등 쿠키를 만드는 브라우저 요청과 쿠키 인증 쓰기는 정확한 허용 Origin을 요구하며 null/누락/불허 Origin은 403 ACCESS_DENIED다. 운영 목록은 환경별 HTTPS Origin으로 설정하고 자격증명 CORS 와일드카드는 허용하지 않는다. 가입은 IP 10회/1시간·email_key 5회/1시간의 모든 시도, 로그인은 IP 100회/15분의 모든 시도와 email_key 20회/15분의 실패를 공유 원장에서 원자적으로 제한한다. 성공한 로그인은 email_key 실패 카운터를 초기화한다. 초과 시 429 RATE_LIMITED와 초 단위 Retry-After를 보낸다. 신뢰 IP는 지정 프록시에서만 취한다.
 
 ### errors
 
@@ -198,7 +206,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## getMemberSession · 회원 세션과 초기 설정 조회
 
-회원 세션과 초기 설정 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+유효한 회원 세션은 member와 세션 결합 csrfToken·expiresAt을 반환한다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -238,7 +246,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/terms |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
 
@@ -252,21 +260,21 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## signUp · 이메일 회원가입
 
-이메일 회원가입. 성공하면 새 회원 세션을 발급해 바로 로그인하고 201 SessionResponse를 반환한다. 공통 규칙 및 x-zoop의 남은 팀 확인 사항을 함께 적용한다.
+이메일 회원가입. 성공하면 새 회원 세션을 발급해 바로 로그인하고 201 SessionResponse를 반환한다. Origin·가입 정책은 x-zoop-common-rules를 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/auth/signup` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | [SignupRequest](#schema-signuprequest) |
-| 응답 | 201: [SessionResponse](#schema-sessionresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, EMAIL_TAKEN, TERMS_REQUIRED |
+| 응답 | 201: [SessionResponse](#schema-sessionresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, ACCESS_DENIED, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, EMAIL_TAKEN, TERMS_REQUIRED |
 | FS/NFS | [FS003](../../system/out/feature-FS003.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-AUT-02](../../system/out/screen-D-AUT-02.md) |
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/signup |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
 
@@ -280,7 +288,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## logIn · 이메일 로그인
 
-이메일 로그인.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+이메일 로그인. Origin·반복 실패 제한·세션 정책은 x-zoop-common-rules를 따른다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -288,13 +296,13 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | [LoginRequest](#schema-loginrequest) |
 | 응답 | 200: [SessionResponse](#schema-sessionresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, INVALID_CREDENTIALS, MEMBER_BLOCKED |
+| 오류 코드 | INVALID_REQUEST, ACCESS_DENIED, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED, INVALID_CREDENTIALS, MEMBER_BLOCKED |
 | FS/NFS | [FS002](../../system/out/feature-FS002.md) · [FS006](../../system/out/feature-FS006.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.4, 6.2.6, 6.2.7 |
 | 프로토타입 대응 | /api/auth/login |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
 
@@ -4811,12 +4819,12 @@ and the baseline stays where it was.
 
 ### LoginRequest
 
-
+email은 가입과 같은 비교키로 조회한다. password 원문은 trim하지 않고 저장된 적응형 해시와 비교한다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| email | 선택 | string |  |
-| password | 선택 | string |  |
+| email | 필수 | string |  |
+| password | 필수 | string |  |
 
 <a id="schema-marketindicator"></a>
 
@@ -5736,7 +5744,7 @@ guest session only.
 
 ### SignupRequest
 
-필수 입력·이메일 중복·필수 약관·승인 버전·실제 동의 여부는 서버에서 검증한다. 가입 성공 직후 새 회원 세션을 발급한다. 이름/비밀번호 정책은 팀 확인 필요다.
+필수 입력·이메일 중복·필수 약관·승인 버전·실제 동의 여부는 서버에서 검증한다. 가입 성공 직후 새 회원 세션을 발급한다. 이름·비밀번호 정책은 x-zoop-common-rules.signupPolicy를 따른다. PR2는 이메일 소유 확인 메일을 보내지 않는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

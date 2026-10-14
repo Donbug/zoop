@@ -380,27 +380,6 @@
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
-      "target": "listTerms",
-      "severity": "warning",
-      "message": "반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다.",
-      "source": ""
-    },
-    {
-      "code": "TEAM_DECISION_REQUIRED",
-      "target": "signUp",
-      "severity": "warning",
-      "message": "반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다.",
-      "source": ""
-    },
-    {
-      "code": "TEAM_DECISION_REQUIRED",
-      "target": "logIn",
-      "severity": "warning",
-      "message": "반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다.",
-      "source": ""
-    },
-    {
-      "code": "TEAM_DECISION_REQUIRED",
       "target": "listSocialProviders",
       "severity": "warning",
       "message": "회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다.",
@@ -1481,7 +1460,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "signUp",
       "severity": "difference",
-      "message": "목표만 152 · BFF만 41 · 형식/필수/권한 변경 9",
+      "message": "목표만 170 · BFF만 32 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -1495,7 +1474,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "logIn",
       "severity": "difference",
-      "message": "목표만 180 · BFF만 23 · 형식/필수/권한 변경 7",
+      "message": "목표만 181 · BFF만 23 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2629,7 +2608,7 @@
     "RESERVED_REQUIREMENT_UNMAPPED": 1,
     "INDEX_DETAIL_RANGE_STALE": 17,
     "INDEX_REQUIREMENT_META_MISMATCH": 4,
-    "TEAM_DECISION_REQUIRED": 38,
+    "TEAM_DECISION_REQUIRED": 35,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
@@ -2644,7 +2623,7 @@
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
-    "warning": 206,
+    "warning": 203,
     "difference": 168
   },
   "xlsxReadback": {
@@ -2655,13 +2634,13 @@
       "기능→WBS→구현 상태": 500,
       "API 목록": 84,
       "오류 코드": 26,
-      "경고": 374,
+      "경고": 371,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 46740
+    "cells": 46725
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2714,7 +2693,7 @@
     "기능→WBS→구현 상태": 500,
     "API 목록": 84,
     "오류 코드": 26,
-    "경고": 374,
+    "경고": 371,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,
