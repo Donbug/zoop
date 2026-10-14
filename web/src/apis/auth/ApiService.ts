@@ -3,6 +3,7 @@ import { clearAuthentication, getAccessToken, setAccessToken } from './auth';
 
 type CallOptions = {
   skipAuth?: boolean;
+  headers?: Record<string, string>;
 };
 
 type RefreshResponse = {
@@ -57,8 +58,12 @@ function createRequestOptions(
   request: unknown,
   accessToken: string | null,
   skipAuth: boolean,
+  extraHeaders?: Record<string, string>,
 ): RequestInit {
-  const headers = new Headers({ 'Content-Type': 'application/json' });
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  });
 
   if (accessToken && !skipAuth) {
     headers.set('Authorization', `Bearer ${accessToken}`);
@@ -86,7 +91,13 @@ export async function call<TResponse = unknown>(
 
   let response = await fetch(
     url,
-    createRequestOptions(method, request, requestedWithToken, skipAuth),
+    createRequestOptions(
+      method,
+      request,
+      requestedWithToken,
+      skipAuth,
+      option?.headers,
+    ),
   );
 
   if (response.status === 401 && !skipAuth) {
@@ -99,7 +110,13 @@ export async function call<TResponse = unknown>(
 
       response = await fetch(
         url,
-        createRequestOptions(method, request, nextToken, false),
+        createRequestOptions(
+          method,
+          request,
+          nextToken,
+          false,
+          option?.headers,
+        ),
       );
     } catch (error) {
       clearAuthentication();
