@@ -234,7 +234,7 @@ jobs:
         run: make api-test api-build
       - name: Company catalog PostgreSQL migrations and search integration tests
         env:
-          ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports[5432] }}/zoop_company_test_19
+          ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19
         run: ./api/gradlew -p api companyIntegrationTest --console=plain
       - name: Bootstrap the ai/service runtime and installed zoop-ai for the real gate (public dependencies, no token)
         run: make service-install
