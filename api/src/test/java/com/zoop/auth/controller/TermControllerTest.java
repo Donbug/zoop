@@ -1,8 +1,11 @@
 package com.zoop.auth.controller;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.List;
 
 import com.zoop.auth.repository.TermRepository;
@@ -52,5 +55,30 @@ class TermControllerTest {
         mvc.perform(get("/api/v1/auth/terms").param("cursor", "invalid!"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error.code").value("INVALID_CURSOR"));
+    }
+
+    @Test
+    void outOfRangeCursorTimestampUsesInvalidCursorInsteadOfInternalError() throws Exception {
+        for (long epochSecond : List.of(Long.MIN_VALUE, Long.MAX_VALUE)) {
+            mvc.perform(get("/api/v1/auth/terms")
+                            .param("cursor", cursorWithTimestamp(epochSecond, 0)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_CURSOR"));
+        }
+        mvc.perform(get("/api/v1/auth/terms")
+                        .param("cursor", cursorWithTimestamp(Long.MAX_VALUE, Integer.MAX_VALUE)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("INVALID_CURSOR"));
+    }
+
+    private static String cursorWithTimestamp(long epochSecond, int nanos) throws Exception {
+        var bytes = new ByteArrayOutputStream();
+        var output = new DataOutputStream(bytes);
+        output.writeByte(1);
+        output.writeLong(epochSecond);
+        output.writeInt(nanos);
+        output.writeInt(1);
+        output.writeUTF("privacy");
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.toByteArray());
     }
 }

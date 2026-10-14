@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
 
@@ -50,7 +51,7 @@ final class TermsCursor {
                 throw invalid();
             }
             return new Decoded(asOf, afterId, limit);
-        } catch (IllegalArgumentException | IOException exception) {
+        } catch (IllegalArgumentException | DateTimeException | ArithmeticException | IOException exception) {
             throw invalid();
         }
     }
