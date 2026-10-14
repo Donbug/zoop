@@ -36,20 +36,20 @@ function EvidenceCard({
   const eventId = evidence.eventIds[0];
   return (
     <article
-      className={`${ui.section} [&_blockquote]:mt-3 [&_blockquote]:rounded-panel [&_blockquote]:border [&_blockquote]:border-panel-line [&_blockquote]:bg-panel-soft [&_blockquote]:p-3 [&_blockquote]:wrap-anywhere`}
+      className={`${ui.section} px-5! py-4! [&_h3]:mt-2! [&_h3]:mb-0! [&_blockquote]:mt-2 [&_blockquote]:rounded-[3px] [&_blockquote]:bg-panel-soft [&_blockquote]:px-3 [&_blockquote]:py-2.5 [&_blockquote]:text-[12px] [&_blockquote]:leading-[19.5px] [&_blockquote]:wrap-anywhere`}
     >
       {evidence.article ? (
         <>
-          <p className={`flex flex-wrap gap-x-1.5 ${ui.muted}`}>
+          <p className={`flex flex-wrap gap-x-1.5 ${ui.secondary}`}>
             <span>{publisherLabel(evidence)}</span>
             <span aria-hidden="true">·</span>
-            <span>
+            <span className={ui.muted}>
               {formatPublishedAt(evidence.article.publishedAt)
                 ? `발행 ${formatPublishedAt(evidence.article.publishedAt)}`
                 : '발행 시각 미상'}
             </span>
           </p>
-          <p className={`mt-1 ${ui.muted}`}>
+          <p className={`${ui.badge} mt-1`}>
             {evidence.quoteVerified === true
               ? '원문 구간 확인됨'
               : evidence.quoteVerified === false
@@ -60,7 +60,7 @@ function EvidenceCard({
             {evidence.article.title ?? '문서 제목 미제공'}
           </h3>
           <blockquote>{evidence.quote}</blockquote>
-          <div className={`${ui.actions} mt-3 border-none! p-0!`}>
+          <div className={`${ui.textActions} mt-3`}>
             {href ? (
               <a href={href} target="_blank" rel="noopener noreferrer">
                 ↗ 원문 기사 보기{' '}
@@ -155,7 +155,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
       <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
       <aside
         ref={dialog}
-        className={`relative ${ui.shell} border-l border-panel-line shadow-xl`}
+        className={`relative ${ui.shell} ${ui.wideShell} border-l border-panel-line`}
         data-screen-id="D-GRP-05"
         role="dialog"
         aria-modal="true"
@@ -186,10 +186,12 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           }
         }}
       >
-        <header className={`${ui.header} border-b border-panel-line pr-14`}>
+        <header
+          className={`${ui.header} border-b border-panel-line px-5 pt-5 pb-4 pr-14`}
+        >
           <button
             type="button"
-            className={`absolute top-4 right-4 ${ui.close}`}
+            className={`absolute top-5 right-5 ${ui.close}`}
             onClick={close}
             aria-label="근거 창 닫기"
           >
@@ -203,7 +205,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           >
             근거 문서
           </h2>
-          <p className={`mt-1 ${ui.muted}`}>
+          <p className={`mt-1 ${ui.secondary}`}>
             {target.label ?? '선택한 연결의 근거'}
           </p>
           <span className="mt-2 block text-base" aria-hidden="true">
@@ -212,7 +214,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
         </header>
         <div className={ui.scroll} aria-busy={loading}>
           <div
-            className={`flex items-center gap-2 ${ui.section} [&_details]:relative [&_summary]:grid [&_summary]:size-5 [&_summary]:cursor-pointer [&_summary]:list-none [&_summary]:place-items-center [&_summary]:rounded-full [&_summary]:border [&_summary]:border-panel-control [&_details_p]:absolute [&_details_p]:top-6 [&_details_p]:right-0 [&_details_p]:z-10 [&_details_p]:w-60 [&_details_p]:rounded-panel [&_details_p]:border [&_details_p]:border-panel-line [&_details_p]:bg-white [&_details_p]:p-3 [&_details_p]:shadow-md`}
+            className={`flex items-center gap-2 px-5! py-3.5! ${ui.section} [&_details]:relative [&_summary]:grid [&_summary]:size-5 [&_summary]:cursor-pointer [&_summary]:list-none [&_summary]:place-items-center [&_summary]:rounded-full [&_summary]:border [&_summary]:border-panel-control [&_details_p]:absolute [&_details_p]:top-6 [&_details_p]:right-0 [&_details_p]:z-10 [&_details_p]:w-60 [&_details_p]:rounded-panel [&_details_p]:border [&_details_p]:border-panel-line [&_details_p]:bg-white [&_details_p]:p-3 [&_details_p]:shadow-md`}
           >
             <span>
               관계 확인 시점{' '}

@@ -181,7 +181,7 @@ export default function CompanyDetailPanel(props: Props) {
       {company && (
         <div className={`company-panel-scroll ${ui.scroll}`}>
           <section className={`company-quote ${ui.sectionFrame}`}>
-            <h3 className="company-quote-title">시세</h3>
+            <h3 className="sr-only">시세</h3>
             {quote ? (
               <>
                 <div className="company-price-row">

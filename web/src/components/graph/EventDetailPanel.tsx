@@ -59,7 +59,7 @@ export default function EventDetailPanel({
   function renderCompanies(items: typeof directCompanies) {
     return (
       <ul
-        className={`${ui.list} [&>li]:flex [&>li]:items-center [&>li]:gap-2 [&_strong]:text-[10.5px] [&_strong]:font-semibold [&_p]:text-[9.5px] [&_p]:text-panel-muted`}
+        className={`${ui.list} [&>li]:flex [&>li]:items-center [&>li]:gap-2.5 [&_strong]:text-[12px] [&_strong]:font-semibold [&_strong]:leading-[18px] [&_p]:text-[11px] [&_p]:leading-[16.5px] [&_p]:text-panel-muted`}
       >
         {items.map((company, index) => (
           <li key={`${company.id}-${index}`}>

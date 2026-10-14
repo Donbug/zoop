@@ -3,11 +3,12 @@
 @theme {
   --font-panel: 'Pretendard Variable', Pretendard, sans-serif;
   --color-panel-ink: #1a1a1a;
-  --color-panel-muted: #777771;
-  --color-panel-line: #e2e2de;
-  --color-panel-control: #bdbdb8;
+  --color-panel-secondary: #5f5f5b;
+  --color-panel-muted: #94948f;
+  --color-panel-line: #d6d6d2;
+  --color-panel-control: #d6d6d2;
   --color-panel-soft: #f2f2f0;
-  --radius-panel: 3px;
+  --radius-panel: 4px;
 }
 
 * {

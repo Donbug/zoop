@@ -22,23 +22,23 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 </aside>;
 ```
 
-`shell`, `header`, `title`, `close`, `scroll`, `sectionFrame`, `section`, `muted`, `itemTitle`, `button`, `actions`, `state`, `footer`, `avatar`, `list`, `badge` are complete, statically discoverable Tailwind class recipes. `sectionFrame` supplies the shared padding/border for specialized content such as company charts; `section` also supplies compact text and headings. Keep native HTML semantics and accessible labels in the calling component. Do not concatenate dynamic Tailwind class fragments.
+`shell`, `wideShell`, `header`, `title`, `close`, `scroll`, `sectionFrame`, `section`, `muted`, `secondary`, `itemTitle`, `button`, `actions`, `textActions`, `state`, `footer`, `avatar`, `list`, `badge` are complete, statically discoverable Tailwind class recipes. `sectionFrame` supplies the shared padding/border for specialized content such as company charts; `section` also supplies text and headings. `wideShell` is reserved for the 400 px D-GRP-05 evidence dialog. Use `actions` for bordered button grids and `textActions` for Figma's borderless evidence/document actions. Keep native HTML semantics and accessible labels in the calling component. Do not concatenate dynamic Tailwind class fragments.
 
 ## Tokens and proportions
 
 Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink`, `text-panel-muted`, `border-panel-line`, `border-panel-control`, `bg-panel-soft`, `rounded-panel` instead of repeating hex values.
 
-| Element                 | Baseline                 |
-| ----------------------- | ------------------------ |
-| Rail / section          | 320 px / 16 px padding   |
-| Font                    | Pretendard Variable      |
-| Heading                 | 17 px / 1.4 / bold       |
-| Section / list title    | 11 px / 10.5 px          |
-| Compact body and action | 9.5 px / 1.6             |
-| Border / radius         | 1 px neutral line / 3 px |
-| Close / action height   | 32 px / minimum 32 px    |
+| Element               | Baseline                                |
+| --------------------- | --------------------------------------- |
+| Rail / section        | 320 px / 16 px padding; evidence 400 px |
+| Font                  | Pretendard Variable                     |
+| Heading               | 17 px / 25.5 px / bold                  |
+| Section / list title  | 13 px / 12 px                           |
+| Body label / action   | 11 px / 12 px                           |
+| Border / radius       | 1 px `#d6d6d2` / 4 px                   |
+| Close / action height | 32 px / 32 px                           |
 
-These intentionally preserve the compact desktop company panel. A future accessibility/responsive size change should update all panels together, not introduce one-off typography. Existing chart and graph geometry CSS stays local; new repeated UI styling belongs in these recipes. Avoid unlayered `font: inherit` or high-specificity rules overriding Tailwind utilities.
+These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), including the 11 px body scale and 32 px controls. A future accessibility/responsive size change should update all panels together, not introduce one-off typography. Existing chart and graph geometry CSS stays local; new repeated UI styling belongs in these recipes. Avoid unlayered `font: inherit` or high-specificity rules overriding Tailwind utilities.
 
 ## Behavior checklist
 

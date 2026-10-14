@@ -238,14 +238,14 @@
   gap: 10px;
 }
 .company-logo {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   color: #fff;
-  font-size: 13px;
+  font-size: 11.4px;
   font-weight: 800;
   overflow: hidden;
 }
@@ -261,10 +261,9 @@
   gap: 2px;
 }
 .company-identity-meta > p {
-  color: #777771;
-  font:
-    10px/14px 'JetBrains Mono Variable',
-    monospace;
+  color: #94948f;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-statuses {
   display: flex;
@@ -273,28 +272,33 @@
 }
 .company-statuses span {
   color: #5f5f5b;
-  font-size: 9px;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-aliases summary,
 .company-source summary,
 .company-metrics summary {
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 .company-aliases p,
 .company-source p {
   padding-top: 6px;
-  color: #777771;
-  font-size: 10px;
+  color: #5f5f5b;
+  font-size: 11px;
 }
 .company-aliases {
-  margin-left: 42px;
+  margin-top: 8px;
 }
 .company-aliases summary {
-  min-height: 32px;
+  width: fit-content;
+  min-height: 26px;
   display: flex;
   align-items: center;
+  padding: 4px 8px;
+  border: 1px solid #d6d6d2;
+  border-radius: 4px;
   list-style: none;
 }
 .company-aliases summary::after {
@@ -305,22 +309,17 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 9px;
+  margin-bottom: 12px;
 }
 .company-section-title h3 {
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 19.5px;
   letter-spacing: -0.1px;
 }
 .company-section-title span {
   color: #94948f;
-  font:
-    8.5px/12px 'JetBrains Mono Variable',
-    monospace;
-}
-.company-quote-title {
-  margin-bottom: 6px;
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 15px;
 }
 .company-price-row {
   display: flex;
@@ -329,22 +328,23 @@
   gap: 3px 10px;
 }
 .company-price-row > strong {
-  font:
-    600 23px/28px 'Inter Variable',
-    sans-serif;
-  letter-spacing: -0.7px;
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 33px;
+  letter-spacing: -0.5px;
 }
 .company-price-row > strong small {
-  font-size: 9px;
-  color: #777771;
+  font-size: 12px;
+  color: #1a1a1a;
   letter-spacing: 0;
 }
 .company-price-row > .up,
 .company-price-row > .down {
   color: #c0362c;
-  font:
-    600 10px/14px 'JetBrains Mono Variable',
-    monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
 }
 .company-price-row > .down {
   color: #235fa4;
@@ -353,9 +353,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin: 5px 0 14px;
+  margin: 4px 0 12px;
   color: #94948f;
-  font-size: 8px;
+  font-size: 10px;
+  line-height: 16.25px;
 }
 .company-source {
   position: relative;
@@ -390,32 +391,39 @@
 .company-holding {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 7px 12px;
+  gap: 12px;
 }
 .company-stat-grid span,
 .company-holding span {
-  color: #777771;
-  font-size: 9px;
+  color: #94948f;
+  font-size: 11px;
+  line-height: 16.5px;
   display: flex;
   flex-direction: column;
 }
 .company-stat-grid b,
 .company-holding b {
   color: #1a1a1a;
-  font-size: 9.5px;
+  font-size: 13px;
+  line-height: 19.5px;
   font-weight: 600;
 }
+.company-holding b {
+  font-size: 14px;
+  line-height: 21px;
+}
 .company-price-chart {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .company-price-chart figcaption {
-  margin-bottom: 4px;
-  color: #777771;
-  font-size: 9px;
+  margin-bottom: 8px;
+  color: #94948f;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-sparkline {
   width: 100%;
-  height: 84px;
+  height: 64px;
   overflow: visible;
 }
 .company-sparkline line {
@@ -430,17 +438,16 @@
 }
 .company-caption {
   color: #94948f;
-  font:
-    7.5px/11px 'JetBrains Mono Variable',
-    monospace;
+  font-size: 10px;
+  line-height: 15px;
 }
 .company-chart-range {
   display: flex;
   justify-content: space-between;
   color: #94948f;
-  font:
-    7.5px/11px 'JetBrains Mono Variable',
-    monospace;
+  padding-top: 4px;
+  font-size: 10px;
+  line-height: 15px;
 }
 .company-metrics summary {
   display: flex;
@@ -457,7 +464,7 @@
   display: flex;
   justify-content: space-between;
   padding-top: 8px;
-  font-size: 9.5px;
+  font-size: 11px;
 }
 .company-list {
   list-style: none;
@@ -482,21 +489,23 @@
   display: block;
 }
 .company-list b {
-  font-size: 10.5px;
+  font-size: 12px;
+  line-height: 18px;
 }
 .company-list span {
   padding-top: 2px;
   color: #94948f;
-  font-size: 8.5px;
+  font-size: 10px;
+  line-height: 15px;
 }
 .company-unavailable,
 .company-section-error,
 .company-watch-error,
 .company-panel-loading,
 .company-panel-fatal {
-  color: #777771;
-  font-size: 9.5px;
-  line-height: 15px;
+  color: #5f5f5b;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-section-error,
 .company-watch-error {
