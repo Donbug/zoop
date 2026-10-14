@@ -77,14 +77,24 @@ export async function call<TResponse = unknown>(
   option?: CallOptions,
 ): Promise<TResponse> {
   const skipAuth = option?.skipAuth ?? false;
-  const response = await fetch(
-    `${API_BASE_URL}${api}`,
-    createRequestOptions(method, request, option?.headers),
-  );
+  const revision = useAuthStore.getState().sessionRevision;
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_BASE_URL}${api}`,
+      createRequestOptions(method, request, option?.headers),
+    );
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', '요청을 보내지 못했어요.');
+  }
 
   if (!response.ok) {
     // 세션이 끝났으면 화면의 로그인 상태를 비운다. 이동은 보호 라우트가 맡는다.
-    if (response.status === 401 && !skipAuth) {
+    if (
+      response.status === 401 &&
+      !skipAuth &&
+      revision === useAuthStore.getState().sessionRevision
+    ) {
       useAuthStore.getState().clearSession();
     }
     throw await toApiError(response);
@@ -94,5 +104,13 @@ export async function call<TResponse = unknown>(
     return undefined as TResponse;
   }
 
-  return (await response.json()) as TResponse;
+  try {
+    return (await response.json()) as TResponse;
+  } catch {
+    throw new ApiError(
+      response.status,
+      'INVALID_RESPONSE',
+      '응답을 확인하지 못했어요.',
+    );
+  }
 }

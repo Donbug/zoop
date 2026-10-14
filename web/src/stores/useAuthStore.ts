@@ -1,40 +1,48 @@
 import { create } from 'zustand';
 import type { AuthState, Session } from '@/types/auth';
+import { useOnboardingStore } from './useOnboardingStore';
+import { useGraphUiStore } from './useGraphUiStore';
+import { useAiChatStore } from './useAiChatStore';
 
-const ANONYMOUS: Session = {
-  authenticated: false,
-  kind: 'anonymous',
-  user: null,
-  setup: null,
-  csrfToken: null,
-  expiresAt: null,
-};
-
-function derive(session: Session) {
-  const isMember = session.kind === 'member' && session.user !== null;
-  return {
-    session,
-    member: isMember ? session.user : null,
-    onboardingCompleted: isMember ? (session.setup?.completed ?? false) : null,
-  };
+function resetPrivateState() {
+  useOnboardingStore.getState().reset();
+  useGraphUiStore.getState().reset();
+  useAiChatStore.getState().reset();
+  try {
+    sessionStorage.removeItem('zoop.graph.personal-filter');
+    sessionStorage.removeItem('oauth_state');
+  } catch {
+    /* cookie sessions work without browser storage */
+  }
 }
-
-// 서버 세션(HttpOnly 쿠키)의 화면용 사본. 인증 판단의 기준은 서버이며
-// 브라우저 저장소에 인증 정보를 두지 않는다.
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'checking',
   session: null,
   member: null,
   onboardingCompleted: null,
-  setSession: (session) => set({ status: 'ready', ...derive(session) }),
+  sessionRevision: 0,
   setStatus: (status) => set({ status }),
+  setSession: (session: Session) => {
+    const member =
+      session.authenticated && session.kind === 'member' ? session.user : null;
+    if (get().member?.id !== member?.id) resetPrivateState();
+    set((state) => ({
+      session,
+      status: 'ready',
+      member,
+      onboardingCompleted: member ? (session.setup?.completed ?? false) : null,
+      sessionRevision: state.sessionRevision + 1,
+    }));
+  },
   clearSession: () => {
-    sessionStorage.removeItem('oauth_state');
-    set({ status: 'ready', ...derive(ANONYMOUS) });
+    resetPrivateState();
+    set((state) => ({
+      session: null,
+      status: 'ready',
+      member: null,
+      onboardingCompleted: null,
+      sessionRevision: state.sessionRevision + 1,
+    }));
   },
 }));
-
-/** 회원 세션이면 회원 ID, 아니면 null. 회원이 바뀌었는지 비교할 때 쓴다. */
-export function selectMemberId(state: AuthState) {
-  return state.member?.id ?? null;
-}
+export const selectMemberId = (state: AuthState) => state.member?.id ?? null;
