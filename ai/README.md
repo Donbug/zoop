@@ -22,3 +22,8 @@ make service-install service-test service-smoke service-openapi-check service-bu
 make service-pipeline-test service-pipeline-smoke                    # S3 relation job: 설치된 pipeline(make pipeline-install)이 있어야 하며 없으면 실패
 make worker-contracts-check                                          # 설치된 BFF 환경 필요
 ```
+
+## 평가 도구
+
+[`evaluation/`](evaluation/README.md)은 위 실행 서비스와 분리된 표준 라이브러리 기반 평가 CLI입니다. Graph 생성 결과와 RAG의 기록된 답변·근거·탐색 경로·시간을 독립 정답 세트와 비교합니다. 현재 포함된 결과는 **합성 채점 대조군**이며 실모델·검색 시스템의 측정 결과가 아닙니다. KPI 정의, 비교 기준선과 WBS 연결은 [AI 벤치마크 계획](../docs/design/ai-benchmark.md)을 따릅니다.
+

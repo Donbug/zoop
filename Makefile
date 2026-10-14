@@ -15,7 +15,7 @@ API_GRADLE ?= ./api/gradlew -p api --console=plain
 ARTIFACT_DIR ?= /tmp/zoop-release-artifacts
 COMMIT ?=
 
-.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-build package-artifacts
+.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build app-web-install app-web-lint app-web-format-check app-web-build app-web-test bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-build package-artifacts
 help:
 	@$(PYTHON) scripts/repo_checks.py help
 projects:
@@ -53,6 +53,18 @@ web-test:
 	$(PNPM) --dir prototype/web test
 web-build:
 	$(PNPM) --dir prototype/web build
+# Production frontend (root web/, pnpm 10 per web/package.json packageManager). Names carry the app-web- prefix so they are never confused with the prototype/web targets above.
+# HUSKY=0 keeps web's prepare script from installing git hooks during install.
+app-web-install:
+	HUSKY=0 $(PNPM) --dir web install --frozen-lockfile
+app-web-lint:
+	$(PNPM) --dir web lint
+app-web-format-check:
+	$(PNPM) --dir web format:check
+app-web-build:
+	$(PNPM) --dir web build
+app-web-test:
+	$(PNPM) --dir web test
 bff-install:
 	$(UV) sync --project prototype/bff --frozen --group dev
 bff-test:
@@ -97,6 +109,9 @@ api-test:
 	$(API_GRADLE) test
 api-ai-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_contract_gate.py
+.PHONY: api-ai-pipeline-smoke
+api-ai-pipeline-smoke:
+	$(SERVICE_PYTHON) api/scripts/ai_pipeline_gate.py
 api-build:
 	$(API_GRADLE) assemble
 package-artifacts:

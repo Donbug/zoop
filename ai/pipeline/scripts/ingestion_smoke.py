@@ -112,7 +112,7 @@ class OfflineFixture:
     def selector(self, rid="round-1", **extra):
         return {"schemaVersion": SCHEMA, "roundId": rid, "sourceId": "synthetic-source", **extra}
 
-    def cli(self, command, request, *, state="state", manifest=None, crash=None, sources=True, expected=0):
+    def cli(self, command, request, *, state="state", manifest=None, crash=None, sources=True, expected=0, extra=()):
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1", **ownership_env()}
         if crash:
             # Kill the actual process at a durable stage, not a fake CLI result.
@@ -126,6 +126,7 @@ class OfflineFixture:
             argv += ["--sources", str(self.registry_path)]
         if manifest:
             argv += ["--fixture-manifest", str(manifest)]
+        argv += list(extra)
         child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=60)
         assert child.returncode == expected, (command, child.returncode, child.stdout.decode(), child.stderr.decode())
         return json.loads(child.stdout) if child.stdout else None

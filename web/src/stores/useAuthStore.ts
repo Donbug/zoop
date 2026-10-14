@@ -1,22 +1,48 @@
 import { create } from 'zustand';
-import type { AuthState } from '@/types/auth';
+import type { AuthState, Session } from '@/types/auth';
+import { useOnboardingStore } from './useOnboardingStore';
+import { useGraphUiStore } from './useGraphUiStore';
+import { useAiChatStore } from './useAiChatStore';
 
-export const ACCESS_TOKEN_KEY = 'accessToken';
-
-// 기존 API 래퍼와 동일한 저장소 키를 사용한다. 서버 인증을 대체하지 않는다.
-export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
+function resetPrivateState() {
+  useOnboardingStore.getState().reset();
+  useGraphUiStore.getState().reset();
+  useAiChatStore.getState().reset();
+  try {
+    sessionStorage.removeItem('zoop.graph.personal-filter');
+    sessionStorage.removeItem('oauth_state');
+  } catch {
+    /* cookie sessions work without browser storage */
+  }
+}
+export const useAuthStore = create<AuthState>((set, get) => ({
+  status: 'checking',
+  session: null,
   member: null,
   onboardingCompleted: null,
-  setAccessToken: (accessToken) => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    set({ accessToken });
+  sessionRevision: 0,
+  setStatus: (status) => set({ status }),
+  setSession: (session: Session) => {
+    const member =
+      session.authenticated && session.kind === 'member' ? session.user : null;
+    if (get().member?.id !== member?.id) resetPrivateState();
+    set((state) => ({
+      session,
+      status: 'ready',
+      member,
+      onboardingCompleted: member ? (session.setup?.completed ?? false) : null,
+      sessionRevision: state.sessionRevision + 1,
+    }));
   },
-  setMember: (member, onboardingCompleted) =>
-    set({ member, onboardingCompleted }),
   clearSession: () => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem('oauth_state');
-    set({ accessToken: null, member: null, onboardingCompleted: null });
+    resetPrivateState();
+    set((state) => ({
+      session: null,
+      status: 'ready',
+      member: null,
+      onboardingCompleted: null,
+      sessionRevision: state.sessionRevision + 1,
+    }));
   },
 }));
+export const selectMemberId = (state: AuthState) => state.member?.id ?? null;

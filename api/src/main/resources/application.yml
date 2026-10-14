@@ -25,6 +25,47 @@ zoop:
       connect-timeout: ${ZOOP_AI_CLIENT_CONNECT_TIMEOUT:3s}
       request-timeout: ${ZOOP_AI_CLIENT_REQUEST_TIMEOUT:30s}
       max-response-bytes: ${ZOOP_AI_CLIENT_MAX_RESPONSE_BYTES:8388608}
+    extraction-client:
+      # Internal S2 extraction-job transport client. Disabled by default; same validation as the S1 client above.
+      enabled: ${ZOOP_AI_EXTRACTION_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_EXTRACTION_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_EXTRACTION_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_EXTRACTION_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_EXTRACTION_CLIENT_REQUEST_TIMEOUT:30s}
+      max-response-bytes: ${ZOOP_AI_EXTRACTION_CLIENT_MAX_RESPONSE_BYTES:8388608}
+    relation-client:
+      # Internal S3 relation-job transport client. Disabled by default; same validation as the S1 client above.
+      enabled: ${ZOOP_AI_RELATION_CLIENT_ENABLED:false}
+      base-url: ${ZOOP_AI_RELATION_CLIENT_BASE_URL:}
+      token: ${ZOOP_AI_RELATION_CLIENT_TOKEN:}
+      connect-timeout: ${ZOOP_AI_RELATION_CLIENT_CONNECT_TIMEOUT:3s}
+      request-timeout: ${ZOOP_AI_RELATION_CLIENT_REQUEST_TIMEOUT:30s}
+      max-response-bytes: ${ZOOP_AI_RELATION_CLIENT_MAX_RESPONSE_BYTES:8388608}
+  document-import:
+    # Operator-only, non-web import of S2-1 extracted text (see api/docs/DOCUMENT_IMPORT.md). Disabled by default; the
+    # application starts without any of these settings. Enabled, it refuses to start unless the run is non-web
+    # (--spring.main.web-application-type=none) and every path below is valid. Paths only; the database uses DB_*.
+    enabled: ${ZOOP_DOCUMENT_IMPORT_ENABLED:false}
+    request: ${ZOOP_DOCUMENT_IMPORT_REQUEST:}
+    result: ${ZOOP_DOCUMENT_IMPORT_RESULT:}
+    ingestion-cli: ${ZOOP_INGESTION_CLI:}
+    ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
+    ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
+    artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  document-analysis:
+    # Operator-only, non-web analysis of registered documents by the S1 AI service (see api/docs/DOCUMENT_ANALYSIS.md).
+    # Disabled by default; the application starts without any of these settings. Enabled, it refuses to start unless the run is
+    # non-web (--spring.main.web-application-type=none), the S1 AI client is enabled (zoop.ai.client.*), the document import is
+    # not enabled in the same process, and every path below is valid. `grants` is the operator's flat S1 grant registry (the
+    # same file the AI service reads as ZOOP_AI_SERVICE_GRANTS). Paths only; the database uses DB_*.
+    enabled: ${ZOOP_DOCUMENT_ANALYSIS_ENABLED:false}
+    request: ${ZOOP_DOCUMENT_ANALYSIS_REQUEST:}
+    result: ${ZOOP_DOCUMENT_ANALYSIS_RESULT:}
+    grants: ${ZOOP_DOCUMENT_ANALYSIS_GRANTS:}
+    ingestion-cli: ${ZOOP_INGESTION_CLI:}
+    ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
+    ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
+    artifact-root: ${ZOOP_ARTIFACT_ROOT:}
 
 server:
   port: ${SERVER_PORT:8080}

@@ -1,6 +1,6 @@
 # Zoop API 실행 환경
 
-Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원 세션 조회가 구현됐습니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
+Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원 세션 조회가 구현됐습니다. 문서 저장(`artifacts`·`articles`·`article_versions`)과 operator 전용 비웹 import([문서 import](docs/DOCUMENT_IMPORT.md)), S1 문서 분석([문서 분석](docs/DOCUMENT_ANALYSIS.md))도 지원합니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
 
@@ -41,7 +41,9 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_AUTH_CSRF_KEYS` | `키ID=base64url(32바이트 이상)` 목록. 키 회전 중에는 쉼표로 이전 키도 유지 |
 | `ZOOP_AUTH_ALLOWED_ORIGINS` | 가입·로그인 및 회원 쿠키가 붙은 쓰기 요청을 허용할 정확한 HTTPS Origin 목록(쉼표 구분). 빈 값은 전부 거절 |
 | `ZOOP_AUTH_TRUSTED_PROXIES` | `X-Forwarded-For`를 제공할 수 있는 프록시의 숫자 IP 목록(쉼표 구분). 빈 값은 전달 헤더 무시 |
-| `ZOOP_AI_CLIENT_*` | 선택. 내부 AI transport 클라이언트(기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정) |
+| `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` | 선택. 내부 AI transport 클라이언트(S1/S2/S3 가족별, 기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정)과 [S2·S3 절](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트) |
+| `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
+| `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
@@ -73,9 +75,10 @@ DB 환경변수가 없으면 단위·웹 계층 테스트만 실행되고 Postgr
 make api-test                        # ./api/gradlew -p api test
 make api-build                       # ./api/gradlew -p api assemble
 make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai replay gate (./gradlew aiContractTest)
+make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> ai/service -> zoop-ai-extract/-relation 종단 gate (./gradlew aiPipelineContractTest)
 ```
 
-`aiContractTest`는 기본 `test`에서 제외되며 `make api-ai-smoke`가 서비스를 띄워 매니페스트를 넘길 때만 통과합니다. 매니페스트가 없으면 skip이 아니라 실패합니다.
+`aiContractTest`와 `aiPipelineContractTest`는 기본 `test`에서 제외되며 각각 `make api-ai-smoke`, `api/scripts/ai_pipeline_gate.py`(`make api-ai-pipeline-smoke`)가 서비스를 띄워 매니페스트를 넘길 때만 통과합니다. 매니페스트가 없으면 skip이 아니라 실패합니다. 후자는 새 합성 운영자 세계와 설치된 pipeline이 필요합니다(`make pipeline-install service-install`; 없으면 실패).
 
 ## 공통 오류 처리
 
@@ -85,7 +88,15 @@ make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai repl
 
 ## AI 분석 transport
 
-`com.zoop.ai`는 `ai/service`의 5개 internal operation(submit/status/result/cancel/recover)을 호출하는 클라이언트입니다. 서비스 principal로 호출하며 사용자 격리·결과 import·공개 인증은 포함하지 않습니다. 설정, 의미(202≠완료, withheld, 결과 불명 복구), 요청 ID, 검증 범위와 인계 사항은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
+`com.zoop.ai`는 `ai/service`의 internal operation을 호출하는 전송 클라이언트입니다. S1 분석 5개(submit/status/result/cancel/recover)에 더해 S2 추출 job(`ExtractionClient`, 서버 사전 승인 digest 참조) 5개와 S3 관계 job(`RelationClient`, 허용된 upstream과 AI 원천 version·revision을 거는 검수 `review`/`operation`/`recoverOperation` 포함) 8개를 별도 가족으로 호출하며, 가족마다 설정은 독립이고 기본 비활성입니다. 서비스 principal로 호출하며 앱 저장·사용자 격리·결과 import·공개 endpoint·공개 인증은 포함하지 않습니다. 설정, 의미(202≠완료, withheld, 결과 불명 복구), 요청 ID, 검증 범위와 인계 사항은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
+
+## 문서 등록 import
+
+`com.zoop.document`·`com.zoop.artifact`는 FS056의 문서 쪽 저장입니다. 설치된 `zoop-ai-ingest export`의 정제 텍스트를 `artifacts`·`articles`·`article_versions`와 로컬 파일로 등록하는 **operator 전용 비웹 실행**(`--spring.main.web-application-type=none`)이며 HTTP 경로가 없고 평소 기동은 달라지지 않습니다(`V20261014120000`이 세 테이블을 만듭니다). 분석·AI 결과 import·그래프·공개 반영은 이 실행이 하지 않습니다(분석은 아래 별도 실행). 입력 스키마, 결과 파일, 실패 코드, 접근 규칙과 실제 DB smoke(`api/scripts/document_import_smoke.py`)는 [문서 import](docs/DOCUMENT_IMPORT.md)에 있습니다.
+
+## 문서 분석
+
+`com.zoop.document.analysis`는 등록된 문서 버전 하나를 S1 AI 서비스로 요약·기업 판정하고 검증된 결과를 `document_analyses`·`evidence`·`ai_executions`와 artifact 파일에 저장하는 **operator 전용 비웹 실행**입니다(`V20261014130000`). `prepare`는 AI 서비스를 부르지 않고 새 AI jobId와 불변 `ai_submit`을 커밋하며, `advance`는 status를 먼저 읽고(submit·recover 직전에는 현재 grant·article을 다시 확인), 결과를 입력 결속·digest 재계산·검증자가 본 claim 대조·코드 포인트 인용 검사·현재 grant 재평가를 거쳐 한 transaction으로 정산하며, 그 transaction이 article·행 잠금을 얻은 뒤 grant를 한 번 더 평가합니다. HTTP 경로·`analysis_jobs`·공개 읽기·live 실행은 없습니다. 입력 스키마, 결과 파일, 실패 코드, 권리·크래시 규칙과 smoke(`api/scripts/document_analysis_smoke.py`)는 [문서 분석](docs/DOCUMENT_ANALYSIS.md)에 있습니다.
 
 ## 스키마와 DB 종료
 

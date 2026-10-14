@@ -37,4 +37,4 @@
 - 실패 판정 조건과 되돌릴 커밋/데이터 복원 절차:
 - 배포 영향: 없음 / 아티팩트 준비만 / 별도 승인된 배포
 
-현재 CI는 프로토타입·문서/계약 검사입니다. 새 본개발 앱의 실제 runner 결과를 별도로 남기세요. 원격 CI 링크, branch protection, credential trust 승인, production 배포를 실행·확인하지 않았다면 완료로 표시하지 마세요.
+현재 CI는 프로토타입·문서/계약 검사에 더해 `api/`(`api`), `ai/`(`ai-worker`·`ai-pipeline`·`ai-service`), 루트 `web/`(`app-web`)을 검사합니다. 아직 CI에 연결되지 않은 새 본개발 앱은 실제 runner 결과를 별도로 남기세요. 원격 CI 링크, branch protection, credential trust 승인, production 배포를 실행·확인하지 않았다면 완료로 표시하지 마세요.

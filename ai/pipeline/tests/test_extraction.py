@@ -93,6 +93,41 @@ def test_export_is_exact_authorized_observation_with_server_owned_metadata(world
     assert kit.cli("export", {"schemaVersion": INGESTION_SCHEMA, **ref}, state="ingestion", expected=2)["error"]["code"] == "source_unauthorized"
 
 
+def test_export_store_requirement_is_opt_in_current_and_changes_nothing(world):
+    """A consumer that persists the exported text (the app document import) asks for `--require-store`; read + quote-display
+    alone must not satisfy it, while the default export used by S2-2 keeps its two-right contract."""
+    kit, ref = world.kit, world.refs["b"]
+    payload = {"schemaVersion": INGESTION_SCHEMA, **ref}
+    require = ("--require-store",)
+    before = dump(kit.root / "ingestion" / "ingestion.sqlite3")
+    grant = kit.registry["sources"][0]["grant"]
+    default = kit.cli("export", payload, state="ingestion")
+    assert kit.cli("export", payload, state="ingestion", extra=require) == default
+
+    grant["allowedOperations"] = ["read", "quote-display"]
+    kit.save_registry()
+    assert kit.cli("export", payload, state="ingestion") == default
+    assert kit.cli("export", payload, state="ingestion", extra=require, expected=2)["error"]["code"] == "source_unauthorized"
+
+    grant["allowedOperations"] = ["read", "store"]
+    kit.save_registry()
+    assert kit.cli("export", payload, state="ingestion", extra=require, expected=2)["error"]["code"] == "source_unauthorized"
+
+    grant["allowedOperations"] = ["read", "store", "quote-display"]
+    grant["enabled"] = False
+    kit.save_registry()
+    assert kit.cli("export", payload, state="ingestion", extra=require, expected=2)["error"]["code"] == "source_unauthorized"
+
+    grant["enabled"] = True
+    kit.save_registry()
+    assert kit.cli("export", payload, state="ingestion", extra=require) == default
+    # The flag exists only for `export`.
+    selector = kit.selector("round-docs", documentId=ref["documentId"], documentVersion=ref["documentVersion"])
+    assert kit.cli("inspect", selector, state="ingestion", extra=require, expected=2)["error"]["code"] == "require_store_not_allowed"
+    assert dump(kit.root / "ingestion" / "ingestion.sqlite3") == before
+
+
+
 # ---------------------------------------------------------------- identities / same event / topic -------------------
 
 def test_two_documents_same_event_keep_document_mention_and_event_identities_separate(world):

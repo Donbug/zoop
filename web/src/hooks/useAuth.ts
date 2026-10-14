@@ -1,32 +1,26 @@
 import { useEffect } from 'react';
-import { ACCESS_TOKEN_KEY, useAuthStore } from '@/stores/useAuthStore';
-import { clearAuthentication } from '@/apis/auth/auth';
-
+import { useAuthStore } from '@/stores/useAuthStore';
+import { loadSession, logout } from '@/apis/auth/auth';
+import { isMemberSession } from '@/apis/auth/member-session';
 export function useAuth() {
+  const status = useAuthStore((s) => s.status);
+  const session = useAuthStore((s) => s.session);
+  const member = useAuthStore((s) => s.member);
+  const onboardingCompleted = useAuthStore((s) => s.onboardingCompleted);
   useEffect(() => {
-    function syncSession(event: StorageEvent) {
-      if (event.storageArea !== localStorage) return;
-      if (event.key !== ACCESS_TOKEN_KEY && event.key !== null) return;
-      if (!event.newValue) clearAuthentication();
-      else
-        useAuthStore.setState({
-          accessToken: event.newValue,
-          member: null,
-          onboardingCompleted: null,
-        });
-    }
-    window.addEventListener('storage', syncSession);
-    return () => window.removeEventListener('storage', syncSession);
-  }, []);
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const member = useAuthStore((state) => state.member);
-  const onboardingCompleted = useAuthStore(
-    (state) => state.onboardingCompleted,
-  );
+    if (status === 'checking' && !session) void loadSession().catch(() => {});
+  }, [status, session]);
   return {
-    isAuthenticated: Boolean(accessToken),
+    status,
+    checking: status === 'checking',
+    failed: status === 'error',
+    isAuthenticated: status === 'ready' && isMemberSession(session),
+    isGuest: session?.kind === 'guest',
     member,
     onboardingCompleted,
-    logout: clearAuthentication,
+    logout,
+    retry: () => {
+      void loadSession(true).catch(() => {});
+    },
   };
 }

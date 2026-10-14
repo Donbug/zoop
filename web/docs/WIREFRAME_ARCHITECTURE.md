@@ -88,12 +88,12 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | `components/auth/SignupForm.tsx`                    | 회원가입          | D-AUT-02                    | 이메일·비밀번호·표시 이름·필수 약관 입력과 가입 API를 연결한다.                          |
 | `components/auth/SocialLoginButtons.tsx`            | 간편 로그인       | D-AUT-01                    | Google·카카오 인증 공급자 연동이 확정되면 활성화한다.                                    |
 | `components/onboarding/InvestmentChoice.tsx`        | 투자 여부         | D-ONB-01                    | 투자 중/미투자 선택을 온보딩 초안에 반영한다.                                            |
-| `components/onboarding/VirtualAccountSelector.tsx`  | 가상 계좌         | D-ONB-02                    | 모의 계좌 목록과 연결·건너뛰기를 제공한다. 실제 증권 계좌가 아니다.                      |
+| `components/portfolio/PortfolioConnect.tsx`         | 가상 계좌 연결    | D-ONB-02 / D-MY-01b         | 초기 설정·내 종목이 함께 쓰는 연결 기능. 진입 출처로 연결 후 이동을 구분한다.            |
 | `components/onboarding/WatchlistSelector.tsx`       | 관심 종목 선택    | D-WAT-01                    | 종목 검색·추가·제거와 저장을 연결한다. 0개 선택을 허용한다.                              |
 | `components/stocks/StockSearchForm.tsx`             | 종목 검색         | PDF 실제 4페이지            | 기업명·영문명·티커 검색을 연결한다.                                                      |
 | `components/stocks/StockList.tsx`                   | 종목 목록         | PDF 실제 4페이지            | 목록 결과와 기업 상세·지도 이동을 연결한다.                                              |
-| `components/my/HoldingsSection.tsx`                 | 보유 종목         | D-MY-01 참조만 존재         | 내 종목 화면은 독립 프레임이 없어 세부 UI 확정이 필요하다.                               |
-| `components/my/WatchlistSection.tsx`                | 관심 종목         | D-MY-01 참조만 존재         | 서버에 저장된 관심 종목을 조회한다. 온보딩 초안과 구분한다.                              |
+| `components/my/HoldingsSection.tsx`                 | 보유 종목         | D-MY-01 / 01b               | 연결 상태·모의 보유 표시, 확인 창을 거친 연결 끊기와 실패 시 다시 시도                   |
+| `components/my/WatchlistSection.tsx`                | 관심 종목         | D-MY-01 / 01b               | 서버 관심 목록, 추가·빼기 즉시 저장, 실패 시 되돌림과 다시 시도                          |
 | `components/graph/GraphCanvas.tsx`                  | 관계 지도         | D-GRP-01 / 01b              | 시장·개인·회차 지도와 확대 상태를 하나의 캔버스로 처리한다. 그래프 엔진은 추후 연결한다. |
 | `components/graph/EventDetailPanel.tsx`             | 사건 상세         | D-GRP-02                    | 사건·직접 관련 기업·근거와 AI 진입 동작을 연결한다.                                      |
 | `components/graph/CompanyDetailPanel.tsx`           | 기업 요약         | D-GRP-03                    | 시세·1개월 추이·모의 보유·직접 이슈·기업 상세 이동을 연결한다.                           |
@@ -162,15 +162,15 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 
 ## 6. 전역 상태 정의
 
-`src/stores/`에 아래 Zustand store를 실제 생성했다. 인증 토큰의 기존 저장 방식 외에는 persist를 추가하지 않았다.
+`src/stores/`에 아래 Zustand store를 실제 생성했다. persist는 쓰지 않는다(인증은 서버 세션 쿠키).
 
-| Store                | 변수와 초기값                                                                        | 공유 이유 / 생명주기                                                             | 현재 연결                                                   |
-| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| useAuthStore         | accessToken: 기존 localStorage 값 또는 null; member: null; onboardingCompleted: null | 가드·헤더·개인 기능에서 인증 참조. 프로필/완료 여부는 서버 확인 전 unknown(null) | 기존 토큰 helper, refresh/로그아웃, useAuth, ProtectedRoute |
-| useAdminSessionStore | session: null; 검증 후 id/displayName/expiresAt                                      | 회원과 독립된 관리자 세션. 메모리만 사용                                         | AdminProtectedRoute, 실제 로그인/회수 API는 미연결          |
-| useOnboardingStore   | investmentStatus: null; virtualAccountId: null; watchlistIds: []                     | 여러 단계에서 공유하는 저장 전 초안                                              | 타입·setter·toggle·reset 정의, 입력/저장 UI 후속 연결       |
-| useGraphUiStore      | evidenceTarget: null; tutorialStep: null                                             | 지도 패널과 근거 창·튜토리얼 간 공유                                             | 근거 창 열림/닫힘, 튜토리얼 setter는 후속 단계 UI 연결      |
-| useAiChatStore       | isOpen: false; context: null; conversationId: null; draft: ''; recoveryStatus: idle  | 지도 선택과 AI 서랍 공유, 닫아도 초안/맥락 유지                                  | 지도에서 열기·닫기·초안, 대화 조회/전송은 미연결            |
+| Store                | 변수와 초기값                                                                       | 공유 이유 / 생명주기                                                                                     | 현재 연결                                                  |
+| -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| useAuthStore         | status: 'checking'; session: null; member: null; onboardingCompleted: null          | 가드·헤더·개인 기능에서 인증 참조. `SessionResponse`의 회원·비회원·없음과 초기 설정 완료 여부, CSRF 토큰 | session API·loadSession, 로그아웃, useAuth, ProtectedRoute |
+| useAdminSessionStore | session: null; 검증 후 id/displayName/expiresAt                                     | 회원과 독립된 관리자 세션. 메모리만 사용                                                                 | AdminProtectedRoute, 실제 로그인/회수 API는 미연결         |
+| useOnboardingStore   | investmentStatus: null; virtualAccountId: null; watchlistIds: []                    | 여러 단계에서 공유하는 저장 전 초안                                                                      | 타입·setter·toggle·reset 정의, 입력/저장 UI 후속 연결      |
+| useGraphUiStore      | evidenceTarget: null; tutorialStep: null                                            | 지도 패널과 근거 창·튜토리얼 간 공유                                                                     | 근거 창 열림/닫힘, 튜토리얼 setter는 후속 단계 UI 연결     |
+| useAiChatStore       | isOpen: false; context: null; conversationId: null; draft: ''; recoveryStatus: idle | 지도 선택과 AI 서랍 공유, 닫아도 초안/맥락 유지                                                          | 지도에서 열기·닫기·초안, 대화 조회/전송은 미연결           |
 
 `GraphTarget`은 company/issue/edge/path + id의 판별 유니온이다. 문자열 ID만 저장하며 문서·시세·응답 본문을 전역 상태에 복제하지 않는다.
 
