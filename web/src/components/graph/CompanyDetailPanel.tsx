@@ -101,6 +101,7 @@ export default function CompanyDetailPanel(props: Props) {
   const prices = data?.prices?.status === 'available' ? data.prices : null;
   const metrics = data?.metrics?.status === 'available' ? data.metrics : null;
   const name = company?.name ?? props.fallback.label;
+  const logoUrl = company?.logoUrl ?? props.fallback.logoUrl;
   const currency = quote?.quote.currency;
   const changePositive = (quote?.quote.change ?? 0) >= 0;
 
@@ -111,6 +112,16 @@ export default function CompanyDetailPanel(props: Props) {
       aria-label={`${name} 기업 상세`}
     >
       <header className="company-panel-header">
+        <div className="company-panel-title">
+          <h2>{name}</h2>
+          <button
+            className="company-close"
+            onClick={props.onClose}
+            aria-label="기업 상세 닫기"
+          >
+            ×
+          </button>
+        </div>
         <div className="company-identity">
           <span
             className="company-logo"
@@ -119,24 +130,26 @@ export default function CompanyDetailPanel(props: Props) {
                 company?.brandColor ?? props.fallback.brandColor ?? '#1a1a1a',
             }}
           >
-            {name.slice(0, 1)}
+            {logoUrl ? <img src={logoUrl} alt="" /> : name.slice(0, 1)}
           </span>
-          <div>
-            <h2>{name}</h2>
-            <p>
-              {company?.market ?? props.companyId.split(':')[0]} ·{' '}
-              {company?.ticker ?? props.companyId.split(':')[1]}
-            </p>
+          <div className="company-identity-meta">
+            <p>{company?.ticker ?? props.companyId.split(':')[1]}</p>
+            <div className="company-statuses">
+              {(company?.holding || props.fallback.holding) && (
+                <span>보유 종목</span>
+              )}
+              {(company?.watch || props.fallback.watch) && (
+                <span>관심 종목</span>
+              )}
+            </div>
           </div>
-          {(company?.holding || props.fallback.holding) && <b>보유 종목</b>}
         </div>
-        <button
-          className="company-close"
-          onClick={props.onClose}
-          aria-label="기업 상세 닫기"
-        >
-          ×
-        </button>
+        {company && company.aliases.length > 0 && (
+          <details className="company-aliases">
+            <summary>기업명 더 보기</summary>
+            <p>{company.aliases.join(' · ')}</p>
+          </details>
+        )}
       </header>
       {loading && (
         <p className="company-panel-loading" role="status">
@@ -153,29 +166,42 @@ export default function CompanyDetailPanel(props: Props) {
       )}
       {company && (
         <div className="company-panel-scroll">
-          <details className="company-aliases">
-            <summary>기업명·별칭 정보</summary>
-            <p>{company.aliases.join(' · ') || '등록된 별칭 없음'}</p>
-          </details>
           <section className="company-quote">
-            <div className="company-section-title">
-              <h3>현재 시세</h3>
-              {quote && (
-                <span>{quote.source.delayNote ?? '지연 정보 없음'}</span>
-              )}
-            </div>
+            <h3 className="company-quote-title">시세</h3>
             {quote ? (
               <>
-                <strong>
-                  {number(quote.quote.price, currency)}{' '}
-                  <small>{currency}</small>
-                </strong>
-                <p className={changePositive ? 'up' : 'down'}>
-                  {changePositive ? '+' : ''}
-                  {number(quote.quote.change, currency)} (
-                  {changePositive ? '+' : ''}
-                  {((quote.quote.changeRate ?? 0) * 100).toFixed(2)}%)
-                </p>
+                <div className="company-price-row">
+                  <strong>
+                    {number(quote.quote.price, currency)}{' '}
+                    <small>{currency}</small>
+                  </strong>
+                  <p className={changePositive ? 'up' : 'down'}>
+                    {changePositive ? '▲ +' : '▼ '}
+                    {number(quote.quote.change, currency)} (
+                    {changePositive ? '+' : ''}
+                    {((quote.quote.changeRate ?? 0) * 100).toFixed(2)}%)
+                  </p>
+                </div>
+                <div className="company-quote-meta">
+                  <span>
+                    전일 대비 · 기준{' '}
+                    {quote.quote.asOf
+                      ? new Date(quote.quote.asOf).toLocaleString('ko-KR')
+                      : '미제공'}{' '}
+                    · {quote.source.name}
+                    {quote.source.delayNote ? ' · 지연 가능' : ''}
+                  </span>
+                  <details className="company-source">
+                    <summary aria-label={`시세 출처: ${quote.source.name}`}>
+                      i
+                    </summary>
+                    <p>
+                      {quote.source.name} ·{' '}
+                      {quote.source.official ? '공식' : '공개 자료'} · 종목 기호{' '}
+                      {quote.source.symbol}
+                    </p>
+                  </details>
+                </div>
                 <div className="company-stat-grid">
                   <span>
                     거래량 <b>{number(quote.quote.volume)}</b>
@@ -193,23 +219,7 @@ export default function CompanyDetailPanel(props: Props) {
                       {number(quote.quote.week52High)}
                     </b>
                   </span>
-                  <span>
-                    관측 시각{' '}
-                    <b>
-                      {quote.quote.asOf
-                        ? new Date(quote.quote.asOf).toLocaleString('ko-KR')
-                        : '미제공'}
-                    </b>
-                  </span>
                 </div>
-                <details className="company-source">
-                  <summary>출처 정보</summary>
-                  <p>
-                    {quote.source.name} ·{' '}
-                    {quote.source.official ? '공식' : '비공식'} ·{' '}
-                    {quote.source.symbol}
-                  </p>
-                </details>
               </>
             ) : data.quote?.status === 'unavailable' ? (
               <p className="company-unavailable">
@@ -220,21 +230,19 @@ export default function CompanyDetailPanel(props: Props) {
               message={errors.quote}
               retry={() => setRetry((value) => value + 1)}
             />
-          </section>
-          <section>
-            <div className="company-section-title">
-              <h3>1개월 가격 추이</h3>
-              <span>1D</span>
-            </div>
             {prices ? (
-              <>
+              <figure className="company-price-chart">
+                <figcaption>최근 1개월 시세 추이</figcaption>
                 <Sparkline values={prices.points.map((point) => point.close)} />
-                <p className="company-caption">
-                  {prices.points.at(0)?.time.slice(0, 10)} —{' '}
-                  {prices.points.at(-1)?.time.slice(0, 10)} ·{' '}
-                  {prices.source.name}
+                <p className="company-chart-range">
+                  <span>{prices.points.at(0)?.time.slice(0, 10)}</span>
+                  <span>{prices.points.at(-1)?.time.slice(0, 10)}</span>
                 </p>
-              </>
+                <p className="company-caption">
+                  {prices.source.name} · 마지막 거래{' '}
+                  {prices.points.at(-1)?.time.slice(0, 10)}
+                </p>
+              </figure>
             ) : data.prices?.status === 'unavailable' ? (
               <p className="company-unavailable">
                 가격 추이 미제공 · {data.prices.reason}
@@ -268,8 +276,7 @@ export default function CompanyDetailPanel(props: Props) {
           </details>
           <section>
             <div className="company-section-title">
-              <h3>모의 보유</h3>
-              <span>계좌 연동</span>
+              <h3>가상 계좌 보유</h3>
             </div>
             {!props.token ? (
               <p className="company-unavailable">

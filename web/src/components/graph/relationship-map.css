@@ -211,81 +211,103 @@
   padding: 0 16px 16px;
 }
 .relationship-body.has-company-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 8px;
+  display: flex;
+  gap: 0;
 }
-.relationship-body.has-company-panel .relationship-canvas {
+.relationship-body.has-company-panel > .relationship-canvas {
+  flex: 1;
   min-width: 0;
+  width: auto;
 }
 .company-panel {
-  min-width: 0;
+  flex: 0 0 320px;
   height: 100%;
-  min-height: 520px;
-  border: 0.667px solid #d6d6d2;
-  border-radius: 6px;
   background: #fff;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  font-size: 12px;
+  line-height: 1.6;
 }
 .company-panel button,
 .company-panel a {
   font: inherit;
 }
 .company-panel-header {
-  min-height: 68px;
-  padding: 12px 14px;
-  border-bottom: 0.667px solid #d6d6d2;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  padding: 16px 16px 4px;
 }
-.company-identity {
-  min-width: 0;
-  flex: 1;
+.company-panel-title {
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.company-panel-title h2 {
+  min-width: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  letter-spacing: -0.35px;
+  overflow-wrap: anywhere;
+}
+.company-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .company-logo {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   color: #fff;
   font-size: 13px;
   font-weight: 800;
+  overflow: hidden;
 }
-.company-identity h2 {
-  font-size: 16px;
-  line-height: 21px;
-  letter-spacing: -0.35px;
+.company-logo img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
 }
-.company-identity p {
+.company-identity-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.company-identity-meta > p {
   color: #777771;
   font:
-    9px/13px 'JetBrains Mono Variable',
+    10px/14px 'JetBrains Mono Variable',
     monospace;
 }
-.company-identity > b {
-  margin-left: auto;
-  padding: 3px 5px;
-  border-radius: 3px;
-  color: #386c43;
-  background: #e7f3e8;
+.company-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.company-statuses span {
+  color: #5f5f5b;
   font-size: 9px;
-  white-space: nowrap;
 }
 .company-close {
-  width: 25px;
-  height: 25px;
-  font-size: 19px !important;
-  color: #777771;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border: 1px solid #d6d6d2;
+  border-radius: 3px;
+  font-size: 22px !important;
+  color: #5f5f5b;
+}
+.company-close:hover {
+  background: #f2f2f0;
 }
 .company-panel-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -293,8 +315,8 @@
 .company-panel-scroll > section,
 .company-panel-scroll > details,
 .company-panel-scroll > .company-actions {
-  padding: 12px 14px;
-  border-bottom: 0.667px solid #d6d6d2;
+  padding: 16px;
+  border-bottom: 1px solid #e2e2de;
 }
 .company-aliases summary,
 .company-source summary,
@@ -308,6 +330,19 @@
   padding-top: 6px;
   color: #777771;
   font-size: 10px;
+}
+.company-aliases {
+  margin-left: 42px;
+}
+.company-aliases summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+.company-aliases summary::after {
+  content: '›';
+  margin-left: 5px;
 }
 .company-section-title {
   display: flex;
@@ -326,28 +361,73 @@
     8.5px/12px 'JetBrains Mono Variable',
     monospace;
 }
-.company-quote > strong {
-  display: block;
+.company-quote-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+.company-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 10px;
+}
+.company-price-row > strong {
   font:
     600 23px/28px 'Inter Variable',
     sans-serif;
   letter-spacing: -0.7px;
 }
-.company-quote > strong small {
+.company-price-row > strong small {
   font-size: 9px;
   color: #777771;
   letter-spacing: 0;
 }
-.company-quote > .up,
-.company-quote > .down {
-  padding: 2px 0 10px;
+.company-price-row > .up,
+.company-price-row > .down {
   color: #c0362c;
   font:
-    10px/14px 'JetBrains Mono Variable',
+    600 10px/14px 'JetBrains Mono Variable',
     monospace;
 }
-.company-quote > .down {
+.company-price-row > .down {
   color: #235fa4;
+}
+.company-quote-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 5px 0 14px;
+  color: #94948f;
+  font-size: 8px;
+}
+.company-source {
+  position: relative;
+  margin: 0;
+}
+.company-source summary {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d6d6d2;
+  border-radius: 50%;
+  list-style: none;
+  color: #5f5f5b;
+  cursor: pointer;
+  font-family: 'Instrument Serif', serif;
+}
+.company-source p {
+  position: absolute;
+  z-index: 3;
+  top: 24px;
+  right: 0;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid #d6d6d2;
+  border-radius: 3px;
+  background: #fff;
+  color: #5f5f5b;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 8%);
 }
 .company-stat-grid,
 .company-holding {
@@ -368,8 +448,13 @@
   font-size: 9.5px;
   font-weight: 600;
 }
-.company-source {
-  margin-top: 9px;
+.company-price-chart {
+  margin-top: 14px;
+}
+.company-price-chart figcaption {
+  margin-bottom: 4px;
+  color: #777771;
+  font-size: 9px;
 }
 .company-sparkline {
   width: 100%;
@@ -387,6 +472,14 @@
   vector-effect: non-scaling-stroke;
 }
 .company-caption {
+  color: #94948f;
+  font:
+    7.5px/11px 'JetBrains Mono Variable',
+    monospace;
+}
+.company-chart-range {
+  display: flex;
+  justify-content: space-between;
   color: #94948f;
   font:
     7.5px/11px 'JetBrains Mono Variable',
@@ -493,9 +586,6 @@
   text-decoration: underline;
 }
 @media (max-width: 1180px) {
-  .relationship-body.has-company-panel {
-    grid-template-columns: minmax(0, 1fr) 330px;
-  }
   .relationship-legend {
     width: 164px;
   }
