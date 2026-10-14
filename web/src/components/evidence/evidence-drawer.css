@@ -1,0 +1,226 @@
+/* D-GRP-05 / Figma 619:8225. The service header remains outside this layer. */
+.relationship-view {
+  position: relative;
+}
+.evidence-layer {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+.evidence-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(20 20 18 / 38%);
+}
+.evidence-drawer {
+  position: relative;
+  width: min(420px, 42vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-left: 1px solid #d6d6d2;
+  box-shadow: -8px 0 24px rgb(0 0 0 / 7%);
+  color: #1a1a1a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.evidence-header {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 112px;
+  padding: 20px 52px 16px 20px;
+  border-bottom: 1px solid #e2e2de;
+}
+.evidence-header h2 {
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: -0.4px;
+}
+.evidence-header p {
+  margin-top: 4px;
+  color: #767670;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.evidence-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #5f5f5b;
+  font-size: 24px;
+}
+.evidence-close:hover {
+  border-color: #d6d6d2;
+  background: #f7f7f5;
+}
+.evidence-archive {
+  display: block;
+  margin-top: 9px;
+  font-size: 16px;
+}
+.evidence-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.evidence-checked-at {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e2e2de;
+  color: #5f5f5b;
+}
+.evidence-checked-at details {
+  position: relative;
+}
+.evidence-checked-at summary {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  list-style: none;
+  border: 1px solid #94948f;
+  border-radius: 50%;
+  cursor: pointer;
+  font-family: 'Instrument Serif', serif;
+}
+.evidence-checked-at details p {
+  position: absolute;
+  z-index: 2;
+  top: 26px;
+  right: 0;
+  width: 260px;
+  padding: 10px 12px;
+  border: 1px solid #d6d6d2;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 10%);
+}
+.evidence-list {
+  display: flex;
+  flex-direction: column;
+}
+.evidence-card {
+  padding: 20px;
+  border-bottom: 1px solid #e2e2de;
+}
+.evidence-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 7px;
+  color: #5f5f5b;
+  font-size: 10.5px;
+}
+.evidence-verification {
+  margin-top: 4px;
+  color: #767670;
+  font-size: 10px;
+}
+.evidence-card h3 {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: -0.1px;
+  overflow-wrap: anywhere;
+}
+.evidence-card blockquote {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: #f2f2f0;
+  color: #30302d;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.evidence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 12px;
+}
+.evidence-actions a,
+.evidence-actions button {
+  color: #0d715e;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.evidence-actions button[aria-pressed='true'] {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.evidence-link-unavailable {
+  color: #767670;
+  font-size: 11px;
+}
+.evidence-loading,
+.evidence-empty,
+.evidence-failures,
+.evidence-unavailable {
+  padding: 20px;
+  color: #5f5f5b;
+}
+.evidence-loading span {
+  display: block;
+  height: 14px;
+  margin-bottom: 9px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #e7e7e3, #f7f7f5, #e7e7e3);
+}
+.evidence-loading span:nth-child(2) {
+  width: 72%;
+  height: 72px;
+}
+.evidence-loading p,
+.evidence-empty p,
+.evidence-unavailable p {
+  margin-top: 6px;
+}
+.evidence-failures {
+  margin: 16px 20px 0;
+  padding: 14px;
+  border: 1px solid #e3b6b1;
+  border-radius: 4px;
+  background: #fff7f6;
+  color: #7b2d27;
+}
+.evidence-failures ul {
+  margin: 7px 0 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+.evidence-failures button {
+  margin-top: 9px;
+  text-decoration: underline;
+}
+.evidence-footer {
+  flex: 0 0 auto;
+  padding: 9px 20px;
+  border-top: 1px solid #e2e2de;
+  background: #f7f7f5;
+  color: #767670;
+  font-size: 9px;
+}
+.evidence-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

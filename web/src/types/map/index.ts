@@ -12,6 +12,7 @@ export type GraphTarget = (
     asOf?: string;
   };
   evidenceIds?: string[];
+  label?: string;
 };
 
 export type MapMode = 'all' | 'personal';

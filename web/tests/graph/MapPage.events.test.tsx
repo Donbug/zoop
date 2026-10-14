@@ -105,12 +105,12 @@ describe('D-GRP-02 · map selection and downstream context', () => {
     );
     await screen.findByRole('heading', { name: 'HBM4 공급 계약' });
     await userEvent.click(
-      screen.getByRole('button', { name: '근거 1건 보기' }),
+      screen.getByRole('button', { name: '근거 2건 보기' }),
     );
     expect(useGraphUiStore.getState().evidenceTarget).toMatchObject({
       kind: 'issue',
       id: 'mock-issue-1',
-      evidenceIds: ['mock-evidence-1'],
+      evidenceIds: ['mock-evidence-1', 'mock-evidence-1-detail'],
       mapContext: {
         graphVersion: 'mock-graph-v1',
         asOf: '2026-10-06T03:41:00Z',

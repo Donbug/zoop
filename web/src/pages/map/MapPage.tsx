@@ -8,6 +8,7 @@ import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
+import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import '@/components/graph/event-panel.css';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
@@ -124,6 +125,7 @@ export default function MapPage() {
     const target: GraphTarget = {
       kind: 'issue',
       id: event.id,
+      label: event.title,
       evidenceIds: event.evidenceIds,
       mapContext: {
         ...eventContext,
@@ -408,6 +410,9 @@ export default function MapPage() {
             )}
           </div>
           <AiChatDrawer />
+          <EvidenceDrawer
+            onViewOnMap={(id) => updateQuery({ focus: id, hops: '1' })}
+          />
         </section>
       </main>
     </div>
