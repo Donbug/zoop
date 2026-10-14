@@ -162,15 +162,15 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 
 ## 6. 전역 상태 정의
 
-`src/stores/`에 아래 Zustand store를 실제 생성했다. 인증 토큰의 기존 저장 방식 외에는 persist를 추가하지 않았다.
+`src/stores/`에 아래 Zustand store를 실제 생성했다. persist는 쓰지 않는다(인증은 서버 세션 쿠키).
 
-| Store                | 변수와 초기값                                                                        | 공유 이유 / 생명주기                                                             | 현재 연결                                                   |
-| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| useAuthStore         | accessToken: 기존 localStorage 값 또는 null; member: null; onboardingCompleted: null | 가드·헤더·개인 기능에서 인증 참조. 프로필/완료 여부는 서버 확인 전 unknown(null) | 기존 토큰 helper, refresh/로그아웃, useAuth, ProtectedRoute |
-| useAdminSessionStore | session: null; 검증 후 id/displayName/expiresAt                                      | 회원과 독립된 관리자 세션. 메모리만 사용                                         | AdminProtectedRoute, 실제 로그인/회수 API는 미연결          |
-| useOnboardingStore   | investmentStatus: null; virtualAccountId: null; watchlistIds: []                     | 여러 단계에서 공유하는 저장 전 초안                                              | 타입·setter·toggle·reset 정의, 입력/저장 UI 후속 연결       |
-| useGraphUiStore      | evidenceTarget: null; tutorialStep: null                                             | 지도 패널과 근거 창·튜토리얼 간 공유                                             | 근거 창 열림/닫힘, 튜토리얼 setter는 후속 단계 UI 연결      |
-| useAiChatStore       | isOpen: false; context: null; conversationId: null; draft: ''; recoveryStatus: idle  | 지도 선택과 AI 서랍 공유, 닫아도 초안/맥락 유지                                  | 지도에서 열기·닫기·초안, 대화 조회/전송은 미연결            |
+| Store                | 변수와 초기값                                                                       | 공유 이유 / 생명주기                                                                                     | 현재 연결                                                  |
+| -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| useAuthStore         | status: 'checking'; session: null; member: null; onboardingCompleted: null          | 가드·헤더·개인 기능에서 인증 참조. `SessionResponse`의 회원·비회원·없음과 초기 설정 완료 여부, CSRF 토큰 | session API·loadSession, 로그아웃, useAuth, ProtectedRoute |
+| useAdminSessionStore | session: null; 검증 후 id/displayName/expiresAt                                     | 회원과 독립된 관리자 세션. 메모리만 사용                                                                 | AdminProtectedRoute, 실제 로그인/회수 API는 미연결         |
+| useOnboardingStore   | investmentStatus: null; virtualAccountId: null; watchlistIds: []                    | 여러 단계에서 공유하는 저장 전 초안                                                                      | 타입·setter·toggle·reset 정의, 입력/저장 UI 후속 연결      |
+| useGraphUiStore      | evidenceTarget: null; tutorialStep: null                                            | 지도 패널과 근거 창·튜토리얼 간 공유                                                                     | 근거 창 열림/닫힘, 튜토리얼 setter는 후속 단계 UI 연결     |
+| useAiChatStore       | isOpen: false; context: null; conversationId: null; draft: ''; recoveryStatus: idle | 지도 선택과 AI 서랍 공유, 닫아도 초안/맥락 유지                                                          | 지도에서 열기·닫기·초안, 대화 조회/전송은 미연결           |
 
 `GraphTarget`은 company/issue/edge/path + id의 판별 유니온이다. 문자열 ID만 저장하며 문서·시세·응답 본문을 전역 상태에 복제하지 않는다.
 
