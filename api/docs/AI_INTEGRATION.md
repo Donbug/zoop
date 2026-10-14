@@ -6,10 +6,10 @@
 
 | 구현됨 (실제 서비스로 검증) | 아직 없음 (소유자가 정해지면 첫 소비 기능이 추가) |
 |---|---|
-| `AiAnalysisClient`의 `submit` / `status` / `result` / `cancel` / `recover` 5개 operation 전부 | 공개 인증·세션·회원/관리자 권한, 도메인 controller·entity·Flyway migration |
-| 4개 kind의 요청 봉투(`schemaVersion=zoop-ai-s1-1`)·타입 있는 응답·AI 오류 해석 | 작업 저장소(DB)와 앱 쪽 jobId 생성·재시도 정책, 스케줄러 |
+| `AiAnalysisClient`의 `submit` / `status` / `result` / `cancel` / `recover` 5개 operation 전부 | 공개 인증·세션·회원/관리자 권한 서비스(인증 저장 스키마 `members`·`member_sessions`의 migration·Entity만 있음), 그 밖의 도메인 controller·entity·Flyway migration |
+| 4개 kind의 요청 봉투(`schemaVersion=zoop-ai-s1-1`)·타입 있는 응답·AI 오류 해석 | 작업 저장소(DB)와 앱 쪽 jobId 생성·재시도 정책, 스케줄러. ERD v6는 AI `jobId` 저장 위치(`document_analyses.ai_job_id` 등)를 정했지만 구현은 없음([아래](#erd-v6-설계와의-관계)) |
 | 설정 기반 bean(기본 비활성), 닫힘 실패 검증 | 결과 가져오기(import): 앱 문서 버전·근거 인용 검증과 한 transaction 쓰기 |
-| 실제 `ai/service` + 설치된 `zoop-ai` replay 종단 시험 | S2-2 추출/S3 관계(`zoop-ai-extract`, `zoop-ai-relation`)와 S2-1 수집: 서비스에 HTTP 명령이 **없어** 지원하지 않음 |
+| 실제 `ai/service` + 설치된 `zoop-ai` replay 종단 시험 | S2-1 수집은 서비스에 HTTP 명령이 **없어** 지원하지 않음. S2-2 추출(`zoop-ai-extract`, `/internal/v1/extraction-jobs`)과 S3 관계(`zoop-ai-relation`)는 서비스에 별도 가족으로 구현돼 있으나(S2는 서버 사전 승인 요청의 digest 참조) Spring 전송 클라이언트와 이 종단 시험에는 아직 포함되지 않음 |
 
 public `ErrorCode`, 인증 필터, `RequestIdFilter`, `GlobalExceptionHandler`는 수정하지 않았습니다. 클라이언트는 서비스 주체(service principal)로 호출하는 **앱**이며 최종 사용자를 모릅니다.
 
@@ -93,7 +93,7 @@ HTTP/1.1, 프록시 없음, 쿠키 없음, **리다이렉트 안 따름**, 자�
 
 ## 소유와 격리
 
-AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최종 사용자(tenant) 식별이 없습니다. 같은 principal의 작업은 모두 같은 소유자라서 **사용자 간 격리는 이 클라이언트가 하지 않습니다.** 앱이 jobId를 사용자·문서·회차에 결속해 저장하고 접근 시 직접 확인해야 합니다. 다른 principal의 작업은 404와 동일하게 보입니다.
+AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최종 사용자(tenant) 식별이 없습니다. 같은 principal의 작업은 모두 같은 소유자라서 **사용자 간 격리는 이 클라이언트가 하지 않습니다.** 앱이 jobId를 사용자·문서·회차에 결속해 저장하고 접근 시 직접 확인해야 합니다. 이 결속을 담을 열은 ERD v6에도 정해져 있지 않습니다([아래](#erd-v6-설계와의-관계)). 다른 principal의 작업은 404와 동일하게 보입니다.
 
 결과를 앱 데이터로 쓰기 전(후속 소비 기능 책임)에 모두 필요합니다.
 
@@ -101,6 +101,16 @@ AI 서비스의 소유자는 **인증된 principal 하나**(이 앱)이며 최�
 2. 앱의 **불변 문서 버전**과 `documentVersion`/근거 인용(`evidence`, quote 오프셋)이 지금도 같은지 검증. `UntrustedAnalysisPayload`의 어떤 필드도 신뢰하지 않습니다.
 3. 현재 출처 권리 재확인. `result`의 AVAILABLE은 요청 시점의 서버 grant일 뿐입니다.
 4. 가져오기·상태 변경·공개 반영을 **하나의 transaction**으로. `READY` ≠ 공개 `completed`.
+
+## ERD v6 설계와의 관계
+
+최신 DB 설계 기준은 [ERD v6](../../docs/erd/zoop-core-erd-v6.md)(2026-10-13)입니다. main `91113ce`(PR #18)의 v6는 AI 작업 식별·영수증·grant snapshot·검수 원천 버전 규칙을 정했습니다. 이 클라이언트에는 v6의 AI 저장 테이블·migration·Entity가 없고(앱의 현재 migration은 인증 스키마 `V20261012210200`·`V20261013000000`뿐입니다), v6도 아래 항목을 닫지 않았습니다. 전체 대조는 [AI 저장 책임 대조](../../docs/design/ai-system.md#erd-v6와-ai-저장-책임-대조)에 있으며 여기에는 Java 소비 기능이 알아야 할 것만 적습니다.
+
+> **병합된 기준(2026-10-13, main `91113ce`).** 팀의 `fix/17-erd-v6-alignment`(`af2f0e3`)는 PR #18로 main에 병합됐고, 병합된 ERD v6와 공개 OpenAPI가 이전에 ‘닫지 않은 것’이던 항목 중 일부를 **문서로** 정했습니다. 내부 AI `jobId`는 공개 `analysis_jobs.id`와 별개이고 한 앱 작업이 여러 AI 작업을 가질 수 있으며, `analysis_jobs.checkpoint.aiUnits[]`(`{unitKey, aiJobId, submitArtifactId, runtimeInputDigest?}`)·`document_analyses.ai_job_id`·`briefing_attempts.stages`에 submit 전에 ID와 불변 요청 artifact를 커밋해 저장합니다. 호출 영수증의 `jobId`·`attemptId`는 `ai_executions.ai_job_id`·`ai_attempt_id`·`receipt_artifact_id`에 그대로 저장하고 같은 시도는 한 행입니다. 실행 당시 권리는 `grant_id`·`grant_revision`·`grant_checked_at`·`grant_scope` snapshot일 뿐이며 현재 권한은 매번 grant registry에서 다시 평가합니다. 검수 결정은 앱 `expectedRevision`과 별개로 AI 원천의 `expectedSourceVersion`·`expectedSourceRevision`을 비교합니다. 이 저장소에서 Java 쪽 구현이나 SQL 확인은 없고 앱 migration도 인증 스키마뿐입니다. 아래 목록은 병합된 v6 기준으로 남은 항목만 적었으며 이 클라이언트 코드는 남은 항목도 추정해 채우지 않습니다. S3 검수의 내부 HTTP 계약(`sourceVersion`=S3 job의 `inputDigest`, `sourceRevision`=relation 이벤트 수)은 [`ai/service/README.md`](../../ai/service/README.md)의 S3 절에 있으며 앱의 대상별 검수 revision과 다른 런타임 값입니다. S3용 Java 클라이언트는 없습니다.
+
+- **v6와 이 문서가 같은 방향인 것:** GET은 모델을 호출하지 않습니다. 현재 접근권한·원문 철회는 응답 때 다시 검사하며 저장된 `available`로 대신하지 않습니다. 완료된 결과는 불변이고 새 요청은 새 행입니다. 저장만 복구하는 `save_only`는 live 호출 수에 넣지 않습니다. 위 4단계 import(권한·문서 버전·인용·현재 grant·단일 transaction)는 v6의 저장 규칙과 모순되지 않는 것으로 읽었으나 실제 SQL·transaction으로 확인한 것은 아닙니다.
+- **병합된 v6도 닫지 않은 것(첫 소비 기능이 소유자와 합의):** (1) 작업 수준 `inputDigest`의 고정·대조 위치(v6는 `runtimeInputDigest?`를 선택 항목으로만 적습니다)와 `jobId`의 사용자·문서·회차 결속. v6 `analysis_jobs`는 관리자 `ingest`/`revalidate`/`project` 작업이라 AI 런타임 job을 대신하지 않습니다. (2) 현재 grant registry의 위치와 grant 발급·회수 계약(v6 §8 항목 4), `grant_reference`·`grant_scope`에 담는 값의 형식. (3) 이 문서의 `receipts`(provider 호출 기록)와 v6 `ai_call_receipt`, 그리고 검증 영수증 `exact_receipt`/`semantic_receipt`의 대응과 파일 형식. (4) 사용량 귀속의 적용 방법(v6와 공개 OpenAPI는 `document-summary`·`semantic-verification`을 `news-analysis`에 귀속합니다)과 `replay`의 의미. 클라이언트 코드는 이 중 어느 것도 추정해 채우지 않습니다.
+- **구현되지 않은 것:** v6 테이블·Flyway migration·Entity는 AI 쪽에 없습니다. 이 클라이언트는 앱 DB 없이 동작합니다.
 
 ## 검증
 
@@ -120,3 +130,4 @@ make service-install api-ai-smoke   # 실제 Java -> uvicorn ai/service -> 설�
 - 해결: 서비스의 요청 ID 형식 검증(`[A-Za-z0-9._-]{1,128}`)과 foundation 필터의 무검증을 클라이언트에서 흡수(전달 전 검증/생성). 서비스의 소문자 오류 코드와 공개 대문자 `ErrorCode`를 섞지 않음.
 - 격차: 인증·도메인 controller·entity·migration·작업 저장소 없음 → 클라이언트는 앱 DB 없이 동작하며 결과를 저장·공개하는 소비자가 아직 없음. 사용자 격리, 문서 버전·인용 검증, 단일 transaction import는 위 소유자 몫. S2-2/S3 HTTP 계약 없음.
 - 최소 인계: (1) 첫 소비 기능 담당 — jobId↔사용자/문서/회차 결속, 위 4단계 import, AI 오류→공개 오류 매핑, 결과 불명 복구 절차. (2) 인증 담당 — `RequestIdFilter` 공개 경계 검증. (3) 운영 — 서비스 principal 토큰 발급·비밀 저장소 주입(`ZOOP_AI_CLIENT_TOKEN`)과 TLS 프록시 관측.
+- 2026-10-13 갱신: 위 ‘entity·migration 없음’은 이후 병합된 인증 저장 migration·Entity(첫 `V20261012210200`과 v6 정렬 `V20261013000000`)로 부분적으로 바뀌었습니다. AI 결과를 저장하는 소비자와 작업 저장소는 여전히 없고, 병합된 ERD v6도 grant registry·검증 영수증 형식 등 일부를 닫지 않았습니다([위 절](#erd-v6-설계와의-관계)).

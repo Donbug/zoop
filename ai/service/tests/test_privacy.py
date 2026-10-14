@@ -140,7 +140,9 @@ def test_no_response_header_or_log_line_holds_a_private_value(start):
         record = json.loads(line)
         assert set(record) <= {"ts", "event", "requestId", "principal", "method", "route", "jobId", "status", "error", "errorClass",
                                "runtime", "problem", "durationMs", "principals", "live", "replay", "requeuedInFlight", "command",
-                               "outcome", "runtimeExit", "runtimeCode"}
+                               "outcome", "runtimeExit", "runtimeCode", "relationInterrupted", "operationId", "settled"}
+        if "relationInterrupted" in record:  # the only relation startup field: a count, never a path, id or text
+            assert record["event"] == "service_starting" and type(record["relationInterrupted"]) is int
     # The service ledger holds owner/idempotency/dispatch state only, never document text.
     ledger = Path(service.workspace.state)
     raw = b"".join(path.read_bytes() for path in ledger.glob("service.sqlite3*"))

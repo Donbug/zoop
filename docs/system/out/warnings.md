@@ -58,9 +58,9 @@
 | INDEX_DETAIL_RANGE_STALE | warning | FS051 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:61 (xlsx-row) |
 | INDEX_REQUIREMENT_META_MISMATCH | warning | FS051 | 목차 요구 번호 ['50']와 현행 상세 메타 요구 번호 ['51']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:94 (xlsx-row) |
 | INDEX_REQUIREMENT_META_MISMATCH | warning | FS066-01 | 목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:134 (xlsx-row) |
-| TEAM_DECISION_REQUIRED | warning | listTerms | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |  |
-| TEAM_DECISION_REQUIRED | warning | signUp | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |  |
-| TEAM_DECISION_REQUIRED | warning | logIn | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |  |
+| TEAM_DECISION_REQUIRED | warning | listTerms | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
+| TEAM_DECISION_REQUIRED | warning | signUp | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
+| TEAM_DECISION_REQUIRED | warning | logIn | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listSocialProviders | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
 | TEAM_DECISION_REQUIRED | warning | authorizeSocialLogin | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
 | TEAM_DECISION_REQUIRED | warning | completeSocialLogin | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
@@ -231,11 +231,11 @@
 | BFF_PATH_DIFFERENCE | difference | completeSocialLogin | 목표 /api/v1/auth/social/{provider}/callback ↔ BFF /api/auth/social/{provider}/callback |  |
 | BFF_FIELD_DIFFERENCE | difference | completeSocialLogin | 목표만 124 · BFF만 30 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | getMySettings | 목표 /api/v1/me/settings ↔ BFF /api/me/settings |  |
-| BFF_FIELD_DIFFERENCE | difference | getMySettings | 목표만 132 · BFF만 32 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getMySettings | 목표만 134 · BFF만 33 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | updateMySettings | 목표 /api/v1/me/settings ↔ BFF /api/me/settings |  |
-| BFF_FIELD_DIFFERENCE | difference | updateMySettings | 목표만 178 · BFF만 23 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | updateMySettings | 목표만 180 · BFF만 24 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | setWatchlistCompany | 목표 /api/v1/me/watchlist/{id} ↔ BFF /api/me/watchlist/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | setWatchlistCompany | 목표만 178 · BFF만 23 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | setWatchlistCompany | 목표만 180 · BFF만 24 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listRecommendations | 목표 /api/v1/me/recommendations ↔ BFF /api/me/recommendations |  |
 | BFF_FIELD_DIFFERENCE | difference | listRecommendations | 목표만 158 · BFF만 32 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listVirtualAccountProfiles | 목표 /api/v1/portfolio/mock-portfolios ↔ BFF /api/portfolio/mock-portfolios |  |
@@ -305,9 +305,9 @@
 | BFF_PATH_DIFFERENCE | difference | listAnalysisCandidates | 목표 /api/v1/admin/pipeline/candidates ↔ BFF /api/admin/pipeline/candidates |  |
 | BFF_FIELD_DIFFERENCE | difference | listAnalysisCandidates | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | getAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id} ↔ BFF /api/admin/pipeline/candidates/{candidate_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 115 · BFF만 30 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 123 · BFF만 30 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | decideAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id}/decision ↔ BFF /api/admin/pipeline/candidates/{candidate_id}/decision |  |
-| BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 172 · BFF만 38 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 176 · BFF만 38 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | listPublicationRules | 목표 /api/v1/admin/pipeline/rules ↔ BFF /api/admin/pipeline/rules |  |
 | BFF_FIELD_DIFFERENCE | difference | listPublicationRules | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | setPublicationRule | 목표 /api/v1/admin/pipeline/rules/{rule_id} ↔ BFF /api/admin/pipeline/rules/{rule_id} |  |

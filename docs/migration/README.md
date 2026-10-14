@@ -39,7 +39,7 @@ React를 바꾼다고 BFF나 worker도 바꿀 필요는 없다. Spring을 선택
 | 앱 BE: FastAPI / Java·Spring | 현재 라우터·서비스·저장 로직은 같은 Python 의존성과 의미에서 재사용 가능하다. `/api/v1` gap은 별도 수정 대상이다. | Controller/DTO/Service/Repository/WorkerClient로 책임을 옮기고 서버의 세션·CSRF·권한·멱등 처리를 구현한다. Python import는 전환 계약이 아니다. | HTTP/OpenAPI, 소유권, 상태 전이, decimal 계산, 불변 발행과 현재 visibility, 고정 버전 조회. |
 | AI: Python worker / 다른 런타임 | 기존 PoC 고정 버전의 공개 port와 worker adapter를 활용한다. 원본 PoC는 읽기 전용이다. | JSON 입력·receipt·결과를 동일하게 처리하는 runner와 provider adapter를 다시 구현한다. 추출/동일성/근거/fence/outbox 동작도 재증명해야 한다. | 같은 worker JSON fixture와 정확 인용, 단계 실패·복구, 중복 요청, 실제 usage/unknown, 공개 gate. |
 
-**이식 가능한 것은 직렬화된 경계와 불변식이다.** 앱·worker·PoC의 물리 DB 테이블 공유, Python 객체 import, React hooks 공유를 portability 근거로 사용하지 않는다. worker는 자기 실행 저장소를 소유하며 앱은 transport를 통해 제출·조회·회수한다. S1용 앱→AI 내부 HTTP transport는 `ai/service`로 **로컬에 구현**했고 계약은 [`internal-ai-openapi.yaml`](../api/internal-ai-openapi.yaml)이다. 그러나 배포·보안 그룹·TLS 프록시는 확인하지 않았고 승인되지 않았으며 현재 BFF는 이를 소비하지 않고 설치된 CLI를 직접 호출한다. Spring 앱의 Java 전송 클라이언트(`api/`의 `com.zoop.ai`, 5개 operation, [설명](../../api/docs/AI_INTEGRATION.md))는 같은 계약에 대해 구현·검증했지만 인증·도메인 소비자와 결과 import는 아직 없다. S2/S3는 등록 전용 CLI가 없어 HTTP 대상이 아니다.
+**이식 가능한 것은 직렬화된 경계와 불변식이다.** 앱·worker·PoC의 물리 DB 테이블 공유, Python 객체 import, React hooks 공유를 portability 근거로 사용하지 않는다. worker는 자기 실행 저장소를 소유하며 앱은 transport를 통해 제출·조회·회수한다. S1용 앱→AI 내부 HTTP transport는 `ai/service`로 **로컬에 구현**했고 계약은 [`internal-ai-openapi.yaml`](../api/internal-ai-openapi.yaml)이다. 그러나 배포·보안 그룹·TLS 프록시는 확인하지 않았고 승인되지 않았으며 현재 BFF는 이를 소비하지 않고 설치된 CLI를 직접 호출한다. Spring 앱의 Java 전송 클라이언트(`api/`의 `com.zoop.ai`, 5개 operation, [설명](../../api/docs/AI_INTEGRATION.md))는 같은 계약에 대해 구현·검증했지만 인증·도메인 소비자와 결과 import는 아직 없다. S2/S3는 등록 전용 CLI `submit`을 갖지만 서비스에 S2/S3 kind가 없어 HTTP 대상이 아니다.
 
 ## 3. 자산별 채택 분류
 
@@ -83,6 +83,8 @@ flowchart LR
 | `chat_jobs.py`, `briefing_rounds.py`, `admin_pipeline.py` | Service | 최초 context 고정, active job 제약, 검증 후 저장, 불변 회차, revalidation→publish 순서. |
 | `statedb.py`, `accounts.py`, `graph_versions.py` | Repository + artifact storage adapter | atomic 앱 commit, 예상 버전 CAS, 버전별 읽기, 데이터 손실 없는 write cutover. |
 | worker transport seam (로컬 구현: `ai/service` 내부 HTTP, [계약](../api/internal-ai-openapi.yaml)) | WorkerClient | worker DB 직접 접근 금지. submit 재전송 멱등(`Idempotency-Key`=jobId, 소유자 결속), ready와 앱 공개 완료 분리, 저장만 복구 시 provider 재호출 금지, `operator_reconcile`는 중단·에스컬레이션. |
+
+**앱 PostgreSQL 저장 기준.** 최신 설계 기준은 [ERD v6](../erd/zoop-core-erd-v6.md)(35개 테이블, 2026-10-13)이다. 현재 적용된 Flyway migration은 인증 스키마(첫 `V20261012210200`과 이를 v6로 정렬한 `V20261013000000`)뿐이며 나머지 테이블은 각 소유자가 후속 migration으로 추가한다([소유권·남은 결정](../development/api-migration-ownership.md#인증-v6-이행-뒤-남은-결정)). 위 표의 `statedb.py` 이식은 SQLite 테이블 이름을 계약으로 삼지 않는다는 규칙을 그대로 따르며, ERD 테이블로의 대응과 데이터 이행은 각 테이블 소유자가 정한다. AI 작업 식별·영수증·grant snapshot의 저장 열은 v6가 정했지만 grant registry와 검증 영수증 형식은 닫지 않았다([AI 저장 책임 대조](../design/ai-system.md#erd-v6와-ai-저장-책임-대조)).
 
 ## 5. 전환 수용 순서와 롤백
 

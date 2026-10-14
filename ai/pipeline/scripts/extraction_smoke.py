@@ -113,7 +113,8 @@ class Kit(OfflineFixture):
 
     # ---- process runner -------------------------------------------------------------------------------------
     def run(self, command: str, request: dict, *, state: str = "extraction", replay: Path | None = None, topic: Path | None = None,
-            crash: str | None = None, expected: int = 0, sources: bool = True, raw: bool = False):
+            crash: str | None = None, expected: int = 0, sources: bool = True, raw: bool = False, forbid_execution: bool = False):
+        """`forbid_execution` ends the process with 76 if it reaches stage execution, a replay model or a call reservation (a submit must not)."""
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
         guard = ("import os, sys, runpy\n"
                  "def _guard(event, args):\n"
@@ -122,6 +123,10 @@ class Kit(OfflineFixture):
                  "sys.addaudithook(_guard)\n"
                  "from zoop_ai_pipeline.extraction import Extractor\n")
         hook = ""
+        if forbid_execution:
+            hook = ("from zoop_ai_pipeline.extraction import Fixtures\n"
+                    "def _forbidden(*a, **k):\n os._exit(76)\n"
+                    "Extractor._execute = Extractor._reserve = Extractor._receipted = Fixtures.model = _forbidden\n")
         if crash:
             kind, _, argument = crash.partition(":")
             hook = {
@@ -155,6 +160,10 @@ class Kit(OfflineFixture):
             extractor = Extractor(store, Sources(self.root / "ingestion", Authority(self.registry_path)))
             if command == "run":
                 return extractor.run(Submit.model_validate(request), fixtures)
+            if command == "submit":
+                submit = Submit.model_validate(request)
+                extractor.freeze(submit, fixtures)
+                return extractor.inspect(submit.job_id)
             job_id = Selector.model_validate(request).job_id
             return extractor.resume(job_id, fixtures) if command == "resume" else getattr(extractor, command)(job_id)
         finally:
@@ -392,6 +401,48 @@ def smoke(root: Path) -> dict:
     os.chmod(ingestion / "ingestion.lock", 0o600)
     os.chmod(ingestion, 0o700)
     checks.append("invalid fixture never becomes a receipt; separator snapshot member refused; ingestion export/extraction read side leaves modes, bytes and files unchanged")
+
+    # 12. Submit-only registration (actual processes): the frozen job is durable and offline, execution is a later `resume`, and a repeated
+    #     submit only reports the stored job (never resumes, re-freezes or resets it) whatever its state. `forbid_execution` ends a process
+    #     with 76 if it reaches stage execution, a replay model or a call reservation.
+    r12, sel12 = kit.replay("r-submit").extract(art["a1"], [m1]).write(), kit.job_selector("job-submit")
+    submitted = kit.submit("job-submit", a1)
+    queued = kit.run("submit", submitted, replay=r12, forbid_execution=True)
+    assert queued["state"] == "queued" and queued["phase"] == "extract" and queued["resumeMode"] == "resume" and queued["failure"] is None
+    assert queued["calls"] == [] and queued["usage"]["replayCalls"] == 0 and queued["eventCandidates"] == [] and queued["delivery"]["status"] == "current"
+    assert {s["state"] for s in queued["stages"].values()} == {"pending"} and len(queued["binding"]["replay"]["fixtureHash"]) == 64
+    assert kit.run("submit", submitted, replay=r12, forbid_execution=True) == kit.run("inspect", sel12) == queued
+    assert kit.run("submit", submitted, expected=2)["error"]["code"] == "replay_fixture_required"
+    assert kit.run("submit", submitted, replay=r12, topic=r12, expected=2)["error"]["code"] == "fixture_not_allowed"
+    live = {**submitted, "provenance": {**submitted["provenance"], "executionMode": "live", "recordingKind": "provider"}}
+    assert kit.run("submit", live, replay=r12, expected=2)["error"]["code"] == "live_mode_unsupported"
+    other12 = kit.replay("r-submit-other").extract(art["a1"], [m1])
+    other12.doc["model_version"] = "authored-model-2"
+    for changed, fixture in (({**submitted, "snapshot": {"revision": "snapshot-2", "events": []}}, r12), (submitted, other12.write())):
+        assert kit.run("submit", changed, replay=fixture, expected=2, forbid_execution=True)["error"]["code"] == "job_input_conflict"
+    assert kit.run("inspect", sel12) == queued
+    grant = kit.registry["sources"][0]["grant"]
+    grant["revision"] = "rights-2"
+    kit.save_registry()
+    moved = kit.run("inspect", sel12, expected=2)
+    assert moved["state"] == "queued" and moved["delivery"] == {"status": "withheld", "code": "grant_revision_changed"} and moved["calls"] == []
+    stopped12 = kit.run("resume", sel12, replay=r12, expected=2)
+    assert stopped12["state"] == "stopped" and stopped12["failure"]["code"] == "grant_revision_changed" and stopped12["calls"] == [] and stopped12["usage"]["replayCalls"] == 0
+    grant["revision"] = "rights-1"
+    kit.save_registry()
+    again = kit.run("submit", submitted, replay=r12, forbid_execution=True)
+    assert again["state"] == "stopped" and again["failure"]["code"] == "grant_revision_changed" and again["calls"] == [] and again["delivery"]["status"] == "current"
+    done12 = kit.run("resume", sel12, replay=r12)
+    assert done12["state"] == "ready" and done12["usage"]["replayCalls"] == 1 and done12["eventCandidates"][0]["disposition"]["status"] == "new-event-candidate"
+    assert kit.run("submit", submitted, replay=r12, forbid_execution=True) == done12
+    cancel_request, cancel_selector = kit.submit("job-submit-cancel", a1), kit.job_selector("job-submit-cancel")
+    kit.run("submit", cancel_request, replay=r12, forbid_execution=True)
+    cancelled12 = kit.run("cancel", cancel_selector, expected=2)
+    assert cancelled12["state"] == "cancelled" and cancelled12["resumeMode"] == "none" and cancelled12["calls"] == [] and cancelled12["delivery"] == {"status": "withheld", "code": "job_cancelled"}
+    assert kit.run("resume", cancel_selector, replay=r12, expected=2) == cancelled12
+    assert kit.run("submit", cancel_request, replay=r12, expected=2, forbid_execution=True) == cancelled12
+    checks.append("submit-only: durable queued job with zero attempts and no replay model, idempotent same submit, conflicting request/fixture, required/forbidden fixture arguments, "
+                  "rights revision change before execution stops resume without calls, duplicate submit never resumes a stopped/ready/cancelled job, queued cancel")
     return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerCalls": 0, "modelCalls": 0, "networkAttempts": "audit hook rejected socket use in every CLI subprocess; none occurred"}
 
 

@@ -13,9 +13,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import grants
+from . import extraction_access, grants, relation_access
 
-SCOPES = ("analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover")
+ANALYSIS_SCOPES = ("analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover")
+RELATION_SCOPES = ("relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review")
+EXTRACTION_SCOPES = ("extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover")
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -28,6 +31,19 @@ STAGE_SETTINGS = tuple(f"ZOOP_AI_{stage}_{setting}" for stage in ("DOCUMENT_SUMM
 LIVE_ONLY = ("ZOOP_AI_LIVE_ENABLED", "ZOOP_AI_GLOBAL_MAX_CALLS", "ZOOP_AI_PROVIDER", "ZOOP_AI_BASE_URL", "ZOOP_AI_API_KEY")
 CHILD_BASE_ENV = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1",
                   "PYTHONUNBUFFERED": "1", "PYTHONNOUSERSITE": "1", "PYTHONUTF8": "1"}
+# S3 relation jobs are an all-or-nothing group: none of these set means the relation routes answer 409 execution_unavailable;
+# some but not all (or any invalid one) refuses to start. A request can name none of them.
+RELATION_VARS = ("ZOOP_AI_SERVICE_RELATION_COMMAND", "ZOOP_AI_RELATION_STATE_DIR", "ZOOP_AI_EXTRACTION_STATE_DIR",
+                 "ZOOP_AI_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_SOURCES", "ZOOP_AI_SERVICE_RELATION_REPLAY",
+                 "ZOOP_AI_SERVICE_RELATION_VERIFIER_REPLAY", "ZOOP_AI_SERVICE_RELATION_UPSTREAMS")
+# S2 extraction jobs are a second, separate all-or-nothing group. The three roots/registry variables below are SHARED with the S3 group: both
+# families read and write the same operator ingestion/extraction roots through the same registry, so they cannot disagree. The topic fixture
+# is the one optional member; naming it alone is an incomplete group.
+SHARED_VARS = ("ZOOP_AI_EXTRACTION_STATE_DIR", "ZOOP_AI_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_SOURCES")
+RELATION_OWN = tuple(name for name in RELATION_VARS if name not in SHARED_VARS)
+EXTRACTION_OWN = ("ZOOP_AI_SERVICE_EXTRACTION_COMMAND", "ZOOP_AI_SERVICE_EXTRACTION_REPLAY", "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
+EXTRACTION_TOPIC = "ZOOP_AI_SERVICE_EXTRACTION_TOPIC_REPLAY"
+EXTRACTION_VARS = (*EXTRACTION_OWN, *SHARED_VARS)
 
 
 class ConfigError(Exception):
@@ -46,6 +62,31 @@ class Principal:
 
 
 @dataclass(frozen=True)
+class RelationConfig:
+    command: Path
+    state_dir: Path            # the service is its only writer
+    extraction_state_dir: Path  # operator-written; the pipeline opens it read-only
+    ingestion_state_dir: Path   # operator-written; the pipeline opens it read-only
+    sources_path: Path
+    producer_replay: Path
+    verifier_replay: Path
+    upstreams_path: Path
+    child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class ExtractionConfig:
+    command: Path
+    state_dir: Path             # the pipeline's S2 ledger (its writer is the `zoop-ai-extract` child this service starts)
+    ingestion_state_dir: Path   # operator-written; the pipeline opens it read-only
+    sources_path: Path
+    producer_replay: Path       # the one authored replay fixture; its digest is pinned in every approval
+    topic_replay: Path | None   # optional topic fixture; its digest is pinned only in approvals that request a topic stage
+    approvals_path: Path
+    child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     principals: tuple[Principal, ...]
     state_dir: Path
@@ -56,6 +97,8 @@ class ServiceConfig:
     port: int
     live_available: bool
     child_env: Mapping[str, str]
+    relation: RelationConfig | None = None
+    extraction: ExtractionConfig | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -156,6 +199,84 @@ def _live(environ: Mapping[str, str]) -> bool:
     return environ.get("ZOOP_AI_LIVE_ENABLED") == "1" and ceiling > 0
 
 
+def _existing_dir(raw: str | None, field: str) -> Path:
+    path = _absolute(raw, field)
+    if not path.is_dir():
+        raise ConfigError(field, "directory_missing")
+    return path
+
+
+def _disjoint(roots: dict[str, Path], reason: str) -> None:
+    names = list(roots)
+    for index, first in enumerate(names):
+        for second in names[index + 1:]:
+            if _overlaps(roots[first], roots[second]):
+                raise ConfigError(second, reason)
+
+
+def _child_env(app_state: Path, worker_state: Path) -> dict[str, str]:
+    # The installed pipeline refuses a ledger that overlaps the application or S1 worker roots unless both are named. No provider variable,
+    # key, URL or model setting is ever copied: the S2/S3 pipelines are replay only and have no way to reach a network.
+    return {**CHILD_BASE_ENV, "ZOOP_STATE_DIR": str(app_state), "ZOOP_AI_WORKER_STATE_DIR": str(worker_state)}
+
+
+def _relation(environ: Mapping[str, str], principals: tuple[Principal, ...], state_dir: Path, worker_state: Path,
+              enabled: bool) -> RelationConfig | None:
+    """All-or-nothing: no relation variable means the feature is off; any one means every one must be valid. The variables shared with the S2
+    group do not by themselves switch the relation group on when the S2 group is configured."""
+    if not enabled:
+        return None
+    for name in RELATION_VARS:
+        if name not in environ:
+            raise ConfigError(name, "relation_group_incomplete")
+    command = _file(environ["ZOOP_AI_SERVICE_RELATION_COMMAND"], "ZOOP_AI_SERVICE_RELATION_COMMAND", executable=True)
+    app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")  # the installed pipeline fails closed without it
+    relation_state = _absolute(environ["ZOOP_AI_RELATION_STATE_DIR"], "ZOOP_AI_RELATION_STATE_DIR")
+    if not relation_state.exists() and not relation_state.parent.is_dir():
+        raise ConfigError("ZOOP_AI_RELATION_STATE_DIR", "parent_missing")
+    if relation_state.exists() and not relation_state.is_dir():
+        raise ConfigError("ZOOP_AI_RELATION_STATE_DIR", "not_a_directory")
+    extraction = _existing_dir(environ["ZOOP_AI_EXTRACTION_STATE_DIR"], "ZOOP_AI_EXTRACTION_STATE_DIR")
+    ingestion = _existing_dir(environ["ZOOP_AI_INGESTION_STATE_DIR"], "ZOOP_AI_INGESTION_STATE_DIR")
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state,
+               "ZOOP_AI_RELATION_STATE_DIR": relation_state, "ZOOP_AI_EXTRACTION_STATE_DIR": extraction,
+               "ZOOP_AI_INGESTION_STATE_DIR": ingestion}, "relation_roots_overlap")
+    sources = _file(environ["ZOOP_AI_SERVICE_SOURCES"], "ZOOP_AI_SERVICE_SOURCES")
+    producer = _file(environ["ZOOP_AI_SERVICE_RELATION_REPLAY"], "ZOOP_AI_SERVICE_RELATION_REPLAY")
+    verifier = _file(environ["ZOOP_AI_SERVICE_RELATION_VERIFIER_REPLAY"], "ZOOP_AI_SERVICE_RELATION_VERIFIER_REPLAY")
+    upstreams = _file(environ["ZOOP_AI_SERVICE_RELATION_UPSTREAMS"], "ZOOP_AI_SERVICE_RELATION_UPSTREAMS")
+    try:
+        relation_access.load(upstreams, [p.name for p in principals])
+    except relation_access.AccessError as error:
+        raise ConfigError("ZOOP_AI_SERVICE_RELATION_UPSTREAMS", error.code) from None
+    return RelationConfig(command, relation_state, extraction, ingestion, sources, producer, verifier, upstreams, _child_env(app_state, worker_state))
+
+
+def _extraction(environ: Mapping[str, str], principals: tuple[Principal, ...], state_dir: Path, worker_state: Path) -> ExtractionConfig | None:
+    """All-or-nothing, like the relation group. The approvals file is validated completely here (shape, digests, topic pins against the optional
+    topic fixture); the fixture digests themselves are checked against the pins on every use, not at start."""
+    if not any(name in environ for name in (*EXTRACTION_OWN, EXTRACTION_TOPIC)):
+        return None
+    for name in EXTRACTION_VARS:
+        if name not in environ:
+            raise ConfigError(name, "extraction_group_incomplete")
+    command = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_COMMAND"], "ZOOP_AI_SERVICE_EXTRACTION_COMMAND", executable=True)
+    app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
+    extraction = _existing_dir(environ["ZOOP_AI_EXTRACTION_STATE_DIR"], "ZOOP_AI_EXTRACTION_STATE_DIR")
+    ingestion = _existing_dir(environ["ZOOP_AI_INGESTION_STATE_DIR"], "ZOOP_AI_INGESTION_STATE_DIR")
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state,
+               "ZOOP_AI_EXTRACTION_STATE_DIR": extraction, "ZOOP_AI_INGESTION_STATE_DIR": ingestion}, "extraction_roots_overlap")
+    sources = _file(environ["ZOOP_AI_SERVICE_SOURCES"], "ZOOP_AI_SERVICE_SOURCES")
+    producer = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_REPLAY"], "ZOOP_AI_SERVICE_EXTRACTION_REPLAY")
+    topic = _file(environ[EXTRACTION_TOPIC], EXTRACTION_TOPIC) if EXTRACTION_TOPIC in environ else None
+    approvals = _file(environ["ZOOP_AI_SERVICE_EXTRACTION_APPROVALS"], "ZOOP_AI_SERVICE_EXTRACTION_APPROVALS")
+    try:
+        extraction_access.load(approvals, [p.name for p in principals], topic_available=topic is not None)
+    except extraction_access.AccessError as error:
+        raise ConfigError("ZOOP_AI_SERVICE_EXTRACTION_APPROVALS", error.code) from None
+    return ExtractionConfig(command, extraction, ingestion, sources, producer, topic, approvals, _child_env(app_state, worker_state))
+
+
 def load(environ: Mapping[str, str]) -> ServiceConfig:
     principals = _principals(environ.get("ZOOP_AI_SERVICE_PRINCIPALS"))
     state_dir = _absolute(environ.get("ZOOP_AI_SERVICE_STATE_DIR"), "ZOOP_AI_SERVICE_STATE_DIR")
@@ -182,4 +303,10 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     for key in (*STAGE_SETTINGS, *(LIVE_ONLY if live else ())):
         if key in environ:
             child[key] = environ[key]
-    return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child)
+    extraction_enabled = any(name in environ for name in (*EXTRACTION_OWN, EXTRACTION_TOPIC))
+    # The S3 group is on when any variable of its own is set, or (as before this group existed) when only the shared ones are set and the
+    # S2 group does not claim them.
+    relation_enabled = any(name in environ for name in RELATION_OWN) or (not extraction_enabled and any(name in environ for name in SHARED_VARS))
+    relation = _relation(environ, principals, state_dir, worker_state, relation_enabled)
+    extraction = _extraction(environ, principals, state_dir, worker_state)
+    return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction)

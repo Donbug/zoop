@@ -1,4 +1,4 @@
-"""The five `/internal/v1` routes. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
+"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes and the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes). HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
 
 Order is fixed: authentication and scope, then headers, then body. Documentation, CORS, proxy headers and the server header are
 off. An unexpected exception becomes a bare `internal_error` envelope; its text is never sent or logged.
@@ -17,12 +17,17 @@ from fastapi import Depends, FastAPI, Header, Path, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth import authenticate
 from .config import Principal
 from .jobs import ApiError, JobService, Observation, Reply
 from .logs import emit
+from .extraction_jobs import ExtractionError, ExtractionJobs
+from .extraction_wire import ExtractionErrorEnvelope, ExtractionJobStatus, ExtractionResultEnvelope, ExtractionSubmit
+from .relation_jobs import RelationError, RelationJobs
+from .relation_wire import RelationErrorEnvelope, RelationJobStatus, RelationOperationStatus, RelationResultEnvelope, RelationReview, RelationSubmit
 from .wire import KINDS, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope
 
 JOB_ID = re.compile(r"[A-Za-z0-9_.-]{1,120}")
@@ -34,6 +39,10 @@ SUBMIT_KEYS = frozenset({"schemaVersion", "jobId", "kind", "mode", "input", "pro
 JOB_ID_PATTERN = JOB_ID.pattern
 PATH_JOB_ID = Path(alias="jobId", description="Runtime job id; equals the Idempotency-Key used at submit.",
                    json_schema_extra={"pattern": "^" + JOB_ID_PATTERN + "$"})
+PATH_OPERATION_ID = Path(alias="operationId", description="The review operation's id: the Idempotency-Key of the POST that created it.",
+                         json_schema_extra={"pattern": "^" + JOB_ID_PATTERN + "$"})
+RELATION_PREFIX = "/internal/v1/relation-jobs"
+EXTRACTION_PREFIX = "/internal/v1/extraction-jobs"
 
 
 def invalid(field: str) -> ApiError:
@@ -109,6 +118,41 @@ def parse_submit(raw: bytes, key: str) -> dict[str, Any]:
     return value
 
 
+def parse_relation_submit(raw: bytes, key: str) -> RelationSubmit:
+    """Strict UTF-8 JSON object without duplicate keys, then the strict S3 Submit model. Unlike S1 the service validates the content
+    itself: it needs the upstream identity for authorization before it may touch a ledger or a child process."""
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+        body = RelationSubmit.model_validate(value)
+    except (UnicodeDecodeError, ValueError, RecursionError, ValidationError):  # pydantic's ValidationError is a ValueError
+        raise invalid("body") from None
+    if body.job_id != key:
+        raise invalid("Idempotency-Key")
+    return body
+
+
+def parse_extraction_submit(raw: bytes, key: str) -> ExtractionSubmit:
+    """Strict UTF-8 JSON object without duplicate keys, then the strict S2 submit reference: only schemaVersion, jobId and approvedRequestDigest.
+    A snapshot, catalogue, observation, path or fixture in the body is an unknown field and is refused."""
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+        body = ExtractionSubmit.model_validate(value)
+    except (UnicodeDecodeError, ValueError, RecursionError, ValidationError):  # pydantic's ValidationError is a ValueError
+        raise invalid("body") from None
+    if body.job_id != key:
+        raise invalid("Idempotency-Key")
+    return body
+
+
+def parse_relation_review(raw: bytes) -> RelationReview:
+    """Strict UTF-8 JSON object without duplicate keys, then the strict review model. The reviewer is never part of it."""
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_duplicate_free, parse_constant=_no_constant)
+        return RelationReview.model_validate(value)
+    except (UnicodeDecodeError, ValueError, RecursionError, ValidationError):  # pydantic's ValidationError is a ValueError
+        raise invalid("body") from None
+
+
 def respond(reply: Reply) -> JSONResponse:
     return JSONResponse(reply.body.wire(), status_code=reply.status, headers=reply.headers)
 
@@ -169,7 +213,13 @@ class Gateway:
         except Exception as error:
             context["errorClass"] = type(error).__name__
             if not started:
-                envelope = ErrorEnvelope(error=ErrorBody(code="internal_error", retryable=False, request_id=request_id))
+                body = ErrorBody(code="internal_error", retryable=False, request_id=request_id)
+                if str(scope.get("path", "")).startswith(RELATION_PREFIX):
+                    envelope: Any = RelationErrorEnvelope(error=body)
+                elif str(scope.get("path", "")).startswith(EXTRACTION_PREFIX):
+                    envelope = ExtractionErrorEnvelope(error=body)
+                else:
+                    envelope = ErrorEnvelope(error=body)
                 await JSONResponse(envelope.wire(), status_code=500)(scope, watch, relay)
         finally:
             if status == 413 and not body_done:
@@ -181,12 +231,18 @@ class Gateway:
                 "method": scope["method"], "route": route or "unmatched", "jobId": context.get("jobId"), "status": status,
                 "error": context.get("error"), "errorClass": context.get("errorClass"),
                 "runtime": seen.runtime if seen else [], "problem": seen.problem if seen else None,
-                "durationMs": round((time.monotonic() - began) * 1000, 1)})
+                "durationMs": round((time.monotonic() - began) * 1000, 1),
+                **({"operationId": context["operationId"]} if "operationId" in context else {})})
 
 
 def _error_response(error: ApiError, request: Request) -> JSONResponse:
     context = _context(request)
     context["error"] = error.code
+    if request.url.path.startswith(RELATION_PREFIX) and not isinstance(error, RelationError):
+        # Framework-level refusals (auth, headers, body, unknown route) on the relation family use its own envelope schema.
+        error = RelationError(error.status, error.code, runtime_code=error.runtime_code, field=error.field, headers=error.headers)
+    elif request.url.path.startswith(EXTRACTION_PREFIX) and not isinstance(error, ExtractionError):
+        error = ExtractionError(error.status, error.code, runtime_code=error.runtime_code, field=error.field, headers=error.headers)
     return JSONResponse(error.envelope(context["requestId"]).wire(), status_code=error.status, headers=error.headers)
 
 
@@ -199,12 +255,34 @@ ERRORS = {
     503: {"model": ErrorEnvelope, "description": "runtime_unavailable, service_configuration_invalid, service_busy or queue_full (retryable)."},
 }
 
+RELATION_ERRORS = {
+    401: {"model": RelationErrorEnvelope, "description": "authentication_required: missing, malformed or unknown bearer token."},
+    403: {"model": RelationErrorEnvelope, "description": "scope_denied: the principal lacks this route's scope."},
+    404: {"model": RelationErrorEnvelope, "description": "job_not_found: unknown job, another principal's job, or a reservation that was never accepted."},
+    409: {"model": RelationErrorEnvelope, "description": "execution_unavailable: the relation configuration group is not enabled."},
+    422: {"model": RelationErrorEnvelope, "description": "invalid_request: header, path or JSON envelope validation."},
+    500: {"model": RelationErrorEnvelope, "description": "runtime_binding_mismatch or internal_error."},
+    503: {"model": RelationErrorEnvelope, "description": "runtime_unavailable, runtime_busy, service_configuration_invalid, service_busy or queue_full (retryable)."},
+}
 
-def create_app(service: JobService | None = None) -> FastAPI:
-    """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests."""
+EXTRACTION_ERRORS = {
+    401: {"model": ExtractionErrorEnvelope, "description": "authentication_required: missing, malformed or unknown bearer token."},
+    403: {"model": ExtractionErrorEnvelope, "description": "scope_denied: the principal lacks this route's scope."},
+    404: {"model": ExtractionErrorEnvelope, "description": "job_not_found: unknown job, another principal's job, or a reservation that was never accepted."},
+    409: {"model": ExtractionErrorEnvelope, "description": "execution_unavailable: the extraction configuration group is not enabled."},
+    422: {"model": ExtractionErrorEnvelope, "description": "invalid_request: header, path or JSON envelope validation."},
+    500: {"model": ExtractionErrorEnvelope, "description": "runtime_binding_mismatch or internal_error."},
+    503: {"model": ExtractionErrorEnvelope, "description": "runtime_unavailable, runtime_busy, service_configuration_invalid, service_busy or queue_full (retryable)."},
+}
+
+
+def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None) -> FastAPI:
+    """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
+    S3 relation-job family and `extraction` the S2 extraction-job family; without one, every route of that family answers 409
+    `execution_unavailable` after authentication."""
     app = FastAPI(title="Zoop internal AI analysis transport", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None,
                   redirect_slashes=False)
-    app.state.service, app.state.log = service, emit
+    app.state.service, app.state.relation, app.state.extraction, app.state.log = service, relation, extraction, emit
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -277,5 +355,200 @@ def create_app(service: JobService | None = None) -> FastAPI:
     async def recover(request: Request, principal: Annotated[Principal, Depends(require("analysis.recover"))],
                       job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
         return await call(request, "recover", principal, job_id)
+
+    def relation_service(request: Request) -> RelationJobs:
+        relation = request.app.state.relation
+        if relation is None:
+            raise RelationError(409, "execution_unavailable")  # the all-or-nothing relation configuration group is not enabled
+        return relation
+
+    async def relation_call(request: Request, operation: str, principal: Principal, job_id: str) -> JSONResponse:
+        relation = relation_service(request)
+        context = _context(request)
+        seen = context["seen"] = Observation()
+        if not JOB_ID.fullmatch(job_id):
+            raise invalid("jobId")
+        context["jobId"] = job_id
+        reply = await run_in_threadpool(getattr(relation, operation), principal.name, job_id, seen)
+        return respond(reply)
+
+    @app.post("/internal/v1/relation-jobs", operation_id="submitRelationJob", tags=["relation-jobs"], status_code=202,
+              response_model=RelationJobStatus, summary="Register and queue an S3 relation job over an allowlisted S2 upstream",
+              responses={**{code: model for code, model in RELATION_ERRORS.items() if code != 404},
+                         200: {"model": RelationJobStatus, "description": "Idempotent replay of an already accepted job."},
+                         403: {"model": RelationErrorEnvelope, "description": "scope_denied, or upstream_not_allowed: the upstream job and digest are not listed for this principal."},
+                         409: {"model": RelationErrorEnvelope, "description": "idempotency_conflict, job_id_unavailable, job_input_conflict, upstream_unavailable or execution_unavailable."},
+                         413: {"model": RelationErrorEnvelope, "description": "request_too_large"},
+                         415: {"model": RelationErrorEnvelope, "description": "unsupported_media_type"}})
+    async def relation_submit(request: Request, principal: Annotated[Principal, Depends(require("relation.submit"))],
+                              idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", description="Must equal body.jobId.")] = None,
+                              x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        relation = relation_service(request)
+        check_content_type(request)
+        key = request.headers.get("idempotency-key", "")
+        if not JOB_ID.fullmatch(key):
+            raise invalid("Idempotency-Key")
+        body = parse_relation_submit(await read_body(request), key)
+        context = _context(request)
+        context["jobId"] = key
+        seen = context["seen"] = Observation()
+        reply = await run_in_threadpool(relation.submit, principal.name, key, body, seen)
+        return respond(reply)
+
+    @app.get("/internal/v1/relation-jobs/{jobId}", operation_id="getRelationJobStatus", tags=["relation-jobs"],
+             response_model=RelationJobStatus, summary="Current relation job status (no content fields)", responses=RELATION_ERRORS)
+    async def relation_status(request: Request, principal: Annotated[Principal, Depends(require("relation.read"))],
+                              job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await relation_call(request, "status", principal, job_id)
+
+    @app.get("/internal/v1/relation-jobs/{jobId}/result", operation_id="getRelationJobResult", tags=["relation-jobs"],
+             response_model=RelationResultEnvelope, summary="Relation candidates, only while every delivery gate holds", responses=RELATION_ERRORS)
+    async def relation_result(request: Request, principal: Annotated[Principal, Depends(require("relation.read"))],
+                              job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await relation_call(request, "result", principal, job_id)
+
+    @app.post("/internal/v1/relation-jobs/{jobId}/cancel", operation_id="cancelRelationJob", tags=["relation-jobs"],
+              response_model=RelationJobStatus, summary="Cancel a relation job (idempotent; a ready job is refused)",
+              responses={**RELATION_ERRORS, 409: {"model": RelationErrorEnvelope, "description": "job_already_terminal: the job is ready."}})
+    async def relation_cancel(request: Request, principal: Annotated[Principal, Depends(require("relation.cancel"))],
+                              job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await relation_call(request, "cancel", principal, job_id)
+
+    @app.post("/internal/v1/relation-jobs/{jobId}/recover", operation_id="recoverRelationJob", tags=["relation-jobs"],
+              status_code=202, response_model=RelationJobStatus, summary="Explicitly resume a stopped, queued or interrupted relation job (idempotent)",
+              responses={**RELATION_ERRORS, 200: {"model": RelationJobStatus, "description": "A dispatch is already pending or in flight; the request was coalesced."},
+                         409: {"model": RelationErrorEnvelope, "description": "reconcile_required or job_not_recoverable."}})
+    async def relation_recover(request: Request, principal: Annotated[Principal, Depends(require("relation.recover"))],
+                               job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await relation_call(request, "recover", principal, job_id)
+
+    async def relation_operation_call(request: Request, operation: str, principal: Principal, job_id: str, operation_id: str) -> JSONResponse:
+        relation = relation_service(request)
+        context = _context(request)
+        seen = context["seen"] = Observation()
+        if not JOB_ID.fullmatch(job_id):
+            raise invalid("jobId")
+        if not JOB_ID.fullmatch(operation_id):
+            raise invalid("operationId")
+        context["jobId"], context["operationId"] = job_id, operation_id
+        reply = await run_in_threadpool(getattr(relation, operation), principal.name, job_id, operation_id, seen)
+        return respond(reply)
+
+    @app.post("/internal/v1/relation-jobs/{jobId}/reviews", operation_id="submitRelationReview", tags=["relation-jobs"], status_code=202,
+              response_model=RelationOperationStatus, summary="Record one allow/reject review of a relation candidate (one operation per Idempotency-Key)",
+              responses={**{code: model for code, model in RELATION_ERRORS.items() if code not in (403, 404, 409)},
+                         200: {"model": RelationOperationStatus, "description": "The decision is recorded and either needs no revalidation (reject) or this is a replay of an existing operation."},
+                         403: {"model": RelationErrorEnvelope, "description": "scope_denied, or upstream_not_allowed: the job's upstream is not (any more) listed for this principal."},
+                         404: {"model": RelationErrorEnvelope, "description": "job_not_found (unknown or another principal's job) or relation_candidate_not_found."},
+                         409: {"model": RelationErrorEnvelope, "description": "source_version_conflict, source_revision_conflict, review_target_not_hold, review_already_pending, job_cancelled, idempotency_conflict, operation_id_unavailable, upstream_unavailable or execution_unavailable. A refusal records nothing."},
+                         413: {"model": RelationErrorEnvelope, "description": "request_too_large"},
+                         415: {"model": RelationErrorEnvelope, "description": "unsupported_media_type"}})
+    async def relation_review(request: Request, principal: Annotated[Principal, Depends(require("relation.review"))],
+                              job_id: Annotated[str, PATH_JOB_ID],
+                              idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", description="The stable id of this review operation.")] = None,
+                              x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        relation = relation_service(request)
+        check_content_type(request)
+        if not JOB_ID.fullmatch(job_id):
+            raise invalid("jobId")
+        key = request.headers.get("idempotency-key", "")
+        if not JOB_ID.fullmatch(key):
+            raise invalid("Idempotency-Key")
+        body = parse_relation_review(await read_body(request))
+        context = _context(request)
+        context["jobId"], context["operationId"] = job_id, key
+        seen = context["seen"] = Observation()
+        reply = await run_in_threadpool(relation.review, principal.name, job_id, key, body, seen)
+        return respond(reply)
+
+    @app.get("/internal/v1/relation-jobs/{jobId}/reviews/{operationId}", operation_id="getRelationReviewOperation", tags=["relation-jobs"],
+             response_model=RelationOperationStatus, summary="Look up one review operation by its key (content-free, from the service ledger)",
+             responses={**{code: model for code, model in RELATION_ERRORS.items() if code != 404},
+                        404: {"model": RelationErrorEnvelope, "description": "job_not_found or operation_not_found: unknown, another principal's, or another job's."}})
+    async def relation_operation(request: Request, principal: Annotated[Principal, Depends(require("relation.read"))],
+                                 job_id: Annotated[str, PATH_JOB_ID], operation_id: Annotated[str, PATH_OPERATION_ID],
+                                 x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await relation_operation_call(request, "operation", principal, job_id, operation_id)
+
+    @app.post("/internal/v1/relation-jobs/{jobId}/reviews/{operationId}/recover", operation_id="recoverRelationReviewOperation", tags=["relation-jobs"],
+              status_code=202, response_model=RelationOperationStatus,
+              summary="Explicitly re-queue the revalidation of an accepted allow, after reading the chain (idempotent)",
+              responses={**{code: model for code, model in RELATION_ERRORS.items() if code not in (403, 404, 409)},
+                         200: {"model": RelationOperationStatus, "description": "Nothing to add: a revalidation is already pending or running, or the chain shows it already settled."},
+                         403: {"model": RelationErrorEnvelope, "description": "scope_denied, or upstream_not_allowed."},
+                         404: {"model": RelationErrorEnvelope, "description": "job_not_found or operation_not_found."},
+                         409: {"model": RelationErrorEnvelope, "description": "review_not_confirmed, operation_not_recoverable, reconcile_required, job_cancelled, upstream_unavailable or execution_unavailable."}})
+    async def relation_operation_recover(request: Request, principal: Annotated[Principal, Depends(require("relation.recover"))],
+                                         job_id: Annotated[str, PATH_JOB_ID], operation_id: Annotated[str, PATH_OPERATION_ID],
+                                         x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await relation_operation_call(request, "recover_operation", principal, job_id, operation_id)
+
+    def extraction_service(request: Request) -> ExtractionJobs:
+        extraction_jobs = request.app.state.extraction
+        if extraction_jobs is None:
+            raise ExtractionError(409, "execution_unavailable")  # the all-or-nothing extraction configuration group is not enabled
+        return extraction_jobs
+
+    async def extraction_call(request: Request, operation: str, principal: Principal, job_id: str) -> JSONResponse:
+        extraction_jobs = extraction_service(request)
+        context = _context(request)
+        seen = context["seen"] = Observation()
+        if not JOB_ID.fullmatch(job_id):
+            raise invalid("jobId")
+        context["jobId"] = job_id
+        reply = await run_in_threadpool(getattr(extraction_jobs, operation), principal.name, job_id, seen)
+        return respond(reply)
+
+    @app.post("/internal/v1/extraction-jobs", operation_id="submitExtractionJob", tags=["extraction-jobs"], status_code=202,
+              response_model=ExtractionJobStatus, summary="Register and queue an operator-approved S2 extraction job",
+              responses={**{code: model for code, model in EXTRACTION_ERRORS.items() if code != 404},
+                         200: {"model": ExtractionJobStatus, "description": "Idempotent replay of an already accepted job."},
+                         403: {"model": ExtractionErrorEnvelope, "description": "scope_denied, or request_not_approved: no approval is listed for this principal, job id and digest."},
+                         409: {"model": ExtractionErrorEnvelope, "description": "idempotency_conflict, job_id_unavailable, job_input_conflict, approval_changed, request_unavailable or execution_unavailable."},
+                         413: {"model": ExtractionErrorEnvelope, "description": "request_too_large"},
+                         415: {"model": ExtractionErrorEnvelope, "description": "unsupported_media_type"}})
+    async def extraction_submit(request: Request, principal: Annotated[Principal, Depends(require("extraction.submit"))],
+                                idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key", description="Must equal body.jobId.")] = None,
+                                x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        extraction_jobs = extraction_service(request)
+        check_content_type(request)
+        key = request.headers.get("idempotency-key", "")
+        if not JOB_ID.fullmatch(key):
+            raise invalid("Idempotency-Key")
+        body = parse_extraction_submit(await read_body(request), key)
+        context = _context(request)
+        context["jobId"] = key
+        seen = context["seen"] = Observation()
+        reply = await run_in_threadpool(extraction_jobs.submit, principal.name, key, body, seen)
+        return respond(reply)
+
+    @app.get("/internal/v1/extraction-jobs/{jobId}", operation_id="getExtractionJobStatus", tags=["extraction-jobs"],
+             response_model=ExtractionJobStatus, summary="Current extraction job status (no content fields)", responses=EXTRACTION_ERRORS)
+    async def extraction_status(request: Request, principal: Annotated[Principal, Depends(require("extraction.read"))],
+                                job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await extraction_call(request, "status", principal, job_id)
+
+    @app.get("/internal/v1/extraction-jobs/{jobId}/result", operation_id="getExtractionJobResult", tags=["extraction-jobs"],
+             response_model=ExtractionResultEnvelope, summary="Event and topic candidates, only while every delivery gate holds", responses=EXTRACTION_ERRORS)
+    async def extraction_result(request: Request, principal: Annotated[Principal, Depends(require("extraction.read"))],
+                                job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await extraction_call(request, "result", principal, job_id)
+
+    @app.post("/internal/v1/extraction-jobs/{jobId}/cancel", operation_id="cancelExtractionJob", tags=["extraction-jobs"],
+              response_model=ExtractionJobStatus, summary="Cancel an extraction job (idempotent; a ready job is refused)",
+              responses={**EXTRACTION_ERRORS, 409: {"model": ExtractionErrorEnvelope, "description": "job_already_terminal: the job is ready."}})
+    async def extraction_cancel(request: Request, principal: Annotated[Principal, Depends(require("extraction.cancel"))],
+                                job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await extraction_call(request, "cancel", principal, job_id)
+
+    @app.post("/internal/v1/extraction-jobs/{jobId}/recover", operation_id="recoverExtractionJob", tags=["extraction-jobs"],
+              status_code=202, response_model=ExtractionJobStatus, summary="Explicitly resume a stopped, queued or interrupted extraction job (idempotent)",
+              responses={**{code: model for code, model in EXTRACTION_ERRORS.items() if code not in (403, 409)},
+                         200: {"model": ExtractionJobStatus, "description": "A dispatch is already pending or in flight; the request was coalesced."},
+                         403: {"model": ExtractionErrorEnvelope, "description": "scope_denied, or request_not_approved: the approval was removed or changed."},
+                         409: {"model": ExtractionErrorEnvelope, "description": "reconcile_required, job_not_recoverable, approval_changed, fixture_changed or execution_unavailable."}})
+    async def extraction_recover(request: Request, principal: Annotated[Principal, Depends(require("extraction.recover"))],
+                                 job_id: Annotated[str, PATH_JOB_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await extraction_call(request, "recover", principal, job_id)
 
     return app

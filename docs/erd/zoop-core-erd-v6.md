@@ -44,6 +44,14 @@ PostgreSQL은 회원·카탈로그·문서·결과·이력을 저장한다. Neo4
 - 현재 접근 권한·원문 철회 여부는 응답 시 다시 검사한다. 과거 스냅샷은 철회된 원문을 공개할 권한을 주지 않는다.
 - 세션/멱등성/로그 보존기간은 명세가 미정이므로 숫자를 새로 확정하지 않는다.
 
+### 앱 작업·AI 작업·입력 버전 연결 규칙
+
+- 공개 관리자 API의 `jobId`는 `analysis_jobs.id`다. 내부 AI 서비스의 `jobId`는 별도 식별자이며 한 앱 작업에 여러 AI 작업을 허용한다. `analysis_jobs.input`은 최초 명령·검수 원천 버전을 고정하고, `checkpoint.aiUnits[]`는 하위 단위별 `{unitKey, aiJobId, submitArtifactId, runtimeInputDigest?}`를 저장한다. `unitKey`는 작업 안에서 유일하다. `document_analyses.ai_job_id`는 해당 문서·단계 요청의 내부 AI 작업을, `briefing_attempts.stages`는 단계별 AI 작업 ID를 가리킨다. 모두 submit 전에 ID와 불변 요청 본문 artifact를 커밋한다.
+- 내부 submit은 저장된 `aiJobId`를 `body.jobId`와 `Idempotency-Key`에 동일하게 쓴다. 전송 결과가 불명확하면 같은 ID·본문을 재전송하고 poll·recover·저장만 복구에도 새 ID를 만들지 않는다. 명시적 재분석은 새 `document_analyses` 행·`request_no`를, 관리자 재시도는 `retry_of`가 있는 새 `analysis_jobs` 행을 만든다. 새 모델 실행이 필요할 때 새 AI `jobId`를 발급하며 이전 결과·호출 이력을 덮어쓰지 않는다.
+- AI 서비스 호출 영수증의 `jobId`/`attemptId`는 `ai_executions.ai_job_id`/`ai_attempt_id`에 그대로 저장한다. 영수증 본문은 `receipt_artifact_id`의 불변 파일에 저장한다. 같은 `(ai_job_id, ai_attempt_id)`를 다시 수집하면 기존 실행 행을 반환해 호출·토큰·비용을 중복 집계하지 않는다. 작업 수준 `inputDigest`와 개별 호출의 `inputDigest`는 다른 값일 수 있으므로 각각 해당 원본과 대조한다. 이 식별자 관계는 `ai_executions.id`의 문자열 형식에 의존하지 않는다.
+- 문서 입력 `article_version`, 분석의 `result_version`, 검수 원천의 `source_version`/`source_revision`, 관리자 결정 `revision`은 서로 독립적이다. 문서 분석은 문서 버전·단계·회사 맥락·`request_no`별로 고정하고, 새 분석은 새 `request_no`와 성공 시 새 `result_version`을 갖는다. 그래프와 브리핑은 사용한 분석 ID·결과 버전·검수 revision을 생성 시점에 고정한다.
+- 검수 대상별 `review_targets.current_revision` 및 전역 `review_decisions.global_revision`은 앱의 결정 revision이다. AI 후보의 `review_targets.source_revision`은 원천 revision이다. 앱 결정 때만 앱 revision을 증가시키고, AI 원천 변경만으로 앱 revision을 증가시키지 않는다. 결정 당시의 원천 버전·revision은 같은 트랜잭션의 `audit_logs.detail`에 `reviewDecisionId`와 함께 고정하고, 해당 감사 행은 결정 이력이 남아 있는 동안 보존한다. 원천 버전·revision이 현재 값과 다른 과거 결정은 새 원천의 승인 근거로 쓰지 않는다. 그래프·브리핑의 `review_revision`은 발행 시점 앱 전역 revision이며 AI 원천 revision이 아니다.
+
 ## 3. 테이블 정의
 
 ### 01. members — 회원·자격·설정
@@ -52,13 +60,13 @@ PostgreSQL은 회원·카탈로그·문서·결과·이력을 저장한다. Neo4
 id text PK; email text; email_key text UNIQUE; display_name text
 password_hash text?; signup_method text; status text
 analytics_key text UNIQUE
-mode text; investor boolean?; completed boolean; tutorial_completed boolean
+mode text?; investor boolean?; completed boolean; tutorial_completed boolean
 settings_version bigint; created_at timestamptz; updated_at timestamptz; blocked_at timestamptz?
 ```
 
 `member_credentials`, `member_settings`를 합친다. 이메일 가입은 password_hash 필수, 소셜 전용은 NULL 가능. 가입 완료 시 이메일은 필수다. 비밀번호 해시를 일반 회원 응답 DTO에 포함하지 않는다. `investor=NULL`은 미응답이다.
 
-가입 시 displayName 생략은 허용한다. 저장 정책은 생략 시 서버 기본 표시명 `회원`을 저장하는 것이다. 이메일/실명을 추정하지 않고 중복 표시명을 허용한다. 명시적으로 보낸 이름은 별도 이름 정책으로 검증한다. 이 기본값은 API 확정 사실이 아닌 구현 제안이다. members.id는 이메일/전화번호에서 유도하지 않는 암호학적 난수 기반 불투명 가명 ID로 발급하고 MemberRow.id와 TranscriptSummary.user에 사용한다. `M-3FA9C2D1` 같은 짧은 예시는 고정 형식이나 충분한 엔트로피의 근거가 아니다. analytics_key는 별도로 발급하며 공개하지 않는다.
+가입 시 displayName 생략은 허용한다. 저장 정책은 생략 시 서버 기본 표시명 `회원`을 저장하는 것이다. 이메일/실명을 추정하지 않고 중복 표시명을 허용한다. 명시적으로 보낸 이름은 별도 이름 정책으로 검증한다. 이 기본값은 API 확정 사실이 아닌 구현 제안이다. 가입 직후 온보딩 방식을 선택하지 않았다면 `mode=NULL`, `completed=false`로 저장한다. `mode`는 관심·보유 기업의 존재 여부가 아닌 선택한 방식이며, 선택 후에만 `assets` 또는 `watchlist`로 설정한다. 두 목록이 모두 비어 있는 상태는 각 관계/연결 행이 없는 것으로 표현한다. members.id는 이메일/전화번호에서 유도하지 않는 암호학적 난수 기반 불투명 가명 ID로 발급하고 MemberRow.id와 TranscriptSummary.user에 사용한다. `M-3FA9C2D1` 같은 짧은 예시는 고정 형식이나 충분한 엔트로피의 근거가 아니다. analytics_key는 별도로 발급하며 공개하지 않는다.
 
 설정 PUT은 요청의 지정 필드와 관심 목록을 현재 상태와 비교한다. 무변경 재전송이면 현재 응답을 반환한다. 실제 변경이면 `settings_version` 일치를 검사하고 관심 목록 변경과 함께 증가시킨다. 차단은 상태 변경과 회원 세션 폐기를 한 트랜잭션으로 수행한다.
 
@@ -204,7 +212,7 @@ id text PK; kind text; storage_uri text UNIQUE; sha256 text; bytes bigint
 media_type text; created_at timestamptz
 ```
 
-원문·인용 기준 텍스트·모델 결과·검증 영수증·그래프 스냅샷·복구 결과를 보관한다. URI 덮어쓰기 금지, bytes>=0. 저장소 비밀 값은 응답에 노출하지 않는다. 공개 AnalysisCitation.textArtifactId와 DocumentAnalysisSummary.artifactId를 지원하므로 유지한다.
+원문·인용 기준 텍스트·모델 결과·검증 영수증·AI submit/내용 없는 호출 영수증·그래프 스냅샷·복구 결과를 보관한다. URI 덮어쓰기 금지, bytes>=0. 저장소 비밀 값은 응답에 노출하지 않는다. 공개 AnalysisCitation.textArtifactId와 DocumentAnalysisSummary.artifactId를 지원하므로 유지한다. `ai_call_receipt`는 제공자 요청·응답 본문이나 원문을 넣지 않는 사용량 메타데이터이고, 검증 통과의 증거로 사용하지 않는다.
 
 ### 15. articles — 문서 식별·접근 상태
 
@@ -247,9 +255,9 @@ id text PK; article_id text; article_version text; stage text; company_id text? 
 request_no bigint; status text; reason text?; result_version text?; result jsonb?
 summary_text_artifact_id text? FK artifacts; result_artifact_id text? FK artifacts
 exact_receipt_id text? FK artifacts; semantic_receipt_id text? FK artifacts
-grant_reference text?; grant_checked_at timestamptz?; revoked_at timestamptz?
+grant_reference text?; grant_revision text?; grant_checked_at timestamptz?; revoked_at timestamptz?
 model text?; prompt_version text?; reasoning_effort text?
-analysis_job_id text? FK analysis_jobs; owner_token text?; lease_until timestamptz?
+analysis_job_id text? FK analysis_jobs; ai_job_id text? UNIQUE; owner_token text?; lease_until timestamptz?
 created_at timestamptz; produced_at timestamptz?; updated_at timestamptz
 FK(article_id, article_version) -> article_versions(article_id, version)
 UNIQUE(article_id, article_version, stage) WHERE company_id IS NULL AND status='pending'
@@ -262,7 +270,11 @@ stage=summary는 company_id=NULL, sentiment는 필수. result는 각각 `Documen
 
 pending의 worker 실행권은 owner_token/lease_until로 관리한다. 아직 접수만 된 pending은 둘 다 NULL일 수 있지만 실행 시작 시 둘 다 설정하고 완료 쓰기는 현재 토큰과 미만료 임대를 검사한다. 중단된 worker의 만료 임대를 회수할 때 문서·분석 행을 잠그고 failed로 종결한 후 새 요청을 허용한다. 단순 조회나 동일 요청 재전송은 새 실행을 만들지 않는다. analysis_job_id는 이 분석을 최초 접수한 작업이며 중복 요청이 이를 다시 연결하지 않는다.
 
+`ai_job_id`는 내부 submit 전에 한 번 발급·저장하고 이후 변경하지 않는다. `article_version`과 결과 `result_version`은 서로 다른 버전이며 새 요청 행에 이전 결과 버전을 복사하지 않는다. exact/semantic 영수증은 각각 별도 artifact다. 두 영수증은 이 분석 ID·문서 버전·입력 digest·정책 버전과 직접 또는 dependency ref를 통해 summary 결과 버전에 결합해야 하며, summary 공개는 exact 통과와 semantic supported가 함께 확인될 때만 가능하다. `grant_reference`는 실행 당시의 grant ID, `grant_revision`과 `grant_checked_at`은 그때 확인한 버전·시각으로 고정한다. `revoked_at`은 철회를 관측한 이력 시각일 뿐 현재 허용 여부의 권위값이 아니다.
+
 현재 상태 조회는 같은 범위에서 가장 최신 request_no를 선택한다. 새 요청이 pending인데 과거 available 결과를 최신인 것처럼 반환하지 않는다. 고정 그래프·회차는 snapshot에 저장한 analysis ID/resultVersion을 사용한다. GET은 모델 호출을 하지 않는다. summary 공개에는 exact/semantic 영수증, 현재 버전 및 grant/철회 검사가 필요하다. 과거 자료의 분석 공개 정책과 current-version gate가 충돌하면 최신 분석으로 대체하지 않고 API의 null/withheld 규칙을 적용한다.
+
+저장된 `status=available`은 결과 생성·검증 완료 이력이며 현재 공개 허가를 뜻하지 않는다. 조회 시 현재 source grant registry와 `articles.access_status`를 다시 확인하고, 허가가 없으면 result나 생성 상태를 수정하지 않고 API에는 withheld/null을 반환한다. 저장 `withheld`는 결과 수입 당시 권리·검증 gate 때문에 결과를 사용하지 못한 종료 상태에만 쓴다. 철회·grant 개정·만료·허용 목적/수신자 변경은 `revoked_at` 유무와 무관하게 현재 권리 검사에 반영한다. 새 모델 전송과 결과 수입·공개도 같은 검사를 통과해야 한다.
 
 ### 19. briefing_rounds — 운영 회차와 발행 원문
 
@@ -403,6 +415,10 @@ detail JSON 복제를 제거한다. 근거·관계·검증 상세는 source_vers
 
 candidateId의 현재 후보 행은 부분 UNIQUE로 한 개만 허용한다. 과거 버전 행은 이력 FK를 위해 유지하며 is_current 전환과 관련 relation 등록을 한 트랜잭션으로 처리한다. API 결정은 현재 후보와 원천 revision을 다시 확인한다. 원천 ID 존재를 SQL FK로 위장하지 않는다. company_ids/relation_types에는 필요한 배열 GIN 인덱스를 둔다.
 
+`source_version`은 대상 행을 만든 뒤 변경하지 않는다. 같은 버전 안에서 AI 원천 revision이 갱신되면 `source_revision` 투영만 갱신하며, 과거 결정이 가리킨 revision은 해당 결정과 함께 저장한 감사 상세에서 보존한다.
+
+`verification_artifact_id`는 이 대상의 정확한 `source_version`/`source_revision`에 대한 자동 검증 결과만 가리킨다. 원천 revision이 바뀌면 이전 검증 artifact를 새 원천의 통과 근거로 재사용하지 않고 재검증 후 포인터를 교체한다. 문서 분석의 exact/semantic 영수증과는 별개다.
+
 ### 27. review_decisions — 검수 결정 이력
 
 ```text
@@ -415,6 +431,10 @@ CHECK(origin <> 'admin' OR admin_id IS NOT NULL)
 ```
 
 candidate와 relation 결정을 모두 보존한다. revision은 결정 대상별 값이며 current_revision은 최초 0이다. relationId가 없으면 candidate 대상, 있으면 해당 후보에 속하는 relation 대상을 해석하고 expectedRevision을 그 대상의 current_revision과 비교한다. 공개 응답의 decision/history에 대상별 revision을 제공해 클라이언트가 같은 대상의 값을 보내도록 한다. 공통 publication_state advisory lock→대상 행 잠금 순으로 획득하고 `current_revision=expectedRevision` 조건부 UPDATE로 +1한 값과 동일 revision의 결정을 INSERT한다. UPDATE 0건 또는 UNIQUE(target_id,revision) 충돌은 REVISION_CONFLICT/409다. origin=admin이면 admin_id 필수, verification_artifact_id는 실제 자동 검증 결과가 있을 때만 채운다. allow는 재검증 접수이며 scope=admin, kind=revalidate, status=queued인 job과 결정·감사·멱등성 완료 기록을 같은 트랜잭션에서 저장한다. 기존 DecisionResponse로 decision=revalidation_requested, jobId=접수한 작업 ID, publicChanged=false를 반환한다. 다른 관리자 작업이 running이어도 접수를 허용하며, 실행 중이라는 이유로 결정을 롤백하거나 결정 API에 JOB_IN_PROGRESS를 추가하지 않는다. 동일 멱등성 요청은 기존 결정 응답과 jobId를 재생한다.
+
+관리자 allow/reject는 자동 검증 판정과 독립적인 이력이다. `verification_artifact_id`를 채운 결정은 그 결정 시점에 실제 참조한 후보 검증 artifact만 가리키며, 사후 생성된 검증 결과를 과거 결정 행에 덧붙이지 않는다. 결과와 영수증 artifact ID는 공개 결정 응답에 추가하지 않고 내부 감사·재현에 사용한다.
+
+결정과 동일 트랜잭션에 저장하는 감사 상세에 `reviewDecisionId`, `sourceVersion`, `sourceRevision`을 넣고 변경하지 않는다. 최신 원천 버전·revision과 일치하지 않는 과거 결정은 history에 남기되 현재 승인·공개 근거로 사용하지 않는다. 결정 API는 상세 응답의 대상별 `sourceVersion`/`sourceRevision`을 `expectedSourceVersion`/`expectedSourceRevision`으로 받는다. `expectedRevision`과 두 원천 기대값을 잠근 검수 대상 및 권위 AI 원천과 비교하고, 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·재검증 작업을 만들지 않는다. relation 결정이면 후보가 아닌 해당 relation의 세 기대값을 비교한다.
 
 global_revision은 대상 전체에 걸친 전역 검수 revision이다. 공통 잠금 아래 `COALESCE(MAX(global_revision),0)+1`로 할당하고 커밋까지 잠금을 유지한다. 전용 DB sequence를 사용하지 않는다. 모든 결정 쓰기·이행 경로가 같은 잠금을 사용하며 이력은 append-only다. READ COMMITTED 트랜잭션에서 잠금 획득 후 별도 SELECT로 MAX를 읽어 대기 전 snapshot을 재사용하지 않는다. 규칙 변경·그래프 생성/활성화·브리핑 발행도 동일 publication_state 잠금을 공유하며 외부 호출은 잠금 밖에서 수행한다.
 
@@ -482,9 +502,12 @@ JobList.items는 대기·실행·종료 작업을 모두 포함한다. JobList.a
 id text PK; feature text; execution_mode text; status text
 chat_job_id text? FK chat_jobs; briefing_attempt_id text? FK briefing_attempts
 analysis_job_id text? FK analysis_jobs; document_analysis_id text? FK document_analyses
+ai_job_id text?; ai_attempt_id text?; stage text?; receipt_artifact_id text? FK artifacts
+grant_id text?; grant_revision text?; grant_checked_at timestamptz?; grant_scope jsonb?
 attempt_no integer?; provider text?; model text?; prompt_version text?; reasoning_effort text?
 input_tokens bigint?; output_tokens bigint?; estimated_cost numeric?; actual_cost numeric?; currency text?
 error_code text?; error_message text?; started_at timestamptz; finished_at timestamptz?
+UNIQUE(ai_job_id, ai_attempt_id) WHERE ai_job_id IS NOT NULL AND ai_attempt_id IS NOT NULL
 ```
 
 feature별 시간·오류·비용 집계가 필요하므로 개별 행을 유지한다. 네 소유/문맥 FK 중 적어도 하나가 NOT NULL이어야 한다. chat_job_id·briefing_attempt_id·analysis_job_id 세 실행 소유 FK는 최대 하나만 허용하고 document_analysis_id는 독립 또는 실행 소유 FK와 함께 허용한다. 문서 분석과 analysis_job이 함께 있으면 document_analyses.analysis_job_id와 일치해야 한다. 다른 실행 소유와 문서 분석을 함께 기록하면 고정 입력에 해당 분석 ID가 실제 포함됐는지 저장 경로에서 검사한다. 이것은 실행 한 건의 추가 문맥이며 중복 실행 행을 만들지 않는다.
@@ -492,6 +515,16 @@ feature별 시간·오류·비용 집계가 필요하므로 개별 행을 유지
 컬럼 CHECK는 `num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id, document_analysis_id)>=1` 및 `num_nonnulls(chat_job_id, briefing_attempt_id, analysis_job_id)<=1`이다. 교차 행 관계는 저장 트랜잭션/트리거로 검증한다. chat/analysis 작업에 연결된 attempt_no는 그 소유 작업의 실제 시도 번호이고, briefing_attempt_id는 자체로 시도를 식별한다. 문서 분석만 연결된 실행은 attempt_no=NULL을 허용한다. 집계는 실행 id를 기준으로 한 번만 센다.
 
 execution_mode는 live/replay/save_only로 통일한다. replay는 저장 산출물 재사용이고 save_only는 검증 결과 저장 복구로 모델 실호출 수에 넣지 않는다. 문서 provenance의 replay/live와 같은 용어를 쓰되 save_only를 해당 공개 enum에 추가하지 않는다. 미제공 비용은 NULL. 인덱스: `(feature, started_at)`, `(status, started_at)`.
+
+AI 서비스 호출 영수증으로 만든 행은 `ai_job_id`/`ai_attempt_id`를 함께 채우고 `receipt_artifact_id`에 내용 없는 원본 영수증을 보존한다. 같은 AI 시도는 한 행만 허용한다. 실행 소유 FK가 문서 분석이면 `document_analyses.ai_job_id`와 일치시키고, 관리자·브리핑이면 각 checkpoint/stages의 AI 작업 ID와 일치시킨다. 앱의 replay/save_only 기록은 AI 시도 ID 없이 남길 수 있다. 영수증의 `stage`·모델 설정·호출 입력 digest는 artifact에서 검증하며 작업 수준 입력 digest와 같은 값으로 가정하지 않는다.
+
+`grant_id`/`grant_revision`/`grant_checked_at`과 `grant_scope`의 sourceId·requiredOperations·requiredPurposes·requiredRecipients는 이 시도 직전에 확인한 권리 스냅샷이다. 실행 시점의 허가를 입증하지만 현재 공개 권한을 부여하지 않는다. 현재 권리는 원천 grant registry에서 매번 재평가한다. `status=unknown`은 제공자 결과·과금 여부가 불명확한 시도로, failed나 비용 0으로 바꾸지 않고 operator_reconcile 대상으로 남긴다. `actual_cost`는 실제 확인된 청구 자료가 있을 때만, `estimated_cost`는 추정 가능한 경우에만 채우며 미보고 토큰·금액은 NULL로 보존한다.
+
+**AI 사용량 산식:** `getAiUsage.features[].requests`는 `analysis_jobs` 전체 행 수가 아니다. chatbot은 접수된 `chat_jobs`, news-analysis는 `stage=summary`의 `document_analyses`, document-sentiment는 `stage=sentiment`의 `document_analyses`, briefing은 `briefing_attempts`, briefing-outlook은 각 시도의 outlook 단계 접수 건수를 센다. 멱등 재전송은 새 요청이 아니다. `succeeded`/`failed`는 같은 요청 모집단의 종결 결과이며 pending/withheld를 임의로 성공·모델 실패에 넣지 않는다. briefing과 briefing-outlook의 요청 수는 포함 관계가 있으므로 기능 간 합계로 전체 요청 수를 만들지 않는다.
+
+`modelCalls`는 실제 외부 모델 전송이 확인된 live 시도 수다. `semantic-verification`은 news-analysis에, 기업 문서 판정은 document-sentiment에, 브리핑 전망 판정은 briefing-outlook에 귀속한다. briefing 생성의 다른 모델 단계만 briefing에 귀속해 동일 영수증을 두 기능에 세지 않는다. `replayCalls`는 저장된 판정 재사용 수, `retries`는 최초 실행 뒤 새 앱/도메인 시도 또는 추가 모델 호출을 동반한 재시도 수이며 한 재시도 단위는 한 번만 센다. 동일 키 submit 재전송·poll·모델 재호출 없는 recover·save_only는 retries에 넣지 않고, replayCalls는 실제 저장 판정 재사용이 있을 때만 늘린다. 전송 여부를 모르는 `unknown`/미영수증 시도가 집계 구간에 있으면 `modelCalls`·불완전한 토큰 합계는 API의 nullable 값을 사용하고 note에 이유를 밝힌다. 비용 미보고를 0으로 만들지 않는다.
+
+권리 철회·개정·만료 뒤에는 새 모델 전송 및 결과 수입·반환·공개를 막는다. 기존 호출·사용량·내용 없는 영수증과 실행 당시 grant 스냅샷은 발생 이력으로 유지하고 값을 소급 수정하지 않는다. 원문·AI 결과·인용이 들어 있는 artifact의 보존·삭제는 소스 권리 계약과 별도 보존 정책에 따르며, 사용량 영수증 보존을 근거로 본문 보존이나 공개를 허용하지 않는다.
 
 ### 33. interaction_events — 사용자 행동 통계 원천
 
@@ -651,7 +684,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | `listPublicationRules`, `setPublicationRule` | publication_rules, publication_rule_changes, review_targets, graph_versions | 현재 상태·history·집계와 변경 직렬화 |
 | `listGraphVersions`, `publishGraphVersion`, `activateGraphVersion` | graph_versions, graph_activations, artifacts, analysis_jobs, audit_logs | 검증된 snapshot·투영 성공·활성화 이력 |
 | `listAnalysisJobs`, `createAnalysisJob`, `getAnalysisJob`, `retryAnalysisJob`, `cancelAnalysisJob` | analysis_jobs, audit_logs, idempotency_records | scope=admin의 ingest/revalidate/project, retryOf·checkpoint·취소 |
-| `getAiUsage` | ai_executions, analysis_jobs, briefing_attempts, chat_jobs | 실제 호출/재사용/복구 구분, 기간별 비용·오류·pastRuns |
+| `getAiUsage` | ai_executions, document_analyses, analysis_jobs, briefing_attempts, chat_jobs | 기능별 접수 단위와 실제 호출·재사용·복구 구분, 기간별 비용·오류·pastRuns |
 | `listAdminBriefingRounds`, `getAdminBriefingRound`, `reprocessBriefingRound` | briefing_rounds, briefing_attempts, briefing_changes, audit_logs | 미발행만 재처리, stages·attemptsLog 보존 |
 | `appendBriefingCorrection`, `setBriefingSuspension` | briefing_changes, briefing_rounds, audit_logs, idempotency_records | 원문 불변, 이력 추가와 상태 변경 원자 처리 |
 | `recordInteractionEvents` | interaction_events, idempotency_records | 동일 배치 중복 적재 방지 |
@@ -690,11 +723,11 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 
 | 위치 | 허용값 또는 규칙 |
 | --- | --- |
-| members.signup_method / status / mode | email, google, kakao / active, blocked / assets, watchlist |
+| members.signup_method / status / mode | email, google, kakao / active, blocked / NULL(온보딩 방식 미선택), assets, watchlist |
 | social_identities.provider | google, kakao |
 | member_sessions.kind | member, guest, oauth_pending; pending은 내부 전용 |
 | admins.status / role | active, disabled / 배포 시 확정한 코드 role registry의 값; 일반 문자열 무제한 허용 금지 |
-| artifacts.kind | raw_document, extracted_text, summary_text, analysis_result, exact_receipt, semantic_receipt, verification_receipt, graph_snapshot, briefing_input, chat_recovery. 내부 분류이며 이전 kind는 내용에 따라 명시적으로 이행 |
+| artifacts.kind | raw_document, extracted_text, summary_text, analysis_result, exact_receipt, semantic_receipt, verification_receipt, ai_submit, ai_call_receipt, graph_snapshot, briefing_input, chat_recovery. 내부 분류이며 이전 kind는 내용에 따라 명시적으로 이행 |
 | articles.kind / access_status | news, disclosure / available, private, deleted |
 | article_versions.publication_precision | datetime, day, unknown; 각각 published_at만 값 / published_date만 값 / 둘 다 NULL |
 | evidence.offset_unit / input_kind | unicode_code_point / body, summary |
@@ -715,7 +748,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | analysis_jobs.kind / scope / status | ingest, revalidate, project / admin, internal_projection / queued, running, succeeded, failed, cancelled |
 | analysis_jobs.attempts | 내부 status=running,succeeded,failed,cancelled; 시도 번호 유일, 단일 활성 원소, 완료 원소 불변 |
 | ai_executions.feature | chatbot, news-analysis, briefing, document-sentiment, briefing-outlook |
-| ai_executions.execution_mode / status | live, replay, save_only / running, succeeded, failed, cancelled. API feature 집계로 변환 |
+| ai_executions.execution_mode / status | live, replay, save_only / running, succeeded, failed, cancelled, unknown. unknown은 제공자 결과·과금 미확정이며 API 집계에서 0/failed로 단정하지 않음 |
 | interaction_events.principal_kind / event_type / screen | member, guest / screen_view, graph_node_select, graph_edge_select, briefing_view, briefing_issue_open / main, briefing 또는 NULL |
 | idempotency_records.status / method | processing, completed, failed / POST |
 | idempotency_records.principal_kind | member, guest, admin, anonymous; anonymous 주체 결합 방식은 인증 전 API 계약으로 확정 |
@@ -723,6 +756,6 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 
 provider, model, prompt_version, currency, market, exchange_code, media_type, source_revision, reason, 오류 코드 등 외부 공급/버전 식별자는 임의 폐쇄 enum을 만들지 않는다. 설정 registry·형식·허용 길이로 검증한다. JSON stages/report/input의 내부 enum은 각 AI/작업 DTO 스키마와 결합해 검증하며 API status와 같은 이름이라는 이유로 공유하지 않는다.
 
-추가 저장 규칙: settings_version/request_no와 결정 revision/global_revision>=1. review_targets.current_revision은 최초 0, 발행 review_revision은 0 이상이며 미발행 회차만 NULL을 허용한다. 기타 운영 revision은 1 이상이다. 시도 번호>=1, runs/attempt_no와 집계 건수>=0, artifacts.bytes>=0. briefing_attempts.trigger=admin이면 admin_id 필수. ai_executions는 32번 테이블 정의의 소유 FK/추가 문맥 규칙과 참조 시도 존재 검사를 적용한다. 통화·금액의 부재는 NULL로 보존한다.
+추가 저장 규칙: settings_version/request_no와 결정 revision/global_revision>=1. review_targets.current_revision은 최초 0, 발행 review_revision은 0 이상이며 미발행 회차만 NULL을 허용한다. 기타 운영 revision은 1 이상이다. 시도 번호>=1, runs/attempt_no와 집계 건수>=0, artifacts.bytes>=0. briefing_attempts.trigger=admin이면 admin_id 필수. ai_executions는 32번 테이블 정의의 소유 FK/추가 문맥 규칙과 참조 시도 존재 검사를 적용한다. `ai_job_id`와 `ai_attempt_id`는 함께 NULL이거나 함께 값이 있어야 하며, `grant_scope`는 sourceId·requiredOperations·requiredPurposes·requiredRecipients 배열을 검증한다. 통화·금액의 부재는 NULL로 보존한다.
 
 TranscriptSummary.userKind는 현 인증 계약에서 항상 member다. guest와 oauth_pending의 채팅 접수를 금지하므로 새로운 guest 대화 행을 만들지 않는다. API enum의 guest는 현재 도달 불가한 허용값으로 문서화하고 API 정본의 축소 여부는 별도 결정한다. 과거 guest 자료가 실제 발견되면 원천·권한·이행 정책을 먼저 확인하며 회원으로 임의 변환하지 않는다.

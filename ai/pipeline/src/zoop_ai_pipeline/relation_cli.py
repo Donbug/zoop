@@ -18,7 +18,7 @@ from .relation_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Review, 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "inspect", "resume", "review", "revalidate", "cancel"))
+    parser.add_argument("command", choices=("run", "submit", "inspect", "resume", "review", "revalidate", "cancel"))
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--extraction-state-dir", required=True, type=Path)
     parser.add_argument("--ingestion-state-dir", required=True, type=Path)
@@ -32,13 +32,14 @@ def main() -> int:
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
         incoming = json.loads(raw)
-        if args.command == "run":
+        if args.command in {"run", "submit"}:
             provenance = incoming.get("provenance") if isinstance(incoming, dict) else None
             if isinstance(provenance, dict) and provenance.get("executionMode") == "live":
                 # No live path or fake fallback exists in the offline seam.
                 raise ExtractionFailure("live_mode_unsupported")
-        request = {"run": Submit, "review": Review, "revalidate": Revalidate}.get(args.command, Selector).model_validate(incoming)
-        if args.command in {"inspect", "cancel", "review"} and (args.replay or args.verifier_replay):
+        request = {"run": Submit, "submit": Submit, "review": Review, "revalidate": Revalidate}.get(args.command, Selector).model_validate(incoming)
+        if args.command in {"inspect", "cancel", "review", "submit"} and (args.replay or args.verifier_replay):
+            # Fixtures are per-call inputs of a later `run`/`resume`/`revalidate`; a submit freezes none of them.
             raise ExtractionFailure("fixture_not_allowed")
         fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                             read_file(args.verifier_replay, MAX_REPLAY) if args.verifier_replay else None)
@@ -47,6 +48,10 @@ def main() -> int:
         engine = Engine(store, Sources(args.ingestion_state_dir, authority), args.extraction_state_dir, args.ingestion_state_dir)
         if args.command == "run":
             result = engine.run(request, fixtures)
+        elif args.command == "submit":
+            # Registration only: freeze, then report the stored job. No execution, replay call or state change for an existing job.
+            engine.freeze(request)
+            result = engine.inspect(request.job_id)
         elif args.command == "resume":
             result = engine.resume(request.job_id, fixtures)
         elif args.command == "inspect":

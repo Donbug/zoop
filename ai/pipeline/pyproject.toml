@@ -1,7 +1,7 @@
 [project]
 name = "zoop-ai-pipeline"
 version = "0.1.0"
-description = "Zoop S2-1/S2-2/S3 offline source preparation, candidate extraction and relation processes (private PoC coupled)"
+description = "Zoop S2-1/S2-2/S3 offline source preparation, candidate extraction and relation processes plus the S4 read-only dependents report (private PoC coupled)"
 requires-python = ">=3.12"
 dependencies = [
   "pydantic==2.13.5",
@@ -15,6 +15,7 @@ dependencies = [
 zoop-ai-ingest = "zoop_ai_pipeline.ingestion_cli:main"
 zoop-ai-extract = "zoop_ai_pipeline.extraction_cli:main"
 zoop-ai-relation = "zoop_ai_pipeline.relation_cli:main"
+zoop-ai-dependents = "zoop_ai_pipeline.dependency_cli:main"
 
 [dependency-groups]
 # The S1 worker is only a test dependency: citation parity checks compare against its public exact() rule.

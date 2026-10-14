@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from . import ingestion_parsers as parsers
 from .ingestion_contracts import (SCHEMA, reserved_state_roots, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
-    Manifest, Run, byte_hash, canonical, digest, now, read_file, timestamp)
+    Manifest, Registry, Run, byte_hash, canonical, digest, now, read_file, timestamp)
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS blobs(hash TEXT PRIMARY KEY, data BLOB NOT NULL);
@@ -497,3 +497,40 @@ class Ingestor:
             "grant": {"grantId": grant.grant_id, "revision": grant.revision}, "document": projection, "locatorMetadata": metadata}
         self._authorize(row, operations)
         return result
+
+
+def recorded(store: Store, changed: dict) -> bool:
+    """Whether the normalized changed identity (document/source/grant wire) is recorded in this ingestion ledger.
+
+    Pure read of an `existing=True` store: no authority, registry file or delivery. It only decides whether an empty downstream result
+    is a real absence or an identity this ledger never saw. Grants are matched in the registry snapshots frozen at round registration,
+    for the source each round belongs to. A snapshot that is missing or does not parse is `dependency_record_invalid`, never a miss."""
+    try:
+        kind = changed["kind"]
+        if kind == "source":
+            return store.one("SELECT 1 FROM rounds WHERE source=? LIMIT 1", (changed["sourceId"],)) is not None
+        if kind == "document":
+            document, version, raw = changed["documentId"], changed["documentVersion"], changed["rawVersion"]
+            if version is not None:
+                sql, args = "SELECT 1 FROM versions WHERE id=? AND document=?", [version, document]
+                if raw is not None:
+                    sql, args = sql + " AND raw_version=?", [*args, raw]
+            elif raw is not None:
+                sql, args = "SELECT 1 FROM raw_versions WHERE id=? AND document=?", [raw, document]
+            else:
+                sql, args = "SELECT 1 FROM documents WHERE id=?", [document]
+            return store.one(sql, args) is not None
+        for row in store.db.execute("SELECT DISTINCT r.source, r.registry_hash, b.data FROM rounds r LEFT JOIN blobs b ON b.hash=r.registry_hash "
+                                    "ORDER BY r.registry_hash, r.source").fetchall():
+            if row["data"] is None:
+                raise IngestionFailure("dependency_record_invalid")
+            try:
+                registry = Registry.model_validate_json(row["data"])
+            except ValueError as exc:
+                raise IngestionFailure("dependency_record_invalid") from exc
+            grant = next((s.grant for s in registry.sources if s.source_id == row["source"]), None)
+            if grant is not None and grant.grant_id == changed["grantId"] and (changed["revision"] is None or grant.revision == changed["revision"]):
+                return True
+        return False
+    except sqlite3.DatabaseError as exc:
+        raise IngestionFailure("ingestion_state_invalid") from exc

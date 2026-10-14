@@ -238,7 +238,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/terms |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
+| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
 
 ### 요청 필드
 
@@ -252,7 +252,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## signUp · 이메일 회원가입
 
-이메일 회원가입.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+이메일 회원가입. 성공하면 새 회원 세션을 발급해 바로 로그인하고 201 SessionResponse를 반환한다. 공통 규칙 및 x-zoop의 남은 팀 확인 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -266,7 +266,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/signup |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
+| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
 
 ### 요청 필드
 
@@ -294,7 +294,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.4, 6.2.6, 6.2.7 |
 | 프로토타입 대응 | /api/auth/login |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
+| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
 
 ### 요청 필드
 
@@ -1578,7 +1578,7 @@ google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 �
 
 ## decideAnalysisCandidate · 후보 거부 또는 재검증 대상으로 전환
 
-expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상으로만 전환한다. 필수 근거 확인 및 자동 검증 통과 전에 공개할 수 없다. 결정·재검증·공개는 별도 기록이다.
+관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·재검증 작업·감사를 성공으로 기록하지 않는다. allow는 재검증 대상으로만 전환한다. 필수 근거 확인 및 자동 검증 통과 전에 공개할 수 없다. 결정·재검증·공개는 별도 기록이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1591,7 +1591,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id}/decision |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF allow 처리와 목표의 재검증 접수·expectedRevision·비공개 유지 규칙을 대조한다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF allow 처리와 목표의 재검증 접수·expectedRevision·expectedSourceVersion·expectedSourceRevision·비공개 유지 규칙을 대조한다. |
 | 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
 
 ### 요청 필드
@@ -1904,7 +1904,7 @@ expectedRevision으로 동시 변경을 거절한다. allow는 재검증 대상�
 
 ## getAiUsage · AI 사용량·비용·오류 조회
 
-AI 사용량·비용·오류 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기능별 접수 요청과 실제 외부 모델 시도·저장 결과 재사용·재시도를 구분한다. requests는 기능별 도메인 작업 수이며 관리자 analysis_jobs 전체 행 수가 아니다. document-summary와 semantic-verification의 모델 호출은 news-analysis, 기업 문서 판정은 document-sentiment, 브리핑 전망은 briefing-outlook에 귀속하고 동일 호출을 briefing에도 중복 집계하지 않는다. 결과 보류 후에도 내용 없는 사용량 영수증은 집계하며, 전송·토큰·비용이 불명확하면 0으로 채우지 않고 nullable 값과 note로 표시한다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2713,13 +2713,13 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| feature | 필수 | string {chatbot, news-analysis, briefing, document-sentiment, briefing-outlook} |  |
+| feature | 필수 | string {chatbot, news-analysis, briefing, document-sentiment, briefing-outlook} | 내부 document-summary/semantic-verification은 news-analysis, 문서 기업 판정은 document-sentiment, 전망 판정은 briefing-outlook. 브리핑의 다른 생성 단계만 briefing에 집계한다. |
 | label | 필수 | string |  |
 | engine | 필수 | string |  |
 | modelBacked | 필수 | boolean |  |
-| requests | 필수 | integer |  |
-| succeeded | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| requests | 필수 | integer | 기능별 접수 단위. chatbot=chat_jobs, news-analysis=summary document_analyses, document-sentiment=sentiment document_analyses, briefing=briefing_attempts, briefing-outlook=해당 시도의 outlook 단계. 멱등 재전송은 제외하며 기능 간 합산은 전체 요청 수가 아니다. |
+| succeeded | 필수 | integer | 해당 기능 requests 모집단에서 성공으로 종결한 수. 권리 보류와 진행 중 요청을 임의로 포함하지 않는다. |
+| failed | 필수 | integer | 해당 기능 requests 모집단에서 실패로 종결한 수. 권리 보류와 결과 불명확 호출을 모델 실패로 단정하지 않는다. |
 | latencyMs | 필수 | [LatencyOut](#schema-latencyout) / null |  |
 | usage | 필수 | [FeatureUsage](#schema-featureusage) |  |
 | cost | 필수 | [FeatureCost](#schema-featurecost) |  |
@@ -3103,6 +3103,8 @@ The immutable published original of a round (what users saw before any correctio
 | --- | --- | --- | --- |
 | title | 필수 | string |  |
 | candidateId | 필수 | string |  |
+| sourceVersion | 필수 | string | 이 상세 응답의 후보 AI 원천 버전. 결정 요청의 expectedSourceVersion으로 보낸다. |
+| sourceRevision | 필수 | string | 이 상세 응답의 후보 AI 원천 revision. 결정 요청의 expectedSourceRevision으로 보낸다. |
 | issueId | 필수 | string |  |
 | status | 필수 | string {ALLOW, HOLD, REJECT} |  |
 | active | 필수 | boolean |  |
@@ -3184,6 +3186,8 @@ The immutable published original of a round (what users saw before any correctio
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | relationId | 필수 | string |  |
+| sourceVersion | 필수 | string | 이 relation AI 원천 버전. relation 결정 요청에 사용한다. |
+| sourceRevision | 필수 | string | 이 relation AI 원천 revision. relation 결정 요청에 사용한다. |
 | relationType | 필수 | string |  |
 | source | 필수 | string |  |
 | target | 필수 | string |  |
@@ -3907,7 +3911,9 @@ The selection frozen when the question was first received.
 | decision | 필수 | string {allow, reject} |  |
 | reason | 필수 | string |  |
 | relationId | 선택 | string / null |  |
-| expectedRevision | 필수 | integer |  |
+| expectedRevision | 필수 | integer | 상세 응답에서 확인한 결정 대상(candidate 또는 relation)의 앱 검수 revision. |
+| expectedSourceVersion | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 버전. 현재 값과 다르면 REVISION_CONFLICT/409. |
+| expectedSourceRevision | 필수 | string | 상세 응답에서 확인한 결정 대상의 AI 원천 revision. 현재 값과 다르면 REVISION_CONFLICT/409. |
 
 <a id="schema-decisionresponse"></a>
 
@@ -4174,9 +4180,9 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| status | 필수 | string {unavailable, estimated} |  |
-| actual | 필수 | number / null |  |
-| estimated | 필수 | number / null |  |
+| status | 필수 | string {unavailable, estimated} | 기존 계약의 추정 가능 상태. 실제 청구액 확인 여부는 actual의 null 여부로 별도 판단한다. |
+| actual | 필수 | number / null | 청구 내역 등으로 확인된 실제 비용만 기록한다. 미보고·불명확 시 null이며 추정액을 복사하지 않는다. |
+| estimated | 필수 | number / null | 확인 가능한 토큰·단가로 계산한 추정 비용. 실제 청구액과 별도로 유지하며 계산할 수 없으면 null. |
 | currency | 필수 | string / null |  |
 | reason | 필수 | string |  |
 
@@ -4188,11 +4194,11 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| modelCalls | 필수 | integer / null |  |
-| inputTokens | 필수 | integer / null |  |
-| outputTokens | 필수 | integer / null |  |
+| modelCalls | 필수 | integer / null | 실제 외부 모델 전송이 확인된 live 시도 수. 미영수증·결과 불명확 시도로 전체 수를 확정할 수 없으면 null. replay/save_only 제외. |
+| inputTokens | 필수 | integer / null | 확인된 입력 토큰 합계. 일부 시도에서 미보고되어 합계를 확정할 수 없으면 null. |
+| outputTokens | 필수 | integer / null | 확인된 출력 토큰 합계. 일부 시도에서 미보고되어 합계를 확정할 수 없으면 null. |
 | replayCalls | 필수 | integer | 저장된 판정 재사용 횟수. 모델 호출 횟수와 구분한다. |
-| retries | 필수 | integer | 실제 재시도 횟수. 새 판정과 저장 복구를 구분하여 기록한다. |
+| retries | 필수 | integer | 최초 실행 뒤 새 앱/도메인 시도 또는 추가 모델 호출을 동반한 재시도 수. 같은 키 재전송·poll·모델 재호출 없는 recover·save_only는 제외하고 한 재시도 단위는 한 번만 센다. |
 
 <a id="schema-feedbackday"></a>
 
@@ -5690,7 +5696,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| mode | 필수 | string {assets, watchlist} |  |
+| mode | 필수 | string {assets, watchlist} / null | 가입 후 온보딩 방식을 고르기 전에는 null. 관심·보유 종목의 존재 여부와는 별개다. |
 | watchlistIds | 필수 | string[] |  |
 | tutorialCompleted | 필수 | boolean |  |
 | completed | 필수 | boolean |  |
@@ -5703,12 +5709,12 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 ### SettingsUpdate
 
 Unset fields keep their stored value; ``version`` must equal the stored version unless the request
-changes nothing (a resent request is answered with the stored settings).
+changes nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | version | 필수 | integer |  |
-| mode | 선택 | string {assets, watchlist} / null |  |
+| mode | 선택 | string {assets, watchlist} / null | assets/watchlist를 지정하면 방식을 선택한다. null 또는 생략은 현재 값을 변경하지 않는다. |
 | watchlistIds | 선택 | string[] / null |  |
 | tutorialCompleted | 선택 | boolean / null |  |
 | completed | 선택 | boolean / null |  |
@@ -5730,7 +5736,7 @@ guest session only.
 
 ### SignupRequest
 
-필수 입력·이메일 중복·필수 약관·승인 버전·실제 동의 여부는 서버에서 검증한다. 이름/비밀번호 정책과 가입 직후 인증 상태는 팀 확인 필요다.
+필수 입력·이메일 중복·필수 약관·승인 버전·실제 동의 여부는 서버에서 검증한다. 가입 성공 직후 새 회원 세션을 발급한다. 이름/비밀번호 정책은 팀 확인 필요다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

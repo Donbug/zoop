@@ -382,21 +382,21 @@
       "code": "TEAM_DECISION_REQUIRED",
       "target": "listTerms",
       "severity": "warning",
-      "message": "반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다.",
+      "message": "반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "signUp",
       "severity": "warning",
-      "message": "반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다.",
+      "message": "반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "logIn",
       "severity": "warning",
-      "message": "반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다.",
+      "message": "반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다.",
       "source": ""
     },
     {
@@ -1593,7 +1593,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getMySettings",
       "severity": "difference",
-      "message": "목표만 132 · BFF만 32 · 형식/필수/권한 변경 7",
+      "message": "목표만 134 · BFF만 33 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -1607,7 +1607,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "updateMySettings",
       "severity": "difference",
-      "message": "목표만 178 · BFF만 23 · 형식/필수/권한 변경 8",
+      "message": "목표만 180 · BFF만 24 · 형식/필수/권한 변경 8",
       "source": ""
     },
     {
@@ -1621,7 +1621,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "setWatchlistCompany",
       "severity": "difference",
-      "message": "목표만 178 · BFF만 23 · 형식/필수/권한 변경 9",
+      "message": "목표만 180 · BFF만 24 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -2111,7 +2111,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 115 · BFF만 30 · 형식/필수/권한 변경 11",
+      "message": "목표만 123 · BFF만 30 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {
@@ -2125,7 +2125,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "decideAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 172 · BFF만 38 · 형식/필수/권한 변경 11",
+      "message": "목표만 176 · BFF만 38 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {

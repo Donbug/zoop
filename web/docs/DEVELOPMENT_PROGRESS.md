@@ -2,6 +2,18 @@
 
 이 문서는 `web` 구현 변경을 날짜순으로 누적한다. 완료 표시는 코드 작성만이 아니라 명시된 검증까지 통과한 경우에만 사용한다.
 
+## 2026-10-14 · PR #23 리뷰 반영 · D-GRP-01 / D-GRP-01b
+
+- 화면 추적 ID: `D-GRP-01`(Figma `619:1819`), `D-GRP-01b`(Figma `619:2374`)
+- `/stocks`, `/companies/:id`, `/briefing`, `/my`의 기존 화면 라우트와 `/my`의 `ProtectedRoute`를 복원했다.
+- 그래프 전용 `ServiceHeader`와 `relationship-map.css`를 `MapPage`로 한정하고, 다른 화면의 `DesktopHeader`·`BottomNav`·공통 레이아웃을 유지했다.
+- 동일 사건-기업 쌍에 직접·구조 관계가 함께 있어도 고유 기업 한 곳으로 집계하여 공유 사건과 접힘 배지를 계산한다.
+- 기업 노드 크기는 연결된 고유 이슈 수를 `0 / 1 / 2 / 3~4 / 5+`의 5단계로 표시한다. 이 값은 중요도나 인과가 아닌 그래프 활동량이다.
+- 현재 단계 경계는 합성 fixture의 `0~6` 분포에 맞춘 검토값이다. 실제 API 데이터 분포가 확보되면 경계를 재검증한다.
+- `corepack pnpm test`: 4 files / 19 tests 통과
+- `corepack pnpm lint`, `corepack pnpm format:check`, `corepack pnpm build`: 통과. 지도 chunk 크기 경고는 기존과 동일하게 남는다.
+- production build에서 그래프 스타일이 `MapPage-*.css`로 분리되고 기존 종목·기업·브리핑·내 종목 페이지 chunk가 생성됨을 확인했다.
+
 ## 2026-10-13 · WBS 6.6.21 · D-GRP-01 / D-GRP-01b
 
 - 담당: 김도현

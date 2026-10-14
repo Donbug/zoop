@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createMockGraph } from '@/mocks/graph/response';
 import { mockMember } from '@/mocks/graph/fixture';
-import { graphSummary, toG6Data } from '@/components/graph/graph-model';
+import {
+  companyNodeSize,
+  graphSummary,
+  toG6Data,
+} from '@/components/graph/graph-model';
 import { graphUrl } from '@/apis/graph/graph';
 
 describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
@@ -84,6 +88,42 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
       watch: 1,
       disconnected: 0,
     });
+  });
+  it('deduplicates companies connected to an issue by multiple direct relation types', () => {
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const individualIssue = graph.nodes.find(
+      (node) =>
+        node.kind === 'issue' && node.label === 'NVIDIA 개별 공시 (예시)',
+    )!;
+    const original = graph.edges.find(
+      (edge) =>
+        edge.source === individualIssue.id && edge.target === 'NASDAQ:NVDA',
+    )!;
+    const before = graphSummary(graph);
+    graph.edges.push({
+      ...original,
+      id: `${original.id}-structural`,
+      relationType: 'STRUCTURALLY_RELATED_TO',
+    });
+
+    const summary = graphSummary(graph);
+    expect(summary.incident.get(individualIssue.id)).toEqual(['NASDAQ:NVDA']);
+    expect(summary.sharedIssues).toBe(before.sharedIssues);
+    expect(summary.folded.get('NASDAQ:NVDA')).toBe(
+      before.folded.get('NASDAQ:NVDA'),
+    );
+  });
+  it('uses five activity sizes based on each company unique issue count', () => {
+    expect([0, 1, 2, 4, 100].map((count) => companyNodeSize(count))).toEqual([
+      18, 22, 26, 34, 44,
+    ]);
+
+    const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const rendered = toG6Data(graph, 1245, 705);
+    const nvidia = rendered.nodes?.find((node) => node.id === 'NASDAQ:NVDA');
+    const samsung = rendered.nodes?.find((node) => node.id === 'KRX:005930');
+    expect(nvidia?.style?.size).toBe(26);
+    expect(samsung?.style?.size).toBe(44);
   });
   it('G6 data keeps IDs intact and folds single-company events without dangling edges', () => {
     const graph = createMockGraph({ mode: 'all', personalFilter: 'all' });

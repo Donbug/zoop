@@ -15,7 +15,7 @@ API_GRADLE ?= ./api/gradlew -p api --console=plain
 ARTIFACT_DIR ?= /tmp/zoop-release-artifacts
 COMMIT ?=
 
-.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-openapi-check service-build api-test api-ai-smoke api-build package-artifacts
+.PHONY: help projects available-checks config-check tooling-test public-check contracts-check worker-schema-check worker-contracts-check bff-types-check docs-check tokens-check secret-check web-install web-typecheck web-test web-build bff-install bff-test bff-build worker-install worker-test worker-build pipeline-install pipeline-test pipeline-smoke pipeline-build service-install service-test service-smoke service-pipeline-test service-pipeline-smoke service-openapi-check service-build api-test api-ai-smoke api-build package-artifacts
 help:
 	@$(PYTHON) scripts/repo_checks.py help
 projects:
@@ -73,6 +73,7 @@ pipeline-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/ingestion_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
 pipeline-build:
 	$(UV) build --project ai/pipeline --out-dir /tmp/zoop-ai-pipeline-build
 service-install:
@@ -81,6 +82,12 @@ service-test:
 	$(SERVICE_PYTHON) -m pytest ai/service/tests
 service-smoke:
 	$(SERVICE_PYTHON) ai/service/scripts/service_smoke.py
+# S2 extraction jobs and the S3 relation jobs over the real installed pipeline (needs `make pipeline-install` AND `make service-install`; fails, never skips, without them).
+service-pipeline-test:
+	$(SERVICE_PYTHON) -m pytest ai/service/pipeline_tests
+service-pipeline-smoke:
+	$(SERVICE_PYTHON) ai/service/scripts/extraction_service_smoke.py
+	$(SERVICE_PYTHON) ai/service/scripts/relation_service_smoke.py
 service-openapi-check:
 	$(SERVICE_PYTHON) ai/service/scripts/export_openapi.py --check
 service-build:

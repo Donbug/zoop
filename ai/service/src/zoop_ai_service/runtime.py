@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -50,9 +51,9 @@ class Outcome:
 
 
 class WorkerProcess:
-    def __init__(self, config: ServiceConfig, deadlines: Deadlines = Deadlines()):
+    def __init__(self, config: ServiceConfig, deadlines: Deadlines = Deadlines(), env: Mapping[str, str] | None = None):
         self._config, self._deadlines = config, deadlines
-        self._env = dict(config.child_env)
+        self._env = dict(config.child_env if env is None else env)
 
     def _argv(self, command: str, *, grants: bool, replay: bool, initial_only: bool = False) -> list[str]:
         argv = [str(self._config.worker_command), command, "--state-dir", str(self._config.worker_state_dir)]
@@ -65,26 +66,28 @@ class WorkerProcess:
         return argv
 
     def submit(self, body: dict[str, Any]) -> Outcome:
-        return self._execute(self._argv("submit", grants=True, replay=False), body, self._deadlines.quick)
+        return self.execute(self._argv("submit", grants=True, replay=False), body, self._deadlines.quick)
 
     def get(self, job_id: str) -> Outcome:
-        return self._execute(self._argv("get", grants=False, replay=False), _reference(job_id), self._deadlines.quick)
+        return self.execute(self._argv("get", grants=False, replay=False), _reference(job_id), self._deadlines.quick)
 
     def cancel(self, job_id: str) -> Outcome:
-        return self._execute(self._argv("cancel", grants=False, replay=False), _reference(job_id), self._deadlines.quick)
+        return self.execute(self._argv("cancel", grants=False, replay=False), _reference(job_id), self._deadlines.quick)
 
     def run(self, job_id: str, stop: threading.Event | None = None, *, initial_only: bool = False) -> Outcome:
         """`initial_only` is the runtime's own under-lock restriction for automatic redispatch: it may start a job that never made
         a call, and otherwise only persist receipts already stored; it can never send a stage that was not already sent."""
-        return self._execute(self._argv("run", grants=True, replay=True, initial_only=initial_only), _reference(job_id),
+        return self.execute(self._argv("run", grants=True, replay=True, initial_only=initial_only), _reference(job_id),
                              self._deadlines.long, stop)
 
     def resume(self, job_id: str, stop: threading.Event | None = None, *, initial_only: bool = False) -> Outcome:
-        return self._execute(self._argv("resume", grants=True, replay=True, initial_only=initial_only), _reference(job_id),
+        return self.execute(self._argv("resume", grants=True, replay=True, initial_only=initial_only), _reference(job_id),
                              self._deadlines.long, stop)
 
-    def _execute(self, argv: list[str], payload: dict[str, Any], deadline: float,
-                 stop: threading.Event | None = None) -> Outcome:
+    def execute(self, argv: list[str], payload: dict[str, Any], deadline: float, stop: threading.Event | None = None,
+                interpret: Callable[[int, bytes], Outcome] | None = None) -> Outcome:
+        """Run one fixed command: payload through an anonymous stdin file, one canonical JSON out. `interpret` maps the exit code and
+        stdout of another contract's runtime (the S3 door) to an Outcome; the default is the S1 contract."""
         data = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         transport = self._config.transport_dir
         try:
@@ -104,7 +107,7 @@ class WorkerProcess:
                 if size > MAX_STDOUT:
                     return Outcome("unavailable", exit_code=code)
                 stdout.seek(0)
-                return _interpret(code, stdout.read(MAX_STDOUT + 1))
+                return (interpret or _interpret)(code, stdout.read(MAX_STDOUT + 1))
         except OSError:
             return Outcome("unavailable")
 
