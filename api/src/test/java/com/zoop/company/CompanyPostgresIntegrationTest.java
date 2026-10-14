@@ -21,6 +21,9 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -79,6 +82,8 @@ class CompanyPostgresIntegrationTest {
     void freshMigrationsAndJpaValidationSucceed() {
         assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
                 + "WHERE version='20261013153313'", Boolean.class));
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
+                + "WHERE version='20261014102810'", Boolean.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_extension WHERE extname='pg_trgm'", Integer.class));
         assertIndex("companies_pkey", "btree", "id", true, null);
         assertIndex("uq_companies_exchange_ticker", "btree", "exchange_code, ticker", true,
@@ -122,6 +127,9 @@ class CompanyPostgresIntegrationTest {
         baseline.migrate();
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables "
                 + "WHERE table_schema=? AND table_name='companies'", Integer.class, schema));
+        Flyway catalog = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+                .schemas(schema).defaultSchema(schema).target("20261013153313").load();
+        assertEquals(1, catalog.migrate().migrationsExecuted);
         Flyway upgrade = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
                 .schemas(schema).defaultSchema(schema).load();
         assertEquals(1, upgrade.migrate().migrationsExecuted);
@@ -214,6 +222,91 @@ class CompanyPostgresIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> service.search("other", cursor, 1, null, null));
         assertThrows(IllegalArgumentException.class, () -> service.search("acme", "!bad!", 1, null, null));
         assertThrows(IllegalArgumentException.class, () -> service.search("acme", "", 1, null, null));
+    }
+
+    @Test
+    void renamingReturnedCompanyRejectsCursorInsteadOfDuplicatingIt() {
+        String cursor = service.search(null, null, 1, null, null).nextCursor();
+        jdbc.update("UPDATE companies SET name='ZZZ renamed' WHERE id='special'");
+        assertStaleCursor(null, cursor);
+        assertEquals(ids(search(null)), collectPages(null));
+    }
+
+    @Test
+    void movingUnseenCompanyBeforeCursorRequiresRestart() {
+        String cursor = service.search(null, null, 1, null, null).nextCursor();
+        jdbc.update("UPDATE companies SET name='000 moved' WHERE id='tie-b'");
+        assertStaleCursor(null, cursor);
+        assertEquals("tie-b", service.search(null, null, 1, null, null).items().getFirst().id());
+    }
+
+    @Test
+    void insertDeleteTruncateAndSearchMembershipChangesInvalidateCursors() {
+        for (String mutation : List.of(
+                "INSERT INTO companies (id,name) VALUES ('added','New')",
+                "DELETE FROM companies WHERE id='added'",
+                "UPDATE companies SET aliases=ARRAY['acme'] WHERE id='boundary'",
+                "UPDATE companies SET ticker='ACME' WHERE id='short'",
+                "TRUNCATE companies")) {
+            String cursor = service.search("acme", null, 1, null, null).nextCursor();
+            assertNotNull(cursor);
+            jdbc.execute(mutation);
+            assertStaleCursor("acme", cursor);
+        }
+        assertTrue(search(null).items().isEmpty());
+    }
+
+    @Test
+    void rolledBackCatalogChangeKeepsCursorValid() {
+        String cursor = service.search(null, null, 1, null, null).nextCursor();
+        long revision = repository.catalogRevision();
+        new TransactionTemplate(context.getBean(PlatformTransactionManager.class)).executeWithoutResult(status -> {
+            jdbc.update("UPDATE companies SET name='Rolled back' WHERE id='special'");
+            assertTrue(repository.catalogRevision() > revision);
+            status.setRollbackOnly();
+        });
+        assertEquals(revision, repository.catalogRevision());
+        assertFalse(service.search(null, cursor, 1, null, null).items().isEmpty());
+    }
+
+    @Test
+    void catalogRevisionAndRowsShareSnapshotWhileAnotherConnectionCommits() throws Exception {
+        TransactionTemplate snapshot = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        snapshot.executeWithoutResult(status -> {
+            repository.lockCatalogForSnapshot();
+            long revision = repository.catalogRevision();
+            List<CompanySearchRow> before = repository.search("", null, null);
+            // A separate connection commits between the revision read and the row read.
+            try (var connection = java.sql.DriverManager.getConnection(url, "company_test", "");
+                 var statement = connection.createStatement()) {
+                statement.executeUpdate("UPDATE companies SET name='Concurrent rename' WHERE id='special'");
+            } catch (java.sql.SQLException exception) {
+                throw new RuntimeException(exception);
+            }
+            assertEquals(revision, repository.catalogRevision());
+            assertEquals(before, repository.search("", null, null));
+        });
+        assertEquals("Concurrent rename", jdbc.queryForObject(
+                "SELECT name FROM companies WHERE id='special'", String.class));
+    }
+
+    private static void assertStaleCursor(String query, String cursor) {
+        var exception = assertThrows(IllegalArgumentException.class,
+                () -> service.search(query, cursor, 1, null, null));
+        assertTrue(exception.getMessage().contains("restart search without a cursor"));
+    }
+
+    private static List<String> collectPages(String query) {
+        List<String> result = new ArrayList<>();
+        String cursor = null;
+        do {
+            var page = service.search(query, cursor, 1, null, null);
+            result.addAll(ids(page));
+            cursor = page.nextCursor();
+            assertTrue(result.size() <= 100, "pagination must terminate");
+        } while (cursor != null);
+        return result;
     }
 
     private static CompanySearchPage search(String query) {

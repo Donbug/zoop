@@ -21,6 +21,7 @@ class CompanySearchServiceTest {
     void setUp() {
         repository = mock(CompanySearchRepository.class);
         service = new CompanySearchService(repository, JsonMapper.builder().build());
+        when(repository.catalogRevision()).thenReturn(1L);
         when(repository.normalize(anyString())).thenReturn("query");
         when(repository.search(anyString(), any(), any())).thenReturn(List.of());
     }
@@ -67,6 +68,29 @@ class CompanySearchServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.search("query", null, 0, null, null));
         assertThrows(IllegalArgumentException.class, () -> service.search("query", null, -1, null, null));
         verifyNoInteractions(repository);
+    }
+
+    @Test
+    void staleRevisionIsRejectedBeforeSearchingRows() {
+        when(repository.search("query", null, 2L)).thenReturn(List.of(row("a"), row("b")));
+        String cursor = service.search("query", null, 1, null, null).nextCursor();
+        when(repository.catalogRevision()).thenReturn(2L);
+        clearInvocations(repository);
+        assertThrows(IllegalArgumentException.class, () -> service.search("query", cursor, 1, null, null));
+        verify(repository, never()).search(anyString(), any(), any());
+    }
+
+    @Test
+    void legacyCursorWithoutCatalogRevisionRequiresRestart() {
+        String json = """
+                {"query":"query","graphVersion":null,"asOf":null,"limit":1,"rank":2,"name":"a","id":"a"}
+                """;
+        String cursor = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var exception = assertThrows(IllegalArgumentException.class,
+                () -> service.search("query", cursor, 1, null, null));
+        assertTrue(exception.getMessage().contains("restart search without a cursor"));
+        verify(repository, never()).search(anyString(), any(), any());
     }
 
     private static CompanySearchRow row(String id) {

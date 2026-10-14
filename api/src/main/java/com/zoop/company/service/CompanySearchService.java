@@ -12,6 +12,9 @@ import com.zoop.company.repository.CompanySearchPosition;
 import com.zoop.company.repository.CompanySearchRepository;
 import com.zoop.company.repository.CompanySearchRow;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,15 +29,21 @@ public class CompanySearchService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
     public CompanySearchPage search(String q, String cursor, Integer limit, String graphVersion, Instant asOf) {
         long startedAt = System.nanoTime();
         log.debug("Company search started: limit={}, cursorPresent={}", limit, cursor != null);
         if (limit != null && limit < 1) {
             throw new IllegalArgumentException("limit must be positive");
         }
+        repository.lockCatalogForSnapshot();
+        long catalogRevision = repository.catalogRevision();
         String normalizedQuery = repository.normalize(q == null ? "" : q);
         Position after = cursor == null
                 ? null : decode(cursor, normalizedQuery, limit, graphVersion, asOf);
+        if (after != null && !Long.valueOf(catalogRevision).equals(after.catalogRevision())) {
+            throw new IllegalArgumentException("Company catalog changed; restart search without a cursor");
+        }
         CompanySearchPosition sortPosition = after == null ? null
                 : new CompanySearchPosition(after.rank(), after.name(), after.id());
         List<CompanySearchRow> rows = repository.search(normalizedQuery, sortPosition,
@@ -46,7 +55,7 @@ public class CompanySearchService {
             List<CompanySearchRow> items = rows.subList(0, limit);
             CompanySearchRow last = items.get(items.size() - 1);
             String next = encode(new Position(normalizedQuery, graphVersion, asOf, limit,
-                    last.matchRank(), last.name(), last.id()));
+                    last.matchRank(), last.name(), last.id(), catalogRevision));
             page = new CompanySearchPage(items, next);
         }
         log.debug("Company search completed: resultCount={}, hasNext={}, elapsedMs={}",
@@ -85,6 +94,6 @@ public class CompanySearchService {
     }
 
     public record Position(String query, String graphVersion, Instant asOf,
-                           Integer limit, int rank, String name, String id) {
+                           Integer limit, int rank, String name, String id, Long catalogRevision) {
     }
 }

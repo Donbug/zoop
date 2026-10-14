@@ -19,6 +19,16 @@ public class CompanySearchRepository {
         this.jdbc = jdbc;
     }
 
+    public void lockCatalogForSnapshot() {
+        // Acquire before the first snapshot read: TRUNCATE is not MVCC-safe.
+        jdbc.getJdbcTemplate().execute("LOCK TABLE companies IN ACCESS SHARE MODE");
+    }
+
+    public long catalogRevision() {
+        return jdbc.getJdbcTemplate().queryForObject(
+                "SELECT revision FROM company_catalog_revision WHERE singleton = true", Long.class);
+    }
+
     public String normalize(String value) {
         return jdbc.getJdbcTemplate().queryForObject(
                 "SELECT " + NORMALIZED + "(?)", String.class, value);

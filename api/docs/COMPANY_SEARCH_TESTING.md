@@ -55,7 +55,26 @@ GitHub Actions의 api job은 PostgreSQL 16.13 서비스의 준비 상태를 확�
 결과는 build/reports/tests/test/index.html과
 build/reports/tests/companyIntegrationTest/index.html에서 확인할 수 있다.
 
-## 검색 DEBUG 로그
+## 카탈로그 변경과 커서 재시작
+
+커서는 PostgreSQL의 `company_catalog_revision.revision`에도 결합한다.
+이 테이블은 페이지 일관성만을 위한 내부 메타데이터이며 GraphDB의 graphVersion/asOf와 독립적이다.
+companies의 INSERT/UPDATE/DELETE/TRUNCATE 문장은 같은 트랜잭션에서 revision을 증가시킨다.
+롤백된 변경은 revision도 되돌아간다. 행에 영향이 없는 쓰기 문장도 보수적으로 커서를 무효화한다.
+메타데이터를 직접 수정하거나 trigger를 끄는 적재 방식은 지원하지 않는다.
+
+검색 호출은 별도의 REPEATABLE READ 트랜잭션에서 revision과 결과를 함께 읽는다.
+첫 스냅샷 읽기 전에 ACCESS SHARE 잠금을 잡아 PostgreSQL의 TRUNCATE와 충돌하도록 한다.
+일반 INSERT/UPDATE/DELETE는 조회와 병행할 수 있다. 쓰기 트랜잭션들은 revision 행 갱신 시 직렬화된다.
+외부 트랜잭션이 있으면 REQUIRES_NEW로 별도 연결을 사용하므로 연결 풀 용량을 고려해야 한다.
+
+페이지 사이에 revision이 달라지면 IllegalArgumentException으로 거절하고 커서 없이 다시 검색한다.
+revision이 없는 이전 형식의 커서도 재시작해야 한다. 현재 공개 HTTP Controller가 없으므로
+HTTP 오류 응답 매핑은 후속 공개 API 작업에서 명세에 맞게 구현한다.
+통합 테스트는 반환된/미반환 회사 이름 변경, 추가·삭제·전체 비우기, 별칭·티커 변경,
+롤백, 다른 연결의 커밋 중 스냅샷 유지 및 재시작 후 전체 페이지 순회를 확인한다.
+
+## 검색 DEBUG 로그 사용
 
 PowerShell에서 아래 환경변수를 설정하면 기업 검색 시작과 정상 완료 로그가 출력된다.
 시작 로그는 limit와 커서 존재 여부, 완료 로그는 반환 개수·다음 페이지 여부·소요 시간을 담는다.
