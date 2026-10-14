@@ -239,7 +239,7 @@ describe('Issue35 · FS003 D-AUT-02', () => {
       screen.getByRole('button', { name: '약관 다시 조회' }),
     );
     await screen.findByLabelText('모두 동의');
-    expect(document.querySelector('.auth-term script')).toBeNull();
+    expect(document.querySelector('[data-term-id] script')).toBeNull();
     expect(screen.getByText('<script>synthetic text</script>')).toBeTruthy();
   });
   it('shows duplicate email and can retry after correcting it', async () => {

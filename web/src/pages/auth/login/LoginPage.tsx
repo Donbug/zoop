@@ -204,7 +204,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 disabled={flow.busy}
-                className="auth-primary"
+                className="mt-1 w-full rounded-lg bg-gray-950 px-4 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-progress disabled:bg-gray-500"
                 onClick={() =>
                   void flow.run(undefined, email.trim() || undefined, from)
                 }
