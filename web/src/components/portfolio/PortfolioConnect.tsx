@@ -1,0 +1,320 @@
+import { useRef, useState } from 'react';
+import ErrorNotice from '@/components/common/ErrorNotice';
+import OnboardingStep from '@/components/onboarding/OnboardingStep';
+import {
+  connectPortfolio,
+  createIdempotencyKey,
+  getMockPortfolios,
+  getPortfolio,
+} from '@/apis/portfolio/portfolio';
+import { useAsyncData } from '@/hooks/useAsyncData';
+import { formatQuantity, formatWeight } from '@/util/format';
+import type {
+  PortfolioConnection,
+  PortfolioConnectProps,
+} from '@/types/portfolio';
+
+const MOCK_NOTICE =
+  '실제 증권 계좌가 아니에요. 준비된 모의 데이터로 만든 가상 계좌예요.';
+
+const primaryButton =
+  'w-full rounded-xl bg-gray-950 px-4 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300';
+const secondaryButton =
+  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-950 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300';
+
+// 와이어프레임 D-ONB-02의 아이콘(모의 데이터·은행·선택됨). 장식이라 읽지 않는다.
+const iconProps = {
+  'aria-hidden': true,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
+
+function FlaskIcon() {
+  return (
+    <svg {...iconProps} className="size-4 shrink-0 text-amber-600">
+      <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3M7 15h10" />
+    </svg>
+  );
+}
+
+function BankIcon({ className }: { className: string }) {
+  return (
+    <svg {...iconProps} className={className}>
+      <path d="M3 10h18M12 3 3 8v2h18V8l-9-5ZM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6 shrink-0">
+      <circle cx="12" cy="12" r="11" className="fill-gray-950" />
+      <path
+        d="m7.5 12.5 3 3 6-6.5"
+        fill="none"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MockNotice() {
+  return (
+    <p className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+      <FlaskIcon />
+      {MOCK_NOTICE}
+    </p>
+  );
+}
+
+// D-ONB-02 가상 계좌 연결(초기 설정) · 내 종목의 계좌 연결이 함께 쓰는 연결 기능
+// - 지금 연결 상태와 연결할 계좌 목록을 모두 확인한 뒤에만 연결한다(조회 실패를 미연결로 보지 않는다).
+// - 연결에 실패하면 고른 계좌를 그대로 두고 다시 시도한다.
+// - 초기 설정: 연결하면 보유 종목을 보여 주고 [관심 종목 고르기]로만 넘어간다. 건너뛰어도 관심 종목으로 간다.
+// - 내 종목: 연결하면 onConnected로 돌아가고, [취소]는 연결하지 않고 돌아간다.
+export default function PortfolioConnect({
+  source,
+  onBack,
+  onConnected,
+  onContinue,
+}: PortfolioConnectProps) {
+  const options = useAsyncData(getMockPortfolios);
+  const portfolio = useAsyncData(getPortfolio);
+  const [chosenId, setChosenId] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [connectFailed, setConnectFailed] = useState(false);
+  const [connected, setConnected] = useState<PortfolioConnection | null>(null);
+  // 같은 계좌로 다시 시도하면 같은 Idempotency-Key를 보낸다(응답 유실 시 중복 연결 방지).
+  const attempt = useRef<{ accountId: string; key: string } | null>(null);
+  const fromOnboarding = source === 'onboarding';
+
+  const items = options.data?.items ?? [];
+  // 목록을 다시 받았을 때 고른 계좌가 없으면 첫 계좌로 돌아간다.
+  const selectedId =
+    (chosenId && items.some((item) => item.id === chosenId)
+      ? chosenId
+      : items[0]?.id) ?? null;
+  const lookupsReady =
+    options.status === 'success' && portfolio.status === 'success';
+  const isConnected = Boolean(connected) || Boolean(portfolio.data?.connected);
+
+  const connect = async () => {
+    if (!lookupsReady || !selectedId || connecting) return;
+    setConnecting(true);
+    setConnectFailed(false);
+    if (attempt.current?.accountId !== selectedId) {
+      attempt.current = { accountId: selectedId, key: createIdempotencyKey() };
+    }
+    try {
+      const connection = await connectPortfolio(
+        selectedId,
+        attempt.current.key,
+      );
+      attempt.current = null;
+      setConnected(connection);
+      onConnected?.(connection);
+      // 초기 설정은 이 화면에서 연결한 계좌의 보유 종목을 보여 준다.
+      if (fromOnboarding) portfolio.reload();
+    } catch {
+      setConnectFailed(true);
+      // 이미 연결됐거나(다른 탭·응답 유실) 상태가 바뀌었을 수 있어 연결 상태를 다시 확인한다.
+      // 연결된 것으로 확인되면 연결 완료 화면으로 넘어간다.
+      portfolio.reload();
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  if (isConnected) {
+    const holdings = portfolio.data?.connected ? portfolio.data.holdings : [];
+    const label =
+      (portfolio.data?.connected && portfolio.data.connection?.label) ||
+      connected?.label ||
+      '가상 계좌';
+    return (
+      <OnboardingStep
+        title="가상 계좌를 연결했어요"
+        footer={
+          fromOnboarding ? (
+            <button
+              type="button"
+              className={primaryButton}
+              onClick={onContinue}
+            >
+              관심 종목 고르기
+            </button>
+          ) : (
+            <button type="button" className={primaryButton} onClick={onBack}>
+              내 종목으로 돌아가기
+            </button>
+          )
+        }
+      >
+        <MockNotice />
+        <section
+          aria-labelledby="portfolio-connected-holdings"
+          className="rounded-xl border border-gray-200 bg-white p-5"
+        >
+          <h2
+            id="portfolio-connected-holdings"
+            className="mb-3 text-lg font-semibold"
+          >
+            {label} 보유 종목
+          </h2>
+          {portfolio.status === 'loading' && (
+            <p role="status" className="text-sm text-gray-500">
+              보유 종목을 불러오고 있어요
+            </p>
+          )}
+          {portfolio.status === 'error' && (
+            <ErrorNotice
+              title="보유 종목을 불러오지 못했어요"
+              message="계좌는 연결됐어요. 다시 시도하거나 다음 단계로 넘어가도 돼요."
+              onRetry={portfolio.reload}
+            />
+          )}
+          {portfolio.status === 'success' && holdings.length === 0 && (
+            <p className="text-sm text-gray-500">
+              이 계좌에는 보유 종목이 없어요.
+            </p>
+          )}
+          {holdings.length > 0 && (
+            <ul className="divide-y divide-gray-100">
+              {holdings.map((holding) => (
+                <li key={holding.companyId} className="py-3">
+                  <p className="font-medium text-gray-950">{holding.name}</p>
+                  <p className="text-sm text-gray-500 tabular-nums">
+                    {[
+                      holding.ticker,
+                      formatQuantity(holding.quantity),
+                      formatWeight(holding.weight),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </OnboardingStep>
+    );
+  }
+
+  return (
+    <OnboardingStep
+      title="가상 계좌를 연결해요"
+      subtitle={
+        fromOnboarding
+          ? undefined
+          : '연결한 계좌의 모의 보유 종목이 내 종목에 보여요. 연결하거나 취소하면 내 종목으로 돌아가요.'
+      }
+      onBack={fromOnboarding ? onBack : undefined}
+      backDisabled={connecting}
+      footer={
+        <>
+          {connectFailed && (
+            <ErrorNotice
+              title="계좌를 연결하지 못했어요"
+              message="고른 계좌는 그대로예요. 다시 시도해 주세요."
+            />
+          )}
+          <button
+            type="button"
+            className={primaryButton}
+            disabled={!lookupsReady || !selectedId || connecting}
+            onClick={() => void connect()}
+          >
+            {connecting
+              ? '연결하고 있어요'
+              : connectFailed
+                ? '다시 연결하기'
+                : '선택한 가상 계좌 연결하기'}
+          </button>
+          <button
+            type="button"
+            className={secondaryButton}
+            disabled={connecting}
+            onClick={fromOnboarding ? onContinue : onBack}
+          >
+            {fromOnboarding ? '건너뛰고 관심 종목 고르기' : '취소'}
+          </button>
+        </>
+      }
+    >
+      <MockNotice />
+      <section
+        aria-labelledby="portfolio-connect-options"
+        className="flex flex-col gap-3"
+      >
+        <h2
+          id="portfolio-connect-options"
+          className="flex items-center gap-2 font-semibold text-gray-950"
+        >
+          <BankIcon className="size-5 shrink-0" />
+          연결할 가상 계좌
+        </h2>
+        {(options.status === 'loading' || portfolio.status === 'loading') && (
+          <p role="status" className="text-sm text-gray-500">
+            가상 계좌를 불러오고 있어요
+          </p>
+        )}
+        {portfolio.status === 'error' && (
+          <ErrorNotice
+            title="지금 계좌 연결 상태를 확인하지 못했어요"
+            message="연결 상태를 확인한 뒤에 연결할 수 있어요."
+            onRetry={portfolio.reload}
+          />
+        )}
+        {options.status === 'error' && (
+          <ErrorNotice
+            title="가상 계좌를 불러오지 못했어요"
+            onRetry={options.reload}
+          />
+        )}
+        {options.status === 'success' && items.length === 0 && (
+          <p className="text-sm text-gray-500">
+            지금은 연결할 수 있는 가상 계좌가 없어요.
+          </p>
+        )}
+        {items.length > 0 && (
+          <ul aria-label="가상 계좌 목록" className="flex flex-col gap-2">
+            {items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  aria-pressed={selectedId === item.id}
+                  disabled={connecting}
+                  onClick={() => setChosenId(item.id)}
+                  className={`flex w-full items-center gap-4 rounded-xl border px-4 py-4 text-left disabled:cursor-not-allowed ${
+                    selectedId === item.id
+                      ? 'border-gray-400 bg-gray-100'
+                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <BankIcon className="size-6 shrink-0 text-gray-700" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="font-semibold text-gray-950">
+                      {item.label}
+                    </span>
+                    <span className="text-sm text-gray-500 tabular-nums">
+                      보유 종목 {item.holdingsCount}개
+                    </span>
+                  </span>
+                  {selectedId === item.id && <CheckIcon />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </OnboardingStep>
+  );
+}

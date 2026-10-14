@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import GraphIcon from '@/components/graph/GraphIcon';
-import { useAuthStore } from '@/stores/useAuthStore';
+import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
 const menus = [
   { to: '/', label: '지도', icon: 'map' },
@@ -11,7 +11,7 @@ const menus = [
 
 // Shared shell from Figma 619:1824. Non-map feature bodies intentionally stay empty.
 export default function ServiceHeader() {
-  const token = useAuthStore((s) => s.accessToken);
+  const token = useAuthStore(selectMemberId);
   const member = useAuthStore((s) => s.member);
   return (
     <header className="relationship-header">

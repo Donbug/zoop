@@ -101,15 +101,16 @@ VITE_API_BASE_URL=https://api.example.com
 
 `src/apis/auth/ApiService.ts`:
 
-- Base URL, JSON 헤더/본문, Bearer token, `credentials: include`.
-- 401 응답에서 refresh 후 원 요청을 한 번 재시도.
-- 동시 refresh는 공유 Promise로 합침.
-- 갱신 실패/재시도 후 401이면 인증 정보 제거 후 로그인 이동.
-- HTTP 오류 예외 처리와 204 응답 처리.
+- Base URL, JSON 헤더/본문, `credentials: include`로 세션 쿠키(`zoop_session`) 전송.
+- 인증은 목표 계약(`docs/api/openapi.yaml`)대로 HttpOnly 세션 쿠키다. 브라우저에 토큰을 저장하지 않으며 `Authorization` 헤더와 refresh가 없다.
+- GET 이외 요청에는 세션 응답의 `csrfToken`을 `X-CSRF-Token`으로 붙인다.
+- 오류 응답 `{ error: { code, message } }`는 `ApiError`(`status`, `code`)로 던진다.
+- 회원 API가 401이면 화면의 세션 상태를 비운다. 로그인 화면 이동은 `ProtectedRoute`가 맡는다. 공개 API는 `skipAuth`로 이 처리를 건너뛴다.
+- 204 응답 처리.
 
-현재 `/api/v1/auth/refresh`, `data.accessToken.token`, `/api/v1/items`는 초기 가이드 기반의 계약/예시다. Zoop 백엔드 계약과 확인한 뒤 연결해야 한다. `items.ts`는 실제 Zoop 기능 완성을 의미하지 않는다. `ApiResponse<T>`, `PageResponse<T>`도 백엔드 응답과 대조해야 한다.
+세션: `src/apis/auth/session.ts`(`GET /api/v1/auth/session`, `POST /api/v1/auth/login`·`guest`·`logout`)와 `loadSession()`이 `SessionResponse`를 `useAuthStore`에 반영한다. `ProtectedRoute`는 세션을 확인하는 동안 기다리고, 확인에 실패하면 로그아웃으로 보지 않고 다시 시도를 보여 준다. 로그아웃은 서버 세션을 폐기한 뒤 온보딩 초안, 근거 창, AI 초안도 초기화한다.
 
-이번 작업에서 인증 helper를 Zustand와 연결했다. API의 최신 토큰 확인은 기존 localStorage 키를 계속 읽고, 토큰 갱신/로그아웃은 화면 상태에도 반영된다. 로그아웃 시 온보딩 초안, 근거 창, AI 초안도 초기화한다.
+`/api/v1/items`, `ApiResponse<T>`, `PageResponse<T>`는 초기 가이드 기반 예시이며 목표 계약(응답 래퍼 없음)과 다르다. `items.ts`는 실제 Zoop 기능 완성을 의미하지 않는다.
 
 ## 6. 레이아웃과 라우팅
 
