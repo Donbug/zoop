@@ -2,6 +2,18 @@
 
 이 문서는 `web` 구현 변경을 날짜순으로 누적한다. 완료 표시는 코드 작성만이 아니라 명시된 검증까지 통과한 경우에만 사용한다.
 
+## 2026-10-14 · WBS 6.6.23 · D-GRP-03
+
+- 화면 추적 ID: `D-GRP-03`(Figma `619:6729`)
+- 확인 자료: `docs/wireframe/README.md`, `docs/wireframe/manifest.json`, 보드 `03-map-relationships-evidence.jpg`, 개별 화면 `D-GRP-03--node-619-6729.png`, `docs/api/openapi.yaml`, `docs/erd/zoop-core-erd-v6.md`
+- `select=node:<companyId>` URL과 그래프 노드 선택을 동기화하고 오른쪽 기업 상세 레일을 열고 닫도록 연결했다.
+- 기업 기본 정보, 출처·관측 시각·지연 정보가 있는 시세, 1개월 일봉 추이, 주요 지표, 모의 보유, 직접·간접 사건, 관련 기업, 뉴스·공시를 ERD의 공통 기업 ID와 Neo4j 이슈 ID에 맞춘 합성 fixture로 구성했다.
+- 기업·시세·지표·일봉·문서·포트폴리오 요청은 독립적으로 정착시켜 한 공급자의 장애가 정상 섹션을 지우지 않는다. `unavailable` 응답과 요청 실패도 별도로 표시한다.
+- 관심기업 저장은 목표 상태 `PUT`, 저장 중 중복 입력 방지, 실패 시 낙관 상태 복원과 재시도를 구현했다. 실제 API 모드에서는 세션에 저장된 CSRF 토큰을 `X-CSRF-Token`으로 보낸다.
+- 기업 상세, 중심 보기, 연결 탐색 시작 기업, 사건 선택, AI 질문으로 이어지는 컨텍스트 전달을 연결했다.
+- `pnpm lint`, `pnpm build`: 통과. 지도 chunk 크기 경고는 기존과 동일하다.
+- `vitest run --pool=vmThreads --maxWorkers=1`: 7 files / 29 tests 통과. 기본 테스트 풀은 Windows 샌드박스 임시 캐시 ENOENT가 발생해 격리 VM 풀로 같은 전체 스위트를 재실행했다.
+
 ## 2026-10-14 · PR #23 리뷰 반영 · D-GRP-01 / D-GRP-01b
 
 - 화면 추적 ID: `D-GRP-01`(Figma `619:1819`), `D-GRP-01b`(Figma `619:2374`)
