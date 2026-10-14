@@ -219,8 +219,11 @@ export default function StocksPage() {
       : first.status === 'loading';
 
   return (
-    <section className="stocks-page" data-screen-id="D-STK-01">
-      <h1 className="stocks-page-title">
+    <section
+      className="mx-auto w-full max-w-[800px] text-zoop-ink"
+      data-screen-id="D-STK-01"
+    >
+      <h1 className="flex items-center gap-2.5 text-[28px] font-[750] tracking-[-0.045em]">
         <GraphIcon name="search" size={24} />
         종목
       </h1>
@@ -230,7 +233,11 @@ export default function StocksPage() {
         onSearch={search}
       />
 
-      <div role="group" aria-label="종목 범위" className="stocks-scope">
+      <div
+        role="group"
+        aria-label="종목 범위"
+        className="mt-4 inline-flex h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px]"
+      >
         {(
           [
             ['all', '시장 전체'],
@@ -242,6 +249,7 @@ export default function StocksPage() {
             type="button"
             aria-pressed={scope === value}
             onClick={() => changeScope(value)}
+            className="min-w-[76px] rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14]"
           >
             {label}
           </button>
@@ -249,7 +257,10 @@ export default function StocksPage() {
       </div>
 
       {loginNeeded && !isAuthenticated && (
-        <p role="alert" className="stocks-notice">
+        <p
+          role="alert"
+          className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted [&_a]:font-bold [&_a]:text-zoop-ink [&_a]:underline"
+        >
           로그인하면 관심 종목을 저장할 수 있어요.{' '}
           <Link to="/login" state={{ from: location }}>
             로그인
@@ -257,7 +268,7 @@ export default function StocksPage() {
         </p>
       )}
       {memberDataFailed && (
-        <div className="stocks-status">
+        <div className="mt-5 text-xs text-zoop-muted">
           <ErrorNotice
             title="관심·보유 종목을 불러오지 못했어요"
             message="다시 불러오기 전에는 관심 종목을 바꿀 수 없어요."
@@ -270,25 +281,25 @@ export default function StocksPage() {
       )}
 
       {scope === 'mine' && !checking && !isAuthenticated ? (
-        <p className="stocks-notice">
+        <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted [&_a]:font-bold [&_a]:text-zoop-ink [&_a]:underline">
           로그인하면 보유·관심 종목만 모아 볼 수 있어요.{' '}
           <Link to="/login" state={{ from: location }}>
             로그인
           </Link>
         </p>
       ) : listLoading ? (
-        <p role="status" className="stocks-status">
+        <p role="status" className="mt-5 text-xs text-zoop-muted">
           종목을 불러오고 있어요
         </p>
       ) : scope === 'all' && first.status === 'error' ? (
-        <div className="stocks-status">
+        <div className="mt-5 text-xs text-zoop-muted">
           <ErrorNotice
             title="종목을 불러오지 못했어요"
             onRetry={first.reload}
           />
         </div>
       ) : rows.length === 0 ? (
-        <p className="stocks-empty">
+        <p className="mt-5 rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash p-[18px] text-[11px] leading-relaxed text-zoop-muted">
           {scope === 'mine'
             ? query
               ? `'${query}'에 맞는 보유·관심 종목이 없어요.`
@@ -299,7 +310,9 @@ export default function StocksPage() {
         </p>
       ) : (
         <>
-          <p className="stocks-count">{rows.length}개 종목</p>
+          <p className="mt-5 mb-2 font-inter text-[11px] text-zoop-muted">
+            {rows.length}개 종목
+          </p>
           <StockList
             rows={rows}
             heldIds={heldIds}
@@ -315,7 +328,7 @@ export default function StocksPage() {
           {scope === 'all' && nextCursor && (
             <button
               type="button"
-              className="stocks-more"
+              className="mx-auto mt-4 block h-9 min-w-[120px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper text-xs font-semibold text-zoop-ink disabled:cursor-progress disabled:opacity-50"
               disabled={moreState === 'loading'}
               onClick={() => void loadMore()}
             >
@@ -323,7 +336,7 @@ export default function StocksPage() {
             </button>
           )}
           {scope === 'all' && moreState === 'error' && (
-            <div className="stocks-status">
+            <div className="mt-5 text-xs text-zoop-muted">
               <ErrorNotice
                 title="다음 종목을 불러오지 못했어요"
                 onRetry={() => void loadMore()}
@@ -334,7 +347,7 @@ export default function StocksPage() {
       )}
 
       {failed && (
-        <div className="stocks-toast">
+        <div className="fixed inset-x-0 bottom-20 z-40 mx-auto w-[min(32rem,calc(100%-2rem))] md:bottom-6">
           <ErrorNotice
             title="관심 종목을 저장하지 못했어요"
             message={`${failed.name}을(를) 이전 상태로 되돌렸어요.`}

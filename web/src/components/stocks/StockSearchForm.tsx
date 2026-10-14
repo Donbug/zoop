@@ -22,16 +22,23 @@ export default function StockSearchForm({
     <form
       role="search"
       aria-label="종목 검색"
-      className="stocks-search"
+      className="mt-5"
       onSubmit={(event) => {
         event.preventDefault();
         onSearch(draft.trim());
       }}
     >
-      <label htmlFor="stock-search">기업명·영문명·티커 검색</label>
-      <div className="stocks-search-row">
-        <div className="stocks-search-field">
-          <GraphIcon name="search" size={15} />
+      <label
+        htmlFor="stock-search"
+        className="mb-2 block text-xs font-semibold text-zoop-ink"
+      >
+        기업명·영문명·티커 검색
+      </label>
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
+            <GraphIcon name="search" size={15} />
+          </span>
           <input
             ref={input}
             id="stock-search"
@@ -40,17 +47,18 @@ export default function StockSearchForm({
             disabled={disabled}
             placeholder="예: 삼성, NVIDIA, 005930"
             onChange={(event) => onDraftChange(event.target.value)}
+            className="h-[42px] w-full rounded-[3px] border-[1.333px] border-zoop-ink bg-zoop-paper pr-[38px] pl-[34px] text-[13px] text-zoop-ink disabled:opacity-50 [&::-webkit-search-cancel-button]:hidden"
           />
           {draft && (
             <button
               type="button"
-              className="stocks-search-clear"
               aria-label="검색어 지우기"
               disabled={disabled}
               onClick={() => {
                 onDraftChange('');
                 input.current?.focus();
               }}
+              className="absolute top-1/2 right-1.5 size-7 -translate-y-1/2 rounded-full text-[15px] text-zoop-muted hover:bg-zoop-soft"
             >
               ×
             </button>
@@ -58,8 +66,8 @@ export default function StockSearchForm({
         </div>
         <button
           type="submit"
-          className="stocks-search-button"
           disabled={disabled}
+          className="flex h-[42px] shrink-0 items-center gap-1.5 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3.5 text-[13px] font-bold text-zoop-ink disabled:opacity-50"
         >
           <GraphIcon name="search" size={14} />
           검색
