@@ -88,7 +88,7 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | `components/auth/SignupForm.tsx`                    | 회원가입          | D-AUT-02                    | 이메일·비밀번호·표시 이름·필수 약관 입력과 가입 API를 연결한다.                          |
 | `components/auth/SocialLoginButtons.tsx`            | 간편 로그인       | D-AUT-01                    | Google·카카오 인증 공급자 연동이 확정되면 활성화한다.                                    |
 | `components/onboarding/InvestmentChoice.tsx`        | 투자 여부         | D-ONB-01                    | 투자 중/미투자 선택을 온보딩 초안에 반영한다.                                            |
-| `components/onboarding/VirtualAccountSelector.tsx`  | 가상 계좌         | D-ONB-02                    | 모의 계좌 목록과 연결·건너뛰기를 제공한다. 실제 증권 계좌가 아니다.                      |
+| `components/portfolio/PortfolioConnect.tsx`         | 가상 계좌 연결    | D-ONB-02 / D-MY-01b         | 초기 설정·내 종목이 함께 쓰는 연결 기능. 진입 출처로 연결 후 이동을 구분한다.            |
 | `components/onboarding/WatchlistSelector.tsx`       | 관심 종목 선택    | D-WAT-01                    | 종목 검색·추가·제거와 저장을 연결한다. 0개 선택을 허용한다.                              |
 | `components/stocks/StockSearchForm.tsx`             | 종목 검색         | PDF 실제 4페이지            | 기업명·영문명·티커 검색을 연결한다.                                                      |
 | `components/stocks/StockList.tsx`                   | 종목 목록         | PDF 실제 4페이지            | 목록 결과와 기업 상세·지도 이동을 연결한다.                                              |

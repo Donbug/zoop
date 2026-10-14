@@ -3,6 +3,7 @@ import { clearAuthentication, getAccessToken, setAccessToken } from './auth';
 
 type CallOptions = {
   skipAuth?: boolean;
+  /** 요청별 추가 헤더(예: 목표 계약의 Idempotency-Key) */
   headers?: Record<string, string>;
 };
 
@@ -61,8 +62,8 @@ function createRequestOptions(
   extraHeaders?: Record<string, string>,
 ): RequestInit {
   const headers = new Headers({
-    'Content-Type': 'application/json',
     ...extraHeaders,
+    'Content-Type': 'application/json',
   });
 
   if (accessToken && !skipAuth) {
