@@ -1,7 +1,7 @@
-# 기업 검색 검증 — 이슈 #19
+# 기업 검색 API 검증 — 이슈 #39
 
 기준: ERD v6 companies, OpenAPI searchCompanies.
-현재 검증 대상은 PostgreSQL 카탈로그 검색 기반이며 HTTP Controller 및 실제 GraphDB 이슈 수 연동은 포함하지 않는다.
+PostgreSQL 기업 카탈로그 검색과 목표 `/api/v1/companies` HTTP 계약을 검증한다. `CompanyIssueCountQuery`는 버전 고정 그래프 이슈 수 경계다. 실제 GraphDB provider가 없으면 응답을 추정하지 않고 `503 SOURCE_UNAVAILABLE`을 반환한다.
 
 ## 기본 테스트
 
@@ -9,7 +9,8 @@ Java 21 환경에서 api/를 작업 디렉터리로 사용한다.
 
     .\gradlew.bat build
 
-CompanySearchServiceTest는 커서 직렬화/복원, 검색 조건 변경 거부, 잘못된 커서,
+검색 단위/API 테스트는 커서 직렬화·조건 변경 거부·catalog revision 무효화,
+그래프 snapshot cursor 고정, issueCount 매핑, 누락된 그래프 수 거부, 공통 응답과 요청 ID,
 0/음수 limit 및 최대 정수 limit의 lookahead 오버플로 방지를 확인한다.
 
 ## PostgreSQL 통합 테스트
@@ -68,9 +69,9 @@ companies의 INSERT/UPDATE/DELETE/TRUNCATE 문장은 같은 트랜잭션에서 r
 일반 INSERT/UPDATE/DELETE는 조회와 병행할 수 있다. 쓰기 트랜잭션들은 revision 행 갱신 시 직렬화된다.
 외부 트랜잭션이 있으면 REQUIRES_NEW로 별도 연결을 사용하므로 연결 풀 용량을 고려해야 한다.
 
-페이지 사이에 revision이 달라지면 IllegalArgumentException으로 거절하고 커서 없이 다시 검색한다.
-revision이 없는 이전 형식의 커서도 재시작해야 한다. 현재 공개 HTTP Controller가 없으므로
-HTTP 오류 응답 매핑은 후속 공개 API 작업에서 명세에 맞게 구현한다.
+페이지 사이에 revision이 달라지면 `INVALID_CURSOR`로 거절하고 커서 없이 다시 검색한다.
+revision이 없는 이전 형식의 커서도 같은 오류로 거절한다. HTTP 오류 본문은 OpenAPI 공통 오류 형식과
+`X-Request-ID`를 사용한다. 그래프 count adapter가 없는 상태는 0건으로 위장하지 않고 `SOURCE_UNAVAILABLE`로 처리한다.
 통합 테스트는 반환된/미반환 회사 이름 변경, 추가·삭제·전체 비우기, 별칭·티커 변경,
 롤백, 다른 연결의 커밋 중 스냅샷 유지 및 재시작 후 전체 페이지 순회를 확인한다.
 

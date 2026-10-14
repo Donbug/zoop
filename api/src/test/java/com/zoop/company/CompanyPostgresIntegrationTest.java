@@ -322,9 +322,12 @@ class CompanyPostgresIntegrationTest {
     void maximumLimitAndInvalidCursorsWorkWithRealRepository() {
         assertEquals(ids(search(null)), ids(service.search(null, null, Integer.MAX_VALUE, null, null)));
         String cursor = service.search("acme", null, 1, null, null).nextCursor();
-        assertThrows(IllegalArgumentException.class, () -> service.search("other", cursor, 1, null, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("acme", "!bad!", 1, null, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("acme", "", 1, null, null));
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.search("other", cursor, 1, null, null));
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.search("acme", "!bad!", 1, null, null));
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.search("acme", "", 1, null, null));
     }
 
     @Test
@@ -400,9 +403,9 @@ class CompanyPostgresIntegrationTest {
     }
 
     private static void assertStaleCursor(String query, String cursor) {
-        var exception = assertThrows(IllegalArgumentException.class,
+        var exception = assertThrows(com.zoop.common.exception.CustomException.class,
                 () -> service.search(query, cursor, 1, null, null));
-        assertTrue(exception.getMessage().contains("restart search without a cursor"));
+        assertEquals(com.zoop.common.exception.ErrorCode.INVALID_CURSOR, exception.getErrorCode());
     }
 
     private static List<String> collectPages(String query) {
