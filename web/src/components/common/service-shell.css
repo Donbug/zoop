@@ -1,0 +1,436 @@
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import '@fontsource-variable/inter';
+
+/* D-GRP-01 visual baseline shared by D-AUT-01, D-WAT-01/01b and D-BRF-01/02. */
+:root {
+  --zoop-ink: #1a1a1a;
+  --zoop-muted: #5f5f5b;
+  --zoop-faint: #94948f;
+  --zoop-line: #d6d6d2;
+  --zoop-paper: #ffffff;
+  --zoop-wash: #f7f7f5;
+  --zoop-soft: #f2f2f0;
+}
+
+.service-surface {
+  min-height: 100dvh;
+  background: var(--zoop-wash);
+  color: var(--zoop-ink);
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
+}
+
+.relationship-header {
+  height: 48px;
+  flex-shrink: 0;
+  border-bottom: 0.667px solid var(--zoop-line);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--zoop-paper);
+}
+
+.relationship-logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--zoop-ink);
+  text-decoration: none;
+}
+
+.relationship-logo strong {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 24px;
+  letter-spacing: -0.4px;
+}
+
+.relationship-logo span {
+  color: var(--zoop-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.relationship-header nav {
+  display: flex;
+  gap: 4px;
+  height: 100%;
+}
+
+.relationship-header nav a,
+.relationship-header nav button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--zoop-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 19.5px;
+  white-space: nowrap;
+}
+
+.relationship-header nav a.active {
+  color: var(--zoop-ink);
+}
+
+.relationship-header nav a.active::after {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 2px;
+  border-radius: 4px;
+  background: var(--zoop-ink);
+  content: '';
+}
+
+.relationship-user-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.relationship-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--zoop-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.relationship-user > span {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--zoop-soft);
+  display: grid;
+  place-items: center;
+}
+
+.relationship-header a:focus-visible,
+.relationship-header button:focus-visible,
+.service-surface a:focus-visible,
+.service-surface button:focus-visible,
+.service-surface input:focus-visible {
+  outline: 2px solid var(--zoop-ink);
+  outline-offset: 2px;
+}
+
+.service-page-main {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+.service-bottom-nav {
+  border-color: var(--zoop-line);
+  background: rgb(255 255 255 / 96%);
+  backdrop-filter: blur(8px);
+}
+
+.auth-surface main > section {
+  gap: 22px;
+}
+
+.auth-surface main > section > div:first-child {
+  padding-bottom: 18px;
+  border-bottom: 0.667px solid var(--zoop-line);
+}
+
+.auth-surface input,
+.auth-surface main a,
+.auth-surface main button {
+  border-radius: 3px;
+}
+
+.auth-surface input {
+  border-color: var(--zoop-line);
+}
+
+.auth-surface main a,
+.auth-surface main button {
+  min-height: 42px;
+}
+
+.onboarding-surface main > section {
+  width: 100%;
+  max-width: 672px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.onboarding-surface input,
+.onboarding-surface button,
+.onboarding-surface [role='alert'] {
+  border-radius: 3px;
+}
+
+.onboarding-surface [data-screen-id^='D-WAT'] > h1 {
+  margin-bottom: -12px;
+  letter-spacing: -0.035em;
+}
+
+.onboarding-surface [data-screen-id^='D-WAT'] > form input,
+.onboarding-surface [data-screen-id^='D-WAT'] > form button,
+.onboarding-surface [data-screen-id^='D-WAT'] ul {
+  border-color: var(--zoop-line);
+}
+
+.onboarding-surface [data-screen-id^='D-WAT'] > div:last-child button {
+  background: var(--zoop-ink);
+}
+
+.briefing-page {
+  width: min(100%, 800px);
+  margin: 0 auto;
+}
+
+.briefing-page-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+}
+
+.briefing-kicker {
+  margin-top: 6px;
+  color: var(--zoop-muted);
+  font-size: 12px;
+}
+
+.briefing-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.briefing-date,
+.briefing-editions {
+  height: 38px;
+  border: 0.667px solid var(--zoop-line);
+  border-radius: 3px;
+  background: var(--zoop-paper);
+}
+
+.briefing-date {
+  padding: 0 12px;
+  color: var(--zoop-ink);
+  font-size: 12px;
+}
+
+.briefing-editions {
+  display: flex;
+  padding: 3px;
+  background: var(--zoop-soft);
+}
+
+.briefing-editions button {
+  min-width: 76px;
+  border-radius: 2px;
+  color: var(--zoop-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.briefing-editions button[aria-pressed='true'] {
+  background: var(--zoop-paper);
+  color: var(--zoop-ink);
+  box-shadow: 0 0 0 0.5px #1a1a1a14;
+}
+
+.briefing-card {
+  margin-top: 18px;
+  border: 0.667px solid var(--zoop-line);
+  border-radius: 5px;
+  background: var(--zoop-paper);
+  padding: 24px;
+}
+
+.briefing-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 0.667px solid var(--zoop-line);
+}
+
+.briefing-card-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.briefing-card-header p {
+  margin-top: 5px;
+  color: var(--zoop-faint);
+  font:
+    10px/1.5 'Inter Variable',
+    sans-serif;
+}
+
+.briefing-status {
+  flex-shrink: 0;
+  border: 0.667px solid var(--zoop-line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--zoop-muted);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.briefing-section {
+  padding: 22px 0;
+  border-bottom: 0.667px solid #e7e7e4;
+}
+
+.briefing-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.briefing-section h3 {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.briefing-empty {
+  border: 0.667px dashed var(--zoop-line);
+  border-radius: 3px;
+  padding: 18px;
+  background: var(--zoop-wash);
+  color: var(--zoop-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.briefing-indicator-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.briefing-indicator-grid li {
+  min-height: 86px;
+  padding: 4px 18px;
+  border-right: 0.667px solid var(--zoop-line);
+}
+
+.briefing-indicator-grid li:first-child {
+  padding-left: 0;
+}
+
+.briefing-indicator-grid li:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.briefing-indicator-grid strong {
+  display: block;
+  font-size: 12px;
+}
+
+.briefing-indicator-grid span {
+  display: block;
+  margin-top: 24px;
+  color: var(--zoop-faint);
+  font-size: 10px;
+}
+
+@media (max-width: 767px) {
+  .relationship-header {
+    padding: 0 14px;
+    gap: 10px;
+  }
+
+  .relationship-header nav {
+    display: none;
+  }
+
+  .relationship-user-tools > button {
+    display: none;
+  }
+
+  .relationship-user {
+    font-size: 0;
+  }
+
+  .relationship-user > span {
+    width: 28px;
+    height: 28px;
+  }
+
+  .relationship-user > svg {
+    display: none;
+  }
+
+  .service-page-main {
+    padding: 28px 16px 88px;
+  }
+
+  .onboarding-surface main {
+    padding: 24px 16px 48px;
+  }
+
+  .onboarding-surface main > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .onboarding-surface main nav {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .onboarding-surface main nav a,
+  .onboarding-surface main nav span {
+    flex: 1 0 auto;
+    text-align: center;
+  }
+
+  .briefing-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .briefing-date,
+  .briefing-editions {
+    width: 100%;
+  }
+
+  .briefing-editions button {
+    flex: 1;
+  }
+
+  .briefing-card {
+    padding: 18px;
+  }
+
+  .briefing-indicator-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .briefing-indicator-grid li,
+  .briefing-indicator-grid li:first-child,
+  .briefing-indicator-grid li:last-child {
+    min-height: auto;
+    padding: 12px 0;
+    border-right: 0;
+    border-bottom: 0.667px solid var(--zoop-line);
+  }
+
+  .briefing-indicator-grid li:last-child {
+    border-bottom: 0;
+  }
+
+  .briefing-indicator-grid span {
+    margin-top: 6px;
+  }
+}
