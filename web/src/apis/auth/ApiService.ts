@@ -56,7 +56,12 @@ function createRequestOptions(
     'Content-Type': 'application/json',
   });
   const csrfToken = useAuthStore.getState().session?.csrfToken;
-  if (csrfToken && !SAFE_METHODS.has(method.toUpperCase())) {
+  // 호출부가 직접 준 CSRF(예: 관리자 세션 토큰)는 회원 토큰으로 덮어쓰지 않는다.
+  if (
+    csrfToken &&
+    !headers.has('X-CSRF-Token') &&
+    !SAFE_METHODS.has(method.toUpperCase())
+  ) {
     headers.set('X-CSRF-Token', csrfToken);
   }
 

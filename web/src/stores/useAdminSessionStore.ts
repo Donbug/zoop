@@ -1,10 +1,25 @@
 import { create } from 'zustand';
 import type { AdminSessionState } from '@/types/admin';
 
-// 관리자 API 검증 결과만 주입한다. 회원 토큰으로 관리자 세션을 만들지 않는다.
-// 새로고침 후 세션 회수 API는 추후 연결하며 현재는 로그인으로 진입한다.
+// 관리자 서버 세션(zoop_admin_session)의 화면용 사본. 회원 세션(useAuthStore)과 섞지 않는다.
 export const useAdminSessionStore = create<AdminSessionState>((set) => ({
+  status: 'checking',
   session: null,
-  setSession: (session) => set({ session }),
-  clearSession: () => set({ session: null }),
+  admin: null,
+  revision: 0,
+  setSession: (session) =>
+    set((state) => ({
+      status: 'ready',
+      session,
+      admin: session.authenticated && !session.expired ? session.admin : null,
+      revision: state.revision + 1,
+    })),
+  setStatus: (status) => set({ status }),
+  clearSession: () =>
+    set((state) => ({
+      status: 'ready',
+      session: null,
+      admin: null,
+      revision: state.revision + 1,
+    })),
 }));
