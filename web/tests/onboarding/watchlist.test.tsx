@@ -101,7 +101,9 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
   it('allows zero stocks, completes setup, and opens market all', async () => {
     renderPage();
     await loaded();
-    expect(screen.getByText(/고르지 않으면 시장 전체/)).toBeTruthy();
+    expect(
+      screen.getByText('관심 종목 없이 시작하면 시장 전체 지도가 열려요.'),
+    ).toBeTruthy();
     await userEvent.click(
       screen.getByRole('button', { name: '고르지 않고 지도 보기' }),
     );
@@ -131,7 +133,11 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     );
     renderPage();
     await loaded();
-    expect(screen.getByText(/보유 종목 기준 내 종목 지도/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        '관심 종목을 추가하지 않아도 보유 종목으로 내 종목 지도를 시작할 수 있어요.',
+      ),
+    ).toBeTruthy();
     await userEvent.click(
       screen.getByRole('button', { name: '고르지 않고 지도 보기' }),
     );
@@ -305,7 +311,7 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     await userEvent.click(
       screen.getByRole('button', { name: '검색 다시 시도' }),
     );
-    expect(await screen.findByText('검색 결과가 없습니다.')).toBeTruthy();
+    expect(await screen.findByText('검색 결과가 없어요.')).toBeTruthy();
   });
   it('does not apply an earlier search after the latest result', async () => {
     const old = deferred<Response>();
@@ -367,5 +373,44 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     expect(
       (screen.getByLabelText('기업명이나 종목 코드') as HTMLInputElement).value,
     ).toBe('');
+  });
+  it('shows the search heading and a held badge for holdings in results', async () => {
+    server.on('GET', '/api/v1/portfolio', () =>
+      json({
+        ...emptyPortfolio,
+        connected: true,
+        holdings: [
+          { companyId: company.id, name: company.name, ticker: company.ticker },
+        ],
+      }),
+    );
+    renderPage();
+    await choose();
+    expect(screen.getByText("'삼성' 검색 결과")).toBeTruthy();
+    expect(screen.getByText('1개 종목')).toBeTruthy();
+    expect(screen.getByText('보유')).toBeTruthy();
+  });
+  it('shows names, not ids, for interests saved before entering', async () => {
+    server.on('GET', '/api/v1/me/settings', () =>
+      json({ ...settings, watchlistIds: [company.id] }),
+    );
+    server.on('GET', '/api/v1/companies/:id', ({ params }) =>
+      json({ id: params.id, name: '삼성전자' }),
+    );
+    renderPage();
+    expect(
+      await screen.findByRole('button', { name: '삼성전자 해제' }),
+    ).toBeTruthy();
+    expect(screen.queryByText(company.id)).toBeNull();
+  });
+  it('ignores an empty search', async () => {
+    renderPage();
+    await loaded();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('기업명이나 종목 코드'), '   ');
+    await user.click(screen.getByRole('button', { name: '검색' }));
+    expect(server.requests.some((r) => r.path === '/api/v1/companies')).toBe(
+      false,
+    );
   });
 });

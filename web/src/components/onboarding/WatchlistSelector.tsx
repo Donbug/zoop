@@ -7,6 +7,7 @@ import {
   getInitialPortfolio,
   searchWatchlistCompanies,
   completeInitialSettings,
+  getWatchlistCompanyName,
 } from '@/apis/onboarding/watchlist';
 import type {
   InitialPortfolio,
@@ -125,6 +126,28 @@ export default function WatchlistSelector() {
       active = false;
     };
   }, [query, token, searchRetry]);
+  // 이미 저장된 관심 종목은 이름을 모르므로 칩에 ID 대신 이름을 보이도록 채운다.
+  const { setWatchlistName, watchlistNames } = draft;
+  // 배열은 렌더마다 새로 만들어지므로 의존성에는 문자열 키를 쓴다.
+  const unnamed = ids.filter((id) => !watchlistNames[id]).join('|');
+  useEffect(() => {
+    if (!unnamed) return;
+    let active = true;
+    for (const id of unnamed.split('|')) {
+      getWatchlistCompanyName(id).then(
+        (company) => {
+          if (active) setWatchlistName(id, company.name);
+        },
+        () => {
+          // 이름을 못 가져오면 ID를 그대로 보여 준다(선택·저장에는 영향 없음).
+        },
+      );
+    }
+    return () => {
+      active = false;
+    };
+  }, [unnamed, setWatchlistName]);
+  const heldIds = new Set(holdings?.map((holding) => holding.companyId));
   async function complete() {
     if (
       !ready ||
@@ -180,7 +203,8 @@ export default function WatchlistSelector() {
       </button>
       <h1>관심 있는 종목을 골라 주세요</h1>
       <p className="watchlist-hint">
-        기업명이나 종목 코드로 검색해 관심 종목을 추가할 수 있어요.
+        고른 종목을 중심으로 내 종목 지도를 보여드려요. 나중에 [내 종목]에서
+        언제든 바꿀 수 있어요.
       </p>
       {lookup.loading && (
         <p role="status">보유 종목과 관심 목록을 확인하고 있어요.</p>
@@ -202,8 +226,9 @@ export default function WatchlistSelector() {
         className="watchlist-search"
         onSubmit={(e) => {
           e.preventDefault();
-          if (busy || !ownsDraft) return;
-          draft.setSearchSubmitted(draft.searchInput.trim());
+          const term = draft.searchInput.trim();
+          if (busy || !ownsDraft || !term) return;
+          draft.setSearchSubmitted(term);
           setSearchRetry((v) => v + 1);
         }}
       >
@@ -219,51 +244,6 @@ export default function WatchlistSelector() {
         />
         <button disabled={busy || !ownsDraft}>검색</button>
       </form>
-      <div className="watchlist-results" aria-label="기업 검색 결과">
-        {search.loading && <p role="status">검색하고 있어요.</p>}
-        {search.error && (
-          <div role="alert">
-            <p>검색 결과를 불러오지 못했어요.</p>
-            <button
-              disabled={busy}
-              onClick={() => setSearchRetry((v) => v + 1)}
-            >
-              검색 다시 시도
-            </button>
-          </div>
-        )}
-        {query !== null &&
-          !search.loading &&
-          !search.error &&
-          search.items.length === 0 && (
-            <p role="status">검색 결과가 없습니다.</p>
-          )}
-        {search.items.length > 0 && (
-          <ul>
-            {search.items.map((company) => (
-              <li key={company.id}>
-                <span className="watchlist-mark" aria-hidden="true">
-                  {company.name.slice(0, 1)}
-                </span>
-                <div>
-                  <strong>{company.name}</strong>
-                  <small>
-                    {company.ticker ?? company.id} · 승인된 사건{' '}
-                    {company.issueCount}건
-                  </small>
-                </div>
-                <button
-                  disabled={busy || !ready || ids.includes(company.id)}
-                  onClick={() => draft.addWatchlistCompany(company)}
-                  aria-label={`${company.name} ${ids.includes(company.id) ? '선택됨' : '추가'}`}
-                >
-                  {ids.includes(company.id) ? '선택됨' : '+ 추가'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
       <section aria-label="고른 종목" className="watchlist-selected">
         <div className="watchlist-heading">
           <h2>☆ 고른 종목</h2>
@@ -273,6 +253,9 @@ export default function WatchlistSelector() {
           <ul className="watchlist-chips">
             {ids.map((id) => (
               <li key={id}>
+                <span className="watchlist-mark" aria-hidden="true">
+                  {(draft.watchlistNames[id] ?? id).slice(0, 1)}
+                </span>
                 <span>{draft.watchlistNames[id] ?? id}</span>
                 <button
                   disabled={busy || !ready}
@@ -288,12 +271,67 @@ export default function WatchlistSelector() {
           ready && (
             <p className="watchlist-empty">
               {holdings?.length
-                ? '고르지 않아도 보유 종목 기준 내 종목 지도로 시작할 수 있어요.'
-                : '아직 고른 종목이 없어요. 고르지 않으면 시장 전체 지도로 시작해요.'}
+                ? '관심 종목을 추가하지 않아도 보유 종목으로 내 종목 지도를 시작할 수 있어요.'
+                : '관심 종목 없이 시작하면 시장 전체 지도가 열려요.'}
             </p>
           )
         )}
       </section>
+      <div className="watchlist-results" aria-label="기업 검색 결과">
+        {query !== null &&
+          !search.loading &&
+          !search.error &&
+          search.items.length > 0 && (
+            <div className="watchlist-heading">
+              <h2>'{query}' 검색 결과</h2>
+              <span>{search.items.length}개 종목</span>
+            </div>
+          )}
+        {search.loading && <p role="status">검색하고 있어요.</p>}
+        {search.error && (
+          <div role="alert">
+            <p>검색 결과를 불러오지 못했어요.</p>
+            <button
+              disabled={busy}
+              onClick={() => setSearchRetry((v) => v + 1)}
+            >
+              검색 다시 시도
+            </button>
+          </div>
+        )}
+        {query !== null &&
+          !search.loading &&
+          !search.error &&
+          search.items.length === 0 && <p role="status">검색 결과가 없어요.</p>}
+        {search.items.length > 0 && (
+          <ul>
+            {search.items.map((company) => (
+              <li key={company.id}>
+                <span className="watchlist-mark" aria-hidden="true">
+                  {company.name.slice(0, 1)}
+                </span>
+                <div>
+                  <strong>{company.name}</strong>
+                  <small>
+                    {company.ticker ?? company.id} · 승인된 사건{' '}
+                    {company.issueCount}건
+                  </small>
+                </div>
+                {heldIds.has(company.id) && (
+                  <span className="watchlist-held">보유</span>
+                )}
+                <button
+                  disabled={busy || !ready || ids.includes(company.id)}
+                  onClick={() => draft.addWatchlistCompany(company)}
+                  aria-label={`${company.name} ${ids.includes(company.id) ? '선택됨' : '추가'}`}
+                >
+                  {ids.includes(company.id) ? '선택됨' : '추가'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div className="watchlist-finish">
         {saveError && (
           <p role="alert">

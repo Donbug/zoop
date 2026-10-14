@@ -11,6 +11,7 @@ interface WatchlistDraft {
   savingWatchlist: boolean;
   initializeWatchlist: (owner: string, ids: string[]) => void;
   addWatchlistCompany: (company: WatchlistCompany) => void;
+  setWatchlistName: (id: string, name: string) => void;
   setSearchInput: (query: string) => void;
   setSearchSubmitted: (query: string) => void;
   setSavingWatchlist: (saving: boolean) => void;
@@ -20,6 +21,7 @@ const initial: OnboardingDraft &
     WatchlistDraft,
     | 'initializeWatchlist'
     | 'addWatchlistCompany'
+    | 'setWatchlistName'
     | 'setSearchInput'
     | 'setSearchSubmitted'
     | 'setSavingWatchlist'
@@ -78,6 +80,10 @@ export const useOnboardingStore = create<OnboardingState & WatchlistDraft>(
               },
             },
       ),
+    setWatchlistName: (id, name) =>
+      set((state) => ({
+        watchlistNames: { ...state.watchlistNames, [id]: name },
+      })),
     setSearchInput: (searchInput) => set({ searchInput }),
     setSearchSubmitted: (searchSubmitted) => set({ searchSubmitted }),
     setSavingWatchlist: (savingWatchlist) => set({ savingWatchlist }),
