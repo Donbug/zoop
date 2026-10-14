@@ -52,7 +52,19 @@ beforeEach(() => {
     .mockImplementation(async (id) => createMockEvent(id));
   useGraphUiStore.getState().reset();
   useAiChatStore.getState().reset();
-  useAuthStore.setState({ accessToken: null });
+  useAuthStore.setState({
+    status: 'ready',
+    session: {
+      authenticated: false,
+      kind: 'anonymous',
+      user: null,
+      setup: null,
+      csrfToken: null,
+      expiresAt: null,
+    },
+    member: null,
+    onboardingCompleted: null,
+  });
 });
 function setup(url = '/?mode=all&scope=watchlist') {
   const router = createMemoryRouter([{ path: '/', element: <MapPage /> }], {

@@ -29,7 +29,10 @@ describe('D-GRP-02 · getEvent consumer / ERD v6 fixtures', () => {
     vi.stubEnv('VITE_GRAPH_DATA_SOURCE', 'api');
     const server = createFakeServer();
     server.on('GET', '/api/v1/events/:id', () => apiError(401, 'UNAUTHORIZED'));
-    await expect(getEvent('mock-issue-1')).rejects.toThrow('401');
+    await expect(getEvent('mock-issue-1')).rejects.toMatchObject({
+      status: 401,
+      code: 'UNAUTHORIZED',
+    });
     expect(server.requests).toHaveLength(1);
   });
   it('rejects a different event/version instead of mixing it into the selected map', async () => {
