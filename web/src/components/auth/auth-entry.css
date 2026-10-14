@@ -1,0 +1,117 @@
+.auth-entry {
+  min-height: 100dvh;
+  background: #f2f2f0;
+  color: #1a1a1a;
+}
+.auth-entry > header {
+  height: 48px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+}
+.auth-brand {
+  font-weight: 800;
+  font-size: 20px;
+}
+.auth-brand small {
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 6px;
+  color: #666;
+}
+.auth-entry > main {
+  max-width: 400px;
+  padding: 40px 16px 32px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.auth-entry h1 {
+  font-size: 24px;
+  font-weight: 700;
+}
+.auth-entry form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-entry label,
+.auth-entry legend {
+  font-size: 13px;
+  color: #555;
+  font-weight: 600;
+}
+.auth-entry input:not([type='checkbox']) {
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  padding: 10px 12px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+.auth-entry button,
+.auth-entry summary,
+.auth-entry a {
+  cursor: pointer;
+}
+.auth-entry button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.auth-entry button:focus-visible,
+.auth-entry input:focus-visible,
+.auth-entry a:focus-visible,
+.auth-entry summary:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 3px;
+}
+.auth-entry fieldset {
+  margin-top: 12px;
+}
+.auth-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.auth-check input {
+  width: 18px;
+  height: 18px;
+}
+.auth-term {
+  margin-top: 8px;
+}
+.auth-term details {
+  margin-left: 28px;
+  font-size: 12px;
+  color: #666;
+}
+.auth-term details p {
+  max-height: 200px;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  color: #333;
+  background: white;
+}
+.auth-entry [role='alert'] {
+  color: #a12828;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-entry .auth-primary {
+  background: #1a1a1a;
+  color: white;
+  border-radius: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+.auth-entry a {
+  font-size: 13px;
+}

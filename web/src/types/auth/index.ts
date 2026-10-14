@@ -34,6 +34,7 @@ export type SessionStatus = 'checking' | 'ready' | 'error';
 
 export type AuthState = {
   status: SessionStatus;
+  sessionRevision: number;
   session: Session | null;
   /** 회원 세션일 때만 값이 있다. */
   member: Member | null;

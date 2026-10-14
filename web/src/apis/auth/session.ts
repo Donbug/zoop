@@ -40,3 +40,29 @@ export function socialLoginUrl(provider: SocialProviderId, returnTo: string) {
   const query = new URLSearchParams({ returnTo });
   return `${API_BASE_URL}/api/v1/auth/social/${provider}/authorize?${query}`;
 }
+
+import type { SignupBody, SignupTerm } from '@/types/auth/session';
+import { ApiError } from './ApiService';
+export const signUp = (body: SignupBody) =>
+  call<Session>('/api/v1/auth/signup', 'POST', body, { skipAuth: true });
+export async function listSignupTerms(): Promise<SignupTerm[]> {
+  const terms: SignupTerm[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  do {
+    const page: { items: SignupTerm[]; nextCursor: string | null } = await call(
+      `/api/v1/auth/terms${cursor ? `?${new URLSearchParams({ cursor })}` : ''}`,
+      'GET',
+      undefined,
+      { skipAuth: true },
+    );
+    terms.push(...page.items);
+    cursor = page.nextCursor;
+    if (cursor && seen.has(cursor))
+      throw new ApiError(200, 'INVALID_TERMS', '약관을 확인하지 못했어요.');
+    if (cursor) seen.add(cursor);
+  } while (cursor);
+  if (new Set(terms.map((t) => t.id)).size !== terms.length)
+    throw new ApiError(200, 'INVALID_TERMS', '약관을 확인하지 못했어요.');
+  return terms;
+}

@@ -35,8 +35,9 @@ function session(overrides: Partial<Session> = {}): Session {
   };
 }
 
+let currentSession: Session;
 function memberSession(completed: boolean): Session {
-  return session({
+  currentSession = session({
     authenticated: true,
     kind: 'member',
     user: {
@@ -48,6 +49,7 @@ function memberSession(completed: boolean): Session {
     csrfToken: 'csrf-member',
     expiresAt: '2026-10-15T00:00:00Z',
   });
+  return currentSession;
 }
 
 const guestSession = session({
@@ -100,9 +102,14 @@ beforeEach(() => {
     member: null,
     onboardingCompleted: null,
   });
+  currentSession = session();
   server = createFakeServer();
+  server.on('GET', '/api/v1/me/settings', () => json({ watchlistIds: [] }));
+  server.on('GET', '/api/v1/portfolio', () =>
+    json({ holdings: [{ companyId: 'synthetic-company' }] }),
+  );
   server.on('GET', '/api/v1/auth/session', () =>
-    json({ ...session(), metadata }),
+    json({ ...currentSession, metadata }),
   );
 });
 
@@ -245,9 +252,10 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
 
 describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
   test('로그인 없이 둘러보면 비회원 세션을 시작하고 시장 전체 지도로 간다', async () => {
-    server.on('POST', '/api/v1/auth/guest', () =>
-      json({ ...guestSession, metadata }),
-    );
+    server.on('POST', '/api/v1/auth/guest', () => {
+      currentSession = guestSession;
+      return json({ ...currentSession, metadata });
+    });
     renderApp();
     await userEvent.click(
       await screen.findByRole('button', { name: '로그인 없이 둘러보기' }),
@@ -304,7 +312,7 @@ describe('세션 쿠키 인증', () => {
     renderApp('/my');
 
     expect(
-      await screen.findByText('로그인 상태를 확인하고 있어요'),
+      await screen.findByText('로그인 상태를 확인하고 있어요.'),
     ).toBeTruthy();
     pending.resolve(json({ ...session(), metadata }));
     expect(
@@ -318,13 +326,15 @@ describe('세션 쿠키 인증', () => {
     );
     renderApp('/my');
     expect(
-      await screen.findByText('로그인 상태를 확인하지 못했어요'),
+      await screen.findByText('로그인 상태를 확인하지 못했어요.'),
     ).toBeTruthy();
 
     server.on('GET', '/api/v1/auth/session', () =>
       json({ ...memberSession(true), metadata }),
     );
-    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: '세션 다시 확인' }),
+    );
     expect((await screen.findByTestId('destination')).textContent).toBe('/my');
   });
 
@@ -358,5 +368,30 @@ describe('세션 쿠키 인증', () => {
       code: 'AUTHENTICATION_REQUIRED',
     });
     await waitFor(() => expect(useAuthStore.getState().member).toBeNull());
+  });
+
+  test('세션 확인에 실패해도 로그인 폼을 보여 주고 로그인할 수 있다', async () => {
+    let loggedIn = false;
+    server.on('GET', '/api/v1/auth/session', () =>
+      loggedIn
+        ? json({ ...memberSession(false), metadata })
+        : apiError(503, 'SOURCE_UNAVAILABLE'),
+    );
+    server.on('POST', '/api/v1/auth/login', () => {
+      loggedIn = true;
+      return json({ ...memberSession(false), metadata });
+    });
+    renderApp();
+
+    expect(
+      await screen.findByText('로그인 상태를 확인하지 못했어요.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: '세션 다시 확인' })).toBeTruthy();
+    await screen.findByRole('heading', { name: '이메일로 로그인' });
+    await fillAndSubmit('member@zoop.test', 'secret-pass');
+
+    expect((await screen.findByTestId('destination')).textContent).toBe(
+      '/onboarding',
+    );
   });
 });
