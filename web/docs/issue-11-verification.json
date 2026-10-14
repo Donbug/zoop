@@ -1,0 +1,30 @@
+{
+  "main": "774f87a",
+  "issue": 11,
+  "date": "2026-10-14",
+  "tests": 34,
+  "passed": 34,
+  "testFiles": 5,
+  "lint": "passed",
+  "format": "passed",
+  "build": "passed",
+  "frozenInstall": "passed",
+  "gitConflicts": false,
+  "browser": {
+    "passed": true,
+    "source": "Chromium with controlled synthetic API",
+    "desktop": 1280,
+    "mobile": 390,
+    "noMobileOverflow": true,
+    "completedNavigation": "/?mode=personal",
+    "request": {
+      "version": 3,
+      "mode": "watchlist",
+      "watchlistIds": ["KRX:005930"],
+      "completed": true
+    },
+    "pageErrors": []
+  },
+  "stagedFilesAtValidation": 0,
+  "newCommitsAtValidation": 0
+}
