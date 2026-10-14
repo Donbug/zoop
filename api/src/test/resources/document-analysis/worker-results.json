@@ -1,0 +1,2972 @@
+{
+ "company": {
+  "companyId": "SYNTH-A",
+  "name": "합성 알파"
+ },
+ "document": {
+  "cleanerVersion": "exact-copy-1",
+  "documentId": "doc-abababababababababababababababababababababababababababababababab",
+  "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+  "inputKind": "body",
+  "rawLocators": [
+   {
+    "end": 57,
+    "locatorId": "raw-1",
+    "start": 0
+   }
+  ],
+  "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+  "sourceId": "authored-synthetic",
+  "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+  "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+ },
+ "generator": "api/scripts/export_document_analysis_fixtures.py",
+ "grant": {
+  "grantId": "grant-analysis-fixture",
+  "revision": "rev-1"
+ },
+ "scenarios": {
+  "sentiment": {
+   "envelope": {
+    "delivery": {
+     "reason": null,
+     "state": "available"
+    },
+    "job": {
+     "artifactIds": [
+      "artifact-18b0eeac553cb9c8cee811d8065c7bf0fa1963fc670044212c7e235809a304f5",
+      "artifact-b45031b21a5310c97d0e1e5d89391dc19db464b8ade64b55c9568bed8f4483a4"
+     ],
+     "artifacts": [
+      {
+       "artifactId": "artifact-18b0eeac553cb9c8cee811d8065c7bf0fa1963fc670044212c7e235809a304f5",
+       "attemptId": "attempt-13add4761f59496c937a6049a462e41f",
+       "claims": [
+        {
+         "assertionKind": "interpretation",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "interpretation",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [
+        "artifact-b45031b21a5310c97d0e1e5d89391dc19db464b8ade64b55c9568bed8f4483a4"
+       ],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "4f241209a2c4fd094d6dfdc628b01e4d57290b466a2c9d853b9607f8e24ca5f3",
+       "jobId": "s1-03030303030303030303030303030303",
+       "kind": "document-sentiment",
+       "modelConfigRevision": "b2746c31c745dacaede9cf36bef68ac0f67c8464054b01fb25b21f859e75f1fa",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.546550+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "citations": [
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 15,
+          "evidenceId": "e1",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "😀 삼성전자 매출이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 0,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         },
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 57,
+          "evidenceId": "e2",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "합성 베타의 비용이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 42,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         }
+        ],
+        "claims": [
+         {
+          "assertionKind": "interpretation",
+          "claimId": "claim-a",
+          "evidenceIds": [
+           "e1"
+          ],
+          "text": "😀 삼성전자 매출이 늘었다."
+         },
+         {
+          "assertionKind": "interpretation",
+          "claimId": "claim-b",
+          "evidenceIds": [
+           "e2"
+          ],
+          "text": "합성 베타의 비용이 늘었다."
+         },
+         {
+          "assertionKind": "limitation",
+          "claimId": "claim-limit",
+          "evidenceIds": [],
+          "text": "합성 문서에 적힌 내용만 다룹니다."
+         }
+        ],
+        "label": "mixed",
+        "limitations": [
+         "합성 문서에 적힌 내용만 다룹니다."
+        ],
+        "rationale": "😀 삼성전자 매출이 늘었다.\n합성 베타의 비용이 늘었다."
+       },
+       "resultVersion": "result-314b1550867ec7ce2b4ad9da4b77a507011a3afb6e1f8cd3040059849a42c7dd",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": true,
+        "exact": true,
+        "reason": null,
+        "semantic": "supported"
+       }
+      },
+      {
+       "artifactId": "artifact-b45031b21a5310c97d0e1e5d89391dc19db464b8ade64b55c9568bed8f4483a4",
+       "attemptId": "attempt-520e8f2f9cd5401aa00d2ad0b902a11c",
+       "claims": [
+        {
+         "assertionKind": "interpretation",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "interpretation",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "4f241209a2c4fd094d6dfdc628b01e4d57290b466a2c9d853b9607f8e24ca5f3",
+       "jobId": "s1-03030303030303030303030303030303",
+       "kind": "semantic-verification",
+       "modelConfigRevision": "da19d9a5f448710c9092d8397651a1b7e43f70832af51488a57c836a0b13944f",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.546305+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "claims": [
+         {
+          "claimId": "claim-a",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-b",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-limit",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+       },
+       "resultVersion": "result-328329df1ba957344b80f3b4fef4e7bd543a80a6e736c3db9c5fc6c4795c628c",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": true,
+        "exact": true,
+        "reason": null,
+        "semantic": "supported"
+       }
+      }
+     ],
+     "attemptId": "attempt-520e8f2f9cd5401aa00d2ad0b902a11c",
+     "calls": [
+      {
+       "attemptId": "attempt-13add4761f59496c937a6049a462e41f",
+       "config": {
+        "model": "authored-synthetic-document-sentiment",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.343875028192997,
+       "error": null,
+       "inputDigest": "5018cb828dff6ccf9367fa2215c4bdaac894499696adf13c8f7448482709df34",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.545417+00:00",
+       "stage": "document-sentiment",
+       "startedAt": "2026-10-14T04:44:38.544973+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      },
+      {
+       "attemptId": "attempt-520e8f2f9cd5401aa00d2ad0b902a11c",
+       "config": {
+        "model": "authored-synthetic-semantic-verification",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.1502500381320715,
+       "error": null,
+       "inputDigest": "24a0eba9a94d13b7be343ffc0de0aa00903eacecf396b7bd68e4e09689180415",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.546119+00:00",
+       "stage": "semantic-verification",
+       "startedAt": "2026-10-14T04:44:38.545881+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      }
+     ],
+     "failure": null,
+     "grant": {
+      "allowedOperations": [
+       "read",
+       "store",
+       "model-send",
+       "quote-display"
+      ],
+      "enabled": true,
+      "evidence": [
+       "authored synthetic fixture"
+      ],
+      "expiresAt": null,
+      "grantId": "grant-analysis-fixture",
+      "purposes": [
+       "document-summary",
+       "document-sentiment",
+       "semantic-verification"
+      ],
+      "recipients": [
+       "authored-replay"
+      ],
+      "revision": "rev-1",
+      "rights": "known",
+      "sourceId": "authored-synthetic"
+     },
+     "input": {
+      "input": {
+       "candidate": null,
+       "company": {
+        "companyId": "SYNTH-A",
+        "name": "합성 알파"
+       },
+       "document": {
+        "cleanerVersion": "exact-copy-1",
+        "documentId": "doc-abababababababababababababababababababababababababababababababab",
+        "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+        "inputKind": "body",
+        "rawLocators": [
+         {
+          "end": 57,
+          "locatorId": "raw-1",
+          "start": 0
+         }
+        ],
+        "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+        "sourceId": "authored-synthetic",
+        "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+        "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+       },
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1"
+      },
+      "jobId": "s1-03030303030303030303030303030303",
+      "kind": "document-sentiment",
+      "mode": "replay",
+      "provenance": {
+       "executionMode": "replay",
+       "recordingKind": "authored-test",
+       "sourceKind": "synthetic"
+      },
+      "schemaVersion": "zoop-ai-s1-1"
+     },
+     "inputDigest": "4f241209a2c4fd094d6dfdc628b01e4d57290b466a2c9d853b9607f8e24ca5f3",
+     "jobId": "s1-03030303030303030303030303030303",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-s1-1",
+     "state": "ready",
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    },
+    "receipts": [
+     {
+      "attemptId": "attempt-13add4761f59496c937a6049a462e41f",
+      "config": {
+       "model": "authored-synthetic-document-sentiment",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.343875028192997,
+      "error": null,
+      "inputDigest": "5018cb828dff6ccf9367fa2215c4bdaac894499696adf13c8f7448482709df34",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.545417+00:00",
+      "stage": "document-sentiment",
+      "startedAt": "2026-10-14T04:44:38.544973+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     },
+     {
+      "attemptId": "attempt-520e8f2f9cd5401aa00d2ad0b902a11c",
+      "config": {
+       "model": "authored-synthetic-semantic-verification",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.1502500381320715,
+      "error": null,
+      "inputDigest": "24a0eba9a94d13b7be343ffc0de0aa00903eacecf396b7bd68e4e09689180415",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.546119+00:00",
+      "stage": "semantic-verification",
+      "startedAt": "2026-10-14T04:44:38.545881+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     }
+    ],
+    "schemaVersion": "zoop-ai-internal-1",
+    "status": {
+     "acceptedAt": "2026-10-14T01:02:03Z",
+     "artifactIds": [
+      "artifact-18b0eeac553cb9c8cee811d8065c7bf0fa1963fc670044212c7e235809a304f5",
+      "artifact-b45031b21a5310c97d0e1e5d89391dc19db464b8ade64b55c9568bed8f4483a4"
+     ],
+     "dispatch": {
+      "command": "run",
+      "dispatchCount": 1,
+      "lastOutcome": "exited",
+      "lastRuntimeCode": null,
+      "state": "idle",
+      "updatedAt": "2026-10-14T01:02:03Z"
+     },
+     "failure": null,
+     "inputDigest": "4f241209a2c4fd094d6dfdc628b01e4d57290b466a2c9d853b9607f8e24ca5f3",
+     "jobId": "s1-03030303030303030303030303030303",
+     "kind": "document-sentiment",
+     "mode": "replay",
+     "next": "fetch_result",
+     "observedAt": "2026-10-14T01:02:03Z",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-internal-1",
+     "state": "ready",
+     "unreceiptedAttempts": 0,
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    }
+   },
+   "status": {
+    "acceptedAt": "2026-10-14T01:02:03Z",
+    "artifactIds": [
+     "artifact-18b0eeac553cb9c8cee811d8065c7bf0fa1963fc670044212c7e235809a304f5",
+     "artifact-b45031b21a5310c97d0e1e5d89391dc19db464b8ade64b55c9568bed8f4483a4"
+    ],
+    "dispatch": {
+     "command": "run",
+     "dispatchCount": 1,
+     "lastOutcome": "exited",
+     "lastRuntimeCode": null,
+     "state": "idle",
+     "updatedAt": "2026-10-14T01:02:03Z"
+    },
+    "failure": null,
+    "inputDigest": "4f241209a2c4fd094d6dfdc628b01e4d57290b466a2c9d853b9607f8e24ca5f3",
+    "jobId": "s1-03030303030303030303030303030303",
+    "kind": "document-sentiment",
+    "mode": "replay",
+    "next": "fetch_result",
+    "observedAt": "2026-10-14T01:02:03Z",
+    "phase": "artifact.persisted",
+    "resumeMode": "none",
+    "schemaVersion": "zoop-ai-internal-1",
+    "state": "ready",
+    "unreceiptedAttempts": 0,
+    "usage": {
+     "cachedTokens": null,
+     "cost": null,
+     "inputTokens": null,
+     "outputTokens": null,
+     "providerAttempts": 0,
+     "reasoningTokens": null,
+     "replayCalls": 2
+    }
+   },
+   "submit": {
+    "input": {
+     "candidate": null,
+     "company": {
+      "companyId": "SYNTH-A",
+      "name": "합성 알파"
+     },
+     "document": {
+      "cleanerVersion": "exact-copy-1",
+      "documentId": "doc-abababababababababababababababababababababababababababababababab",
+      "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "inputKind": "body",
+      "rawLocators": [
+       {
+        "end": 57,
+        "locatorId": "raw-1",
+        "start": 0
+       }
+      ],
+      "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+      "sourceId": "authored-synthetic",
+      "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+      "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+     },
+     "grantId": "grant-analysis-fixture",
+     "grantRevision": "rev-1"
+    },
+    "jobId": "s1-03030303030303030303030303030303",
+    "kind": "document-sentiment",
+    "mode": "replay",
+    "provenance": {
+     "executionMode": "replay",
+     "recordingKind": "authored-test",
+     "sourceKind": "synthetic"
+    },
+    "schemaVersion": "zoop-ai-s1-1"
+   }
+  },
+  "summary": {
+   "cache": {
+    "envelope": {
+     "delivery": {
+      "reason": null,
+      "state": "available"
+     },
+     "job": {
+      "artifactIds": [
+       "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+       "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+      ],
+      "artifacts": [
+       {
+        "artifactId": "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+        "attemptId": "attempt-ce6a79af49ba4189ad690cd56ecdb215",
+        "claims": [
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-a",
+          "evidenceIds": [
+           "e1"
+          ],
+          "text": "😀 삼성전자 매출이 늘었다."
+         },
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-b",
+          "evidenceIds": [
+           "e2"
+          ],
+          "text": "합성 베타의 비용이 늘었다."
+         },
+         {
+          "assertionKind": "limitation",
+          "claimId": "claim-limit",
+          "evidenceIds": [],
+          "text": "합성 문서에 적힌 내용만 다룹니다."
+         }
+        ],
+        "companyId": "SYNTH-A",
+        "dependencyRefs": [
+         "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+        ],
+        "grantId": "grant-analysis-fixture",
+        "grantRevision": "rev-1",
+        "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+        "jobId": "s1-01010101010101010101010101010101",
+        "kind": "document-summary",
+        "modelConfigRevision": "33da695ad0ea89d4e45a038503c5577162f0bacfbeb41a29d9e61d9de136cf66",
+        "policyVersion": "zoop-document-gate-2",
+        "producedAt": "2026-10-14T04:44:38.535885+00:00",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provenance": {
+         "executionMode": "replay",
+         "recordingKind": "authored-test",
+         "sourceKind": "synthetic"
+        },
+        "result": {
+         "citations": [
+          {
+           "documentId": "doc-abababababababababababababababababababababababababababababababab",
+           "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+           "end": 15,
+           "evidenceId": "e1",
+           "inputKind": "body",
+           "offsetUnit": "unicode_code_point",
+           "quote": "😀 삼성전자 매출이 늘었다.",
+           "rawLocatorIds": [
+            "raw-1"
+           ],
+           "start": 0,
+           "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+          },
+          {
+           "documentId": "doc-abababababababababababababababababababababababababababababababab",
+           "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+           "end": 57,
+           "evidenceId": "e2",
+           "inputKind": "body",
+           "offsetUnit": "unicode_code_point",
+           "quote": "합성 베타의 비용이 늘었다.",
+           "rawLocatorIds": [
+            "raw-1"
+           ],
+           "start": 42,
+           "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+          }
+         ],
+         "claims": [
+          {
+           "assertionKind": "fact",
+           "claimId": "claim-a",
+           "evidenceIds": [
+            "e1"
+           ],
+           "text": "😀 삼성전자 매출이 늘었다."
+          },
+          {
+           "assertionKind": "fact",
+           "claimId": "claim-b",
+           "evidenceIds": [
+            "e2"
+           ],
+           "text": "합성 베타의 비용이 늘었다."
+          },
+          {
+           "assertionKind": "limitation",
+           "claimId": "claim-limit",
+           "evidenceIds": [],
+           "text": "합성 문서에 적힌 내용만 다룹니다."
+          }
+         ],
+         "limitations": [
+          "합성 문서에 적힌 내용만 다룹니다."
+         ],
+         "text": "😀 삼성전자 매출이 늘었다.\n합성 베타의 비용이 늘었다."
+        },
+        "resultVersion": "result-ab82b0bba931499e876961ce91e33289c812828427e0e0d8116119f522cfe953",
+        "schemaVersion": "zoop-ai-s1-1",
+        "sourceRefs": [
+         {
+          "cleanerVersion": "exact-copy-1",
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "inputKind": "body",
+          "rawLocators": [
+           {
+            "end": 57,
+            "locatorId": "raw-1",
+            "start": 0
+           }
+          ],
+          "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+          "sourceId": "authored-synthetic",
+          "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         }
+        ],
+        "validation": {
+         "eligible": true,
+         "exact": true,
+         "reason": null,
+         "semantic": "supported"
+        }
+       },
+       {
+        "artifactId": "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f",
+        "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+        "claims": [
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-a",
+          "evidenceIds": [
+           "e1"
+          ],
+          "text": "😀 삼성전자 매출이 늘었다."
+         },
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-b",
+          "evidenceIds": [
+           "e2"
+          ],
+          "text": "합성 베타의 비용이 늘었다."
+         },
+         {
+          "assertionKind": "limitation",
+          "claimId": "claim-limit",
+          "evidenceIds": [],
+          "text": "합성 문서에 적힌 내용만 다룹니다."
+         }
+        ],
+        "companyId": "SYNTH-A",
+        "dependencyRefs": [],
+        "grantId": "grant-analysis-fixture",
+        "grantRevision": "rev-1",
+        "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+        "jobId": "s1-01010101010101010101010101010101",
+        "kind": "semantic-verification",
+        "modelConfigRevision": "da19d9a5f448710c9092d8397651a1b7e43f70832af51488a57c836a0b13944f",
+        "policyVersion": "zoop-document-gate-2",
+        "producedAt": "2026-10-14T04:44:38.535590+00:00",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provenance": {
+         "executionMode": "replay",
+         "recordingKind": "authored-test",
+         "sourceKind": "synthetic"
+        },
+        "result": {
+         "claims": [
+          {
+           "claimId": "claim-a",
+           "decision": "supported",
+           "reason": "합성 판정 표본"
+          },
+          {
+           "claimId": "claim-b",
+           "decision": "supported",
+           "reason": "합성 판정 표본"
+          },
+          {
+           "claimId": "claim-limit",
+           "decision": "supported",
+           "reason": "합성 판정 표본"
+          }
+         ],
+         "prohibitedAdvice": false,
+         "unsupportedCausality": false
+        },
+        "resultVersion": "result-0615623b27215afd5ee01cc8a35ec1cc8b26fd767edccc354a83cf3b81d318b1",
+        "schemaVersion": "zoop-ai-s1-1",
+        "sourceRefs": [
+         {
+          "cleanerVersion": "exact-copy-1",
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "inputKind": "body",
+          "rawLocators": [
+           {
+            "end": 57,
+            "locatorId": "raw-1",
+            "start": 0
+           }
+          ],
+          "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+          "sourceId": "authored-synthetic",
+          "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         }
+        ],
+        "validation": {
+         "eligible": true,
+         "exact": true,
+         "reason": null,
+         "semantic": "supported"
+        }
+       }
+      ],
+      "attemptId": null,
+      "calls": [
+       {
+        "attemptId": "attempt-ce6a79af49ba4189ad690cd56ecdb215",
+        "config": {
+         "model": "authored-synthetic-document-summary",
+         "policyVersion": "zoop-document-gate-2",
+         "promptVersion": "zoop-document-2026-10-08-2",
+         "provider": "authored-replay",
+         "providerRevision": "authored-replay-1",
+         "reasoningEffort": null,
+         "schemaVersion": "zoop-ai-s1-1"
+        },
+        "durationMs": 0.3614169545471668,
+        "error": null,
+        "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+        "mode": "replay",
+        "receivedAt": "2026-10-14T04:44:38.534786+00:00",
+        "stage": "document-summary",
+        "startedAt": "2026-10-14T04:44:38.534305+00:00",
+        "state": "validated",
+        "usage": {
+         "cachedTokens": null,
+         "inputTokens": null,
+         "outputTokens": null,
+         "reasoningTokens": null
+        }
+       },
+       {
+        "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+        "config": {
+         "model": "authored-synthetic-semantic-verification",
+         "policyVersion": "zoop-document-gate-2",
+         "promptVersion": "zoop-document-2026-10-08-2",
+         "provider": "authored-replay",
+         "providerRevision": "authored-replay-1",
+         "reasoningEffort": null,
+         "schemaVersion": "zoop-ai-s1-1"
+        },
+        "durationMs": 0.16037496970966458,
+        "error": null,
+        "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+        "mode": "replay",
+        "receivedAt": "2026-10-14T04:44:38.535469+00:00",
+        "stage": "semantic-verification",
+        "startedAt": "2026-10-14T04:44:38.535122+00:00",
+        "state": "validated",
+        "usage": {
+         "cachedTokens": null,
+         "inputTokens": null,
+         "outputTokens": null,
+         "reasoningTokens": null
+        }
+       }
+      ],
+      "failure": null,
+      "grant": {
+       "allowedOperations": [
+        "read",
+        "store",
+        "model-send",
+        "quote-display"
+       ],
+       "enabled": true,
+       "evidence": [
+        "authored synthetic fixture"
+       ],
+       "expiresAt": null,
+       "grantId": "grant-analysis-fixture",
+       "purposes": [
+        "document-summary",
+        "document-sentiment",
+        "semantic-verification"
+       ],
+       "recipients": [
+        "authored-replay"
+       ],
+       "revision": "rev-1",
+       "rights": "known",
+       "sourceId": "authored-synthetic"
+      },
+      "input": {
+       "input": {
+        "candidate": null,
+        "company": {
+         "companyId": "SYNTH-A",
+         "name": "합성 알파"
+        },
+        "document": {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        },
+        "grantId": "grant-analysis-fixture",
+        "grantRevision": "rev-1"
+       },
+       "jobId": "s1-02020202020202020202020202020202",
+       "kind": "document-summary",
+       "mode": "replay",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+      "jobId": "s1-02020202020202020202020202020202",
+      "phase": "artifact.cache_hit",
+      "resumeMode": "none",
+      "schemaVersion": "zoop-ai-s1-1",
+      "state": "ready",
+      "usage": {
+       "cachedTokens": null,
+       "cost": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "providerAttempts": 0,
+       "reasoningTokens": null,
+       "replayCalls": 0
+      }
+     },
+     "receipts": [
+      {
+       "attemptId": "attempt-ce6a79af49ba4189ad690cd56ecdb215",
+       "config": {
+        "model": "authored-synthetic-document-summary",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.3614169545471668,
+       "error": null,
+       "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.534786+00:00",
+       "stage": "document-summary",
+       "startedAt": "2026-10-14T04:44:38.534305+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      },
+      {
+       "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+       "config": {
+        "model": "authored-synthetic-semantic-verification",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.16037496970966458,
+       "error": null,
+       "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.535469+00:00",
+       "stage": "semantic-verification",
+       "startedAt": "2026-10-14T04:44:38.535122+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      }
+     ],
+     "schemaVersion": "zoop-ai-internal-1",
+     "status": {
+      "acceptedAt": "2026-10-14T01:02:03Z",
+      "artifactIds": [
+       "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+       "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+      ],
+      "dispatch": {
+       "command": "run",
+       "dispatchCount": 1,
+       "lastOutcome": "exited",
+       "lastRuntimeCode": null,
+       "state": "idle",
+       "updatedAt": "2026-10-14T01:02:03Z"
+      },
+      "failure": null,
+      "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+      "jobId": "s1-02020202020202020202020202020202",
+      "kind": "document-summary",
+      "mode": "replay",
+      "next": "fetch_result",
+      "observedAt": "2026-10-14T01:02:03Z",
+      "phase": "artifact.cache_hit",
+      "resumeMode": "none",
+      "schemaVersion": "zoop-ai-internal-1",
+      "state": "ready",
+      "unreceiptedAttempts": 0,
+      "usage": {
+       "cachedTokens": null,
+       "cost": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "providerAttempts": 0,
+       "reasoningTokens": null,
+       "replayCalls": 0
+      }
+     }
+    },
+    "status": {
+     "acceptedAt": "2026-10-14T01:02:03Z",
+     "artifactIds": [
+      "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+      "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+     ],
+     "dispatch": {
+      "command": "run",
+      "dispatchCount": 1,
+      "lastOutcome": "exited",
+      "lastRuntimeCode": null,
+      "state": "idle",
+      "updatedAt": "2026-10-14T01:02:03Z"
+     },
+     "failure": null,
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-02020202020202020202020202020202",
+     "kind": "document-summary",
+     "mode": "replay",
+     "next": "fetch_result",
+     "observedAt": "2026-10-14T01:02:03Z",
+     "phase": "artifact.cache_hit",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-internal-1",
+     "state": "ready",
+     "unreceiptedAttempts": 0,
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 0
+     }
+    },
+    "submit": {
+     "input": {
+      "candidate": null,
+      "company": {
+       "companyId": "SYNTH-A",
+       "name": "합성 알파"
+      },
+      "document": {
+       "cleanerVersion": "exact-copy-1",
+       "documentId": "doc-abababababababababababababababababababababababababababababababab",
+       "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+       "inputKind": "body",
+       "rawLocators": [
+        {
+         "end": 57,
+         "locatorId": "raw-1",
+         "start": 0
+        }
+       ],
+       "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+       "sourceId": "authored-synthetic",
+       "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+       "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+      },
+      "grantId": "grant-analysis-fixture",
+      "grantRevision": "rev-1"
+     },
+     "jobId": "s1-02020202020202020202020202020202",
+     "kind": "document-summary",
+     "mode": "replay",
+     "provenance": {
+      "executionMode": "replay",
+      "recordingKind": "authored-test",
+      "sourceKind": "synthetic"
+     },
+     "schemaVersion": "zoop-ai-s1-1"
+    }
+   },
+   "envelope": {
+    "delivery": {
+     "reason": null,
+     "state": "available"
+    },
+    "job": {
+     "artifactIds": [
+      "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+      "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+     ],
+     "artifacts": [
+      {
+       "artifactId": "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+       "attemptId": "attempt-ce6a79af49ba4189ad690cd56ecdb215",
+       "claims": [
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [
+        "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+       ],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+       "jobId": "s1-01010101010101010101010101010101",
+       "kind": "document-summary",
+       "modelConfigRevision": "33da695ad0ea89d4e45a038503c5577162f0bacfbeb41a29d9e61d9de136cf66",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.535885+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "citations": [
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 15,
+          "evidenceId": "e1",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "😀 삼성전자 매출이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 0,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         },
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 57,
+          "evidenceId": "e2",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "합성 베타의 비용이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 42,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         }
+        ],
+        "claims": [
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-a",
+          "evidenceIds": [
+           "e1"
+          ],
+          "text": "😀 삼성전자 매출이 늘었다."
+         },
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-b",
+          "evidenceIds": [
+           "e2"
+          ],
+          "text": "합성 베타의 비용이 늘었다."
+         },
+         {
+          "assertionKind": "limitation",
+          "claimId": "claim-limit",
+          "evidenceIds": [],
+          "text": "합성 문서에 적힌 내용만 다룹니다."
+         }
+        ],
+        "limitations": [
+         "합성 문서에 적힌 내용만 다룹니다."
+        ],
+        "text": "😀 삼성전자 매출이 늘었다.\n합성 베타의 비용이 늘었다."
+       },
+       "resultVersion": "result-ab82b0bba931499e876961ce91e33289c812828427e0e0d8116119f522cfe953",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": true,
+        "exact": true,
+        "reason": null,
+        "semantic": "supported"
+       }
+      },
+      {
+       "artifactId": "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f",
+       "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+       "claims": [
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+       "jobId": "s1-01010101010101010101010101010101",
+       "kind": "semantic-verification",
+       "modelConfigRevision": "da19d9a5f448710c9092d8397651a1b7e43f70832af51488a57c836a0b13944f",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.535590+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "claims": [
+         {
+          "claimId": "claim-a",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-b",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-limit",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+       },
+       "resultVersion": "result-0615623b27215afd5ee01cc8a35ec1cc8b26fd767edccc354a83cf3b81d318b1",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": true,
+        "exact": true,
+        "reason": null,
+        "semantic": "supported"
+       }
+      }
+     ],
+     "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+     "calls": [
+      {
+       "attemptId": "attempt-ce6a79af49ba4189ad690cd56ecdb215",
+       "config": {
+        "model": "authored-synthetic-document-summary",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.3614169545471668,
+       "error": null,
+       "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.534786+00:00",
+       "stage": "document-summary",
+       "startedAt": "2026-10-14T04:44:38.534305+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      },
+      {
+       "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+       "config": {
+        "model": "authored-synthetic-semantic-verification",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.16037496970966458,
+       "error": null,
+       "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.535469+00:00",
+       "stage": "semantic-verification",
+       "startedAt": "2026-10-14T04:44:38.535122+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      }
+     ],
+     "failure": null,
+     "grant": {
+      "allowedOperations": [
+       "read",
+       "store",
+       "model-send",
+       "quote-display"
+      ],
+      "enabled": true,
+      "evidence": [
+       "authored synthetic fixture"
+      ],
+      "expiresAt": null,
+      "grantId": "grant-analysis-fixture",
+      "purposes": [
+       "document-summary",
+       "document-sentiment",
+       "semantic-verification"
+      ],
+      "recipients": [
+       "authored-replay"
+      ],
+      "revision": "rev-1",
+      "rights": "known",
+      "sourceId": "authored-synthetic"
+     },
+     "input": {
+      "input": {
+       "candidate": null,
+       "company": {
+        "companyId": "SYNTH-A",
+        "name": "합성 알파"
+       },
+       "document": {
+        "cleanerVersion": "exact-copy-1",
+        "documentId": "doc-abababababababababababababababababababababababababababababababab",
+        "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+        "inputKind": "body",
+        "rawLocators": [
+         {
+          "end": 57,
+          "locatorId": "raw-1",
+          "start": 0
+         }
+        ],
+        "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+        "sourceId": "authored-synthetic",
+        "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+        "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+       },
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1"
+      },
+      "jobId": "s1-01010101010101010101010101010101",
+      "kind": "document-summary",
+      "mode": "replay",
+      "provenance": {
+       "executionMode": "replay",
+       "recordingKind": "authored-test",
+       "sourceKind": "synthetic"
+      },
+      "schemaVersion": "zoop-ai-s1-1"
+     },
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-01010101010101010101010101010101",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-s1-1",
+     "state": "ready",
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    },
+    "receipts": [
+     {
+      "attemptId": "attempt-ce6a79af49ba4189ad690cd56ecdb215",
+      "config": {
+       "model": "authored-synthetic-document-summary",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.3614169545471668,
+      "error": null,
+      "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.534786+00:00",
+      "stage": "document-summary",
+      "startedAt": "2026-10-14T04:44:38.534305+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     },
+     {
+      "attemptId": "attempt-517b62f7fef647ad946ba3ebd9e7da92",
+      "config": {
+       "model": "authored-synthetic-semantic-verification",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.16037496970966458,
+      "error": null,
+      "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.535469+00:00",
+      "stage": "semantic-verification",
+      "startedAt": "2026-10-14T04:44:38.535122+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     }
+    ],
+    "schemaVersion": "zoop-ai-internal-1",
+    "status": {
+     "acceptedAt": "2026-10-14T01:02:03Z",
+     "artifactIds": [
+      "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+      "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+     ],
+     "dispatch": {
+      "command": "run",
+      "dispatchCount": 1,
+      "lastOutcome": "exited",
+      "lastRuntimeCode": null,
+      "state": "idle",
+      "updatedAt": "2026-10-14T01:02:03Z"
+     },
+     "failure": null,
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-01010101010101010101010101010101",
+     "kind": "document-summary",
+     "mode": "replay",
+     "next": "fetch_result",
+     "observedAt": "2026-10-14T01:02:03Z",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-internal-1",
+     "state": "ready",
+     "unreceiptedAttempts": 0,
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    }
+   },
+   "status": {
+    "acceptedAt": "2026-10-14T01:02:03Z",
+    "artifactIds": [
+     "artifact-555e06b74ba1cf6df26ebc0534d878b7c01163b3e562d66fb0f4d63acc3f0006",
+     "artifact-7e2c0a8e7d944532936054f6320dcdaf867959f28d3c22454f91cad8515a4c7f"
+    ],
+    "dispatch": {
+     "command": "run",
+     "dispatchCount": 1,
+     "lastOutcome": "exited",
+     "lastRuntimeCode": null,
+     "state": "idle",
+     "updatedAt": "2026-10-14T01:02:03Z"
+    },
+    "failure": null,
+    "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+    "jobId": "s1-01010101010101010101010101010101",
+    "kind": "document-summary",
+    "mode": "replay",
+    "next": "fetch_result",
+    "observedAt": "2026-10-14T01:02:03Z",
+    "phase": "artifact.persisted",
+    "resumeMode": "none",
+    "schemaVersion": "zoop-ai-internal-1",
+    "state": "ready",
+    "unreceiptedAttempts": 0,
+    "usage": {
+     "cachedTokens": null,
+     "cost": null,
+     "inputTokens": null,
+     "outputTokens": null,
+     "providerAttempts": 0,
+     "reasoningTokens": null,
+     "replayCalls": 2
+    }
+   },
+   "submit": {
+    "input": {
+     "candidate": null,
+     "company": {
+      "companyId": "SYNTH-A",
+      "name": "합성 알파"
+     },
+     "document": {
+      "cleanerVersion": "exact-copy-1",
+      "documentId": "doc-abababababababababababababababababababababababababababababababab",
+      "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "inputKind": "body",
+      "rawLocators": [
+       {
+        "end": 57,
+        "locatorId": "raw-1",
+        "start": 0
+       }
+      ],
+      "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+      "sourceId": "authored-synthetic",
+      "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+      "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+     },
+     "grantId": "grant-analysis-fixture",
+     "grantRevision": "rev-1"
+    },
+    "jobId": "s1-01010101010101010101010101010101",
+    "kind": "document-summary",
+    "mode": "replay",
+    "provenance": {
+     "executionMode": "replay",
+     "recordingKind": "authored-test",
+     "sourceKind": "synthetic"
+    },
+    "schemaVersion": "zoop-ai-s1-1"
+   }
+  },
+  "summaryFailed": {
+   "envelope": {
+    "delivery": {
+     "reason": null,
+     "state": "available"
+    },
+    "job": {
+     "artifactIds": [],
+     "artifacts": [],
+     "attemptId": "attempt-6f4ff70e6acf4fe782d9f0810e6ae8f2",
+     "calls": [
+      {
+       "attemptId": "attempt-6f4ff70e6acf4fe782d9f0810e6ae8f2",
+       "config": {
+        "model": "authored-synthetic-document-summary",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.32945798011496663,
+       "error": "provider_http_500",
+       "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+       "mode": "replay",
+       "receivedAt": null,
+       "stage": "document-summary",
+       "startedAt": "2026-10-14T04:44:38.566041+00:00",
+       "state": "failed",
+       "usage": null
+      }
+     ],
+     "failure": {
+      "code": "provider_http_500",
+      "stage": "document-summary"
+     },
+     "grant": {
+      "allowedOperations": [
+       "read",
+       "store",
+       "model-send",
+       "quote-display"
+      ],
+      "enabled": true,
+      "evidence": [
+       "authored synthetic fixture"
+      ],
+      "expiresAt": null,
+      "grantId": "grant-analysis-fixture",
+      "purposes": [
+       "document-summary",
+       "document-sentiment",
+       "semantic-verification"
+      ],
+      "recipients": [
+       "authored-replay"
+      ],
+      "revision": "rev-1",
+      "rights": "known",
+      "sourceId": "authored-synthetic"
+     },
+     "input": {
+      "input": {
+       "candidate": null,
+       "company": {
+        "companyId": "SYNTH-A",
+        "name": "합성 알파"
+       },
+       "document": {
+        "cleanerVersion": "exact-copy-1",
+        "documentId": "doc-abababababababababababababababababababababababababababababababab",
+        "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+        "inputKind": "body",
+        "rawLocators": [
+         {
+          "end": 57,
+          "locatorId": "raw-1",
+          "start": 0
+         }
+        ],
+        "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+        "sourceId": "authored-synthetic",
+        "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+        "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+       },
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1"
+      },
+      "jobId": "s1-06060606060606060606060606060606",
+      "kind": "document-summary",
+      "mode": "replay",
+      "provenance": {
+       "executionMode": "replay",
+       "recordingKind": "authored-test",
+       "sourceKind": "synthetic"
+      },
+      "schemaVersion": "zoop-ai-s1-1"
+     },
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-06060606060606060606060606060606",
+     "phase": "provider.failed",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-s1-1",
+     "state": "failed",
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 1
+     }
+    },
+    "receipts": [
+     {
+      "attemptId": "attempt-6f4ff70e6acf4fe782d9f0810e6ae8f2",
+      "config": {
+       "model": "authored-synthetic-document-summary",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.32945798011496663,
+      "error": "provider_http_500",
+      "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+      "mode": "replay",
+      "receivedAt": null,
+      "stage": "document-summary",
+      "startedAt": "2026-10-14T04:44:38.566041+00:00",
+      "state": "failed",
+      "usage": null
+     }
+    ],
+    "schemaVersion": "zoop-ai-internal-1",
+    "status": {
+     "acceptedAt": "2026-10-14T01:02:03Z",
+     "artifactIds": [],
+     "dispatch": {
+      "command": "run",
+      "dispatchCount": 1,
+      "lastOutcome": "exited",
+      "lastRuntimeCode": null,
+      "state": "idle",
+      "updatedAt": "2026-10-14T01:02:03Z"
+     },
+     "failure": {
+      "code": "provider_http_500",
+      "stage": "document-summary"
+     },
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-06060606060606060606060606060606",
+     "kind": "document-summary",
+     "mode": "replay",
+     "next": "none",
+     "observedAt": "2026-10-14T01:02:03Z",
+     "phase": "provider.failed",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-internal-1",
+     "state": "failed",
+     "unreceiptedAttempts": 0,
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 1
+     }
+    }
+   },
+   "status": {
+    "acceptedAt": "2026-10-14T01:02:03Z",
+    "artifactIds": [],
+    "dispatch": {
+     "command": "run",
+     "dispatchCount": 1,
+     "lastOutcome": "exited",
+     "lastRuntimeCode": null,
+     "state": "idle",
+     "updatedAt": "2026-10-14T01:02:03Z"
+    },
+    "failure": {
+     "code": "provider_http_500",
+     "stage": "document-summary"
+    },
+    "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+    "jobId": "s1-06060606060606060606060606060606",
+    "kind": "document-summary",
+    "mode": "replay",
+    "next": "none",
+    "observedAt": "2026-10-14T01:02:03Z",
+    "phase": "provider.failed",
+    "resumeMode": "none",
+    "schemaVersion": "zoop-ai-internal-1",
+    "state": "failed",
+    "unreceiptedAttempts": 0,
+    "usage": {
+     "cachedTokens": null,
+     "cost": null,
+     "inputTokens": null,
+     "outputTokens": null,
+     "providerAttempts": 0,
+     "reasoningTokens": null,
+     "replayCalls": 1
+    }
+   },
+   "submit": {
+    "input": {
+     "candidate": null,
+     "company": {
+      "companyId": "SYNTH-A",
+      "name": "합성 알파"
+     },
+     "document": {
+      "cleanerVersion": "exact-copy-1",
+      "documentId": "doc-abababababababababababababababababababababababababababababababab",
+      "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "inputKind": "body",
+      "rawLocators": [
+       {
+        "end": 57,
+        "locatorId": "raw-1",
+        "start": 0
+       }
+      ],
+      "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+      "sourceId": "authored-synthetic",
+      "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+      "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+     },
+     "grantId": "grant-analysis-fixture",
+     "grantRevision": "rev-1"
+    },
+    "jobId": "s1-06060606060606060606060606060606",
+    "kind": "document-summary",
+    "mode": "replay",
+    "provenance": {
+     "executionMode": "replay",
+     "recordingKind": "authored-test",
+     "sourceKind": "synthetic"
+    },
+    "schemaVersion": "zoop-ai-s1-1"
+   }
+  },
+  "summaryHold": {
+   "envelope": {
+    "delivery": {
+     "reason": null,
+     "state": "available"
+    },
+    "job": {
+     "artifactIds": [
+      "artifact-aa383a889f3d30137e5b52a91b506d34e90c6e908d9ef381a38ca2ff5a86dac7",
+      "artifact-7fef7225d71b002917e56582a4a6ec1f33f429d58fcffbb47859ac472e32e146"
+     ],
+     "artifacts": [
+      {
+       "artifactId": "artifact-aa383a889f3d30137e5b52a91b506d34e90c6e908d9ef381a38ca2ff5a86dac7",
+       "attemptId": "attempt-bce3605d35704b959cca5e5960b5f148",
+       "claims": [
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [
+        "artifact-7fef7225d71b002917e56582a4a6ec1f33f429d58fcffbb47859ac472e32e146"
+       ],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+       "jobId": "s1-04040404040404040404040404040404",
+       "kind": "document-summary",
+       "modelConfigRevision": "33da695ad0ea89d4e45a038503c5577162f0bacfbeb41a29d9e61d9de136cf66",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.554434+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "citations": [
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 15,
+          "evidenceId": "e1",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "😀 삼성전자 매출이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 0,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         },
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 57,
+          "evidenceId": "e2",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "합성 베타의 비용이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 42,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         }
+        ],
+        "claims": [
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-a",
+          "evidenceIds": [
+           "e1"
+          ],
+          "text": "😀 삼성전자 매출이 늘었다."
+         },
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-b",
+          "evidenceIds": [
+           "e2"
+          ],
+          "text": "합성 베타의 비용이 늘었다."
+         },
+         {
+          "assertionKind": "limitation",
+          "claimId": "claim-limit",
+          "evidenceIds": [],
+          "text": "합성 문서에 적힌 내용만 다룹니다."
+         }
+        ],
+        "limitations": [
+         "합성 문서에 적힌 내용만 다룹니다."
+        ],
+        "text": "😀 삼성전자 매출이 늘었다.\n합성 베타의 비용이 늘었다."
+       },
+       "resultVersion": "result-ab82b0bba931499e876961ce91e33289c812828427e0e0d8116119f522cfe953",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": false,
+        "exact": true,
+        "reason": "semantic_hold",
+        "semantic": "hold"
+       }
+      },
+      {
+       "artifactId": "artifact-7fef7225d71b002917e56582a4a6ec1f33f429d58fcffbb47859ac472e32e146",
+       "attemptId": "attempt-44fb84a259004fc7aab5602ab5e9d33a",
+       "claims": [
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+       "jobId": "s1-04040404040404040404040404040404",
+       "kind": "semantic-verification",
+       "modelConfigRevision": "da19d9a5f448710c9092d8397651a1b7e43f70832af51488a57c836a0b13944f",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.554179+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "claims": [
+         {
+          "claimId": "claim-a",
+          "decision": "insufficient",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-b",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-limit",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         }
+        ],
+        "prohibitedAdvice": false,
+        "unsupportedCausality": false
+       },
+       "resultVersion": "result-5d38bf89a826474425e16b03bb029833f2a76aba84f2733907979c550abbaa04",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": false,
+        "exact": true,
+        "reason": "semantic_hold",
+        "semantic": "hold"
+       }
+      }
+     ],
+     "attemptId": "attempt-44fb84a259004fc7aab5602ab5e9d33a",
+     "calls": [
+      {
+       "attemptId": "attempt-bce3605d35704b959cca5e5960b5f148",
+       "config": {
+        "model": "authored-synthetic-document-summary",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.3357909736223519,
+       "error": null,
+       "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.553122+00:00",
+       "stage": "document-summary",
+       "startedAt": "2026-10-14T04:44:38.552554+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      },
+      {
+       "attemptId": "attempt-44fb84a259004fc7aab5602ab5e9d33a",
+       "config": {
+        "model": "authored-synthetic-semantic-verification",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.1948749995790422,
+       "error": null,
+       "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.554004+00:00",
+       "stage": "semantic-verification",
+       "startedAt": "2026-10-14T04:44:38.553681+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      }
+     ],
+     "failure": null,
+     "grant": {
+      "allowedOperations": [
+       "read",
+       "store",
+       "model-send",
+       "quote-display"
+      ],
+      "enabled": true,
+      "evidence": [
+       "authored synthetic fixture"
+      ],
+      "expiresAt": null,
+      "grantId": "grant-analysis-fixture",
+      "purposes": [
+       "document-summary",
+       "document-sentiment",
+       "semantic-verification"
+      ],
+      "recipients": [
+       "authored-replay"
+      ],
+      "revision": "rev-1",
+      "rights": "known",
+      "sourceId": "authored-synthetic"
+     },
+     "input": {
+      "input": {
+       "candidate": null,
+       "company": {
+        "companyId": "SYNTH-A",
+        "name": "합성 알파"
+       },
+       "document": {
+        "cleanerVersion": "exact-copy-1",
+        "documentId": "doc-abababababababababababababababababababababababababababababababab",
+        "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+        "inputKind": "body",
+        "rawLocators": [
+         {
+          "end": 57,
+          "locatorId": "raw-1",
+          "start": 0
+         }
+        ],
+        "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+        "sourceId": "authored-synthetic",
+        "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+        "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+       },
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1"
+      },
+      "jobId": "s1-04040404040404040404040404040404",
+      "kind": "document-summary",
+      "mode": "replay",
+      "provenance": {
+       "executionMode": "replay",
+       "recordingKind": "authored-test",
+       "sourceKind": "synthetic"
+      },
+      "schemaVersion": "zoop-ai-s1-1"
+     },
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-04040404040404040404040404040404",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-s1-1",
+     "state": "ready",
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    },
+    "receipts": [
+     {
+      "attemptId": "attempt-bce3605d35704b959cca5e5960b5f148",
+      "config": {
+       "model": "authored-synthetic-document-summary",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.3357909736223519,
+      "error": null,
+      "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.553122+00:00",
+      "stage": "document-summary",
+      "startedAt": "2026-10-14T04:44:38.552554+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     },
+     {
+      "attemptId": "attempt-44fb84a259004fc7aab5602ab5e9d33a",
+      "config": {
+       "model": "authored-synthetic-semantic-verification",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.1948749995790422,
+      "error": null,
+      "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.554004+00:00",
+      "stage": "semantic-verification",
+      "startedAt": "2026-10-14T04:44:38.553681+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     }
+    ],
+    "schemaVersion": "zoop-ai-internal-1",
+    "status": {
+     "acceptedAt": "2026-10-14T01:02:03Z",
+     "artifactIds": [
+      "artifact-aa383a889f3d30137e5b52a91b506d34e90c6e908d9ef381a38ca2ff5a86dac7",
+      "artifact-7fef7225d71b002917e56582a4a6ec1f33f429d58fcffbb47859ac472e32e146"
+     ],
+     "dispatch": {
+      "command": "run",
+      "dispatchCount": 1,
+      "lastOutcome": "exited",
+      "lastRuntimeCode": null,
+      "state": "idle",
+      "updatedAt": "2026-10-14T01:02:03Z"
+     },
+     "failure": null,
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-04040404040404040404040404040404",
+     "kind": "document-summary",
+     "mode": "replay",
+     "next": "fetch_result",
+     "observedAt": "2026-10-14T01:02:03Z",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-internal-1",
+     "state": "ready",
+     "unreceiptedAttempts": 0,
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    }
+   },
+   "status": {
+    "acceptedAt": "2026-10-14T01:02:03Z",
+    "artifactIds": [
+     "artifact-aa383a889f3d30137e5b52a91b506d34e90c6e908d9ef381a38ca2ff5a86dac7",
+     "artifact-7fef7225d71b002917e56582a4a6ec1f33f429d58fcffbb47859ac472e32e146"
+    ],
+    "dispatch": {
+     "command": "run",
+     "dispatchCount": 1,
+     "lastOutcome": "exited",
+     "lastRuntimeCode": null,
+     "state": "idle",
+     "updatedAt": "2026-10-14T01:02:03Z"
+    },
+    "failure": null,
+    "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+    "jobId": "s1-04040404040404040404040404040404",
+    "kind": "document-summary",
+    "mode": "replay",
+    "next": "fetch_result",
+    "observedAt": "2026-10-14T01:02:03Z",
+    "phase": "artifact.persisted",
+    "resumeMode": "none",
+    "schemaVersion": "zoop-ai-internal-1",
+    "state": "ready",
+    "unreceiptedAttempts": 0,
+    "usage": {
+     "cachedTokens": null,
+     "cost": null,
+     "inputTokens": null,
+     "outputTokens": null,
+     "providerAttempts": 0,
+     "reasoningTokens": null,
+     "replayCalls": 2
+    }
+   },
+   "submit": {
+    "input": {
+     "candidate": null,
+     "company": {
+      "companyId": "SYNTH-A",
+      "name": "합성 알파"
+     },
+     "document": {
+      "cleanerVersion": "exact-copy-1",
+      "documentId": "doc-abababababababababababababababababababababababababababababababab",
+      "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "inputKind": "body",
+      "rawLocators": [
+       {
+        "end": 57,
+        "locatorId": "raw-1",
+        "start": 0
+       }
+      ],
+      "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+      "sourceId": "authored-synthetic",
+      "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+      "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+     },
+     "grantId": "grant-analysis-fixture",
+     "grantRevision": "rev-1"
+    },
+    "jobId": "s1-04040404040404040404040404040404",
+    "kind": "document-summary",
+    "mode": "replay",
+    "provenance": {
+     "executionMode": "replay",
+     "recordingKind": "authored-test",
+     "sourceKind": "synthetic"
+    },
+    "schemaVersion": "zoop-ai-s1-1"
+   }
+  },
+  "summaryReject": {
+   "envelope": {
+    "delivery": {
+     "reason": null,
+     "state": "available"
+    },
+    "job": {
+     "artifactIds": [
+      "artifact-cce1d245e4a5ae99a44d951f4409c612615c83ae5ca314abd74fdb56783e38ba",
+      "artifact-941a10f5ab06a63980c43575d9fb4da08f126b8651dea7abf323b9876635cd3f"
+     ],
+     "artifacts": [
+      {
+       "artifactId": "artifact-cce1d245e4a5ae99a44d951f4409c612615c83ae5ca314abd74fdb56783e38ba",
+       "attemptId": "attempt-c5ad11c5035344ffb0251e7e3a7eac4e",
+       "claims": [
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [
+        "artifact-941a10f5ab06a63980c43575d9fb4da08f126b8651dea7abf323b9876635cd3f"
+       ],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+       "jobId": "s1-05050505050505050505050505050505",
+       "kind": "document-summary",
+       "modelConfigRevision": "33da695ad0ea89d4e45a038503c5577162f0bacfbeb41a29d9e61d9de136cf66",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.560709+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "citations": [
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 15,
+          "evidenceId": "e1",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "😀 삼성전자 매출이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 0,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         },
+         {
+          "documentId": "doc-abababababababababababababababababababababababababababababababab",
+          "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+          "end": 57,
+          "evidenceId": "e2",
+          "inputKind": "body",
+          "offsetUnit": "unicode_code_point",
+          "quote": "합성 베타의 비용이 늘었다.",
+          "rawLocatorIds": [
+           "raw-1"
+          ],
+          "start": 42,
+          "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+         }
+        ],
+        "claims": [
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-a",
+          "evidenceIds": [
+           "e1"
+          ],
+          "text": "😀 삼성전자 매출이 늘었다."
+         },
+         {
+          "assertionKind": "fact",
+          "claimId": "claim-b",
+          "evidenceIds": [
+           "e2"
+          ],
+          "text": "합성 베타의 비용이 늘었다."
+         },
+         {
+          "assertionKind": "limitation",
+          "claimId": "claim-limit",
+          "evidenceIds": [],
+          "text": "합성 문서에 적힌 내용만 다룹니다."
+         }
+        ],
+        "limitations": [
+         "합성 문서에 적힌 내용만 다룹니다."
+        ],
+        "text": "😀 삼성전자 매출이 늘었다.\n합성 베타의 비용이 늘었다."
+       },
+       "resultVersion": "result-ab82b0bba931499e876961ce91e33289c812828427e0e0d8116119f522cfe953",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": false,
+        "exact": true,
+        "reason": "semantic_reject",
+        "semantic": "reject"
+       }
+      },
+      {
+       "artifactId": "artifact-941a10f5ab06a63980c43575d9fb4da08f126b8651dea7abf323b9876635cd3f",
+       "attemptId": "attempt-4f5816020b22454a9e1bc3ba710888d6",
+       "claims": [
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-a",
+         "evidenceIds": [
+          "e1"
+         ],
+         "text": "😀 삼성전자 매출이 늘었다."
+        },
+        {
+         "assertionKind": "fact",
+         "claimId": "claim-b",
+         "evidenceIds": [
+          "e2"
+         ],
+         "text": "합성 베타의 비용이 늘었다."
+        },
+        {
+         "assertionKind": "limitation",
+         "claimId": "claim-limit",
+         "evidenceIds": [],
+         "text": "합성 문서에 적힌 내용만 다룹니다."
+        }
+       ],
+       "companyId": "SYNTH-A",
+       "dependencyRefs": [],
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1",
+       "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+       "jobId": "s1-05050505050505050505050505050505",
+       "kind": "semantic-verification",
+       "modelConfigRevision": "da19d9a5f448710c9092d8397651a1b7e43f70832af51488a57c836a0b13944f",
+       "policyVersion": "zoop-document-gate-2",
+       "producedAt": "2026-10-14T04:44:38.560553+00:00",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provenance": {
+        "executionMode": "replay",
+        "recordingKind": "authored-test",
+        "sourceKind": "synthetic"
+       },
+       "result": {
+        "claims": [
+         {
+          "claimId": "claim-a",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-b",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         },
+         {
+          "claimId": "claim-limit",
+          "decision": "supported",
+          "reason": "합성 판정 표본"
+         }
+        ],
+        "prohibitedAdvice": true,
+        "unsupportedCausality": false
+       },
+       "resultVersion": "result-7ef1bbb5a738a640a84484ce72fc8520b2d85b05cc10e0905663aa0e0d436044",
+       "schemaVersion": "zoop-ai-s1-1",
+       "sourceRefs": [
+        {
+         "cleanerVersion": "exact-copy-1",
+         "documentId": "doc-abababababababababababababababababababababababababababababababab",
+         "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+         "inputKind": "body",
+         "rawLocators": [
+          {
+           "end": 57,
+           "locatorId": "raw-1",
+           "start": 0
+          }
+         ],
+         "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+         "sourceId": "authored-synthetic",
+         "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+         "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+        }
+       ],
+       "validation": {
+        "eligible": false,
+        "exact": true,
+        "reason": "semantic_reject",
+        "semantic": "reject"
+       }
+      }
+     ],
+     "attemptId": "attempt-4f5816020b22454a9e1bc3ba710888d6",
+     "calls": [
+      {
+       "attemptId": "attempt-c5ad11c5035344ffb0251e7e3a7eac4e",
+       "config": {
+        "model": "authored-synthetic-document-summary",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.3363330033607781,
+       "error": null,
+       "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.559917+00:00",
+       "stage": "document-summary",
+       "startedAt": "2026-10-14T04:44:38.559480+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      },
+      {
+       "attemptId": "attempt-4f5816020b22454a9e1bc3ba710888d6",
+       "config": {
+        "model": "authored-synthetic-semantic-verification",
+        "policyVersion": "zoop-document-gate-2",
+        "promptVersion": "zoop-document-2026-10-08-2",
+        "provider": "authored-replay",
+        "providerRevision": "authored-replay-1",
+        "reasoningEffort": null,
+        "schemaVersion": "zoop-ai-s1-1"
+       },
+       "durationMs": 0.14962500426918268,
+       "error": null,
+       "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+       "mode": "replay",
+       "receivedAt": "2026-10-14T04:44:38.560439+00:00",
+       "stage": "semantic-verification",
+       "startedAt": "2026-10-14T04:44:38.560204+00:00",
+       "state": "validated",
+       "usage": {
+        "cachedTokens": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "reasoningTokens": null
+       }
+      }
+     ],
+     "failure": null,
+     "grant": {
+      "allowedOperations": [
+       "read",
+       "store",
+       "model-send",
+       "quote-display"
+      ],
+      "enabled": true,
+      "evidence": [
+       "authored synthetic fixture"
+      ],
+      "expiresAt": null,
+      "grantId": "grant-analysis-fixture",
+      "purposes": [
+       "document-summary",
+       "document-sentiment",
+       "semantic-verification"
+      ],
+      "recipients": [
+       "authored-replay"
+      ],
+      "revision": "rev-1",
+      "rights": "known",
+      "sourceId": "authored-synthetic"
+     },
+     "input": {
+      "input": {
+       "candidate": null,
+       "company": {
+        "companyId": "SYNTH-A",
+        "name": "합성 알파"
+       },
+       "document": {
+        "cleanerVersion": "exact-copy-1",
+        "documentId": "doc-abababababababababababababababababababababababababababababababab",
+        "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+        "inputKind": "body",
+        "rawLocators": [
+         {
+          "end": 57,
+          "locatorId": "raw-1",
+          "start": 0
+         }
+        ],
+        "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+        "sourceId": "authored-synthetic",
+        "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+        "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+       },
+       "grantId": "grant-analysis-fixture",
+       "grantRevision": "rev-1"
+      },
+      "jobId": "s1-05050505050505050505050505050505",
+      "kind": "document-summary",
+      "mode": "replay",
+      "provenance": {
+       "executionMode": "replay",
+       "recordingKind": "authored-test",
+       "sourceKind": "synthetic"
+      },
+      "schemaVersion": "zoop-ai-s1-1"
+     },
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-05050505050505050505050505050505",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-s1-1",
+     "state": "ready",
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    },
+    "receipts": [
+     {
+      "attemptId": "attempt-c5ad11c5035344ffb0251e7e3a7eac4e",
+      "config": {
+       "model": "authored-synthetic-document-summary",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.3363330033607781,
+      "error": null,
+      "inputDigest": "174ac1d4957b76ee16db2d0d1b37d539bed0efab21eed42de8c7718d84ea263c",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.559917+00:00",
+      "stage": "document-summary",
+      "startedAt": "2026-10-14T04:44:38.559480+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     },
+     {
+      "attemptId": "attempt-4f5816020b22454a9e1bc3ba710888d6",
+      "config": {
+       "model": "authored-synthetic-semantic-verification",
+       "policyVersion": "zoop-document-gate-2",
+       "promptVersion": "zoop-document-2026-10-08-2",
+       "provider": "authored-replay",
+       "providerRevision": "authored-replay-1",
+       "reasoningEffort": null,
+       "schemaVersion": "zoop-ai-s1-1"
+      },
+      "durationMs": 0.14962500426918268,
+      "error": null,
+      "inputDigest": "9f21e6b921445072bb5c2765b1e483eb2f11ba0f645bd80f312d46dc92288386",
+      "mode": "replay",
+      "receivedAt": "2026-10-14T04:44:38.560439+00:00",
+      "stage": "semantic-verification",
+      "startedAt": "2026-10-14T04:44:38.560204+00:00",
+      "state": "validated",
+      "usage": {
+       "cachedTokens": null,
+       "inputTokens": null,
+       "outputTokens": null,
+       "reasoningTokens": null
+      }
+     }
+    ],
+    "schemaVersion": "zoop-ai-internal-1",
+    "status": {
+     "acceptedAt": "2026-10-14T01:02:03Z",
+     "artifactIds": [
+      "artifact-cce1d245e4a5ae99a44d951f4409c612615c83ae5ca314abd74fdb56783e38ba",
+      "artifact-941a10f5ab06a63980c43575d9fb4da08f126b8651dea7abf323b9876635cd3f"
+     ],
+     "dispatch": {
+      "command": "run",
+      "dispatchCount": 1,
+      "lastOutcome": "exited",
+      "lastRuntimeCode": null,
+      "state": "idle",
+      "updatedAt": "2026-10-14T01:02:03Z"
+     },
+     "failure": null,
+     "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+     "jobId": "s1-05050505050505050505050505050505",
+     "kind": "document-summary",
+     "mode": "replay",
+     "next": "fetch_result",
+     "observedAt": "2026-10-14T01:02:03Z",
+     "phase": "artifact.persisted",
+     "resumeMode": "none",
+     "schemaVersion": "zoop-ai-internal-1",
+     "state": "ready",
+     "unreceiptedAttempts": 0,
+     "usage": {
+      "cachedTokens": null,
+      "cost": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "providerAttempts": 0,
+      "reasoningTokens": null,
+      "replayCalls": 2
+     }
+    }
+   },
+   "status": {
+    "acceptedAt": "2026-10-14T01:02:03Z",
+    "artifactIds": [
+     "artifact-cce1d245e4a5ae99a44d951f4409c612615c83ae5ca314abd74fdb56783e38ba",
+     "artifact-941a10f5ab06a63980c43575d9fb4da08f126b8651dea7abf323b9876635cd3f"
+    ],
+    "dispatch": {
+     "command": "run",
+     "dispatchCount": 1,
+     "lastOutcome": "exited",
+     "lastRuntimeCode": null,
+     "state": "idle",
+     "updatedAt": "2026-10-14T01:02:03Z"
+    },
+    "failure": null,
+    "inputDigest": "e732e1f033df2e342b0f9255148da9c4bd1f746db35ae425898f998c6cecb929",
+    "jobId": "s1-05050505050505050505050505050505",
+    "kind": "document-summary",
+    "mode": "replay",
+    "next": "fetch_result",
+    "observedAt": "2026-10-14T01:02:03Z",
+    "phase": "artifact.persisted",
+    "resumeMode": "none",
+    "schemaVersion": "zoop-ai-internal-1",
+    "state": "ready",
+    "unreceiptedAttempts": 0,
+    "usage": {
+     "cachedTokens": null,
+     "cost": null,
+     "inputTokens": null,
+     "outputTokens": null,
+     "providerAttempts": 0,
+     "reasoningTokens": null,
+     "replayCalls": 2
+    }
+   },
+   "submit": {
+    "input": {
+     "candidate": null,
+     "company": {
+      "companyId": "SYNTH-A",
+      "name": "합성 알파"
+     },
+     "document": {
+      "cleanerVersion": "exact-copy-1",
+      "documentId": "doc-abababababababababababababababababababababababababababababababab",
+      "documentVersion": "7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e",
+      "inputKind": "body",
+      "rawLocators": [
+       {
+        "end": 57,
+        "locatorId": "raw-1",
+        "start": 0
+       }
+      ],
+      "sourceHash": "313c1c0bb60520063d99031b34d5ae7cf5c7854faeb674eb088862989cb12600",
+      "sourceId": "authored-synthetic",
+      "text": "😀 삼성전자 매출이 늘었다. \"인용\" 부호와 \\ 역슬래시.\n두 번째 문단: 합성 베타의 비용이 늘었다.",
+      "textArtifactId": "text-7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e"
+     },
+     "grantId": "grant-analysis-fixture",
+     "grantRevision": "rev-1"
+    },
+    "jobId": "s1-05050505050505050505050505050505",
+    "kind": "document-summary",
+    "mode": "replay",
+    "provenance": {
+     "executionMode": "replay",
+     "recordingKind": "authored-test",
+     "sourceKind": "synthetic"
+    },
+    "schemaVersion": "zoop-ai-s1-1"
+   }
+  }
+ },
+ "sourceId": "authored-synthetic"
+}

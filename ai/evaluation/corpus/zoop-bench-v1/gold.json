@@ -1,0 +1,743 @@
+{
+ "schema": "zoop-bench-gold-1",
+ "corpusId": "zoop-bench-v1",
+ "corpusRevision": "2026-10-14.1",
+ "goldRevision": "2026-10-14.1",
+ "provenance": {
+  "authoredBy": "BenchmarkFoundation (single author, agent-drafted)",
+  "synthetic": true,
+  "adjudicated": false,
+  "annotators": 1,
+  "note": "Single-author draft, not adjudicated by two humans. Withheld from systems under test. Scores on it support scorer/pipeline controls, not accuracy claims."
+ },
+ "graph": [
+  {
+   "taskId": "GT-A1",
+   "entityLinks": {
+    "m-a01": "E-ARC",
+    "m-a02": "E-ESK",
+    "m-a03": "E-ARC",
+    "m-a04": "E-BRL",
+    "m-a05": "E-CRV",
+    "m-a06": "E-BRL",
+    "m-a07": "E-DQL",
+    "m-a08": "E-CRV"
+   },
+   "events": {},
+   "merges": {},
+   "edges": [
+    {
+     "edgeId": "a1",
+     "subject": "E-ESK",
+     "predicate": "SUPPLIES",
+     "object": "E-ARC",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D01-P1"
+     ]
+    },
+    {
+     "edgeId": "a2",
+     "subject": "E-ARC",
+     "predicate": "SUPPLIES",
+     "object": "E-BRL",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D02-P1"
+     ]
+    },
+    {
+     "edgeId": "a3",
+     "subject": "E-BRL",
+     "predicate": "SUPPLIES",
+     "object": "E-CRV",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D03-P1"
+     ]
+    }
+   ]
+  },
+  {
+   "taskId": "GT-A2",
+   "entityLinks": {
+    "m-a09": "E-CRV",
+    "m-a10": "E-ESK",
+    "m-a11": "E-CRV",
+    "m-a12": "E-ESK",
+    "m-a13": "E-BRL"
+   },
+   "events": {},
+   "merges": {},
+   "edges": [
+    {
+     "edgeId": "a4",
+     "subject": "E-CRV",
+     "predicate": "INVESTS_IN",
+     "object": "E-ESK",
+     "validFrom": "2025-03-01",
+     "validTo": "2026-06-30",
+     "status": "asserted",
+     "evidence": [
+      "D04-P1",
+      "D05-P1"
+     ]
+    },
+    {
+     "edgeId": "a5",
+     "subject": "E-BRL",
+     "predicate": "INVESTS_IN",
+     "object": "E-ESK",
+     "validFrom": "2026-07-01",
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D05-P1"
+     ]
+    }
+   ]
+  },
+  {
+   "taskId": "GT-A3",
+   "entityLinks": {
+    "m-a14": "E-ZEN",
+    "m-a15": "E-BRL",
+    "m-a16": "E-ZEN",
+    "m-a17": "E-ARC",
+    "m-a18": "E-BRL",
+    "m-a19": "E-ZEN"
+   },
+   "events": {},
+   "merges": {},
+   "edges": [
+    {
+     "edgeId": "a6",
+     "subject": "E-ZEN",
+     "predicate": "SUPPLIES",
+     "object": "E-BRL",
+     "validFrom": null,
+     "validTo": null,
+     "status": "disputed",
+     "evidence": [
+      "D06-P1",
+      "D07-P1"
+     ]
+    },
+    {
+     "edgeId": "a7",
+     "subject": "E-ZEN",
+     "predicate": "COMPETES_WITH",
+     "object": "E-ARC",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D06-P2"
+     ]
+    }
+   ]
+  },
+  {
+   "taskId": "GT-A4",
+   "entityLinks": {
+    "m-a20": "E-MBIO",
+    "m-a21": null,
+    "m-a22": "E-MSTL"
+   },
+   "events": {},
+   "merges": {
+    "pair-a01": "DIFFERENT",
+    "pair-a02": "UNDECIDABLE"
+   },
+   "edges": []
+  },
+  {
+   "taskId": "GT-A5",
+   "entityLinks": {},
+   "events": {
+    "em-a01": {
+     "eventType": "PLANT_OPENING",
+     "eventDate": "2026-03-10"
+    },
+    "em-a02": {
+     "eventType": "EXEC_APPOINTMENT",
+     "eventDate": "2026-03-10"
+    },
+    "em-a03": {
+     "eventType": "PLANT_OPENING",
+     "eventDate": null
+    },
+    "em-a04": {
+     "eventType": "PLANT_OPENING",
+     "eventDate": "2026-09-02"
+    },
+    "em-a05": {
+     "eventType": "PLANT_OPENING",
+     "eventDate": null
+    }
+   },
+   "merges": {
+    "pair-a03": "DIFFERENT",
+    "pair-a04": "SAME",
+    "pair-a05": "DIFFERENT",
+    "pair-a06": "UNDECIDABLE",
+    "pair-a07": "DIFFERENT"
+   },
+   "edges": []
+  },
+  {
+   "taskId": "GT-B1",
+   "entityLinks": {
+    "m-b01": "E-NVC",
+    "m-b02": "E-PLR",
+    "m-b03": "E-PLR",
+    "m-b04": "E-QLA",
+    "m-b05": "E-RSR",
+    "m-b06": "E-QLA"
+   },
+   "events": {},
+   "merges": {},
+   "edges": [
+    {
+     "edgeId": "b1",
+     "subject": "E-NVC",
+     "predicate": "SUPPLIES",
+     "object": "E-PLR",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D21-P1"
+     ]
+    },
+    {
+     "edgeId": "b2",
+     "subject": "E-PLR",
+     "predicate": "SUPPLIES",
+     "object": "E-QLA",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D22-P1"
+     ]
+    },
+    {
+     "edgeId": "b3",
+     "subject": "E-QLA",
+     "predicate": "SUPPLIES",
+     "object": "E-RSR",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D23-P1"
+     ]
+    }
+   ]
+  },
+  {
+   "taskId": "GT-B2",
+   "entityLinks": {
+    "m-b07": "E-TAM",
+    "m-b08": "E-NVC",
+    "m-b09": "E-UVA",
+    "m-b10": "E-NVC"
+   },
+   "events": {},
+   "merges": {},
+   "edges": [
+    {
+     "edgeId": "b4",
+     "subject": "E-TAM",
+     "predicate": "INVESTS_IN",
+     "object": "E-NVC",
+     "validFrom": "2025-01-01",
+     "validTo": "2025-12-31",
+     "status": "asserted",
+     "evidence": [
+      "D24-P1"
+     ]
+    },
+    {
+     "edgeId": "b5",
+     "subject": "E-UVA",
+     "predicate": "INVESTS_IN",
+     "object": "E-NVC",
+     "validFrom": "2026-01-01",
+     "validTo": null,
+     "status": "asserted",
+     "evidence": [
+      "D25-P1"
+     ]
+    }
+   ]
+  },
+  {
+   "taskId": "GT-B3",
+   "entityLinks": {
+    "m-b11": "E-SOL",
+    "m-b12": "E-PLR",
+    "m-b13": "E-PLR",
+    "m-b14": "E-SOL"
+   },
+   "events": {},
+   "merges": {},
+   "edges": [
+    {
+     "edgeId": "b6",
+     "subject": "E-SOL",
+     "predicate": "SUPPLIES",
+     "object": "E-PLR",
+     "validFrom": null,
+     "validTo": null,
+     "status": "disputed",
+     "evidence": [
+      "D26-P1",
+      "D27-P1"
+     ]
+    }
+   ]
+  },
+  {
+   "taskId": "GT-B4",
+   "entityLinks": {
+    "m-b15": "E-KOPT",
+    "m-b16": null,
+    "m-b17": "E-KBNK"
+   },
+   "events": {},
+   "merges": {
+    "pair-b01": "DIFFERENT",
+    "pair-b02": "UNDECIDABLE"
+   },
+   "edges": []
+  },
+  {
+   "taskId": "GT-B5",
+   "entityLinks": {},
+   "events": {
+    "em-b01": {
+     "eventType": "LINE_OPENING",
+     "eventDate": "2026-06-01"
+    },
+    "em-b02": {
+     "eventType": "LINE_OPENING",
+     "eventDate": "2026-06-01"
+    },
+    "em-b03": {
+     "eventType": "LINE_OPENING",
+     "eventDate": "2026-06-01"
+    },
+    "em-b04": {
+     "eventType": "LINE_OPENING",
+     "eventDate": null
+    }
+   },
+   "merges": {
+    "pair-b03": "DIFFERENT",
+    "pair-b04": "SAME",
+    "pair-b05": "UNDECIDABLE",
+    "pair-b06": "DIFFERENT"
+   },
+   "edges": []
+  }
+ ],
+ "questions": [
+  {
+   "questionId": "QA-1",
+   "kind": "direct",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-ESK"
+   ],
+   "facts": [
+    {
+     "subject": "E-ESK",
+     "predicate": "SUPPLIES",
+     "object": "E-ARC",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "a1"
+    ]
+   ],
+   "supportPassages": [
+    "D01-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-2",
+   "kind": "directed",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-BRL"
+   ],
+   "facts": [
+    {
+     "subject": "E-ARC",
+     "predicate": "SUPPLIES",
+     "object": "E-BRL",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "a2"
+    ]
+   ],
+   "supportPassages": [
+    "D02-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-3",
+   "kind": "direct",
+   "hop": 2,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-BRL"
+   ],
+   "facts": [],
+   "paths": [
+    [
+     "a1",
+     "a2"
+    ]
+   ],
+   "supportPassages": [
+    "D01-P1",
+    "D02-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-4",
+   "kind": "direct",
+   "hop": 3,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-CRV"
+   ],
+   "facts": [],
+   "paths": [
+    [
+     "a1",
+     "a2",
+     "a3"
+    ]
+   ],
+   "supportPassages": [
+    "D01-P1",
+    "D02-P1",
+    "D03-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-5",
+   "kind": "temporal",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-CRV"
+   ],
+   "facts": [
+    {
+     "subject": "E-CRV",
+     "predicate": "INVESTS_IN",
+     "object": "E-ESK",
+     "validFrom": "2025-03-01",
+     "validTo": "2026-06-30",
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "a4"
+    ]
+   ],
+   "supportPassages": [
+    "D04-P1",
+    "D05-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-6",
+   "kind": "temporal",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-BRL"
+   ],
+   "facts": [
+    {
+     "subject": "E-BRL",
+     "predicate": "INVESTS_IN",
+     "object": "E-ESK",
+     "validFrom": "2026-07-01",
+     "validTo": null,
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "a5"
+    ]
+   ],
+   "supportPassages": [
+    "D05-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-7",
+   "kind": "unknown",
+   "hop": null,
+   "outcome": "abstained",
+   "answerEntities": [],
+   "facts": [],
+   "paths": [],
+   "supportPassages": [
+    "D05-P1"
+   ],
+   "abstainReason": "end_unknown"
+  },
+  {
+   "questionId": "QA-8",
+   "kind": "conflict",
+   "hop": null,
+   "outcome": "conflict",
+   "answerEntities": [],
+   "facts": [],
+   "paths": [],
+   "supportPassages": [
+    "D06-P1",
+    "D07-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QA-9",
+   "kind": "unknown",
+   "hop": null,
+   "outcome": "abstained",
+   "answerEntities": [],
+   "facts": [],
+   "paths": [],
+   "supportPassages": [],
+   "abstainReason": "no_evidence"
+  },
+  {
+   "questionId": "QB-1",
+   "kind": "direct",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-NVC"
+   ],
+   "facts": [
+    {
+     "subject": "E-NVC",
+     "predicate": "SUPPLIES",
+     "object": "E-PLR",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "b1"
+    ]
+   ],
+   "supportPassages": [
+    "D21-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-2",
+   "kind": "directed",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-RSR"
+   ],
+   "facts": [
+    {
+     "subject": "E-QLA",
+     "predicate": "SUPPLIES",
+     "object": "E-RSR",
+     "validFrom": null,
+     "validTo": null,
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "b3"
+    ]
+   ],
+   "supportPassages": [
+    "D23-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-3",
+   "kind": "direct",
+   "hop": 2,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-QLA"
+   ],
+   "facts": [],
+   "paths": [
+    [
+     "b1",
+     "b2"
+    ]
+   ],
+   "supportPassages": [
+    "D21-P1",
+    "D22-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-4",
+   "kind": "direct",
+   "hop": 3,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-RSR"
+   ],
+   "facts": [],
+   "paths": [
+    [
+     "b1",
+     "b2",
+     "b3"
+    ]
+   ],
+   "supportPassages": [
+    "D21-P1",
+    "D22-P1",
+    "D23-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-5",
+   "kind": "temporal",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-TAM"
+   ],
+   "facts": [
+    {
+     "subject": "E-TAM",
+     "predicate": "INVESTS_IN",
+     "object": "E-NVC",
+     "validFrom": "2025-01-01",
+     "validTo": "2025-12-31",
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "b4"
+    ]
+   ],
+   "supportPassages": [
+    "D24-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-6",
+   "kind": "temporal",
+   "hop": 1,
+   "outcome": "answered",
+   "answerEntities": [
+    "E-UVA"
+   ],
+   "facts": [
+    {
+     "subject": "E-UVA",
+     "predicate": "INVESTS_IN",
+     "object": "E-NVC",
+     "validFrom": "2026-01-01",
+     "validTo": null,
+     "status": "asserted"
+    }
+   ],
+   "paths": [
+    [
+     "b5"
+    ]
+   ],
+   "supportPassages": [
+    "D25-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-7",
+   "kind": "unknown",
+   "hop": null,
+   "outcome": "abstained",
+   "answerEntities": [],
+   "facts": [],
+   "paths": [],
+   "supportPassages": [
+    "D25-P1"
+   ],
+   "abstainReason": "end_unknown"
+  },
+  {
+   "questionId": "QB-8",
+   "kind": "conflict",
+   "hop": null,
+   "outcome": "conflict",
+   "answerEntities": [],
+   "facts": [],
+   "paths": [],
+   "supportPassages": [
+    "D26-P1",
+    "D27-P1"
+   ],
+   "abstainReason": null
+  },
+  {
+   "questionId": "QB-9",
+   "kind": "unknown",
+   "hop": null,
+   "outcome": "abstained",
+   "answerEntities": [],
+   "facts": [],
+   "paths": [],
+   "supportPassages": [],
+   "abstainReason": "no_evidence"
+  }
+ ]
+}

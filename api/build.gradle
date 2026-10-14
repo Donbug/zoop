@@ -32,6 +32,7 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform {
 		excludeTags 'ai-contract'
+		excludeTags 'ai-pipeline-contract'
 		excludeTags 'company-postgres'
 	}
 }
@@ -62,6 +63,25 @@ tasks.register('aiContractTest', Test) {
 	classpath = sourceSets.test.runtimeClasspath
 	useJUnitPlatform {
 		includeTags 'ai-contract'
+	}
+	outputs.upToDateWhen { false }
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
+}
+
+// Real cross-language gate for the S2 extraction and S3 relation clients: this JVM talks to a running ai/service and the
+// installed zoop-ai-extract / zoop-ai-relation over a fresh synthetic operator world (replay only, no model, no network).
+// Run it through `make api-ai-pipeline-smoke`; that script prepares the world and exports ZOOP_AI_PIPELINE_MANIFEST.
+// Without the manifest the tests fail; they never skip.
+tasks.register('aiPipelineContractTest', Test) {
+	group = 'verification'
+	description = 'Runs the S2/S3 cross-language transport tests against a live ai/service (see make api-ai-pipeline-smoke).'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'ai-pipeline-contract'
 	}
 	outputs.upToDateWhen { false }
 	testLogging {

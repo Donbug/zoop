@@ -97,6 +97,9 @@ api-test:
 	$(API_GRADLE) test
 api-ai-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_contract_gate.py
+.PHONY: api-ai-pipeline-smoke
+api-ai-pipeline-smoke:
+	$(SERVICE_PYTHON) api/scripts/ai_pipeline_gate.py
 api-build:
 	$(API_GRADLE) assemble
 package-artifacts:

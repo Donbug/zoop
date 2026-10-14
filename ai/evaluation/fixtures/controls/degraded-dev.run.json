@@ -1,0 +1,666 @@
+{
+ "schema": "zoop-bench-run-1",
+ "runId": "control-degraded-dev",
+ "label": "authored degraded control, dev split",
+ "provenance": {
+  "kind": "authored_control",
+  "executionMode": "authored",
+  "recorder": "zoop_eval.controls",
+  "recordedAt": null,
+  "controlKind": "hand_degraded_mistakes",
+  "note": "Derived from the gold by code. A scorer sanity input; not a system and not a measurement."
+ },
+ "corpus": {
+  "corpusId": "zoop-bench-v1",
+  "corpusRevision": "2026-10-14.1",
+  "goldRevision": "2026-10-14.1",
+  "inputsSha256": "dc3a2f49940e85fea8d77b3ea4efea3e3a7e13a2013978e5dd308f92538b6f31",
+  "split": "dev",
+  "tasks": [
+   "graph",
+   "qa"
+  ]
+ },
+ "system": {
+  "systemId": "control-degraded",
+  "family": "no_model_deterministic",
+  "model": null,
+  "config": {
+   "control": "degraded"
+  },
+  "promptRevision": null,
+  "toolRevision": "authored-control-1",
+  "schemaRevision": "zoop-bench-run-1",
+  "graphRevision": null,
+  "capabilities": {
+   "retrieval": true,
+   "path": true,
+   "citations": true
+  }
+ },
+ "records": [
+  {
+   "task": "graph",
+   "caseId": "GT-A1",
+   "status": "ok",
+   "output": {
+    "entityLinks": [
+     {
+      "mentionId": "m-a01",
+      "entityId": "E-ARC"
+     },
+     {
+      "mentionId": "m-a02",
+      "entityId": "E-ESK"
+     },
+     {
+      "mentionId": "m-a03",
+      "entityId": "E-ARC"
+     },
+     {
+      "mentionId": "m-a04",
+      "entityId": "E-BRL"
+     },
+     {
+      "mentionId": "m-a05",
+      "entityId": "E-CRV"
+     },
+     {
+      "mentionId": "m-a06",
+      "entityId": "E-BRL"
+     },
+     {
+      "mentionId": "m-a07",
+      "entityId": null
+     },
+     {
+      "mentionId": "m-a08",
+      "entityId": "E-DQL"
+     }
+    ],
+    "events": [],
+    "mergeDecisions": [],
+    "edges": [
+     {
+      "subject": "E-ARC",
+      "predicate": "SUPPLIES",
+      "object": "E-ESK",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D01-P1"
+      ]
+     },
+     {
+      "subject": "E-ARC",
+      "predicate": "SUPPLIES",
+      "object": "E-BRL",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D02-P1"
+      ]
+     },
+     {
+      "subject": "E-DQL",
+      "predicate": "SUPPLIES",
+      "object": "E-CRV",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D03-P2"
+      ]
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 130,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-A2",
+   "status": "ok",
+   "output": {
+    "entityLinks": [
+     {
+      "mentionId": "m-a09",
+      "entityId": "E-CRV"
+     },
+     {
+      "mentionId": "m-a10",
+      "entityId": "E-ESK"
+     },
+     {
+      "mentionId": "m-a11",
+      "entityId": "E-CRV"
+     },
+     {
+      "mentionId": "m-a12",
+      "entityId": "E-ESK"
+     },
+     {
+      "mentionId": "m-a13",
+      "entityId": "E-BRL"
+     }
+    ],
+    "events": [],
+    "mergeDecisions": [],
+    "edges": [
+     {
+      "subject": "E-CRV",
+      "predicate": "INVESTS_IN",
+      "object": "E-ESK",
+      "validFrom": "2025-03-01",
+      "validTo": "2026-06-30",
+      "status": "asserted",
+      "citations": [
+       "D04-P1",
+       "D05-P1"
+      ]
+     },
+     {
+      "subject": "E-BRL",
+      "predicate": "INVESTS_IN",
+      "object": "E-ESK",
+      "validFrom": "2026-07-01",
+      "validTo": "2026-12-31",
+      "status": "asserted",
+      "citations": [
+       "D05-P1"
+      ]
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 140,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-A3",
+   "status": "refused",
+   "trace": {
+    "startMs": 0,
+    "endMs": 150,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   },
+   "detail": "provider refused the request"
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-A5",
+   "status": "ok",
+   "output": {
+    "entityLinks": [],
+    "events": [
+     {
+      "eventMentionId": "em-a01",
+      "eventType": "PLANT_OPENING",
+      "eventDate": "2026-03-10"
+     },
+     {
+      "eventMentionId": "em-a02",
+      "eventType": "EXEC_APPOINTMENT",
+      "eventDate": "2026-03-10"
+     },
+     {
+      "eventMentionId": "em-a03",
+      "eventType": "PLANT_OPENING",
+      "eventDate": null
+     },
+     {
+      "eventMentionId": "em-a04",
+      "eventType": "PLANT_OPENING",
+      "eventDate": "2026-09-02"
+     },
+     {
+      "eventMentionId": "em-a05",
+      "eventType": "PLANT_OPENING",
+      "eventDate": "2026-09-04"
+     }
+    ],
+    "mergeDecisions": [
+     {
+      "pairId": "pair-a03",
+      "decision": "SAME"
+     },
+     {
+      "pairId": "pair-a04",
+      "decision": "DIFFERENT"
+     },
+     {
+      "pairId": "pair-a05",
+      "decision": "DIFFERENT"
+     },
+     {
+      "pairId": "pair-a06",
+      "decision": "HOLD"
+     },
+     {
+      "pairId": "pair-a07",
+      "decision": "DIFFERENT"
+     }
+    ],
+    "edges": []
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 170,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-1",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-ESK"
+    ],
+    "facts": [
+     {
+      "subject": "E-ESK",
+      "predicate": "SUPPLIES",
+      "object": "E-ARC",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D01-P1"
+    ],
+    "citations": [
+     "D01-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-ESK",
+      "predicate": "SUPPLIES",
+      "object": "E-ARC"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-2",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-BRL"
+    ],
+    "facts": [
+     {
+      "subject": "E-BRL",
+      "predicate": "SUPPLIES",
+      "object": "E-ARC",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D02-P1"
+    ],
+    "citations": [
+     "D02-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-BRL",
+      "predicate": "SUPPLIES",
+      "object": "E-ARC"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-3",
+   "status": "ok",
+   "output": {
+    "outcome": "abstained",
+    "abstainReason": "no_evidence",
+    "retrieved": [
+     "D01-P1",
+     "D02-P1"
+    ],
+    "citations": []
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 90,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 40,
+      "endMs": 70,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-4",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-CRV"
+    ],
+    "facts": [],
+    "retrieved": [
+     "D01-P1",
+     "D03-P1"
+    ],
+    "citations": [
+     "D01-P1",
+     "D03-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-ESK",
+      "predicate": "SUPPLIES",
+      "object": "E-ARC"
+     },
+     {
+      "subject": "E-BRL",
+      "predicate": "SUPPLIES",
+      "object": "E-CRV"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 120,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 40,
+      "endMs": 70,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 70,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-5",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-BRL"
+    ],
+    "facts": [
+     {
+      "subject": "E-BRL",
+      "predicate": "INVESTS_IN",
+      "object": "E-ESK",
+      "validFrom": "2026-07-01",
+      "validTo": null,
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D05-P1",
+     "D04-P1"
+    ],
+    "citations": [
+     "D05-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-BRL",
+      "predicate": "INVESTS_IN",
+      "object": "E-ESK"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-7",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-ESK"
+    ],
+    "facts": [
+     {
+      "subject": "E-BRL",
+      "predicate": "INVESTS_IN",
+      "object": "E-ESK",
+      "validFrom": "2026-07-01",
+      "validTo": "2027-01-01",
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D05-P1"
+    ],
+    "citations": [
+     "D05-P1"
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-8",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-BRL"
+    ],
+    "facts": [],
+    "retrieved": [
+     "D06-P1",
+     "D03-P1"
+    ],
+    "citations": [
+     "D06-P1"
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QA-9",
+   "status": "error",
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   },
+   "detail": "tool timeout"
+  }
+ ]
+}
