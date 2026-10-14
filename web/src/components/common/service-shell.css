@@ -344,6 +344,311 @@
   font-size: 10px;
 }
 
+/* D-STK-01 종목 탐색: briefing 화면과 같은 기준(토큰·헤어라인·세그먼트) */
+.stocks-page {
+  width: min(100%, 800px);
+  margin: 0 auto;
+}
+
+.stocks-page-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+}
+
+.stocks-search {
+  margin-top: 20px;
+}
+
+.stocks-search label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--zoop-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stocks-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.stocks-search-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.stocks-search-field > img {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+}
+
+.stocks-search-field input {
+  width: 100%;
+  height: 42px;
+  border: 1.333px solid var(--zoop-ink);
+  border-radius: 3px;
+  background: var(--zoop-paper);
+  padding: 0 38px 0 34px;
+  color: var(--zoop-ink);
+  font-size: 13px;
+}
+
+.stocks-search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.stocks-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  color: var(--zoop-muted);
+  font-size: 15px;
+}
+
+.stocks-search-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 42px;
+  border: 0.667px solid var(--zoop-line);
+  border-radius: 3px;
+  background: var(--zoop-paper);
+  padding: 0 14px;
+  color: var(--zoop-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stocks-scope {
+  display: inline-flex;
+  height: 38px;
+  margin-top: 16px;
+  border: 0.667px solid var(--zoop-line);
+  border-radius: 3px;
+  background: var(--zoop-soft);
+  padding: 3px;
+}
+
+.stocks-scope button {
+  min-width: 76px;
+  border-radius: 2px;
+  color: var(--zoop-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stocks-scope button[aria-pressed='true'] {
+  background: var(--zoop-paper);
+  color: var(--zoop-ink);
+  box-shadow: 0 0 0 0.5px #1a1a1a14;
+}
+
+.stocks-count {
+  margin: 20px 0 8px;
+  color: var(--zoop-muted);
+  font:
+    11px/1.5 'Inter Variable',
+    'Pretendard Variable',
+    sans-serif;
+}
+
+.stocks-list {
+  border-top: 0.667px solid var(--zoop-line);
+}
+
+.stocks-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 8px;
+  border-bottom: 0.667px solid var(--zoop-line);
+}
+
+.stocks-mark {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--zoop-ink);
+  color: var(--zoop-paper);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stocks-identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.stocks-name {
+  overflow: hidden;
+  color: var(--zoop-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stocks-meta {
+  margin-top: 3px;
+  color: var(--zoop-muted);
+  font:
+    11px/1.5 'Inter Variable',
+    'Pretendard Variable',
+    sans-serif;
+}
+
+.stocks-held {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  color: var(--zoop-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.stocks-quote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 84px;
+  font-family: 'Inter Variable', 'Pretendard Variable', sans-serif;
+}
+
+.stocks-quote strong {
+  color: var(--zoop-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stocks-quote span {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.stocks-quote .is-up {
+  color: #d23c3c;
+}
+
+.stocks-quote .is-down {
+  color: #2f6fd8;
+}
+
+.stocks-quote .is-flat,
+.stocks-quote .is-empty {
+  color: var(--zoop-faint);
+}
+
+.stocks-action {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  color: var(--zoop-muted);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.stocks-action:hover {
+  background: var(--zoop-soft);
+  color: var(--zoop-ink);
+}
+
+.stocks-action[aria-pressed='true'] {
+  border: 0.667px solid var(--zoop-ink);
+  color: var(--zoop-ink);
+}
+
+.stocks-action:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.stocks-empty,
+.stocks-notice {
+  margin-top: 20px;
+  border: 0.667px dashed var(--zoop-line);
+  border-radius: 3px;
+  padding: 18px;
+  background: var(--zoop-wash);
+  color: var(--zoop-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.stocks-notice a {
+  color: var(--zoop-ink);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.stocks-status {
+  margin-top: 20px;
+  color: var(--zoop-muted);
+  font-size: 12px;
+}
+
+.stocks-more {
+  display: block;
+  margin: 16px auto 0;
+  min-width: 120px;
+  height: 36px;
+  border: 0.667px solid var(--zoop-line);
+  border-radius: 3px;
+  background: var(--zoop-paper);
+  color: var(--zoop-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stocks-more:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+.stocks-toast {
+  position: fixed;
+  right: 0;
+  bottom: 24px;
+  left: 0;
+  z-index: 40;
+  width: min(32rem, calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+@media (max-width: 767px) {
+  .stocks-row {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 0;
+  }
+
+  .stocks-quote {
+    min-width: auto;
+  }
+
+  .stocks-toast {
+    bottom: 80px;
+  }
+}
+
 @media (max-width: 767px) {
   .relationship-header {
     padding: 0 14px;
