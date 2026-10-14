@@ -1,5 +1,5 @@
 import { ApiError } from '@/apis/auth/ApiService';
-import { issues } from '@/mocks/graph/fixture';
+import { issues, follows } from '@/mocks/graph/fixture';
 import type { EvidenceResponse } from '@/types/evidence';
 
 export type EvidenceMockScenario =
@@ -62,6 +62,7 @@ for (const [index, issue] of issues.entries()) {
   });
   records.set(secondId, {
     ...shared,
+    articleId: `${articleId}-detail`,
     id: secondId,
     quote: secondQuote,
     start: 12,
@@ -74,6 +75,30 @@ for (const [index, issue] of issues.entries()) {
     },
     quoteVerified: null,
   });
+}
+
+// A FOLLOWS edge has its own relation evidence, not the endpoints' evidence union.
+for (const edge of follows) {
+  const source = issues.find((issue) => issue.id === edge.source)!;
+  const target = issues.find((issue) => issue.id === edge.target)!;
+  const base = records.get(evidenceIdsForIssue(target.id)[0])!;
+  const quote = `${source.label}에서 ${target.label}으로 이어지는 후속 관계를 설명하는 합성 인용문입니다.`;
+  for (const id of edge.evidenceIds)
+    records.set(id, {
+      ...base,
+      id,
+      articleId: `mock-article-${edge.id}`,
+      quote,
+      start: 0,
+      end: quoteLength(quote),
+      eventIds: [target.id, source.id],
+      article: {
+        title: '[가상 기사] 후속 사건 연결 자료',
+        publisher: '줍 가상 뉴스룸',
+        url: null,
+        publishedAt: null,
+      },
+    });
 }
 
 export function createMockEvidence(

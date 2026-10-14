@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
+import { isSelectableRelation } from '@/types/map/relation';
 import GraphIcon from './GraphIcon';
 import { graphSummary, toG6Data } from './graph-model';
 
@@ -9,11 +10,15 @@ export default function GraphCanvas({
   selectedId: selected = null,
   onSelect,
   focusId = null,
+  selectedEdgeId = null,
+  onSelectEdge,
 }: {
   data: GraphResponse;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
+  selectedEdgeId?: string | null;
+  onSelectEdge?: (id: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<Graph | null>(null);
@@ -21,6 +26,10 @@ export default function GraphCanvas({
   const drawing = useRef(Promise.resolve());
   const lastFocused = useRef<string | null>(null);
   const selectNode = useEffectEvent((id: string | null) => onSelect?.(id));
+  const selectEdge = useEffectEvent((id: string) => {
+    if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
+      onSelectEdge?.(id);
+  });
   const [renderError, setRenderError] = useState(false);
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
@@ -48,10 +57,14 @@ export default function GraphCanvas({
         if (graph.destroyed) return;
         await graph.setElementState(
           Object.fromEntries(
-            (rendered.nodes ?? []).map((node) => [
-              node.id,
-              node.id === selected ? ['selected'] : [],
-            ]),
+            [...(rendered.nodes ?? []), ...(rendered.edges ?? [])].map(
+              (node) => [
+                node.id,
+                node.id === selected || node.id === selectedEdgeId
+                  ? ['selected']
+                  : [],
+              ],
+            ),
           ),
         );
         if (
@@ -68,7 +81,7 @@ export default function GraphCanvas({
   });
   useEffect(() => {
     syncSelection();
-  }, [selected, focusId]);
+  }, [selected, selectedEdgeId, focusId]);
   useEffect(() => {
     const host = container.current;
     if (!host) return;
@@ -89,6 +102,11 @@ export default function GraphCanvas({
         data: toG6Data(data, host.clientWidth, host.clientHeight),
         behaviors: ['drag-canvas', 'zoom-canvas'],
         zoomRange: [0.25, 4],
+        edge: {
+          state: {
+            selected: { lineWidth: 2, stroke: '#1a1a1a', strokeOpacity: 1 },
+          },
+        },
         node: {
           state: {
             selected: {
@@ -104,6 +122,9 @@ export default function GraphCanvas({
         selectNode(event.target.id),
       );
       graph.on('canvas:click', () => selectNode(null));
+      graph.on('edge:click', (event: IElementEvent) =>
+        selectEdge(event.target.id),
+      );
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
@@ -273,7 +294,7 @@ export default function GraphCanvas({
       )}
       <div
         className="relationship-accessible-nodes"
-        aria-label="키보드로 기업·사건 선택"
+        aria-label="키보드로 기업·사건·연결선 선택"
       >
         {data.nodes.map((node) => (
           <button
@@ -285,6 +306,17 @@ export default function GraphCanvas({
             {node.label}
             {node.holding ? ' · 보유' : ''}
             {node.watch ? ' · 관심' : ''}
+          </button>
+        ))}
+        {data.edges.filter(isSelectableRelation).map((edge) => (
+          <button
+            key={edge.id}
+            aria-pressed={selectedEdgeId === edge.id}
+            onClick={() => onSelectEdge?.(edge.id)}
+          >
+            연결선: {data.nodes.find((node) => node.id === edge.source)?.label}{' '}
+            – {data.nodes.find((node) => node.id === edge.target)?.label} ·{' '}
+            {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}
           </button>
         ))}
       </div>

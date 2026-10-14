@@ -42,6 +42,26 @@ beforeEach(() => {
 });
 
 describe('D-GRP-05 · evidence drawer states and interactions', () => {
+  it('traps reverse Tab from the heading and restores background interaction on close', async () => {
+    mocked.mockImplementation(async (id) => createMockEvidence(id));
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: '근거 열기' });
+    await userEvent.click(opener);
+    await screen.findByText('[가상 공시] HBM4 공급 계약 참고 자료');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('heading', { name: '근거 문서' }),
+      ),
+    );
+    expect(opener.inert).toBe(true);
+    await userEvent.tab({ shift: true });
+    expect(document.activeElement).toBe(
+      screen.getAllByRole('button', { name: '◇ 지도에서 보기' }).at(-1),
+    );
+    await userEvent.keyboard('{Escape}');
+    expect(opener.inert).not.toBe(true);
+    expect(document.activeElement).toBe(opener);
+  });
   it('shows source, publication time, captured quotes and link availability', async () => {
     mocked.mockImplementation(async (id) => createMockEvidence(id));
     const onViewOnMap = vi.fn();
@@ -50,9 +70,7 @@ describe('D-GRP-05 · evidence drawer states and interactions', () => {
     const dialog = await screen.findByRole('dialog', { name: '근거 문서' });
     expect(dialog.getAttribute('data-screen-id')).toBe('D-GRP-05');
     expect(screen.getByText('HBM4 공급 계약')).toBeTruthy();
-    expect(
-      screen.getByText(/관계 확인 시점 2026-10-06 12:41 KST/),
-    ).toBeTruthy();
+    expect(screen.getByText(/관계 확인 시점 확인 시점 미제공/)).toBeTruthy();
     expect(screen.getByText(/줍 가상 뉴스룸 \(example.com\)/)).toBeTruthy();
     expect(screen.getByText('발행 2026-10-06 09:00 KST')).toBeTruthy();
     expect(screen.getAllByText(/합성 인용문|추가로 확인/)).toHaveLength(2);

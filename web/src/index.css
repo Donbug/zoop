@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-panel: 'Pretendard Variable', Pretendard, sans-serif;
+  --color-panel-ink: #1a1a1a;
+  --color-panel-muted: #777771;
+  --color-panel-line: #e2e2de;
+  --color-panel-control: #bdbdb8;
+  --color-panel-soft: #f2f2f0;
+  --radius-panel: 3px;
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -26,9 +36,11 @@ body {
     sans-serif;
 }
 
-button,
-input {
-  font: inherit;
+@layer base {
+  button,
+  input {
+    font: inherit;
+  }
 }
 
 #root {

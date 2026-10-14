@@ -10,7 +10,8 @@ export function evidenceUrl(id: string) {
 }
 
 export async function getEvidence(id: string): Promise<EvidenceResponse> {
-  if (usesEvidenceMock) {
+  // D-GRP-04 mock targets must never fall through to a production API.
+  if (usesEvidenceMock || id.startsWith('mock-evidence-')) {
     const { createMockEvidence } = await import('@/mocks/evidence/fixture');
     await new Promise((resolve) => setTimeout(resolve, 220));
     return createMockEvidence(

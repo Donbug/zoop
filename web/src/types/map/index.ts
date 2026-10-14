@@ -12,6 +12,8 @@ export type GraphTarget = (
     asOf?: string;
   };
   evidenceIds?: string[];
+  // Actual verification timestamp only; never substitute a graph snapshot asOf.
+  verifiedAt?: string | null;
   label?: string;
 };
 

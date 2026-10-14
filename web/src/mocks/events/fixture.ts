@@ -65,6 +65,14 @@ export function createMockEvent(
         publishedAt: '2026-10-06T00:00:00Z',
         relationType: 'REPORTS',
       },
+      {
+        id: `${articleId}-detail`,
+        title: `[가상 공시] ${issue.label} 참고 자료`,
+        publisher: '줍 가상 공시 저장소',
+        url: null,
+        publishedAt: null,
+        relationType: 'PROVIDES_BACKGROUND',
+      },
     ],
     evidenceIds,
     summary: evidenceIds.length
@@ -91,9 +99,9 @@ export function createMockEvent(
       evidenceIds,
     })),
     sourceSupport: {
-      articleCount: 1,
+      articleCount: 2,
       knownLineageCount: null,
-      unknownLineageArticles: [articleId],
+      unknownLineageArticles: [articleId, `${articleId}-detail`],
       independentSourceCount: null,
       duplicateGroups: [],
     },

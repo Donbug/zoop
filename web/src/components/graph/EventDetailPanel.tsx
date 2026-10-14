@@ -1,3 +1,4 @@
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { useEffect, useRef, useState } from 'react';
 import { useEventData } from '@/hooks/useEventData';
 import type { EventContext, EventDetail } from '@/types/map/event';
@@ -57,10 +58,12 @@ export default function EventDetailPanel({
     ) ?? [];
   function renderCompanies(items: typeof directCompanies) {
     return (
-      <ul className="event-companies">
+      <ul
+        className={`${ui.list} [&>li]:flex [&>li]:items-center [&>li]:gap-2 [&_strong]:text-[10.5px] [&_strong]:font-semibold [&_p]:text-[9.5px] [&_p]:text-panel-muted`}
+      >
         {items.map((company, index) => (
           <li key={`${company.id}-${index}`}>
-            <span className="event-company-avatar" aria-hidden="true">
+            <span className={ui.avatar} aria-hidden="true">
               {company.name.slice(0, 1)}
             </span>
             <div>
@@ -80,7 +83,7 @@ export default function EventDetailPanel({
   }
   return (
     <aside
-      className="event-panel"
+      className={`event-panel ${ui.shell}`}
       data-screen-id="D-GRP-02"
       aria-labelledby="event-panel-title"
       onKeyDown={(event) => {
@@ -90,13 +93,13 @@ export default function EventDetailPanel({
         }
       }}
     >
-      <header className="event-header">
-        <div className="event-badges">
-          <span>
+      <header className={ui.header}>
+        <div className="mb-3 flex flex-wrap gap-1.5 pr-10">
+          <span className={ui.badge}>
             <GraphIcon name="issue" size={12} />
             사건
           </span>
-          <span>
+          <span className={ui.badge}>
             {geography === 'domestic'
               ? '국내'
               : geography === 'international'
@@ -105,31 +108,36 @@ export default function EventDetailPanel({
           </span>
         </div>
         <button
-          className="event-close"
+          className={`absolute top-4 right-4 ${ui.close}`}
           onClick={onClose}
           aria-label="상세 닫기"
         >
           ×
         </button>
-        <h2 id="event-panel-title" ref={heading} tabIndex={-1}>
+        <h2
+          id="event-panel-title"
+          ref={heading}
+          tabIndex={-1}
+          className={ui.title}
+        >
           {data?.title ?? '사건 상세'}
         </h2>
         {data && (
-          <p className="event-muted">
+          <p className={ui.muted}>
             {formatEventTime(data.eventTime, data.timePrecision)}
           </p>
         )}
-        {data?.period && <p className="event-muted">기간 · {data.period}</p>}
+        {data?.period && <p className={ui.muted}>기간 · {data.period}</p>}
       </header>
-      <div aria-busy={loading}>
+      <div className={ui.scroll} aria-busy={loading}>
         {loading && (
-          <div className="event-state" role="status">
-            <span className="event-skeleton" />
+          <div className={ui.state} role="status">
+            <span className="block h-16 rounded-panel bg-panel-line motion-safe:animate-pulse" />
             <p>사건 정보를 불러오는 중입니다.</p>
           </div>
         )}
         {error && (
-          <div className="event-state" role="alert">
+          <div className={ui.state} role="alert">
             <strong>사건을 불러오지 못했습니다.</strong>
             <p>{error}</p>
             <p>지도는 그대로 유지됩니다.</p>
@@ -140,7 +148,9 @@ export default function EventDetailPanel({
         )}
         {data && (
           <>
-            <div className="event-actions">
+            <div
+              className={`${ui.actions} [&>button:last-child]:col-span-2 [&>button:last-child]:bg-panel-ink [&>button:last-child]:text-white`}
+            >
               <button
                 disabled={
                   failed('evidence') ||
@@ -163,12 +173,12 @@ export default function EventDetailPanel({
               </button>
             </div>
             {notice && (
-              <p className="event-action-notice" role="status">
+              <p className={ui.state} role="status">
                 {notice}
               </p>
             )}
             {data.metadata.partial && (
-              <div className="event-partial" role="status">
+              <div className={ui.state} role="status">
                 <strong>일부 정보를 불러오지 못했습니다.</strong>
                 <ul>
                   {failures.map((failure, index) => (
@@ -186,7 +196,7 @@ export default function EventDetailPanel({
               </div>
             )}
             <section
-              className="event-section"
+              className={ui.section}
               aria-labelledby="event-summary-title"
             >
               <h3 id="event-summary-title">핵심 내용</h3>
@@ -199,7 +209,7 @@ export default function EventDetailPanel({
               </p>
             </section>
             <section
-              className="event-section"
+              className={ui.section}
               aria-labelledby="event-companies-title"
             >
               <h3 id="event-companies-title">
@@ -210,17 +220,17 @@ export default function EventDetailPanel({
                   : `${new Set(directCompanies.map((c) => c.id)).size}곳`}
               </h3>
               {failed('companies') ? (
-                <p className="event-muted">
+                <p className={ui.muted}>
                   관련 기업 정보를 불러오지 못했습니다.
                 </p>
               ) : directCompanies.length ? (
                 renderCompanies(directCompanies)
               ) : (
-                <p className="event-muted">직접 관련 기업이 없습니다.</p>
+                <p className={ui.muted}>직접 관련 기업이 없습니다.</p>
               )}
               {structuralCompanies.length > 0 && (
                 <>
-                  <h3 className="event-structural-title">
+                  <h3 className="mt-4">
                     구조적 관련 기업{' '}
                     {new Set(structuralCompanies.map((c) => c.id)).size}곳
                   </h3>
@@ -229,7 +239,7 @@ export default function EventDetailPanel({
               )}
             </section>
             <section
-              className="event-section"
+              className={ui.section}
               aria-labelledby="event-documents-title"
             >
               <h3 id="event-documents-title">
@@ -238,14 +248,16 @@ export default function EventDetailPanel({
                 {failed('articles') ? '조회 실패' : `${data.articles.length}건`}
               </h3>
               {failed('articles') ? (
-                <p className="event-muted">관련 문서를 불러오지 못했습니다.</p>
+                <p className={ui.muted}>관련 문서를 불러오지 못했습니다.</p>
               ) : data.articles.length ? (
-                <ul className="event-articles">
+                <ul
+                  className={`${ui.list} [&_h4]:my-1 [&_h4]:font-semibold [&_h4]:wrap-anywhere [&_a]:mt-2 [&_a]:inline-block [&_a]:underline`}
+                >
                   {data.articles.map((article) => {
                     const href = safeArticleUrl(article.url);
                     return (
                       <li key={article.id}>
-                        <span className="event-document-type">
+                        <span className={ui.muted}>
                           {article.relationType === 'REPORTS'
                             ? '보도 기사'
                             : article.relationType === 'PROVIDES_BACKGROUND'
@@ -253,7 +265,7 @@ export default function EventDetailPanel({
                               : '문서 유형 미제공'}
                         </span>
                         <h4>{article.title ?? '제목 미제공'}</h4>
-                        <p className="event-muted">
+                        <p className={ui.muted}>
                           {article.publisher ?? '출처 미제공'} ·{' '}
                           {formatPublishedAt(article.publishedAt)
                             ? `발행 ${formatPublishedAt(article.publishedAt)}`
@@ -265,21 +277,20 @@ export default function EventDetailPanel({
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            원문 보기{' '}
-                            <span className="event-muted">(새 창)</span>
+                            원문 보기 <span className={ui.muted}>(새 창)</span>
                           </a>
                         ) : (
-                          <p className="event-muted">원문 링크 미제공</p>
+                          <p className={ui.muted}>원문 링크 미제공</p>
                         )}
                       </li>
                     );
                   })}
                 </ul>
               ) : (
-                <p className="event-muted">관련 문서가 없습니다.</p>
+                <p className={ui.muted}>관련 문서가 없습니다.</p>
               )}
             </section>
-            <section className="event-section" aria-label="근거 안내">
+            <section className={ui.section} aria-label="근거 안내">
               <p>
                 {failed('evidence') || failed('evidenceIds')
                   ? '근거 정보를 불러오지 못했습니다.'
@@ -287,11 +298,11 @@ export default function EventDetailPanel({
                     ? `연결된 근거 ${evidenceCount}건 · 문서 수와 인용 근거 수는 다를 수 있습니다.`
                     : '연결된 근거가 없습니다.'}
               </p>
-              <p className="event-muted">
+              <p className={ui.muted}>
                 기업별 영향 해석은 제공되지 않았습니다.
               </p>
             </section>
-            <footer className="event-footer">
+            <footer className={ui.footer}>
               <p>{data.metadata.source}</p>
               <p>
                 조회 기준 · {formatPublishedAt(data.metadata.asOf) ?? '미제공'}

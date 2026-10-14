@@ -6,7 +6,7 @@ import {
 import { useEvidenceData } from '@/hooks/useEvidenceData';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EvidenceResponse } from '@/types/evidence';
-import './evidence-drawer.css';
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 
 interface Props {
   onViewOnMap?: (eventId: string) => void;
@@ -35,10 +35,12 @@ function EvidenceCard({
   const href = safeArticleUrl(evidence.article?.url ?? null);
   const eventId = evidence.eventIds[0];
   return (
-    <article className="evidence-card">
+    <article
+      className={`${ui.section} [&_blockquote]:mt-3 [&_blockquote]:rounded-panel [&_blockquote]:border [&_blockquote]:border-panel-line [&_blockquote]:bg-panel-soft [&_blockquote]:p-3 [&_blockquote]:wrap-anywhere`}
+    >
       {evidence.article ? (
         <>
-          <p className="evidence-source">
+          <p className={`flex flex-wrap gap-x-1.5 ${ui.muted}`}>
             <span>{publisherLabel(evidence)}</span>
             <span aria-hidden="true">·</span>
             <span>
@@ -47,27 +49,25 @@ function EvidenceCard({
                 : '발행 시각 미상'}
             </span>
           </p>
-          <p className="evidence-verification">
+          <p className={`mt-1 ${ui.muted}`}>
             {evidence.quoteVerified === true
               ? '원문 구간 확인됨'
               : evidence.quoteVerified === false
                 ? '원문 구간 불일치'
                 : '원문 구간 검증 상태 미제공'}
           </p>
-          <h3>{evidence.article.title ?? '문서 제목 미제공'}</h3>
+          <h3 className="mt-3">
+            {evidence.article.title ?? '문서 제목 미제공'}
+          </h3>
           <blockquote>{evidence.quote}</blockquote>
-          <div className="evidence-actions">
+          <div className={`${ui.actions} mt-3 border-none! p-0!`}>
             {href ? (
               <a href={href} target="_blank" rel="noopener noreferrer">
                 ↗ 원문 기사 보기{' '}
-                <span className="evidence-visually-hidden">
-                  (새 창에서 열림)
-                </span>
+                <span className="sr-only">(새 창에서 열림)</span>
               </a>
             ) : (
-              <span className="evidence-link-unavailable">
-                원문 링크가 제공되지 않았습니다.
-              </span>
+              <span className={ui.muted}>원문 링크가 제공되지 않았습니다.</span>
             )}
             {eventId && onViewOnMap && (
               <button
@@ -81,7 +81,7 @@ function EvidenceCard({
           </div>
         </>
       ) : (
-        <div className="evidence-unavailable">
+        <div className={ui.state}>
           <strong>근거 문서를 제공할 수 없습니다.</strong>
           <p>
             삭제·비공개 또는 이용 권한 변경으로 원문 정보를 표시하지 않습니다.
@@ -116,32 +116,46 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    // Block interaction outside the dialog, including the service header.
+    const siblings: { element: HTMLElement; inert: boolean }[] = [];
+    let branch: HTMLElement | null = dialog.current?.parentElement ?? null;
+    while (branch?.parentElement) {
+      for (const child of branch.parentElement.children) {
+        if (child !== branch && child instanceof HTMLElement) {
+          siblings.push({ element: child, inert: child.inert });
+          child.inert = true;
+        }
+      }
+      branch = branch.parentElement;
+      if (branch === document.body) break;
+    }
     const frame = requestAnimationFrame(() => heading.current?.focus());
     return () => {
       cancelAnimationFrame(frame);
+      siblings.forEach(({ element, inert }) => {
+        element.inert = inert;
+      });
       if (opener.current?.isConnected) opener.current.focus();
     };
   }, [target]);
 
   if (!target) return null;
-  const checkedAt = target.mapContext?.asOf ?? items[0]?.metadata.asOf ?? null;
+  const checkedAt = target.verifiedAt ?? null;
   const retryable = failures.some((failure) => failure.retryable);
 
   function viewOnMap(evidence: EvidenceResponse) {
     const eventId = evidence.eventIds[0];
     if (!eventId || !onViewOnMap) return;
-    setFocusedEvidenceId((current) =>
-      current === evidence.id ? null : evidence.id,
-    );
+    setFocusedEvidenceId(evidence.id);
     onViewOnMap(eventId);
   }
 
   return (
-    <div className="evidence-layer">
-      <div className="evidence-backdrop" aria-hidden="true" />
+    <div className="absolute inset-0 z-20 flex justify-end">
+      <div className="absolute inset-0 bg-black/35" aria-hidden="true" />
       <aside
         ref={dialog}
-        className="evidence-drawer"
+        className={`relative ${ui.shell} border-l border-panel-line shadow-xl`}
         data-screen-id="D-GRP-05"
         role="dialog"
         aria-modal="true"
@@ -159,7 +173,11 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           if (!focusable?.length) return;
           const first = focusable[0];
           const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
+          if (
+            event.shiftKey &&
+            (document.activeElement === first ||
+              document.activeElement === heading.current)
+          ) {
             event.preventDefault();
             last.focus();
           } else if (!event.shiftKey && document.activeElement === last) {
@@ -168,25 +186,34 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           }
         }}
       >
-        <header className="evidence-header">
+        <header className={`${ui.header} border-b border-panel-line pr-14`}>
           <button
             type="button"
-            className="evidence-close"
+            className={`absolute top-4 right-4 ${ui.close}`}
             onClick={close}
             aria-label="근거 창 닫기"
           >
             ×
           </button>
-          <h2 id="evidence-title" ref={heading} tabIndex={-1}>
+          <h2
+            id="evidence-title"
+            ref={heading}
+            tabIndex={-1}
+            className={ui.title}
+          >
             근거 문서
           </h2>
-          <p>{target.label ?? '선택한 연결의 근거'}</p>
-          <span className="evidence-archive" aria-hidden="true">
+          <p className={`mt-1 ${ui.muted}`}>
+            {target.label ?? '선택한 연결의 근거'}
+          </p>
+          <span className="mt-2 block text-base" aria-hidden="true">
             ▱
           </span>
         </header>
-        <div className="evidence-scroll" aria-busy={loading}>
-          <div className="evidence-checked-at">
+        <div className={ui.scroll} aria-busy={loading}>
+          <div
+            className={`flex items-center gap-2 ${ui.section} [&_details]:relative [&_summary]:grid [&_summary]:size-5 [&_summary]:cursor-pointer [&_summary]:list-none [&_summary]:place-items-center [&_summary]:rounded-full [&_summary]:border [&_summary]:border-panel-control [&_details_p]:absolute [&_details_p]:top-6 [&_details_p]:right-0 [&_details_p]:z-10 [&_details_p]:w-60 [&_details_p]:rounded-panel [&_details_p]:border [&_details_p]:border-panel-line [&_details_p]:bg-white [&_details_p]:p-3 [&_details_p]:shadow-md`}
+          >
             <span>
               관계 확인 시점{' '}
               {formatPublishedAt(checkedAt) ?? '확인 시점 미제공'}
@@ -194,14 +221,14 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
             <details>
               <summary aria-label="관계 확인 시점">i</summary>
               <p>
-                검증을 통과한 자료를 이 시각 기준으로 확인했습니다. 각 문서의
-                발행 시각과는 다릅니다.
+                관계 근거에 기록된 검증 시각입니다. 그래프 조회 기준이나 문서
+                발행 시각과는 다르며, 기록이 없으면 미제공으로 표시합니다.
               </p>
             </details>
           </div>
 
           {loading && (
-            <div className="evidence-loading" role="status">
+            <div className={ui.state} role="status">
               <span />
               <span />
               <p>근거 문서를 불러오는 중입니다.</p>
@@ -209,17 +236,14 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           )}
 
           {!loading && evidenceIds.length === 0 && (
-            <div className="evidence-empty" role="status">
+            <div className={ui.state} role="status">
               <strong>연결된 근거가 없습니다.</strong>
               <p>근거가 충분하지 않아 원문 인용을 표시하지 않습니다.</p>
             </div>
           )}
 
           {!loading && failures.length > 0 && (
-            <section
-              className="evidence-failures"
-              aria-label="제공하지 못한 근거"
-            >
+            <section className={ui.state} aria-label="제공하지 못한 근거">
               <strong>
                 {items.length
                   ? '일부 근거를 불러오지 못했습니다.'
@@ -250,7 +274,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
           )}
 
           {!loading && items.length > 0 && (
-            <div className="evidence-list">
+            <div className="flex flex-col">
               {items.map((evidence) => (
                 <EvidenceCard
                   key={evidence.id}
@@ -264,8 +288,10 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
             </div>
           )}
         </div>
-        <footer className="evidence-footer">
-          MOCK · ERD v6 구조를 따른 합성 데이터이며 실제 기사·공시가 아닙니다.
+        <footer className={ui.footer}>
+          {evidenceIds.some((id) => id.startsWith('mock-evidence-'))
+            ? 'MOCK · ERD v6 구조를 따른 합성 데이터이며 실제 기사·공시가 아닙니다.'
+            : '원문 인용과 검증 상태를 함께 확인해 주세요.'}
         </footer>
       </aside>
     </div>
