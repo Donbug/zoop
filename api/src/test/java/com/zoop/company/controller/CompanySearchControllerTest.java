@@ -59,4 +59,15 @@ class CompanySearchControllerTest {
                 .andExpect(jsonPath("$.metadata.failures").isEmpty())
                 .andExpect(jsonPath("$.nextCursor").value("opaque-next"));
     }
+
+    @Test
+    void rejectsNonPositiveLimitAsInvalidRequest() throws Exception {
+        for (String limit : List.of("0", "-1")) {
+            mvc.perform(get("/api/v1/companies").param("limit", limit))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+                    .andExpect(jsonPath("$.error.retryable").value(false));
+        }
+        verifyNoInteractions(service);
+    }
 }
