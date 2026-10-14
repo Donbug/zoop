@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = (
     ("web", "prototype/web", "React/Vite prototype", "pnpm install --frozen-lockfile", "pnpm typecheck; pnpm test; pnpm build"),
+    ("app-web", "web", "Production React/Vite frontend (pnpm 10 per its packageManager)", "HUSKY=0 pnpm install --frozen-lockfile", "pnpm lint; pnpm format:check; pnpm build; pnpm test"),
     ("bff", "prototype/bff", "FastAPI prototype (private pinned PoC)", "uv sync --frozen --group dev", "uv run --no-sync python -m pytest; uv build"),
     ("ai-worker", "ai/worker", "S1 Python CLI JSON worker (public dependencies only, not an HTTP service)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; uv build"),
     ("ai-service", "ai/service", "S1 internal loopback HTTP transport to the installed zoop-ai CLI (public dependencies only; local preparation, not deployed)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/service_smoke.py; scripts/export_openapi.py --check; uv build"),
@@ -26,7 +27,8 @@ PROJECTS = (
 HELP = """Polyglot monorepo: app code stays in its current directories.
 Discovery: make help | projects | available-checks
 Public/offline: make config-check | contracts-check | docs-check | tokens-check | secret-check | tooling-test | public-check
-Web only: make web-install | web-typecheck | web-test | web-build
+Prototype web only: make web-install | web-typecheck | web-test | web-build
+Production web (root web/) only: make app-web-install | app-web-lint | app-web-format-check | app-web-build | app-web-test
 BFF only: make bff-install | bff-test | bff-build
 Worker only: make worker-install | worker-test | worker-schema-check | worker-build
 Pipeline only (private PoC): make pipeline-install | pipeline-test | pipeline-smoke | pipeline-build
