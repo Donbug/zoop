@@ -15,6 +15,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.zoop.common.request.RequestIdFilter;
+import com.zoop.auth.service.RateLimitedException;
+import org.springframework.http.HttpHeaders;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -23,6 +25,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustom(CustomException exception, HttpServletRequest request) {
         return response(exception.getErrorCode(), request);
+    }
+
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimited(RateLimitedException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(ErrorCode.RATE_LIMITED.getStatus())
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.retryAfterSeconds()))
+                .body(ErrorResponse.of(ErrorCode.RATE_LIMITED, RequestIdFilter.currentId(request)));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class,
