@@ -1,11 +1,14 @@
 package com.zoop.company;
 
 import java.time.Instant;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
 import com.zoop.ZoopApplication;
+import com.zoop.company.catalog.CompanyCatalogImportService;
 import com.zoop.company.repository.CompanySearchPage;
 import com.zoop.company.repository.CompanySearchRepository;
 import com.zoop.company.repository.CompanySearchRow;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -96,6 +100,61 @@ class CompanyPostgresIntegrationTest {
                 + "JOIN pg_opclass op ON op.oid=i.indclass[0] "
                 + "WHERE i.indexrelid='public.ix_companies_search_text_trgm'::regclass", String.class));
         context.getBean(Flyway.class).validate();
+    }
+
+    @Test
+    void confirmedCatalogImportsTwentyFourCompaniesAndRetiresOldSeedIds() throws Exception {
+        var importer = context.getBean(CompanyCatalogImportService.class);
+        Path file = Path.of(getClass().getResource("/company/demo-companies.json").toURI());
+        jdbc.update("INSERT INTO companies (id, name) VALUES ('NYSE:PINS', 'Old seed company')");
+        long before = repository.catalogRevision();
+
+        var imported = importer.importFile(file);
+        assertEquals(24, imported.total());
+        assertEquals(24, imported.changed());
+        assertEquals(0, imported.unchanged());
+        assertEquals(1, imported.deleted());
+        assertEquals(24, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id LIKE 'KRX:%' "
+                + "OR id LIKE 'NASDAQ:%' OR id LIKE 'NYSE:%' OR id LIKE 'TSE:%' "
+                + "OR id LIKE 'ORG:%'", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='NYSE:PINS'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='special'", Integer.class));
+        assertEquals("005930", jdbc.queryForObject(
+                "SELECT ticker FROM companies WHERE id='KRX:005930'", String.class));
+        assertEquals("KRX", jdbc.queryForObject(
+                "SELECT exchange_code FROM companies WHERE id='KRX:005930'", String.class));
+        assertNull(jdbc.queryForObject("SELECT ticker FROM companies WHERE id='ORG:OPENAI'", String.class));
+        assertNull(jdbc.queryForObject("SELECT exchange_code FROM companies WHERE id='ORG:ANTHROPIC'", String.class));
+        assertEquals("064400", jdbc.queryForObject(
+                "SELECT ticker FROM companies WHERE id='KRX:064400'", String.class));
+        assertEquals("Alphabet", jdbc.queryForObject(
+                "SELECT name FROM companies WHERE id='NASDAQ:GOOGL'", String.class));
+        assertEquals(List.of("ORG:OPENAI"), ids(search("openai")));
+        assertTrue(repository.catalogRevision() > before);
+        long after = repository.catalogRevision();
+
+        var repeated = importer.importFile(file);
+        assertEquals(0, repeated.changed());
+        assertEquals(24, repeated.unchanged());
+        assertEquals(0, repeated.deleted());
+        assertEquals(after, repository.catalogRevision());
+    }
+
+    @Test
+    void duplicateCompanyIdsRejectWholeCatalogBeforeWriting(@TempDir Path directory) throws Exception {
+        Path file = directory.resolve("duplicate.json");
+        Files.writeString(file, """
+                {"companies":[
+                  {"company_id":"ORG:DUP","name":"First","ticker":null,"aliases":[]},
+                  {"company_id":"ORG:DUP","name":"Second","ticker":null,"aliases":[]}
+                ]}
+                """);
+        var importer = context.getBean(CompanyCatalogImportService.class);
+        long revision = repository.catalogRevision();
+
+        assertThrows(IllegalArgumentException.class, () -> importer.importFile(file));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='ORG:DUP'", Integer.class));
+        assertEquals(revision, repository.catalogRevision());
     }
 
     private static void assertIndex(String name, String method, String keys, boolean unique, String predicate) {

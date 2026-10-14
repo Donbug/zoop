@@ -72,6 +72,28 @@ make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai repl
 
 `com.zoop.ai`는 `ai/service`의 5개 internal operation(submit/status/result/cancel/recover)을 호출하는 클라이언트입니다. 서비스 principal로 호출하며 사용자 격리·결과 import·공개 인증은 포함하지 않습니다. 설정, 의미(202≠완료, withheld, 결과 불명 복구), 요청 ID, 검증 범위와 인계 사항은 [AI 연동](docs/AI_INTEGRATION.md)에 있습니다.
 
+## 기본 기업 카탈로그 적재
+
+`src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. 기존 60개 시드를 사용한 DB에서는 `retired_company_ids`에 명시한 이전 시드 40개만 삭제합니다. 다른 회사 행은 삭제하지 않습니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
+
+DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번 자동으로** 24개 기업을 적재합니다. 기존 60개 시드 DB에서는 이전 시드 ID 40개만 정리합니다. PostgreSQL 컨테이너만 시작하면 Flyway는 실행되지 않으므로 API도 시작해야 합니다. Spring Boot는 `.env` 파일을 자동으로 읽지 않습니다.
+
+카탈로그 JSON을 수정해 로컬 DB에 다시 반영할 때에만 `api` 디렉터리에서 명시적 적재 명령을 사용합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=catalog-import --spring.main.web-application-type=none --zoop.catalog.import-file=src/main/resources/company/demo-companies.json"
+```
+
+이 수동 명령은 입력 전체를 검증한 뒤 이전 시드 ID를 정리하고, 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상을 갱신합니다. `profile`, `market`, `logo_url`은 근거 또는 실제 제공 경로가 없어서 채우지 않습니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`, `deleted`로 결과를 확인하세요. 이후 기본 목록을 바꾸려면 기존 Flyway migration을 수정하지 말고 새 migration을 추가해야 합니다.
+
+```sql
+SELECT count(*) FROM companies;
+SELECT id, name, ticker, exchange_code FROM companies
+WHERE id IN ('KRX:005930', 'ORG:OPENAI', 'ORG:ANTHROPIC') ORDER BY id;
+```
+
+이 파일은 현재 확정된 기본 목록입니다. 상장사 전체 수집·주기적 갱신 및 시세 데이터는 이 적재 절차의 범위가 아닙니다. 회사 검색 API 변경 사항이 합쳐진 뒤에도 GraphDB 이슈 수 snapshot이 준비되지 않으면 검색 요청은 `503 SOURCE_UNAVAILABLE`일 수 있으므로 SQL로 적재 결과를 먼저 확인합니다.
+
 ## 스키마와 DB 종료
 
 JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 첫 migration은 당시 설계에 따라 `members`, `member_credentials`, `member_sessions`를 생성합니다. 이어지는 [`V20261013000000__align_auth_identity_with_erd_v6.sql`](src/main/resources/db/migration/V20261013000000__align_auth_identity_with_erd_v6.sql)이 비어 있는 인증 스키마를 [ERD v6](../docs/erd/zoop-core-erd-v6.md)에 맞춰 변경합니다. [`V20261013010000__allow_unselected_member_mode.sql`](src/main/resources/db/migration/V20261013010000__allow_unselected_member_mode.sql)은 가입 직후 온보딩 방식을 고르지 않은 회원을 `members.mode=NULL`로 저장할 수 있도록 합니다. [`V20261013020000__create_terms.sql`](src/main/resources/db/migration/V20261013020000__create_terms.sql)은 약관 항목·버전·동의 기록 테이블과 기간 중복 방지 제약을 만듭니다. [`V20261013030000__register_term_catalog.sql`](src/main/resources/db/migration/V20261013030000__register_term_catalog.sql)은 필수 `service`·`privacy` 마스터만 등록합니다. [`V20261013040000__register_approved_term_versions.sql`](src/main/resources/db/migration/V20261013040000__register_approved_term_versions.sql)은 [공개용 약관](../docs/legal/README.md)의 두 본문을 버전 `2026-10-13.1`로 등록하고 2026-10-13 17:00 KST부터 효력이 생기게 합니다. 적용 후 비밀번호 해시와 회원 설정은 `members`에 있고 `member_credentials`는 없습니다. 대응 Entity는 `com.zoop.auth.entity`에 있습니다. 회원가입·로그인 서비스 및 소셜·관리자 테이블은 아직 없습니다. 후속 스키마 변경은 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
