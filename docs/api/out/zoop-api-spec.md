@@ -238,7 +238,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/terms |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
+| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
 
 ### 요청 필드
 
@@ -252,7 +252,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## signUp · 이메일 회원가입
 
-이메일 회원가입.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+이메일 회원가입. 성공하면 새 회원 세션을 발급해 바로 로그인하고 201 SessionResponse를 반환한다. 공통 규칙 및 x-zoop의 남은 팀 확인 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -266,7 +266,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.7 |
 | 프로토타입 대응 | /api/auth/signup |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
+| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
 
 ### 요청 필드
 
@@ -294,7 +294,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.1, 6.2.4, 6.2.6, 6.2.7 |
 | 프로토타입 대응 | /api/auth/login |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책·약관 본문과 버전을 팀이 확정해야 한다. 가입 직후 세션 생성은 현재 BFF 출발점이며 정식 정책 확인이 필요하다. |
+| 팀 확인 필요 | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |
 
 ### 요청 필드
 
@@ -5696,7 +5696,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| mode | 필수 | string {assets, watchlist} |  |
+| mode | 필수 | string {assets, watchlist} / null | 가입 후 온보딩 방식을 고르기 전에는 null. 관심·보유 종목의 존재 여부와는 별개다. |
 | watchlistIds | 필수 | string[] |  |
 | tutorialCompleted | 필수 | boolean |  |
 | completed | 필수 | boolean |  |
@@ -5709,12 +5709,12 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 ### SettingsUpdate
 
 Unset fields keep their stored value; ``version`` must equal the stored version unless the request
-changes nothing (a resent request is answered with the stored settings).
+changes nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | version | 필수 | integer |  |
-| mode | 선택 | string {assets, watchlist} / null |  |
+| mode | 선택 | string {assets, watchlist} / null | assets/watchlist를 지정하면 방식을 선택한다. null 또는 생략은 현재 값을 변경하지 않는다. |
 | watchlistIds | 선택 | string[] / null |  |
 | tutorialCompleted | 선택 | boolean / null |  |
 | completed | 선택 | boolean / null |  |
@@ -5736,7 +5736,7 @@ guest session only.
 
 ### SignupRequest
 
-필수 입력·이메일 중복·필수 약관·승인 버전·실제 동의 여부는 서버에서 검증한다. 이름/비밀번호 정책과 가입 직후 인증 상태는 팀 확인 필요다.
+필수 입력·이메일 중복·필수 약관·승인 버전·실제 동의 여부는 서버에서 검증한다. 가입 성공 직후 새 회원 세션을 발급한다. 이름/비밀번호 정책은 팀 확인 필요다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

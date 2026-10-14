@@ -52,6 +52,16 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.mode<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "assets",
+        "watchlist"
+      ]
+    },
+    "response:200:application/json.mode<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -358,6 +368,13 @@
       "type": "boolean"
     },
     "response:200:application/json.metadata.synthetic:required": true,
+    "response:200:application/json.mode": {
+      "type": "string",
+      "enum": [
+        "assets",
+        "watchlist"
+      ]
+    },
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },

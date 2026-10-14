@@ -9,7 +9,7 @@
 | 범위 | 소유 담당 | 처음 필요한 테이블 | 후속 테이블·조건 |
 | --- | --- | --- | --- |
 | 이메일 인증·회원 세션 | 임현 — WBS 6.2.1 | `members`, `member_sessions` | 비밀번호 해시·회원 설정은 `members` 컬럼에 둔다. 실제 회원가입에는 `terms`, `term_versions`, `term_agreements`와 승인된 약관 데이터가 필요하다. 비회원 세션은 `member_sessions`를 공유한다. |
-| 소셜 인증·온보딩·관리자 인증 | 임현 — 관련 WBS | 인증 기반 외 아직 미구현 | 기능 착수 시 `social_identities`, 약관 테이블, `admins`, `admin_sessions`를 추가한다. 관리자 role→permissions는 코드에서 관리한다. OAuth 진행 상태는 `member_sessions.auth_flow`를 사용한다. |
+| 소셜 인증·온보딩·관리자 인증 | 임현 — 관련 WBS | 약관 테이블·승인 본문까지 구현, 나머지 미구현 | 약관 `terms`, `term_versions`, `term_agreements`는 등록됐다. 기능 착수 시 `social_identities`, `admins`, `admin_sessions`를 추가한다. 관리자 role→permissions는 코드에서 관리한다. OAuth 진행 상태는 `member_sessions.auth_flow`를 사용한다. |
 | 기업 목록·검색 | 정세빈 — WBS 6.6.11·6.7.1 | `companies` | 별칭은 `companies.aliases`에 저장한다. 검색용 `search_text`·트리거와 `pg_trgm` 인덱스는 기업 담당자가 구현한다. |
 | 관심종목 | 임현 — WBS 6.3.4·6.4.1·6.4.2 | `watchlist` | `members.id`, `companies.id`에 의존한다. 두 소유자와 FK·삭제 정책·적용 순서를 합의한다. |
 | 문서·근거·AI 분석 저장 | 미확정 — `api/README.md` 범위표의 문서·근거·분석 연동 담당(윤서진)이 후보 | 아직 migration 없음. v6 기준 `artifacts`, `articles`, `article_versions`, `evidence`, `document_analyses`, `analysis_jobs`, `ai_executions`(v3.5의 분석 하위 5개·시도·projection 테이블은 합쳐짐) | `artifacts`처럼 여러 기능이 참조하는 테이블은 소유자가 먼저 제공한다. `analysis_jobs`·`review_*`는 `pipeline`을 정세빈·윤서진이 함께 쓰므로 소유자를 먼저 정한다. 공개 `analysis_jobs.id`와 내부 AI `jobId`의 분리, `document_analyses.ai_job_id`, `ai_executions`의 호출 영수증·grant snapshot 열은 v6가 정했다. 남은 외부 계약과 AI 서비스 대응은 [ai-system 대조](../design/ai-system.md#erd-v6와-ai-저장-책임-대조)에 있다. |
