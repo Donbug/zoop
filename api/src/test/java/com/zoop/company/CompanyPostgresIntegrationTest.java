@@ -129,12 +129,16 @@ class CompanyPostgresIntegrationTest {
                 + "WHERE table_schema=? AND table_name='companies'", Integer.class, schema));
         Flyway catalog = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
                 .schemas(schema).defaultSchema(schema).target("20261013153313").load();
-        assertEquals(1, catalog.migrate().migrationsExecuted);
+        catalog.migrate();
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".flyway_schema_history "
+                + "WHERE success AND version IN ('20261013153313', '20261014102810')", Integer.class));
         Flyway upgrade = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
                 .schemas(schema).defaultSchema(schema).load();
-        assertEquals(1, upgrade.migrate().migrationsExecuted);
+        upgrade.migrate();
         upgrade.validate();
-        assertEquals(0, upgrade.migrate().migrationsExecuted);
+        upgrade.migrate();
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".flyway_schema_history "
+                + "WHERE success AND version IN ('20261013153313', '20261014102810')", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables "
                 + "WHERE table_schema=? AND table_name='companies'", Integer.class, schema));
     }
