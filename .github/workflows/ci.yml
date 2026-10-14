@@ -199,6 +199,20 @@ jobs:
     name: api
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    services:
+      company-postgres:
+        image: postgres:16.13-alpine
+        env:
+          POSTGRES_USER: company_test
+          POSTGRES_DB: zoop_company_test_19
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U company_test -d zoop_company_test_19"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -218,6 +232,10 @@ jobs:
           enable-cache: false
       - name: Java tests (foundation + AI client against in-process stub servers; no DB, no Python, no secret) and application assemble
         run: make api-test api-build
+      - name: Company catalog PostgreSQL migrations and search integration tests
+        env:
+          ZOOP_COMPANY_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_company_test_19
+        run: ./api/gradlew -p api companyIntegrationTest --console=plain
       - name: Bootstrap the ai/service runtime and installed zoop-ai for the real gate (public dependencies, no token)
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)
