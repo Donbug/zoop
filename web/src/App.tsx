@@ -21,7 +21,9 @@ function LegacyDetailRedirect() {
   return <Navigate to={`/companies/${encodeURIComponent(id ?? '')}`} replace />;
 }
 
-const router = createBrowserRouter([
+// Exported so route ownership/protection can be regression-tested without navigation mocks.
+// eslint-disable-next-line react-refresh/only-export-components
+export const router = createBrowserRouter([
   {
     path: '/login',
     lazy: async () => ({
@@ -35,20 +37,44 @@ const router = createBrowserRouter([
     }),
   },
   {
+    path: '/',
+    lazy: async () => ({
+      Component: (await import('@/pages/map/MapPage')).default,
+    }),
+  },
+  {
     element: <AppLayout />,
     children: [
       {
-        path: '/',
+        path: '/stocks',
         lazy: async () => ({
-          Component: (await import('@/pages/map/MapPage')).default,
+          Component: (await import('@/pages/stocks/StocksPage')).default,
         }),
       },
-      ...['/stocks', '/companies', '/briefing', '/my'].map((path) => ({
-        path,
+      {
+        path: '/companies/:id',
         lazy: async () => ({
-          Component: (await import('@/pages/common/OutOfScopePage')).default,
+          Component: (await import('@/pages/company/CompanyDetailPage'))
+            .default,
         }),
-      })),
+      },
+      {
+        path: '/briefing',
+        lazy: async () => ({
+          Component: (await import('@/pages/briefing/BriefingPage')).default,
+        }),
+      },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          {
+            path: '/my',
+            lazy: async () => ({
+              Component: (await import('@/pages/my/MyStocksPage')).default,
+            }),
+          },
+        ],
+      },
     ],
   },
   {

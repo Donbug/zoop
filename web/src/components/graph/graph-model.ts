@@ -4,20 +4,41 @@ import layouts from './figma-layout.json';
 
 export function graphSummary(data: GraphResponse) {
   const companyNodes = data.nodes.filter((n) => n.kind === 'company');
-  const incident = new Map<string, string[]>();
-  for (const node of data.nodes.filter((n) => n.kind === 'issue')) {
-    incident.set(
-      node.id,
-      data.edges
-        .filter(
-          (e) =>
-            (e.relationType === 'INVOLVES' ||
-              e.relationType === 'STRUCTURALLY_RELATED_TO') &&
-            (e.source === node.id || e.target === node.id),
-        )
-        .map((e) => (e.source === node.id ? e.target : e.source)),
-    );
+  const nodesById = new Map(data.nodes.map((node) => [node.id, node]));
+  const incidentSets = new Map(
+    data.nodes
+      .filter((node) => node.kind === 'issue')
+      .map((node) => [node.id, new Set<string>()]),
+  );
+  const companyIssueSets = new Map(
+    companyNodes.map((node) => [node.id, new Set<string>()]),
+  );
+  for (const edge of data.edges) {
+    if (
+      edge.relationType !== 'INVOLVES' &&
+      edge.relationType !== 'STRUCTURALLY_RELATED_TO'
+    )
+      continue;
+    const source = nodesById.get(edge.source);
+    const target = nodesById.get(edge.target);
+    const issue = source?.kind === 'issue' ? source : target;
+    const company = source?.kind === 'company' ? source : target;
+    if (issue?.kind !== 'issue' || company?.kind !== 'company') continue;
+    incidentSets.get(issue.id)?.add(company.id);
+    companyIssueSets.get(company.id)?.add(issue.id);
   }
+  const incident = new Map(
+    [...incidentSets].map(([issueId, companyIds]) => [
+      issueId,
+      [...companyIds],
+    ]),
+  );
+  const companyIssueCounts = new Map(
+    [...companyIssueSets].map(([companyId, issueIds]) => [
+      companyId,
+      issueIds.size,
+    ]),
+  );
   const folded = new Map<string, number>();
   incident.forEach((ids) => {
     if (ids.length === 1) folded.set(ids[0], (folded.get(ids[0]) ?? 0) + 1);
@@ -25,6 +46,7 @@ export function graphSummary(data: GraphResponse) {
   return {
     companyNodes,
     incident,
+    companyIssueCounts,
     folded,
     company: companyNodes.length,
     issue: incident.size,
@@ -41,6 +63,22 @@ export function graphSummary(data: GraphResponse) {
     disconnected: [...incident.values()].filter((ids) => ids.length === 0)
       .length,
   };
+}
+
+// Review calibration for D-GRP-01/01b fixture distribution (0–6 issues).
+// The value represents graph activity only, never importance or causality.
+export function companyNodeSize(issueCount: number, scale = 1) {
+  const level =
+    issueCount <= 0
+      ? 0
+      : issueCount === 1
+        ? 1
+        : issueCount === 2
+          ? 2
+          : issueCount <= 4
+            ? 3
+            : 4;
+  return [18, 22, 26, 34, 44][level] * scale;
 }
 
 // Figma 619:1819 / 619:2374 presentation only; API DTOs never contain x/y.
@@ -123,7 +161,9 @@ export function toG6Data(
           ? planned[personal ? 3 : 1]
           : neighbors.reduce((v, n) => v + n.y, 0) / (neighbors.length || 1) +
             Math.sin(i) * 50);
-      const size = p?.size ?? 7 * scale;
+      const size = company
+        ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
+        : 7 * scale;
       const badges = [
         ...(company && summary.folded.has(n.id)
           ? [
