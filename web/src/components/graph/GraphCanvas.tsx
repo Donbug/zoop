@@ -4,19 +4,42 @@ import type { GraphResponse } from '@/types/map/graph';
 import GraphIcon from './GraphIcon';
 import { graphSummary, toG6Data } from './graph-model';
 
-export default function GraphCanvas({ data }: { data: GraphResponse }) {
+export default function GraphCanvas({
+  data,
+  selectedId = null,
+  onSelect,
+}: {
+  data: GraphResponse;
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<Graph | null>(null);
+  const selectedIdRef = useRef(selectedId);
+  const previousSelectedId = useRef<string | null>(null);
+  const onSelectRef = useRef(onSelect);
   const [zoom, setZoom] = useState(1);
-  const [selected, setSelected] = useState<string | null>(null);
   const [renderError, setRenderError] = useState(false);
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
   const center =
-    data.nodes.find((n) => n.id === selected && n.kind === 'company') ??
+    data.nodes.find((n) => n.id === selectedId && n.kind === 'company') ??
     data.nodes.find((n) => n.isFocus);
-  const selectedNode = data.nodes.find((n) => n.id === selected);
+  const selectedNode = data.nodes.find((n) => n.id === selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+    onSelectRef.current = onSelect;
+    const graph = instance.current;
+    if (!graph || graph.destroyed) return;
+    const states: Record<string, string[]> = {};
+    if (previousSelectedId.current) states[previousSelectedId.current] = [];
+    if (selectedId) states[selectedId] = ['selected'];
+    previousSelectedId.current = selectedId;
+    void graph.setElementState(states).catch(() => {
+      /* a folded issue can be selected without a rendered G6 element */
+    });
+  }, [selectedId, onSelect]);
   useEffect(() => {
     const host = container.current;
     if (!host) return;
@@ -27,7 +50,6 @@ export default function GraphCanvas({ data }: { data: GraphResponse }) {
       await document.fonts.ready;
       if (disposed || !host) return;
       setRenderError(false);
-      setSelected(null);
       setZoom(1);
       graph = new Graph({
         container: host,
@@ -49,10 +71,12 @@ export default function GraphCanvas({ data }: { data: GraphResponse }) {
         },
       });
       instance.current = graph;
-      graph.on('node:click', (event: IElementEvent) =>
-        setSelected(event.target.id),
-      );
-      graph.on('canvas:click', () => setSelected(null));
+      graph.on('node:click', (event: IElementEvent) => {
+        onSelectRef.current?.(event.target.id);
+      });
+      graph.on('canvas:click', () => {
+        onSelectRef.current?.(null);
+      });
       graph.on('aftertransform', () => {
         if (!graph || disposed) return;
         try {
@@ -63,6 +87,12 @@ export default function GraphCanvas({ data }: { data: GraphResponse }) {
       });
       try {
         await graph.render();
+        if (selectedIdRef.current) {
+          await graph.setElementState({
+            [selectedIdRef.current]: ['selected'],
+          });
+        }
+        previousSelectedId.current = selectedIdRef.current;
       } catch {
         if (!disposed) setRenderError(true);
       }
@@ -106,7 +136,7 @@ export default function GraphCanvas({ data }: { data: GraphResponse }) {
     try {
       await graph.focusElement(id, false);
       await graph.setElementState({ [id]: ['selected'] });
-      setSelected(id);
+      onSelectRef.current?.(id);
     } catch {
       setRenderError(true);
     }

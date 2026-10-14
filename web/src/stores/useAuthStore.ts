@@ -17,6 +17,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   clearSession: () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem('oauth_state');
+    sessionStorage.removeItem('csrfToken');
     set({ accessToken: null, member: null, onboardingCompleted: null });
   },
 }));
