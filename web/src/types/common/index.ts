@@ -16,3 +16,11 @@ export type QueryChanges = Record<string, string | null>;
 export type QueryUpdateOptions = {
   replace?: boolean;
 };
+
+export type ErrorNoticeProps = {
+  title: string;
+  message?: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+  retryDisabled?: boolean;
+};
