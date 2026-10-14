@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import WatchlistSetupPage from '@/pages/onboarding/watchlist/WatchlistSetupPage';
 import OnboardingLayout from '@/components/onboarding/OnboardingLayout';
 import { useAuthStore } from '@/stores/useAuthStore';
+import type { Session } from '@/types/auth';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import {
   createFakeServer,
@@ -40,11 +41,27 @@ const emptyPortfolio = {
   valuation: null,
   metadata: {},
 };
+/** 초기 설정 중인 회원의 쿠키 세션(합성 값) */
+function memberSession(id: string): Session {
+  return {
+    authenticated: true,
+    kind: 'member',
+    user: { id, email: `${id}@zoop.test`, displayName: '테스트 회원' },
+    setup: { completed: false, tutorialCompleted: false },
+    csrfToken: 'csrf-test',
+    expiresAt: null,
+  };
+}
 let server: ReturnType<typeof createFakeServer>;
 beforeEach(() => {
   useOnboardingStore.getState().reset();
-  useAuthStore.setState({ member: null, onboardingCompleted: null });
-  useAuthStore.getState().setAccessToken('member-test');
+  useAuthStore.setState({
+    status: 'checking',
+    session: null,
+    member: null,
+    onboardingCompleted: null,
+  });
+  useAuthStore.getState().setSession(memberSession('member-test'));
   useOnboardingStore.getState().setInvestmentStatus('not-investing');
   server = createFakeServer();
   server.on('GET', '/api/v1/me/settings', () => json(settings));
@@ -341,14 +358,16 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     await act(async () => old.resolve(json({ items: [] })));
     expect(screen.getByRole('button', { name: '삼성전자 추가' })).toBeTruthy();
   });
-  it('keeps the draft across access-token refresh for the same member', async () => {
-    useAuthStore
-      .getState()
-      .setMember({ id: 'stable-member', displayName: '테스트' }, false);
+  it('keeps the draft across a session refresh for the same member', async () => {
+    useAuthStore.getState().setSession(memberSession('stable-member'));
     renderPage();
     await choose();
+    // 같은 회원의 세션 재조회(CSRF 토큰만 바뀜)는 초안을 유지한다.
     await act(async () =>
-      useAuthStore.getState().setAccessToken('refreshed-token'),
+      useAuthStore.getState().setSession({
+        ...memberSession('stable-member'),
+        csrfToken: 'rotated-csrf',
+      }),
     );
     await waitFor(() =>
       expect(
@@ -366,7 +385,7 @@ describe('Issue #11 · WBS 6.4.5 · D-WAT-01/01b', () => {
     const view = renderPage();
     await choose();
     view.unmount();
-    useAuthStore.getState().setAccessToken('another-member');
+    useAuthStore.getState().setSession(memberSession('another-member'));
     renderPage();
     await loaded();
     expect(useOnboardingStore.getState().watchlistIds).toEqual([]);
