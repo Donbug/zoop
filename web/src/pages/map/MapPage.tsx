@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
+import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
+import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useAiChatStore } from '@/stores/useAiChatStore';
 import type { MapMode, PersonalScope } from '@/types/map';
 import '@/components/graph/relationship-map.css';
 
@@ -26,6 +29,7 @@ export default function MapPage() {
   const token = useAuthStore((s) => s.accessToken);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
+  const openAi = useAiChatStore((state) => state.open);
   const desiredMode: MapMode =
     params.get('mode') === 'personal' ? 'personal' : 'all';
   const requestedMode =
@@ -40,6 +44,42 @@ export default function MapPage() {
   );
   const appliedMode = data?.metadata.mode ?? 'all';
   const stats = data ? graphSummary(data) : null;
+  const rawSelection = params.get('select');
+  const selectedId = rawSelection?.startsWith('node:')
+    ? rawSelection.slice(5)
+    : null;
+  const selectedNode =
+    data?.nodes.find((node) => node.id === selectedId) ?? null;
+  const companyNode = selectedNode?.kind === 'company' ? selectedNode : null;
+  const relatedCompanies = useMemo(() => {
+    if (!data || !companyNode) return [];
+    const issueIds = new Set(
+      data.edges
+        .filter((edge) => edge.target === companyNode.id && !edge.derived)
+        .map((edge) => edge.source),
+    );
+    const counts = new Map<string, number>();
+    data.edges.forEach((edge) => {
+      if (
+        !edge.derived &&
+        issueIds.has(edge.source) &&
+        edge.target !== companyNode.id
+      )
+        counts.set(edge.target, (counts.get(edge.target) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .map(([id, sharedIssueCount]) => ({
+        id,
+        name: data.nodes.find((node) => node.id === id)?.label ?? id,
+        sharedIssueCount,
+      }))
+      .sort((a, b) => b.sharedIssueCount - a.sharedIssueCount);
+  }, [companyNode, data]);
+  const selectNode = useCallback(
+    (id: string | null) =>
+      updateQuery({ select: id ? `node:${id}` : null, id: null }),
+    [updateQuery],
+  );
   const loginNeeded =
     !token && (desiredMode === 'personal' || notice === 'login');
   function changeMode(mode: MapMode) {
@@ -72,7 +112,13 @@ export default function MapPage() {
       <main className="relationship-main">
         <section
           className="relationship-view"
-          data-screen-id={appliedMode === 'personal' ? 'D-GRP-01b' : 'D-GRP-01'}
+          data-screen-id={
+            companyNode
+              ? 'D-GRP-03'
+              : appliedMode === 'personal'
+                ? 'D-GRP-01b'
+                : 'D-GRP-01'
+          }
         >
           <div className="relationship-toolbar">
             <button
@@ -180,9 +226,16 @@ export default function MapPage() {
               </button>
             </div>
           </div>
-          <div className="relationship-body" aria-busy={loading}>
+          <div
+            className={`relationship-body${companyNode ? ' has-company-panel' : ''}`}
+            aria-busy={loading}
+          >
             {data ? (
-              <GraphCanvas data={data} />
+              <GraphCanvas
+                data={data}
+                selectedId={selectedId}
+                onSelect={selectNode}
+              />
             ) : (
               <div className="relationship-canvas">
                 <p className="relationship-message" role="status">
@@ -191,6 +244,25 @@ export default function MapPage() {
                     : '관계 지도를 불러오지 못했습니다.'}
                 </p>
               </div>
+            )}
+            {companyNode && (
+              <CompanyDetailPanel
+                key={companyNode.id}
+                companyId={companyNode.id}
+                fallback={companyNode}
+                relatedCompanies={relatedCompanies}
+                token={token}
+                onClose={() => selectNode(null)}
+                onSelectIssue={selectNode}
+                onFocus={() =>
+                  updateQuery({ focus: companyNode.id, hops: '1' })
+                }
+                onConnections={() => {
+                  updateQuery({ path: companyNode.id });
+                  setNotice('connections');
+                }}
+                onAskAi={() => openAi({ kind: 'company', id: companyNode.id })}
+              />
             )}
             {(loading ||
               error ||
@@ -238,6 +310,12 @@ export default function MapPage() {
                     범위입니다.
                   </p>
                 )}
+                {notice === 'connections' && (
+                  <p>
+                    연결 탐색의 시작 기업을 저장했습니다. 지도에서 비교할 기업을
+                    선택해 주세요.
+                  </p>
+                )}
                 {data?.metadata.partial && (
                   <p>
                     일부 데이터를 조회하지 못했습니다.{' '}
@@ -257,6 +335,7 @@ export default function MapPage() {
               </div>
             )}
           </div>
+          <AiChatDrawer />
         </section>
       </main>
     </div>
