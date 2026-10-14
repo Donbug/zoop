@@ -18,6 +18,7 @@ def main() -> int:
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--sources", required=True, type=Path)
     parser.add_argument("--fixture-manifest", type=Path)
+    parser.add_argument("--require-store", action="store_true", help="export only: also require the current grant to allow `store` (for consumers that persist the text)")
     args = parser.parse_args()
     store = None
     try:
@@ -32,6 +33,8 @@ def main() -> int:
             raise IngestionFailure("fixture_manifest_required")
         if args.command != "run" and args.fixture_manifest is not None:
             raise IngestionFailure("fixture_manifest_not_allowed")
+        if args.require_store and args.command != "export":
+            raise IngestionFailure("require_store_not_allowed")
         store = Store(args.state_dir, existing=args.command == "export")
         runner = Ingestor(store, authority)
         if args.command == "run":
@@ -39,7 +42,7 @@ def main() -> int:
         elif args.command == "resume":
             result = runner.resume(request.round_id, request.source_id)
         elif args.command == "export":
-            result = runner.export(request)
+            result = runner.export(request, require_store=args.require_store)
         else:
             result = runner.inspect(request)
         print(canonical(result))

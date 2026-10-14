@@ -23,12 +23,12 @@ import tools.jackson.databind.JsonNode;
 /** Typed decoding of the internal transport documents (schema {@code zoop-ai-internal-1}). Fails closed with {@link Malformed}. */
 final class AnalysisWire {
     static final String INTERNAL_SCHEMA = "zoop-ai-internal-1";
-    private static final Pattern CODE = Pattern.compile("[a-z][a-z0-9_]{0,63}");
+    static final Pattern CODE = Pattern.compile("[a-z][a-z0-9_]{0,63}");
     private static final Pattern RECEIPT_STAMP = Pattern.compile(
             "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})");
-    private static final Pattern TEXT = Pattern.compile("[\\x20-\\x7E]{1,200}");
+    static final Pattern TEXT = Pattern.compile("[\\x20-\\x7E]{1,200}");
     private static final Pattern STAMP = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z");
-    private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9._-]{1,128}");
+    static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9._-]{1,128}");
     private static final int MAX_ARTIFACTS = 64;
     private static final int MAX_RECEIPTS = 64;
 
@@ -45,6 +45,16 @@ final class AnalysisWire {
         } catch (DateTimeParseException error) {
             throw new Malformed(obj.path() + "." + name);
         }
+    }
+
+    static Optional<Instant> optStamp(Obj obj, String name) {
+        return obj.optString(name, STAMP).map(value -> {
+            try {
+                return Instant.parse(value);
+            } catch (DateTimeParseException error) {
+                throw new Malformed(obj.path() + "." + name);
+            }
+        });
     }
 
     /** Receipt times come from the runtime ledger: ISO-8601 with microseconds and an explicit offset ({@code ...+00:00}). */

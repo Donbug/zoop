@@ -1,0 +1,802 @@
+{
+ "schema": "zoop-bench-run-1",
+ "runId": "control-oracle-test",
+ "label": "authored oracle control, test split",
+ "provenance": {
+  "kind": "authored_control",
+  "executionMode": "authored",
+  "recorder": "zoop_eval.controls",
+  "recordedAt": null,
+  "controlKind": "oracle_gold_echo",
+  "note": "Derived from the gold by code. A scorer sanity input; not a system and not a measurement."
+ },
+ "corpus": {
+  "corpusId": "zoop-bench-v1",
+  "corpusRevision": "2026-10-14.1",
+  "goldRevision": "2026-10-14.1",
+  "inputsSha256": "dc3a2f49940e85fea8d77b3ea4efea3e3a7e13a2013978e5dd308f92538b6f31",
+  "split": "test",
+  "tasks": [
+   "graph",
+   "qa"
+  ]
+ },
+ "system": {
+  "systemId": "control-oracle",
+  "family": "no_model_deterministic",
+  "model": null,
+  "config": {
+   "control": "oracle"
+  },
+  "promptRevision": null,
+  "toolRevision": "authored-control-1",
+  "schemaRevision": "zoop-bench-run-1",
+  "graphRevision": null,
+  "capabilities": {
+   "retrieval": true,
+   "path": true,
+   "citations": true
+  }
+ },
+ "records": [
+  {
+   "task": "graph",
+   "caseId": "GT-B1",
+   "status": "ok",
+   "output": {
+    "entityLinks": [
+     {
+      "mentionId": "m-b01",
+      "entityId": "E-NVC"
+     },
+     {
+      "mentionId": "m-b02",
+      "entityId": "E-PLR"
+     },
+     {
+      "mentionId": "m-b03",
+      "entityId": "E-PLR"
+     },
+     {
+      "mentionId": "m-b04",
+      "entityId": "E-QLA"
+     },
+     {
+      "mentionId": "m-b05",
+      "entityId": "E-RSR"
+     },
+     {
+      "mentionId": "m-b06",
+      "entityId": "E-QLA"
+     }
+    ],
+    "events": [],
+    "mergeDecisions": [],
+    "edges": [
+     {
+      "subject": "E-NVC",
+      "predicate": "SUPPLIES",
+      "object": "E-PLR",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D21-P1"
+      ]
+     },
+     {
+      "subject": "E-PLR",
+      "predicate": "SUPPLIES",
+      "object": "E-QLA",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D22-P1"
+      ]
+     },
+     {
+      "subject": "E-QLA",
+      "predicate": "SUPPLIES",
+      "object": "E-RSR",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D23-P1"
+      ]
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 130,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-B2",
+   "status": "ok",
+   "output": {
+    "entityLinks": [
+     {
+      "mentionId": "m-b07",
+      "entityId": "E-TAM"
+     },
+     {
+      "mentionId": "m-b08",
+      "entityId": "E-NVC"
+     },
+     {
+      "mentionId": "m-b09",
+      "entityId": "E-UVA"
+     },
+     {
+      "mentionId": "m-b10",
+      "entityId": "E-NVC"
+     }
+    ],
+    "events": [],
+    "mergeDecisions": [],
+    "edges": [
+     {
+      "subject": "E-TAM",
+      "predicate": "INVESTS_IN",
+      "object": "E-NVC",
+      "validFrom": "2025-01-01",
+      "validTo": "2025-12-31",
+      "status": "asserted",
+      "citations": [
+       "D24-P1"
+      ]
+     },
+     {
+      "subject": "E-UVA",
+      "predicate": "INVESTS_IN",
+      "object": "E-NVC",
+      "validFrom": "2026-01-01",
+      "validTo": null,
+      "status": "asserted",
+      "citations": [
+       "D25-P1"
+      ]
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 140,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-B3",
+   "status": "ok",
+   "output": {
+    "entityLinks": [
+     {
+      "mentionId": "m-b11",
+      "entityId": "E-SOL"
+     },
+     {
+      "mentionId": "m-b12",
+      "entityId": "E-PLR"
+     },
+     {
+      "mentionId": "m-b13",
+      "entityId": "E-PLR"
+     },
+     {
+      "mentionId": "m-b14",
+      "entityId": "E-SOL"
+     }
+    ],
+    "events": [],
+    "mergeDecisions": [],
+    "edges": [
+     {
+      "subject": "E-SOL",
+      "predicate": "SUPPLIES",
+      "object": "E-PLR",
+      "validFrom": null,
+      "validTo": null,
+      "status": "disputed",
+      "citations": [
+       "D26-P1",
+       "D27-P1"
+      ]
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 150,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-B4",
+   "status": "ok",
+   "output": {
+    "entityLinks": [
+     {
+      "mentionId": "m-b15",
+      "entityId": "E-KOPT"
+     },
+     {
+      "mentionId": "m-b16",
+      "entityId": null
+     },
+     {
+      "mentionId": "m-b17",
+      "entityId": "E-KBNK"
+     }
+    ],
+    "events": [],
+    "mergeDecisions": [
+     {
+      "pairId": "pair-b01",
+      "decision": "DIFFERENT"
+     },
+     {
+      "pairId": "pair-b02",
+      "decision": "HOLD"
+     }
+    ],
+    "edges": []
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 160,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "graph",
+   "caseId": "GT-B5",
+   "status": "ok",
+   "output": {
+    "entityLinks": [],
+    "events": [
+     {
+      "eventMentionId": "em-b01",
+      "eventType": "LINE_OPENING",
+      "eventDate": "2026-06-01"
+     },
+     {
+      "eventMentionId": "em-b02",
+      "eventType": "LINE_OPENING",
+      "eventDate": "2026-06-01"
+     },
+     {
+      "eventMentionId": "em-b03",
+      "eventType": "LINE_OPENING",
+      "eventDate": "2026-06-01"
+     },
+     {
+      "eventMentionId": "em-b04",
+      "eventType": "LINE_OPENING",
+      "eventDate": null
+     }
+    ],
+    "mergeDecisions": [
+     {
+      "pairId": "pair-b03",
+      "decision": "DIFFERENT"
+     },
+     {
+      "pairId": "pair-b04",
+      "decision": "SAME"
+     },
+     {
+      "pairId": "pair-b05",
+      "decision": "HOLD"
+     },
+     {
+      "pairId": "pair-b06",
+      "decision": "DIFFERENT"
+     }
+    ],
+    "edges": []
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 170,
+    "spans": [
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "link",
+      "startMs": 0,
+      "endMs": 60,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "merge",
+      "startMs": 40,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-1",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-NVC"
+    ],
+    "facts": [
+     {
+      "subject": "E-NVC",
+      "predicate": "SUPPLIES",
+      "object": "E-PLR",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D21-P1"
+    ],
+    "citations": [
+     "D21-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-NVC",
+      "predicate": "SUPPLIES",
+      "object": "E-PLR"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-2",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-RSR"
+    ],
+    "facts": [
+     {
+      "subject": "E-QLA",
+      "predicate": "SUPPLIES",
+      "object": "E-RSR",
+      "validFrom": null,
+      "validTo": null,
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D23-P1"
+    ],
+    "citations": [
+     "D23-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-QLA",
+      "predicate": "SUPPLIES",
+      "object": "E-RSR"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-3",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-QLA"
+    ],
+    "facts": [],
+    "retrieved": [
+     "D21-P1",
+     "D22-P1"
+    ],
+    "citations": [
+     "D21-P1",
+     "D22-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-NVC",
+      "predicate": "SUPPLIES",
+      "object": "E-PLR"
+     },
+     {
+      "subject": "E-PLR",
+      "predicate": "SUPPLIES",
+      "object": "E-QLA"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 90,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 40,
+      "endMs": 70,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-4",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-RSR"
+    ],
+    "facts": [],
+    "retrieved": [
+     "D21-P1",
+     "D22-P1",
+     "D23-P1"
+    ],
+    "citations": [
+     "D21-P1",
+     "D22-P1",
+     "D23-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-NVC",
+      "predicate": "SUPPLIES",
+      "object": "E-PLR"
+     },
+     {
+      "subject": "E-PLR",
+      "predicate": "SUPPLIES",
+      "object": "E-QLA"
+     },
+     {
+      "subject": "E-QLA",
+      "predicate": "SUPPLIES",
+      "object": "E-RSR"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 120,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s1",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 40,
+      "endMs": 70,
+      "costUsd": 0
+     },
+     {
+      "spanId": "s2",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 70,
+      "endMs": 100,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-5",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-TAM"
+    ],
+    "facts": [
+     {
+      "subject": "E-TAM",
+      "predicate": "INVESTS_IN",
+      "object": "E-NVC",
+      "validFrom": "2025-01-01",
+      "validTo": "2025-12-31",
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D24-P1"
+    ],
+    "citations": [
+     "D24-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-TAM",
+      "predicate": "INVESTS_IN",
+      "object": "E-NVC"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-6",
+   "status": "ok",
+   "output": {
+    "outcome": "answered",
+    "answerEntities": [
+     "E-UVA"
+    ],
+    "facts": [
+     {
+      "subject": "E-UVA",
+      "predicate": "INVESTS_IN",
+      "object": "E-NVC",
+      "validFrom": "2026-01-01",
+      "validTo": null,
+      "status": "asserted"
+     }
+    ],
+    "retrieved": [
+     "D25-P1"
+    ],
+    "citations": [
+     "D25-P1"
+    ],
+    "path": [
+     {
+      "subject": "E-UVA",
+      "predicate": "INVESTS_IN",
+      "object": "E-NVC"
+     }
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-7",
+   "status": "ok",
+   "output": {
+    "outcome": "abstained",
+    "answerEntities": [],
+    "facts": [],
+    "retrieved": [
+     "D25-P1"
+    ],
+    "citations": [
+     "D25-P1"
+    ],
+    "abstainReason": "end_unknown"
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-8",
+   "status": "ok",
+   "output": {
+    "outcome": "conflict",
+    "answerEntities": [],
+    "facts": [],
+    "retrieved": [
+     "D26-P1",
+     "D27-P1"
+    ],
+    "citations": [
+     "D26-P1",
+     "D27-P1"
+    ]
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  },
+  {
+   "task": "qa",
+   "caseId": "QB-9",
+   "status": "ok",
+   "output": {
+    "outcome": "abstained",
+    "answerEntities": [],
+    "facts": [],
+    "retrieved": [],
+    "citations": [],
+    "abstainReason": "no_evidence"
+   },
+   "trace": {
+    "startMs": 0,
+    "endMs": 60,
+    "spans": [
+     {
+      "spanId": "s0",
+      "kind": "tool",
+      "name": "graph_lookup",
+      "startMs": 10,
+      "endMs": 40,
+      "costUsd": 0
+     }
+    ]
+   }
+  }
+ ]
+}

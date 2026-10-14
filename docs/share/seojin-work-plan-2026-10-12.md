@@ -16,6 +16,8 @@
 
 **10/13 후속 실행:** ERD와 독립적으로 S2 사건 추출·S3 관계 분석에 등록 전용 `submit`을 추가했다. 접수 시 분석 호출 없이 입력·권리·버전을 고정하고 이후 실행·취소할 수 있다. 전체 pipeline **228개 시험**과 네 CLI smoke가 통과했다. 이 기록 당시 S2/S3의 HTTP 연결은 없었고(이후 로컬 구현은 아래 1번 항목) 팀원 소유 DB·공개 API는 수정하지 않았다. 원격 반영도 당시에는 하지 않았다.
 
+**10/14 실행 결과(FS056 문서 쪽만):** 앞 목록 2번 ‘문서 저장 기반’ 중 `artifacts`·`articles`·`article_versions`와 이를 채우는 operator 전용 비웹 문서 import를 로컬에 구현했다([문서 import](../../api/docs/DOCUMENT_IMPORT.md)). 매 항목 새 `zoop-ai-ingest export --require-store`(pipeline에 export 전용 옵션 추가), 불변 문서·버전·텍스트 파일, 명시적 compare-and-set 포인터만 쓰며 분석 결과 import·`evidence`·GraphDB·공개 API는 하지 않는다. Java 157개·pipeline 229개 시험과 실제 Spring+설치된 CLI+PostgreSQL 17.11 smoke(16단계)·SQL 증명이 통과했고 원본 ledger는 바뀌지 않았다. compose의 16.13·원격 CI·커밋/푸시는 하지 않았고 유료 모델 호출은 0이다. 소유 담당은 확정 전이다. 다음 선행 조건은 기업·`analysis_jobs`·`document_analyses` 소유와 migration이다.
+
 ### ERD v6 동기화 후의 작업 순서
 
 원격 `52b50d0`(PR #16)의 [ERD v6](../erd/zoop-core-erd-v6.md)와 변경 이력을 가져왔다. 오늘의 미커밋 pipeline 변경은 유지했다. 최신 설계는 v6(35개 테이블)이었고 당시 main의 인증 SQL은 v3.5의 3개 테이블 구조여서, 이미 병합된 migration을 고치지 않고 담당자가 후속 migration으로 이행해야 하는 상태였다. 현재 참조는 [migration 소유권](../development/api-migration-ownership.md)과 [AI 저장 책임 대조](../design/ai-system.md#erd-v6와-ai-저장-책임-대조)에 동기화했다.
