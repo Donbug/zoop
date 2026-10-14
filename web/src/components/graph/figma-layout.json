@@ -1,0 +1,230 @@
+{
+  "all": [
+    {
+      "label": "NVIDIA",
+      "x": 622.66,
+      "y": 352.67,
+      "size": 48.82,
+      "symbol": null
+    },
+    {
+      "label": "삼성전자",
+      "x": 796.64,
+      "y": 252.12,
+      "size": 42.09,
+      "symbol": null
+    },
+    {
+      "label": "SK하이닉스",
+      "x": 586.43,
+      "y": 90.49,
+      "size": 29.14,
+      "symbol": "SK"
+    },
+    {
+      "label": "삼성SDI",
+      "x": 1040.54,
+      "y": 274.51,
+      "size": 22.04,
+      "symbol": "S"
+    },
+    {
+      "label": "TSMC",
+      "x": 481.51,
+      "y": 309.15,
+      "size": 31.51,
+      "symbol": "T"
+    },
+    {
+      "label": "ASML",
+      "x": 646.82,
+      "y": 217.63,
+      "size": 25.9,
+      "symbol": "A"
+    },
+    {
+      "label": "NAVER",
+      "x": 1160.46,
+      "y": 340.57,
+      "size": 26.28,
+      "symbol": null
+    },
+    {
+      "label": "한미반도체",
+      "x": 475.28,
+      "y": -36.29,
+      "size": 22.54,
+      "symbol": "H"
+    },
+    {
+      "label": "Micron",
+      "x": 691.72,
+      "y": 29.94,
+      "size": 22.54,
+      "symbol": "M"
+    },
+    {
+      "label": "Tesla",
+      "x": 820.3,
+      "y": 501.77,
+      "size": 25.9,
+      "symbol": null
+    },
+    {
+      "label": "Amazon",
+      "x": 693.71,
+      "y": 582.99,
+      "size": 23.04,
+      "symbol": "A"
+    },
+    {
+      "label": "Apple",
+      "x": 266.13,
+      "y": 452.19,
+      "size": 28.14,
+      "symbol": null
+    },
+    {
+      "label": "Alphabet",
+      "x": 275.9,
+      "y": 736.93,
+      "size": 25.28,
+      "symbol": null
+    },
+    {
+      "label": "Microsoft",
+      "x": 449.13,
+      "y": 673.06,
+      "size": 26.28,
+      "symbol": "MS"
+    },
+    {
+      "label": "Meta",
+      "x": 358.03,
+      "y": 408.32,
+      "size": 22.42,
+      "symbol": null
+    },
+    {
+      "label": "AMD",
+      "x": 513.14,
+      "y": 452.29,
+      "size": 25.78,
+      "symbol": null
+    },
+    {
+      "label": "Intel",
+      "x": 621.17,
+      "y": 486.75,
+      "size": 21.92,
+      "symbol": null
+    },
+    {
+      "label": "Broadcom",
+      "x": 144.52,
+      "y": 555.48,
+      "size": 21.05,
+      "symbol": null
+    },
+    {
+      "label": "Qualcomm",
+      "x": 244.89,
+      "y": 287.14,
+      "size": 23.04,
+      "symbol": null
+    },
+    {
+      "label": "Arm",
+      "x": 303.67,
+      "y": 181.2,
+      "size": 22.04,
+      "symbol": null
+    },
+    {
+      "label": "현대차",
+      "x": 996.82,
+      "y": 667.49,
+      "size": 22.54,
+      "symbol": null
+    },
+    {
+      "label": "카카오",
+      "x": 1104.67,
+      "y": 144.1,
+      "size": 22.04,
+      "symbol": null
+    },
+    {
+      "label": "LG에너지솔루션",
+      "x": 827.77,
+      "y": 682.12,
+      "size": 22.91,
+      "symbol": null
+    }
+  ],
+  "personal": [
+    {
+      "label": "삼성전자",
+      "x": 415.07,
+      "y": 261.29,
+      "size": 35.62,
+      "symbol": null
+    },
+    {
+      "label": "NVIDIA",
+      "x": 260.15,
+      "y": 220.7,
+      "size": 23.41,
+      "symbol": null
+    },
+    {
+      "label": "삼성SDI",
+      "x": 509.53,
+      "y": 335.77,
+      "size": 15.57,
+      "symbol": "S"
+    },
+    {
+      "label": "SK하이닉스",
+      "x": 300.25,
+      "y": 387.4,
+      "size": 18.93,
+      "symbol": "SK"
+    },
+    {
+      "label": "ASML",
+      "x": 241.53,
+      "y": 327.98,
+      "size": 16.31,
+      "symbol": "A"
+    },
+    {
+      "label": "NAVER",
+      "x": 634.93,
+      "y": 246.76,
+      "size": 17.81,
+      "symbol": null
+    },
+    {
+      "label": "TSMC",
+      "x": 137.67,
+      "y": 233.75,
+      "size": 18.56,
+      "symbol": "T"
+    },
+    {
+      "label": "Micron",
+      "x": 398.44,
+      "y": 175.59,
+      "size": 16.06,
+      "symbol": "M"
+    },
+    {
+      "label": "Tesla",
+      "x": 363.08,
+      "y": 94.73,
+      "size": 17.56,
+      "symbol": null
+    }
+  ]
+}
