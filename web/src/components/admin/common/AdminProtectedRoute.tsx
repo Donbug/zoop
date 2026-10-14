@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { loadAdminSession } from '@/apis/admin/auth';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
-import '@/components/common/service-shell.css';
 import type { AdminLoginLocationState } from '@/types/admin';
 
 /** 다음 만료 시각(유휴·최대 중 이른 쪽)까지 남은 밀리초 */
@@ -43,7 +42,7 @@ export default function AdminProtectedRoute() {
 
   if (status === 'checking') {
     return (
-      <p role="status" className="admin-gate">
+      <p role="status" className="p-6 text-xs text-zoop-muted">
         관리자 세션을 확인하고 있어요
       </p>
     );
@@ -52,9 +51,16 @@ export default function AdminProtectedRoute() {
   // 확인 실패를 로그아웃으로 보지 않는다.
   if (status === 'error') {
     return (
-      <div role="alert" className="admin-gate">
+      <div
+        role="alert"
+        className="flex items-center gap-3 p-6 text-xs text-zoop-muted"
+      >
         <p>관리자 세션을 확인하지 못했어요.</p>
-        <button type="button" onClick={() => void loadAdminSession()}>
+        <button
+          type="button"
+          onClick={() => void loadAdminSession()}
+          className="h-8 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs font-semibold text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+        >
           다시 시도
         </button>
       </div>

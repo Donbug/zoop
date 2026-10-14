@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loadAdminSession, logInAdmin } from '@/apis/admin/auth';
 import { ApiError } from '@/apis/auth/ApiService';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
-import '@/components/common/service-shell.css';
 import type {
   AdminExpiredReason,
   AdminLoginLocationState,
@@ -100,27 +99,42 @@ export default function AdminLoginPage() {
     : null;
 
   return (
-    <main className="admin-login" data-screen-id="A-ADM-05c">
+    <main
+      className="grid min-h-dvh place-items-center bg-zoop-soft px-4 py-12 text-zoop-ink"
+      data-screen-id="A-ADM-05c"
+    >
       <section
-        className="admin-login-panel"
+        className="flex w-full max-w-[358px] flex-col gap-4"
         aria-labelledby="admin-login-title"
       >
-        <h1 id="admin-login-title" className="admin-login-title">
+        <h1
+          id="admin-login-title"
+          className="text-xl font-[750] tracking-[-0.035em]"
+        >
           줍 관리자
         </h1>
         {expired && !error && (
-          <p role="alert" className="admin-login-notice">
+          <p
+            role="alert"
+            className="rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-paper px-3.5 py-3 text-[11px] leading-relaxed text-zoop-ink"
+          >
             {expired}
           </p>
         )}
         <form
           noValidate
-          className="admin-login-form"
+          className="flex flex-col gap-2"
           onSubmit={(event) => void handleSubmit(event)}
         >
-          <label htmlFor="admin-email">관리자 이메일</label>
+          <label
+            htmlFor="admin-email"
+            className="mt-2 text-[11px] font-semibold text-zoop-muted"
+          >
+            관리자 이메일
+          </label>
           <input
             id="admin-email"
+            className="h-[46px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-[13px] text-zoop-ink focus:border-[1.333px] focus:border-zoop-ink disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
             type="email"
             autoComplete="username"
             value={email}
@@ -128,9 +142,15 @@ export default function AdminLoginPage() {
             aria-invalid={missing && !email.trim()}
             onChange={(event) => setEmail(event.target.value)}
           />
-          <label htmlFor="admin-password">비밀번호</label>
+          <label
+            htmlFor="admin-password"
+            className="mt-2 text-[11px] font-semibold text-zoop-muted"
+          >
+            비밀번호
+          </label>
           <input
             id="admin-password"
+            className="h-[46px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-[13px] text-zoop-ink focus:border-[1.333px] focus:border-zoop-ink disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
             type="password"
             autoComplete="current-password"
             value={password}
@@ -139,24 +159,37 @@ export default function AdminLoginPage() {
             onChange={(event) => setPassword(event.target.value)}
           />
           {missing && (
-            <p role="alert" className="admin-login-error">
+            <p
+              role="alert"
+              className="text-[11px] leading-relaxed text-[#b42318]"
+            >
               관리자 이메일과 비밀번호를 모두 입력해 주세요.
             </p>
           )}
           {error && (
-            <p role="alert" className="admin-login-error">
+            <p
+              role="alert"
+              className="text-[11px] leading-relaxed text-[#b42318]"
+            >
               {error}
             </p>
           )}
-          <button type="submit" disabled={pending}>
+          <button
+            type="submit"
+            disabled={pending}
+            className="mt-3.5 h-[46px] rounded-[3px] bg-zoop-ink text-[13px] font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+          >
             {pending ? '확인하고 있어요' : '관리자 로그인'}
           </button>
         </form>
-        <p className="admin-login-hint">
+        <p className="text-center text-[10px] text-zoop-faint">
           관리자 세션은 회원 세션과 분리돼요
           {idleMinutes ? ` · ${idleMinutes}분 동안 활동이 없으면 만료` : ''}
         </p>
-        <Link to="/login" className="admin-login-member">
+        <Link
+          to="/login"
+          className="self-center text-[11px] text-zoop-muted underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+        >
           회원 로그인으로
         </Link>
       </section>

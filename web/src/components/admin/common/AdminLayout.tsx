@@ -2,7 +2,6 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { adminMenus } from '@/constants/navigation';
 import { logoutAdmin } from '@/apis/admin/auth';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
-import '@/components/common/service-shell.css';
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -25,12 +24,18 @@ export default function AdminLayout() {
           ))}
         </nav>
         {admin && (
-          <div className="admin-account">
-            <p>
-              <strong>{admin.displayName}</strong>
-              <span>{admin.role}</span>
+          <div className="mt-8 flex flex-col gap-2 border-t-[0.667px] border-zoop-line pt-4">
+            <p className="flex flex-col gap-0.5">
+              <strong className="text-xs">{admin.displayName}</strong>
+              <span className="font-inter text-[10px] text-zoop-faint">
+                {admin.role}
+              </span>
             </p>
-            <button type="button" onClick={() => void logout()}>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="h-8 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs font-semibold text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+            >
               관리자 로그아웃
             </button>
           </div>
