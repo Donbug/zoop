@@ -222,4 +222,25 @@ describe('D-MY-01 / 01b 내 종목: 관심 종목', () => {
 
     expect(await within(section).findByText('NVIDIA')).toBeTruthy();
   });
+
+  test('관심 행의 기업 정보를 불러오지 못하면 그 행에서 다시 시도한다', async () => {
+    const server = createFakeServer();
+    myMember(server, { watchlistIds: ['cmp-nvidia'] });
+    server.on('GET', '/api/v1/companies/:id', () =>
+      apiError(503, 'SOURCE_UNAVAILABLE'),
+    );
+    const { user } = openMy();
+
+    expect(
+      await screen.findByText('종목 정보를 불러오지 못했어요.'),
+    ).toBeTruthy();
+
+    myMember(server, { watchlistIds: ['cmp-nvidia'] });
+    await user.click(
+      screen.getByRole('button', { name: '종목 정보 다시 불러오기' }),
+    );
+
+    expect(await screen.findByText('NVIDIA')).toBeTruthy();
+    expect(screen.queryByText('종목 정보를 불러오지 못했어요.')).toBeNull();
+  });
 });

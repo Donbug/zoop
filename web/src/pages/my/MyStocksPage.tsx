@@ -32,6 +32,7 @@ export default function MyStocksPage() {
     query: '',
   });
   const savedScroll = useRef<number | null>(null);
+  const wasConnecting = useRef(connecting);
 
   useEffect(() => {
     if (connecting) {
@@ -40,7 +41,10 @@ export default function MyStocksPage() {
       window.scrollTo(0, savedScroll.current);
       savedScroll.current = null;
     }
-  }, [connecting]);
+    // 연결 화면에서 돌아오면(성공·취소·뒤로 가기·연결 화면에서 확인한 기존 연결) 보유를 다시 읽는다.
+    if (wasConnecting.current && !connecting) reloadPortfolio();
+    wasConnecting.current = connecting;
+  }, [connecting, reloadPortfolio]);
 
   const openConnect = () => {
     savedScroll.current = window.scrollY;
@@ -65,10 +69,7 @@ export default function MyStocksPage() {
           <PortfolioConnect
             source="my"
             onBack={closeConnect}
-            onConnected={() => {
-              reloadPortfolio();
-              closeConnect();
-            }}
+            onConnected={closeConnect}
           />
         </div>
       )}

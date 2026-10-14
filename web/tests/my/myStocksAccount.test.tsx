@@ -311,4 +311,52 @@ describe('D-MY-01 / 01b 내 종목: 보유 종목과 계좌 연결', () => {
 
     expect(await within(section).findByText('삼성전자')).toBeTruthy();
   });
+
+  test('연결 요청은 실패했지만 이미 연결된 것으로 확인되면, 돌아온 내 종목에 보유 종목을 보여 준다', async () => {
+    const server = createFakeServer();
+    const state = myMember(server);
+    // 다른 탭에서 먼저 연결했거나 응답만 유실된 경우
+    server.on('POST', '/api/v1/portfolio/connections', () => {
+      state.connected = true;
+      return apiError(409, 'REVISION_CONFLICT');
+    });
+    const { user, location } = openMy();
+
+    await user.click(
+      await screen.findByRole('button', { name: '가상 계좌 연결하기' }),
+    );
+    await screen.findByRole('list', { name: '가상 계좌 목록' });
+    await user.click(
+      screen.getByRole('button', { name: '선택한 가상 계좌 연결하기' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: '내 종목으로 돌아가기' }),
+    );
+
+    await waitFor(() => expect(location()).toBe('/my'));
+    const section = await holdingsSection();
+    expect(await within(section).findByText('삼성전자')).toBeTruthy();
+    expect(within(section).queryByText('연결 안 됨')).toBeNull();
+  });
+
+  test('다른 곳에서 이미 끊겼으면 끊기 실패 뒤 창을 닫고 연결 안 됨을 보여 준다', async () => {
+    const server = createFakeServer();
+    const state = myMember(server, { connected: true });
+    server.on('DELETE', DELETE_CONNECTION, () => {
+      state.connected = false;
+      return apiError(404, 'RESOURCE_NOT_FOUND');
+    });
+    const { user } = openMy();
+
+    const section = await holdingsSection();
+    await user.click(
+      await within(section).findByRole('button', { name: '연결 끊기' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: '연결 끊기' }));
+
+    expect(await within(section).findByText('연결 안 됨')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(server.calls('DELETE', DELETE_CONNECTION)).toHaveLength(1);
+  });
 });

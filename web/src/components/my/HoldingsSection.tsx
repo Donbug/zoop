@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import ErrorNotice from '@/components/common/ErrorNotice';
 import StockRow from '@/components/my/StockRow';
-import { disconnectPortfolio } from '@/apis/portfolio/portfolio';
+import { disconnectPortfolio, getPortfolio } from '@/apis/portfolio/portfolio';
 import {
   formatKst,
   formatMoney,
@@ -65,6 +65,16 @@ export default function HoldingsSection({
       setConfirming(false);
     } catch {
       setDisconnectFailed(true);
+      // 다른 탭에서 이미 끊었으면(404 등) 다시 시도해도 계속 실패하므로 연결 상태를 다시 확인한다.
+      try {
+        const latest = await getPortfolio();
+        if (!latest.connected) {
+          portfolio.setData(latest);
+          closeConfirm();
+        }
+      } catch {
+        // 확인도 실패하면 기존 연결·보유를 그대로 두고 다시 시도를 안내한다.
+      }
     } finally {
       setDisconnecting(false);
     }

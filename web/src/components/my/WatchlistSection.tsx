@@ -33,6 +33,7 @@ export default function WatchlistSection({
   const [failed, setFailed] = useState<WatchChange | null>(null);
   const [briefs, setBriefs] = useState<Record<string, BriefEntry>>({});
   const requested = useRef(new Set<string>());
+  const [briefAttempt, setBriefAttempt] = useState(0);
 
   const savedIds = settings.data?.watchlistIds ?? [];
   const shownIds = applyChange(savedIds, pending);
@@ -57,7 +58,18 @@ export default function WatchlistSection({
           setBriefs((previous) => ({ ...previous, [id]: { status: 'error' } })),
       );
     }
-  }, [shownKey]);
+  }, [shownKey, briefAttempt]);
+
+  /** 기업 정보 조회에 실패한 행만 다시 조회한다. */
+  const retryBrief = (id: string) => {
+    requested.current.delete(id);
+    setBriefs((previous) => {
+      const next = { ...previous };
+      delete next[id];
+      return next;
+    });
+    setBriefAttempt((value) => value + 1);
+  };
 
   const change = async (next: WatchChange) => {
     if (pending) return;
@@ -156,6 +168,16 @@ export default function WatchlistSection({
                         ? '종목 정보를 불러오지 못했어요.'
                         : '종목 정보를 불러오고 있어요'}
                     </p>
+                    {entry?.status === 'error' && (
+                      <button
+                        type="button"
+                        aria-label="종목 정보 다시 불러오기"
+                        onClick={() => retryBrief(id)}
+                        className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                      >
+                        다시 시도
+                      </button>
+                    )}
                     {removeButton}
                   </li>
                 );
