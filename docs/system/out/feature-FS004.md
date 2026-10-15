@@ -40,3 +40,5 @@
 | [listSocialProviders](../../api/out/zoop-api-spec.md#listsocialproviders) | GET /api/v1/auth/social/providers | 6.1.2, 6.11.1, 6.2.2 | 공개 |
 | [authorizeSocialLogin](../../api/out/zoop-api-spec.md#authorizesociallogin) | GET /api/v1/auth/social/{provider}/authorize | 6.1.2, 6.11.1, 6.2.2 | 공개 |
 | [completeSocialLogin](../../api/out/zoop-api-spec.md#completesociallogin) | GET /api/v1/auth/social/{provider}/callback | 6.1.2, 6.11.1, 6.2.2 | 공개 |
+| [authorizeSocialLink](../../api/out/zoop-api-spec.md#authorizesociallink) | POST /api/v1/auth/social/{provider}/link/authorize | 6.2.2 | 회원(본인) |
+| [completeSocialSignup](../../api/out/zoop-api-spec.md#completesocialsignup) | POST /api/v1/auth/social/signup | 6.2.2 | 공개(pending 쿠키 결합) |

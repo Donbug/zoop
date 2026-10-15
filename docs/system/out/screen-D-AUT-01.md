@@ -14,5 +14,7 @@
 | [FS004](feature-FS004.md) · [FS061](feature-FS061.md) | [listSocialProviders](../../api/out/zoop-api-spec.md#listsocialproviders) | GET /api/v1/auth/social/providers | P1 |
 | [FS004](feature-FS004.md) · [FS061](feature-FS061.md) | [authorizeSocialLogin](../../api/out/zoop-api-spec.md#authorizesociallogin) | GET /api/v1/auth/social/{provider}/authorize | P1 |
 | [FS004](feature-FS004.md) · [FS061](feature-FS061.md) | [completeSocialLogin](../../api/out/zoop-api-spec.md#completesociallogin) | GET /api/v1/auth/social/{provider}/callback | P1 |
+| [FS004](feature-FS004.md) · [FS061](feature-FS061.md) | [authorizeSocialLink](../../api/out/zoop-api-spec.md#authorizesociallink) | POST /api/v1/auth/social/{provider}/link/authorize | P1 |
+| [FS004](feature-FS004.md) · [FS061](feature-FS061.md) | [completeSocialSignup](../../api/out/zoop-api-spec.md#completesocialsignup) | POST /api/v1/auth/social/signup | P1 |
 
 공통 품질: [NFS001](feature-NFS001.md) · [NFS002](feature-NFS002.md) · [NFS004](feature-NFS004.md) · [NFS008](feature-NFS008.md) · [NFS003](feature-NFS003.md) · [NFS009](feature-NFS009.md)

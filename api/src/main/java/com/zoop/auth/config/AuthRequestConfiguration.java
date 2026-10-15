@@ -33,8 +33,10 @@ public class AuthRequestConfiguration implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(interceptor).addPathPatterns(
-                "/api/v1/auth/signup", "/api/v1/auth/login");
+                "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/social/signup",
+                "/api/v1/auth/social/*/link/authorize");
         registry.addInterceptor(memberCsrfInterceptor).addPathPatterns("/api/v1/**")
-                .excludePathPatterns("/api/v1/auth/signup", "/api/v1/auth/login");
+                .excludePathPatterns("/api/v1/auth/signup", "/api/v1/auth/login",
+                        "/api/v1/auth/social/signup");
     }
 }

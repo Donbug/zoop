@@ -52,6 +52,19 @@ class AuthRequestBoundaryTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         verify(rates, times(2)).recordSignupIpAttempt("127.0.0.1");
+        mvc.perform(post("/api/v1/auth/social/signup")
+                        .header("Origin", "https://zoop.example")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"agreements\":[]}"))
+                .andExpect(status().isOk());
+        verify(rates, times(3)).recordSignupIpAttempt("127.0.0.1");
+        mvc.perform(post("/api/v1/auth/social/google/link/authorize")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/auth/social/google/link/authorize")
+                        .header("Origin", "https://zoop.example")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
         mvc.perform(post("/api/v1/auth/login")
                         .header("Origin", "https://zoop.example"))
                 .andExpect(status().isTooManyRequests())
@@ -69,6 +82,14 @@ class AuthRequestBoundaryTest {
         @PostMapping("/api/v1/auth/login")
         void login() {
             throw new RateLimitedException(17);
+        }
+
+        @PostMapping("/api/v1/auth/social/signup")
+        void socialSignup() {
+        }
+
+        @PostMapping("/api/v1/auth/social/google/link/authorize")
+        void linkSocial() {
         }
     }
 }

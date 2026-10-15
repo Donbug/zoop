@@ -1,4 +1,4 @@
--- Run against an isolated database after Flyway has applied both auth migrations.
+-- Run against an isolated database after Flyway has applied the auth migrations.
 -- The transaction is rolled back so the fixture never becomes development data.
 BEGIN;
 
@@ -7,8 +7,11 @@ BEGIN
     IF to_regclass('public.member_credentials') IS NOT NULL THEN
         RAISE EXCEPTION 'member_credentials must be removed';
     END IF;
-    IF (SELECT count(*) FROM flyway_schema_history WHERE success) <> 2 THEN
-        RAISE EXCEPTION 'expected two successful Flyway migrations';
+    IF (
+        SELECT count(*) FROM flyway_schema_history
+        WHERE success AND version IN ('20261012210200', '20261013000000', '20261014140000', '20261015100000', '20261015110000')
+    ) <> 5 THEN
+        RAISE EXCEPTION 'expected all five required auth migrations';
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes
@@ -16,6 +19,13 @@ BEGIN
           AND indexname = 'ix_member_sessions_member_created_at'
     ) THEN
         RAISE EXCEPTION 'member session creation index is missing';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE tablename = 'member_sessions'
+          AND indexname = 'ix_member_sessions_oauth_pending_expiry'
+    ) THEN
+        RAISE EXCEPTION 'OAuth pending expiry index is missing';
     END IF;
 END $$;
 
@@ -31,6 +41,9 @@ INSERT INTO members (
      '회원', NULL, 'google', 'active', 'watchlist', NULL, false, false,
      1, now(), now());
 
+INSERT INTO social_identities (id, member_id, provider, provider_subject, linked_at)
+VALUES ('test-social-identity', 'test-social', 'google', 'synthetic-google-subject', now());
+
 INSERT INTO member_sessions (
     id, member_id, kind, analytics_key, token_hash, csrf_key_id, csrf_version,
     tutorial_completed, auth_flow, created_at, expires_at
@@ -40,7 +53,12 @@ INSERT INTO member_sessions (
     ('test-guest-session', NULL, 'guest', 'guest-analytics', 'hash-guest', 'key', 1,
      false, NULL, now(), now() + interval '1 day'),
     ('test-oauth-session', NULL, 'oauth_pending', NULL, 'hash-oauth', 'reserved', 1,
-     false, '{}'::jsonb, now(), now() + interval '5 minutes');
+     false, jsonb_build_object('schemaVersion', 1, 'phase', 'authorization_pending',
+        'provider', 'google', 'stateHash', repeat('a', 64)), now(), now() + interval '5 minutes'),
+    ('test-oauth-verified', NULL, 'oauth_pending', NULL, 'hash-oauth-verified', 'reserved', 1,
+     false, jsonb_build_object('schemaVersion', 1, 'phase', 'identity_verified',
+        'provider', 'kakao', 'stateHash', repeat('b', 64), 'providerSubject', 'synthetic-subject',
+        'email', 'verified@example.invalid', 'emailVerified', true), now(), now() + interval '5 minutes');
 
 DO $$
 BEGIN
@@ -130,6 +148,25 @@ BEGIN
             true, '{}'::jsonb, now(), now() + interval '1 day'
         );
         RAISE EXCEPTION 'oauth pending session with tutorial access was accepted';
+    EXCEPTION WHEN check_violation THEN NULL;
+    END;
+
+    BEGIN
+        INSERT INTO social_identities (id, member_id, provider, provider_subject, linked_at)
+        VALUES ('bad-social-identity', 'test-email', 'google', 'synthetic-google-subject', now());
+        RAISE EXCEPTION 'duplicate provider subject was accepted';
+    EXCEPTION WHEN unique_violation THEN NULL;
+    END;
+
+    BEGIN
+        INSERT INTO member_sessions (
+            id, kind, token_hash, csrf_key_id, csrf_version,
+            tutorial_completed, auth_flow, created_at, expires_at
+        ) VALUES (
+            'bad-oauth-flow', 'oauth_pending', 'bad-hash-5', 'reserved', 1,
+            false, '{}'::jsonb, now(), now() + interval '5 minutes'
+        );
+        RAISE EXCEPTION 'invalid oauth flow document was accepted';
     EXCEPTION WHEN check_violation THEN NULL;
     END;
 END $$;
