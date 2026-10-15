@@ -12,8 +12,10 @@
 | logOut | /api/v1/auth/logout | /api/auth/logout | 목표만 126 · BFF만 30 · 형식/필수/권한 변경 5 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. / 목표는 활성 회원 세션의 Origin/조건부 CSRF 검증, 무세션 반복204 및 회원/관리자 쿠키 분리를 요구한다. 현재 BFF의 목표 보안 구현 완료를 뜻하지 않는다. |
 | setTutorialState | /api/v1/auth/tutorial | /api/auth/tutorial | 목표만 182 · BFF만 23 · 형식/필수/권한 변경 8 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | listSocialProviders | /api/v1/auth/social/providers | /api/auth/social/providers | 목표만 131 · BFF만 34 · 형식/필수/권한 변경 5 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| authorizeSocialLogin | /api/v1/auth/social/{provider}/authorize | /api/auth/social/{provider}/authorize | 목표만 124 · BFF만 30 · 형식/필수/권한 변경 5 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| completeSocialLogin | /api/v1/auth/social/{provider}/callback | /api/auth/social/{provider}/callback | 목표만 124 · BFF만 30 · 형식/필수/권한 변경 5 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
+| authorizeSocialLogin | /api/v1/auth/social/{provider}/authorize | /api/auth/social/{provider}/authorize | 목표만 169 · BFF만 21 · 형식/필수/권한 변경 6 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
+| completeSocialLogin | /api/v1/auth/social/{provider}/callback | /api/auth/social/{provider}/callback | 목표만 186 · BFF만 12 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
+| authorizeSocialLink | /api/v1/auth/social/{provider}/link/authorize | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
+| completeSocialSignup | /api/v1/auth/social/signup | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getMySettings | /api/v1/me/settings | /api/me/settings | 목표만 134 · BFF만 33 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | updateMySettings | /api/v1/me/settings | /api/me/settings | 목표만 180 · BFF만 24 · 형식/필수/권한 변경 8 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | setWatchlistCompany | /api/v1/me/watchlist/{id} | /api/me/watchlist/{id} | 목표만 180 · BFF만 24 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |

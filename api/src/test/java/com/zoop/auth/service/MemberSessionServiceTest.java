@@ -102,6 +102,17 @@ class MemberSessionServiceTest {
         assertCsrfDenied(first.token(), first.response().csrfToken());
     }
 
+    @Test
+    void currentBindingReturnsExactActiveSessionAndRejectsMissingOrExpiredBindings() {
+        var issued = service.issue("member-1", null, "req");
+        var binding = service.currentBinding(issued.token());
+        assertEquals("member-1", binding.memberId());
+        assertEquals(repository.rows.get(MemberSessionService.hashToken(issued.token())).id(), binding.sessionId());
+        assertTrue(service.currentBindingIfActive("invalid").isEmpty());
+        var error = assertThrows(CustomException.class, () -> service.currentBinding("invalid"));
+        assertEquals(ErrorCode.ACCESS_DENIED, error.getErrorCode());
+    }
+
     private void assertCsrfDenied(String token, String csrf) {
         var error = assertThrows(CustomException.class, () -> service.verifyCsrf(token, csrf));
         assertEquals(ErrorCode.ACCESS_DENIED, error.getErrorCode());

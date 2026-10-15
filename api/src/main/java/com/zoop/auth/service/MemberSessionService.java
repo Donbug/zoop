@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
 
 import com.zoop.auth.dto.SessionResponse;
 import com.zoop.common.exception.CustomException;
@@ -63,6 +64,25 @@ public class MemberSessionService {
             return new SessionLookup(SessionResponse.anonymous(now, requestId), true);
         }
         return new SessionLookup(memberResponse(row.get(), now, requestId), false);
+    }
+
+    /** Returns the active member and exact session binding for a privileged OAuth link flow. */
+    @Transactional(readOnly = true)
+    public SessionBinding currentBinding(String cookieToken) {
+        return currentBindingIfActive(cookieToken).orElseThrow(() -> new CustomException(ErrorCode.ACCESS_DENIED));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<SessionBinding> currentBindingIfActive(String cookieToken) {
+        if (!validToken(cookieToken)) return Optional.empty();
+        Instant now = clock.instant();
+        var row = repository.findByTokenHash(hashToken(cookieToken));
+        if (row.isEmpty() || !isUsable(row.get(), now)
+                || keyRing.derive(row.get().csrfKeyId(), row.get().kind(),
+                        row.get().id(), row.get().csrfVersion()).isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new SessionBinding(row.get().memberId(), row.get().id()));
     }
 
     /** Require an active member session and its exact session-bound CSRF token for a cookie write. */
@@ -133,5 +153,8 @@ public class MemberSessionService {
     }
 
     public record SessionLookup(SessionResponse response, boolean clearCookie) {
+    }
+
+    public record SessionBinding(String memberId, String sessionId) {
     }
 }
