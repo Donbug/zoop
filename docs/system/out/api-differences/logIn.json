@@ -67,6 +67,9 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:header:Set-Cookie": {
+      "type": "string"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -533,6 +536,14 @@
     }
   },
   "changed": {
+    "request:application/json.email:required": {
+      "target": true,
+      "bff": false
+    },
+    "request:application/json.password:required": {
+      "target": true,
+      "bff": false
+    },
     "response:200:application/json.metadata.asOf": {
       "target": {
         "type": "string",

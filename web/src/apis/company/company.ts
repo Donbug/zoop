@@ -20,11 +20,7 @@ export async function readCompanyResource<T>(
   const requested = new URL(url, 'http://localhost');
   const payload = first as { metadata?: { graphVersion?: string | null } };
   const expectedVersion = requested.searchParams.get('graphVersion');
-  if (
-    expectedVersion &&
-    payload.metadata &&
-    payload.metadata.graphVersion !== expectedVersion
-  )
+  if (expectedVersion && payload.metadata?.graphVersion !== expectedVersion)
     throw new ApiError(
       409,
       'VERSION_UNAVAILABLE',

@@ -614,3 +614,16 @@ test('selected graph version is not silently replaced with latest', async () => 
     screen.queryByRole('img', { name: '기준 시점 기업 관계 그래프' }),
   ).toBeNull();
 });
+
+test('selected graph version rejects a response that omits snapshot metadata', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', () => {
+    const withoutMetadata: Partial<GraphResponse> = { ...graph };
+    delete withoutMetadata.metadata;
+    return json(withoutMetadata);
+  });
+  open(pinned);
+  await screen.findByText(/요청한 공개 버전과 다른 자료를 받았어요/);
+  expect(
+    screen.queryByRole('img', { name: '기준 시점 기업 관계 그래프' }),
+  ).toBeNull();
+});

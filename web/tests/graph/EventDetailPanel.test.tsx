@@ -40,7 +40,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     const user = userEvent.setup();
     await user.tab();
     expect(document.activeElement).toBe(
-      screen.getByRole('button', { name: '근거 1건 보기' }),
+      screen.getByRole('button', { name: '근거 2건 보기' }),
     );
     await user.keyboard('{Enter}');
     expect(props.onAction).toHaveBeenCalledWith('evidence', event);
@@ -135,7 +135,7 @@ describe('D-GRP-02 · panel states and accessibility', () => {
     await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     await waitFor(() =>
       expect(
-        within(screen.getByRole('region', { name: '관련 문서 1건' })).getByText(
+        within(screen.getByRole('region', { name: '관련 문서 2건' })).getByText(
           '보도 기사',
         ),
       ).toBeTruthy(),

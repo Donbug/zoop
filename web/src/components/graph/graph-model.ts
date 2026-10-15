@@ -1,5 +1,6 @@
 import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
+import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
 
 export function graphSummary(data: GraphResponse) {
@@ -256,6 +257,8 @@ export function toG6Data(
           lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
           endArrow: e.relationType === 'FOLLOWS',
           endArrowSize: 4,
+          cursor: isSelectableRelation(e) ? 'pointer' : 'default',
+          increasedLineWidthForHitTesting: isSelectableRelation(e) ? 8 : 0,
         },
       })),
   };

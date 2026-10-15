@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
@@ -14,6 +15,7 @@ type Props = {
   onSelectIssue: (id: string) => void;
   onFocus: () => void;
   onConnections: () => void;
+  onSelectRelation?: (companyId: string) => void;
   onAskAi: () => void;
 };
 
@@ -67,6 +69,10 @@ function SectionError({
 
 // WBS 6.6.23 · D-GRP-03 · Figma 619:6729
 export default function CompanyDetailPanel(props: Props) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, [props.companyId]);
   const [retry, setRetry] = useState(0);
   const { data, loading, errors } = useCompanyData(
     props.companyId,
@@ -107,15 +113,23 @@ export default function CompanyDetailPanel(props: Props) {
 
   return (
     <aside
-      className="company-panel"
+      className={`company-panel ${ui.shell}`}
       data-screen-id="D-GRP-03"
       aria-label={`${name} 기업 상세`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          props.onClose();
+        }
+      }}
     >
       <header className="company-panel-header">
         <div className="company-panel-title">
-          <h2>{name}</h2>
+          <h2 className={ui.title} ref={heading} tabIndex={-1}>
+            {name}
+          </h2>
           <button
-            className="company-close"
+            className={ui.close}
             onClick={props.onClose}
             aria-label="기업 상세 닫기"
           >
@@ -165,9 +179,9 @@ export default function CompanyDetailPanel(props: Props) {
         </div>
       )}
       {company && (
-        <div className="company-panel-scroll">
-          <section className="company-quote">
-            <h3 className="company-quote-title">시세</h3>
+        <div className={`company-panel-scroll ${ui.scroll}`}>
+          <section className={`company-quote ${ui.sectionFrame}`}>
+            <h3 className="sr-only">시세</h3>
             {quote ? (
               <>
                 <div className="company-price-row">
@@ -253,7 +267,7 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </section>
-          <details className="company-metrics">
+          <details className={`company-metrics ${ui.sectionFrame}`}>
             <summary>
               주요 지표{' '}
               <span>{metrics ? `${metrics.items.length}개` : '—'}</span>
@@ -274,7 +288,7 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </details>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>가상 계좌 보유</h3>
             </div>
@@ -322,7 +336,9 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </section>
-          <div className="company-actions">
+          <div
+            className={`company-actions ${ui.actions} [&>:last-child]:col-span-2`}
+          >
             <Link to={`/companies/${encodeURIComponent(company.id)}`}>
               기업 상세
             </Link>
@@ -339,7 +355,12 @@ export default function CompanyDetailPanel(props: Props) {
             )}
             <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
             <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
-            <button onClick={props.onAskAi}>AI에게 이 기업 묻기</button>
+            <button
+              className="col-span-2 bg-panel-ink! text-white!"
+              onClick={props.onAskAi}
+            >
+              AI에게 이 기업 묻기
+            </button>
           </div>
           {watchError && (
             <p className="company-watch-error" role="alert">
@@ -347,7 +368,7 @@ export default function CompanyDetailPanel(props: Props) {
               <button onClick={() => void toggleWatch()}>재시도</button>
             </p>
           )}
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>직접 관련 사건</h3>
               <span>{company.directIssues.length}</span>
@@ -370,7 +391,7 @@ export default function CompanyDetailPanel(props: Props) {
               <p className="company-unavailable">직접 관련 사건이 없습니다.</p>
             )}
           </section>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>간접 관련 사건</h3>
               <span>{company.structuralIssues.length}</span>
@@ -392,7 +413,7 @@ export default function CompanyDetailPanel(props: Props) {
               </p>
             )}
           </section>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>관련 기업</h3>
               <span>{props.relatedCompanies.length}</span>
@@ -401,7 +422,9 @@ export default function CompanyDetailPanel(props: Props) {
               <ul className="company-list">
                 {props.relatedCompanies.slice(0, 5).map((related) => (
                   <li key={related.id}>
-                    <button onClick={props.onConnections}>
+                    <button
+                      onClick={() => props.onSelectRelation?.(related.id)}
+                    >
                       <b>{related.name}</b>
                       <span>공유 사건 {related.sharedIssueCount}건</span>
                     </button>
@@ -414,7 +437,7 @@ export default function CompanyDetailPanel(props: Props) {
               </p>
             )}
           </section>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>뉴스·공시</h3>
               <span>{data.documents?.items.length ?? '—'}</span>
