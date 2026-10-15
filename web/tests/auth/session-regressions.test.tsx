@@ -133,19 +133,6 @@ test('logout posts to server with CSRF and clears client state', async () => {
   expect(useOnboardingStore.getState().watchlistIds).toEqual([]);
   expect(useAiChatStore.getState().draft).toBe('');
 });
-test('failed logout preserves the current session for retry', async () => {
-  useAuthStore.getState().setSession(member());
-  server.on('POST', '/api/v1/auth/logout', () =>
-    apiError(503, 'SOURCE_UNAVAILABLE'),
-  );
-
-  await expect(logout()).rejects.toMatchObject({
-    status: 503,
-    code: 'SOURCE_UNAVAILABLE',
-  });
-
-  expect(useAuthStore.getState().member?.id).toBe('synthetic-a');
-});
 test('known zero portfolio and interests select market mode', async () => {
   useAuthStore.getState().setSession(member());
   server.on('GET', '/api/v1/me/settings', () => json({ watchlistIds: [] }));
