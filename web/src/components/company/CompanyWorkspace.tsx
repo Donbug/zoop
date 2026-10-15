@@ -13,13 +13,13 @@ import type {
   Events,
   EventDetail,
   Financials,
-  Documents,
   Impact,
   Meta,
 } from '@/types/company/detail';
 import type { ChartPeriod } from '@/types/company';
 import type { GraphResponse } from '@/types/map/graph';
 import CompanyCatalog from './CompanyCatalog';
+import CompanyDocumentPanel from './CompanyDocumentPanel';
 import CompanyGraphPreview from './CompanyGraphPreview';
 import {
   periods,
@@ -156,11 +156,6 @@ export default function CompanyWorkspace() {
   const financials = useCompanyResource<Financials>(
     ready ? companyUrl(id, '/financials', snapshot) : null,
   );
-  const documents = useCompanyResource<Documents>(
-    ready ? companyUrl(id, '/documents', snapshot) : null,
-    '',
-    true,
-  );
   const tab = ['events', 'documents', 'info'].includes(params.get('tab') ?? '')
     ? params.get('tab')!
     : 'events';
@@ -187,9 +182,12 @@ export default function CompanyWorkspace() {
   if (version) mapQuery.set('graphVersion', version);
   if (eventId) mapQuery.set('event', eventId);
   const highlighted = graph.data ? impactEdges(graph.data, impact.data) : [];
-  function selectEvent(item: Events['items'][number]) {
+  function selectEvent(item: Events['items'][number], targetTab?: string) {
     updateQuery({
       event: item.id,
+      ...(targetTab
+        ? { tab: targetTab, docScope: 'event', document: null, evidence: null }
+        : {}),
       ...(item.timePrecision === 'datetime' && exactTime(item.eventTime)
         ? { asOf: item.eventTime! }
         : {}),
@@ -474,6 +472,9 @@ export default function CompanyWorkspace() {
                       {item.eventTime ?? '시점 미상'} · 문서 {item.articleCount}
                       건 · {item.relationTypes.join(', ') || '직접 관계 미확인'}
                     </p>
+                    <button onClick={() => selectEvent(item, 'documents')}>
+                      근거 문서 {item.articleCount}건 보기
+                    </button>
                     {item.timePrecision !== 'datetime' && (
                       <p>
                         정확한 사건 시각이 없어 기준 시점을 임의 변경하지
@@ -505,7 +506,30 @@ export default function CompanyWorkspace() {
                 {event.data && (
                   <article>
                     <h3>{event.data.title}</h3>
-                    <p>근거 {event.data.evidenceIds.length}건</p>
+                    <p>
+                      근거 인용 {event.data.evidenceIds.length}건 · 문서{' '}
+                      {
+                        new Set(
+                          event.data.articles.map((article) => article.id),
+                        ).size
+                      }
+                      건
+                    </p>
+                    {event.data.evidenceIds.map((evidenceId) => (
+                      <button
+                        key={evidenceId}
+                        onClick={() =>
+                          updateQuery({
+                            tab: 'documents',
+                            evidence: evidenceId,
+                            document: null,
+                            docScope: 'event',
+                          })
+                        }
+                      >
+                        근거 {evidenceId} 보기
+                      </button>
+                    ))}
                     <Link to={`/?${mapQuery}`}>
                       이 사건의 관계를 지도에서 보기
                     </Link>
@@ -515,38 +539,7 @@ export default function CompanyWorkspace() {
             )}
           </section>
         )}
-        {tab === 'documents' && (
-          <section aria-label="뉴스·공시">
-            <h2>뉴스·공시</h2>
-            <Status resource={documents} label="뉴스·공시" />
-            {documents.data && (
-              <>
-                <Basis metadata={documents.data.metadata} />
-                {!documents.data.items.length && (
-                  <p>공개된 뉴스·공시가 없어요.</p>
-                )}
-                {documents.data.items.map((d) => (
-                  <article key={d.id}>
-                    <h3>{d.title ?? '제목 미제공'}</h3>
-                    <p>
-                      {d.publisher ?? '출처 미제공'} ·{' '}
-                      {d.publishedAt ?? '발행 시각 미제공'}
-                    </p>
-                    {safeHref(d.url) && (
-                      <a
-                        href={safeHref(d.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        원문 보기
-                      </a>
-                    )}
-                  </article>
-                ))}
-              </>
-            )}
-          </section>
-        )}
+        {tab === 'documents' && <CompanyDocumentPanel />}
         {tab === 'info' && company.data && (
           <section aria-label="기업 기준정보">
             <h2>기업 기준정보</h2>
@@ -641,6 +634,9 @@ export default function CompanyWorkspace() {
                   const next = new URLSearchParams(params);
                   next.delete('event');
                   next.delete('bucket');
+                  next.delete('document');
+                  next.delete('evidence');
+                  next.delete('docScope');
                   navigate(`/companies/${encodeURIComponent(node)}?${next}`);
                 }
               }}

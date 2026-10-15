@@ -1,3 +1,4 @@
+import type { Meta } from '@/types/company/detail';
 import { ApiError, call } from '@/apis/auth/ApiService';
 export function companyUrl(
   id: string,
@@ -31,7 +32,7 @@ export async function readCompanyResource<T>(
     items: { id: string }[];
     unknownTimeItems?: { id: string }[];
     nextCursor: string | null;
-    metadata?: { asOf: string; graphVersion: string | null };
+    metadata?: Meta;
   };
   const result = first as Page;
   const seen = new Set<string>();
@@ -57,6 +58,15 @@ export async function readCompanyResource<T>(
         'REVISION_CONFLICT',
         '조회 중 공개 자료 기준이 바뀌었어요.',
       );
+    if (result.metadata && next.metadata) {
+      result.metadata.partial = Boolean(
+        result.metadata.partial || next.metadata.partial,
+      );
+      result.metadata.failures = [
+        ...(result.metadata.failures ?? []),
+        ...(next.metadata.failures ?? []),
+      ];
+    }
     result.items.push(...next.items);
     if (next.unknownTimeItems)
       result.unknownTimeItems?.push(...next.unknownTimeItems);

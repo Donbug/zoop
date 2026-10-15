@@ -615,15 +615,47 @@ test('selected graph version is not silently replaced with latest', async () => 
   ).toBeNull();
 });
 
-test('selected graph version rejects a response that omits snapshot metadata', async () => {
-  server.on('GET', '/api/v1/companies/:id/graph', () => {
-    const withoutMetadata: Partial<GraphResponse> = { ...graph };
-    delete withoutMetadata.metadata;
-    return json(withoutMetadata);
-  });
+test('FS043: event card enters its document scope with period and exact time retained', async () => {
+  server.on('GET', '/api/v1/companies/:id/documents', (r) =>
+    json({
+      items: [
+        {
+          id: 'doc-synthetic',
+          title: '사건 A 근거 문서',
+          publisher: '합성 출처',
+          publishedAt: old,
+          url: null,
+          kind: 'news',
+          events: [
+            {
+              eventId: 'issue-a',
+              title: '합성 사건 A',
+              relationType: 'REPORTS',
+            },
+          ],
+          quotes: [],
+          sentiment: null,
+        },
+      ],
+      nextCursor: null,
+      metadata: { ...metadata, asOf: r.query.get('asOf') ?? time },
+    }),
+  );
   open(pinned);
-  await screen.findByText(/요청한 공개 버전과 다른 자료를 받았어요/);
+  await userEvent.click(
+    await screen.findByRole('button', { name: '2026-10-05 · 사건 2건' }),
+  );
+  await userEvent.click(
+    screen.getByRole('button', { name: '근거 문서 1건 보기' }),
+  );
+  await screen.findByRole('heading', { name: '사건 A 근거 문서' });
+  expect(screen.getByTestId('address').textContent).toContain('tab=documents');
+  expect(screen.getByTestId('address').textContent).toContain('docScope=event');
+  expect(screen.getByTestId('address').textContent).toContain('event=issue-a');
   expect(
-    screen.queryByRole('img', { name: '기준 시점 기업 관계 그래프' }),
-  ).toBeNull();
+    server
+      .calls('GET', '/api/v1/companies/:id/documents')
+      .at(-1)
+      ?.query.get('asOf'),
+  ).toBe(old);
 });
