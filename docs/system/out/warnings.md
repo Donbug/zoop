@@ -58,9 +58,6 @@
 | INDEX_DETAIL_RANGE_STALE | warning | FS051 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:61 (xlsx-row) |
 | INDEX_REQUIREMENT_META_MISMATCH | warning | FS051 | 목차 요구 번호 ['50']와 현행 상세 메타 요구 번호 ['51']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:94 (xlsx-row) |
 | INDEX_REQUIREMENT_META_MISMATCH | warning | FS066-01 | 목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:134 (xlsx-row) |
-| TEAM_DECISION_REQUIRED | warning | listTerms | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
-| TEAM_DECISION_REQUIRED | warning | signUp | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
-| TEAM_DECISION_REQUIRED | warning | logIn | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listSocialProviders | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
 | TEAM_DECISION_REQUIRED | warning | authorizeSocialLogin | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
 | TEAM_DECISION_REQUIRED | warning | completeSocialLogin | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
@@ -215,9 +212,9 @@
 | BFF_PATH_DIFFERENCE | difference | listTerms | 목표 /api/v1/auth/terms ↔ BFF /api/auth/terms |  |
 | BFF_FIELD_DIFFERENCE | difference | listTerms | 목표만 90 · BFF만 39 · 형식/필수/권한 변경 3 |  |
 | BFF_PATH_DIFFERENCE | difference | signUp | 목표 /api/v1/auth/signup ↔ BFF /api/auth/signup |  |
-| BFF_FIELD_DIFFERENCE | difference | signUp | 목표만 152 · BFF만 41 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | signUp | 목표만 170 · BFF만 32 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | logIn | 목표 /api/v1/auth/login ↔ BFF /api/auth/login |  |
-| BFF_FIELD_DIFFERENCE | difference | logIn | 목표만 180 · BFF만 23 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | logIn | 목표만 181 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | startGuestSession | 목표 /api/v1/auth/guest ↔ BFF /api/auth/guest |  |
 | BFF_FIELD_DIFFERENCE | difference | startGuestSession | 목표만 146 · BFF만 41 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | logOut | 목표 /api/v1/auth/logout ↔ BFF /api/auth/logout |  |
