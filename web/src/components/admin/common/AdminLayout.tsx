@@ -14,7 +14,7 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]">
-      <aside className="border-r border-gray-200 bg-white p-6">
+      <aside className="border-r-[0.667px] border-zoop-line bg-zoop-paper p-6 text-zoop-ink">
         <p className="mb-6 text-xl font-bold">줍 관리자</p>
         <nav aria-label="관리자 메뉴" className="flex flex-col gap-4">
           {adminMenus.map((menu) => (
