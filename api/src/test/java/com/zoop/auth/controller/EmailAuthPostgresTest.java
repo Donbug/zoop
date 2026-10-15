@@ -230,6 +230,35 @@ class EmailAuthPostgresTest {
         }
     }
 
+    @Test
+    void malformedBodiesConsumeIpAttemptBudgetBeforeDeserialization() throws Exception {
+        assertMalformedBodyLimit("/api/v1/auth/signup", "signup_ip", 10);
+        assertMalformedBodyLimit("/api/v1/auth/login", "login_ip", 100);
+    }
+
+    private void assertMalformedBodyLimit(String path, String scope, int limit) throws Exception {
+        String ip = remoteIp();
+        try {
+            for (int i = 0; i < limit; i++) {
+                mvc.perform(post(path).with(remote(ip)).header("Origin", ORIGIN)
+                                .contentType(MediaType.APPLICATION_JSON).content("{"))
+                        .andExpect(status().isUnprocessableEntity())
+                        .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+            }
+            mvc.perform(post(path).with(remote(ip)).header("Origin", ORIGIN)
+                            .contentType(MediaType.APPLICATION_JSON).content("{"))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().exists("Retry-After"))
+                    .andExpect(jsonPath("$.error.code").value("RATE_LIMITED"));
+            assertEquals(limit, jdbc.queryForObject(
+                    "SELECT count(*) FROM auth_rate_events WHERE scope = ? AND subject_hash = ?",
+                    Integer.class, scope, subjectHash(scope, ip)));
+        } finally {
+            jdbc.update("DELETE FROM auth_rate_events WHERE scope = ? AND subject_hash = ?",
+                    scope, subjectHash(scope, ip));
+        }
+    }
+
     private List<Map<String, Object>> currentAgreements() {
         return jdbc.query("""
                 SELECT t.id, v.version FROM terms t JOIN term_versions v ON v.term_id = t.id

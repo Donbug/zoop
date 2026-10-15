@@ -1,6 +1,9 @@
 package com.zoop.auth.dto;
 
-public record LoginRequest(String email, String password) {
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record LoginRequest(@NotBlank String email, @NotNull String password) {
     @Override
     public String toString() {
         return "LoginRequest[credentials=<redacted>]";

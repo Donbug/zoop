@@ -9,6 +9,7 @@ import com.zoop.auth.service.SessionCookie;
 import com.zoop.auth.service.SignupService;
 import com.zoop.common.request.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +33,7 @@ public class EmailAuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<SessionResponse> signup(@RequestBody SignupRequest body,
+    public ResponseEntity<SessionResponse> signup(@Valid @RequestBody SignupRequest body,
             @CookieValue(name = SessionCookie.NAME, required = false) String previousToken,
             HttpServletRequest request) {
         var email = attempts.signup(request, body.email());
@@ -43,7 +44,7 @@ public class EmailAuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<SessionResponse> login(@RequestBody LoginRequest body,
+    public ResponseEntity<SessionResponse> login(@Valid @RequestBody LoginRequest body,
             @CookieValue(name = SessionCookie.NAME, required = false) String previousToken,
             HttpServletRequest request) {
         var email = attempts.login(request, body.email());

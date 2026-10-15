@@ -21,36 +21,40 @@ class AuthRateLimiterTest {
     void signupLimitsBothIpAndEmailAndUsesRollingHour() {
         var limit = at(START);
         for (int i = 0; i < 5; i++) {
-            limit.recordSignupAttempt("192.0.2.1", "a@example.com");
+            limit.recordSignupIpAttempt("192.0.2.1");
+            limit.recordSignupEmailAttempt("a@example.com");
         }
         var emailLimit = assertThrows(RateLimitedException.class,
-                () -> limit.recordSignupAttempt("192.0.2.2", "a@example.com"));
+                () -> limit.recordSignupEmailAttempt("a@example.com"));
         assertEquals(3600, emailLimit.retryAfterSeconds());
         for (int i = 0; i < 5; i++) {
-            limit.recordSignupAttempt("192.0.2.1", "b" + i + "@example.com");
+            limit.recordSignupIpAttempt("192.0.2.1");
+            limit.recordSignupEmailAttempt("b" + i + "@example.com");
         }
         assertEquals(3600, assertThrows(RateLimitedException.class,
-                () -> limit.recordSignupAttempt("192.0.2.1", "other@example.com")).retryAfterSeconds());
-        at(START.plusSeconds(3600)).recordSignupAttempt("192.0.2.1", "a@example.com");
+                () -> limit.recordSignupIpAttempt("192.0.2.1")).retryAfterSeconds());
+        at(START.plusSeconds(3600)).recordSignupIpAttempt("192.0.2.1");
+        at(START.plusSeconds(3600)).recordSignupEmailAttempt("a@example.com");
     }
 
     @Test
     void loginCountsEveryIpAttemptOnlyEmailFailuresAndSuccessClearsThem() {
         var limit = at(START);
         for (int i = 0; i < 20; i++) {
-            limit.recordLoginAttempt("192.0.2.1", "a@example.com");
+            limit.recordLoginIpAttempt("192.0.2.1");
+            limit.checkLoginEmailFailures("a@example.com");
             limit.recordLoginFailure("a@example.com");
         }
         assertEquals(900, assertThrows(RateLimitedException.class,
-                () -> limit.recordLoginAttempt("192.0.2.2", "a@example.com")).retryAfterSeconds());
+                () -> limit.checkLoginEmailFailures("a@example.com")).retryAfterSeconds());
         limit.clearLoginFailures("a@example.com");
-        limit.recordLoginAttempt("192.0.2.2", "a@example.com");
+        limit.checkLoginEmailFailures("a@example.com");
         for (int i = 20; i < 100; i++) {
-            limit.recordLoginAttempt("192.0.2.1", "b@example.com");
+            limit.recordLoginIpAttempt("192.0.2.1");
         }
         assertEquals(900, assertThrows(RateLimitedException.class,
-                () -> limit.recordLoginAttempt("192.0.2.1", "c@example.com")).retryAfterSeconds());
-        at(START.plusSeconds(900)).recordLoginAttempt("192.0.2.1", "a@example.com");
+                () -> limit.recordLoginIpAttempt("192.0.2.1")).retryAfterSeconds());
+        at(START.plusSeconds(900)).recordLoginIpAttempt("192.0.2.1");
     }
 
     @Test
@@ -60,12 +64,12 @@ class AuthRateLimiterTest {
             limit.recordSignupIpAttempt("192.0.2.3");
         }
         assertThrows(RateLimitedException.class,
-                () -> limit.recordSignupAttempt("192.0.2.3", "valid@example.com"));
+                () -> limit.recordSignupIpAttempt("192.0.2.3"));
         for (int i = 0; i < 100; i++) {
             limit.recordLoginIpAttempt("192.0.2.4");
         }
         assertThrows(RateLimitedException.class,
-                () -> limit.recordLoginAttempt("192.0.2.4", "valid@example.com"));
+                () -> limit.recordLoginIpAttempt("192.0.2.4"));
     }
 
     private AuthRateLimiter at(Instant instant) {

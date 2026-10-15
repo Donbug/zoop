@@ -28,38 +28,32 @@ public class AuthRateLimiter {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordSignupAttempt(String clientIp, String emailKey) {
-        Key ip = key("signup_ip", clientIp);
+    public void recordSignupEmailAttempt(String emailKey) {
         Key email = key("signup_email", emailKey);
         Instant now = clock.instant();
-        lockBoth(ip, email);
-        long retry = Math.max(retryAfter(ip, SIGNUP_WINDOW, 10, now),
-                retryAfter(email, SIGNUP_WINDOW, 5, now));
+        store.lock(email.scope(), email.hash());
+        long retry = retryAfter(email, SIGNUP_WINDOW, 5, now);
         if (retry > 0) {
             throw new RateLimitedException(retry);
         }
-        store.add(ip.scope(), ip.hash(), now);
         store.add(email.scope(), email.hash(), now);
     }
 
-    /** Count malformed-email requests against the IP budget before validation rejects them. */
+    /** Count every request before MVC deserializes the body, including malformed JSON. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSignupIpAttempt(String clientIp) {
         recordIpOnly("signup_ip", clientIp, SIGNUP_WINDOW, 10);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordLoginAttempt(String clientIp, String emailKey) {
-        Key ip = key("login_ip", clientIp);
+    public void checkLoginEmailFailures(String emailKey) {
         Key emailFailures = key("login_email_failure", emailKey);
         Instant now = clock.instant();
-        lockBoth(ip, emailFailures);
-        long retry = Math.max(retryAfter(ip, LOGIN_WINDOW, 100, now),
-                retryAfter(emailFailures, LOGIN_WINDOW, 20, now));
+        store.lock(emailFailures.scope(), emailFailures.hash());
+        long retry = retryAfter(emailFailures, LOGIN_WINDOW, 20, now);
         if (retry > 0) {
             throw new RateLimitedException(retry);
         }
-        store.add(ip.scope(), ip.hash(), now);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -86,16 +80,6 @@ public class AuthRateLimiter {
         Key email = key("login_email_failure", emailKey);
         store.lock(email.scope(), email.hash());
         store.clear(email.scope(), email.hash());
-    }
-
-    private void lockBoth(Key first, Key second) {
-        if (first.scope().compareTo(second.scope()) <= 0) {
-            store.lock(first.scope(), first.hash());
-            store.lock(second.scope(), second.hash());
-        } else {
-            store.lock(second.scope(), second.hash());
-            store.lock(first.scope(), first.hash());
-        }
     }
 
     private void recordIpOnly(String scope, String clientIp, Duration window, int limit) {

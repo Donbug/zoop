@@ -36,18 +36,11 @@ class AuthRatePostgresTest {
         String hex = suffix.replace("-", "");
         String ip = "2001:db8::" + hex.substring(0, 4) + ":" + hex.substring(4, 8)
                 + ":" + hex.substring(8, 12) + ":" + hex.substring(12, 16);
-        List<String> emails = new ArrayList<>();
-        for (int i = 0; i < 11; i++) {
-            emails.add("signup-" + i + "-" + suffix + "@example.com");
-        }
         try {
-            int accepted = race(11, index -> limiter.recordSignupAttempt(ip, emails.get(index)));
+            int accepted = race(11, index -> limiter.recordSignupIpAttempt(ip));
             assertEquals(10, accepted);
         } finally {
             clear("signup_ip", ip);
-            for (String email : emails) {
-                clear("signup_email", email);
-            }
         }
     }
 

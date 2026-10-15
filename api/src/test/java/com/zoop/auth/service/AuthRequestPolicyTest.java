@@ -52,10 +52,9 @@ class AuthRequestPolicyTest {
     }
 
     @Test
-    void gateRejectsOriginBeforeCountingAndCountsMalformedEmailByIp() {
+    void gateRejectsOriginBeforeEmailCounting() {
         var rates = mock(AuthRateLimiter.class);
-        var gate = new AuthAttemptGate(new AuthOriginPolicy("https://zoop.example"),
-                new AuthClientIpResolver(""), rates);
+        var gate = new AuthAttemptGate(new AuthOriginPolicy("https://zoop.example"), rates);
         var request = new MockHttpServletRequest();
         request.setRemoteAddr("192.0.2.8");
         assertEquals(ErrorCode.ACCESS_DENIED,
@@ -67,9 +66,11 @@ class AuthRequestPolicyTest {
         assertEquals(ErrorCode.INVALID_REQUEST,
                 assertThrows(CustomException.class, () -> gate.signup(request, "bad"))
                         .getErrorCode());
-        verify(rates).recordSignupIpAttempt("192.0.2.8");
+        verifyNoInteractions(rates);
+        assertEquals("user@example.com", gate.signup(request, " User@Example.com ").key());
+        verify(rates).recordSignupEmailAttempt("user@example.com");
         assertEquals("user@example.com", gate.login(request, " User@Example.com ").key());
-        verify(rates).recordLoginAttempt("192.0.2.8", "user@example.com");
+        verify(rates).checkLoginEmailFailures("user@example.com");
     }
 
     private static void assertDenied(AuthOriginPolicy policy, MockHttpServletRequest request) {
