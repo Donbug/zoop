@@ -9,10 +9,11 @@ servers:
     description: "정식 배포의 동일 출처 API. 환경 호스트는 배포 시 지정한다."
 x-zoop-common-rules:
   versioning: "모든 정식 HTTP 경로는 /api/v1로 시작한다. 호환되지 않는 변경은 새 경로 버전으로 분리한다. operationId는 문서·추적표의 안정된 식별자다."
-  authentication: "회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. 로그인·가입·비회원 시작·외부 인증 콜백에는 세션 생성 전 Origin/state 검증을 적용한다. 회원/관리자 로그아웃에서 해당 활성 세션이 있으면 같은 쿠키·Origin·세션 결합 CSRF를 반드시 검증하며 실패는 403 ACCESS_DENIED다. CSRF가 없거나 틀렸다고 무세션 분기로 우회하지 않는다. 해당 세션이 없거나 무효/만료이면 다른 세션을 변경하지 않고 204와 해당 쿠키만 제거한다. OpenAPI의 선택 인증/선택 헤더는 이 조건부 런타임 검증을 자동 강제하지 않는다."
-  sessionLifecycle: "로그아웃과 차단은 서버 세션을 폐기한다. 회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 회원 쿠키는 Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200이며 서버 만료가 최종 권위다. 회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다."
+  authentication: "회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. POST 로그인·가입·비회원 시작·소셜 가입 완료·명시적 소셜 연결 시작에는 허용 Origin을 적용한다. 브라우저 탐색 GET인 소셜 authorize/callback은 Origin을 인증 근거로 사용하지 않고 state·브라우저 pending 쿠키·nonce·PKCE·등록 redirect URI로 보호한다. 회원/관리자 로그아웃에서 해당 활성 세션이 있으면 같은 쿠키·Origin·세션 결합 CSRF를 반드시 검증하며 실패는 403 ACCESS_DENIED다. CSRF가 없거나 틀렸다고 무세션 분기로 우회하지 않는다. 해당 세션이 없거나 무효/만료이면 다른 세션을 변경하지 않고 204와 해당 쿠키만 제거한다. OpenAPI의 선택 인증/선택 헤더는 이 조건부 런타임 검증을 자동 강제하지 않는다."
+  sessionLifecycle: "로그아웃과 차단은 서버 세션을 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다."
   signupPolicy: "2026-10-14 사용자 확정: 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 15~128 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md."
-  authOriginAndRateLimit: "가입·로그인 등 쿠키를 만드는 브라우저 요청과 쿠키 인증 쓰기는 정확한 허용 Origin을 요구하며 null/누락/불허 Origin은 403 ACCESS_DENIED다. 운영 목록은 환경별 HTTPS Origin으로 설정하고 자격증명 CORS 와일드카드는 허용하지 않는다. 가입은 IP 10회/1시간·email_key 5회/1시간의 모든 시도, 로그인은 IP 100회/15분의 모든 시도와 email_key 20회/15분의 실패를 공유 원장에서 원자적으로 제한한다. 성공한 로그인은 email_key 실패 카운터를 초기화한다. 초과 시 429 RATE_LIMITED와 초 단위 Retry-After를 보낸다. 신뢰 IP는 지정 프록시에서만 취한다."
+  socialAuthPolicy: "이슈 #30 Task 1 구현 기준은 docs/development/social-auth-policy-2026-10-15.md. 이미 연결된 (provider, subject)는 이메일 변경과 무관하게 기존 회원으로 로그인한다. 최초 소셜 가입은 검증된 이메일과 서비스 필수 약관 동의 후 완료한다. 동일 이메일 기존 회원은 이메일 일치만으로 연결하지 않으며, 기존 계정 로그인 후 세션 결합 CSRF·Origin을 검증한 명시적 연결 OAuth 왕복에서만 연결한다. 일반 authorize/callback은 브라우저 탐색 GET이므로 Origin을 인증 근거로 사용하지 않고 state·pending 쿠키·nonce·PKCE·등록 redirect URI·만료·일회성 소비로 검증한다."
+  authOriginAndRateLimit: "POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 쿠키 인증 쓰기는 정확한 허용 Origin을 요구하며 null/누락/불허 Origin은 403 ACCESS_DENIED다. 탐색 GET 소셜 authorize/callback은 Origin 필수 규칙의 예외이며 별도 OAuth 왕복 검증을 적용한다. 운영 목록은 환경별 HTTPS Origin으로 설정하고 자격증명 CORS 와일드카드는 허용하지 않는다. 이메일 가입은 IP 10회/1시간·email_key 5회/1시간의 모든 시도, 이메일 로그인은 IP 100회/15분의 모든 시도와 email_key 20회/15분의 실패를 공유 원장에서 원자적으로 제한한다. 성공한 이메일 로그인은 email_key 실패 카운터를 초기화한다. 소셜 시작은 IP 및 브라우저 결합 키 기준 한도를 별도 운영 설정으로 적용한다. 초과 시 429 RATE_LIMITED와 초 단위 Retry-After를 보낸다. 신뢰 IP는 지정 프록시에서만 취한다."
   errors: "오류는 application/json의 {error:{code,message,requestId,retryable,details?}}다. HTTP 상태와 안정된 대문자 오류 코드를 함께 사용한다. 빈 자료·근거 부족은 성공 결과이고 외부 장애와 구분한다. 보유량·분모 없음·시세 미제공을 0으로 대체하지 않는다."
   requestIds: "모든 요청은 선택 X-Request-ID를 받는다. 없으면 서버가 생성하고 모든 응답의 X-Request-ID에 실제 ID를 반환한다. 서로 다른 전송은 별도 요청 ID를 사용한다. 로그와 작업 ID를 연결하되 요청 ID를 멱등성 키로 사용하지 않는다."
   idempotency: "부작용을 발생시키는 POST는 필수 Idempotency-Key를 받는다(세션 생성·소셜 인증·회원/관리자 로그아웃은 제외). 로그아웃은 같은 세션의 반복 폐기가 같은 상태에 도달하는 자연 멱등 작업이며 추가 키 저장 계약 없이 반복 204를 반환한다. 같은 주체·메서드·경로·키·본문은 기존 저장 결과 또는 같은 진행 작업을 반환한다. 내용 불일치는 409 IDEMPOTENCY_CONFLICT다. PUT/DELETE는 목표 상태·리소스 ID로 멱등 처리하며 추가 키 없이 재전송할 수 있다. 키 보존 기간은 팀 확인 필요다. 응답 미수신은 기존 작업/상태 조회가 우선이며 새로운 키로 재실행하지 않는다."
@@ -134,6 +135,16 @@ x-zoop-error-codes:
     meaning: "소셜 인증 state·코드 검증 실패"
     recovery: "기존 세션 성공으로 처리하지 않는다"
   -
+    code: "SOCIAL_LINK_REQUIRED"
+    httpStatus: 409
+    meaning: "같은 이메일의 기존 회원이 있으나 기존 서비스 계정의 연결 권한이 확인되지 않음"
+    recovery: "기존 계정으로 로그인한 후 명시적 연결 OAuth를 시작한다"
+  -
+    code: "SOCIAL_EMAIL_REQUIRED"
+    httpStatus: 422
+    meaning: "최초 가입·연결에 사용할 검증된 제공자 이메일이 없음"
+    recovery: "제공자 이메일 동의를 다시 요청하거나 다른 로그인 방식을 선택한다"
+  -
     code: "INVALID_CURSOR"
     httpStatus: 422
     meaning: "만료 또는 조건 불일치 커서"
@@ -173,8 +184,8 @@ paths:
     get:
       tags:
         - "auth"
-      summary: "회원 세션과 초기 설정 조회"
-      description: "유효한 회원 세션은 member와 세션 결합 csrfToken·expiresAt을 반환한다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다."
+      summary: "회원·비회원 세션과 초기 설정 조회"
+      description: "유효한 회원 세션은 해당 회원의 현재 저장된 초기 설정 상태와 함께 member로 반환한다. 유효한 비회원 세션은 guest로 반환하며 user=null, setup.completed=false, setup.tutorialCompleted=false이고 튜토리얼 진행·완료·건너뛰기 상태를 서버에 저장하지 않는다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 user=null, setup=null인 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다."
       operationId: "getMemberSession"
       responses:
         "200":
@@ -480,7 +491,7 @@ paths:
       tags:
         - "auth"
       summary: "비회원 시작"
-      description: "비회원 시작.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "회원가입이나 로그인 없이 비회원 세션을 시작한다. 200 SessionResponse(kind=guest, authenticated=true, user=null, setup={completed:false,tutorialCompleted:false})와 zoop_session 쿠키를 반환한다. 토큰 원문은 쿠키로만 전달하고 서버에는 토큰 해시를 저장한다. guest는 전체 그래프와 공개 기업·브리핑을 읽을 수 있지만 계좌 연결, 관심종목 저장, 개인화 조회, AI 질문·평가를 이용할 수 없다. 튜토리얼은 회원과 동일하게 제공하며 진행·완료·건너뛰기 상태는 저장하지 않는다. POST에는 허용 Origin을 요구한다."
       operationId: "startGuestSession"
       responses:
         "200":
@@ -492,6 +503,10 @@ paths:
           headers:
             X-Request-ID:
               description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+            Set-Cookie:
+              description: "새 zoop_session. Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200. 서버 만료가 최종 권위다."
               schema:
                 type: "string"
         "404":
@@ -625,7 +640,7 @@ paths:
       tags:
         - "auth"
       summary: "튜토리얼 진행 결과 저장"
-      description: "튜토리얼 진행 결과 저장.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "회원 튜토리얼 진행 결과만 저장한다. guest의 진행·완료·건너뛰기는 저장하지 않으므로 클라이언트 로컬에서 관리하며 이 작업은 guest에게 403 MEMBER_REQUIRED를 반환한다."
       operationId: "setTutorialState"
       requestBody:
         content:
@@ -692,7 +707,7 @@ paths:
           - "6.3.7"
           - "6.3.10"
         priority: "P1"
-        authority: "회원 또는 비회원 세션"
+        authority: "회원"
         errorCodes:
           - "INVALID_REQUEST"
           - "RESOURCE_NOT_FOUND"
@@ -785,13 +800,13 @@ paths:
             - "모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다."
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
         teamQuestions:
-          - "회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다."
+          - "Google·카카오 운영 앱 등록과 관리자 SSO·권한 등급/회수 정책은 별도다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다."
   "/api/v1/auth/social/{provider}/authorize":
     get:
       tags:
         - "auth"
       summary: "소셜 인증 시작"
-      description: "google 또는 kakao 회원 소셜 인증을 시작한다. 지원하지 않는 provider는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 연결 권한 확인을 유지한다. 실제 OAuth 등록·연동 완료는 별도다."
+      description: "google 또는 kakao 회원 로그인을 시작한다. 지원하지 않는 provider와 외부/위험 복귀 경로를 거절한다. 브라우저 탐색 GET에는 Origin이 없을 수 있으므로 state·브라우저 결합 pending 쿠키·nonce·PKCE(S256)·등록 redirect URI로 왕복을 보호한다. 기존 회원 세션은 시작 시 변경하지 않는다. 동일 이메일 기존 계정의 명시적 연결은 별도 POST link/authorize를 사용한다. 구현 기준: docs/development/social-auth-policy-2026-10-15.md."
       operationId: "authorizeSocialLogin"
       parameters:
         -
@@ -815,7 +830,7 @@ paths:
           "$ref": "#/components/parameters/RequestId"
       responses:
         "302":
-          description: "정상 응답"
+          description: "제공자 인증 URL로 이동. 단명 zoop_oauth_pending 쿠키를 설정한다."
           headers:
             X-Request-ID:
               description: "실제 사용한 전송별 요청 ID"
@@ -826,14 +841,22 @@ paths:
               schema:
                 type: "string"
                 format: "uri-reference"
+            Set-Cookie:
+              description: "zoop_oauth_pending; HTTPS에서는 Secure; HttpOnly; SameSite=Lax; Path=/api/v1/auth/social; host-only. Max-Age는 서버 pending 만료와 동일하다. 개발 전용 ZOOP_AUTH_SOCIAL_ALLOW_INSECURE_LOCALHOST=true 설정으로 localhost HTTP를 사용할 때만 Secure를 생략한다."
+              schema:
+                type: "string"
         "400":
           "$ref": "#/components/responses/Error400"
         "401":
           "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
         "404":
           "$ref": "#/components/responses/Error404"
         "422":
           "$ref": "#/components/responses/Error422"
+        "429":
+          "$ref": "#/components/responses/Error429"
         "500":
           "$ref": "#/components/responses/Error500"
         "503":
@@ -858,6 +881,8 @@ paths:
         authority: "공개"
         errorCodes:
           - "INVALID_REQUEST"
+          - "ACCESS_DENIED"
+          - "RATE_LIMITED"
           - "RESOURCE_NOT_FOUND"
           - "SOURCE_UNAVAILABLE"
           - "INTERNAL_ERROR"
@@ -871,13 +896,13 @@ paths:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
             - "모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다."
         teamQuestions:
-          - "회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다."
+          - "운영 앱 등록·OAuth pending TTL·시도 제한값·허용 복귀 경로의 환경별 값은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다."
   "/api/v1/auth/social/{provider}/callback":
     get:
       tags:
         - "auth"
       summary: "소셜 인증 콜백"
-      description: "google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 않는 provider와 유효하지 않은 state는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 본인/연결권한 확인 없이 계정 연결을 완료하지 않는 보안 경계를 유지한다."
+      description: "google 또는 kakao 인증 코드를 서버에서 교환·검증한다. state·pending 쿠키·nonce·PKCE·redirect URI·만료·일회성 소비를 검증한다. 기존 연결은 활성 회원 세션으로 로그인하고, 미연결·새 이메일은 회전된 pending 쿠키로 약관 동의 대기, 미연결·기존 이메일은 연결 없이 link_required, 이메일 부재·미검증은 email_required로 복귀한다. intent=link는 시작 때 결합한 동일 활성 회원 세션, 동일 이메일, 미연결 subject를 다시 확인해 연결하고 새 회원 세션을 발급하지 않는다. 브라우저 GET callback의 Origin은 인증 근거가 아니다. 실패·취소 URL에 인증 정보나 이메일을 노출하지 않는다."
       operationId: "completeSocialLogin"
       parameters:
         -
@@ -921,7 +946,7 @@ paths:
           "$ref": "#/components/parameters/RequestId"
       responses:
         "302":
-          description: "정상 응답"
+          description: "검증 결과에 따라 허용된 서비스 경로로 이동한다. 로그인 성공은 회원 세션을 발급하고, 신규 가입은 약관 동의를 기다린다. intent=link 성공은 identity만 연결하고 새 회원 세션은 발급하지 않는다. 동일 이메일 기존 회원은 로그인 없이 연결 안내로 복귀한다. 실패·취소는 회원·연결 상태를 변경하지 않는다."
           headers:
             X-Request-ID:
               description: "실제 사용한 전송별 요청 ID"
@@ -932,14 +957,24 @@ paths:
               schema:
                 type: "string"
                 format: "uri-reference"
+            Set-Cookie:
+              description: "결과에 따라 pending 쿠키를 같은 Path에서 폐기하거나 가입 동의용으로 회전한다. 로그인 성공일 때만 zoop_session을 설정하며 intent=link 완료는 새 세션을 발급하지 않는다. 복수 쿠키는 별도 Set-Cookie 헤더로 보낸다."
+              schema:
+                type: "string"
         "400":
           "$ref": "#/components/responses/Error400"
         "401":
           "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
         "404":
           "$ref": "#/components/responses/Error404"
+        "409":
+          "$ref": "#/components/responses/Error409"
         "422":
           "$ref": "#/components/responses/Error422"
+        "429":
+          "$ref": "#/components/responses/Error429"
         "500":
           "$ref": "#/components/responses/Error500"
         "503":
@@ -964,6 +999,10 @@ paths:
         authority: "공개"
         errorCodes:
           - "INVALID_REQUEST"
+          - "ACCESS_DENIED"
+          - "MEMBER_BLOCKED"
+          - "SOCIAL_LINK_REQUIRED"
+          - "SOCIAL_EMAIL_REQUIRED"
           - "RESOURCE_NOT_FOUND"
           - "SOURCE_UNAVAILABLE"
           - "INTERNAL_ERROR"
@@ -977,7 +1016,145 @@ paths:
             - "/api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용."
             - "모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다."
         teamQuestions:
-          - "회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다."
+          - "운영 앱 등록·OAuth pending TTL은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다."
+  "/api/v1/auth/social/{provider}/link/authorize":
+    post:
+      tags: ["auth"]
+      summary: "로그인된 기존 계정에 소셜 제공자 연결 시작"
+      operationId: "authorizeSocialLink"
+      description: "활성 회원 세션과 동일 세션의 CSRF, 허용 Origin을 확인한 뒤 명시적 연결 OAuth를 시작한다. pending에 회원 ID·세션 ID·intent=link를 결합한다. 브라우저는 응답 URL로 탐색한다. 이메일 일치나 제공자의 이메일 확인만으로 기존 계정을 연결하지 않는다."
+      parameters:
+        - name: "provider"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            enum: ["google", "kakao"]
+        - "$ref": "#/components/parameters/CsrfToken"
+        - "$ref": "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/SocialLinkStartRequest"
+      security:
+        - memberSession: []
+      responses:
+        "200":
+          description: "연결 OAuth를 시작할 제공자 URL과 단명 pending 쿠키. 연결은 callback 검증 후에만 완료된다."
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+            Set-Cookie:
+              description: "zoop_oauth_pending; HTTPS에서는 Secure; HttpOnly; SameSite=Lax; Path=/api/v1/auth/social; host-only. Max-Age는 서버 pending 만료와 동일하다. 개발 전용 ZOOP_AUTH_SOCIAL_ALLOW_INSECURE_LOCALHOST=true 설정으로 localhost HTTP를 사용할 때만 Secure를 생략한다."
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/SocialAuthorizationResponse"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "409":
+          "$ref": "#/components/responses/Error409"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "429":
+          "$ref": "#/components/responses/Error429"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      x-zoop:
+        fsIds: ["FS004", "FS061"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS008"]
+        screenIds: ["D-AUT-01"]
+        wbsIds: ["6.2.2"]
+        priority: "P1"
+        authority: "회원(본인)"
+        errorCodes: ["INVALID_REQUEST", "AUTH_REQUIRED", "ACCESS_DENIED", "MEMBER_BLOCKED", "RATE_LIMITED", "SOCIAL_AUTH_FAILED", "SOURCE_UNAVAILABLE", "INTERNAL_ERROR"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 활성 회원 세션의 명시적 소셜 연결은 정식 API에서 구현한다."
+        teamQuestions:
+          - "D-AUT-01에서 기존 계정 로그인 후 명시적 연결 시작 UI는 화면 계획과 함께 검증한다."
+  "/api/v1/auth/social/signup":
+    post:
+      tags: ["auth"]
+      summary: "검증된 소셜 인증으로 신규 회원가입 완료"
+      operationId: "completeSocialSignup"
+      description: "callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허용 Origin, 현재 승인된 필수 약관 동의를 확인한다. 회원·약관 동의·소셜 연결·새 회원 세션을 원자적으로 생성한다. 요청의 이메일·subject를 신뢰하지 않는다. 동일 이메일의 기존 회원이 생겼으면 pending을 소비하고 SOCIAL_LINK_REQUIRED(409)를 반환한다."
+      parameters:
+        - "$ref": "#/components/parameters/RequestId"
+        - name: "zoop_oauth_pending"
+          in: "cookie"
+          required: true
+          schema:
+            type: "string"
+            pattern: "^[A-Za-z0-9_-]{43}$"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/SocialSignupRequest"
+      security: []
+      responses:
+        "201":
+          description: "신규 회원과 연결·동의를 저장하고 새 회원 세션을 발급한다."
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema:
+                type: "string"
+            Set-Cookie:
+              description: "새 zoop_session 및 같은 Path에서 폐기하는 zoop_oauth_pending. 복수 쿠키는 별도 Set-Cookie 헤더로 보낸다."
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/SessionResponse"
+        "401":
+          "$ref": "#/components/responses/Error401"
+        "403":
+          "$ref": "#/components/responses/Error403"
+        "409":
+          "$ref": "#/components/responses/Error409"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "429":
+          "$ref": "#/components/responses/Error429"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      x-zoop:
+        fsIds: ["FS004", "FS061"]
+        nfsIds: ["NFS001", "NFS002", "NFS004", "NFS008"]
+        screenIds: ["D-AUT-01"]
+        wbsIds: ["6.2.2"]
+        priority: "P1"
+        authority: "공개(pending 쿠키 결합)"
+        errorCodes: ["INVALID_REQUEST", "ACCESS_DENIED", "SOCIAL_AUTH_FAILED", "SOCIAL_LINK_REQUIRED", "SOCIAL_EMAIL_REQUIRED", "TERMS_REQUIRED", "RATE_LIMITED", "SOURCE_UNAVAILABLE", "INTERNAL_ERROR"]
+        prototype:
+          method: null
+          path: null
+          operationId: null
+          differences:
+            - "직접 대응 BFF 작업 없음. 검증된 제공자 결과와 약관 동의로 완료하는 소셜 가입은 정식 API에서 구현한다."
+        teamQuestions:
+          - "소셜 신규 가입 약관 동의 UI는 D-AUT-01 진입 흐름에서 화면 계획과 함께 검증한다."
   "/api/v1/me/settings":
     get:
       tags:
@@ -9967,7 +10144,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Same-origin logo path (`/logos/<file>`); null when the catalog has none."
+          description: "Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none."
         directIssues:
           items:
             "$ref": "#/components/schemas/CompanyIssueRef"
@@ -10379,7 +10556,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Same-origin logo path (`/logos/<file>`); null when the catalog has none."
+          description: "Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none."
         issueCount:
           type: "integer"
       type: "object"
@@ -12009,7 +12186,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Same-origin path of the company logo (`/logos/<file>`); null for issues or when unset."
+          description: "Same-origin path of the company logo (`/graph-assets/<file>`); null for issues or when unset."
         eventTime:
           anyOf:
             -
@@ -14751,6 +14928,7 @@ components:
               "$ref": "#/components/schemas/SetupState"
             -
               type: "null"
+          description: "회원은 해당 계정의 현재 저장 상태를 반환하고 guest는 두 값 모두 false다. anonymous에는 초기 설정 상태가 없어 null이다."
         metadata:
           "$ref": "#/components/schemas/Metadata"
         csrfToken:
@@ -14867,7 +15045,7 @@ components:
       required:
         - "completed"
         - "tutorialCompleted"
-      description: "Guests: ``completed`` is always false (they have no settings); ``tutorialCompleted`` is kept on the\nguest session only."
+      description: "For members, these booleans reflect the current persisted state of the authenticated member. For guests, both are always false and tutorial progress, completion, and skip state are never persisted; the client can run or replay the tutorial locally. Anonymous sessions have no setup state and return setup=null."
     SignupRequest:
       properties:
         email:
@@ -15016,6 +15194,32 @@ components:
       required:
         - "items"
         - "nextCursor"
+    SocialAuthorizationResponse:
+      type: "object"
+      properties:
+        authorizationUrl:
+          type: "string"
+          format: "uri"
+          description: "등록된 Google 또는 카카오 인증 URL. 클라이언트는 이 URL로 페이지 이동한다."
+      required: [authorizationUrl]
+    SocialLinkStartRequest:
+      type: "object"
+      properties:
+        returnTo:
+          type: "string"
+          description: "허용된 서비스 내부 상대 복귀 경로. 외부 URL, //, 역슬래시, 제어 문자를 거절한다."
+      additionalProperties: false
+    SocialSignupRequest:
+      type: "object"
+      properties:
+        displayName:
+          type: "string"
+          description: "선택 입력. 생략하면 기본 표시명 '회원'을 사용한다."
+        agreements:
+          "$ref": "#/components/schemas/SignupRequest/properties/agreements"
+      required: [agreements]
+      additionalProperties: false
+      description: "이메일·제공자·subject는 callback에서 검증해 저장한 pending에서만 읽는다."
     SourceSupportOut:
       properties:
         articleCount:
@@ -16005,6 +16209,8 @@ components:
         - "VALIDATION_FAILED"
         - "SOCIAL_AUTH_CANCELLED"
         - "SOCIAL_AUTH_FAILED"
+        - "SOCIAL_LINK_REQUIRED"
+        - "SOCIAL_EMAIL_REQUIRED"
         - "INVALID_CURSOR"
         - "RATE_LIMITED"
         - "SOURCE_UNAVAILABLE"

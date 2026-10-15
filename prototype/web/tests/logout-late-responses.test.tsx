@@ -61,8 +61,9 @@ describe("로그아웃과 이전 회원의 늦은 응답", () => {
     world.nextLogin = memberSession({ id: "member-2", displayName: OTHER_MEMBER_NAME });
     world.portfolio = holdingsPortfolio(BETA);
     world.settings = watchSettings([BETA.id]);
-    await navigate("/me/stocks");
+    await settle();
     await logIn(user);
+    await navigate("/me/stocks");
     await waitFor(() => expect(screen.queryAllByText(BETA.name).length).toBeGreaterThan(1));
 
     held.respond(json(holdingsPortfolio(ALPHA)));
@@ -89,8 +90,9 @@ describe("로그아웃과 이전 회원의 늦은 응답", () => {
     world.nextLogin = memberSession({ id: "member-2", displayName: OTHER_MEMBER_NAME });
     world.portfolio = holdingsPortfolio(BETA);
     world.settings = watchSettings([BETA.id]);
-    await navigate("/me/stocks");
+    await settle();
     await logIn(user);
+    await navigate("/me/stocks");
     await waitFor(() => expect(screen.queryAllByText(BETA.name).length).toBeGreaterThan(1));
 
     save.respond(json({ ...watchSettings([]), version: 2 }));

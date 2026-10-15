@@ -3,13 +3,14 @@ import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import GraphIcon from './GraphIcon';
-import { graphSummary, toG6Data } from './graph-model';
+import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 
 export default function GraphCanvas({
   data,
   selectedId: selected = null,
   onSelect,
   focusId = null,
+  focusHops = 1,
   highlightedEdgeIds = [],
   selectedEdgeId = null,
   onSelectEdge,
@@ -18,6 +19,7 @@ export default function GraphCanvas({
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
+  focusHops?: 1 | 2;
   highlightedEdgeIds?: string[];
   selectedEdgeId?: string | null;
   onSelectEdge?: (id: string) => void;
@@ -36,6 +38,7 @@ export default function GraphCanvas({
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
+  const focusedNodes = focusNeighborhood(data, focusId, focusHops);
   const center =
     data.nodes.find((n) => n.id === selected && n.kind === 'company') ??
     data.nodes.find((n) => n.isFocus);
@@ -56,6 +59,7 @@ export default function GraphCanvas({
           data.edges
             .filter((edge) => highlightedEdgeIds.includes(edge.id))
             .flatMap((edge) => [edge.source, edge.target]),
+          focusedNodes,
         );
         rendered.edges = rendered.edges?.map((edge) =>
           highlightedEdgeIds.includes(String(edge.id))
@@ -94,7 +98,7 @@ export default function GraphCanvas({
   });
   useEffect(() => {
     syncSelection();
-  }, [selected, selectedEdgeId, focusId, highlightedEdgeIds]);
+  }, [selected, selectedEdgeId, focusId, focusHops, highlightedEdgeIds]);
   useEffect(() => {
     const host = container.current;
     if (!host) return;
@@ -195,49 +199,53 @@ export default function GraphCanvas({
         role="img"
         aria-label={`${personal ? '내 종목' : '시장 전체'} 관계 지도: 기업 ${stats.company}개, 사건 ${stats.issue}개. 드래그로 이동하고 휠로 확대합니다.`}
       />
-      <aside className="relationship-legend" aria-label="그래프 범례">
-        <div className="relationship-title">
-          <i>(01)</i>
-          <h1>{center?.label ?? '관계 지도'}</h1>
-        </div>
-        <p className="relationship-subtitle">(RELATIONSHIP MAP) · 중심 관계</p>
-        <p className="relationship-meta">
-          {stats.company} COMPANIES · {stats.sharedIssues} SHARED EVENTS
-        </p>
-        <div className="relationship-legend-items">
-          <h2>LEGEND</h2>
-          <span>
-            <b className="legend-company" />
-            기업
-          </span>
-          <span>
-            <b className="legend-focus" />
-            중심·선택
-          </span>
-          <span>
-            <b className="legend-issue" />
-            공유 사건
-          </span>
-          <span>
-            <b className="legend-folded">ϟn</b>접힌 사건
-          </span>
-          <span>
-            <b className="legend-line" />
-            직접 관련
-          </span>
-          <span>
-            <b className="legend-line dashed" />
-            사건 공유
-          </span>
-          <span>
-            <b className="legend-line arrow" />
-            후속 사건
-          </span>
-          <span>
-            <b className="legend-size">○◯</b>크기=활동
-          </span>
-        </div>
-      </aside>
+      {!focusId && (
+        <aside className="relationship-legend" aria-label="그래프 범례">
+          <div className="relationship-title">
+            <i>(01)</i>
+            <h1>{center?.label ?? '관계 지도'}</h1>
+          </div>
+          <p className="relationship-subtitle">
+            (RELATIONSHIP MAP) · 중심 관계
+          </p>
+          <p className="relationship-meta">
+            {stats.company} COMPANIES · {stats.sharedIssues} SHARED EVENTS
+          </p>
+          <div className="relationship-legend-items">
+            <h2>LEGEND</h2>
+            <span>
+              <b className="legend-company" />
+              기업
+            </span>
+            <span>
+              <b className="legend-focus" />
+              중심·선택
+            </span>
+            <span>
+              <b className="legend-issue" />
+              공유 사건
+            </span>
+            <span>
+              <b className="legend-folded">ϟn</b>접힌 사건
+            </span>
+            <span>
+              <b className="legend-line" />
+              직접 관련
+            </span>
+            <span>
+              <b className="legend-line dashed" />
+              사건 공유
+            </span>
+            <span>
+              <b className="legend-line arrow" />
+              후속 사건
+            </span>
+            <span>
+              <b className="legend-size">○◯</b>크기=활동
+            </span>
+          </div>
+        </aside>
+      )}
       <div className="relationship-disconnected">
         <span>{stats.disconnected}</span>
         <p>연결 없는 사건</p>

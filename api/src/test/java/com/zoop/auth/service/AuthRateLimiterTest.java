@@ -72,6 +72,21 @@ class AuthRateLimiterTest {
                 () -> limit.recordLoginIpAttempt("192.0.2.4"));
     }
 
+    @Test
+    void socialAuthorizationUsesIndependentIpAndBrowserRollingLimits() {
+        var limit = at(START);
+        for (int i = 0; i < 2; i++) {
+            limit.recordSocialStartIpAttempt("192.0.2.9", 2);
+            limit.recordSocialStartBrowserAttempt("browser-key", 2);
+        }
+        assertEquals(900, assertThrows(RateLimitedException.class,
+                () -> limit.recordSocialStartIpAttempt("192.0.2.9", 2)).retryAfterSeconds());
+        assertEquals(900, assertThrows(RateLimitedException.class,
+                () -> limit.recordSocialStartBrowserAttempt("browser-key", 2)).retryAfterSeconds());
+        limit.recordSocialStartIpAttempt("192.0.2.10", 2);
+        limit.recordSocialStartBrowserAttempt("another-browser", 2);
+    }
+
     private AuthRateLimiter at(Instant instant) {
         return new AuthRateLimiter(events, Clock.fixed(instant, ZoneOffset.UTC));
     }

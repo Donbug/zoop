@@ -12,19 +12,23 @@
 
 ### authentication
 
-회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. 로그인·가입·비회원 시작·외부 인증 콜백에는 세션 생성 전 Origin/state 검증을 적용한다. 회원/관리자 로그아웃에서 해당 활성 세션이 있으면 같은 쿠키·Origin·세션 결합 CSRF를 반드시 검증하며 실패는 403 ACCESS_DENIED다. CSRF가 없거나 틀렸다고 무세션 분기로 우회하지 않는다. 해당 세션이 없거나 무효/만료이면 다른 세션을 변경하지 않고 204와 해당 쿠키만 제거한다. OpenAPI의 선택 인증/선택 헤더는 이 조건부 런타임 검증을 자동 강제하지 않는다.
+회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. POST 로그인·가입·비회원 시작·소셜 가입 완료·명시적 소셜 연결 시작에는 허용 Origin을 적용한다. 브라우저 탐색 GET인 소셜 authorize/callback은 Origin을 인증 근거로 사용하지 않고 state·브라우저 pending 쿠키·nonce·PKCE·등록 redirect URI로 보호한다. 회원/관리자 로그아웃에서 해당 활성 세션이 있으면 같은 쿠키·Origin·세션 결합 CSRF를 반드시 검증하며 실패는 403 ACCESS_DENIED다. CSRF가 없거나 틀렸다고 무세션 분기로 우회하지 않는다. 해당 세션이 없거나 무효/만료이면 다른 세션을 변경하지 않고 204와 해당 쿠키만 제거한다. OpenAPI의 선택 인증/선택 헤더는 이 조건부 런타임 검증을 자동 강제하지 않는다.
 
 ### sessionLifecycle
 
-로그아웃과 차단은 서버 세션을 폐기한다. 회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 회원 쿠키는 Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200이며 서버 만료가 최종 권위다. 회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
+로그아웃과 차단은 서버 세션을 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
 
 ### signupPolicy
 
 2026-10-14 사용자 확정: 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 15~128 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md.
 
+### socialAuthPolicy
+
+이슈 #30 Task 1 구현 기준은 docs/development/social-auth-policy-2026-10-15.md. 이미 연결된 (provider, subject)는 이메일 변경과 무관하게 기존 회원으로 로그인한다. 최초 소셜 가입은 검증된 이메일과 서비스 필수 약관 동의 후 완료한다. 동일 이메일 기존 회원은 이메일 일치만으로 연결하지 않으며, 기존 계정 로그인 후 세션 결합 CSRF·Origin을 검증한 명시적 연결 OAuth 왕복에서만 연결한다. 일반 authorize/callback은 브라우저 탐색 GET이므로 Origin을 인증 근거로 사용하지 않고 state·pending 쿠키·nonce·PKCE·등록 redirect URI·만료·일회성 소비로 검증한다.
+
 ### authOriginAndRateLimit
 
-가입·로그인 등 쿠키를 만드는 브라우저 요청과 쿠키 인증 쓰기는 정확한 허용 Origin을 요구하며 null/누락/불허 Origin은 403 ACCESS_DENIED다. 운영 목록은 환경별 HTTPS Origin으로 설정하고 자격증명 CORS 와일드카드는 허용하지 않는다. 가입은 IP 10회/1시간·email_key 5회/1시간의 모든 시도, 로그인은 IP 100회/15분의 모든 시도와 email_key 20회/15분의 실패를 공유 원장에서 원자적으로 제한한다. 성공한 로그인은 email_key 실패 카운터를 초기화한다. 초과 시 429 RATE_LIMITED와 초 단위 Retry-After를 보낸다. 신뢰 IP는 지정 프록시에서만 취한다.
+POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 쿠키 인증 쓰기는 정확한 허용 Origin을 요구하며 null/누락/불허 Origin은 403 ACCESS_DENIED다. 탐색 GET 소셜 authorize/callback은 Origin 필수 규칙의 예외이며 별도 OAuth 왕복 검증을 적용한다. 운영 목록은 환경별 HTTPS Origin으로 설정하고 자격증명 CORS 와일드카드는 허용하지 않는다. 이메일 가입은 IP 10회/1시간·email_key 5회/1시간의 모든 시도, 이메일 로그인은 IP 100회/15분의 모든 시도와 email_key 20회/15분의 실패를 공유 원장에서 원자적으로 제한한다. 성공한 이메일 로그인은 email_key 실패 카운터를 초기화한다. 소셜 시작은 IP 및 브라우저 결합 키 기준 한도를 별도 운영 설정으로 적용한다. 초과 시 429 RATE_LIMITED와 초 단위 Retry-After를 보낸다. 신뢰 IP는 지정 프록시에서만 취한다.
 
 ### errors
 
@@ -105,6 +109,8 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | VALIDATION_FAILED | 422 | 자동 검증 또는 필수 근거 검증 실패 | 공개하지 않는다 |
 | SOCIAL_AUTH_CANCELLED | 400 | 소셜 인증 취소 | 시작 화면에서 다시 선택한다 |
 | SOCIAL_AUTH_FAILED | 401 | 소셜 인증 state·코드 검증 실패 | 기존 세션 성공으로 처리하지 않는다 |
+| SOCIAL_LINK_REQUIRED | 409 | 같은 이메일의 기존 회원이 있으나 기존 서비스 계정의 연결 권한이 확인되지 않음 | 기존 계정으로 로그인한 후 명시적 연결 OAuth를 시작한다 |
+| SOCIAL_EMAIL_REQUIRED | 422 | 최초 가입·연결에 사용할 검증된 제공자 이메일이 없음 | 제공자 이메일 동의를 다시 요청하거나 다른 로그인 방식을 선택한다 |
 | INVALID_CURSOR | 422 | 만료 또는 조건 불일치 커서 | 첫 페이지부터 조회한다 |
 | RATE_LIMITED | 429 | 확정된 운영 정책의 요청 한도 초과 | Retry-After 이후 확인한다 |
 | SOURCE_UNAVAILABLE | 503 | 외부 자료 조회 장애 | 해당 영역 조회만 재시도한다 |
@@ -123,10 +129,12 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [logIn](#login) | POST | /api/v1/auth/login | 공개 | P1 |
 | [startGuestSession](#startguestsession) | POST | /api/v1/auth/guest | 공개 | P1 |
 | [logOut](#logout) | POST | /api/v1/auth/logout | 공개 | P1 |
-| [setTutorialState](#settutorialstate) | PUT | /api/v1/auth/tutorial | 회원 또는 비회원 세션 | P1 |
+| [setTutorialState](#settutorialstate) | PUT | /api/v1/auth/tutorial | 회원 | P1 |
 | [listSocialProviders](#listsocialproviders) | GET | /api/v1/auth/social/providers | 공개 | P1 |
 | [authorizeSocialLogin](#authorizesociallogin) | GET | /api/v1/auth/social/{provider}/authorize | 공개 | P1 |
 | [completeSocialLogin](#completesociallogin) | GET | /api/v1/auth/social/{provider}/callback | 공개 | P1 |
+| [authorizeSocialLink](#authorizesociallink) | POST | /api/v1/auth/social/{provider}/link/authorize | 회원(본인) | P1 |
+| [completeSocialSignup](#completesocialsignup) | POST | /api/v1/auth/social/signup | 공개(pending 쿠키 결합) | P1 |
 | [getMySettings](#getmysettings) | GET | /api/v1/me/settings | 회원(본인) | P1 |
 | [updateMySettings](#updatemysettings) | PUT | /api/v1/me/settings | 회원(본인) | P1 |
 | [setWatchlistCompany](#setwatchlistcompany) | PUT | /api/v1/me/watchlist/{id} | 회원(본인) | P1 |
@@ -204,9 +212,9 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 <a id="getmembersession"></a>
 
-## getMemberSession · 회원 세션과 초기 설정 조회
+## getMemberSession · 회원·비회원 세션과 초기 설정 조회
 
-유효한 회원 세션은 member와 세션 결합 csrfToken·expiresAt을 반환한다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
+유효한 회원 세션은 해당 회원의 현재 저장된 초기 설정 상태와 함께 member로 반환한다. 유효한 비회원 세션은 guest로 반환하며 user=null, setup.completed=false, setup.tutorialCompleted=false이고 튜토리얼 진행·완료·건너뛰기 상태를 서버에 저장하지 않는다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 user=null, setup=null인 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -316,7 +324,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## startGuestSession · 비회원 시작
 
-비회원 시작.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원가입이나 로그인 없이 비회원 세션을 시작한다. 200 SessionResponse(kind=guest, authenticated=true, user=null, setup={completed:false,tutorialCompleted:false})와 zoop_session 쿠키를 반환한다. 토큰 원문은 쿠키로만 전달하고 서버에는 토큰 해시를 저장한다. guest는 전체 그래프와 공개 기업·브리핑을 읽을 수 있지만 계좌 연결, 관심종목 저장, 개인화 조회, AI 질문·평가를 이용할 수 없다. 튜토리얼은 회원과 동일하게 제공하며 진행·완료·건너뛰기 상태는 저장하지 않는다. POST에는 허용 Origin을 요구한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -369,12 +377,12 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## setTutorialState · 튜토리얼 진행 결과 저장
 
-튜토리얼 진행 결과 저장.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 튜토리얼 진행 결과만 저장한다. guest의 진행·완료·건너뛰기는 저장하지 않으므로 클라이언트 로컬에서 관리하며 이 작업은 guest에게 403 MEMBER_REQUIRED를 반환한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `PUT /api/v1/auth/tutorial` |
-| 권한·우선순위 | 회원 또는 비회원 세션 · P1 |
+| 권한·우선순위 | 회원 · P1 |
 | 요청 본문 | [TutorialUpdate](#schema-tutorialupdate) |
 | 응답 | 200: [SessionResponse](#schema-sessionresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
@@ -412,7 +420,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/providers |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다., 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| 팀 확인 필요 | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |
+| 팀 확인 필요 | Google·카카오 운영 앱 등록과 관리자 SSO·권한 등급/회수 정책은 별도다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |
 
 ### 요청 필드
 
@@ -426,21 +434,21 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## authorizeSocialLogin · 소셜 인증 시작
 
-google 또는 kakao 회원 소셜 인증을 시작한다. 지원하지 않는 provider는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 연결 권한 확인을 유지한다. 실제 OAuth 등록·연동 완료는 별도다.
+google 또는 kakao 회원 로그인을 시작한다. 지원하지 않는 provider와 외부/위험 복귀 경로를 거절한다. 브라우저 탐색 GET에는 Origin이 없을 수 있으므로 state·브라우저 결합 pending 쿠키·nonce·PKCE(S256)·등록 redirect URI로 왕복을 보호한다. 기존 회원 세션은 시작 시 변경하지 않는다. 동일 이메일 기존 계정의 명시적 연결은 별도 POST link/authorize를 사용한다. 구현 기준: docs/development/social-auth-policy-2026-10-15.md.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/auth/social/{provider}/authorize` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 302: 본문 없음, 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
+| 응답 | 302: 본문 없음, 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, ACCESS_DENIED, RATE_LIMITED, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
 | FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/{provider}/authorize |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |
+| 팀 확인 필요 | 운영 앱 등록·OAuth pending TTL·시도 제한값·허용 복귀 경로의 환경별 값은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |
 
 ### 요청 필드
 
@@ -454,21 +462,21 @@ google 또는 kakao 회원 소셜 인증을 시작한다. 지원하지 않는 pr
 
 ## completeSocialLogin · 소셜 인증 콜백
 
-google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 않는 provider와 유효하지 않은 state는 거절한다. 공통 Origin/state·허용 복귀 경로 검증과 기존 계정 본인/연결권한 확인 없이 계정 연결을 완료하지 않는 보안 경계를 유지한다.
+google 또는 kakao 인증 코드를 서버에서 교환·검증한다. state·pending 쿠키·nonce·PKCE·redirect URI·만료·일회성 소비를 검증한다. 기존 연결은 활성 회원 세션으로 로그인하고, 미연결·새 이메일은 회전된 pending 쿠키로 약관 동의 대기, 미연결·기존 이메일은 연결 없이 link_required, 이메일 부재·미검증은 email_required로 복귀한다. intent=link는 시작 때 결합한 동일 활성 회원 세션, 동일 이메일, 미연결 subject를 다시 확인해 연결하고 새 회원 세션을 발급하지 않는다. 브라우저 GET callback의 Origin은 인증 근거가 아니다. 실패·취소 URL에 인증 정보나 이메일을 노출하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `GET /api/v1/auth/social/{provider}/callback` |
 | 권한·우선순위 | 공개 · P1 |
 | 요청 본문 | 없음 |
-| 응답 | 302: 본문 없음, 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
-| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
+| 응답 | 302: 본문 없음, 400: [ErrorResponse](#schema-errorresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, ACCESS_DENIED, MEMBER_BLOCKED, SOCIAL_LINK_REQUIRED, SOCIAL_EMAIL_REQUIRED, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED |
 | FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
 | 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
 | WBS | 6.1.2, 6.11.1, 6.2.2 |
 | 프로토타입 대응 | /api/auth/social/{provider}/callback |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
-| 팀 확인 필요 | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |
+| 팀 확인 필요 | 운영 앱 등록·OAuth pending TTL은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |
 
 ### 요청 필드
 
@@ -479,6 +487,65 @@ google 또는 kakao 회원 소셜 인증 콜백을 처리한다. 지원하지 �
 | code | query | 선택 | string / null |  |
 | error | query | 선택 | string / null |  |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+<a id="authorizesociallink"></a>
+
+## authorizeSocialLink · 로그인된 기존 계정에 소셜 제공자 연결 시작
+
+활성 회원 세션과 동일 세션의 CSRF, 허용 Origin을 확인한 뒤 명시적 연결 OAuth를 시작한다. pending에 회원 ID·세션 ID·intent=link를 결합한다. 브라우저는 응답 URL로 탐색한다. 이메일 일치나 제공자의 이메일 확인만으로 기존 계정을 연결하지 않는다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/auth/social/{provider}/link/authorize` |
+| 권한·우선순위 | 회원(본인) · P1 |
+| 요청 본문 | [SocialLinkStartRequest](#schema-sociallinkstartrequest) |
+| 응답 | 200: [SocialAuthorizationResponse](#schema-socialauthorizationresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, AUTH_REQUIRED, ACCESS_DENIED, MEMBER_BLOCKED, RATE_LIMITED, SOCIAL_AUTH_FAILED, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
+| WBS | 6.2.2 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 활성 회원 세션의 명시적 소셜 연결은 정식 API에서 구현한다. |
+| 팀 확인 필요 | D-AUT-01에서 기존 계정 로그인 후 명시적 연결 시작 UI는 화면 계획과 함께 검증한다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| provider | path | 필수 | string {google, kakao} |  |
+| X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
+본문 스키마: [SocialLinkStartRequest](#schema-sociallinkstartrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+
+<a id="completesocialsignup"></a>
+
+## completeSocialSignup · 검증된 소셜 인증으로 신규 회원가입 완료
+
+callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허용 Origin, 현재 승인된 필수 약관 동의를 확인한다. 회원·약관 동의·소셜 연결·새 회원 세션을 원자적으로 생성한다. 요청의 이메일·subject를 신뢰하지 않는다. 동일 이메일의 기존 회원이 생겼으면 pending을 소비하고 SOCIAL_LINK_REQUIRED(409)를 반환한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `POST /api/v1/auth/social/signup` |
+| 권한·우선순위 | 공개(pending 쿠키 결합) · P1 |
+| 요청 본문 | [SocialSignupRequest](#schema-socialsignuprequest) |
+| 응답 | 201: [SessionResponse](#schema-sessionresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, ACCESS_DENIED, SOCIAL_AUTH_FAILED, SOCIAL_LINK_REQUIRED, SOCIAL_EMAIL_REQUIRED, TERMS_REQUIRED, RATE_LIMITED, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS004](../../system/out/feature-FS004.md) · [FS061](../../system/out/feature-FS061.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-AUT-01](../../system/out/screen-D-AUT-01.md) |
+| WBS | 6.2.2 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 직접 대응 BFF 작업 없음. 검증된 제공자 결과와 약관 동의로 완료하는 소셜 가입은 정식 API에서 구현한다. |
+| 팀 확인 필요 | 소셜 신규 가입 약관 동의 UI는 D-AUT-01 진입 흐름에서 화면 계획과 함께 검증한다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+| zoop_oauth_pending | cookie | 필수 | string |  |
+
+본문 스키마: [SocialSignupRequest](#schema-socialsignuprequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="getmysettings"></a>
 
@@ -3496,7 +3563,7 @@ The selection frozen when the question was first received.
 | aliases | 필수 | string[] |  |
 | sector | 필수 | string / null | 확인된 업종. 기존 sector 필드를 여섯 프로필 키 중 하나로 유지하며 자료가 없으면 null이다. |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB`; null when the catalog has none. |
-| logoUrl | 필수 | string / null | Same-origin logo path (`/logos/<file>`); null when the catalog has none. |
+| logoUrl | 필수 | string / null | Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none. |
 | directIssues | 필수 | [CompanyIssueRef](#schema-companyissueref)[] |  |
 | structuralIssues | 필수 | [CompanyIssueRef](#schema-companyissueref)[] |  |
 | summary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
@@ -3680,7 +3747,7 @@ The selection frozen when the question was first received.
 | aliases | 필수 | string[] |  |
 | sector | 필수 | string / null |  |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB`; null when the catalog has none. |
-| logoUrl | 필수 | string / null | Same-origin logo path (`/logos/<file>`); null when the catalog has none. |
+| logoUrl | 필수 | string / null | Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none. |
 | issueCount | 필수 | integer |  |
 
 <a id="schema-connectioninfo"></a>
@@ -4448,7 +4515,7 @@ same request again never toggles anything.
 | holding | 필수 | boolean |  |
 | watch | 필수 | boolean |  |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB` from the catalog; null for issues or when unset. |
-| logoUrl | 필수 | string / null | Same-origin path of the company logo (`/logos/<file>`); null for issues or when unset. |
+| logoUrl | 필수 | string / null | Same-origin path of the company logo (`/graph-assets/<file>`); null for issues or when unset. |
 | eventTime | 필수 | string / null |  |
 | timePrecision | 필수 | string {year, month, day, datetime, unknown} / null |  |
 | action | 필수 | string / null |  |
@@ -5691,7 +5758,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | authenticated | 필수 | boolean |  |
 | kind | 필수 | string {anonymous, guest, member} |  |
 | user | 필수 | [UserInfo](#schema-userinfo) / null |  |
-| setup | 필수 | [SetupState](#schema-setupstate) / null |  |
+| setup | 필수 | [SetupState](#schema-setupstate) / null | 회원은 해당 계정의 현재 저장 상태를 반환하고 guest는 두 값 모두 false다. anonymous에는 초기 설정 상태가 없어 null이다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 | csrfToken | 필수 | string, null | 인증 세션 쓰기에 사용하는 세션 결합 토큰. 무세션은 null. |
 | expiresAt | 필수 | string, null (date-time) |  |
@@ -5732,8 +5799,7 @@ changes nothing (a resent request is answered with the stored settings). The mod
 
 ### SetupState
 
-Guests: ``completed`` is always false (they have no settings); ``tutorialCompleted`` is kept on the
-guest session only.
+For members, these booleans reflect the current persisted state of the authenticated member. For guests, both are always false and tutorial progress, completion, and skip state are never persisted; the client can run or replay the tutorial locally. Anonymous sessions have no setup state and return setup=null.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5800,6 +5866,37 @@ Key issues of an evening round compared with the same day's published morning ro
 | --- | --- | --- | --- |
 | items | 필수 | [SocialProvider](#schema-socialprovider)[] | 개별 페이지의 회원 인증 제공자 목록이다. 전체 커서 순회 결과는 google/kakao 각각 한 번이며 페이지마다 두 항목 모두를 강제하지 않는다. |
 | nextCursor | 필수 | string, null |  |
+
+<a id="schema-socialauthorizationresponse"></a>
+
+### SocialAuthorizationResponse
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| authorizationUrl | 필수 | string (uri) | 등록된 Google 또는 카카오 인증 URL. 클라이언트는 이 URL로 페이지 이동한다. |
+
+<a id="schema-sociallinkstartrequest"></a>
+
+### SocialLinkStartRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| returnTo | 선택 | string | 허용된 서비스 내부 상대 복귀 경로. 외부 URL, //, 역슬래시, 제어 문자를 거절한다. |
+
+<a id="schema-socialsignuprequest"></a>
+
+### SocialSignupRequest
+
+이메일·제공자·subject는 callback에서 검증해 저장한 pending에서만 읽는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| displayName | 선택 | string | 선택 입력. 생략하면 기본 표시명 '회원'을 사용한다. |
+| agreements | 필수 | [agreements](#schema-agreements) |  |
 
 <a id="schema-sourcesupportout"></a>
 
@@ -6374,4 +6471,4 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 
 
-string {INVALID_REQUEST, INVALID_CREDENTIALS, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, MEMBER_BLOCKED, EMAIL_TAKEN, TERMS_REQUIRED, RESOURCE_NOT_FOUND, EVIDENCE_UNAVAILABLE, VERSION_UNAVAILABLE, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, ALREADY_PUBLISHED, VALIDATION_FAILED, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED, INVALID_CURSOR, RATE_LIMITED, SOURCE_UNAVAILABLE, MODEL_UNAVAILABLE, AUDIT_UNAVAILABLE, MASKING_FAILED, INTERNAL_ERROR}
+string {INVALID_REQUEST, INVALID_CREDENTIALS, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, MEMBER_BLOCKED, EMAIL_TAKEN, TERMS_REQUIRED, RESOURCE_NOT_FOUND, EVIDENCE_UNAVAILABLE, VERSION_UNAVAILABLE, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, ALREADY_PUBLISHED, VALIDATION_FAILED, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED, SOCIAL_LINK_REQUIRED, SOCIAL_EMAIL_REQUIRED, INVALID_CURSOR, RATE_LIMITED, SOURCE_UNAVAILABLE, MODEL_UNAVAILABLE, AUDIT_UNAVAILABLE, MASKING_FAILED, INTERNAL_ERROR}

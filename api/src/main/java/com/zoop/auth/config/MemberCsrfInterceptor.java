@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** Protects member-cookie writes; authentication of cookie-free requests belongs to each resource. */
+/** Protects member/guest-cookie writes; authorization of cookie-free requests belongs to each resource. */
 @Component
 public class MemberCsrfInterceptor implements HandlerInterceptor {
     private final AuthOriginPolicy origins;

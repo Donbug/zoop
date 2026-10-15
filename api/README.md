@@ -1,6 +1,6 @@
 # Zoop API 실행 환경
 
-Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원 세션 조회가 구현됐습니다. 문서 저장(`artifacts`·`articles`·`article_versions`)과 operator 전용 비웹 import([문서 import](docs/DOCUMENT_IMPORT.md)), S1 문서 분석([문서 분석](docs/DOCUMENT_ANALYSIS.md))도 지원합니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
+Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트와 ERD v6에 맞춘 인증 DB 스키마가 있습니다. 공개 약관 조회·이메일 회원가입·로그인·회원/비회원 세션 발급 및 조회가 구현됐습니다. 문서 저장(`artifacts`·`articles`·`article_versions`)과 operator 전용 비웹 import([문서 import](docs/DOCUMENT_IMPORT.md)), S1 문서 분석([문서 분석](docs/DOCUMENT_ANALYSIS.md))도 지원합니다. 루트 `make api-test`·`api-build`·`api-ai-smoke`와 CI job `api`가 연결돼 있습니다. 기존 프로토타입과 DB를 공유하지 않습니다.
 
 ## 도구
 
@@ -37,9 +37,9 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `DB_USERNAME` | DB 계정 |
 | `DB_PASSWORD` | DB 비밀번호 |
 | `SERVER_PORT` | 애플리케이션 포트 (기본값 8080) |
-| `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID` | 새 회원 세션의 CSRF 서명 키 ID. 예: `local-v1` |
+| `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID` | 새 회원·비회원 세션의 CSRF 서명 키 ID. 예: `local-v1` |
 | `ZOOP_AUTH_CSRF_KEYS` | `키ID=base64url(32바이트 이상)` 목록. 키 회전 중에는 쉼표로 이전 키도 유지 |
-| `ZOOP_AUTH_ALLOWED_ORIGINS` | 가입·로그인 및 회원 쿠키가 붙은 쓰기 요청을 허용할 정확한 HTTPS Origin 목록(쉼표 구분). 빈 값은 전부 거절 |
+| `ZOOP_AUTH_ALLOWED_ORIGINS` | 가입·로그인·비회원 시작 및 회원/비회원 쿠키가 붙은 쓰기 요청을 허용할 정확한 HTTPS Origin 목록(쉼표 구분). 빈 값은 전부 거절 |
 | `ZOOP_AUTH_TRUSTED_PROXIES` | `X-Forwarded-For`를 제공할 수 있는 프록시의 숫자 IP 목록(쉼표 구분). 빈 값은 전달 헤더 무시 |
 | `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` | 선택. 내부 AI transport 클라이언트(S1/S2/S3 가족별, 기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정)과 [S2·S3 절](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트) |
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
@@ -47,7 +47,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
-회원 세션용 키를 로컬에서 생성해 `api/.env`의 `ZOOP_AUTH_CSRF_KEYS`에 `local-v1=<출력값>` 형식으로 넣으세요. `python3 -c 'import secrets,base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("="))'`로 생성할 수 있습니다. 키 설정이 없거나 32바이트 미만이면 서버 기동이 실패합니다. 운영에서는 비밀 저장소로 두 환경변수를 주입하고, 키를 교체할 때 아직 살아 있는 세션이 참조하는 이전 키를 목록에 보관합니다. 이 값과 세션 쿠키 원문은 로그나 저장소에 남기지 마세요.
+회원·비회원 세션용 키를 로컬에서 생성해 `api/.env`의 `ZOOP_AUTH_CSRF_KEYS`에 `local-v1=<출력값>` 형식으로 넣으세요. `python3 -c 'import secrets,base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("="))'`로 생성할 수 있습니다. 키 설정이 없거나 32바이트 미만이면 서버 기동이 실패합니다. 운영에서는 비밀 저장소로 두 환경변수를 주입하고, 키를 교체할 때 아직 살아 있는 세션이 참조하는 이전 키를 목록에 보관합니다. 이 값과 세션 쿠키 원문은 로그나 저장소에 남기지 마세요.
 
 `/`의 404는 정상입니다. 서버 로그의 `Started ZoopApplication`과 DB·Flyway 초기화를 확인하세요. 잘못된 DB 설정에서는 기동이 실패해야 합니다.
 
@@ -55,9 +55,13 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 
 `POST /api/v1/auth/signup`은 현재 유효한 필수 약관 버전과 실제 동의를 확인한 뒤 회원·동의·세션을 한 트랜잭션에 저장하고 `201 SessionResponse`와 보안 쿠키를 반환합니다. `POST /api/v1/auth/login`은 이메일·비밀번호로 활성 회원을 인증해 `200 SessionResponse`와 새 보안 쿠키를 반환합니다. 잘못된 자격 증명은 `401 INVALID_CREDENTIALS`, 비밀번호가 맞는 차단 계정은 `403 MEMBER_BLOCKED`입니다. 가입·로그인 입력과 응답 형식은 [OpenAPI](../docs/api/openapi.yaml)를 따릅니다.
 
-`GET /api/v1/auth/session`은 `zoop_session` 쿠키가 없으면 `anonymous`를 반환하고 새 세션을 만들지 않습니다. 유효한 회원 쿠키는 회원·설정 상태·만료 시각·세션 결합 CSRF 토큰을 반환합니다. 만료·폐기·무효 쿠키는 `Max-Age=0`으로 제거합니다. 세션 토큰 원문은 쿠키로만 전달하고 DB에는 SHA-256 해시만 저장합니다.
+`POST /api/v1/auth/guest`는 허용 Origin을 확인한 뒤 비회원 세션을 발급하고 `200 SessionResponse`와 `zoop_session` 쿠키를 반환합니다. 회원가입이나 로그인이 필요하지 않습니다. 회원과 비회원 세션은 12시간 절대 만료를 사용합니다. guest 응답은 `kind=guest`, `authenticated=true`, `user=null`, `setup.completed=false`, `setup.tutorialCompleted=false`입니다. guest는 전체 그래프와 공개 기업·브리핑을 읽을 수 있지만 계좌 연결, 관심종목 저장, 개인화 조회, AI 질문·평가를 할 수 없습니다.
 
-회원 쿠키가 붙은 `/api/v1/**` 쓰기 요청은 허용 Origin과 단일 `X-CSRF-Token` 헤더를 검사합니다. 토큰은 현재 활성 세션에 결합되어야 하며 누락·불일치·만료·폐기·중복 쿠키/헤더는 `403 ACCESS_DENIED`입니다. 가입·로그인은 세션 발급 전 Origin을 별도로 검사합니다. 쿠키가 없는 요청의 인증·권한은 각 업무 API에서 강제해야 합니다. 관리자 쿠키의 CSRF 검증은 관리자 인증 구현 범위입니다.
+`GET /api/v1/auth/session`은 `zoop_session` 쿠키가 없으면 `anonymous`를 반환하고 새 세션을 만들지 않습니다. 유효한 회원 쿠키는 회원·설정 상태, 유효한 비회원 쿠키는 guest 상태와 함께 만료 시각·세션 결합 CSRF 토큰을 반환합니다. 만료·폐기·무효 쿠키는 `Max-Age=0`으로 제거합니다. 세션 토큰 원문은 쿠키로만 전달하고 DB에는 SHA-256 해시만 저장합니다. guest 튜토리얼 진행·완료·건너뛰기는 서버에 저장하지 않으며 응답의 `tutorialCompleted`는 항상 `false`입니다.
+
+회원 전용 경계는 [이슈 #31 인계 문서](../docs/development/issue-31-guest-access-handoff.md)에 연결돼 있습니다. 개인 API는 세션에서 얻은 `MemberPrincipal`을 사용하고 리소스 소유자와 일치하는지 확인해야 합니다. 계약상 `PUT /api/v1/auth/tutorial`은 회원 전용이며 guest의 상태 저장은 금지합니다. 이 API 모듈에는 아직 튜토리얼 저장 컨트롤러가 없고, 구현 시 등록된 회원 권한 인터셉터가 guest를 `403 MEMBER_REQUIRED`로 거절합니다.
+
+회원 또는 비회원 쿠키가 붙은 `/api/v1/**` 쓰기 요청은 허용 Origin과 단일 `X-CSRF-Token` 헤더를 검사합니다. 토큰은 현재 활성 세션에 결합되어야 하며 누락·불일치·만료·폐기·중복 쿠키/헤더는 `403 ACCESS_DENIED`입니다. 가입·로그인·비회원 시작은 세션 발급 전 Origin을 별도로 검사합니다. 쿠키가 없는 요청의 인증·권한은 각 업무 API에서 강제해야 합니다. 관리자 쿠키의 CSRF 검증은 관리자 인증 구현 범위입니다.
 
 가입·로그인 POST는 Origin이 정확히 허용 목록에 있어야 합니다. 누락·`null`·불일치 Origin은 `403 ACCESS_DENIED`이며 `Referer`로 대체하지 않습니다. 클라이언트 IP는 기본적으로 직접 연결 주소를 사용하고, 명시한 프록시에서 온 요청만 `X-Forwarded-For`의 신뢰 체인을 해석합니다. 프록시는 외부에서 받은 전달 헤더를 제거하거나 덮어써야 합니다. 가입은 IP 10회/시간·이메일 비교키 5회/시간, 로그인은 IP 100회/15분·이메일 비교키 실패 20회/15분을 PostgreSQL의 이동 창 기록으로 제한합니다. 허용 Origin의 요청은 본문 파싱 전에 IP 시도를 기록하므로 잘못된 JSON·이메일 형식도 IP 제한에 포함됩니다. 유효한 이메일의 가입 시도는 이후 이메일 비교키에도 기록합니다. 거절된 요청은 `429 RATE_LIMITED`와 초 단위 `Retry-After`를 받습니다. 로그인 성공은 해당 이메일 실패 카운터를 초기화합니다. 기록은 1시간 후 정리됩니다.
 
@@ -97,6 +101,28 @@ make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> a
 ## 문서 분석
 
 `com.zoop.document.analysis`는 등록된 문서 버전 하나를 S1 AI 서비스로 요약·기업 판정하고 검증된 결과를 `document_analyses`·`evidence`·`ai_executions`와 artifact 파일에 저장하는 **operator 전용 비웹 실행**입니다(`V20261014130000`). `prepare`는 AI 서비스를 부르지 않고 새 AI jobId와 불변 `ai_submit`을 커밋하며, `advance`는 status를 먼저 읽고(submit·recover 직전에는 현재 grant·article을 다시 확인), 결과를 입력 결속·digest 재계산·검증자가 본 claim 대조·코드 포인트 인용 검사·현재 grant 재평가를 거쳐 한 transaction으로 정산하며, 그 transaction이 article·행 잠금을 얻은 뒤 grant를 한 번 더 평가합니다. HTTP 경로·`analysis_jobs`·공개 읽기·live 실행은 없습니다. 입력 스키마, 결과 파일, 실패 코드, 권리·크래시 규칙과 smoke(`api/scripts/document_analysis_smoke.py`)는 [문서 분석](docs/DOCUMENT_ANALYSIS.md)에 있습니다.
+
+## 기본 기업 카탈로그 적재
+
+`src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. `brand_source`는 색상·로고 출처가 확인된 경우에만 넣고, 단순 홈페이지 주소는 `null`로 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
+
+DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번** 24개 기업을 적재하고, `V20261015090000__add_company_brand_source.sql`이 내부 출처 컬럼을 추가합니다. 그 다음 앱 시작 시 번들 JSON을 읽어 같은 기업 ID의 값을 갱신합니다. 이후 JSON을 바꿔 다시 시작해도 ID 기준으로 변경된 행만 갱신하며 중복 삽입하지 않습니다. 다른 기업 및 이를 참조하는 분석 기록은 삭제하지 않습니다. PostgreSQL 컨테이너만 시작하면 Flyway와 JSON 적재가 실행되지 않으므로 API도 시작해야 합니다. Spring Boot는 `.env` 파일을 자동으로 읽지 않습니다.
+
+카탈로그 JSON을 수정해 로컬 DB에 다시 반영할 때에만 `api` 디렉터리에서 명시적 적재 명령을 사용합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=catalog-import --spring.main.web-application-type=none --zoop.catalog.import-file=src/main/resources/company/demo-companies.json"
+```
+
+이 수동 명령은 입력 전체를 검증한 뒤 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상·로고 경로·내부 출처(`brand_source`)를 갱신합니다. `brand_source`의 `null`은 기존 출처를 비우며, 생략하면 기존 값을 보존합니다. 다른 기업은 삭제하지 않습니다. OpenAI·Anthropic의 `market`은 NULL로 바로잡고 다른 기업의 `market`과 `profile`은 보존합니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`로 결과를 확인하세요. 기존 Flyway migration은 수정하지 않습니다. 일부 SVG는 프론트엔드가 같은 이름으로 `web/public/graph-assets`에 추가할 예정입니다.
+
+```sql
+SELECT count(*) FROM companies;
+SELECT id, name, ticker, exchange_code FROM companies
+WHERE id IN ('KRX:005930', 'ORG:OPENAI', 'ORG:ANTHROPIC') ORDER BY id;
+```
+
+이 파일은 현재 확정된 기본 목록입니다. 상장사 전체 수집·주기적 갱신 및 시세 데이터는 이 적재 절차의 범위가 아닙니다. 회사 검색 API 변경 사항이 합쳐진 뒤에도 GraphDB 이슈 수 snapshot이 준비되지 않으면 검색 요청은 `503 SOURCE_UNAVAILABLE`일 수 있으므로 SQL로 적재 결과를 먼저 확인합니다.
 
 ## 스키마와 DB 종료
 

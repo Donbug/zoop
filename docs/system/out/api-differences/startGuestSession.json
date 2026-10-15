@@ -67,6 +67,9 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:header:Set-Cookie": {
+      "type": "string"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -210,6 +213,8 @@
         "VALIDATION_FAILED",
         "SOCIAL_AUTH_CANCELLED",
         "SOCIAL_AUTH_FAILED",
+        "SOCIAL_LINK_REQUIRED",
+        "SOCIAL_EMAIL_REQUIRED",
         "INVALID_CURSOR",
         "RATE_LIMITED",
         "SOURCE_UNAVAILABLE",
@@ -295,6 +300,8 @@
         "VALIDATION_FAILED",
         "SOCIAL_AUTH_CANCELLED",
         "SOCIAL_AUTH_FAILED",
+        "SOCIAL_LINK_REQUIRED",
+        "SOCIAL_EMAIL_REQUIRED",
         "INVALID_CURSOR",
         "RATE_LIMITED",
         "SOURCE_UNAVAILABLE",
@@ -525,6 +532,8 @@
           "VALIDATION_FAILED",
           "SOCIAL_AUTH_CANCELLED",
           "SOCIAL_AUTH_FAILED",
+          "SOCIAL_LINK_REQUIRED",
+          "SOCIAL_EMAIL_REQUIRED",
           "INVALID_CURSOR",
           "RATE_LIMITED",
           "SOURCE_UNAVAILABLE",
@@ -561,6 +570,8 @@
           "VALIDATION_FAILED",
           "SOCIAL_AUTH_CANCELLED",
           "SOCIAL_AUTH_FAILED",
+          "SOCIAL_LINK_REQUIRED",
+          "SOCIAL_EMAIL_REQUIRED",
           "INVALID_CURSOR",
           "RATE_LIMITED",
           "SOURCE_UNAVAILABLE",
@@ -597,6 +608,8 @@
           "VALIDATION_FAILED",
           "SOCIAL_AUTH_CANCELLED",
           "SOCIAL_AUTH_FAILED",
+          "SOCIAL_LINK_REQUIRED",
+          "SOCIAL_EMAIL_REQUIRED",
           "INVALID_CURSOR",
           "RATE_LIMITED",
           "SOURCE_UNAVAILABLE",
@@ -633,6 +646,8 @@
           "VALIDATION_FAILED",
           "SOCIAL_AUTH_CANCELLED",
           "SOCIAL_AUTH_FAILED",
+          "SOCIAL_LINK_REQUIRED",
+          "SOCIAL_EMAIL_REQUIRED",
           "INVALID_CURSOR",
           "RATE_LIMITED",
           "SOURCE_UNAVAILABLE",

@@ -82,6 +82,29 @@ export function companyNodeSize(issueCount: number, scale = 1) {
   return [18, 22, 26, 34, 44][level] * scale;
 }
 
+export function focusNeighborhood(
+  data: GraphResponse,
+  focusId: string | null,
+  hops: 1 | 2,
+) {
+  if (!focusId || !data.nodes.some((node) => node.id === focusId))
+    return new Set<string>();
+  const visible = new Set([focusId]);
+  let frontier = new Set([focusId]);
+  for (let depth = 0; depth < hops; depth += 1) {
+    const next = new Set<string>();
+    data.edges.forEach((edge) => {
+      if (frontier.has(edge.source) && !visible.has(edge.target))
+        next.add(edge.target);
+      if (frontier.has(edge.target) && !visible.has(edge.source))
+        next.add(edge.source);
+    });
+    next.forEach((id) => visible.add(id));
+    frontier = next;
+  }
+  return visible;
+}
+
 // Figma 619:1819 / 619:2374 presentation only; API DTOs never contain x/y.
 const issueLayout: Record<string, [number, number, number, number]> = {
   'HBM4 공급 계약': [559, 218, 302, 301],
@@ -100,6 +123,7 @@ export function toG6Data(
   height: number,
   expandedId?: string | null,
   forcedNodes: string[] = [],
+  emphasizedNodes: Set<string> = new Set(),
 ): GraphData {
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
@@ -201,6 +225,7 @@ export function toG6Data(
             ]
           : []),
       ];
+      const dimmed = emphasizedNodes.size > 0 && !emphasizedNodes.has(n.id);
       return {
         id: n.id,
         type: company ? 'circle' : 'diamond',
@@ -241,25 +266,35 @@ export function toG6Data(
           labelPadding: [2, 7],
           badges,
           cursor: 'pointer',
+          opacity: dimmed ? 0.16 : 1,
         },
       };
     }),
     edges: data.edges
       .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
-      .map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        style: {
-          stroke: e.relationType === 'FOLLOWS' ? '#c0362c' : '#94948f',
-          lineWidth: 0.65,
-          strokeOpacity: e.relationType === 'SHARES_ISSUE' ? 0.5 : 0.75,
-          lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
-          endArrow: e.relationType === 'FOLLOWS',
-          endArrowSize: 4,
-          cursor: isSelectableRelation(e) ? 'pointer' : 'default',
-          increasedLineWidthForHitTesting: isSelectableRelation(e) ? 8 : 0,
-        },
-      })),
+      .map((e) => {
+        const dimmed =
+          emphasizedNodes.size > 0 &&
+          (!emphasizedNodes.has(e.source) || !emphasizedNodes.has(e.target));
+        return {
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          style: {
+            stroke: e.relationType === 'FOLLOWS' ? '#c0362c' : '#94948f',
+            lineWidth: 0.65,
+            strokeOpacity: dimmed
+              ? 0.08
+              : e.relationType === 'SHARES_ISSUE'
+                ? 0.5
+                : 0.75,
+            lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
+            endArrow: e.relationType === 'FOLLOWS',
+            endArrowSize: 4,
+            cursor: isSelectableRelation(e) ? 'pointer' : 'default',
+            increasedLineWidthForHitTesting: isSelectableRelation(e) ? 8 : 0,
+          },
+        };
+      }),
   };
 }

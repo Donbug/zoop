@@ -27,7 +27,7 @@ public class AuthOriginInterceptor implements HandlerInterceptor {
             policy.verify(request);
             String path = request.getRequestURI().substring(request.getContextPath().length());
             String ip = clientIps.resolve(request);
-            if ("/api/v1/auth/signup".equals(path)) {
+            if ("/api/v1/auth/signup".equals(path) || "/api/v1/auth/social/signup".equals(path)) {
                 rates.recordSignupIpAttempt(ip);
             } else if ("/api/v1/auth/login".equals(path)) {
                 rates.recordLoginIpAttempt(ip);

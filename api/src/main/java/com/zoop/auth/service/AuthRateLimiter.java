@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthRateLimiter {
     private static final Duration SIGNUP_WINDOW = Duration.ofHours(1);
     private static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
+    private static final Duration SOCIAL_WINDOW = Duration.ofMinutes(15);
     private final AuthRateEventStore store;
     private final Clock clock;
 
@@ -59,6 +60,16 @@ public class AuthRateLimiter {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordLoginIpAttempt(String clientIp) {
         recordIpOnly("login_ip", clientIp, LOGIN_WINDOW, 100);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSocialStartIpAttempt(String clientIp, int limit) {
+        recordIpOnly("social_start_ip", clientIp, SOCIAL_WINDOW, limit);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSocialStartBrowserAttempt(String browserKey, int limit) {
+        recordIpOnly("social_start_browser", browserKey, SOCIAL_WINDOW, limit);
     }
 
     /** Call only for INVALID_CREDENTIALS, including unknown accounts. */
