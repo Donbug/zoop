@@ -99,6 +99,32 @@ VITE_API_BASE_URL=https://api.example.com
 
 이 주소는 예시다. Vite의 `VITE_*` 값은 클라이언트 번들에 포함되므로 비밀키를 넣지 않는다.
 
+### 로컬에서 실제 api/(Spring)와 연결하기
+
+인증 API는 가입·로그인 요청의 Origin이 **정확한 HTTPS Origin**일 때만 받고(`ZOOP_AUTH_ALLOWED_ORIGINS`), 세션 쿠키는 `Secure; SameSite=Lax; Path=/api/v1`이다. 그래서 로컬에서는 개발 서버를 HTTPS로 띄우고 `/api`를 같은 Origin의 프록시로 API에 넘긴다. 두 설정은 아래 값이 있을 때만 켜지며, 없으면 기존 개발 서버와 같다.
+
+1. `api/README.md`대로 `api/.env`를 만들고 `ZOOP_AUTH_ALLOWED_ORIGINS=https://localhost:5173`(개발 서버 주소와 정확히 같게)을 넣은 뒤 DB와 API를 실행한다. 8080이 사용 중이면 `SERVER_PORT`를 바꾼다.
+2. 로컬 전용 인증서를 만든다(`web/.cert`는 Git에서 제외된다).
+
+   ```sh
+   mkdir -p web/.cert
+   openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=localhost" \
+     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+     -keyout web/.cert/localhost-key.pem -out web/.cert/localhost.pem
+   ```
+
+3. `web/.env.local`에 아래 값을 둔다. `ZOOP_DEV_*`는 개발 서버 설정에서만 읽고 클라이언트 번들에 들어가지 않는다. `VITE_API_BASE_URL`은 비워 같은 Origin으로 요청하게 한다.
+
+   ```dotenv
+   ZOOP_DEV_API_TARGET=http://localhost:8080
+   ZOOP_DEV_HTTPS_CERT=.cert/localhost.pem
+   ZOOP_DEV_HTTPS_KEY=.cert/localhost-key.pem
+   ```
+
+4. `pnpm --dir web dev`로 띄운 `https://localhost:5173/login`을 브라우저에서 열고, 자체 서명 인증서 경고는 이 로컬 주소에 한해 진행한다.
+
+현재 `api/`에 구현된 인증 API는 가입·로그인·세션 조회·약관·소셜(Google·카카오) 시작·콜백·소셜 가입이다. 로그아웃(`POST /api/v1/auth/logout`), 비회원 세션(`POST /api/v1/auth/guest`), 로그인 후 이동을 정하는 `GET /api/v1/me/settings`·`GET /api/v1/portfolio`는 아직 없어 404다. 그래서 초기 설정을 마친 회원은 로그인 후 종목을 확인하지 못해 이동할 화면을 정하지 못하고, 로그인 화면에서 [로그인 상태 다시 확인]만 할 수 있다(FS006: 추측하지 않음). 소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다.
+
 `src/apis/auth/ApiService.ts`:
 
 - Base URL, JSON 헤더/본문, `credentials: include`로 세션 쿠키(`zoop_session`) 전송.
