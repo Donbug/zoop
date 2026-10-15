@@ -35,7 +35,10 @@ for (const [index, issue] of issues.entries()) {
     sentiment: null,
     documentVersion: 'mock-article-v1',
     documentSummary: null,
-    analysisStatus: 'available',
+    analysisStatus: {
+      summary: { status: 'not_requested' as const, reason: null },
+      sentiment: { status: 'not_requested' as const, reason: null },
+    },
     analysisProvenance: {
       sourceKind: 'synthetic' as const,
       executionMode: 'replay' as const,

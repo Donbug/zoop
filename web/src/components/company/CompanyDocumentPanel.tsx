@@ -3,11 +3,8 @@ import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
 import { companyUrl } from '@/apis/company/company';
 import { exactTime, safeHref } from './detail-model';
-import type {
-  CompanyDocuments,
-  DocumentAnalysis,
-  Evidence,
-} from '@/types/company/documents';
+import type { CompanyDocuments, Evidence } from '@/types/company/documents';
+import type { DocumentAnalysis } from '@/types/evidence';
 
 const stageLabels = {
   not_requested: '미요청',

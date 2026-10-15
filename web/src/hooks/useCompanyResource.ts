@@ -5,8 +5,8 @@ export type Resource<T> = {
   data: T | null;
   loading: boolean;
   error: string | null;
-  errorCode?: string | null;
-  errorStatus?: number | null;
+  errorCode: string | null;
+  errorStatus: number | null;
   retry: () => void;
 };
 export function useCompanyResource<T>(

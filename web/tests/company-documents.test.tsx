@@ -22,7 +22,9 @@ const metadata = {
   source: 'synthetic',
   asOf,
   graphVersion: 'v1',
+  requestId: 'req-company-documents',
   partial: false,
+  failures: [],
 };
 const doc: CompanyDocument = {
   id: 'doc-a',
@@ -399,6 +401,7 @@ test('other company sentiment is not borrowed and synthetic results are labeled'
             companyId: 'OTHER',
             label: 'positive',
             rationale: '다른 기업 긍정',
+            quotes: ['다른 기업에 대한 합성 근거'],
             judgedAt: asOf,
             model: 'synthetic',
             promptVersion: 'v1',
