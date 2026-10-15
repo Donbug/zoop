@@ -74,9 +74,9 @@ make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai repl
 
 ## 기본 기업 카탈로그 적재
 
-`src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. 기존 60개 시드를 사용한 DB에서는 `retired_company_ids`에 명시한 이전 시드 40개만 삭제합니다. 다른 회사 행은 삭제하지 않습니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
+`src/main/resources/company/demo-companies.json`은 팀이 확정한 24개 기업 목록입니다. `prototype/` 파일이나 DB를 실행 중에 읽지 않습니다. 종목 코드가 없는 OpenAI·Anthropic은 `ORG:OPENAI`, `ORG:ANTHROPIC` ID를 사용하며 `ticker`, `exchange_code`, `market`은 비워 둡니다. 향후 GraphDB에서도 같은 회사 ID를 써야 합니다.
 
-DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번 자동으로** 24개 기업을 적재합니다. 기존 60개 시드 DB에서는 이전 시드 ID 40개만 정리합니다. PostgreSQL 컨테이너만 시작하면 Flyway는 실행되지 않으므로 API도 시작해야 합니다. Spring Boot는 `.env` 파일을 자동으로 읽지 않습니다.
+DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 시작하면 Flyway migration `V20261014163000__seed_confirmed_companies.sql`이 **최초 한 번 자동으로** 24개 기업을 적재합니다. 다른 기업 행과 이를 참조하는 분석 기록은 보존합니다. 기존 개발 DB에 잘못 적재한 기업은 해당 DB에서 별도로 정리해야 합니다. PostgreSQL 컨테이너만 시작하면 Flyway는 실행되지 않으므로 API도 시작해야 합니다. Spring Boot는 `.env` 파일을 자동으로 읽지 않습니다.
 
 카탈로그 JSON을 수정해 로컬 DB에 다시 반영할 때에만 `api` 디렉터리에서 명시적 적재 명령을 사용합니다.
 
@@ -84,7 +84,7 @@ DB 환경변수(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`)를 설정하고 API를 �
 .\gradlew.bat bootRun --args="--spring.profiles.active=catalog-import --spring.main.web-application-type=none --zoop.catalog.import-file=src/main/resources/company/demo-companies.json"
 ```
 
-이 수동 명령은 입력 전체를 검증한 뒤 이전 시드 ID를 정리하고, 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상을 갱신합니다. `profile`, `market`, `logo_url`은 근거 또는 실제 제공 경로가 없어서 채우지 않습니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`, `deleted`로 결과를 확인하세요. 이후 기본 목록을 바꾸려면 기존 Flyway migration을 수정하지 말고 새 migration을 추가해야 합니다.
+이 수동 명령은 입력 전체를 검증한 뒤 확정 목록을 `companies`에 삽입하거나 같은 ID의 이름·종목 코드·거래소·별칭·브랜드 색상을 갱신합니다. 다른 기업은 삭제하지 않습니다. `profile`, `market`, `logo_url`은 근거 또는 실제 제공 경로가 없어서 채우지 않습니다. 재실행 시 동일한 행은 쓰지 않아 `company_catalog_revision`도 바뀌지 않습니다. 완료 로그의 `total`, `changed`, `unchanged`로 결과를 확인하세요. 이후 기본 목록을 바꾸려면 기존 Flyway migration을 수정하지 말고 새 migration을 추가해야 합니다.
 
 ```sql
 SELECT count(*) FROM companies;

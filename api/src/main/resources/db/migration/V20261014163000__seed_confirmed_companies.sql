@@ -1,48 +1,5 @@
--- One-time seed of the 24 confirmed companies. Keep this migration aligned with company/demo-companies.json.
--- Only IDs from the previous 60-company demo seed are retired; unrelated catalog rows remain.
-DELETE FROM companies WHERE id IN (
-    'NYSE:PINS',
-    'NYSE:DELL',
-    'TSE:6702',
-    'NYSE:ORCL',
-    'NYSE:HPE',
-    'NASDAQ:QCOM',
-    'NASDAQ:CSCO',
-    'NYSE:IBM',
-    'NASDAQ:TSLA',
-    'NASDAQ:SMCI',
-    'NASDAQ:CRWV',
-    'KRX:005380',
-    'KRX:000270',
-    'KRX:373220',
-    'KRX:066570',
-    'KRX:006400',
-    'KRX:005490',
-    'NYSE:GM',
-    'NYSE:UBER',
-    'NASDAQ:CRWD',
-    'NASDAQ:PANW',
-    'NYSE:CRM',
-    'NYSE:NOW',
-    'NASDAQ:PLTR',
-    'NYSE:SNOW',
-    'NASDAQ:SNPS',
-    'NASDAQ:CDNS',
-    'NASDAQ:NTAP',
-    'NASDAQ:NBIS',
-    'NYSE:VRT',
-    'NASDAQ:ADBE',
-    'NYSE:NET',
-    'TSE:9984',
-    'KRX:009830',
-    'KRX:047050',
-    'KRX:028260',
-    'KRX:009150',
-    'KRX:030200',
-    'KRX:032640',
-    'KRX:011070'
-);
-
+-- Seed the 24 confirmed companies without deleting historical catalog rows.
+-- Existing document analyses may reference other company IDs.
 INSERT INTO companies (id, name, ticker, exchange_code, aliases, brand_color) VALUES
     ('ORG:OPENAI', 'OpenAI', NULL, NULL, ARRAY[]::text[], NULL),
     ('ORG:ANTHROPIC', 'Anthropic', NULL, NULL, ARRAY[]::text[], NULL),

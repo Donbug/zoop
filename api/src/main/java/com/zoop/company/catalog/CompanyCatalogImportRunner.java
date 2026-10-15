@@ -30,7 +30,7 @@ public class CompanyCatalogImportRunner implements ApplicationRunner {
             throw new IllegalArgumentException("Set --zoop.catalog.import-file to a company catalog JSON file");
         }
         var result = importer.importFile(Path.of(file));
-        log.info("Company catalog import completed: total={}, changed={}, unchanged={}, deleted={}",
-                result.total(), result.changed(), result.unchanged(), result.deleted());
+        log.info("Company catalog import completed: total={}, changed={}, unchanged={}",
+                result.total(), result.changed(), result.unchanged());
     }
 }

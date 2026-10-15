@@ -103,7 +103,7 @@ class CompanyPostgresIntegrationTest {
     }
 
     @Test
-    void confirmedCatalogImportsTwentyFourCompaniesAndRetiresOldSeedIds() throws Exception {
+    void confirmedCatalogImportsTwentyFourCompaniesAndPreservesOtherRows() throws Exception {
         var importer = context.getBean(CompanyCatalogImportService.class);
         Path file = Path.of(getClass().getResource("/company/demo-companies.json").toURI());
         jdbc.update("INSERT INTO companies (id, name) VALUES ('NYSE:PINS', 'Old seed company')");
@@ -113,11 +113,10 @@ class CompanyPostgresIntegrationTest {
         assertEquals(24, imported.total());
         assertEquals(24, imported.changed());
         assertEquals(0, imported.unchanged());
-        assertEquals(1, imported.deleted());
-        assertEquals(24, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id LIKE 'KRX:%' "
+        assertEquals(25, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id LIKE 'KRX:%' "
                 + "OR id LIKE 'NASDAQ:%' OR id LIKE 'NYSE:%' OR id LIKE 'TSE:%' "
                 + "OR id LIKE 'ORG:%'", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='NYSE:PINS'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='NYSE:PINS'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='special'", Integer.class));
         assertEquals("005930", jdbc.queryForObject(
                 "SELECT ticker FROM companies WHERE id='KRX:005930'", String.class));
@@ -136,7 +135,6 @@ class CompanyPostgresIntegrationTest {
         var repeated = importer.importFile(file);
         assertEquals(0, repeated.changed());
         assertEquals(24, repeated.unchanged());
-        assertEquals(0, repeated.deleted());
         assertEquals(after, repository.catalogRevision());
     }
 

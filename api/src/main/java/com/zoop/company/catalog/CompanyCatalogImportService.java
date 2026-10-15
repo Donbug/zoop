@@ -34,16 +34,9 @@ public class CompanyCatalogImportService {
 
     @Transactional
     public ImportResult importFile(Path path) {
-        CatalogSeed catalog = read(path);
-        List<CompanySeed> companies = catalog.companies();
+        List<CompanySeed> companies = read(path);
         // Keep the comparison and writes in one transaction, without racing another catalog writer.
         jdbc.execute("LOCK TABLE companies IN SHARE ROW EXCLUSIVE MODE");
-        int deleted = 0;
-        for (String id : catalog.retiredIds()) {
-            if (jdbc.queryForObject("SELECT count(*) FROM companies WHERE id = ?", Integer.class, id) == 1) {
-                deleted += jdbc.update("DELETE FROM companies WHERE id = ?", id);
-            }
-        }
         int changed = 0;
         for (CompanySeed company : companies) {
             List<CompanySeed> existing = jdbc.query("""
@@ -76,14 +69,14 @@ public class CompanyCatalogImportService {
             });
             changed++;
         }
-        return new ImportResult(companies.size(), changed, companies.size() - changed, deleted);
+        return new ImportResult(companies.size(), changed, companies.size() - changed);
     }
 
     private static List<String> sqlAliases(Array value) throws SQLException {
         return List.of((String[]) value.getArray());
     }
 
-    private CatalogSeed read(Path path) {
+    private List<CompanySeed> read(Path path) {
         final JsonNode root;
         try {
             root = mapper.readTree(Files.readString(path));
@@ -132,26 +125,7 @@ public class CompanyCatalogImportService {
             }
             companies.add(new CompanySeed(id, name, ticker, exchangeCode, List.copyOf(aliases), brandColor));
         }
-        JsonNode retiredNode = root.get("retired_company_ids");
-        List<String> retiredIds = new ArrayList<>();
-        if (retiredNode != null) {
-            if (!retiredNode.isArray()) {
-                throw new IllegalArgumentException("retired_company_ids must be an array");
-            }
-            Set<String> retired = new HashSet<>();
-            for (JsonNode retiredId : retiredNode) {
-                if (!retiredId.isTextual() || retiredId.textValue().isBlank()
-                        || !Objects.equals(retiredId.textValue(), retiredId.textValue().strip())) {
-                    throw new IllegalArgumentException("retired_company_ids must contain trimmed IDs");
-                }
-                String id = retiredId.textValue();
-                if (!retired.add(id) || ids.contains(id)) {
-                    throw new IllegalArgumentException("Duplicate or active retired company_id: " + id);
-                }
-                retiredIds.add(id);
-            }
-        }
-        return new CatalogSeed(List.copyOf(companies), List.copyOf(retiredIds));
+        return List.copyOf(companies);
     }
 
     private static String requiredText(JsonNode item, String field) {
@@ -178,9 +152,6 @@ public class CompanyCatalogImportService {
                                List<String> aliases, String brandColor) {
     }
 
-    private record CatalogSeed(List<CompanySeed> companies, List<String> retiredIds) {
-    }
-
-    public record ImportResult(int total, int changed, int unchanged, int deleted) {
+    public record ImportResult(int total, int changed, int unchanged) {
     }
 }
