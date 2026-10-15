@@ -311,6 +311,70 @@ $PY ai/evaluation/scripts/graph_tool_bench.py cleanup --manifest /tmp/zoop-gtb.m
 - 정확성 340/340은 같은 작성자가 쓴 합성 world·gold(기업 4곳)에서 도구가 문서화된 focus 규칙대로 동작함을 보인 것이지 일반 정확도가 아니다. 단일 머신·단일 컨테이너·한 번의 실행이라 실행 간 변동과 환경 차이는 보지 않았다.
 - run·score·report 파일은 저장소에 복사하지 않았다(Main이 임시 경로에 보관). 필요하면 위 명령으로 같은 형식을 다시 만든다.
 
+## 한국어 금융 semantic-verification 벤치마크 (오프라인, 하네스 정합성 단계)
+
+**무엇인가.** 네이티브 Jev 검증 stage(S1 `semantic-verification`)가 후보 claim에 내린 판정을, 사람이 문서 본문만 보고 따로 쓴 gold와 결정적으로 비교한다. 두 가지를 분리해서 말한다.
+
+- **하네스 정합성(지금 증명된 것).** 직접 쓴 한국어 합성 입력 → 실제 설치된 `zoop-ai` CLI → loopback 가짜 native 서버 → 원문 receipt → export → 엄격한 채점이 끝까지 이어지고, 변조·누락·출처 불일치·비용 불명 대 0을 거부한다는 것.
+- **실제 한국어 품질(아직 0건).** 어떤 모델·Jev의 한국어 금융 판정 품질도 측정하지 않았다. loopback 서버의 답은 **저작된 script**(gold에 명시한 오답·실패를 섞은 control)이지 모델이 아니다. 따라서 이 절의 어떤 숫자도 모델 정확도로 인용하지 않는다.
+
+```bash
+cd ai/evaluation
+python3 -B -m zoop_eval verify-validate                                   # cases·gold 무결성, gold 구성 요약
+python3 -B -m zoop_eval verify-controls --out-dir fixtures/verification/controls   # authored control + loopback script 재생성
+python3 -B -m zoop_eval verify-score fixtures/verification/controls/loopback-expected-dev.run.json --format text
+python3 -B -m unittest discover -s tests -p 'test_verification.py'
+# 저장소 루트, 설치된 worker 필요(make worker-install)
+ai/worker/.venv/bin/python ai/worker/scripts/verification_bench.py smoke           # 실제 CLI + loopback + export + 엄격 채점 + 음성 control
+ai/worker/.venv/bin/python ai/worker/scripts/verification_bench.py run --out /tmp/zoop-vk.run.json
+python3 -B -m zoop_eval verify-score /tmp/zoop-vk.run.json --format text
+ai/worker/.venv/bin/python -m pytest ai/worker/tests/test_verification_bench.py
+```
+
+### 구성과 경계
+
+| 경로 | 역할 |
+|---|---|
+| `ai/evaluation/corpus/fin-verify-ko-v1/cases.json` | **producer가 볼 수 있는** 입력(`zoop-verify-cases-1`): 허구 기업 7곳의 한국어 문장 7개, 후보 case 28개(claim 55개, 인용 구간은 code point 오프셋). gold 키가 하나라도 있으면 거부한다(`gold_leak`) |
+| `ai/evaluation/corpus/fin-verify-ko-v1/gold.json` | **숨기는** 정답(`zoop-verify-gold-1`): claim별 `supported`/`contradicted`/`insufficient`, 태그, 근거 메모, case별 `expectedGate`·`expectedAdvice`·`expectedCausality`. `inputsSha256`로 정확한 cases.json에 묶인다 |
+| `ai/evaluation/zoop_eval/verification.py` | 검증·run 파싱·채점·authored control·loopback script(표준 라이브러리) |
+| `ai/evaluation/fixtures/verification/controls/` | `oracle`, `degraded_all_supported`, `injected_errors`, `loopback_script_expected` run 4개와 `loopback-script.json`. 생성기와의 일치를 시험이 검사한다 |
+| `ai/worker/scripts/verification_bench.py` | worker 쪽 다리: `build-jobs`, `run`, `export`, `smoke`. **producer 단계는 gold를 열지 않는다**: `cases.json`과 script만 읽고, 시험은 gold 없는 디렉터리에서도 동작함과 job 생성·가짜 서버 구성 중 `gold.json` open 시도가 0건임(audit hook)을 확인한다. smoke는 gold 없는 private 복사본으로 producer(CLI 실행·export)를 끝낸 **뒤에만** gold를 열어 채점한다 |
+
+gold 작성: 문서 본문만 보고 한 사람이 썼고 어떤 모델 출력에서도 가져오지 않았다. `annotators=1`, `adjudicated=false`, `devOnly=true`다. 도출 숫자(예: 1,050/12,400=8.47%)는 gold 메모에 계산을 적었다. 제한(limitation) claim, 원인·예측 표현, 도출 숫자는 라벨 논쟁 여지가 있다. 구성은 gate `supported` 8·`hold` 5·`reject` 15, claim 35·10·10(supported·contradicted·insufficient)이며 부정·시점·주체 불일치, 숫자·방향 변조, 원인 과장(2), 금지된 조언·예측(3), 제한 claim(4)을 포함한다. test split은 없다.
+
+### run 계약 (`zoop-verify-run-1`)
+
+- 한 run은 한 corpus id·revision·`inputsSha256`·split(dev)에 묶인다. 모든 case에 기록이 **정확히 하나**여야 한다: 누락(`missing_record`), 중복(`duplicate_record`), 모르는 case(`unknown_case`)는 점수 없이 거부한다. 기록은 `caseSha256`(case 내용)과 `claimBinding`(claim id와 `claim-{i}` 질문 키)으로 정확히 묶이고 어긋나면 거부한다.
+- 기록은 `ok` 또는 `error`다. `ok`는 정규화 결과(`result`: gate, claim별 decision, 두 flag), **원문 receipt**(`raw`), 호출 정보(`call`: 시도 id, 모델, endpoint revision, prompt/policy 버전, 토큰, 비용 `{usd, source}`), `latencyMs`를 낸다. 채점기는 선언된 `system.policy`로 `raw`에서 결과를 **다시 계산**해 worker가 쓴 정규화 결과와 다르면 `normalization_mismatch`, `raw`가 유효한 native 응답이 아니면 `raw_receipt_invalid`로 거부한다. `error`는 코드와 결과 확정 여부(`definite`/`unknown`)를 내고, native 검증 오류(`native_*`)는 receipt가 있고 그 receipt가 실제로 그 코드로 실패해야 한다(`error_not_reproducible`).
+- 한 run은 모델·endpoint revision·prompt/policy 버전이 하나다(`mixed_versions`). 모델은 고정 버전이어야 하고 `latest`·`preview` 별칭은 거부한다(`model_not_pinned`). 토큰은 receipt의 `usage`와 같아야 하고 보고되지 않았으면 `null`이다(`usage_mismatch`).
+- **비용: 불명은 0이 아니다.** `usd=null ⇔ source=unknown`. `0`은 `loopback_no_charge`(loopback control 한정, 가짜 서버가 청구하지 않았다는 뜻일 뿐 Jev 단가가 아님)로만, 실제 값은 `provider_reported`(real_measured 한정)로만 쓸 수 있다(`cost_unproven`). Jev는 비용을 보고하지 않으며 추정하지 않는다.
+- **출처(provenance).** `real_measured`는 `executionMode=live`와 실제 provider endpoint, 기록 시각, raw receipt가 필요하고 `replay`는 받지 않는다(replay는 raw native receipt를 거치지 않는다). 승인 전에는 만들지 않는다. `authored_control`은 `controlKind`(`oracle`, `degraded_all_supported`, `injected_errors`, `loopback_script_expected`, `loopback_fake_native_server`)를 밝히고 `recordedAt=null`이다. 어느 쪽이든 endpoint 종류가 출처와 맞아야 한다(`provenance_invalid`). 채점 문서는 control에 `AUTHORED CONTROL … NOT a measurement` 라벨을 붙인다.
+
+### 지표 (`zoop-verify-score-1`)
+
+모든 비율은 `{num, den, value}`이고 분모 0이면 `value=null`이다. gold 쪽 분모(정확도, recall, 오류율)는 모든 case·claim을 포함하며 오류 case는 분자에 0을 낸다. precision은 `ok` 기록이 실제로 낸 것만 센다.
+
+| 구역 | 내용 |
+|---|---|
+| `claims` | 3×3 confusion(오류 case의 claim은 `unscored`), 클래스별 precision·recall·F1, macro-F1(정의된 클래스 수 표기), `accuracy`, **`unsafeSupported`**(gold가 supported가 아닌 claim 중 `supported`로 받은 비율), 태그별(`negation`, `time`, `entity`, `numeric`, `numeric-derived`, `causal`, `advice`, `limitation`, …) 정확도·unsafeSupported |
+| `gate` | gold gate 대 예측(`supported`/`hold`/`reject`/`error`) confusion. **`unsafeAccept`**(gold가 hold·reject인 case를 accept한 비율)와 **`coverage`**(`safeCasesAccepted`: gold supported 중 accept, `acceptedPrecision`)를 함께 읽는다. 모두 accept하는 control은 coverage 8/8이지만 unsafeAccept 20/20이다. `outcomes`의 accept·hold·reject·error 비율, reject/hold의 precision·recall, `heldInsteadOfRejected`(약한 모순이 hold로 내려간 것), `rejectedInsteadOfHeld`, `falseReject`, `falseHold` |
+| `flags` | 금지된 조언·미근거 인과 flag의 precision·recall·오탐, 불확실 Noul 때문에 놓친 양성 수, 오류 case의 미채점 양성 수 |
+| `errors` | 오류율, 코드별 개수, 결과 불명 대 확정 수. **오류는 hold도 reject도 accept도 아니다**: 모든 gold 분모에 남고 분자에 0이다 |
+| `calibration` | `real_measured` live provider 기록의 유효한 원문 선택 분포에만 계산한다(Brier, log loss, ECE, 구간별 표). authored·loopback은 `not_evaluated`이며 이유를 쓴다. 합성 단일 작성자 dev gold로 임계치를 보정하지 않는다: 결과에 "임계치 보정이 아님" 주의를 항상 붙이고 임계치를 제안하지 않는다 |
+| `timing`, `cost` | 기존 `timing` 모듈 재사용(wall = record 자신의 구간, 합산 안 함, 표본 부족 주의). loopback은 `loopback_fake_server_time_not_model_latency`, 비용은 known/unknown/total |
+
+### 처음 확인한 것, 확인하지 않은 것
+
+- Main 실행(2026-10-15): evaluation 전체 198개, worker benchmark 38개 테스트와 corpus 28건·claim 55건 검증이 통과했다. 실제 설치 CLI → loopback 합성 Jev 서버 → 영수증 export → 채점 smoke도 통과했다. 생산 단계의 gold 미열람, 채점 시 입력 digest 일치, 의도적으로 넣은 잘못된 통과·오류의 검출, 누락·중복·모델 별칭·변조·출처 위조·비용/usage 불일치 거절을 확인했다. 합성 확률에는 calibration을 계산하지 않았다. 초기 소스 문자열 검사 실패는 문자열 재고정 대신 실제 파일 접근·gold 없는 입력 디렉터리·생산 완료 후 gold 로딩으로 교체했다. 실제 모델 호출은 없으며 이 결과는 모델 정확도가 아니다.
+- smoke는 case당 실제 CLI submit·run·get 서브프로세스를 쓰는 28개 job의 loopback 실행, 가짜 서버 요청 기록(case당 정확히 한 번의 `POST /systemone`, loopback key만, `TypeSafe-*` 헤더 없음), export가 script의 기대 결과(`loopback_script_expected`)와 같은 claim·gate·flag·오류 구역을 내는지, 그리고 음성 control(누락·중복·변조·출처·비용·버전·usage 불일치)의 거부를 확인한다.
+- 측정하지 않은 것: 실제 모델·Jev의 한국어 판정 품질, 실제 계정의 확률 분포와 보정, 지연·비용, 임계치(0.90/0.80/0.90/0.10)의 타당성, 더 큰 corpus·test split, 두 사람 합의 gold. 임계치 결정은 이 작업의 범위가 아니다([런타임 설정 §9 4번](../development/ai-runtime-setup.md)).
+- 승인 경계는 아래와 같다: 실제 Jev·모델 호출, 키 사용, 비용 지출, 한국어 실제 기사 사용은 별도 승인이다. 새 chat·RAG·유료 backend는 만들지 않았다.
+
+### WBS 대응 (원문 행만 인용, 상태·일정을 새로 정하지 않음)
+
+이 벤치마크는 독립 WBS 행이 없다. 가장 가까운 원문 행: **6.5.7** AI 분석 연동(FS064, P1), **6.6.18** FS079 검증 시험(원문 `6.6.15–6.6.18`은 FS076–FS079), **6.11.4–6.11.6** 통합 검증. 이슈 대응은 [`docs/share/seojin-issue-triage-2026-10-14.md`](../share/seojin-issue-triage-2026-10-14.md)의 표기(#58, #77)를 따르며 GitHub에서 다시 확인하지 않았다. 일정·담당은 바꾸지 않는다. 비기능 명세(문서·시점·인용 검증 실패를 검증된 것처럼 보이지 않는다)의 시험 방법인 "다른 시점의 문서·원문에 없는 인용"에 가장 가까운 합성 대응이 이 corpus의 시점 불일치(`VK-08`, `VK-22`)·부정(`VK-12`, `VK-15`) case이며, 실제 기사·실제 provider에 대한 검증은 아니다.
+
 ## 승인 경계와 WBS
 
 다음은 사용자 승인 없이 하지 않는다: 실제 모델 호출·과금(공급자, 모델, 비용 상한, 데이터 전송 권리를 먼저 정함), 외부 서비스·경쟁 서비스 질의, Neo4j 등 그래프 DB 설치·기동, 새 의존성 설치, test split 사용·결과 공개, `ai-system.md`·루트 `Makefile`·CI 연결, 결과의 대외 공개. 승인 전에는 `provenance.kind=real_measured`인 run 파일을 만들지 않는다.
@@ -322,7 +386,7 @@ WBS는 변경하지 않았고 이 벤치마크는 독립 WBS 행·일정이 없�
 - 실제 검색기·채팅이 없고 그래프 DB는 비공개 version stage(`zoop-ai-graph`)뿐이라 어떤 시스템의 점수도 없다. control은 채점기 점검이다.
 - gold는 단일 작성자 초안이며 합의를 거치지 않았다. 규모가 작아(split당 질문 9, 그래프 task 5, edge 13) 비율이 거칠다. 통계적 유의성 검정은 하지 않는다.
 - 자유 서술 품질, 인용의 의미적 뒷받침, 사실별 인용 귀속, 사용자 체감 품질은 측정하지 않는다.
-- 한국어 기사 corpus가 아니라 영어 합성 문장이다. 한국어 개체·날짜 표현의 난점은 이 corpus가 검증하지 않는다.
+- 기존 그래프/QA corpus는 영어 합성 문장이다. 별도 `fin-verify-ko-v1`은 한국어 금융 합성 사례지만 단일 작성자·미합의 dev 자료이며, 실제 한국어 기사나 모델 품질을 검증한 것은 아니다.
 - trace의 시계(단조 시계)와 span 의미는 adapter가 보장해야 한다. 하네스는 일관성만 검사하고 측정이 정확한지는 알 수 없다.
 - replay 기록의 지연은 하네스 시간이며 모델·서비스 지연이 아니다.
 - 이 하네스(`zoop_eval`, `score`, `measure`)는 `ai/evaluation`에서만 동작하며 BFF·S1·S2·S3 코드를 import하지 않는다. 예외는 그래프 도구 baseline의 `prepare`·`cleanup`뿐이며, 파이프라인 인터프리터에서 `ai/pipeline/scripts`의 손으로 쓴 world 빌더를 import한다.

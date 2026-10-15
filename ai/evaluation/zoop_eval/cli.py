@@ -1,4 +1,5 @@
-"""Command line: validate | controls | score | compare. JSON on stdout (exit 0 ok, 2 rejected), text with --format text."""
+"""Command line: validate | controls | score | compare, and verify-validate | verify-controls | verify-score for the
+semantic-verification benchmark. JSON on stdout (exit 0 ok, 2 rejected), text with --format text."""
 from __future__ import annotations
 
 import argparse
@@ -14,6 +15,9 @@ from .controls import write_controls
 from .report import render_compare, render_score
 from .run import parse_run
 from .scoring import score_run
+from .verification import (
+    DEFAULT_VERIFY_CORPUS, describe, load_verify_corpus, parse_verify_run, render_verify_score, score_verify_run, write_verify_controls,
+)
 
 
 def _emit(document: dict[str, Any], fmt: str, renderer, out: Path | None) -> None:
@@ -65,9 +69,27 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("run", help="run file (zoop-bench-run-1)")
         if name == "compare":
             p.add_argument("runs", nargs="+", help="two or more run files")
+    for name in ("verify-validate", "verify-controls", "verify-score"):
+        p = sub.add_parser(name)
+        p.add_argument("--corpus", type=Path, default=DEFAULT_VERIFY_CORPUS, help="verification corpus directory (cases.json, gold.json)")
+        if name == "verify-controls":
+            p.add_argument("--out-dir", type=Path, required=True)
+        if name == "verify-score":
+            p.add_argument("--format", choices=("json", "text"), default="json")
+            p.add_argument("--out", type=Path, help="also write the JSON document here")
+            p.add_argument("run", help="run file (zoop-verify-run-1)")
     args = parser.parse_args(argv)
     try:
-        if args.command == "validate":
+        if args.command == "verify-validate":
+            print(json.dumps(describe(load_verify_corpus(args.corpus)), indent=1, ensure_ascii=False))
+        elif args.command == "verify-controls":
+            written = write_verify_controls(load_verify_corpus(args.corpus), args.out_dir)
+            print(json.dumps({"ok": True, "written": [str(p) for p in written],
+                              "note": "authored controls and a loopback script: harness sanity inputs, never measurements of a model"}, indent=1))
+        elif args.command == "verify-score":
+            corpus = load_verify_corpus(args.corpus)
+            _emit(score_verify_run(corpus, parse_verify_run(read_json(Path(args.run)), corpus)), args.format, render_verify_score, args.out)
+        elif args.command == "validate":
             print(json.dumps(_validate(args), indent=1, ensure_ascii=False))
         elif args.command == "controls":
             bench = load_bench(args.corpus)
