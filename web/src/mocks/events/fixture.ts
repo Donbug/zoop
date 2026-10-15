@@ -1,4 +1,8 @@
 import { companies, directEdges, issues } from '@/mocks/graph/fixture';
+import {
+  evidenceIdsForIssue,
+  mockEvidenceRecords,
+} from '@/mocks/evidence/fixture';
 import type { EventContext, EventDetail } from '@/types/map/event';
 
 export type EventMockScenario =
@@ -34,9 +38,7 @@ export function createMockEvent(
       ? []
       : directEdges.filter((edge) => edge.source === id);
   const evidenceIds =
-    scenario === 'no-evidence'
-      ? []
-      : [`mock-evidence-${issues.indexOf(issue) + 1}`];
+    scenario === 'no-evidence' ? [] : evidenceIdsForIssue(issue.id);
   const articleId = `mock-article-${id}`;
   const event: EventDetail = {
     id,
@@ -62,6 +64,14 @@ export function createMockEvent(
         url: null,
         publishedAt: '2026-10-06T00:00:00Z',
         relationType: 'REPORTS',
+      },
+      {
+        id: `${articleId}-detail`,
+        title: `[가상 공시] ${issue.label} 참고 자료`,
+        publisher: '줍 가상 공시 저장소',
+        url: null,
+        publishedAt: null,
+        relationType: 'PROVIDES_BACKGROUND',
       },
     ],
     evidenceIds,
@@ -89,9 +99,9 @@ export function createMockEvent(
       evidenceIds,
     })),
     sourceSupport: {
-      articleCount: 1,
+      articleCount: 2,
       knownLineageCount: null,
-      unknownLineageArticles: [articleId],
+      unknownLineageArticles: [articleId, `${articleId}-detail`],
       independentSourceCount: null,
       duplicateGroups: [],
     },
@@ -123,15 +133,4 @@ export function createMockEvent(
 }
 
 // Shared evidence IDs point to versioned article text, just as in ERD v6.
-export const mockEventEvidence = issues.map((issue, index) => {
-  const quote = `${issue.label}에 관한 합성 자료입니다.`;
-  return {
-    id: `mock-evidence-${index + 1}`,
-    articleId: `mock-article-${issue.id}`,
-    articleVersion: 'mock-article-v1',
-    quote,
-    start: 0,
-    end: [...quote].length,
-    eventIds: [issue.id],
-  };
-});
+export const mockEventEvidence = mockEvidenceRecords;
