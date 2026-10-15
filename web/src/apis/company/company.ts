@@ -19,6 +19,18 @@ export async function readCompanyResource<T>(
     skipAuth: !url.startsWith('/api/v1/portfolio'),
   });
   const requested = new URL(url, 'http://localhost');
+  const companyId = /^\/api\/v1\/companies\/([^/]+)$/.exec(
+    requested.pathname,
+  )?.[1];
+  if (
+    companyId &&
+    (first as { id?: unknown }).id !== decodeURIComponent(companyId)
+  )
+    throw new ApiError(
+      502,
+      'INVALID_RESPONSE',
+      '요청한 기업과 다른 자료를 받았어요.',
+    );
   const payload = first as { metadata?: { graphVersion?: string | null } };
   const expectedVersion = requested.searchParams.get('graphVersion');
   if (expectedVersion && payload.metadata?.graphVersion !== expectedVersion)
