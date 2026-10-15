@@ -155,6 +155,21 @@ describe('A-ADM-05c 관리자 로그인 (FS073)', () => {
     expect(screen.getByText('운영 관리자')).toBeTruthy();
   });
 
+  test('회원 로그인 중에도 관리자 로그인에 회원 CSRF를 보내지 않는다', async () => {
+    useAuthStore.getState().setSession(memberSession);
+    server.on('POST', LOGIN, () => json(signedIn()));
+    const { user } = openAdmin('/admin/login');
+    await screen.findByRole('heading', { name: '줍 관리자' });
+    await submit(user, 'admin@zoop.test', 'secret-pass');
+    await screen.findByTestId('destination');
+
+    const [, init] = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).endsWith(LOGIN))!;
+    expect(new Headers(init?.headers).get('X-CSRF-Token')).toBeNull();
+    expect(useAuthStore.getState().member?.id).toBe('mem-1');
+  });
+
   test('보호된 관리자 화면에서 왔으면 로그인 후 그 화면으로 돌아간다', async () => {
     server.on('POST', LOGIN, () => json(signedIn()));
     const { user } = openAdmin('/admin/members');

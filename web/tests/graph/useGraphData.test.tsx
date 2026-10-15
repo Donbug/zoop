@@ -75,3 +75,31 @@ describe('D-GRP-01/01b async states', () => {
     expect(result.current.data).toBeNull();
   });
 });
+
+it('D-COM-01 hides a previous historical graph immediately after changing the snapshot', async () => {
+  const oldRequest: GraphRequest = {
+    ...all,
+    companyId: 'fixture-company',
+    asOf: '2026-10-01T00:00:00Z',
+    graphVersion: 'fixture-v1',
+    depth: 1,
+  };
+  let resolveNext!: (value: GraphResponse) => void;
+  mocked.mockResolvedValueOnce(createMockGraph(all));
+  mocked.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveNext = resolve;
+      }),
+  );
+  const { result, rerender } = renderHook(
+    ({ request }) => useGraphData(request, null, 0),
+    { initialProps: { request: oldRequest } },
+  );
+  await waitFor(() => expect(result.current.data).not.toBeNull());
+  rerender({ request: { ...oldRequest, asOf: '2026-10-02T00:00:00Z' } });
+  expect(result.current.data).toBeNull();
+  await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
+  await act(async () => resolveNext(createMockGraph(all)));
+  expect(result.current.data).not.toBeNull();
+});

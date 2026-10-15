@@ -9,7 +9,7 @@ export default function AppLayout() {
         <ServiceHeader navLabel="데스크톱 주 메뉴" />
       </div>
 
-      <main className="service-page-main">
+      <main className="service-page-main has-[>.company-workspace]:w-full! has-[>.company-workspace]:max-w-[1320px] has-[>.company-workspace]:pt-6!">
         <Outlet />
       </main>
 

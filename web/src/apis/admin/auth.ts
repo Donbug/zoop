@@ -11,12 +11,14 @@ const ADMIN_AUTH = '/api/v1/admin/auth';
 export function getAdminSession() {
   return call<AdminSession>(`${ADMIN_AUTH}/session`, 'GET', undefined, {
     skipAuth: true,
+    skipMemberCsrf: true,
   });
 }
 
 export function logInAdmin(request: AdminLoginRequest) {
   return call<AdminSession>(`${ADMIN_AUTH}/login`, 'POST', request, {
     skipAuth: true,
+    skipMemberCsrf: true,
   });
 }
 
@@ -35,6 +37,7 @@ export async function adminCall<TResponse = unknown>(
   try {
     return await call<TResponse>(api, method, request, {
       skipAuth: true,
+      skipMemberCsrf: true,
       headers:
         csrfToken && method.toUpperCase() !== 'GET'
           ? { 'X-CSRF-Token': csrfToken }

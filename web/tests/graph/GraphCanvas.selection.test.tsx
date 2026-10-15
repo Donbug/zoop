@@ -52,6 +52,53 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('D-GRP-04 selects eligible edges via canvas/keyboard and never recreates the viewport', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelectEdge = vi.fn();
+    const shared = data.edges.find(
+      (edge) => edge.relationType === 'SHARES_ISSUE',
+    )!;
+    const involves = data.edges.find(
+      (edge) => edge.relationType === 'INVOLVES',
+    )!;
+    const { rerender } = render(
+      <GraphCanvas data={data} onSelectEdge={onSelectEdge} />,
+    );
+    await waitFor(() => expect(canvas.handlers.has('edge:click')).toBe(true));
+    await act(async () =>
+      canvas.handlers.get('edge:click')!({ target: { id: involves.id } }),
+    );
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    await act(async () =>
+      canvas.handlers.get('edge:click')!({ target: { id: shared.id } }),
+    );
+    expect(onSelectEdge).toHaveBeenCalledWith(shared.id);
+    rerender(
+      <GraphCanvas
+        data={data}
+        onSelectEdge={onSelectEdge}
+        selectedEdgeId={shared.id}
+      />,
+    );
+    await waitFor(() =>
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ [shared.id]: ['selected'] }),
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: /연결선: HBM3E 12단 경쟁 – HBM4 공급 계약/,
+      }),
+    );
+    expect(onSelectEdge).toHaveBeenLastCalledWith('mock-follows-1');
+    rerender(<GraphCanvas data={data} onSelectEdge={onSelectEdge} />);
+    await waitFor(() =>
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ [shared.id]: [] }),
+      ),
+    );
+    expect(canvas.created).toHaveBeenCalledOnce();
+  });
   it('keeps the graph instance across selection/close and clears visual selection', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();

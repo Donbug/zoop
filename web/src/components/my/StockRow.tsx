@@ -14,7 +14,7 @@ export default function StockRow({
   return (
     <li className="flex items-center gap-2 py-3">
       <Link
-        to={`/?mode=personal&select=company&id=${encoded}`}
+        to={`/?mode=personal&select=node:${encoded}`}
         aria-label={`${name}, 지도에서 보기`}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-lg hover:bg-gray-50"
       >

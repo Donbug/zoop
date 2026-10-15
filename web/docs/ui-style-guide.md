@@ -1,0 +1,49 @@
+# Shared detail panel styles
+
+Read before editing frontend UI. Baseline: D-GRP-03 company side panel, Figma 619:6729. Applies to D-GRP-02 event, D-GRP-04 relation, D-GRP-05 evidence. Wireframes remain the navigation reference; this guide unifies the visual primitives, not the data semantics.
+
+## Import and reuse
+
+```tsx
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+
+<aside className={ui.shell}>
+  <header className={ui.header}>
+    <h2 className={ui.title}>연결선 상세</h2>
+    <button className={ui.close} aria-label="상세 닫기">
+      ×
+    </button>
+  </header>
+  <div className={ui.scroll}>
+    <section className={ui.section}>
+      <h3>공유 사건</h3>
+    </section>
+  </div>
+</aside>;
+```
+
+`shell`, `wideShell`, `header`, `title`, `close`, `scroll`, `sectionFrame`, `section`, `muted`, `secondary`, `itemTitle`, `button`, `actions`, `textActions`, `state`, `footer`, `avatar`, `list`, `badge` are complete, statically discoverable Tailwind class recipes. `sectionFrame` supplies the shared padding/border for specialized content such as company charts; `section` also supplies text and headings. `wideShell` is reserved for the 400 px D-GRP-05 evidence dialog. Use `actions` for bordered button grids and `textActions` for Figma's borderless evidence/document actions. Keep native HTML semantics and accessible labels in the calling component. Do not concatenate dynamic Tailwind class fragments.
+
+## Tokens and proportions
+
+Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink`, `text-panel-muted`, `border-panel-line`, `border-panel-control`, `bg-panel-soft`, `rounded-panel` instead of repeating hex values.
+
+| Element               | Baseline                                |
+| --------------------- | --------------------------------------- |
+| Rail / section        | 320 px / 16 px padding; evidence 400 px |
+| Font                  | Pretendard Variable                     |
+| Heading               | 17 px / 25.5 px / bold                  |
+| Section / list title  | 13 px / 12 px                           |
+| Body label / action   | 11 px / 12 px                           |
+| Border / radius       | 1 px `#d6d6d2` / 4 px                   |
+| Close / action height | 32 px / 32 px                           |
+
+These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), including the 11 px body scale and 32 px controls. A future accessibility/responsive size change should update all panels together, not introduce one-off typography. Existing chart and graph geometry CSS stays local; new repeated UI styling belongs in these recipes. Avoid unlayered `font: inherit` or high-specificity rules overriding Tailwind utilities.
+
+## Behavior checklist
+
+- Heading focus on selection; visible keyboard focus; Escape closes; restore focus to the opener or map when it no longer exists.
+- Independent scroll area, stable graph instance/zoom, URL selection and Back navigation preserved.
+- Distinct loading, failure/retry, empty and permission states. Never fabricate missing evidence, dates or direct business relations.
+- Evidence dialog blocks background interaction and returns to the selected panel; shared actions pass actual IDs, graph version and map URL.
+- Verify D-GRP-02/03/04/05 after shared recipe changes. Tests are in `tests/graph` and `tests/evidence`.
