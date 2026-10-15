@@ -26,6 +26,25 @@ export type CompanyBrief = Pick<
   'id' | 'name' | 'ticker' | 'issueCount'
 >;
 
+/**
+ * GET /api/v1/companies/{id}/quote 중 종목 행에 쓰는 값(CompanyQuote | CompanyQuoteUnavailable).
+ * changeRate는 (price - previousClose) / previousClose 비율이다(0.0718 = +7.18%).
+ */
+export type CompanyQuoteSummary =
+  | {
+      status: 'available';
+      companyId: string;
+      quote: {
+        currency: string;
+        price: number;
+        changeRate: number | null;
+      };
+    }
+  | { status: 'unavailable'; companyId: string; reasonCode: string };
+
+/** D-STK-01 목록 범위: 시장 전체 또는 내 종목(보유·관심) */
+export type StockScope = 'all' | 'mine';
+
 /** 입력 중인 검색어(draft)와 마지막으로 실행한 검색어(query) */
 export type CompanySearchTerms = {
   draft: string;

@@ -97,7 +97,7 @@ describe('D-MY-01 / 01b 내 종목: 보유 종목과 계좌 연결', () => {
       within(list)
         .getByRole('link', { name: '삼성전자, 지도에서 보기' })
         .getAttribute('href'),
-    ).toBe('/?mode=personal&select=company&id=cmp-samsung');
+    ).toBe('/?mode=personal&select=node:cmp-samsung');
     expect(
       within(list)
         .getByRole('link', { name: '삼성전자 기업 상세' })
