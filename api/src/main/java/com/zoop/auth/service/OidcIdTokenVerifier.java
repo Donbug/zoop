@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 final class OidcIdTokenVerifier {
-    private static final long MAX_FUTURE_IAT_SECONDS = 60;
+    private static final long CLOCK_SKEW_SECONDS = 60;
+    private static final long MAX_FUTURE_IAT_SECONDS = CLOCK_SKEW_SECONDS;
     private final OidcJwksProvider jwks;
     private final Clock clock;
 
@@ -58,10 +59,13 @@ final class OidcIdTokenVerifier {
             long now = clock.instant().getEpochSecond();
             JsonNode expires = claims.get("exp");
             JsonNode issued = claims.get("iat");
+            JsonNode notBefore = claims.get("nbf");
             if (expires == null || !expires.isIntegralNumber() || expires.asLong() <= now
                     || issued == null || !issued.isIntegralNumber() || issued.asLong() > now + MAX_FUTURE_IAT_SECONDS
                     || Duration.between(java.time.Instant.ofEpochSecond(issued.asLong()), clock.instant())
-                            .compareTo(Duration.ofHours(24)) > 0) throw invalid();
+                            .compareTo(Duration.ofHours(24)) > 0
+                    || notBefore != null && (!notBefore.isIntegralNumber()
+                            || notBefore.asLong() > now + CLOCK_SKEW_SECONDS)) throw invalid();
 
             String subject = text(claims, "sub");
             String nonce = text(claims, "nonce");

@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HexFormat;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.zoop.auth.config.SocialAuthSettings;
@@ -88,13 +89,36 @@ class OidcIdTokenVerifierTest {
                 () -> verifier.verify("google", google, none, hash("nonce-value")));
     }
 
+    @Test
+    void validatesOptionalNotBeforeWithSixtySecondClockSkew() throws Exception {
+        String slightlyFuture = signedToken("https://accounts.google.com", "client-id", "nonce-value",
+                NOW.plusSeconds(300), mapper.getNodeFactory().numberNode(NOW.getEpochSecond() + 60));
+        verifier.verify("google", google, slightlyFuture, hash("nonce-value"));
+
+        String future = signedToken("https://accounts.google.com", "client-id", "nonce-value",
+                NOW.plusSeconds(300), mapper.getNodeFactory().numberNode(NOW.getEpochSecond() + 61));
+        assertThrows(InvalidSocialAuthException.class,
+                () -> verifier.verify("google", google, future, hash("nonce-value")));
+
+        String nonNumericDate = signedToken("https://accounts.google.com", "client-id", "nonce-value",
+                NOW.plusSeconds(300), mapper.getNodeFactory().textNode("2026-10-15T00:00:00Z"));
+        assertThrows(InvalidSocialAuthException.class,
+                () -> verifier.verify("google", google, nonNumericDate, hash("nonce-value")));
+    }
+
     private String signedToken(String issuer, String audience, String nonce, Instant expiry) throws Exception {
+        return signedToken(issuer, audience, nonce, expiry, null);
+    }
+
+    private String signedToken(String issuer, String audience, String nonce, Instant expiry, JsonNode notBefore)
+            throws Exception {
         var header = mapper.createObjectNode().put("alg", "RS256").put("kid", "test-key").put("typ", "JWT");
         var claims = mapper.createObjectNode()
                 .put("iss", issuer).put("aud", audience)
                 .put("sub", "stable-provider-subject")
                 .put("iat", NOW.getEpochSecond()).put("exp", expiry.getEpochSecond())
                 .put("nonce", nonce).put("email", "person@example.com").put("email_verified", true);
+        if (notBefore != null) claims.set("nbf", notBefore);
         String signingInput = base64(mapper.writeValueAsBytes(header)) + "."
                 + base64(mapper.writeValueAsBytes(claims));
         Signature signature = Signature.getInstance("SHA256withRSA");
