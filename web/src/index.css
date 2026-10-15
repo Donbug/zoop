@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
-/* #169 디자인 기준(service-shell.css :root)과 같은 값을 Tailwind 테마로 등록한다.
-   예: text-zoop-muted, border-zoop-line, bg-zoop-wash, font-inter */
+/* #169 서비스 셸과 D-GRP-02/03/04/05 상세 패널의 공용 토큰.
+   화면별 값 대신 Tailwind 유틸리티(text-zoop-muted, font-panel 등)로 사용한다. */
 @theme {
   --color-zoop-ink: #1a1a1a;
   --color-zoop-muted: #5f5f5b;
@@ -13,6 +13,15 @@
   --color-zoop-up: #d23c3c;
   --color-zoop-down: #2f6fd8;
   --font-inter: 'Inter Variable', 'Pretendard Variable', sans-serif;
+
+  --font-panel: 'Pretendard Variable', Pretendard, sans-serif;
+  --color-panel-ink: #1a1a1a;
+  --color-panel-secondary: #5f5f5b;
+  --color-panel-muted: #94948f;
+  --color-panel-line: #d6d6d2;
+  --color-panel-control: #d6d6d2;
+  --color-panel-soft: #f2f2f0;
+  --radius-panel: 4px;
 }
 
 /* 기본 규칙은 base 레이어에 둔다. 레이어 밖에 두면 Tailwind 유틸리티(text-xs 등)보다

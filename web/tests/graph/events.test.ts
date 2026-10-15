@@ -57,7 +57,7 @@ describe('D-GRP-02 · getEvent consumer / ERD v6 fixtures', () => {
         expect(event.articles.some((a) => a.id === evidence.articleId)).toBe(
           true,
         );
-        expect(evidence.end).toBe([...evidence.quote].length);
+        expect(evidence.end - evidence.start).toBe([...evidence.quote].length);
       }
     }
     expect(() => createMockEvent('missing')).toThrow();

@@ -4,11 +4,13 @@ import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
+import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
+import type { RelationDetail } from '@/types/map/relation';
 import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
-import '@/components/graph/event-panel.css';
+import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
@@ -54,6 +56,9 @@ export default function MapPage() {
   const appliedMode = data?.metadata.mode ?? 'all';
   const stats = data ? graphSummary(data) : null;
   const rawSelection = params.get('select');
+  const edgeId = rawSelection?.startsWith('edge:')
+    ? rawSelection.slice(5) || null
+    : null;
   const selectedId = rawSelection?.startsWith('node:')
     ? rawSelection.slice(5) || null
     : null;
@@ -67,30 +72,34 @@ export default function MapPage() {
   const mapRegion = useRef<HTMLElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const previousEvent = useRef<string | null>(null);
+  const selectedPanel = eventId ?? edgeId ?? companyNode?.id ?? null;
   useEffect(() => {
-    if (previousEvent.current && !eventId) {
+    if (previousEvent.current && !selectedPanel) {
       (opener.current?.isConnected
         ? opener.current
         : mapRegion.current
       )?.focus();
     }
-    previousEvent.current = eventId;
-  }, [eventId]);
+    previousEvent.current = selectedPanel;
+  }, [selectedPanel]);
   const relatedCompanies = useMemo(() => {
     if (!data || !companyNode) return [];
-    const issueIds = new Set(
-      data.edges
-        .filter((edge) => edge.target === companyNode.id && !edge.derived)
-        .map((edge) => edge.source),
-    );
     const counts = new Map<string, number>();
     data.edges.forEach((edge) => {
+      if (edge.relationType !== 'SHARES_ISSUE') return;
+      const otherId =
+        edge.source === companyNode.id
+          ? edge.target
+          : edge.target === companyNode.id
+            ? edge.source
+            : null;
       if (
-        !edge.derived &&
-        issueIds.has(edge.source) &&
-        edge.target !== companyNode.id
+        otherId &&
+        data.nodes.some(
+          (node) => node.id === otherId && node.kind === 'company',
+        )
       )
-        counts.set(edge.target, (counts.get(edge.target) ?? 0) + 1);
+        counts.set(otherId, new Set(edge.via).size);
     });
     return [...counts.entries()]
       .map(([id, sharedIssueCount]) => ({
@@ -120,10 +129,48 @@ export default function MapPage() {
       params.get('graphVersion') ?? data?.metadata.graphVersion ?? undefined,
     asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
   };
+  function selectEdge(id: string) {
+    if (
+      document.activeElement instanceof HTMLElement &&
+      mapRegion.current?.contains(document.activeElement)
+    )
+      opener.current = document.activeElement;
+    updateQuery({ select: `edge:${id}`, id: null });
+  }
+  function relationAction(
+    action: 'evidence' | 'ai',
+    relation: RelationDetail,
+    issueId?: string,
+  ) {
+    const issue = relation.via.find((item) => item.id === issueId);
+    const target: GraphTarget = {
+      kind: issue ? 'issue' : 'edge',
+      id: issue?.id ?? relation.id,
+      label:
+        issue?.title ?? `${relation.source.label} – ${relation.target.label}`,
+      evidenceIds: issue?.evidenceIds ?? relation.evidenceIds,
+      verifiedAt: issue
+        ? null
+        : (relation.basis
+            .map((basis) => basis.verifiedAt)
+            .filter((value): value is string => Boolean(value))
+            .sort()
+            .at(-1) ?? null),
+      mapContext: {
+        ...eventContext,
+        graphVersion: relation.metadata.graphVersion ?? undefined,
+        asOf: relation.metadata.asOf,
+        url: `/?${params}`,
+      },
+    };
+    if (action === 'evidence') useGraphUiStore.getState().openEvidence(target);
+    else openAi(target);
+  }
   function eventAction(action: EventAction, event: EventDetail) {
     const target: GraphTarget = {
       kind: 'issue',
       id: event.id,
+      label: event.title,
       evidenceIds: event.evidenceIds,
       mapContext: {
         ...eventContext,
@@ -172,13 +219,15 @@ export default function MapPage() {
           aria-label="관계 지도"
           className="relationship-view"
           data-screen-id={
-            eventId
-              ? 'D-GRP-02'
-              : companyNode
-                ? 'D-GRP-03'
-                : appliedMode === 'personal'
-                  ? 'D-GRP-01b'
-                  : 'D-GRP-01'
+            edgeId
+              ? 'D-GRP-04'
+              : eventId
+                ? 'D-GRP-02'
+                : companyNode
+                  ? 'D-GRP-03'
+                  : appliedMode === 'personal'
+                    ? 'D-GRP-01b'
+                    : 'D-GRP-01'
           }
         >
           <div className="relationship-toolbar">
@@ -288,13 +337,15 @@ export default function MapPage() {
             </div>
           </div>
           <div
-            className={`relationship-body${companyNode ? ' has-company-panel' : ''}`}
+            className={`relationship-body${selectedPanel ? ' has-company-panel' : ''}`}
             aria-busy={loading}
           >
             {data ? (
               <GraphCanvas
                 data={data}
                 selectedId={selectedId}
+                selectedEdgeId={edgeId}
+                onSelectEdge={selectEdge}
                 onSelect={selectNode}
                 focusId={params.get('focus')}
               />
@@ -323,6 +374,17 @@ export default function MapPage() {
                   updateQuery({ path: companyNode.id });
                   setNotice('connections');
                 }}
+                onSelectRelation={(companyId) => {
+                  const edge = data?.edges.find(
+                    (item) =>
+                      item.relationType === 'SHARES_ISSUE' &&
+                      ((item.source === companyNode.id &&
+                        item.target === companyId) ||
+                        (item.target === companyNode.id &&
+                          item.source === companyId)),
+                  );
+                  if (edge) selectEdge(edge.id);
+                }}
                 onAskAi={() => openAi({ kind: 'company', id: companyNode.id })}
               />
             )}
@@ -334,6 +396,16 @@ export default function MapPage() {
                 geography={selectedNode?.geography ?? null}
                 onClose={() => selectNode(null)}
                 onAction={eventAction}
+              />
+            )}
+            {edgeId && (
+              <RelationDetailPanel
+                key={edgeId}
+                id={edgeId}
+                context={eventContext}
+                onClose={() => selectNode(null)}
+                onSelectNode={selectNode}
+                onAction={relationAction}
               />
             )}
             {(loading ||
@@ -379,7 +451,7 @@ export default function MapPage() {
                   <p>
                     빈 영역 드래그로 이동 · 휠 또는 +/−로 확대 · 맞춤 버튼으로
                     전체 보기 · 기업 또는 사건 선택으로 상세 확인 · Tab으로 노드
-                    이동 · Enter로 선택 · Escape로 사건 상세 닫기.
+                    및 연결선 이동 · Enter로 선택 · Escape로 상세 닫기.
                   </p>
                 )}
                 {notice === 'connections' && (
@@ -408,6 +480,9 @@ export default function MapPage() {
             )}
           </div>
           <AiChatDrawer />
+          <EvidenceDrawer
+            onViewOnMap={(id) => updateQuery({ focus: id, hops: '1' })}
+          />
         </section>
       </main>
     </div>

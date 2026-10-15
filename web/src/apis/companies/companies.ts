@@ -30,7 +30,14 @@ export function searchCompanies(
     limit: String(SEARCH_LIMIT),
   });
   if (cursor) params.set('cursor', cursor);
-  return call<CompanyListResponse>(`${COMPANIES_API}?${params}`, 'GET');
+  return call<CompanyListResponse>(
+    `${COMPANIES_API}?${params}`,
+    'GET',
+    undefined,
+    {
+      skipAuth: true,
+    },
+  );
 }
 
 /**
@@ -64,6 +71,8 @@ export async function getCompanyBrief(id: string): Promise<CompanyBrief> {
   const detail = await call<CompanyDetailResponse>(
     `${COMPANIES_API}/${encodeURIComponent(id)}`,
     'GET',
+    undefined,
+    { skipAuth: true },
   );
   const issueIds = new Set(
     [...detail.directIssues, ...detail.structuralIssues].map(

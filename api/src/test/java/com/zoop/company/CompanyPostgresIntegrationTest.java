@@ -45,7 +45,9 @@ class CompanyPostgresIntegrationTest {
                 .web(WebApplicationType.NONE)
                 .run("--spring.datasource.url=" + url,
                         "--spring.datasource.username=company_test", "--spring.datasource.password=",
-                        "--spring.jpa.hibernate.ddl-auto=validate", "--zoop.ai.client.enabled=false");
+                        "--spring.jpa.hibernate.ddl-auto=validate", "--zoop.ai.client.enabled=false",
+                        "--ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
+                        "--ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         jdbc = context.getBean(JdbcTemplate.class);
         service = context.getBean(CompanySearchService.class);
         repository = context.getBean(CompanySearchRepository.class);

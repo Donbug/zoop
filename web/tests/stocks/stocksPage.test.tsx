@@ -286,6 +286,35 @@ describe('D-STK-01 관심 종목 (FS027)', () => {
     ).toBe('true');
   });
 
+  test('내 종목의 기업 정보 조회가 실패하면 빈 목록 대신 오류와 재시도를 제공한다', async () => {
+    useAuthStore.getState().setSession(member());
+    const server = createFakeServer();
+    myMember(server, { watchlistIds: [NVIDIA.id] });
+    quotes(server);
+    server.on('GET', COMPANIES, () => json(companyListBody([SAMSUNG])));
+    server.on('GET', '/api/v1/companies/:id', () =>
+      apiError(503, 'SOURCE_UNAVAILABLE'),
+    );
+    const { user } = openStocks('/stocks?scope=mine');
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '일부 종목 정보를 불러오지 못했어요',
+    );
+    expect(screen.queryByText('보유·관심 종목이 없어요.')).toBeNull();
+
+    server.on('GET', '/api/v1/companies/:id', () =>
+      json({
+        ...NVIDIA,
+        directIssues: [],
+        structuralIssues: [],
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    expect(await screen.findByText('NVIDIA')).toBeTruthy();
+    expect(server.calls('GET', '/api/v1/companies/:id')).toHaveLength(2);
+  });
+
   test('비회원은 [내 종목]에서 로그인 안내를 본다', async () => {
     const server = createFakeServer();
     myMember(server);

@@ -126,6 +126,7 @@ export default function StocksPage() {
   const [briefs, setBriefs] = useState<Record<string, CompanyBrief | 'error'>>(
     {},
   );
+  const [briefAttempt, setBriefAttempt] = useState(0);
   const requested = useRef(new Set<string>());
   const mineIds = [...new Set([...watchedIds, ...heldIds])];
   const mineKey = scope === 'mine' ? mineIds.join('\n') : '';
@@ -139,7 +140,7 @@ export default function StocksPage() {
         () => setBriefs((previous) => ({ ...previous, [id]: 'error' })),
       );
     }
-  }, [mineKey]);
+  }, [briefAttempt, mineKey]);
   const knownBrief = (id: string): CompanyBrief | null => {
     const fromSearch = allRows.find((row) => row.id === id);
     if (fromSearch) return toBrief(fromSearch);
@@ -153,6 +154,22 @@ export default function StocksPage() {
   const mineWaiting = mineIds.some(
     (id) => !knownBrief(id) && briefs[id] !== 'error',
   );
+  const mineFailed = mineIds.some(
+    (id) => !allRows.some((row) => row.id === id) && briefs[id] === 'error',
+  );
+
+  const retryMineBriefs = () => {
+    const failedIds = mineIds.filter((id) => briefs[id] === 'error');
+    requested.current = new Set(
+      [...requested.current].filter((id) => !failedIds.includes(id)),
+    );
+    setBriefs((previous) => {
+      const next = { ...previous };
+      for (const id of failedIds) delete next[id];
+      return next;
+    });
+    setBriefAttempt((attempt) => attempt + 1);
+  };
 
   const changeWatch = async (next: WatchChange) => {
     if (pending) return;
@@ -296,6 +313,14 @@ export default function StocksPage() {
           <ErrorNotice
             title="종목을 불러오지 못했어요"
             onRetry={first.reload}
+          />
+        </div>
+      ) : scope === 'mine' && mineFailed ? (
+        <div className="mt-5 text-xs text-zoop-muted">
+          <ErrorNotice
+            title="일부 종목 정보를 불러오지 못했어요"
+            message="목록을 비어 있는 것으로 표시하지 않고 다시 불러올 수 있어요."
+            onRetry={retryMineBriefs}
           />
         </div>
       ) : rows.length === 0 ? (

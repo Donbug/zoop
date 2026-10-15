@@ -4,6 +4,12 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.UNPROCESSABLE_CONTENT, "잘못된 요청입니다.", false),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호를 확인해 주세요.", false),
+    MEMBER_BLOCKED(HttpStatus.FORBIDDEN, "차단된 회원입니다.", false),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "요청이 허용되지 않습니다.", false),
+    EMAIL_TAKEN(HttpStatus.CONFLICT, "이미 등록된 이메일입니다.", false),
+    TERMS_REQUIRED(HttpStatus.UNPROCESSABLE_CONTENT, "필수 약관 동의를 확인해 주세요.", false),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", true),
     INVALID_CURSOR(HttpStatus.UNPROCESSABLE_CONTENT, "유효하지 않은 커서입니다.", false),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다.", false),
     SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "요청한 정보를 일시적으로 사용할 수 없습니다.", true),
