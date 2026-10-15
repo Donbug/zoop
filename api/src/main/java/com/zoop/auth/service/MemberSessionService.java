@@ -84,6 +84,31 @@ public class MemberSessionService {
         return new SessionLookup(response, false);
     }
 
+    /** True only when this cookie identifies a currently usable member or guest session. */
+    @Transactional(readOnly = true)
+    public boolean isActiveSession(String cookieToken) {
+        if (!validToken(cookieToken)) return false;
+        Instant now = clock.instant();
+        var row = repository.findByTokenHash(hashToken(cookieToken));
+        return row.filter(value -> isUsable(value, now)
+                && keyRing.derive(value.csrfKeyId(), value.kind(), value.id(), value.csrfVersion()).isPresent())
+                .isPresent();
+    }
+
+    /** Revokes only the current member session; guest sessions are outside member logout scope. */
+    @Transactional
+    public void logoutMember(String cookieToken) {
+        if (!validToken(cookieToken)) return;
+        Instant now = clock.instant();
+        String tokenHash = hashToken(cookieToken);
+        var row = repository.findByTokenHash(tokenHash);
+        if (row.isPresent() && "member".equals(row.get().kind()) && isUsable(row.get(), now)
+                && keyRing.derive(row.get().csrfKeyId(), row.get().kind(),
+                        row.get().id(), row.get().csrfVersion()).isPresent()) {
+            repository.revokeMemberSession(tokenHash, row.get().memberId(), now);
+        }
+    }
+
     /** Returns the active member and exact session binding for a privileged OAuth link flow. */
     @Transactional(readOnly = true)
     public SessionBinding currentBinding(String cookieToken) {

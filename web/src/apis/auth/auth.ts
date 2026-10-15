@@ -20,10 +20,8 @@ export function isMember() {
 }
 export async function logout() {
   const revision = useAuthStore.getState().sessionRevision;
-  try {
-    await logOut();
-  } finally {
-    if (revision === useAuthStore.getState().sessionRevision)
-      clearAuthentication();
-  }
+  await logOut();
+  if (revision !== useAuthStore.getState().sessionRevision) return false;
+  clearAuthentication();
+  return true;
 }

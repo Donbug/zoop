@@ -31,6 +31,8 @@ export default function MyStocksPage() {
     draft: '',
     query: '',
   });
+  const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
   const savedScroll = useRef<number | null>(null);
   const wasConnecting = useRef(connecting);
 
@@ -62,6 +64,19 @@ export default function MyStocksPage() {
     }
   };
 
+  const handleLogout = async () => {
+    if (logoutPending) return;
+    setLogoutPending(true);
+    setLogoutError(false);
+    try {
+      if (await logout()) navigate('/login', { replace: true });
+    } catch {
+      setLogoutError(true);
+    } finally {
+      setLogoutPending(false);
+    }
+  };
+
   return (
     <>
       {connecting && (
@@ -82,8 +97,21 @@ export default function MyStocksPage() {
             terms={terms}
             onTermsChange={setTerms}
           />
-          <button type="button" onClick={logout} className="underline">
-            로그아웃
+          {logoutError && (
+            <p role="alert">로그아웃하지 못했어요. 다시 시도해 주세요.</p>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="underline"
+            disabled={logoutPending}
+            aria-busy={logoutPending}
+          >
+            {logoutPending
+              ? '로그아웃 중…'
+              : logoutError
+                ? '로그아웃 다시 시도'
+                : '로그아웃'}
           </button>
         </PageShell>
       </div>

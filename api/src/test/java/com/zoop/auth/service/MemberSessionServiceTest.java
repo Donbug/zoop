@@ -70,6 +70,29 @@ class MemberSessionServiceTest {
     }
 
     @Test
+    void logoutRevokesOnlyTheCurrentMemberSessionAndIsIdempotent() {
+        var current = service.issue("member-1", null, "current");
+        var another = service.issue("member-1", null, "another");
+
+        service.logoutMember(current.token());
+        service.logoutMember(current.token());
+
+        assertTrue(service.lookup(current.token(), "logged-out").clearCookie());
+        assertTrue(service.lookup(another.token(), "another-active").response().authenticated());
+        assertDoesNotThrow(() -> service.logoutMember(null));
+        assertDoesNotThrow(() -> service.logoutMember("invalid"));
+    }
+
+    @Test
+    void memberLogoutDoesNotRevokeGuestSession() {
+        var guest = service.issueGuest(null, "guest-session");
+
+        service.logoutMember(guest.token());
+
+        assertEquals("guest", service.lookup(guest.token(), "guest-still-active").response().kind());
+    }
+
+    @Test
     void guestSessionIsHashedRotatableAndNeverCarriesTutorialState() {
         var guest = service.issueGuest(null, "guest-start");
         var row = repository.rows.get(MemberSessionService.hashToken(guest.token()));
