@@ -7,7 +7,7 @@
 | `zoop-ai-relation {run,submit,inspect,resume,review,revalidate,cancel}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 
-세 원장은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). 모두 authored replay 전용이며 live/네트워크 경로가 없습니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다.
+세 원장은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). 모두 authored replay 전용이며 live/네트워크 경로가 없습니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
 
 private PoC(`Donbug/investmate-poc` commit `fa446e7c72edfa06ec1a0e8e999199a21d31c695`)가 필요합니다. 로컬에서는 `gh auth setup-git` 등 git 인증, CI에서는 `ai-pipeline` job의 GitHub App 읽기 토큰(`scripts/private_poc_sync.py --project ai/pipeline`)으로 설치합니다. lxml 6.1.3·pypdf 6.19.0·pydantic 2.13.5·httpx 0.28.1은 BFF lock과 같은 버전입니다.
 

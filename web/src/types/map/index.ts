@@ -1,8 +1,21 @@
-export type GraphTarget =
+export type GraphTarget = (
   | { kind: 'company'; id: string }
   | { kind: 'issue'; id: string }
   | { kind: 'edge'; id: string }
-  | { kind: 'path'; id: string };
+  | { kind: 'path'; id: string }
+) & {
+  // D-GRP-02 handoff: preserve the map URL and the actual response version.
+  mapContext?: {
+    url: string;
+    round?: string;
+    graphVersion?: string;
+    asOf?: string;
+  };
+  evidenceIds?: string[];
+  // Actual verification timestamp only; never substitute a graph snapshot asOf.
+  verifiedAt?: string | null;
+  label?: string;
+};
 
 export type MapMode = 'all' | 'personal';
 

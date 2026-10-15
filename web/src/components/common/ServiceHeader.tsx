@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
+import './service-shell.css';
 
 const menus = [
   { to: '/', label: '지도', icon: 'map' },
@@ -10,7 +11,11 @@ const menus = [
 ] as const;
 
 // Shared shell from Figma 619:1824. Non-map feature bodies intentionally stay empty.
-export default function ServiceHeader() {
+export default function ServiceHeader({
+  navLabel = '주 메뉴',
+}: {
+  navLabel?: string;
+}) {
   const token = useAuthStore(selectMemberId);
   const member = useAuthStore((s) => s.member);
   return (
@@ -19,7 +24,7 @@ export default function ServiceHeader() {
         <strong>줍</strong>
         <span>Zoop</span>
       </NavLink>
-      <nav aria-label="주 메뉴">
+      <nav aria-label={navLabel}>
         {menus.map((menu) => (
           <NavLink key={menu.to} to={menu.to} end={menu.to === '/'}>
             <GraphIcon name={menu.icon} size={15} />

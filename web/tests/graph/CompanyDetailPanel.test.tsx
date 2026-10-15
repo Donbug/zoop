@@ -76,7 +76,7 @@ describe('D-GRP-03 CompanyDetailPanel', () => {
     const { container } = renderPanel();
     expect(container.querySelector('[data-screen-id="D-GRP-03"]')).toBeTruthy();
     expect(screen.getByRole('heading', { name: '삼성전자' })).toBeTruthy();
-    expect(screen.getByText('현재 시세')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '시세' })).toBeTruthy();
     expect(
       screen.getByRole('img', { name: '최근 1개월 가격 추이' }),
     ).toBeTruthy();

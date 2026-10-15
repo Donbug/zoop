@@ -22,6 +22,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.security:spring-security-crypto'
+	implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -32,6 +34,7 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform {
 		excludeTags 'ai-contract'
+		excludeTags 'ai-pipeline-contract'
 		excludeTags 'company-postgres'
 	}
 }
@@ -52,6 +55,26 @@ tasks.register('companyIntegrationTest', Test) {
 	}
 }
 
+tasks.register('authIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Verifies authentication migrations and flows against PostgreSQL.'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'auth-postgres'
+	}
+	outputs.upToDateWhen { false }
+	doFirst {
+		if (!System.getenv('DB_URL')?.startsWith('jdbc:postgresql:')) {
+			throw new GradleException('Set DB_URL to a PostgreSQL test database for authIntegrationTest')
+		}
+	}
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
+}
+
 // Real cross-language gate: this JVM talks to a running ai/service and the installed zoop-ai CLI (replay only).
 // Run it through `make api-ai-smoke`; that script starts the service and exports ZOOP_AI_CONTRACT_MANIFEST.
 // Without the manifest the tests fail; they never skip.
@@ -62,6 +85,25 @@ tasks.register('aiContractTest', Test) {
 	classpath = sourceSets.test.runtimeClasspath
 	useJUnitPlatform {
 		includeTags 'ai-contract'
+	}
+	outputs.upToDateWhen { false }
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
+}
+
+// Real cross-language gate for the S2 extraction and S3 relation clients: this JVM talks to a running ai/service and the
+// installed zoop-ai-extract / zoop-ai-relation over a fresh synthetic operator world (replay only, no model, no network).
+// Run it through `make api-ai-pipeline-smoke`; that script prepares the world and exports ZOOP_AI_PIPELINE_MANIFEST.
+// Without the manifest the tests fail; they never skip.
+tasks.register('aiPipelineContractTest', Test) {
+	group = 'verification'
+	description = 'Runs the S2/S3 cross-language transport tests against a live ai/service (see make api-ai-pipeline-smoke).'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'ai-pipeline-contract'
 	}
 	outputs.upToDateWhen { false }
 	testLogging {

@@ -53,4 +53,7 @@ export interface GraphRequest {
   mode: MapMode;
   personalFilter: PersonalScope;
   companyId?: string;
+  asOf?: string;
+  graphVersion?: string;
+  depth?: 1 | 2;
 }

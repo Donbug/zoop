@@ -35,7 +35,7 @@
 
 | 도메인 | 연결 작업 수 | 작업 목록 |
 | --- | --- | --- |
-| auth | 10 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
+| auth | 12 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | me | 4 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | portfolio | 5 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |
 | graph | 2 | [전체 API 목록](../../api/out/zoop-api-spec.md#작업-목록) |

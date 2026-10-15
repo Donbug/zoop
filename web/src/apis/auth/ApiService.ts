@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/useAuthStore';
 type CallOptions = {
   /** 공개 API. 401을 받아도 세션 만료로 처리하지 않는다. */
   skipAuth?: boolean;
+  /** 관리자·공개 쓰기처럼 회원 세션과 분리된 요청에는 회원 CSRF를 보내지 않는다. */
+  skipMemberCsrf?: boolean;
   /** 요청별 추가 헤더(예: 목표 계약의 Idempotency-Key) */
   headers?: Record<string, string>;
 };
@@ -50,13 +52,20 @@ function createRequestOptions(
   method: string,
   request: unknown,
   extraHeaders?: Record<string, string>,
+  skipMemberCsrf = false,
 ): RequestInit {
   const headers = new Headers({
     ...extraHeaders,
     'Content-Type': 'application/json',
   });
   const csrfToken = useAuthStore.getState().session?.csrfToken;
-  if (csrfToken && !SAFE_METHODS.has(method.toUpperCase())) {
+  // 호출부가 직접 준 CSRF(예: 관리자 세션 토큰)는 회원 토큰으로 덮어쓰지 않는다.
+  if (
+    csrfToken &&
+    !skipMemberCsrf &&
+    !headers.has('X-CSRF-Token') &&
+    !SAFE_METHODS.has(method.toUpperCase())
+  ) {
     headers.set('X-CSRF-Token', csrfToken);
   }
 
@@ -77,14 +86,29 @@ export async function call<TResponse = unknown>(
   option?: CallOptions,
 ): Promise<TResponse> {
   const skipAuth = option?.skipAuth ?? false;
-  const response = await fetch(
-    `${API_BASE_URL}${api}`,
-    createRequestOptions(method, request, option?.headers),
-  );
+  const revision = useAuthStore.getState().sessionRevision;
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_BASE_URL}${api}`,
+      createRequestOptions(
+        method,
+        request,
+        option?.headers,
+        option?.skipMemberCsrf,
+      ),
+    );
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', '요청을 보내지 못했어요.');
+  }
 
   if (!response.ok) {
     // 세션이 끝났으면 화면의 로그인 상태를 비운다. 이동은 보호 라우트가 맡는다.
-    if (response.status === 401 && !skipAuth) {
+    if (
+      response.status === 401 &&
+      !skipAuth &&
+      revision === useAuthStore.getState().sessionRevision
+    ) {
       useAuthStore.getState().clearSession();
     }
     throw await toApiError(response);
@@ -94,5 +118,13 @@ export async function call<TResponse = unknown>(
     return undefined as TResponse;
   }
 
-  return (await response.json()) as TResponse;
+  try {
+    return (await response.json()) as TResponse;
+  } catch {
+    throw new ApiError(
+      response.status,
+      'INVALID_RESPONSE',
+      '응답을 확인하지 못했어요.',
+    );
+  }
 }

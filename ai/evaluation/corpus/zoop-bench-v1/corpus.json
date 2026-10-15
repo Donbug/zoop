@@ -1,0 +1,439 @@
+{
+ "schema": "zoop-bench-corpus-1",
+ "corpusId": "zoop-bench-v1",
+ "corpusRevision": "2026-10-14.1",
+ "provenance": {
+  "authored": true,
+  "synthetic": true,
+  "note": "Fictional companies and articles written for this benchmark; no real issuer, article or market data. Passage text is the only thing a system under test may read."
+ },
+ "entities": [
+  {
+   "entityId": "E-ARC",
+   "name": "Arcturus Foundry",
+   "type": "company"
+  },
+  {
+   "entityId": "E-BRL",
+   "name": "Brightline Devices",
+   "type": "company"
+  },
+  {
+   "entityId": "E-CRV",
+   "name": "Corvane Motors",
+   "type": "company"
+  },
+  {
+   "entityId": "E-DQL",
+   "name": "Delta Quay Logistics",
+   "type": "company"
+  },
+  {
+   "entityId": "E-ESK",
+   "name": "Eskel Materials",
+   "type": "company"
+  },
+  {
+   "entityId": "E-ZEN",
+   "name": "Zenith Fab",
+   "type": "company"
+  },
+  {
+   "entityId": "E-MBIO",
+   "name": "Meridian Bio",
+   "type": "company"
+  },
+  {
+   "entityId": "E-MSTL",
+   "name": "Meridian Steel",
+   "type": "company"
+  },
+  {
+   "entityId": "E-NVC",
+   "name": "Norvik Cells",
+   "type": "company"
+  },
+  {
+   "entityId": "E-PLR",
+   "name": "Palisade Robotics",
+   "type": "company"
+  },
+  {
+   "entityId": "E-QLA",
+   "name": "Quillon Autos",
+   "type": "company"
+  },
+  {
+   "entityId": "E-RSR",
+   "name": "Rastrel Rail",
+   "type": "company"
+  },
+  {
+   "entityId": "E-TAM",
+   "name": "Tamsin Capital",
+   "type": "company"
+  },
+  {
+   "entityId": "E-UVA",
+   "name": "Uvarov Holdings",
+   "type": "company"
+  },
+  {
+   "entityId": "E-SOL",
+   "name": "Solvane Metals",
+   "type": "company"
+  },
+  {
+   "entityId": "E-KOPT",
+   "name": "Kestrel Optics",
+   "type": "company"
+  },
+  {
+   "entityId": "E-KBNK",
+   "name": "Kestrel Bank",
+   "type": "company"
+  }
+ ],
+ "documents": [
+  {
+   "docId": "D01",
+   "publishedAt": "2026-02-03",
+   "source": "Ledger Wire",
+   "originFamily": "F-D01",
+   "passages": [
+    {
+     "passageId": "D01-P1",
+     "text": "Arcturus Foundry buys wafer-grade silicon from Eskel Materials under a multi-year contract."
+    }
+   ]
+  },
+  {
+   "docId": "D02",
+   "publishedAt": "2026-02-10",
+   "source": "Ledger Wire",
+   "originFamily": "F-D02",
+   "passages": [
+    {
+     "passageId": "D02-P1",
+     "text": "Arcturus Foundry supplies Brightline Devices with sensor chips for its automotive line."
+    }
+   ]
+  },
+  {
+   "docId": "D03",
+   "publishedAt": "2026-02-17",
+   "source": "Market Wire",
+   "originFamily": "F-D03",
+   "passages": [
+    {
+     "passageId": "D03-P1",
+     "text": "Corvane Motors sources its driver-assist modules from Brightline Devices."
+    },
+    {
+     "passageId": "D03-P2",
+     "text": "Delta Quay Logistics trucks the modules to Corvane Motors plants every week."
+    }
+   ]
+  },
+  {
+   "docId": "D04",
+   "publishedAt": "2026-03-05",
+   "source": "Market Wire",
+   "originFamily": "F-D04",
+   "passages": [
+    {
+     "passageId": "D04-P1",
+     "text": "Corvane Motors has held a stake in Eskel Materials since 1 March 2025."
+    }
+   ]
+  },
+  {
+   "docId": "D05",
+   "publishedAt": "2026-07-02",
+   "source": "Market Wire",
+   "originFamily": "F-D05",
+   "passages": [
+    {
+     "passageId": "D05-P1",
+     "text": "Corvane Motors sold its stake in Eskel Materials on 30 June 2026. Brightline Devices bought into Eskel Materials from 1 July 2026, and the terms were not disclosed."
+    }
+   ]
+  },
+  {
+   "docId": "D06",
+   "publishedAt": "2026-04-01",
+   "source": "Daily Ledger",
+   "originFamily": "F-D06",
+   "passages": [
+    {
+     "passageId": "D06-P1",
+     "text": "Zenith Fab supplies display drivers to Brightline Devices, company executives said."
+    },
+    {
+     "passageId": "D06-P2",
+     "text": "Zenith Fab competes with Arcturus Foundry for mature-node capacity."
+    }
+   ]
+  },
+  {
+   "docId": "D07",
+   "publishedAt": "2026-04-01",
+   "source": "Market Wire",
+   "originFamily": "F-D07",
+   "passages": [
+    {
+     "passageId": "D07-P1",
+     "text": "Brightline Devices said it has no supply agreement with Zenith Fab."
+    }
+   ]
+  },
+  {
+   "docId": "D08",
+   "publishedAt": "2026-04-20",
+   "source": "Ledger Wire",
+   "originFamily": "F-D08",
+   "passages": [
+    {
+     "passageId": "D08-P1",
+     "text": "Meridian raised its list prices by 4 percent this quarter."
+    }
+   ]
+  },
+  {
+   "docId": "D09",
+   "publishedAt": "2026-04-20",
+   "source": "Daily Ledger",
+   "originFamily": "F-D09",
+   "passages": [
+    {
+     "passageId": "D09-P1",
+     "text": "Meridian Bio reported a delay in its phase two trial."
+    }
+   ]
+  },
+  {
+   "docId": "D15",
+   "publishedAt": "2026-04-21",
+   "source": "Market Wire",
+   "originFamily": "F-D15",
+   "passages": [
+    {
+     "passageId": "D15-P1",
+     "text": "Meridian Steel cut output at its eastern mill."
+    }
+   ]
+  },
+  {
+   "docId": "D10",
+   "publishedAt": "2026-03-10",
+   "source": "Ledger Wire",
+   "originFamily": "F-D10",
+   "passages": [
+    {
+     "passageId": "D10-P1",
+     "text": "Arcturus Foundry opened its Busan plant on 10 March 2026."
+    },
+    {
+     "passageId": "D10-P2",
+     "text": "Also on 10 March 2026, Arcturus Foundry named a new chief financial officer."
+    }
+   ]
+  },
+  {
+   "docId": "D11",
+   "publishedAt": "2026-03-11",
+   "source": "Daily Ledger",
+   "originFamily": "F-D11",
+   "passages": [
+    {
+     "passageId": "D11-P1",
+     "text": "The Busan fab that Arcturus Foundry inaugurated this week is its first site in Korea."
+    }
+   ]
+  },
+  {
+   "docId": "D12",
+   "publishedAt": "2026-09-03",
+   "source": "Ledger Wire",
+   "originFamily": "F-D12",
+   "passages": [
+    {
+     "passageId": "D12-P1",
+     "text": "Arcturus Foundry opened its Ulsan plant on 2 September 2026."
+    }
+   ]
+  },
+  {
+   "docId": "D13",
+   "publishedAt": "2026-09-04",
+   "source": "Daily Ledger",
+   "originFamily": "F-D13",
+   "passages": [
+    {
+     "passageId": "D13-P1",
+     "text": "A filing shows Arcturus Foundry opened another plant, but it names neither a location nor a date."
+    }
+   ]
+  },
+  {
+   "docId": "D21",
+   "publishedAt": "2026-05-04",
+   "source": "Ledger Wire",
+   "originFamily": "F-D21",
+   "passages": [
+    {
+     "passageId": "D21-P1",
+     "text": "Norvik Cells delivers battery cells to Palisade Robotics."
+    }
+   ]
+  },
+  {
+   "docId": "D22",
+   "publishedAt": "2026-05-12",
+   "source": "Ledger Wire",
+   "originFamily": "F-D22",
+   "passages": [
+    {
+     "passageId": "D22-P1",
+     "text": "Palisade Robotics supplies Quillon Autos with warehouse robots."
+    }
+   ]
+  },
+  {
+   "docId": "D23",
+   "publishedAt": "2026-05-20",
+   "source": "Market Wire",
+   "originFamily": "F-D23",
+   "passages": [
+    {
+     "passageId": "D23-P1",
+     "text": "Rastrel Rail purchases its yard vehicles from Quillon Autos."
+    }
+   ]
+  },
+  {
+   "docId": "D24",
+   "publishedAt": "2026-01-06",
+   "source": "Market Wire",
+   "originFamily": "F-D24",
+   "passages": [
+    {
+     "passageId": "D24-P1",
+     "text": "Tamsin Capital invested in Norvik Cells on 1 January 2025 and sold out on 31 December 2025."
+    }
+   ]
+  },
+  {
+   "docId": "D25",
+   "publishedAt": "2026-01-08",
+   "source": "Market Wire",
+   "originFamily": "F-D25",
+   "passages": [
+    {
+     "passageId": "D25-P1",
+     "text": "Uvarov Holdings has owned a stake in Norvik Cells since 1 January 2026, and no end date has been stated."
+    }
+   ]
+  },
+  {
+   "docId": "D26",
+   "publishedAt": "2026-06-01",
+   "source": "Daily Ledger",
+   "originFamily": "F-D26",
+   "passages": [
+    {
+     "passageId": "D26-P1",
+     "text": "Solvane Metals supplies titanium to Palisade Robotics, a Solvane spokesperson said."
+    }
+   ]
+  },
+  {
+   "docId": "D27",
+   "publishedAt": "2026-06-01",
+   "source": "Market Wire",
+   "originFamily": "F-D27",
+   "passages": [
+    {
+     "passageId": "D27-P1",
+     "text": "Palisade Robotics denied buying titanium from Solvane Metals."
+    }
+   ]
+  },
+  {
+   "docId": "D28",
+   "publishedAt": "2026-06-10",
+   "source": "Ledger Wire",
+   "originFamily": "F-D28",
+   "passages": [
+    {
+     "passageId": "D28-P1",
+     "text": "Kestrel reported record quarterly earnings."
+    }
+   ]
+  },
+  {
+   "docId": "D29",
+   "publishedAt": "2026-06-10",
+   "source": "Daily Ledger",
+   "originFamily": "F-D29",
+   "passages": [
+    {
+     "passageId": "D29-P1",
+     "text": "Kestrel Optics shipped a record number of lenses."
+    }
+   ]
+  },
+  {
+   "docId": "D33",
+   "publishedAt": "2026-06-11",
+   "source": "Market Wire",
+   "originFamily": "F-D33",
+   "passages": [
+    {
+     "passageId": "D33-P1",
+     "text": "Kestrel Bank raised its deposit rates."
+    }
+   ]
+  },
+  {
+   "docId": "D30",
+   "publishedAt": "2026-06-01",
+   "source": "Ledger Wire",
+   "originFamily": "F-D30",
+   "passages": [
+    {
+     "passageId": "D30-P1",
+     "text": "Norvik Cells opened its Daegu line on 1 June 2026."
+    },
+    {
+     "passageId": "D30-P2",
+     "text": "Norvik Cells opened its Gwangju line on 1 June 2026."
+    }
+   ]
+  },
+  {
+   "docId": "D31",
+   "publishedAt": "2026-06-02",
+   "source": "Daily Ledger",
+   "originFamily": "F-D31",
+   "passages": [
+    {
+     "passageId": "D31-P1",
+     "text": "Norvik Cells inaugurated the Daegu line it opened on 1 June 2026, a spokesperson said."
+    }
+   ]
+  },
+  {
+   "docId": "D32",
+   "publishedAt": "2026-06-03",
+   "source": "Market Wire",
+   "originFamily": "F-D32",
+   "passages": [
+    {
+     "passageId": "D32-P1",
+     "text": "An analyst note says Norvik Cells opened yet another line, without saying where or when."
+    }
+   ]
+  }
+ ]
+}

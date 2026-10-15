@@ -14,6 +14,9 @@
   display: flex;
   flex-direction: column;
 }
+.relationship-view {
+  position: relative;
+}
 .relationship-main,
 .relationship-view {
   flex: 1;
@@ -211,169 +214,216 @@
   padding: 0 16px 16px;
 }
 .relationship-body.has-company-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 8px;
-}
-.relationship-body.has-company-panel .relationship-canvas {
-  min-width: 0;
-}
-.company-panel {
-  min-width: 0;
-  height: 100%;
-  min-height: 520px;
-  border: 0.667px solid #d6d6d2;
-  border-radius: 6px;
-  background: #fff;
-  overflow: hidden;
   display: flex;
-  flex-direction: column;
+  gap: 0;
 }
-.company-panel button,
-.company-panel a {
-  font: inherit;
+.relationship-body.has-company-panel > .relationship-canvas {
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 .company-panel-header {
-  min-height: 68px;
-  padding: 12px 14px;
-  border-bottom: 0.667px solid #d6d6d2;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  padding: 16px 16px 4px;
 }
-.company-identity {
-  min-width: 0;
-  flex: 1;
+.company-panel-title {
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.company-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .company-logo {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   color: #fff;
-  font-size: 13px;
+  font-size: 11.4px;
   font-weight: 800;
+  overflow: hidden;
 }
-.company-identity h2 {
-  font-size: 16px;
-  line-height: 21px;
-  letter-spacing: -0.35px;
+.company-logo img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
 }
-.company-identity p {
-  color: #777771;
-  font:
-    9px/13px 'JetBrains Mono Variable',
-    monospace;
+.company-identity-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.company-identity > b {
-  margin-left: auto;
-  padding: 3px 5px;
-  border-radius: 3px;
-  color: #386c43;
-  background: #e7f3e8;
-  font-size: 9px;
-  white-space: nowrap;
+.company-identity-meta > p {
+  color: #94948f;
+  font-size: 11px;
+  line-height: 16.5px;
 }
-.company-close {
-  width: 25px;
-  height: 25px;
-  font-size: 19px !important;
-  color: #777771;
+.company-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.company-panel-scroll {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-}
-.company-panel-scroll > section,
-.company-panel-scroll > details,
-.company-panel-scroll > .company-actions {
-  padding: 12px 14px;
-  border-bottom: 0.667px solid #d6d6d2;
+.company-statuses span {
+  color: #5f5f5b;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-aliases summary,
 .company-source summary,
 .company-metrics summary {
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 .company-aliases p,
 .company-source p {
   padding-top: 6px;
-  color: #777771;
-  font-size: 10px;
+  color: #5f5f5b;
+  font-size: 11px;
+}
+.company-aliases {
+  margin-top: 8px;
+}
+.company-aliases summary {
+  width: fit-content;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid #d6d6d2;
+  border-radius: 4px;
+  list-style: none;
+}
+.company-aliases summary::after {
+  content: '›';
+  margin-left: 5px;
 }
 .company-section-title {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 9px;
+  margin-bottom: 12px;
 }
 .company-section-title h3 {
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 19.5px;
   letter-spacing: -0.1px;
 }
 .company-section-title span {
   color: #94948f;
-  font:
-    8.5px/12px 'JetBrains Mono Variable',
-    monospace;
+  font-size: 10px;
+  line-height: 15px;
 }
-.company-quote > strong {
-  display: block;
-  font:
-    600 23px/28px 'Inter Variable',
-    sans-serif;
-  letter-spacing: -0.7px;
+.company-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 10px;
 }
-.company-quote > strong small {
-  font-size: 9px;
-  color: #777771;
+.company-price-row > strong {
+  font-family: 'Pretendard Variable', Pretendard, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 33px;
+  letter-spacing: -0.5px;
+}
+.company-price-row > strong small {
+  font-size: 12px;
+  color: #1a1a1a;
   letter-spacing: 0;
 }
-.company-quote > .up,
-.company-quote > .down {
-  padding: 2px 0 10px;
+.company-price-row > .up,
+.company-price-row > .down {
   color: #c0362c;
-  font:
-    10px/14px 'JetBrains Mono Variable',
-    monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
 }
-.company-quote > .down {
+.company-price-row > .down {
   color: #235fa4;
+}
+.company-quote-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 12px;
+  color: #94948f;
+  font-size: 10px;
+  line-height: 16.25px;
+}
+.company-source {
+  position: relative;
+  margin: 0;
+}
+.company-source summary {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d6d6d2;
+  border-radius: 50%;
+  list-style: none;
+  color: #5f5f5b;
+  cursor: pointer;
+  font-family: 'Instrument Serif', serif;
+}
+.company-source p {
+  position: absolute;
+  z-index: 3;
+  top: 24px;
+  right: 0;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid #d6d6d2;
+  border-radius: 3px;
+  background: #fff;
+  color: #5f5f5b;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 8%);
 }
 .company-stat-grid,
 .company-holding {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 7px 12px;
+  gap: 12px;
 }
 .company-stat-grid span,
 .company-holding span {
-  color: #777771;
-  font-size: 9px;
+  color: #94948f;
+  font-size: 11px;
+  line-height: 16.5px;
   display: flex;
   flex-direction: column;
 }
 .company-stat-grid b,
 .company-holding b {
   color: #1a1a1a;
-  font-size: 9.5px;
+  font-size: 13px;
+  line-height: 19.5px;
   font-weight: 600;
 }
-.company-source {
-  margin-top: 9px;
+.company-holding b {
+  font-size: 14px;
+  line-height: 21px;
+}
+.company-price-chart {
+  margin-top: 16px;
+}
+.company-price-chart figcaption {
+  margin-bottom: 8px;
+  color: #94948f;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-sparkline {
   width: 100%;
-  height: 84px;
+  height: 64px;
   overflow: visible;
 }
 .company-sparkline line {
@@ -388,9 +438,16 @@
 }
 .company-caption {
   color: #94948f;
-  font:
-    7.5px/11px 'JetBrains Mono Variable',
-    monospace;
+  font-size: 10px;
+  line-height: 15px;
+}
+.company-chart-range {
+  display: flex;
+  justify-content: space-between;
+  color: #94948f;
+  padding-top: 4px;
+  font-size: 10px;
+  line-height: 15px;
 }
 .company-metrics summary {
   display: flex;
@@ -407,31 +464,7 @@
   display: flex;
   justify-content: space-between;
   padding-top: 8px;
-  font-size: 9.5px;
-}
-.company-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-.company-actions > button,
-.company-actions > a {
-  min-height: 31px;
-  padding: 7px;
-  border: 0.667px solid #bdbdb8;
-  border-radius: 3px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  text-decoration: none;
-  color: #1a1a1a;
-  font-size: 9.5px;
-  font-weight: 600;
-}
-.company-actions > :last-child {
-  grid-column: 1 / -1;
-  background: #1a1a1a;
-  color: #fff;
+  font-size: 11px;
 }
 .company-list {
   list-style: none;
@@ -456,21 +489,23 @@
   display: block;
 }
 .company-list b {
-  font-size: 10.5px;
+  font-size: 12px;
+  line-height: 18px;
 }
 .company-list span {
   padding-top: 2px;
   color: #94948f;
-  font-size: 8.5px;
+  font-size: 10px;
+  line-height: 15px;
 }
 .company-unavailable,
 .company-section-error,
 .company-watch-error,
 .company-panel-loading,
 .company-panel-fatal {
-  color: #777771;
-  font-size: 9.5px;
-  line-height: 15px;
+  color: #5f5f5b;
+  font-size: 11px;
+  line-height: 16.5px;
 }
 .company-section-error,
 .company-watch-error {
@@ -493,9 +528,6 @@
   text-decoration: underline;
 }
 @media (max-width: 1180px) {
-  .relationship-body.has-company-panel {
-    grid-template-columns: minmax(0, 1fr) 330px;
-  }
   .relationship-legend {
     width: 164px;
   }

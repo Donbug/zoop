@@ -476,10 +476,14 @@ class Ingestor:
                 metadata[name] = content[name]
         return source, version, content, projection, metadata
 
-    def export(self, request: Export):
-        """Exact observation + server-owned metadata for a downstream consumer; read-only on all ingestion state."""
+    def export(self, request: Export, require_store: bool = False):
+        """Exact observation + server-owned metadata for a downstream consumer; read-only on all ingestion state.
+
+        By default a consumer needs read and quote-display. A consumer that PERSISTS the exported text (the app document import)
+        must pass `require_store`, which additionally requires the current grant to allow `store`; the check runs against the
+        current registry on this call like every other right, so no consumer has to parse or trust the registry itself."""
         row = self._round(request.round_id, request.source_id)
-        operations = ("read", "quote-display")
+        operations = ("read", "store", "quote-display") if require_store else ("read", "quote-display")
         candidate = self.store.one("SELECT * FROM candidates WHERE round=? AND source=? AND page=? AND ordinal=?", (request.round_id, request.source_id, request.page, request.ordinal))
         if candidate is None or candidate["hold"] or candidate["error"] or (candidate["document"], candidate["raw_version"], candidate["version"]) != (request.document_id, request.raw_version, request.document_version):
             raise IngestionFailure("observation_not_found")

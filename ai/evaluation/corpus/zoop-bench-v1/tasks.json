@@ -1,0 +1,595 @@
+{
+ "schema": "zoop-bench-tasks-1",
+ "corpusId": "zoop-bench-v1",
+ "corpusRevision": "2026-10-14.1",
+ "predicates": {
+  "SUPPLIES": {
+   "directed": true
+  },
+  "INVESTS_IN": {
+   "directed": true
+  },
+  "COMPETES_WITH": {
+   "directed": false
+  }
+ },
+ "graphTasks": [
+  {
+   "taskId": "GT-A1",
+   "split": "dev",
+   "docIds": [
+    "D01",
+    "D02",
+    "D03"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-a01",
+     "passageId": "D01-P1",
+     "surface": "Arcturus Foundry"
+    },
+    {
+     "mentionId": "m-a02",
+     "passageId": "D01-P1",
+     "surface": "Eskel Materials"
+    },
+    {
+     "mentionId": "m-a03",
+     "passageId": "D02-P1",
+     "surface": "Arcturus Foundry"
+    },
+    {
+     "mentionId": "m-a04",
+     "passageId": "D02-P1",
+     "surface": "Brightline Devices"
+    },
+    {
+     "mentionId": "m-a05",
+     "passageId": "D03-P1",
+     "surface": "Corvane Motors"
+    },
+    {
+     "mentionId": "m-a06",
+     "passageId": "D03-P1",
+     "surface": "Brightline Devices"
+    },
+    {
+     "mentionId": "m-a07",
+     "passageId": "D03-P2",
+     "surface": "Delta Quay Logistics"
+    },
+    {
+     "mentionId": "m-a08",
+     "passageId": "D03-P2",
+     "surface": "Corvane Motors"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": []
+  },
+  {
+   "taskId": "GT-A2",
+   "split": "dev",
+   "docIds": [
+    "D04",
+    "D05"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-a09",
+     "passageId": "D04-P1",
+     "surface": "Corvane Motors"
+    },
+    {
+     "mentionId": "m-a10",
+     "passageId": "D04-P1",
+     "surface": "Eskel Materials"
+    },
+    {
+     "mentionId": "m-a11",
+     "passageId": "D05-P1",
+     "surface": "Corvane Motors"
+    },
+    {
+     "mentionId": "m-a12",
+     "passageId": "D05-P1",
+     "surface": "Eskel Materials"
+    },
+    {
+     "mentionId": "m-a13",
+     "passageId": "D05-P1",
+     "surface": "Brightline Devices"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": []
+  },
+  {
+   "taskId": "GT-A3",
+   "split": "dev",
+   "docIds": [
+    "D06",
+    "D07"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-a14",
+     "passageId": "D06-P1",
+     "surface": "Zenith Fab"
+    },
+    {
+     "mentionId": "m-a15",
+     "passageId": "D06-P1",
+     "surface": "Brightline Devices"
+    },
+    {
+     "mentionId": "m-a16",
+     "passageId": "D06-P2",
+     "surface": "Zenith Fab"
+    },
+    {
+     "mentionId": "m-a17",
+     "passageId": "D06-P2",
+     "surface": "Arcturus Foundry"
+    },
+    {
+     "mentionId": "m-a18",
+     "passageId": "D07-P1",
+     "surface": "Brightline Devices"
+    },
+    {
+     "mentionId": "m-a19",
+     "passageId": "D07-P1",
+     "surface": "Zenith Fab"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": []
+  },
+  {
+   "taskId": "GT-A4",
+   "split": "dev",
+   "docIds": [
+    "D08",
+    "D09",
+    "D15"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-a20",
+     "passageId": "D09-P1",
+     "surface": "Meridian Bio"
+    },
+    {
+     "mentionId": "m-a21",
+     "passageId": "D08-P1",
+     "surface": "Meridian"
+    },
+    {
+     "mentionId": "m-a22",
+     "passageId": "D15-P1",
+     "surface": "Meridian Steel"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": [
+    {
+     "pairId": "pair-a01",
+     "kind": "entity",
+     "a": "m-a20",
+     "b": "m-a22"
+    },
+    {
+     "pairId": "pair-a02",
+     "kind": "entity",
+     "a": "m-a21",
+     "b": "m-a22"
+    }
+   ]
+  },
+  {
+   "taskId": "GT-A5",
+   "split": "dev",
+   "docIds": [
+    "D10",
+    "D11",
+    "D12",
+    "D13"
+   ],
+   "entityMentions": [],
+   "eventMentions": [
+    {
+     "eventMentionId": "em-a01",
+     "passageId": "D10-P1",
+     "surface": "opened its Busan plant"
+    },
+    {
+     "eventMentionId": "em-a02",
+     "passageId": "D10-P2",
+     "surface": "named a new chief financial officer"
+    },
+    {
+     "eventMentionId": "em-a03",
+     "passageId": "D11-P1",
+     "surface": "inaugurated the Busan fab"
+    },
+    {
+     "eventMentionId": "em-a04",
+     "passageId": "D12-P1",
+     "surface": "opened its Ulsan plant"
+    },
+    {
+     "eventMentionId": "em-a05",
+     "passageId": "D13-P1",
+     "surface": "opened another plant"
+    }
+   ],
+   "mergeCandidates": [
+    {
+     "pairId": "pair-a03",
+     "kind": "event",
+     "a": "em-a01",
+     "b": "em-a02"
+    },
+    {
+     "pairId": "pair-a04",
+     "kind": "event",
+     "a": "em-a01",
+     "b": "em-a03"
+    },
+    {
+     "pairId": "pair-a05",
+     "kind": "event",
+     "a": "em-a01",
+     "b": "em-a04"
+    },
+    {
+     "pairId": "pair-a06",
+     "kind": "event",
+     "a": "em-a04",
+     "b": "em-a05"
+    },
+    {
+     "pairId": "pair-a07",
+     "kind": "event",
+     "a": "em-a02",
+     "b": "em-a03"
+    }
+   ]
+  },
+  {
+   "taskId": "GT-B1",
+   "split": "test",
+   "docIds": [
+    "D21",
+    "D22",
+    "D23"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-b01",
+     "passageId": "D21-P1",
+     "surface": "Norvik Cells"
+    },
+    {
+     "mentionId": "m-b02",
+     "passageId": "D21-P1",
+     "surface": "Palisade Robotics"
+    },
+    {
+     "mentionId": "m-b03",
+     "passageId": "D22-P1",
+     "surface": "Palisade Robotics"
+    },
+    {
+     "mentionId": "m-b04",
+     "passageId": "D22-P1",
+     "surface": "Quillon Autos"
+    },
+    {
+     "mentionId": "m-b05",
+     "passageId": "D23-P1",
+     "surface": "Rastrel Rail"
+    },
+    {
+     "mentionId": "m-b06",
+     "passageId": "D23-P1",
+     "surface": "Quillon Autos"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": []
+  },
+  {
+   "taskId": "GT-B2",
+   "split": "test",
+   "docIds": [
+    "D24",
+    "D25"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-b07",
+     "passageId": "D24-P1",
+     "surface": "Tamsin Capital"
+    },
+    {
+     "mentionId": "m-b08",
+     "passageId": "D24-P1",
+     "surface": "Norvik Cells"
+    },
+    {
+     "mentionId": "m-b09",
+     "passageId": "D25-P1",
+     "surface": "Uvarov Holdings"
+    },
+    {
+     "mentionId": "m-b10",
+     "passageId": "D25-P1",
+     "surface": "Norvik Cells"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": []
+  },
+  {
+   "taskId": "GT-B3",
+   "split": "test",
+   "docIds": [
+    "D26",
+    "D27"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-b11",
+     "passageId": "D26-P1",
+     "surface": "Solvane Metals"
+    },
+    {
+     "mentionId": "m-b12",
+     "passageId": "D26-P1",
+     "surface": "Palisade Robotics"
+    },
+    {
+     "mentionId": "m-b13",
+     "passageId": "D27-P1",
+     "surface": "Palisade Robotics"
+    },
+    {
+     "mentionId": "m-b14",
+     "passageId": "D27-P1",
+     "surface": "Solvane Metals"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": []
+  },
+  {
+   "taskId": "GT-B4",
+   "split": "test",
+   "docIds": [
+    "D28",
+    "D29",
+    "D33"
+   ],
+   "entityMentions": [
+    {
+     "mentionId": "m-b15",
+     "passageId": "D29-P1",
+     "surface": "Kestrel Optics"
+    },
+    {
+     "mentionId": "m-b16",
+     "passageId": "D28-P1",
+     "surface": "Kestrel"
+    },
+    {
+     "mentionId": "m-b17",
+     "passageId": "D33-P1",
+     "surface": "Kestrel Bank"
+    }
+   ],
+   "eventMentions": [],
+   "mergeCandidates": [
+    {
+     "pairId": "pair-b01",
+     "kind": "entity",
+     "a": "m-b15",
+     "b": "m-b17"
+    },
+    {
+     "pairId": "pair-b02",
+     "kind": "entity",
+     "a": "m-b16",
+     "b": "m-b17"
+    }
+   ]
+  },
+  {
+   "taskId": "GT-B5",
+   "split": "test",
+   "docIds": [
+    "D30",
+    "D31",
+    "D32"
+   ],
+   "entityMentions": [],
+   "eventMentions": [
+    {
+     "eventMentionId": "em-b01",
+     "passageId": "D30-P1",
+     "surface": "opened its Daegu line"
+    },
+    {
+     "eventMentionId": "em-b02",
+     "passageId": "D30-P2",
+     "surface": "opened its Gwangju line"
+    },
+    {
+     "eventMentionId": "em-b03",
+     "passageId": "D31-P1",
+     "surface": "inaugurated the Daegu line"
+    },
+    {
+     "eventMentionId": "em-b04",
+     "passageId": "D32-P1",
+     "surface": "opened yet another line"
+    }
+   ],
+   "mergeCandidates": [
+    {
+     "pairId": "pair-b03",
+     "kind": "event",
+     "a": "em-b01",
+     "b": "em-b02"
+    },
+    {
+     "pairId": "pair-b04",
+     "kind": "event",
+     "a": "em-b01",
+     "b": "em-b03"
+    },
+    {
+     "pairId": "pair-b05",
+     "kind": "event",
+     "a": "em-b02",
+     "b": "em-b04"
+    },
+    {
+     "pairId": "pair-b06",
+     "kind": "event",
+     "a": "em-b03",
+     "b": "em-b02"
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "questionId": "QA-1",
+   "split": "dev",
+   "text": "Which company directly supplies Arcturus Foundry?",
+   "asOf": null,
+   "anchorEntity": "E-ARC"
+  },
+  {
+   "questionId": "QA-2",
+   "split": "dev",
+   "text": "Which companies does Arcturus Foundry directly supply?",
+   "asOf": null,
+   "anchorEntity": "E-ARC"
+  },
+  {
+   "questionId": "QA-3",
+   "split": "dev",
+   "text": "Which company is exactly two supply steps downstream of Eskel Materials?",
+   "asOf": null,
+   "anchorEntity": "E-ESK"
+  },
+  {
+   "questionId": "QA-4",
+   "split": "dev",
+   "text": "Which company is exactly three supply steps downstream of Eskel Materials?",
+   "asOf": null,
+   "anchorEntity": "E-ESK"
+  },
+  {
+   "questionId": "QA-5",
+   "split": "dev",
+   "text": "Which company held an investment in Eskel Materials on 2026-01-15?",
+   "asOf": "2026-01-15",
+   "anchorEntity": "E-ESK"
+  },
+  {
+   "questionId": "QA-6",
+   "split": "dev",
+   "text": "Which company held an investment in Eskel Materials on 2026-08-01?",
+   "asOf": "2026-08-01",
+   "anchorEntity": "E-ESK"
+  },
+  {
+   "questionId": "QA-7",
+   "split": "dev",
+   "text": "Until when will Brightline Devices keep its stake in Eskel Materials?",
+   "asOf": null,
+   "anchorEntity": "E-BRL"
+  },
+  {
+   "questionId": "QA-8",
+   "split": "dev",
+   "text": "Does Zenith Fab supply Brightline Devices?",
+   "asOf": null,
+   "anchorEntity": "E-ZEN"
+  },
+  {
+   "questionId": "QA-9",
+   "split": "dev",
+   "text": "Which company supplies Zenith Fab?",
+   "asOf": null,
+   "anchorEntity": "E-ZEN"
+  },
+  {
+   "questionId": "QB-1",
+   "split": "test",
+   "text": "Which company directly supplies Palisade Robotics?",
+   "asOf": null,
+   "anchorEntity": "E-PLR"
+  },
+  {
+   "questionId": "QB-2",
+   "split": "test",
+   "text": "Which companies does Quillon Autos directly supply?",
+   "asOf": null,
+   "anchorEntity": "E-QLA"
+  },
+  {
+   "questionId": "QB-3",
+   "split": "test",
+   "text": "Which company is exactly two supply steps downstream of Norvik Cells?",
+   "asOf": null,
+   "anchorEntity": "E-NVC"
+  },
+  {
+   "questionId": "QB-4",
+   "split": "test",
+   "text": "Which company is exactly three supply steps downstream of Norvik Cells?",
+   "asOf": null,
+   "anchorEntity": "E-NVC"
+  },
+  {
+   "questionId": "QB-5",
+   "split": "test",
+   "text": "Which company held an investment in Norvik Cells on 2025-06-15?",
+   "asOf": "2025-06-15",
+   "anchorEntity": "E-NVC"
+  },
+  {
+   "questionId": "QB-6",
+   "split": "test",
+   "text": "Which company held an investment in Norvik Cells on 2026-03-01?",
+   "asOf": "2026-03-01",
+   "anchorEntity": "E-NVC"
+  },
+  {
+   "questionId": "QB-7",
+   "split": "test",
+   "text": "Until when will Uvarov Holdings keep its stake in Norvik Cells?",
+   "asOf": null,
+   "anchorEntity": "E-UVA"
+  },
+  {
+   "questionId": "QB-8",
+   "split": "test",
+   "text": "Does Solvane Metals supply Palisade Robotics?",
+   "asOf": null,
+   "anchorEntity": "E-SOL"
+  },
+  {
+   "questionId": "QB-9",
+   "split": "test",
+   "text": "Which company supplies Solvane Metals?",
+   "asOf": null,
+   "anchorEntity": "E-SOL"
+  }
+ ]
+}

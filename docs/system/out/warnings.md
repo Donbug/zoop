@@ -58,12 +58,11 @@
 | INDEX_DETAIL_RANGE_STALE | warning | FS051 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:61 (xlsx-row) |
 | INDEX_REQUIREMENT_META_MISMATCH | warning | FS051 | 목차 요구 번호 ['50']와 현행 상세 메타 요구 번호 ['51']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:94 (xlsx-row) |
 | INDEX_REQUIREMENT_META_MISMATCH | warning | FS066-01 | 목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:134 (xlsx-row) |
-| TEAM_DECISION_REQUIRED | warning | listTerms | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
-| TEAM_DECISION_REQUIRED | warning | signUp | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
-| TEAM_DECISION_REQUIRED | warning | logIn | 반복 실패 제한·가입 필드·비밀번호 정책은 팀 확인이 필요하다. 약관 본문·버전은 승인됐으며 가입 성공 직후 새 회원 세션을 발급해 로그인한다. |  |
-| TEAM_DECISION_REQUIRED | warning | listSocialProviders | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
-| TEAM_DECISION_REQUIRED | warning | authorizeSocialLogin | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
-| TEAM_DECISION_REQUIRED | warning | completeSocialLogin | 회원 제공자는 Google/카카오로 채택한다. 실제 OAuth 등록·연동, 기존 계정 본인/연결권한 확인 정책은 별도이며 관리자 SSO·권한 등급/회수 정책은 미정이다. |  |
+| TEAM_DECISION_REQUIRED | warning | listSocialProviders | Google·카카오 운영 앱 등록과 관리자 SSO·권한 등급/회수 정책은 별도다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |  |
+| TEAM_DECISION_REQUIRED | warning | authorizeSocialLogin | 운영 앱 등록·OAuth pending TTL·시도 제한값·허용 복귀 경로의 환경별 값은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |  |
+| TEAM_DECISION_REQUIRED | warning | completeSocialLogin | 운영 앱 등록·OAuth pending TTL은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |  |
+| TEAM_DECISION_REQUIRED | warning | authorizeSocialLink | D-AUT-01에서 기존 계정 로그인 후 명시적 연결 시작 UI는 화면 계획과 함께 검증한다. |  |
+| TEAM_DECISION_REQUIRED | warning | completeSocialSignup | 소셜 신규 가입 약관 동의 UI는 D-AUT-01 진입 흐름에서 화면 계획과 함께 검증한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getGraph | 메인그래프 v2(04 시트)가 현행 상세이고 옛 메인 그래프 탭(03)은 이력으로 보존한다. 목차 FS019~027의 상세 위치(range)와 v2 시트의 실제 구획 행 불일치는 명세 담당자가 정정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listCompanyDocuments | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getEvent | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
@@ -215,9 +214,9 @@
 | BFF_PATH_DIFFERENCE | difference | listTerms | 목표 /api/v1/auth/terms ↔ BFF /api/auth/terms |  |
 | BFF_FIELD_DIFFERENCE | difference | listTerms | 목표만 90 · BFF만 39 · 형식/필수/권한 변경 3 |  |
 | BFF_PATH_DIFFERENCE | difference | signUp | 목표 /api/v1/auth/signup ↔ BFF /api/auth/signup |  |
-| BFF_FIELD_DIFFERENCE | difference | signUp | 목표만 152 · BFF만 41 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | signUp | 목표만 170 · BFF만 32 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | logIn | 목표 /api/v1/auth/login ↔ BFF /api/auth/login |  |
-| BFF_FIELD_DIFFERENCE | difference | logIn | 목표만 180 · BFF만 23 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | logIn | 목표만 181 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | startGuestSession | 목표 /api/v1/auth/guest ↔ BFF /api/auth/guest |  |
 | BFF_FIELD_DIFFERENCE | difference | startGuestSession | 목표만 146 · BFF만 41 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | logOut | 목표 /api/v1/auth/logout ↔ BFF /api/auth/logout |  |
@@ -227,9 +226,11 @@
 | BFF_PATH_DIFFERENCE | difference | listSocialProviders | 목표 /api/v1/auth/social/providers ↔ BFF /api/auth/social/providers |  |
 | BFF_FIELD_DIFFERENCE | difference | listSocialProviders | 목표만 131 · BFF만 34 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | authorizeSocialLogin | 목표 /api/v1/auth/social/{provider}/authorize ↔ BFF /api/auth/social/{provider}/authorize |  |
-| BFF_FIELD_DIFFERENCE | difference | authorizeSocialLogin | 목표만 124 · BFF만 30 · 형식/필수/권한 변경 5 |  |
+| BFF_FIELD_DIFFERENCE | difference | authorizeSocialLogin | 목표만 169 · BFF만 21 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | completeSocialLogin | 목표 /api/v1/auth/social/{provider}/callback ↔ BFF /api/auth/social/{provider}/callback |  |
-| BFF_FIELD_DIFFERENCE | difference | completeSocialLogin | 목표만 124 · BFF만 30 · 형식/필수/권한 변경 5 |  |
+| BFF_FIELD_DIFFERENCE | difference | completeSocialLogin | 목표만 186 · BFF만 12 · 형식/필수/권한 변경 7 |  |
+| TARGET_ONLY_API | difference | authorizeSocialLink | POST /api/v1/auth/social/{provider}/link/authorize: 직접 대응 BFF 없음 |  |
+| TARGET_ONLY_API | difference | completeSocialSignup | POST /api/v1/auth/social/signup: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getMySettings | 목표 /api/v1/me/settings ↔ BFF /api/me/settings |  |
 | BFF_FIELD_DIFFERENCE | difference | getMySettings | 목표만 134 · BFF만 33 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | updateMySettings | 목표 /api/v1/me/settings ↔ BFF /api/me/settings |  |

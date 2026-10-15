@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { setWatchlistCompany } from '@/apis/graph/companies';
 import { useCompanyData } from '@/hooks/useCompanyData';
@@ -14,6 +15,7 @@ type Props = {
   onSelectIssue: (id: string) => void;
   onFocus: () => void;
   onConnections: () => void;
+  onSelectRelation?: (companyId: string) => void;
   onAskAi: () => void;
 };
 
@@ -67,6 +69,10 @@ function SectionError({
 
 // WBS 6.6.23 · D-GRP-03 · Figma 619:6729
 export default function CompanyDetailPanel(props: Props) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, [props.companyId]);
   const [retry, setRetry] = useState(0);
   const { data, loading, errors } = useCompanyData(
     props.companyId,
@@ -101,16 +107,35 @@ export default function CompanyDetailPanel(props: Props) {
   const prices = data?.prices?.status === 'available' ? data.prices : null;
   const metrics = data?.metrics?.status === 'available' ? data.metrics : null;
   const name = company?.name ?? props.fallback.label;
+  const logoUrl = company?.logoUrl ?? props.fallback.logoUrl;
   const currency = quote?.quote.currency;
   const changePositive = (quote?.quote.change ?? 0) >= 0;
 
   return (
     <aside
-      className="company-panel"
+      className={`company-panel ${ui.shell}`}
       data-screen-id="D-GRP-03"
       aria-label={`${name} 기업 상세`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          props.onClose();
+        }
+      }}
     >
       <header className="company-panel-header">
+        <div className="company-panel-title">
+          <h2 className={ui.title} ref={heading} tabIndex={-1}>
+            {name}
+          </h2>
+          <button
+            className={ui.close}
+            onClick={props.onClose}
+            aria-label="기업 상세 닫기"
+          >
+            ×
+          </button>
+        </div>
         <div className="company-identity">
           <span
             className="company-logo"
@@ -119,24 +144,26 @@ export default function CompanyDetailPanel(props: Props) {
                 company?.brandColor ?? props.fallback.brandColor ?? '#1a1a1a',
             }}
           >
-            {name.slice(0, 1)}
+            {logoUrl ? <img src={logoUrl} alt="" /> : name.slice(0, 1)}
           </span>
-          <div>
-            <h2>{name}</h2>
-            <p>
-              {company?.market ?? props.companyId.split(':')[0]} ·{' '}
-              {company?.ticker ?? props.companyId.split(':')[1]}
-            </p>
+          <div className="company-identity-meta">
+            <p>{company?.ticker ?? props.companyId.split(':')[1]}</p>
+            <div className="company-statuses">
+              {(company?.holding || props.fallback.holding) && (
+                <span>보유 종목</span>
+              )}
+              {(company?.watch || props.fallback.watch) && (
+                <span>관심 종목</span>
+              )}
+            </div>
           </div>
-          {(company?.holding || props.fallback.holding) && <b>보유 종목</b>}
         </div>
-        <button
-          className="company-close"
-          onClick={props.onClose}
-          aria-label="기업 상세 닫기"
-        >
-          ×
-        </button>
+        {company && company.aliases.length > 0 && (
+          <details className="company-aliases">
+            <summary>기업명 더 보기</summary>
+            <p>{company.aliases.join(' · ')}</p>
+          </details>
+        )}
       </header>
       {loading && (
         <p className="company-panel-loading" role="status">
@@ -152,30 +179,43 @@ export default function CompanyDetailPanel(props: Props) {
         </div>
       )}
       {company && (
-        <div className="company-panel-scroll">
-          <details className="company-aliases">
-            <summary>기업명·별칭 정보</summary>
-            <p>{company.aliases.join(' · ') || '등록된 별칭 없음'}</p>
-          </details>
-          <section className="company-quote">
-            <div className="company-section-title">
-              <h3>현재 시세</h3>
-              {quote && (
-                <span>{quote.source.delayNote ?? '지연 정보 없음'}</span>
-              )}
-            </div>
+        <div className={`company-panel-scroll ${ui.scroll}`}>
+          <section className={`company-quote ${ui.sectionFrame}`}>
+            <h3 className="sr-only">시세</h3>
             {quote ? (
               <>
-                <strong>
-                  {number(quote.quote.price, currency)}{' '}
-                  <small>{currency}</small>
-                </strong>
-                <p className={changePositive ? 'up' : 'down'}>
-                  {changePositive ? '+' : ''}
-                  {number(quote.quote.change, currency)} (
-                  {changePositive ? '+' : ''}
-                  {((quote.quote.changeRate ?? 0) * 100).toFixed(2)}%)
-                </p>
+                <div className="company-price-row">
+                  <strong>
+                    {number(quote.quote.price, currency)}{' '}
+                    <small>{currency}</small>
+                  </strong>
+                  <p className={changePositive ? 'up' : 'down'}>
+                    {changePositive ? '▲ +' : '▼ '}
+                    {number(quote.quote.change, currency)} (
+                    {changePositive ? '+' : ''}
+                    {((quote.quote.changeRate ?? 0) * 100).toFixed(2)}%)
+                  </p>
+                </div>
+                <div className="company-quote-meta">
+                  <span>
+                    전일 대비 · 기준{' '}
+                    {quote.quote.asOf
+                      ? new Date(quote.quote.asOf).toLocaleString('ko-KR')
+                      : '미제공'}{' '}
+                    · {quote.source.name}
+                    {quote.source.delayNote ? ' · 지연 가능' : ''}
+                  </span>
+                  <details className="company-source">
+                    <summary aria-label={`시세 출처: ${quote.source.name}`}>
+                      i
+                    </summary>
+                    <p>
+                      {quote.source.name} ·{' '}
+                      {quote.source.official ? '공식' : '공개 자료'} · 종목 기호{' '}
+                      {quote.source.symbol}
+                    </p>
+                  </details>
+                </div>
                 <div className="company-stat-grid">
                   <span>
                     거래량 <b>{number(quote.quote.volume)}</b>
@@ -193,23 +233,7 @@ export default function CompanyDetailPanel(props: Props) {
                       {number(quote.quote.week52High)}
                     </b>
                   </span>
-                  <span>
-                    관측 시각{' '}
-                    <b>
-                      {quote.quote.asOf
-                        ? new Date(quote.quote.asOf).toLocaleString('ko-KR')
-                        : '미제공'}
-                    </b>
-                  </span>
                 </div>
-                <details className="company-source">
-                  <summary>출처 정보</summary>
-                  <p>
-                    {quote.source.name} ·{' '}
-                    {quote.source.official ? '공식' : '비공식'} ·{' '}
-                    {quote.source.symbol}
-                  </p>
-                </details>
               </>
             ) : data.quote?.status === 'unavailable' ? (
               <p className="company-unavailable">
@@ -220,21 +244,19 @@ export default function CompanyDetailPanel(props: Props) {
               message={errors.quote}
               retry={() => setRetry((value) => value + 1)}
             />
-          </section>
-          <section>
-            <div className="company-section-title">
-              <h3>1개월 가격 추이</h3>
-              <span>1D</span>
-            </div>
             {prices ? (
-              <>
+              <figure className="company-price-chart">
+                <figcaption>최근 1개월 시세 추이</figcaption>
                 <Sparkline values={prices.points.map((point) => point.close)} />
-                <p className="company-caption">
-                  {prices.points.at(0)?.time.slice(0, 10)} —{' '}
-                  {prices.points.at(-1)?.time.slice(0, 10)} ·{' '}
-                  {prices.source.name}
+                <p className="company-chart-range">
+                  <span>{prices.points.at(0)?.time.slice(0, 10)}</span>
+                  <span>{prices.points.at(-1)?.time.slice(0, 10)}</span>
                 </p>
-              </>
+                <p className="company-caption">
+                  {prices.source.name} · 마지막 거래{' '}
+                  {prices.points.at(-1)?.time.slice(0, 10)}
+                </p>
+              </figure>
             ) : data.prices?.status === 'unavailable' ? (
               <p className="company-unavailable">
                 가격 추이 미제공 · {data.prices.reason}
@@ -245,7 +267,7 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </section>
-          <details className="company-metrics">
+          <details className={`company-metrics ${ui.sectionFrame}`}>
             <summary>
               주요 지표{' '}
               <span>{metrics ? `${metrics.items.length}개` : '—'}</span>
@@ -266,10 +288,9 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </details>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
-              <h3>모의 보유</h3>
-              <span>계좌 연동</span>
+              <h3>가상 계좌 보유</h3>
             </div>
             {!props.token ? (
               <p className="company-unavailable">
@@ -315,7 +336,9 @@ export default function CompanyDetailPanel(props: Props) {
               retry={() => setRetry((value) => value + 1)}
             />
           </section>
-          <div className="company-actions">
+          <div
+            className={`company-actions ${ui.actions} [&>:last-child]:col-span-2`}
+          >
             <Link to={`/companies/${encodeURIComponent(company.id)}`}>
               기업 상세
             </Link>
@@ -332,7 +355,12 @@ export default function CompanyDetailPanel(props: Props) {
             )}
             <button onClick={props.onFocus}>이 기업 중심으로 보기</button>
             <button onClick={props.onConnections}>다른 기업과 연결 보기</button>
-            <button onClick={props.onAskAi}>AI에게 이 기업 묻기</button>
+            <button
+              className="col-span-2 bg-panel-ink! text-white!"
+              onClick={props.onAskAi}
+            >
+              AI에게 이 기업 묻기
+            </button>
           </div>
           {watchError && (
             <p className="company-watch-error" role="alert">
@@ -340,7 +368,7 @@ export default function CompanyDetailPanel(props: Props) {
               <button onClick={() => void toggleWatch()}>재시도</button>
             </p>
           )}
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>직접 관련 사건</h3>
               <span>{company.directIssues.length}</span>
@@ -363,7 +391,7 @@ export default function CompanyDetailPanel(props: Props) {
               <p className="company-unavailable">직접 관련 사건이 없습니다.</p>
             )}
           </section>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>간접 관련 사건</h3>
               <span>{company.structuralIssues.length}</span>
@@ -385,7 +413,7 @@ export default function CompanyDetailPanel(props: Props) {
               </p>
             )}
           </section>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>관련 기업</h3>
               <span>{props.relatedCompanies.length}</span>
@@ -394,7 +422,9 @@ export default function CompanyDetailPanel(props: Props) {
               <ul className="company-list">
                 {props.relatedCompanies.slice(0, 5).map((related) => (
                   <li key={related.id}>
-                    <button onClick={props.onConnections}>
+                    <button
+                      onClick={() => props.onSelectRelation?.(related.id)}
+                    >
                       <b>{related.name}</b>
                       <span>공유 사건 {related.sharedIssueCount}건</span>
                     </button>
@@ -407,7 +437,7 @@ export default function CompanyDetailPanel(props: Props) {
               </p>
             )}
           </section>
-          <section>
+          <section className={ui.sectionFrame}>
             <div className="company-section-title">
               <h3>뉴스·공시</h3>
               <span>{data.documents?.items.length ?? '—'}</span>

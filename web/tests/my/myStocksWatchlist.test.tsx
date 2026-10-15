@@ -82,7 +82,7 @@ describe('D-MY-01 / 01b 내 종목: 관심 종목', () => {
       within(list)
         .getByRole('link', { name: 'NVIDIA, 지도에서 보기' })
         .getAttribute('href'),
-    ).toBe('/?mode=personal&select=company&id=cmp-nvidia');
+    ).toBe('/?mode=personal&select=node:cmp-nvidia');
     expect(screen.queryByText(MARKET_INFO)).toBeNull();
   });
 

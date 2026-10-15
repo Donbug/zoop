@@ -1,5 +1,6 @@
 import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
+import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
 
 export function graphSummary(data: GraphResponse) {
@@ -97,6 +98,8 @@ export function toG6Data(
   data: GraphResponse,
   width: number,
   height: number,
+  expandedId?: string | null,
+  forcedNodes: string[] = [],
 ): GraphData {
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
@@ -111,7 +114,9 @@ export function toG6Data(
   );
   const visible = data.nodes.filter(
     (n) =>
+      forcedNodes.includes(n.id) ||
       n.kind === 'company' ||
+      n.id === expandedId ||
       (summary.incident.get(n.id)?.length ?? 0) > 1 ||
       followsIds.has(n.id),
   );
@@ -153,13 +158,17 @@ export function toG6Data(
         p?.x ??
         (planned
           ? planned[personal ? 2 : 0]
-          : neighbors.reduce((v, n) => v + n.x, 0) / (neighbors.length || 1) +
+          : (neighbors.length
+              ? neighbors.reduce((v, n) => v + n.x, 0) / neighbors.length
+              : 1000) +
             Math.cos(i) * 50);
       const y =
         p?.y ??
         (planned
           ? planned[personal ? 3 : 1]
-          : neighbors.reduce((v, n) => v + n.y, 0) / (neighbors.length || 1) +
+          : (neighbors.length
+              ? neighbors.reduce((v, n) => v + n.y, 0) / neighbors.length
+              : 400) +
             Math.sin(i) * 50);
       const size = company
         ? companyNodeSize(summary.companyIssueCounts.get(n.id) ?? 0, scale)
@@ -248,6 +257,8 @@ export function toG6Data(
           lineDash: e.relationType === 'SHARES_ISSUE' ? [2, 4] : undefined,
           endArrow: e.relationType === 'FOLLOWS',
           endArrowSize: 4,
+          cursor: isSelectableRelation(e) ? 'pointer' : 'default',
+          increasedLineWidthForHitTesting: isSelectableRelation(e) ? 8 : 0,
         },
       })),
   };

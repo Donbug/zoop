@@ -10,7 +10,7 @@ import java.util.Objects;
  * They are not the public {@code ErrorCode} enum, and nothing maps them to it automatically: a feature that exposes AI calls
  * to users chooses that mapping. Left unhandled, {@code GlobalExceptionHandler} answers {@code INTERNAL_ERROR}.
  */
-public abstract sealed class AiClientException extends RuntimeException permits AiServiceErrorException, AiTransportException {
+public abstract sealed class AiClientException extends RuntimeException permits AiServiceRejectionException, AiTransportException {
     private final AiOperation operation;
     private final String requestId;
 
