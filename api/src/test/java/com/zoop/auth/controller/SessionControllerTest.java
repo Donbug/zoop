@@ -48,7 +48,16 @@ class SessionControllerTest {
             }
 
             @Override
+            public void insertGuestSession(String id, String analyticsKey, String hash,
+                    String keyId, Instant created, Instant expiry) {
+            }
+
+            @Override
             public void revokeMemberSession(String hash, String memberId, Instant at) {
+            }
+
+            @Override
+            public void revokeGuestSession(String hash, Instant at) {
             }
         };
         String key = Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);

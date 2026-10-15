@@ -16,7 +16,7 @@
 
 ### sessionLifecycle
 
-로그아웃과 차단은 서버 세션을 폐기한다. 회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 회원 쿠키는 Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200이며 서버 만료가 최종 권위다. 회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
+로그아웃과 차단은 서버 세션을 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
 
 ### signupPolicy
 
@@ -129,7 +129,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [logIn](#login) | POST | /api/v1/auth/login | 공개 | P1 |
 | [startGuestSession](#startguestsession) | POST | /api/v1/auth/guest | 공개 | P1 |
 | [logOut](#logout) | POST | /api/v1/auth/logout | 공개 | P1 |
-| [setTutorialState](#settutorialstate) | PUT | /api/v1/auth/tutorial | 회원 또는 비회원 세션 | P1 |
+| [setTutorialState](#settutorialstate) | PUT | /api/v1/auth/tutorial | 회원 | P1 |
 | [listSocialProviders](#listsocialproviders) | GET | /api/v1/auth/social/providers | 공개 | P1 |
 | [authorizeSocialLogin](#authorizesociallogin) | GET | /api/v1/auth/social/{provider}/authorize | 공개 | P1 |
 | [completeSocialLogin](#completesociallogin) | GET | /api/v1/auth/social/{provider}/callback | 공개 | P1 |
@@ -212,9 +212,9 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 <a id="getmembersession"></a>
 
-## getMemberSession · 회원 세션과 초기 설정 조회
+## getMemberSession · 회원·비회원 세션과 초기 설정 조회
 
-유효한 회원 세션은 member와 세션 결합 csrfToken·expiresAt을 반환한다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
+유효한 회원 또는 비회원 세션을 각각 member 또는 guest로 반환한다. guest는 user=null, setup.completed=false, setup.tutorialCompleted=false이며 튜토리얼 진행·완료·건너뛰기 상태를 서버에 저장하지 않는다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -324,7 +324,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## startGuestSession · 비회원 시작
 
-비회원 시작.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원가입이나 로그인 없이 비회원 세션을 시작한다. 200 SessionResponse(kind=guest, authenticated=true, user=null, setup={completed:false,tutorialCompleted:false})와 zoop_session 쿠키를 반환한다. 토큰 원문은 쿠키로만 전달하고 서버에는 토큰 해시를 저장한다. guest는 전체 그래프와 공개 기업·브리핑을 읽을 수 있지만 계좌 연결, 관심종목 저장, 개인화 조회, AI 질문·평가를 이용할 수 없다. 튜토리얼은 회원과 동일하게 제공하며 진행·완료·건너뛰기 상태는 저장하지 않는다. POST에는 허용 Origin을 요구한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -377,12 +377,12 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## setTutorialState · 튜토리얼 진행 결과 저장
 
-튜토리얼 진행 결과 저장.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 튜토리얼 진행 결과만 저장한다. guest의 진행·완료·건너뛰기는 저장하지 않으므로 클라이언트 로컬에서 관리하며 이 작업은 guest에게 403 MEMBER_REQUIRED를 반환한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `PUT /api/v1/auth/tutorial` |
-| 권한·우선순위 | 회원 또는 비회원 세션 · P1 |
+| 권한·우선순위 | 회원 · P1 |
 | 요청 본문 | [TutorialUpdate](#schema-tutorialupdate) |
 | 응답 | 200: [SessionResponse](#schema-sessionresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
@@ -5799,8 +5799,7 @@ changes nothing (a resent request is answered with the stored settings). The mod
 
 ### SetupState
 
-Guests: ``completed`` is always false (they have no settings); ``tutorialCompleted`` is kept on the
-guest session only.
+For guests, ``completed`` and ``tutorialCompleted`` are always false. Guest tutorial progress, completion, and skip state are never persisted; the client can run or replay the tutorial locally.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

@@ -1502,7 +1502,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "startGuestSession",
       "severity": "difference",
-      "message": "목표만 146 · BFF만 41 · 형식/필수/권한 변경 5",
+      "message": "목표만 147 · BFF만 41 · 형식/필수/권한 변경 5",
       "source": ""
     },
     {

@@ -67,6 +67,9 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:header:Set-Cookie": {
+      "type": "string"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

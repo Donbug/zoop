@@ -53,6 +53,41 @@ class MemberSessionServiceTest {
     }
 
     @Test
+    void guestSessionIsHashedRotatableAndNeverCarriesTutorialState() {
+        var guest = service.issueGuest(null, "guest-start");
+        var row = repository.rows.get(MemberSessionService.hashToken(guest.token()));
+        assertNotNull(row);
+        assertEquals("guest", guest.response().kind());
+        assertTrue(guest.response().authenticated());
+        assertNull(guest.response().user());
+        assertFalse(guest.response().setup().completed());
+        assertFalse(guest.response().setup().tutorialCompleted());
+        assertEquals(NOW.plus(SessionCookie.LIFETIME), guest.response().expiresAt());
+        assertFalse(repository.rows.containsKey(guest.token()));
+        assertEquals("guest", service.lookup(guest.token(), "guest-read").response().kind());
+        service.verifyCsrf(guest.token(), guest.response().csrfToken());
+
+        var replacement = service.issueGuest(guest.token(), "guest-reissue");
+        assertTrue(service.lookup(guest.token(), "guest-revoked").clearCookie());
+        assertEquals("guest", service.lookup(replacement.token(), "guest-current").response().kind());
+        var error = assertThrows(CustomException.class, () -> service.requireMember(replacement.token()));
+        assertEquals(ErrorCode.MEMBER_REQUIRED, error.getErrorCode());
+    }
+
+    @Test
+    void memberGuardRequiresSessionAndResourceOwner() {
+        var member = service.issue("member-1", null, "member");
+        var principal = service.requireMember(member.token());
+        assertEquals("member-1", principal.memberId());
+        service.requireOwner(principal, "member-1");
+        var missing = assertThrows(CustomException.class, () -> service.requireMember(null));
+        assertEquals(ErrorCode.AUTH_REQUIRED, missing.getErrorCode());
+        var foreignOwner = assertThrows(CustomException.class,
+                () -> service.requireOwner(principal, "member-2"));
+        assertEquals(ErrorCode.ACCESS_DENIED, foreignOwner.getErrorCode());
+    }
+
+    @Test
     void expiredRevokedAndMissingKeySessionsBecomeAnonymous() {
         var issued = service.issue("member-1", null, "req");
         String hash = MemberSessionService.hashToken(issued.token());
@@ -149,9 +184,25 @@ class MemberSessionServiceTest {
         }
 
         @Override
+        public void insertGuestSession(String id, String analyticsKey, String hash,
+                String keyId, Instant created, Instant expiry) {
+            rows.put(hash, new MemberSessionRow(id, null, "guest", hash, keyId, 1,
+                    created, expiry, null, null, null, null, false, false));
+        }
+
+        @Override
         public void revokeMemberSession(String hash, String memberId, Instant at) {
             var row = rows.get(hash);
             if (row != null && memberId.equals(row.memberId()) && row.revokedAt() == null && row.expiresAt().isAfter(at)) {
+                rows.put(hash, copy(row, row.expiresAt(), at, row.csrfKeyId()));
+            }
+        }
+
+        @Override
+        public void revokeGuestSession(String hash, Instant at) {
+            var row = rows.get(hash);
+            if (row != null && "guest".equals(row.kind()) && row.revokedAt() == null
+                    && row.expiresAt().isAfter(at)) {
                 rows.put(hash, copy(row, row.expiresAt(), at, row.csrfKeyId()));
             }
         }

@@ -38,4 +38,4 @@
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
-| [setTutorialState](../../api/out/zoop-api-spec.md#settutorialstate) | PUT /api/v1/auth/tutorial | 6.1.2, 6.11.1, 6.3.7, 6.3.10 | 회원 또는 비회원 세션 |
+| [setTutorialState](../../api/out/zoop-api-spec.md#settutorialstate) | PUT /api/v1/auth/tutorial | 6.1.2, 6.11.1, 6.3.7, 6.3.10 | 회원 |

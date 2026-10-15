@@ -58,4 +58,27 @@ class MemberSessionPostgresTest {
                 Timestamp.from(now.minusSeconds(1)), MemberSessionService.hashToken(replacement.token()));
         assertTrue(service.lookup(replacement.token(), "postgres-expired").clearCookie());
     }
+
+    @Test
+    @Transactional
+    void guestSessionPersistsWithoutMemberOrTutorialState() {
+        var issued = service.issueGuest(null, "guest-postgres-test");
+        var row = jdbc.queryForMap("""
+                SELECT kind, member_id, analytics_key, token_hash, tutorial_completed
+                FROM member_sessions WHERE token_hash = ?
+                """, MemberSessionService.hashToken(issued.token()));
+        assertEquals("guest", row.get("kind"));
+        assertNull(row.get("member_id"));
+        assertNotNull(row.get("analytics_key"));
+        assertEquals(MemberSessionService.hashToken(issued.token()), row.get("token_hash"));
+        assertEquals(false, row.get("tutorial_completed"));
+        assertEquals("guest", service.lookup(issued.token(), "guest-postgres-read").response().kind());
+
+        var replacement = service.issueGuest(issued.token(), "guest-postgres-rotate");
+        assertTrue(service.lookup(issued.token(), "guest-postgres-revoked").clearCookie());
+        assertTrue(service.lookup(replacement.token(), "guest-postgres-current").response().authenticated());
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                () -> jdbc.update("UPDATE member_sessions SET tutorial_completed = true WHERE token_hash = ?",
+                        MemberSessionService.hashToken(replacement.token())));
+    }
 }

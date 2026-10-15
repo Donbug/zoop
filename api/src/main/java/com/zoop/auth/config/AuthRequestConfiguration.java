@@ -12,11 +12,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class AuthRequestConfiguration implements WebMvcConfigurer {
     private final AuthOriginInterceptor interceptor;
     private final MemberCsrfInterceptor memberCsrfInterceptor;
+    private final MemberAuthorizationInterceptor memberAuthorizationInterceptor;
 
     public AuthRequestConfiguration(AuthOriginInterceptor interceptor,
-            MemberCsrfInterceptor memberCsrfInterceptor) {
+            MemberCsrfInterceptor memberCsrfInterceptor,
+            MemberAuthorizationInterceptor memberAuthorizationInterceptor) {
         this.interceptor = interceptor;
         this.memberCsrfInterceptor = memberCsrfInterceptor;
+        this.memberAuthorizationInterceptor = memberAuthorizationInterceptor;
     }
 
     @Bean
@@ -33,10 +36,15 @@ public class AuthRequestConfiguration implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(interceptor).addPathPatterns(
-                "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/social/signup",
+                "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/guest", "/api/v1/auth/social/signup",
                 "/api/v1/auth/social/*/link/authorize");
         registry.addInterceptor(memberCsrfInterceptor).addPathPatterns("/api/v1/**")
                 .excludePathPatterns("/api/v1/auth/signup", "/api/v1/auth/login",
                         "/api/v1/auth/social/signup");
+        registry.addInterceptor(memberAuthorizationInterceptor)
+                .addPathPatterns("/api/v1/me/**", "/api/v1/portfolio", "/api/v1/portfolio/**",
+                        "/api/v1/chat/**",
+                        "/api/v1/feedback", "/api/v1/briefings/*/personalized",
+                        "/api/v1/auth/tutorial");
     }
 }
