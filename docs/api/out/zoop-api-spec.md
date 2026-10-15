@@ -16,7 +16,7 @@
 
 ### sessionLifecycle
 
-로그아웃과 차단은 서버 세션을 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
+회원 로그아웃은 현재 회원 세션만 폐기하고 관리자 로그아웃은 현재 관리자 세션만 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
 
 ### signupPolicy
 
@@ -350,7 +350,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## logOut · 회원 로그아웃
 
-회원 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_session 쿠키만 제거하며 관리자 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
+회원 로그아웃은 현재 회원 세션만 자연 멱등하게 폐기하며 Idempotency-Key를 요구하지 않는다. 활성 zoop_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증한다. 활성 회원 세션이면 해당 세션만 폐기하고, 비회원 세션이면 서버 세션을 폐기하지 않는다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료 상태에서는 다른 세션을 변경하지 않고 204를 반환한다. 모든 경우 zoop_session 쿠키만 제거하며 관리자 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
