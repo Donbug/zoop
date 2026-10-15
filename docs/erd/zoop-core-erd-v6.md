@@ -155,10 +155,12 @@ CHECK(idle_expires_at <= expires_at)
 
 ```text
 id text PK; ticker text?; exchange_code text?; name text; name_key text; market text?
-aliases text[]; search_text text; brand_color text?; logo_url text?; profile jsonb
+aliases text[]; search_text text; brand_color text?; logo_url text?; brand_source text?; profile jsonb
 created_at timestamptz; updated_at timestamptz
 UNIQUE(exchange_code, ticker) WHERE exchange_code IS NOT NULL AND ticker IS NOT NULL
 ```
+
+`brand_source`는 `brand_color`·`logo_url`에 사용한 색상·로고의 출처 URL을 보관하는 선택 필드다. 기업 상세 API의 공식 홈페이지 주소(`websiteUrl`)와 구분하며, 공개 기업 API 응답에는 포함하지 않는다. 출처를 확인할 수 없으면 NULL로 둔다.
 
 별칭 테이블을 배열로 합친다. ticker 단독 UNIQUE는 두지 않고 거래소와 묶는다. q는 id/name/alias/ticker를 검색한다. id 정확 일치와 ticker 정확 일치를 최상위 정확 식별자 그룹으로 합치고, 그다음 이름 정확 일치→부분 일치, 동률은 name/id로 안정 정렬한다. id 정확 일치는 PK B-tree를 사용하며 다른 검색 분기 결과와 기업 ID로 중복 제거한다. 동일 ticker의 다른 거래소 기업도 각각 반환한다. 별칭은 회사 간 중복 가능하다.
 

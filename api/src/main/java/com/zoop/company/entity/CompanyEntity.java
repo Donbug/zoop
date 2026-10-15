@@ -46,6 +46,9 @@ public class CompanyEntity {
     @Column(name = "logo_url", columnDefinition = "text")
     private String logoUrl;
 
+    @Column(name = "brand_source", columnDefinition = "text")
+    private String brandSource;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "profile", nullable = false, columnDefinition = "jsonb")
     private Map<String, Object> profile;

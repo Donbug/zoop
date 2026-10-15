@@ -9956,7 +9956,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Same-origin logo path (`/logos/<file>`); null when the catalog has none."
+          description: "Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none."
         directIssues:
           items:
             "$ref": "#/components/schemas/CompanyIssueRef"
@@ -10368,7 +10368,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Same-origin logo path (`/logos/<file>`); null when the catalog has none."
+          description: "Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none."
         issueCount:
           type: "integer"
       type: "object"
@@ -11998,7 +11998,7 @@ components:
               type: "string"
             -
               type: "null"
-          description: "Same-origin path of the company logo (`/logos/<file>`); null for issues or when unset."
+          description: "Same-origin path of the company logo (`/graph-assets/<file>`); null for issues or when unset."
         eventTime:
           anyOf:
             -
