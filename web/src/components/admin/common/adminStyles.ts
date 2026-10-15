@@ -56,3 +56,4 @@ export function adminActionErrorMessage(error: Error) {
 export const TEXTAREA = `min-h-20 w-full rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 py-2 text-xs leading-relaxed text-zoop-ink focus:border-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
 export const SELECT = `h-9 w-full rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2 text-xs text-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
 export const PRIMARY_BUTTON = `h-9 shrink-0 rounded-[3px] bg-zoop-ink px-3 text-xs font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${FOCUS_RING}`;
+export const SEARCH_INPUT = `h-9 w-full max-w-80 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs text-zoop-ink placeholder:text-zoop-faint focus:border-zoop-ink ${FOCUS_RING}`;

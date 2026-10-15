@@ -194,6 +194,14 @@ export const router = createBrowserRouter([
             }),
           },
           {
+            path: 'members/:memberId',
+            lazy: async () => ({
+              Component: (
+                await import('@/pages/admin/members/AdminMemberDetailPage')
+              ).default,
+            }),
+          },
+          {
             path: 'members',
             lazy: async () => ({
               Component: (
