@@ -98,6 +98,7 @@ export function toG6Data(
   width: number,
   height: number,
   expandedId?: string | null,
+  forcedNodes: string[] = [],
 ): GraphData {
   const summary = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
@@ -112,6 +113,7 @@ export function toG6Data(
   );
   const visible = data.nodes.filter(
     (n) =>
+      forcedNodes.includes(n.id) ||
       n.kind === 'company' ||
       n.id === expandedId ||
       (summary.incident.get(n.id)?.length ?? 0) > 1 ||
