@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.zoop.auth.dto.SessionResponse;
 import com.zoop.auth.repository.MemberSessionRepository;
 import com.zoop.auth.repository.MemberSessionRow;
 import com.zoop.common.exception.CustomException;
@@ -38,7 +39,23 @@ class MemberSessionServiceTest {
         assertEquals(issued.response().csrfToken(), lookup.response().csrfToken());
         assertEquals("req-2", lookup.response().metadata().requestId());
         assertEquals("member-1", lookup.response().user().id());
+        assertEquals(new SessionResponse.Setup(false, false), lookup.response().setup());
         assertFalse(lookup.clearCookie());
+    }
+
+    @Test
+    void memberLookupReturnsLatestStoredSetupState() {
+        var issued = service.issue("member-1", null, "setup-state");
+        String hash = MemberSessionService.hashToken(issued.token());
+        var row = repository.rows.get(hash);
+        repository.rows.put(hash, new MemberSessionRow(row.id(), row.memberId(), row.kind(),
+                row.tokenHash(), row.csrfKeyId(), row.csrfVersion(), row.createdAt(), row.expiresAt(),
+                row.revokedAt(), row.memberStatus(), row.email(), row.displayName(), true, true));
+
+        var lookup = service.lookup(issued.token(), "setup-state-read");
+
+        assertEquals(new SessionResponse.Setup(true, true), lookup.response().setup());
+        assertEquals("member-1", lookup.response().user().id());
     }
 
     @Test
@@ -50,6 +67,41 @@ class MemberSessionServiceTest {
         assertTrue(service.lookup(first.token(), "one").clearCookie());
         assertTrue(service.lookup(second.token(), "two").response().authenticated());
         assertTrue(service.lookup(other.token(), "other").response().authenticated());
+    }
+
+    @Test
+    void guestSessionIsHashedRotatableAndNeverCarriesTutorialState() {
+        var guest = service.issueGuest(null, "guest-start");
+        var row = repository.rows.get(MemberSessionService.hashToken(guest.token()));
+        assertNotNull(row);
+        assertEquals("guest", guest.response().kind());
+        assertTrue(guest.response().authenticated());
+        assertNull(guest.response().user());
+        assertFalse(guest.response().setup().completed());
+        assertFalse(guest.response().setup().tutorialCompleted());
+        assertEquals(NOW.plus(SessionCookie.LIFETIME), guest.response().expiresAt());
+        assertFalse(repository.rows.containsKey(guest.token()));
+        assertEquals("guest", service.lookup(guest.token(), "guest-read").response().kind());
+        service.verifyCsrf(guest.token(), guest.response().csrfToken());
+
+        var replacement = service.issueGuest(guest.token(), "guest-reissue");
+        assertTrue(service.lookup(guest.token(), "guest-revoked").clearCookie());
+        assertEquals("guest", service.lookup(replacement.token(), "guest-current").response().kind());
+        var error = assertThrows(CustomException.class, () -> service.requireMember(replacement.token()));
+        assertEquals(ErrorCode.MEMBER_REQUIRED, error.getErrorCode());
+    }
+
+    @Test
+    void memberGuardRequiresSessionAndResourceOwner() {
+        var member = service.issue("member-1", null, "member");
+        var principal = service.requireMember(member.token());
+        assertEquals("member-1", principal.memberId());
+        service.requireOwner(principal, "member-1");
+        var missing = assertThrows(CustomException.class, () -> service.requireMember(null));
+        assertEquals(ErrorCode.AUTH_REQUIRED, missing.getErrorCode());
+        var foreignOwner = assertThrows(CustomException.class,
+                () -> service.requireOwner(principal, "member-2"));
+        assertEquals(ErrorCode.ACCESS_DENIED, foreignOwner.getErrorCode());
     }
 
     @Test
@@ -122,6 +174,8 @@ class MemberSessionServiceTest {
         var result = service.lookup(token, "req");
         assertFalse(result.response().authenticated());
         assertEquals("anonymous", result.response().kind());
+        assertNull(result.response().user());
+        assertNull(result.response().setup());
         assertNull(result.response().csrfToken());
         assertNull(result.response().expiresAt());
         assertTrue(result.clearCookie());
@@ -149,9 +203,25 @@ class MemberSessionServiceTest {
         }
 
         @Override
+        public void insertGuestSession(String id, String analyticsKey, String hash,
+                String keyId, Instant created, Instant expiry) {
+            rows.put(hash, new MemberSessionRow(id, null, "guest", hash, keyId, 1,
+                    created, expiry, null, null, null, null, false, false));
+        }
+
+        @Override
         public void revokeMemberSession(String hash, String memberId, Instant at) {
             var row = rows.get(hash);
             if (row != null && memberId.equals(row.memberId()) && row.revokedAt() == null && row.expiresAt().isAfter(at)) {
+                rows.put(hash, copy(row, row.expiresAt(), at, row.csrfKeyId()));
+            }
+        }
+
+        @Override
+        public void revokeGuestSession(String hash, Instant at) {
+            var row = rows.get(hash);
+            if (row != null && "guest".equals(row.kind()) && row.revokedAt() == null
+                    && row.expiresAt().isAfter(at)) {
                 rows.put(hash, copy(row, row.expiresAt(), at, row.csrfKeyId()));
             }
         }

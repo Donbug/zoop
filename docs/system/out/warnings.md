@@ -218,7 +218,7 @@
 | BFF_PATH_DIFFERENCE | difference | logIn | 목표 /api/v1/auth/login ↔ BFF /api/auth/login |  |
 | BFF_FIELD_DIFFERENCE | difference | logIn | 목표만 181 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | startGuestSession | 목표 /api/v1/auth/guest ↔ BFF /api/auth/guest |  |
-| BFF_FIELD_DIFFERENCE | difference | startGuestSession | 목표만 146 · BFF만 41 · 형식/필수/권한 변경 5 |  |
+| BFF_FIELD_DIFFERENCE | difference | startGuestSession | 목표만 147 · BFF만 41 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | logOut | 목표 /api/v1/auth/logout ↔ BFF /api/auth/logout |  |
 | BFF_FIELD_DIFFERENCE | difference | logOut | 목표만 126 · BFF만 30 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | setTutorialState | 목표 /api/v1/auth/tutorial ↔ BFF /api/auth/tutorial |  |

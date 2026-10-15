@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.UNPROCESSABLE_CONTENT, "잘못된 요청입니다.", false),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호를 확인해 주세요.", false),
+    AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.", false),
+    MEMBER_REQUIRED(HttpStatus.FORBIDDEN, "회원 전용 기능입니다.", false),
     MEMBER_BLOCKED(HttpStatus.FORBIDDEN, "차단된 회원입니다.", false),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "요청이 허용되지 않습니다.", false),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "이미 등록된 이메일입니다.", false),
