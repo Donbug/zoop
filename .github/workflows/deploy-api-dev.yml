@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Validate deployment variables
         shell: bash
@@ -55,7 +55,7 @@ jobs:
           fi
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.3.0
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -63,7 +63,7 @@ jobs:
 
       - name: Log in to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2.1.7
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
 
       - name: Build and push API image
         id: build-image
@@ -92,14 +92,14 @@ jobs:
 
       - name: Render API task definition
         id: render-task-definition
-        uses: aws-actions/amazon-ecs-render-task-definition@v1.9.0
+        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea
         with:
           task-definition: task-definition.json
           container-name: ${{ env.ECS_CONTAINER_NAME }}
           image: ${{ steps.build-image.outputs.image }}
 
       - name: Deploy API to Amazon ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.3
+        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de
         with:
           task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
           service: ${{ env.ECS_SERVICE }}
