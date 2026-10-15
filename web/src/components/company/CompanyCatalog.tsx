@@ -42,6 +42,9 @@ export default function CompanyCatalog() {
           const params = new URLSearchParams(location.search);
           params.delete('event');
           params.delete('bucket');
+          params.delete('document');
+          params.delete('evidence');
+          params.delete('docScope');
           params.delete('returnTo');
           return (
             <li key={c.id}>
