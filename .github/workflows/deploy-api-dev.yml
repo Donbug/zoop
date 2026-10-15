@@ -1,0 +1,106 @@
+name: Deploy API to Dev
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-api-dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.API_ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ vars.API_ECS_CLUSTER }}
+  ECS_SERVICE: ${{ vars.API_ECS_SERVICE }}
+  ECS_TASK_DEFINITION: ${{ vars.API_ECS_TASK_DEFINITION }}
+  ECS_CONTAINER_NAME: ${{ vars.API_ECS_CONTAINER_NAME }}
+
+jobs:
+  deploy:
+    name: Build and deploy API
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Validate deployment variables
+        shell: bash
+        run: |
+          required_variables=(
+            AWS_REGION
+            ECR_REPOSITORY
+            ECS_CLUSTER
+            ECS_SERVICE
+            ECS_TASK_DEFINITION
+            ECS_CONTAINER_NAME
+          )
+
+          for variable_name in "${required_variables[@]}"; do
+            if [ -z "${!variable_name}" ]; then
+              echo "::error::$variable_name is not configured."
+              exit 1
+            fi
+          done
+
+          if [ -z "${{ vars.AWS_ROLE_ARN }}" ]; then
+            echo "::error::AWS_ROLE_ARN is not configured."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: zoop-api-dev-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.7
+
+      - name: Build and push API image
+        id: build-image
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          image_uri="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+          docker build \
+            --file api/Dockerfile \
+            --tag "$image_uri" \
+            api
+
+          docker push "$image_uri"
+          echo "image=$image_uri" >> "$GITHUB_OUTPUT"
+
+      - name: Download current task definition
+        shell: bash
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render API task definition
+        id: render-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1.9.0
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy API to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.3
+        with:
+          task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
