@@ -55,6 +55,26 @@ tasks.register('companyIntegrationTest', Test) {
 	}
 }
 
+tasks.register('authIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Verifies authentication migrations and flows against PostgreSQL.'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'auth-postgres'
+	}
+	outputs.upToDateWhen { false }
+	doFirst {
+		if (!System.getenv('DB_URL')?.startsWith('jdbc:postgresql:')) {
+			throw new GradleException('Set DB_URL to a PostgreSQL test database for authIntegrationTest')
+		}
+	}
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat 'full'
+	}
+}
+
 // Real cross-language gate: this JVM talks to a running ai/service and the installed zoop-ai CLI (replay only).
 // Run it through `make api-ai-smoke`; that script starts the service and exports ZOOP_AI_CONTRACT_MANIFEST.
 // Without the manifest the tests fail; they never skip.

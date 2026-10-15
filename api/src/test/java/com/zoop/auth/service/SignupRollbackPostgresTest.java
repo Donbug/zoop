@@ -11,6 +11,7 @@ import com.zoop.auth.repository.JdbcSignupTermsRepository;
 import com.zoop.auth.repository.SignupTermRow;
 import com.zoop.auth.repository.SignupTermsRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 @Import(SignupRollbackPostgresTest.FailingAgreementConfig.class)
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
+@Tag("auth-postgres")
 class SignupRollbackPostgresTest {
     @Autowired SignupService signups;
     @Autowired JdbcSignupTermsRepository actualTerms;

@@ -24,6 +24,7 @@ import com.zoop.common.exception.ErrorCode;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "ZOOP_AUTH_ALLOWED_ORIGINS=https://zoop.example"
 })
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
+@Tag("auth-postgres")
 class EmailAuthPostgresTest {
     private static final String PASSWORD = "correct horse battery staple 2026";
     private static final String ORIGIN = "https://zoop.example";

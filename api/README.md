@@ -69,7 +69,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 ./api/gradlew -p api test
 ```
 
-DB 환경변수가 없으면 단위·웹 계층 테스트만 실행되고 PostgreSQL 통합 테스트는 건너뜁니다. `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 설정한 뒤 `./api/gradlew -p api test`를 실행하면 가입·로그인·세션·제한 경계 통합 테스트도 실행됩니다. 결과 XML의 `skipped`가 0인지 확인하세요. 새 DB 경로는 별도 빈 데이터베이스를 만들고 같은 환경변수로 `test`를 실행해 Flyway 전체 적용을 검증합니다. 기존 DB 경로는 기존 로컬 DB URL로 다시 실행합니다. 실행 JAR은 `api/build/libs/`에 생성됩니다. 루트에서는 아래 이름을 씁니다(`prototype/bff`의 `bff-*`와 구분됩니다).
+DB 환경변수가 없으면 단위·웹 계층 테스트만 실행되고 PostgreSQL 통합 테스트는 건너뜁니다. `DB_URL`·`DB_USERNAME`·`DB_PASSWORD`를 설정한 뒤 `./api/gradlew -p api authIntegrationTest`를 실행하면 가입·로그인·세션·제한 경계 통합 테스트를 명시적으로 실행합니다. DB 설정이 없으면 이 전용 작업은 실패합니다. CI도 PostgreSQL 서비스에서 이 작업을 실행합니다. 새 DB 경로는 별도 빈 데이터베이스를 만들고 같은 환경변수로 전용 작업을 실행해 Flyway 전체 적용을 검증합니다. 기존 DB 경로는 기존 로컬 DB URL로 다시 실행합니다. 실행 JAR은 `api/build/libs/`에 생성됩니다. 루트에서는 아래 이름을 씁니다(`prototype/bff`의 `bff-*`와 구분됩니다).
 
 ```sh
 make api-test                        # ./api/gradlew -p api test
