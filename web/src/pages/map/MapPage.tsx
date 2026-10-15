@@ -28,6 +28,7 @@ import { impactEdges, exactTime } from '@/components/company/detail-model';
 import type { Impact } from '@/types/company/detail';
 import { useAuth } from '@/hooks/useAuth';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
+import { track, useScreenView } from '@/util/track';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EventDetail } from '@/types/map/event';
@@ -52,6 +53,8 @@ function readFilter(value: string | null): PersonalScope {
 // WBS 6.6.21~6.6.23 · D-GRP-01/01b + D-GRP-02/03.
 export default function MapPage() {
   const { params, updateQuery } = useRouteQuery();
+  // FS065 계측: 메인 지도 노출 1회와 노드 선택. 노출 중 선택 여부는 viewId로 묶는다.
+  const viewId = useScreenView('main');
   // 회원 세션의 회원 ID(쿠키 세션). 비회원·세션 없음은 null
   const { checking } = useAuth();
   const token = useAuthStore(selectMemberId);
@@ -223,6 +226,7 @@ export default function MapPage() {
       id: null,
       impact: null,
     });
+    if (id) track({ type: 'graph_node_select', targetId: id, viewId });
   };
   const eventContext = {
     round,

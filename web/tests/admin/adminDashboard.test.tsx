@@ -5,6 +5,7 @@ import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import { useAdminSessionStore } from '@/stores/useAdminSessionStore';
 import type { AdminSession } from '@/types/admin';
 import type { Dashboard } from '@/types/admin/dashboard';
+import type { InsightsOverview } from '@/types/admin/insights';
 import {
   apiError,
   createFakeServer,
@@ -15,6 +16,59 @@ import { renderRoutes } from '../support/renderRoutes';
 
 const DASHBOARD = '/api/v1/admin/dashboard';
 const SESSION = '/api/v1/admin/auth/session';
+const OVERVIEW = '/api/v1/admin/insights/overview';
+
+// 합성 fixture. 와이어프레임 A-ADM-01 '이용·선호도(7일)'의 예시 수치를 따른다.
+function overview(): InsightsOverview {
+  return {
+    window: '7d',
+    asOf: '2026-10-06T03:43:56Z',
+    minSample: 5,
+    metrics: [
+      {
+        key: 'activeUsers',
+        group: 'usage',
+        label: '활성 사용자',
+        kind: 'count',
+        unit: '명',
+        definition: '',
+        count: 4,
+        numerator: null,
+        denominator: null,
+        rate: null,
+        sampleHidden: false,
+      },
+      {
+        key: 'nodeCtr',
+        group: 'usage',
+        label: '노드 클릭률',
+        kind: 'ratio',
+        unit: '노출',
+        definition: '',
+        count: null,
+        numerator: 15,
+        denominator: 37,
+        rate: 0.405,
+        sampleHidden: false,
+      },
+      {
+        key: 'briefingRate',
+        group: 'interest',
+        label: '브리핑 조회율',
+        kind: 'ratio',
+        unit: '명',
+        definition: '',
+        count: null,
+        numerator: 0,
+        denominator: 4,
+        rate: null,
+        sampleHidden: true,
+      },
+    ],
+    feedback: { up: 0, down: 0, rate: null, sampleHidden: true },
+    members: { registered: 3, active: 3, blocked: 0 },
+  };
+}
 
 const signedIn: AdminSession = {
   authenticated: true,
@@ -131,6 +185,7 @@ beforeEach(() => {
   });
   server = createFakeServer();
   server.on('GET', SESSION, () => json(signedIn));
+  server.on('GET', OVERVIEW, () => json(overview()));
 });
 
 describe('A-ADM-01 운영 대시보드 (FS072)', () => {
@@ -165,6 +220,33 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
 
     const usage = screen.getByRole('region', { name: '이용 현황' });
     expect(within(usage).getByText('비회원 0')).toBeTruthy();
+  });
+
+  test('이용·선호도(7일)는 표본이 작으면 비율 대신 건수만 보여 준다', async () => {
+    server.on('GET', DASHBOARD, () => json(dashboard()));
+    openDashboard();
+
+    const section = await screen.findByRole('region', {
+      name: '이용·선호도(7일)',
+    });
+    expect(await within(section).findByText('40.5%')).toBeTruthy();
+    expect(within(section).getByText('15 / 37노출')).toBeTruthy();
+    expect(
+      within(section).getByText('0 / 4명 (분모 5 미만이라 비율 숨김)'),
+    ).toBeTruthy();
+    expect(within(section).getByText('3명')).toBeTruthy();
+    expect(within(section).getByText('차단 0명')).toBeTruthy();
+  });
+
+  test('이용·선호도 조회가 실패해도 나머지 대시보드는 보인다', async () => {
+    server.on('GET', DASHBOARD, () => json(dashboard()));
+    server.on('GET', OVERVIEW, () => apiError(503, 'SOURCE_UNAVAILABLE'));
+    openDashboard();
+
+    expect(
+      await screen.findByText('이용 통계를 불러오지 못했어요'),
+    ).toBeTruthy();
+    expect(screen.getByText('260건')).toBeTruthy();
   });
 
   test('관리 화면으로 가는 링크를 제공한다', async () => {
@@ -265,7 +347,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
 
     expect(
       await screen.findByText(
-        '대시보드를 볼 권한이 없어요. 관리자 권한을 확인해 주세요.',
+        '이 화면을 볼 권한이 없어요. 관리자 권한을 확인해 주세요.',
       ),
     ).toBeTruthy();
   });
