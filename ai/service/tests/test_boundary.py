@@ -107,3 +107,14 @@ def test_process_lookup_failure_is_an_error_and_not_a_clean_no_match(tmp_path, m
     monkeypatch.setattr(support, "PGREP", str(tmp_path / "absent"))
     with pytest.raises(OSError):
         runtime_processes(tmp_path / "state")
+
+
+def test_the_graph_door_opens_no_database_and_names_no_ledger_or_neo4j_driver():
+    """The graph family is a pure transport over the installed CLI: it imports no database driver or the pipeline and names no ledger file."""
+    doors = [path for path in SOURCE.glob("graph_*.py")]
+    assert {path.name for path in doors} >= {"graph_access.py", "graph_reads.py", "graph_runtime.py", "graph_wire.py", "graph_doc.py"}
+    for path in doors:
+        text = path.read_text(encoding="utf-8")
+        roots = imported_roots()[path.name]
+        assert not roots & {"sqlite3", "neo4j", "zoop_ai_pipeline"}, path.name
+        assert "graph.sqlite3" not in text and "graph.lock" not in text and "bolt://" not in text, path.name

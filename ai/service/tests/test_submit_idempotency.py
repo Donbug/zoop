@@ -5,7 +5,9 @@ import copy
 import json
 from concurrent.futures import ThreadPoolExecutor
 
-from support import canonical, cli, document_jobs, document_replay, reference
+import pytest
+
+from support import canonical, cli, document_jobs, document_replay, live_job, reference
 
 JOBS = "/internal/v1/analysis-jobs"
 
@@ -180,3 +182,28 @@ def test_an_oversized_content_length_is_refused_immediately_without_waiting_for_
     with socket.create_connection(("127.0.0.1", service.workspace.port), timeout=5) as quiet:
         quiet.sendall(head.replace(token.encode(), b"u" * 43))
         assert quiet.recv(65536).startswith(b"HTTP/1.1 401")
+
+
+NATIVE = {"ZOOP_AI_VERIFY_PROVIDER": "typesafe-native", "TYPESAFE_API_KEY": "synthetic-jev-key", "TYPESAFE_BASE_URL": "http://127.0.0.1:9/v1",
+          "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0", "ZOOP_AI_VERIFY_MODEL": None}
+
+
+@pytest.mark.parametrize("broken,code", [
+    ({"TYPESAFE_VALIDATION_MODEL": "jev-latest"}, "native_model_unsupported"),
+    ({"ZOOP_AI_VERIFY_MODEL": "synthetic-verify-model"}, "native_verify_stale_model_setting"),
+    ({"ZOOP_AI_VERIFY_REASONING_EFFORT": "high"}, "native_verify_stale_effort_setting"),
+])
+def test_a_definitely_invalid_native_configuration_is_409_unavailable_releases_the_key_and_a_corrected_retry_is_accepted(
+        start, live, broken, code):
+    workspace, base = live()
+    service = start(workspace=workspace, env={**base, **NATIVE, **broken})
+    job = live_job()
+    refused = service.submit(job)
+    assert refused.status_code == 409 and error_code(refused) == "execution_unavailable"
+    assert refused.json()["error"]["runtimeCode"] == code and refused.json()["error"]["retryable"] is False
+    assert not runtime_has(service, job["jobId"]) and service.status(job["jobId"]).status_code == 404
+    # The only attempt was refused definitively, so nothing is held for this key: another principal may claim it once the
+    # configuration is corrected (an unreleased reservation would answer 409 job_id_unavailable here).
+    service.stop()
+    fixed = start(workspace=workspace, env={**base, **NATIVE})
+    assert fixed.submit(job, as_="beta").status_code == 202

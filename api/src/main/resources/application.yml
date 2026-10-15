@@ -66,6 +66,15 @@ zoop:
     ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
     ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  document-read:
+    # Public GET /api/v1/evidence/{id} (see api/docs/DOCUMENT_ANALYSIS.md). Both settings are optional, independent of the operator
+    # import/analysis flags above, and read-only: nothing is created, locked or written. Paths only; the database uses DB_*.
+    # `grants` is the operator's flat S1 grant registry (the same file as ZOOP_DOCUMENT_ANALYSIS_GRANTS / the AI service),
+    # re-read on every request; unset, every evidence read answers 503. `artifact-root` is only needed to read the exact receipt
+    # of a summary that was served from the AI artifact cache; unset, only that read answers 503. A set value that is not a
+    # normalized absolute path to an existing file/directory fails startup.
+    grants: ${ZOOP_DOCUMENT_READ_GRANTS:}
+    artifact-root: ${ZOOP_DOCUMENT_READ_ARTIFACT_ROOT:}
 
 server:
   port: ${SERVER_PORT:8080}

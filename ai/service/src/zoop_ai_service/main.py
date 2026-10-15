@@ -20,6 +20,8 @@ from .extraction_dispatch import ExtractionDispatcher
 from .extraction_jobs import ExtractionJobs
 from .extraction_ledger import ExtractionLedger
 from .extraction_runtime import ExtractionProcess
+from .graph_reads import GraphReads
+from .graph_runtime import GraphProcess
 from .relation_dispatch import RelationDispatcher
 from .relation_jobs import RelationJobs
 from .relation_ledger import RelationLedger
@@ -43,6 +45,7 @@ class Service:
     extraction: ExtractionJobs | None = None
     extraction_dispatcher: ExtractionDispatcher | None = None
     extraction_ledger: ExtractionLedger | None = None
+    graph: GraphReads | None = None
 
 
 def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) -> Service:
@@ -79,19 +82,24 @@ def build_service(config: ServiceConfig, *, deadlines: Deadlines = Deadlines()) 
         extraction_dispatcher = ExtractionDispatcher(extraction_ledger, extraction_process, gate, emit,
                                                      lambda owner, pins, job_id: authority.refusal(owner, job_id, pins.approval))
         extraction = ExtractionJobs(config, extraction_ledger, extraction_process, extraction_dispatcher, gate, authority)
+    # The graph door is read-only and has no ledger of its own. When an S2/S3 group of this process is configured it shares THEIR gate (they write the
+    # ledgers the graph reads and a pipeline writer lock does not wait); without one the graph children run side by side behind a small slot limit.
+    graph = GraphReads(config, GraphProcess(config, deadlines), gate if config.graph.shared_gate else None) if config.graph is not None else None
     starting: dict[str, object] = {"event": "service_starting", "principals": len(config.principals), "live": config.live_available,
                                    "replay": config.replay_path is not None, "requeuedInFlight": requeued}
     if config.relation is not None:  # a disabled feature leaves the S1 startup line exactly as it was
         starting["relationInterrupted"] = interrupted
     if config.extraction is not None:
         starting["extractionInterrupted"] = extraction_interrupted
+    if config.graph is not None:
+        starting["graph"] = True
     emit(starting)
     return Service(config, lock, ledger, worker, dispatcher, jobs, relation, relation_dispatcher, relation_ledger, extraction, extraction_dispatcher,
-                   extraction_ledger)
+                   extraction_ledger, graph)
 
 
 def serve(service: Service) -> None:
-    app = create_app(service.jobs, service.relation, service.extraction)
+    app = create_app(service.jobs, service.relation, service.extraction, service.graph)
     service.dispatcher.start()
     if service.relation_dispatcher is not None:
         service.relation_dispatcher.start()

@@ -35,8 +35,9 @@ def _outlook_has_prohibited_expression(text: str) -> bool:
 
 
 class Runner:
-    def __init__(self, store: Store, provider=None, *, live_enabled: bool = False, max_calls: int = 0):
-        self.store, self.provider = store, provider
+    def __init__(self, store: Store, provider=None, *, verifier=None, live_enabled: bool = False, max_calls: int = 0):
+        """`provider` serves every stage; `verifier`, when set, serves only semantic-verification (a different recipient)."""
+        self.store, self.provider, self.verifier = store, provider, verifier
         self.live_enabled, self.max_calls = live_enabled, max_calls
 
     def submit(self, request: Submit) -> JobResult:
@@ -155,6 +156,7 @@ class Runner:
                     if not self.live_enabled:
                         raise WorkerFailure("live_opt_in_required")
                     self.store.configure_budget(self.max_calls)
+                    self._preflight(configs, received_stages)
                 if request.kind == "briefing-outlook":
                     answer, call = self._call(request, stage, self._payload(request), configs[stage], fence)
                     known = {i.event_id for i in request.input.issues}
@@ -243,6 +245,17 @@ class Runner:
             payload["candidate"] = candidate.wire()
         return payload
 
+    def _provider(self, stage):
+        return self.verifier if stage == "semantic-verification" and self.verifier is not None else self.provider
+
+    def _preflight(self, configs, received):
+        """Before any stage is paid for, every stage still to be sent must be sendable under the configuration it was frozen with:
+        a drifted endpoint, model or policy fails the job here rather than after an earlier stage was already charged."""
+        for stage, config in configs.items():
+            provider = self._provider(stage)
+            if stage not in received and provider is not None and not isinstance(provider, ReplayProvider) and not provider.accepts(config):
+                raise ProviderError("provider_configuration_changed")
+
     def _call(self, request, stage, payload, config, fence):
         previous = next((c for c in self.store.calls(request.job_id) if c["stage"] == stage), None)
         if previous:
@@ -250,27 +263,34 @@ class Runner:
                 if previous["error"]:
                     raise ProviderError(previous["error"], uncertain=previous["state"] == "unknown")
                 raise ProviderError("provider_response_unknown", uncertain=True)
+            if previous["state"] == "failed" and previous["error"]:
+                raise ValueError(previous["error"])  # a received response this stage already refused: never re-read, never re-sent
             return ANSWERS[stage].model_validate_json(previous["content"]), previous
-        if self.provider is None:
+        provider = self._provider(stage)
+        if provider is None:
             raise WorkerFailure("provider_not_configured")
-        if (request.mode == "replay") != isinstance(self.provider, ReplayProvider):
+        if (request.mode == "replay") != isinstance(provider, ReplayProvider):
             raise ProviderError("provider_mode_mismatch")
-        if request.mode == "live" and self.provider.provider_revision != config.provider_revision:
+        # The frozen stage configuration, not today's environment, decides who may receive this stage: no silent re-route.
+        if request.mode == "live" and not provider.accepts(config):
             raise ProviderError("provider_configuration_changed")
         self.store.authorize(request, stage, config)
         attempt_id = "attempt-" + uuid.uuid4().hex
         ordinal = self.store.reserve(job_id=request.job_id, stage=stage, request_digest=request_identity(stage, payload, config),
                                      config=config.wire(), mode=request.mode, fence=fence, attempt_id=attempt_id,
-                                     fixture_digest=self.provider.fixture_digest if isinstance(self.provider, ReplayProvider) else None)
+                                     fixture_digest=provider.fixture_digest if isinstance(provider, ReplayProvider) else None)
         started = time.perf_counter()
         try:
-            reply = self.provider.complete(stage, payload, config, ordinal=ordinal or 0)
+            reply = provider.complete(stage, payload, config, ordinal=ordinal or 0)
         except ProviderError as exc:
             self.store.db.execute("UPDATE calls SET state=?,error=?,duration_ms=? WHERE attempt_id=?",
                                   ("unknown" if exc.uncertain else "failed", exc.code, (time.perf_counter() - started) * 1000, attempt_id))
             raise
         self.store.receive(attempt_id, reply, (time.perf_counter() - started) * 1000)
         call = next(c for c in self.store.calls(request.job_id) if c["attempt_id"] == attempt_id)
+        if reply.invalid:
+            # Already durable with the receipt (Store.receive): the stage fails closed under the adapter's own code.
+            raise ValueError(reply.invalid)
         return ANSWERS[stage].model_validate_json(reply.content), call
 
     def _validate_verdict(self, candidate, verdict: VerificationAnswer):

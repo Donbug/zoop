@@ -129,6 +129,77 @@ public final class ArtifactFileStore {
         }
     }
 
+    /**
+     * Read-only variant of {@link Session#read} for a reader that holds no session: the same checks (regular owner-matching
+     * 0600 file in an owner-matching 0700 directory, exactly {@code bytes} long, hashing to {@code sha256}, at most
+     * {@value #MAX_READ_BYTES} bytes) and the same failure reasons, plus the root's own checks. It takes no lock and never
+     * creates, repairs, syncs or deletes anything: not the lock file, not a directory, not a temporary file. An operator
+     * session may run at the same time, because a final file is only ever linked into place complete and never changed.
+     */
+    public byte[] readVerified(String uri, String sha256, long bytes) {
+        try {
+            requireRoot(root, rootOwner);
+        } catch (IOException | UnsupportedOperationException | SecurityException error) {
+            throw unavailable(error);
+        }
+        return readVerified(root, rootOwner, uri, sha256, bytes);
+    }
+
+    private static byte[] readVerified(Path root, UserPrincipal rootOwner, String uri, String sha256, long bytes) {
+        if (uri == null || !uri.startsWith(URI_SCHEME) || sha256 == null || !SHA256.matcher(sha256).matches()
+                || bytes < 0 || bytes > MAX_READ_BYTES) {
+            throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "uri");
+        }
+        String relative = uri.substring(URI_SCHEME.length());
+        int slash = relative.indexOf('/');
+        if (slash <= 0 || relative.indexOf('/', slash + 1) >= 0) {
+            throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "uri");
+        }
+        String directory = relative.substring(0, slash);
+        String fileName = relative.substring(slash + 1);
+        if (!DIRECTORY.matcher(directory).matches() || !FILE_NAME.matcher(fileName).matches()) {
+            throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "name");
+        }
+        try {
+            Path folder = root.resolve(directory);
+            PosixFileAttributes directoryAttributes = attributesOrConflict(folder);
+            if (!directoryAttributes.isDirectory() || !OWNER_DIRECTORY.equals(directoryAttributes.permissions())
+                    || !rootOwner.equals(directoryAttributes.owner())) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "directory");
+            }
+            Path target = folder.resolve(fileName);
+            PosixFileAttributes attributes = attributesOrConflict(target);
+            if (!attributes.isRegularFile()) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "file");
+            }
+            if (!OWNER_FILE.equals(attributes.permissions()) || !rootOwner.equals(attributes.owner())) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "file");
+            }
+            if (attributes.size() != bytes) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "file");
+            }
+            byte[] content = readBounded(target, bytes);
+            if (content.length != bytes || !sha256(content).equals(sha256)) {
+                throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "file");
+            }
+            return content;
+        } catch (ArtifactStoreException error) {
+            throw error;
+        } catch (NoSuchFileException vanished) {
+            throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "missing");
+        } catch (IOException | UnsupportedOperationException | SecurityException error) {
+            throw unavailable(error);
+        }
+    }
+
+    private static PosixFileAttributes attributesOrConflict(Path path) throws IOException {
+        try {
+            return Files.readAttributes(path, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        } catch (NoSuchFileException absent) {
+            throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "missing");
+        }
+    }
+
     /** Content that is in the store, whether this session created it or found it. */
     public static final class StoredFile {
         private final Path path;
@@ -287,56 +358,7 @@ public final class ArtifactFileStore {
          * an insecure entry is unavailable, as for {@link #put}. At most {@value #MAX_READ_BYTES} bytes are ever read.
          */
         public byte[] read(String uri, String sha256, long bytes) {
-            if (uri == null || !uri.startsWith(URI_SCHEME) || sha256 == null || !SHA256.matcher(sha256).matches()
-                    || bytes < 0 || bytes > MAX_READ_BYTES) {
-                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "uri");
-            }
-            String relative = uri.substring(URI_SCHEME.length());
-            int slash = relative.indexOf('/');
-            if (slash <= 0 || relative.indexOf('/', slash + 1) >= 0) {
-                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "uri");
-            }
-            String directory = relative.substring(0, slash);
-            String fileName = relative.substring(slash + 1);
-            if (!DIRECTORY.matcher(directory).matches() || !FILE_NAME.matcher(fileName).matches()) {
-                throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "name");
-            }
-            try {
-                Path folder = root.resolve(directory);
-                PosixFileAttributes directoryAttributes = attributesOrConflict(folder);
-                if (!directoryAttributes.isDirectory() || !OWNER_DIRECTORY.equals(directoryAttributes.permissions())
-                        || !rootOwner.equals(directoryAttributes.owner())) {
-                    throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "directory");
-                }
-                Path target = folder.resolve(fileName);
-                PosixFileAttributes attributes = attributesOrConflict(target);
-                if (!attributes.isRegularFile()) {
-                    throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "file");
-                }
-                if (!OWNER_FILE.equals(attributes.permissions()) || !rootOwner.equals(attributes.owner())) {
-                    throw new ArtifactStoreException(ArtifactStoreException.Reason.UNAVAILABLE, "file");
-                }
-                if (attributes.size() != bytes) {
-                    throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "file");
-                }
-                byte[] content = readBounded(target, bytes);
-                if (content.length != bytes || !sha256(content).equals(sha256)) {
-                    throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "file");
-                }
-                return content;
-            } catch (ArtifactStoreException error) {
-                throw error;
-            } catch (IOException | UnsupportedOperationException | SecurityException error) {
-                throw unavailable(error);
-            }
-        }
-
-        private static PosixFileAttributes attributesOrConflict(Path path) throws IOException {
-            try {
-                return Files.readAttributes(path, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            } catch (NoSuchFileException absent) {
-                throw new ArtifactStoreException(ArtifactStoreException.Reason.CONFLICT, "missing");
-            }
+            return readVerified(root, rootOwner, uri, sha256, bytes);
         }
 
         @Override

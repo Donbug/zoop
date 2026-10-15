@@ -14,7 +14,14 @@ Everything is synthetic and local; no provider, no model, no network beyond loop
      values computed here, independently of the Java code. Authority is exercised at its edges: an app grant copy revoked between
      prepare and advance (the service still allows it) must not cause a submit, a grant revoked or expired while the settlement
      waits for a REAL PostgreSQL row lock must not become `available`, and a file conflict after other files were stored must
-     remove exactly the files that attempt created.
+     remove exactly the files that attempt created,
+  6. then (default; --no-with-evidence-read skips it) starts the SAME jar as a real web server on 127.0.0.1 with only the
+     ZOOP_DOCUMENT_READ_* settings and reads EVERY stored evidence row through GET /api/v1/evidence/{id}: the shape and the
+     quote against the exported text, pins, company context, a grant changed while the server runs, a private article, a moved
+     current version, a newer pending request, and the cache-served J4b (its calls are recorded under the withheld J4, so one
+     verified read of its exact receipt proves the creator; missing, altered or insecure receipt, missing creator executions, an
+     operator holding the store lock, no artifact root). Expectations come from psql and the grant file, not from the Java code. It
+     proves the reads change nothing: no AI request, no worker call, no row or table write, no file or lock file.
 
 Run it with the ai/service interpreter (zoop_ai and the service test harness are importable), against an EMPTY dedicated
 loopback PostgreSQL database that the jar will migrate:
@@ -31,6 +38,8 @@ stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls"
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import fcntl
 import hashlib
 import http.server
 import json
@@ -307,6 +316,420 @@ def pitem(ref: dict, kind: str, company: str, *, mode: str = "replay", source_ki
             "mode": mode, "sourceKind": source_kind, "latest": {"expected": expected}}
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# the public evidence read: the built jar as a REAL web server on loopback (no operator flag, no AI client)
+# --------------------------------------------------------------------------------------------------------------------
+EVIDENCE_KEYS = {"id", "quote", "start", "end", "articleId", "articleVersion", "article", "quoteVerified", "eventIds", "metadata",
+                 "sentiment", "documentVersion", "documentSummary", "analysisStatus", "analysisProvenance", "resultVersion"}
+METADATA_KEYS = {"source", "asOf", "graphVersion", "requestId", "partial", "failures"}
+FAILURE_KEYS = {"section", "code", "message", "retryable", "asOf"}
+ARTICLE_KEYS = {"title", "publisher", "url", "publishedAt"}
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+class Web:
+    """`java -jar` as a web server on 127.0.0.1 with only the read settings; the log is kept for the leak checks."""
+    logs: list[str] = []  # the whole log of every server this script started
+
+    def __init__(self, jar):
+        self.jar = jar
+        self.process: subprocess.Popen | None = None
+        self.lines: list[str] = []
+        self.port = 0
+
+    def start(self, grants: Path | None, root: Path | None) -> None:
+        check(self.process is None, "a web server is already running")
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            self.port = probe.getsockname()[1]
+        env = self.jar.base_env()
+        if grants is not None:
+            env["ZOOP_DOCUMENT_READ_GRANTS"] = str(grants)
+        if root is not None:
+            env["ZOOP_DOCUMENT_READ_ARTIFACT_ROOT"] = str(root)
+        self.lines = []
+        self.process = subprocess.Popen(self.jar.argv("--server.address=127.0.0.1", f"--server.port={self.port}"), env=env,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = self.process
+
+        def drain():
+            for raw in process.stdout:
+                self.lines.append(raw.decode("utf-8", "replace"))
+
+        threading.Thread(target=drain, daemon=True).start()
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline and process.poll() is None and not any("Started ZoopApplication" in line for line in self.lines):
+            time.sleep(0.3)
+        check(process.poll() is None and any("Started ZoopApplication" in line for line in self.lines),
+              "the web server did not start: " + "".join(self.lines)[-1500:])
+
+    def stop(self) -> None:
+        if self.process is None:
+            return
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=30)
+        time.sleep(0.3)
+        imp.OUTPUT.append("".join(self.lines))
+        Web.logs.append("".join(self.lines))
+        self.process = None
+
+    def get(self, path: str, headers: dict | None = None) -> tuple[int, dict, dict]:
+        request = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", headers=headers or {})
+        try:
+            with OPENER.open(request, timeout=30) as response:
+                return response.status, {k.lower(): v for k, v in response.headers.items()}, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, {k.lower(): v for k, v in error.headers.items()}, json.loads(error.read())
+
+
+def refuses_to_start(jar, env_extra: dict, needle: str, secret: str) -> None:
+    done = subprocess.run(jar.argv("--server.address=127.0.0.1", "--server.port=0"), env={**jar.base_env(), **env_extra},
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=240)
+    output = done.stdout.decode("utf-8", "replace")
+    imp.OUTPUT.append(output)
+    check(done.returncode != 0 and needle in output and "Tomcat started" not in output and secret not in output,
+          f"an unusable read setting must fail startup naming only the setting ({needle}): {output[-600:]}")
+
+
+def tree_snapshot(root: Path) -> list:
+    entries = []
+    for path in sorted(root.rglob("*")):
+        info = path.lstat()
+        entries.append((str(path.relative_to(root)), stat.S_IMODE(info.st_mode), info.st_mtime_ns, info.st_size))
+    return entries
+
+
+def content_snapshot(root: Path) -> dict:
+    return {str(p.relative_to(root)): (stat.S_IMODE(p.lstat().st_mode), sha(p.read_bytes())) for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def evidence_read_steps(jar, db, world, scratch: Path, refs: dict, documents: dict, cases: dict, observe) -> dict:
+    """Every real evidence row through the real HTTP route, against the state the analysis steps left behind.
+
+    Expectations are computed here from psql, the exported texts and the read grant file, never from the Java code. `cases` names
+    the analyses the scenario made: `j1` (summary whose document later got a pending request), `j4` (withheld: it made the calls), `j4b` (a
+    summary served from the AI artifact cache: its calls are recorded under J4), `j9`, `j6` (document whose latest request was withheld).
+    `observe()` returns the counters that a read must never move: AI service requests, worker calls and database row counts.
+    """
+    grants_file = scratch / "read-grants.json"
+    web = Web(jar)
+    article_doc = {refs[n]["documentId"]: n for n in refs}
+    served = {"requests": 0}
+
+    def save(document: dict | None, raw: str | None = None) -> None:
+        if document is None and raw is None:
+            grants_file.unlink(missing_ok=True)
+            return
+        temporary = scratch / "next-read-grants.json"
+        temporary.write_text(raw if raw is not None else json.dumps(document), encoding="utf-8")
+        temporary.replace(grants_file)
+
+    def grants(**changes) -> dict:
+        document = flat_grants()
+        document["grants"][0].update(changes)
+        return document
+
+    def rows() -> list[dict]:
+        return db.rows("SELECT e.id, e.article_id, e.article_version, e.quote, e.start_offset, e.end_offset, e.verification_artifact_id, "
+                       "d.id AS analysis_id, d.ai_job_id, d.result_version, d.result FROM evidence e "
+                       "JOIN document_analyses d ON d.exact_receipt_id = e.verification_artifact_id ORDER BY e.id")
+
+    def latest() -> dict:
+        found = db.rows("SELECT DISTINCT ON (article_id, article_version) id, article_id, article_version, status, result_version, result "
+                        "FROM document_analyses WHERE stage = 'summary' ORDER BY article_id, article_version, request_no DESC")
+        return {(r["article_id"], r["article_version"]): r for r in found}
+
+    def versions() -> dict:
+        found = db.rows("SELECT article_id, version, title, publisher, url, publication_precision, "
+                        "to_char(published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS published_at FROM article_versions")
+        return {(r["article_id"], r["version"]): r for r in found}
+
+    def get(evidence_id: str, query: str = "", request_id: str | None = None) -> tuple[int, dict, dict]:
+        served["requests"] += 1
+        return web.get(f"/api/v1/evidence/{evidence_id}{query}", {"X-Request-ID": request_id} if request_id else None)
+
+    def error(status: int, headers: dict, body: dict, http_status: int, code: str, message: str) -> None:
+        check(status == http_status and set(body) == {"error"} and set(body["error"]) == {"code", "message", "requestId", "retryable"}
+              and body["error"]["code"] == code and body["error"]["requestId"] == headers.get("x-request-id"),
+              f"{message}: expected {http_status} {code}, got {status} {json.dumps(body)[:300]}")
+
+    def expect_each(label: str, http_status: int, code: str | None = None, only: set | None = None) -> None:
+        """Every evidence row (or the `only` ids) answers `http_status`; a 200 is verified in full by `verify`."""
+        context = (versions(), latest()) if http_status == 200 else None
+        for ev in rows():
+            if only is not None and ev["id"] not in only:
+                continue
+            status, headers, body = get(ev["id"], request_id=f"smoke-{ev['id'][3:11]}")
+            if http_status == 200:
+                verify(label, ev, status, headers, body, context=context)
+            else:
+                error(status, headers, body, http_status, code, f"{label}: {ev['id']}")
+
+    def verify(label: str, ev: dict, status: int, headers: dict, body: dict, query: str = "", context=None) -> None:
+        known_versions, known_latest = context or (versions(), latest())
+        check(status == 200, f"{label}: {ev['id']} answered {status}: {json.dumps(body)[:300]}")
+        number = article_doc[ev["article_id"]]
+        text = documents[number]["text"]
+        check(set(body) == EVIDENCE_KEYS and set(body["metadata"]) == METADATA_KEYS and set(body["article"]) == ARTICLE_KEYS
+              and all(set(f) == FAILURE_KEYS for f in body["metadata"]["failures"]), f"{label}: keys {sorted(body)}")
+        check(body["id"] == ev["id"] and body["quote"] == ev["quote"] == text[ev["start_offset"]:ev["end_offset"]]
+              and (body["start"], body["end"]) == (ev["start_offset"], ev["end_offset"]),
+              f"{label}: the quote is not the Python code point slice of the exported text")
+        check(body["quoteVerified"] is True
+              and (body["articleId"], body["articleVersion"], body["documentVersion"]) == (ev["article_id"], ev["article_version"], ev["article_version"])
+              and body["eventIds"] == [] and body["sentiment"] is None and body["analysisStatus"] is None, f"{label}: base fields {body}")
+        version = known_versions[(ev["article_id"], ev["article_version"])]
+        published = None if version["publication_precision"] != "datetime" else version["published_at"]
+        check(body["article"] == {"title": version["title"], "publisher": version["publisher"], "url": version["url"],
+                                  "publishedAt": published}, f"{label}: article {body['article']} vs {version}")
+        meta = body["metadata"]
+        check(meta["source"] == "document-analysis" and meta["graphVersion"] is None and meta["partial"] is True
+              and meta["requestId"] == headers.get("x-request-id") and meta["failures"][0] == {
+                  "section": "eventIds", "code": "SOURCE_UNAVAILABLE", "message": meta["failures"][0]["message"], "retryable": False,
+                  "asOf": None} and len(meta["failures"]) == (2 if "companyId=SYNTH-A" in query else 1), f"{label}: metadata {meta}")
+        as_of = dt.datetime.fromisoformat(meta["asOf"].replace("Z", "+00:00"))
+        check(abs((dt.datetime.now(dt.timezone.utc) - as_of).total_seconds()) < 600, f"{label}: asOf {meta['asOf']} is not the request time")
+        newest = known_latest[(ev["article_id"], ev["article_version"])]
+        if newest["status"] == "available":
+            check(body["documentSummary"] == newest["result"] and body["resultVersion"] == newest["result_version"]
+                  and body["analysisProvenance"] == newest["result"]["provenance"],
+                  f"{label}: documentSummary is not the latest available result")
+            if newest["id"] == ev["analysis_id"]:
+                check(ev["id"] in [c["evidenceId"] for c in body["documentSummary"]["citations"]], f"{label}: the summary does not cite its evidence")
+        else:
+            check(body["documentSummary"] is None and body["resultVersion"] is None and body["analysisProvenance"] is None,
+                  f"{label}: a {newest['status']} latest request must not fall back to an older summary")
+        text_dump = json.dumps(body, ensure_ascii=False)
+        check(str(world.root) not in text_dump and "artifact-root:" not in text_dump and "storage_uri" not in text_dump,
+              f"{label}: the body names a storage location")
+
+    def database_digest() -> str:
+        return db.run("SELECT md5(concat_ws('|', "
+                      "(SELECT coalesce(string_agg(t::text, '|' ORDER BY t.id), '') FROM document_analyses t), "
+                      "(SELECT coalesce(string_agg(t::text, '|' ORDER BY t.id), '') FROM ai_executions t), "
+                      "(SELECT coalesce(string_agg(t::text, '|' ORDER BY t.id), '') FROM evidence t), "
+                      "(SELECT coalesce(string_agg(t::text, '|' ORDER BY t.id), '') FROM artifacts t), "
+                      "(SELECT coalesce(string_agg(t::text, '|' ORDER BY t.id), '') FROM articles t)))")
+
+    def table_writes() -> int:
+        time.sleep(3)  # the statistics collector reports on idle backends after about a second
+        return db.scalar("SELECT coalesce(sum(n_tup_ins + n_tup_upd + n_tup_del), 0) FROM pg_stat_user_tables")
+
+    j1, j4b, j9, j6 = cases["j1"], cases["j4b"], cases["j9"], cases["j6"]
+    ids = {name: [e["id"] for e in rows() if e["analysis_id"] == cases[name]["analysisId"]] for name in ("j1", "j4b", "j6", "j9")}
+    check(all(len(v) == 2 for v in ids.values()), f"every case summary must own two evidence rows: {ids}")
+    check(len(rows()) == 10, f"expected ten stored evidence rows, got {len(rows())}")
+    cached_ids = set(ids["j4b"])
+    exact = lambda case: world.artifacts / "exact_receipt" / f"exact-{case['analysisId']}.json"  # noqa: E731
+    save(flat_grants())
+    try:
+        # ---- A: every stored evidence row, with the artifact root --------------------------------------------------------------
+        label = step("evidence read: the built jar as a real web server; EVERY stored evidence row (incl. the cache-served J4b) answers 200 with a verified shape")
+        web.start(grants_file, world.artifacts)
+        baseline, files_before, db_before, contents = observe(), tree_snapshot(world.artifacts), database_digest(), content_snapshot(world.artifacts)
+        writes_before = table_writes()
+        check(world.artifacts.joinpath(".document-import.lock").exists(), f"{label}: the analysis runs must have created the lock file")
+        expect_each(label, 200)
+        check(len(cached_ids & {e["id"] for e in rows()}) == 2 and db.rows(
+            f"SELECT 1 FROM ai_executions WHERE ai_job_id = '{j4b['aiJobId']}'") == [], f"{label}: J4b must be the cache-served case")
+
+        label = step("evidence read: public (no credential), X-Request-ID echoed or generated, JSON content type, unknown and malformed ids")
+        first = ids["j1"][0]
+        status, headers, body = get(first, request_id="smoke-echo-1")
+        check(status == 200 and headers.get("x-request-id") == "smoke-echo-1" and body["metadata"]["requestId"] == "smoke-echo-1"
+              and headers.get("content-type", "").startswith("application/json"), f"{label}: {status} {headers}")
+        status, headers, body = get(first)
+        check(status == 200 and headers.get("x-request-id") and body["metadata"]["requestId"] == headers["x-request-id"], f"{label}: generated id")
+        for bad in ("ev-" + "0" * 64, "ev-" + "0" * 63, "EV-" + "0" * 64, "nope", "ev-" + "g" * 64):
+            status, headers, body = get(bad)
+            error(status, headers, body, 404, "RESOURCE_NOT_FOUND", f"{label}: {bad}")
+
+        label = step("evidence read: pinned round/graphVersion/asOf are 409 VERSION_UNAVAILABLE (never the latest), blank or offset-less values 422")
+        for query in ("?round=brf-2026-09-17-morning", "?graphVersion=gv-1", "?asOf=2026-10-15T00:00:00Z", "?asOf=2026-10-15T09%3A00%3A00%2B09%3A00"):
+            status, headers, body = get(first, query)
+            error(status, headers, body, 409, "VERSION_UNAVAILABLE", f"{label}: {query}")
+            check(body["error"]["retryable"] is False, f"{label}: {query} is not retryable")
+        for query in ("?round=", "?graphVersion=", "?asOf=", "?companyId=", "?asOf=2026-10-15T00:00:00", "?asOf=yesterday"):
+            status, headers, body = get(first, query)
+            error(status, headers, body, 422, "INVALID_REQUEST", f"{label}: {query}")
+
+        label = step("evidence read: companyId has no approved link (no graph): a known company adds a failed sentiment section and NEVER a sentiment; unknown 404")
+        status, headers, body = get(first, "?companyId=SYNTH-A")
+        verify(label, next(e for e in rows() if e["id"] == first), status, headers, body, "?companyId=SYNTH-A")
+        check([f["section"] for f in body["metadata"]["failures"]] == ["eventIds", "sentiment"] and body["sentiment"] is None
+              and all(f["retryable"] is False and f["code"] == "SOURCE_UNAVAILABLE" for f in body["metadata"]["failures"]),
+              f"{label}: {body['metadata']}")
+        sentiment_rows = db.scalar("SELECT count(*) FROM document_analyses WHERE stage = 'sentiment' AND status = 'available'")
+        check(sentiment_rows >= 1, f"{label}: the scenario must hold available sentiment rows that the read still never serves")
+        status, headers, body = get(first, "?companyId=NO-SUCH")
+        error(status, headers, body, 404, "RESOURCE_NOT_FOUND", label)
+
+        label = step("evidence read: GET changed nothing - no AI request, no worker call, no row, no file, no lock file, no table write")
+        check(table_writes() == writes_before, f"{label}: PostgreSQL counted writes while only GETs ran")
+        check(observe() == baseline and database_digest() == db_before, f"{label}: counters or rows changed: {observe()} vs {baseline}")
+        check(tree_snapshot(world.artifacts) == files_before and content_snapshot(world.artifacts) == contents,
+              f"{label}: the artifact root changed")
+
+        # ---- B: the current grant is judged on every request ----------------------------------------------------------------------
+        label = step("evidence read: a grant that changes while the server runs withholds EVERY evidence at the next request (404 EVIDENCE_UNAVAILABLE), no reason on the wire")
+        past = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
+        variants = {
+            "disabled": grants(enabled=False), "rights unknown": grants(rights="unknown"), "expired": grants(expiresAt=past),
+            "quote-display removed": grants(allowedOperations=["read", "store", "model-send"]),
+            "new revision": grants(revision="rev-2"), "source changed": grants(sourceId="other-source"),
+            "recipient removed": grants(recipients=["someone-else"]), "no recipients": grants(recipients=[]),
+            "purpose removed": grants(purposes=["document-sentiment", "semantic-verification"]),
+            "verifier purpose removed": grants(purposes=["document-summary", "document-sentiment"]),
+            "other grant id": grants(grantId="other-grant"),
+        }
+        for name, document in variants.items():
+            save(document)
+            expect_each(f"{label} [{name}]", 404, "EVIDENCE_UNAVAILABLE")
+            save(flat_grants())
+            status, headers, body = get(ids["j1"][0])
+            check(status == 200, f"{label} [{name}]: restoring the grant did not restore the evidence ({status})")
+        save(grants(revision="rev-2"))
+        status, headers, body = get(ids["j1"][0])
+        check(status == 404 and "rev-2" not in json.dumps(body) and "grant" not in json.dumps(body).lower(),
+              f"{label}: the denial reason leaked: {body}")
+        save(flat_grants())
+
+        label = step("evidence read: an unreadable, invalid or missing registry is 503 SOURCE_UNAVAILABLE (never open, never empty), recovery is immediate")
+        for name, raw in (("truncated", "{"), ("wrong schema", json.dumps({"schemaVersion": "other", "grants": []})),
+                          ("duplicate key", '{"schemaVersion":"zoop-ai-s1-1","grants":[],"grants":[]}')):
+            save(None, raw)
+            expect_each(f"{label} [{name}]", 503, "SOURCE_UNAVAILABLE")
+        save(None)
+        expect_each(f"{label} [missing]", 503, "SOURCE_UNAVAILABLE")
+        status, headers, body = get(first)
+        check(body["error"]["retryable"] is True, f"{label}: SOURCE_UNAVAILABLE must be retryable")
+        save(flat_grants())
+        expect_each(f"{label} [restored]", 200)
+
+        # ---- C: the current document state ------------------------------------------------------------------------------------------
+        doc1 = refs[1]["documentId"]
+        doc1_ids = {e["id"] for e in rows() if e["article_id"] == doc1}
+        label = step("evidence read: private article, then a moved current version, then a newer pending request - each judged at the next request")
+        db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{doc1}'")
+        try:
+            expect_each(f"{label} [private]", 404, "EVIDENCE_UNAVAILABLE", only=doc1_ids)
+            expect_each(f"{label} [private: other documents]", 200, only={e["id"] for e in rows()} - doc1_ids)
+        finally:
+            db.run(f"UPDATE articles SET access_status = 'available' WHERE id = '{doc1}'")
+        expect_each(f"{label} [restored]", 200)
+        version1 = refs[1]["documentVersion"]
+        db.run("INSERT INTO article_versions (article_id, version, publication_precision, text_artifact_id, collected_at) "
+               f"SELECT article_id, 'smoke-next', 'unknown', text_artifact_id, now() FROM article_versions "
+               f"WHERE article_id = '{doc1}' AND version = '{version1}'")
+        db.run(f"UPDATE articles SET current_version = 'smoke-next' WHERE id = '{doc1}'")
+        try:
+            expect_each(f"{label} [pointer moved]", 404, "EVIDENCE_UNAVAILABLE", only=doc1_ids)
+        finally:
+            db.run(f"UPDATE articles SET current_version = '{version1}' WHERE id = '{doc1}'")
+            db.run(f"DELETE FROM article_versions WHERE article_id = '{doc1}' AND version = 'smoke-next'")
+        expect_each(f"{label} [pointer back]", 200)
+        doc2 = refs[2]["documentId"]
+        doc2_version = refs[2]["documentVersion"]
+        doc2_ids = {e["id"] for e in rows() if e["article_id"] == doc2}
+        owner9 = db.rows(f"SELECT grant_reference, grant_revision FROM document_analyses WHERE id = '{j9['analysisId']}'")[0]
+        db.run("INSERT INTO document_analyses (id, article_id, article_version, stage, company_id, request_no, status, grant_reference, "
+               "grant_revision, grant_checked_at, ai_job_id, created_at, updated_at) VALUES "
+               f"('smoke-pending', '{doc2}', '{doc2_version}', 'summary', NULL, "
+               f"(SELECT max(request_no) + 1 FROM document_analyses WHERE article_id = '{doc2}' AND stage = 'summary'), 'pending', "
+               f"'{owner9['grant_reference']}', '{owner9['grant_revision']}', now(), 'smoke-read-pending', now(), now())")
+        try:
+            for evidence_id in sorted(doc2_ids):
+                status, headers, body = get(evidence_id)
+                check(status == 200 and body["documentSummary"] is None and body["resultVersion"] is None
+                      and body["analysisProvenance"] is None and body["quote"], f"{label} [pending]: {status} {json.dumps(body)[:300]}")
+        finally:
+            db.run("DELETE FROM document_analyses WHERE id = 'smoke-pending'")
+        expect_each(f"{label} [pending removed]", 200)
+        doc4_ids = {e["id"] for e in rows() if e["article_id"] == refs[4]["documentId"]}
+        for evidence_id in sorted(doc4_ids):
+            status, headers, body = get(evidence_id)
+            check(status == 200 and body["documentSummary"] is None, f"{label}: J6's evidence while J11 (withheld) is the latest request")
+
+        # ---- D: the cache-served summary (J4b) --------------------------------------------------------------------------------------
+        label = step("evidence read: J4b (served from the artifact cache, calls recorded under the withheld J4) is proven by ONE verified receipt read")
+        receipt = exact(j4b)
+        original = receipt.read_bytes()
+        check(stat.S_IMODE(receipt.stat().st_mode) == 0o600 and json.loads(original)["creatorJobId"] == cases["j4"]["aiJobId"],
+              f"{label}: the receipt names the creator job")
+        receipt.rename(receipt.with_name("exact-moved.json"))
+        try:
+            expect_each(f"{label} [receipt file missing]", 404, "EVIDENCE_UNAVAILABLE", only=cached_ids)
+            expect_each(f"{label} [other summaries unaffected]", 200, only=set(ids["j1"]))
+        finally:
+            receipt.with_name("exact-moved.json").rename(receipt)
+        receipt.write_bytes(original.replace(b'"documentVersion"', b'"documentVersioN"'))
+        try:
+            expect_each(f"{label} [receipt bytes differ from the registered hash]", 404, "EVIDENCE_UNAVAILABLE", only=cached_ids)
+        finally:
+            receipt.write_bytes(original)
+        receipt.chmod(0o644)
+        try:
+            expect_each(f"{label} [receipt file insecure]", 503, "SOURCE_UNAVAILABLE", only=cached_ids)
+            expect_each(f"{label} [insecure receipt, other summaries]", 200, only=set(ids["j1"]))
+        finally:
+            receipt.chmod(0o600)
+        expect_each(f"{label} [receipt restored]", 200, only=cached_ids)
+        creator = cases["j4"]
+        db.run("CREATE TABLE zz_smoke_exec AS SELECT * FROM ai_executions "
+               f"WHERE ai_job_id = '{creator['aiJobId']}' AND document_analysis_id = '{creator['analysisId']}'")
+        check(db.scalar("SELECT count(*) FROM zz_smoke_exec") == 2, f"{label}: the creator's two executions")
+        db.run(f"DELETE FROM ai_executions WHERE ai_job_id = '{creator['aiJobId']}'")
+        try:
+            expect_each(f"{label} [creator executions missing]", 404, "EVIDENCE_UNAVAILABLE", only=cached_ids)
+        finally:
+            db.run("INSERT INTO ai_executions SELECT * FROM zz_smoke_exec")
+            db.run("DROP TABLE zz_smoke_exec")
+        expect_each(f"{label} [creator executions restored]", 200, only=cached_ids)
+
+        label = step("evidence read: an operator holding the artifact-store lock does not block any read (the proof takes no lock)")
+        descriptor = os.open(world.artifacts / ".document-import.lock", os.O_RDWR)
+        try:
+            fcntl.lockf(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            expect_each(f"{label} [lock held]", 200)
+        finally:
+            os.close(descriptor)
+
+        label = step("evidence read: web server stopped; J4b without a configured artifact root is 503 (retryable) while normal summaries stay 200")
+        files_before_stop = tree_snapshot(world.artifacts)
+        web.stop()
+        web.start(grants_file, None)
+        expect_each(f"{label} [no root: cache-served]", 503, "SOURCE_UNAVAILABLE", only=cached_ids)
+        expect_each(f"{label} [no root: normal]", 200, only={e["id"] for e in rows()} - cached_ids)
+        web.stop()
+        web.start(None, world.artifacts)
+        expect_each(f"{label} [no grants]", 503, "SOURCE_UNAVAILABLE")
+        web.stop()
+        check(tree_snapshot(world.artifacts) == files_before_stop, f"{label}: starting the read server changed the artifact root")
+
+        label = step("evidence read: an unusable read setting refuses to start and names only the setting, never its value")
+        secret_dir = scratch / "secret-location-xyz"
+        refuses_to_start(jar, {"ZOOP_DOCUMENT_READ_GRANTS": "relative/grants.json"}, "zoop.document-read.grants", "relative/grants.json")
+        refuses_to_start(jar, {"ZOOP_DOCUMENT_READ_GRANTS": str(secret_dir / "grants.json")}, "zoop.document-read.grants", "secret-location-xyz")
+        refuses_to_start(jar, {"ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(secret_dir)}, "zoop.document-read.artifact-root", "secret-location-xyz")
+        check(not secret_dir.exists() and tree_snapshot(world.artifacts) == files_before_stop, f"{label}: a refused start created something")
+
+        label = step("evidence read: final - no AI request, no worker call, no row or file changed by any read; grants file and server are cleaned up")
+        check(observe() == baseline and database_digest() == db_before, f"{label}: counters or rows differ from before the reads")
+        check(content_snapshot(world.artifacts) == contents, f"{label}: artifact content changed")
+        server_logs = "\n".join(Web.logs)
+        check(server_logs and all(e["quote"] not in server_logs for e in rows()) and str(world.root) not in server_logs
+              and str(scratch) not in server_logs and (len(db.password) < 8 or db.password not in server_logs), f"{label}: a server log carries a quote, a path or the password")
+        return {"evidenceRequests": served["requests"]}
+    finally:
+        web.stop()
+        grants_file.unlink(missing_ok=True)
+
+
 TEXTS: list[str] = []
 CONTENT_DIRECTORIES = ("analysis_result", "semantic_receipt", "exact_receipt")  # the artifact kind is the directory name
 CONTENT_KINDS = CONTENT_DIRECTORIES
@@ -322,6 +745,9 @@ def main() -> int:
     parser.add_argument("--psql", default=shutil.which("psql"))
     parser.add_argument("--db-user", default=None)
     parser.add_argument("--db-name", default=None)
+    parser.add_argument("--with-evidence-read", action=argparse.BooleanOptionalAction, default=True,
+                        help="after the analysis steps, exercise GET /api/v1/evidence/{id} against the built jar as a real web server "
+                             "(default: on; --no-with-evidence-read keeps the analysis-only run)")
     args = parser.parse_args()
 
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
@@ -915,6 +1341,18 @@ def main() -> int:
         done = analysis.settle("advance-j15", j15["analysisId"])
         check(done["outcome"] == "available" and done["executions"] == {"recorded": 2, "existing": 0}, f"{label}: {done}")
 
+        # ---- 10f: the public evidence read over everything the steps above created ------------------------------------------------
+        evidence_summary = {}
+        if args.with_evidence_read:
+            read_before = (counts(), len(worker_calls()), len(proxy.requests), db.scalar("SELECT count(*) FROM ai_executions"))
+            evidence_summary = evidence_read_steps(
+                jar, db, world, scratch, refs, documents,
+                {"j1": j1, "j4": j4, "j4b": j4b, "j6": j6, "j9": j9},
+                lambda: {"counts": counts(), "workerCalls": len(worker_calls()), "aiRequests": len(proxy.requests),
+                         "serviceJobs": sorted(c["job_id"] for c in worker_calls())})
+            check(read_before == (counts(), len(worker_calls()), len(proxy.requests), db.scalar("SELECT count(*) FROM ai_executions")),
+                  "the evidence read steps changed the analysis counts that the final checks rely on")
+
         # ---- 11: the operator guards ------------------------------------------------------------------------------------------
         label = step("enabled without --spring.main.web-application-type=none, or next to the document import, refuses to start")
         request, result = analysis.files("web-refusal", "advance", [{"analysisId": j1["analysisId"]}])
@@ -960,7 +1398,7 @@ def main() -> int:
         print(json.dumps({"status": "passed", "steps": len(imp.STEPS), "providerCalls": 0, "modelCalls": 0,
                           "analyses": db.scalar("SELECT count(*) FROM document_analyses"), "executions": len(all_executions),
                           "workerCalls": len(calls_all), "evidence": db.scalar("SELECT count(*) FROM evidence"),
-                          "jarRuns": jar.counter, "ledgerReadOnly": True}))
+                          "jarRuns": jar.counter, "ledgerReadOnly": True, "evidenceRead": bool(evidence_summary), **evidence_summary}))
         return 0
     finally:
         proxy.close()

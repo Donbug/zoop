@@ -12,6 +12,8 @@ import httpx
 from .contracts import (Kind, POLICY_VERSION, PROMPT_VERSION, SCHEMA_VERSION, StageConfig,
                         SummaryAnswer, SentimentAnswer, VerificationAnswer, OutlookAnswer, canonical, digest)
 
+from . import native_jev
+
 ANSWERS = {"document-summary": SummaryAnswer, "document-sentiment": SentimentAnswer,
            "semantic-verification": VerificationAnswer, "briefing-outlook": OutlookAnswer}
 PROMPTS = {
@@ -34,11 +36,65 @@ class Reply:
     content: str
     raw: dict[str, Any]
     usage: dict[str, int | None]
+    invalid: str | None = None  # a received response the adapter refused: the stage fails with this code and `raw` stays the receipt
+
+
+STAGE_ENV = {"document-summary": "DOCUMENT_SUMMARY", "document-sentiment": "DOCUMENT_SENTIMENT",
+             "semantic-verification": "VERIFY", "briefing-outlook": "BRIEFING_OUTLOOK"}
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+NATIVE_PROVIDER = "typesafe-native"
+NATIVE_DEFAULT_BASE_URL = "https://api.typesafe.ai/v1"
+VERIFY_PROVIDERS = ("openai-compatible", NATIVE_PROVIDER)
+
+
+def validate_base_url(base_url: str) -> httpx.URL:
+    """The one endpoint transport rule: https, or http only to loopback. Raises provider_requires_https."""
+    try:
+        url = httpx.URL(base_url)
+    except httpx.InvalidURL:
+        raise ProviderError("provider_requires_https") from None
+    if url.scheme != "https" and not (url.scheme == "http" and url.host in LOOPBACK_HOSTS):
+        raise ProviderError("provider_requires_https")
+    return url
+
+
+def native_revision(base_url: str) -> str:
+    """Recipient identity of the native endpoint, granted as `typesafe-native:<revision>`. It covers the API and the endpoint only;
+    the model, the question texts and the thresholds are pinned separately by the stage configuration."""
+    return digest({"api": native_jev.API, "endpoint": base_url})
+
+
+def verify_provider() -> str:
+    """Which adapter serves semantic-verification. Chat stays the default; the native one is an explicit opt-in."""
+    selected = os.environ.get("ZOOP_AI_VERIFY_PROVIDER", "").strip() or "openai-compatible"
+    if selected not in VERIFY_PROVIDERS:
+        raise ProviderError("provider_unsupported")
+    return selected
+
+
+def native_stage_config() -> StageConfig:
+    # The OpenAI-compatible verify settings must be absent: a stale `gpt-6-luna` there would name a verifier that is not in use.
+    if os.environ.get("ZOOP_AI_VERIFY_MODEL", "").strip():
+        raise ProviderError("native_verify_stale_model_setting")
+    if os.environ.get("ZOOP_AI_VERIFY_REASONING_EFFORT", "").strip():
+        raise ProviderError("native_verify_stale_effort_setting")
+    model = os.environ.get("TYPESAFE_VALIDATION_MODEL", "").strip()
+    if not model:
+        raise ProviderError("stage_model_required")
+    if model != native_jev.MODEL:
+        raise ProviderError("native_model_unsupported")
+    # `gpt-6-luna` effort is not applicable to Jev; the model identity pins the policy through `prompt_version`.
+    return StageConfig(provider=NATIVE_PROVIDER,
+                       provider_revision=native_revision(os.environ.get("TYPESAFE_BASE_URL", NATIVE_DEFAULT_BASE_URL)),
+                       model=model, reasoning_effort=None, prompt_version=native_jev.prompt_version(),
+                       schema_version=SCHEMA_VERSION, policy_version=POLICY_VERSION)
 
 
 def stage_config(kind: Kind, mode: str) -> StageConfig:
-    stage = {"document-summary": "DOCUMENT_SUMMARY", "document-sentiment": "DOCUMENT_SENTIMENT",
-             "semantic-verification": "VERIFY", "briefing-outlook": "BRIEFING_OUTLOOK"}[kind]
+    if kind == "semantic-verification" and mode == "live" and verify_provider() == NATIVE_PROVIDER:
+        return native_stage_config()
+    stage = STAGE_ENV[kind]
     model = os.environ.get(f"ZOOP_AI_{stage}_MODEL", "").strip()
     effort = os.environ.get(f"ZOOP_AI_{stage}_REASONING_EFFORT", "").strip() or None
     if effort is not None and effort not in EFFORTS:
@@ -50,13 +106,16 @@ def stage_config(kind: Kind, mode: str) -> StageConfig:
     provider = os.environ.get("ZOOP_AI_PROVIDER", "openai-compatible") if mode == "live" else "authored-replay"
     if provider != ("openai-compatible" if mode == "live" else "authored-replay"):
         raise ProviderError("provider_unsupported")
-    revision = digest({"endpoint": os.environ.get("ZOOP_AI_BASE_URL", "https://api.openai.com/v1")}) if mode == "live" else "authored-replay-1"
+    revision = digest({"endpoint": os.environ.get("ZOOP_AI_BASE_URL", DEFAULT_BASE_URL)}) if mode == "live" else "authored-replay-1"
     return StageConfig(provider=provider, provider_revision=revision, model=model, reasoning_effort=effort,
                        prompt_version="zoop-outlook-2026-10-08-1" if kind == "briefing-outlook" else PROMPT_VERSION,
                        schema_version=SCHEMA_VERSION, policy_version="legacy-outlook-exact-1" if kind == "briefing-outlook" else POLICY_VERSION)
 
 
 def request_identity(kind: Kind, payload: dict[str, Any], config: StageConfig) -> str:
+    if config.provider == NATIVE_PROVIDER:
+        # Questions, state shape and thresholds are code rather than a prompt string; `identity()` binds all of them.
+        return digest({"stage": kind, "input": payload, "config": config.wire(), "adapter": native_jev.identity()})
     return digest({"stage": kind, "input": payload, "config": config.wire(), "prompt": PROMPTS[kind],
                    "schema": ANSWERS[kind].model_json_schema(by_alias=True)})
 
@@ -88,11 +147,11 @@ class ReplayProvider:
 
 
 class OpenAICompatibleProvider:
+    name = "openai-compatible"
+
     def __init__(self, *, base_url: str, api_key: str, timeout: float = 30,
                  transport: httpx.BaseTransport | None = None):
-        url = httpx.URL(base_url)
-        if url.scheme != "https" and not (url.scheme == "http" and url.host in {"127.0.0.1", "localhost", "::1"}):
-            raise ProviderError("provider_requires_https")
+        validate_base_url(base_url)
         if not api_key:
             raise ProviderError("provider_key_required")
         self.provider_revision = digest({"endpoint": base_url})
@@ -100,6 +159,10 @@ class OpenAICompatibleProvider:
                                    headers={"Authorization": "Bearer " + api_key},
                                    follow_redirects=False, transport=transport)
         self.calls = 0
+
+    def accepts(self, config: StageConfig) -> bool:
+        """True only for the frozen configuration of the endpoint this client was built for."""
+        return config.provider == self.name and config.provider_revision == self.provider_revision
 
     def complete(self, kind: Kind, payload: dict[str, Any], config: StageConfig, *, ordinal: int = 0) -> Reply:
         request = {"model": config.model,
@@ -140,6 +203,64 @@ class OpenAICompatibleProvider:
             reported = {k: None for k in ("inputTokens", "outputTokens", "cachedTokens", "reasoningTokens")}
         # Raw response is durable before runner schema validation, including refusal/invalid JSON/shape.
         return Reply(content, raw, reported)
+
+    def close(self) -> None:
+        self.client.close()
+
+
+class NativeJevProvider:
+    """Native TypeSafe Jev client for the semantic-verification stage: one POST per attempt, no retry, no redirect, no SDK and no
+    optional or danger-zone headers. A non-2xx status is a definite failure and a transport error leaves the outcome unknown. A 2xx
+    response is always returned, so the runner makes its raw body the durable receipt; a malformed one carries `invalid`."""
+    name = NATIVE_PROVIDER
+
+    def __init__(self, *, base_url: str, api_key: str, timeout: float = 30,
+                 transport: httpx.BaseTransport | None = None):
+        validate_base_url(base_url)
+        if not api_key:
+            raise ProviderError("provider_key_required")
+        self.provider_revision = native_revision(base_url)
+        self.client = httpx.Client(base_url=base_url.rstrip("/") + "/", timeout=timeout,
+                                   headers={"Authorization": "Bearer " + api_key},
+                                   follow_redirects=False, transport=transport)
+        self.calls = 0
+
+    def accepts(self, config: StageConfig) -> bool:
+        """The frozen configuration must be exactly what this adapter would configure now: endpoint, pinned model, no effort,
+        and the very question texts and thresholds the job was frozen with."""
+        return (config.provider == self.name and config.provider_revision == self.provider_revision
+                and config.model == native_jev.MODEL and config.reasoning_effort is None
+                and config.prompt_version == native_jev.prompt_version()
+                and config.schema_version == SCHEMA_VERSION and config.policy_version == POLICY_VERSION)
+
+    def complete(self, kind: Kind, payload: dict[str, Any], config: StageConfig, *, ordinal: int = 0) -> Reply:
+        if kind != "semantic-verification":
+            raise ProviderError("native_stage_unsupported")
+        try:
+            body = native_jev.build_request(payload, config.model)
+            ids = native_jev.claim_ids(payload)
+        except (KeyError, TypeError, ValueError):
+            raise ProviderError("native_request_invalid") from None
+        self.calls += 1
+        try:
+            response = self.client.post("systemone", json=body)
+        except httpx.TransportError:
+            raise ProviderError("provider_response_unknown", uncertain=True) from None
+        if not 200 <= response.status_code < 300:
+            raise ProviderError(f"provider_http_{response.status_code}")
+        try:
+            raw = response.json()
+        except ValueError:
+            raw = {"responseText": response.text, "httpStatus": response.status_code}
+        if not isinstance(raw, dict):
+            raw = {"responseValue": raw, "httpStatus": response.status_code}
+        reported = native_jev.usage(raw)
+        try:
+            answer = native_jev.interpret(raw, ids, config.model)
+        except ValueError as exc:
+            # Raw response is durable before the runner fails the stage closed; nothing here is retried or repaired.
+            return Reply("", raw, reported, invalid=str(exc))
+        return Reply(canonical(answer.wire()), raw, reported)
 
     def close(self) -> None:
         self.client.close()

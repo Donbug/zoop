@@ -86,6 +86,10 @@ pipeline-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
+.PHONY: pipeline-graph-smoke
+# Requires an explicitly configured, isolated empty Neo4j test database.
+pipeline-graph-smoke:
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_projection_smoke.py
 pipeline-build:
 	$(UV) build --project ai/pipeline --out-dir /tmp/zoop-ai-pipeline-build
 service-install:
@@ -100,6 +104,10 @@ service-pipeline-test:
 service-pipeline-smoke:
 	$(SERVICE_PYTHON) ai/service/scripts/extraction_service_smoke.py
 	$(SERVICE_PYTHON) ai/service/scripts/relation_service_smoke.py
+.PHONY: service-graph-smoke
+# Requires an explicitly configured, isolated empty Neo4j test database.
+service-graph-smoke:
+	$(SERVICE_PYTHON) ai/service/scripts/graph_service_smoke.py
 service-openapi-check:
 	$(SERVICE_PYTHON) ai/service/scripts/export_openapi.py --check
 service-build:

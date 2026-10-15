@@ -125,6 +125,20 @@ def test_child_environment_is_an_allowlist(tmp_path):
     assert set(child) == set(service_config.CHILD_BASE_ENV) | {"ZOOP_AI_LIVE_ENABLED", "ZOOP_AI_GLOBAL_MAX_CALLS", "ZOOP_AI_DOCUMENT_SUMMARY_MODEL"}
 
 
+NATIVE = {"ZOOP_AI_VERIFY_PROVIDER": "typesafe-native", "TYPESAFE_API_KEY": "synthetic-jev-key",
+          "TYPESAFE_BASE_URL": "http://127.0.0.1:9/v1", "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0"}
+
+
+def test_native_jev_selection_and_key_reach_the_s1_child_only_when_live_is_available(tmp_path):
+    ws = workspace(tmp_path)
+    closed = load(ws.env(ZOOP_AI_API_KEY="synthetic-key", **NATIVE))
+    assert not closed.live_available and not set(NATIVE) & set(closed.child_env)
+    live = load(ws.env(ZOOP_AI_LIVE_ENABLED="1", ZOOP_AI_GLOBAL_MAX_CALLS="3", ZOOP_AI_API_KEY="synthetic-key", **NATIVE))
+    assert live.live_available and NATIVE.items() <= dict(live.child_env).items()
+    # The key names only ever join the live-only group: the always-forwarded stage settings never carry a provider key.
+    assert not {"TYPESAFE_API_KEY", "TYPESAFE_BASE_URL", "TYPESAFE_VALIDATION_MODEL"} & set(service_config.STAGE_SETTINGS)
+
+
 def run_service(env: dict[str, str]) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, "-m", "zoop_ai_service.main"], env=env, capture_output=True, text=True, timeout=30)
 
