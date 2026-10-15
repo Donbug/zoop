@@ -3488,7 +3488,7 @@ The selection frozen when the question was first received.
 | aliases | 필수 | string[] |  |
 | sector | 필수 | string / null | 확인된 업종. 기존 sector 필드를 여섯 프로필 키 중 하나로 유지하며 자료가 없으면 null이다. |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB`; null when the catalog has none. |
-| logoUrl | 필수 | string / null | Same-origin logo path (`/logos/<file>`); null when the catalog has none. |
+| logoUrl | 필수 | string / null | Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none. |
 | directIssues | 필수 | [CompanyIssueRef](#schema-companyissueref)[] |  |
 | structuralIssues | 필수 | [CompanyIssueRef](#schema-companyissueref)[] |  |
 | summary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
@@ -3672,7 +3672,7 @@ The selection frozen when the question was first received.
 | aliases | 필수 | string[] |  |
 | sector | 필수 | string / null |  |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB`; null when the catalog has none. |
-| logoUrl | 필수 | string / null | Same-origin logo path (`/logos/<file>`); null when the catalog has none. |
+| logoUrl | 필수 | string / null | Same-origin logo path (`/graph-assets/<file>`); null when the catalog has none. |
 | issueCount | 필수 | integer |  |
 
 <a id="schema-connectioninfo"></a>
@@ -4440,7 +4440,7 @@ same request again never toggles anything.
 | holding | 필수 | boolean |  |
 | watch | 필수 | boolean |  |
 | brandColor | 필수 | string / null | Company brand color `#RRGGBB` from the catalog; null for issues or when unset. |
-| logoUrl | 필수 | string / null | Same-origin path of the company logo (`/logos/<file>`); null for issues or when unset. |
+| logoUrl | 필수 | string / null | Same-origin path of the company logo (`/graph-assets/<file>`); null for issues or when unset. |
 | eventTime | 필수 | string / null |  |
 | timePrecision | 필수 | string {year, month, day, datetime, unknown} / null |  |
 | action | 필수 | string / null |  |
