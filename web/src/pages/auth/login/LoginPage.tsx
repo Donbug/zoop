@@ -21,7 +21,6 @@ import {
   authNote,
   authPrimaryButton,
   authSecondaryButton,
-  authSmallButton,
 } from '@/components/auth/authStyles';
 import type { LoginLocationState } from '@/types/auth';
 
@@ -246,27 +245,16 @@ export default function LoginPage() {
               </p>
             )}
             {flow.recovering ? (
-              <div className="mt-2 flex flex-col gap-2">
-                <button
-                  type="button"
-                  disabled={flow.busy}
-                  className={authPrimaryButton}
-                  onClick={() =>
-                    void flow.run(undefined, email.trim() || undefined, from)
-                  }
-                >
-                  로그인 상태 다시 확인
-                </button>
-                {/* FS006: 종목을 확인하지 못하면 개인화 여부를 추측하지 않는다. 사용자가 고르면 시장 전체 지도로 간다. */}
-                <button
-                  type="button"
-                  disabled={flow.busy}
-                  className={authSmallButton}
-                  onClick={() => navigate('/?mode=all', { replace: true })}
-                >
-                  시장 전체 지도로 가기
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={flow.busy}
+                className={authPrimaryButton}
+                onClick={() =>
+                  void flow.run(undefined, email.trim() || undefined, from)
+                }
+              >
+                로그인 상태 다시 확인
+              </button>
             ) : (
               <button
                 type="submit"

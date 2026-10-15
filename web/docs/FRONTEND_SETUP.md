@@ -123,7 +123,7 @@ VITE_API_BASE_URL=https://api.example.com
 
 4. `pnpm --dir web dev`로 띄운 `https://localhost:5173/login`을 브라우저에서 열고, 자체 서명 인증서 경고는 이 로컬 주소에 한해 진행한다.
 
-현재 `api/`에 구현된 인증 API는 가입·로그인·세션 조회·약관·소셜(Google·카카오) 시작·콜백·소셜 가입이다. 로그아웃(`POST /api/v1/auth/logout`), 비회원 세션(`POST /api/v1/auth/guest`), 로그인 후 이동을 정하는 `GET /api/v1/me/settings`·`GET /api/v1/portfolio`는 아직 없어 404다. 초기 설정을 마친 회원은 로그인 후 종목을 확인하지 못해 개인화 여부를 정하지 못하며, 로그인 화면에서 [시장 전체 지도로 가기]를 고를 수 있다. 소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다.
+현재 `api/`에 구현된 인증 API는 가입·로그인·세션 조회·약관·소셜(Google·카카오) 시작·콜백·소셜 가입이다. 로그아웃(`POST /api/v1/auth/logout`), 비회원 세션(`POST /api/v1/auth/guest`), 로그인 후 이동을 정하는 `GET /api/v1/me/settings`·`GET /api/v1/portfolio`는 아직 없어 404다. 그래서 초기 설정을 마친 회원은 로그인 후 종목을 확인하지 못해 이동할 화면을 정하지 못하고, 로그인 화면에서 [로그인 상태 다시 확인]만 할 수 있다(FS006: 추측하지 않음). 소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다.
 
 `src/apis/auth/ApiService.ts`:
 

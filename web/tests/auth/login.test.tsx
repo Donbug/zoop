@@ -114,7 +114,7 @@ beforeEach(() => {
 });
 
 describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
-  test('로그인은 됐지만 종목을 확인하지 못하면(설정 API 404) 추측하지 않고 시장 전체 지도를 고를 수 있다', async () => {
+  test('로그인은 됐지만 종목을 확인하지 못하면(설정 API 404) 이동할 화면을 추측하지 않고 다시 확인만 제공한다', async () => {
     server.on('POST', '/api/v1/auth/login', () =>
       json({ ...memberSession(true), metadata }),
     );
@@ -123,7 +123,7 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     );
     renderApp();
     await screen.findByRole('heading', { name: '이메일로 로그인' });
-    const user = await fillAndSubmit('member@zoop.test', 'secret-pass');
+    await fillAndSubmit('member@zoop.test', 'secret-pass');
 
     expect(
       await screen.findByText(
@@ -133,12 +133,7 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     expect(
       screen.getByRole('button', { name: '로그인 상태 다시 확인' }),
     ).toBeTruthy();
-    await user.click(
-      screen.getByRole('button', { name: '시장 전체 지도로 가기' }),
-    );
-    expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=all',
-    );
+    expect(screen.queryByTestId('destination')).toBeNull();
   });
 
   test('초기 설정을 마치지 않은 회원은 로그인 후 초기 설정으로 간다', async () => {
