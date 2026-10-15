@@ -60,6 +60,22 @@ public class JdbcMemberSessionRepository implements MemberSessionRepository {
     }
 
     @Override
+    public void insertGuestSession(String id, String analyticsKey, String tokenHash,
+            String csrfKeyId, Instant createdAt, Instant expiresAt) {
+        jdbc.update("""
+                INSERT INTO member_sessions
+                  (id, member_id, kind, analytics_key, token_hash, csrf_key_id,
+                   csrf_version, tutorial_completed, auth_flow, created_at, expires_at, revoked_at)
+                VALUES (:id, NULL, 'guest', :analyticsKey, :tokenHash, :csrfKeyId,
+                        1, false, NULL, :createdAt, :expiresAt, NULL)
+                """, new MapSqlParameterSource()
+                .addValue("id", id).addValue("analyticsKey", analyticsKey)
+                .addValue("tokenHash", tokenHash).addValue("csrfKeyId", csrfKeyId)
+                .addValue("createdAt", Timestamp.from(createdAt))
+                .addValue("expiresAt", Timestamp.from(expiresAt)));
+    }
+
+    @Override
     public void revokeMemberSession(String tokenHash, String memberId, Instant at) {
         jdbc.update("""
                 UPDATE member_sessions SET revoked_at = :at
@@ -68,5 +84,15 @@ public class JdbcMemberSessionRepository implements MemberSessionRepository {
                 """, new MapSqlParameterSource()
                 .addValue("at", Timestamp.from(at))
                 .addValue("tokenHash", tokenHash).addValue("memberId", memberId));
+    }
+
+    @Override
+    public void revokeGuestSession(String tokenHash, Instant at) {
+        jdbc.update("""
+                UPDATE member_sessions SET revoked_at = :at
+                WHERE token_hash = :tokenHash AND kind = 'guest'
+                  AND revoked_at IS NULL AND expires_at > :at
+                """, new MapSqlParameterSource()
+                .addValue("at", Timestamp.from(at)).addValue("tokenHash", tokenHash));
     }
 }
