@@ -965,6 +965,7 @@ dependencies = [
     { name = "httpx" },
     { name = "investmate-poc" },
     { name = "lxml" },
+    { name = "neo4j" },
     { name = "pydantic" },
     { name = "pypdf" },
 ]
@@ -980,6 +981,7 @@ requires-dist = [
     { name = "httpx", specifier = "==0.28.1" },
     { name = "investmate-poc", git = "https://github.com/Donbug/investmate-poc.git?rev=fa446e7c72edfa06ec1a0e8e999199a21d31c695" },
     { name = "lxml", specifier = "==6.1.3" },
+    { name = "neo4j", specifier = "==6.3.1" },
     { name = "pydantic", specifier = "==2.13.5" },
     { name = "pypdf", specifier = "==6.19.0" },
 ]

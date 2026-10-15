@@ -159,6 +159,64 @@ class CiGateTests(unittest.TestCase):
             require_ci.require_jobs([])
 
 
+class EvaluationVerificationGateTests(unittest.TestCase):
+    def installed_cli(self, root: Path) -> Path:
+        cli = root / "ai/worker/.venv/bin/zoop-ai"
+        cli.parent.mkdir(parents=True)
+        cli.write_text("synthetic installed CLI marker; never executed\n", encoding="utf-8")
+        cli.chmod(0o700)
+        return cli
+
+    def test_subprocess_environment_excludes_provider_proxy_and_python_overrides(self):
+        observed = []
+
+        def probe_environment(command, *, cwd, env):
+            result = subprocess.run(
+                [sys.executable, "-I", "-c", "import json, os; print(json.dumps(dict(os.environ)))"],
+                env=env, capture_output=True, text=True, check=True,
+            )
+            observed.append(json.loads(result.stdout))
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.installed_cli(root)
+            inherited = {"PATH": "/usr/bin:/bin", "HOME": folder, "LANG": "C.UTF-8",
+                         "PYTHONPATH": "/synthetic/untrusted", "ZOOP_AI_LIVE_ENABLED": "1",
+                         "TYPESAFE_BASE_URL": "https://example.invalid", "HTTPS_PROXY": "https://example.invalid"}
+            with patch.object(repo_checks, "ROOT", root), patch.dict(os.environ, inherited, clear=True), \
+                    patch.object(repo_checks, "run", side_effect=probe_environment), redirect_stdout(io.StringIO()):
+                repo_checks.evaluation_verification()
+            self.assertTrue(observed)
+            for child_env in observed:
+                for forbidden in ("PYTHONPATH", "ZOOP_AI_LIVE_ENABLED", "TYPESAFE_BASE_URL", "HTTPS_PROXY"):
+                    self.assertNotIn(forbidden, child_env)
+                self.assertEqual(child_env["HOME"], folder)
+                self.assertEqual(child_env["PYTHONDONTWRITEBYTECODE"], "1")
+
+    def test_missing_or_nonexecutable_cli_fails_without_running_commands(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            with patch.object(repo_checks, "ROOT", root), patch.object(repo_checks, "run") as run:
+                with self.assertRaisesRegex(ValueError, "make worker-install"):
+                    repo_checks.evaluation_verification()
+                cli = self.installed_cli(root)
+                cli.chmod(0o600)
+                with self.assertRaisesRegex(ValueError, "make worker-install"):
+                    repo_checks.evaluation_verification()
+                run.assert_not_called()
+
+    def test_smoke_failure_stops_before_gold_reading_evaluation_commands(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.installed_cli(root)
+            with patch.object(repo_checks, "ROOT", root), \
+                    patch.object(repo_checks, "run", side_effect=subprocess.CalledProcessError(1, "smoke")) as run:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    repo_checks.evaluation_verification()
+            run.assert_called_once()
+            self.assertEqual(run.call_args.args[0][-1], "smoke")
+
+
 class SecretAndCredentialTests(unittest.TestCase):
     def test_secret_filenames_detected_without_contents(self):
         for name in (".env", "app/.env.production", "app/state.sqlite", "app/private.pem"):

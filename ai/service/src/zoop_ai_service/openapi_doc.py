@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import extraction_doc
+from . import extraction_doc, graph_doc
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
@@ -396,11 +396,13 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     """The full document. `submit_example` is a worker-fixture Submit body (repository-authored synthetic text)."""
     spec = app.openapi()
     sample = examples()
-    spec["info"] = {"title": "Zoop internal AI analysis transport", "version": "1.0.0", "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION).strip()}
+    spec["info"] = {"title": "Zoop internal AI analysis transport", "version": "1.0.0",
+                    "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION).strip()}
     spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."}]
     spec["tags"] = [{"name": "analysis-jobs", "description": "S1 analysis jobs over the installed zoop-ai runtime."},
                     {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay only)."},
-                    {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay only)."}]
+                    {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay only)."},
+                    {"name": "graph-versions", "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
                                                     "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."}}
@@ -413,7 +415,8 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "cancelRelationJob": "relation.cancel", "recoverRelationJob": "relation.recover", "submitRelationReview": "relation.review",
               "getRelationReviewOperation": "relation.read", "recoverRelationReviewOperation": "relation.recover",
               "submitExtractionJob": "extraction.submit", "getExtractionJobStatus": "extraction.read", "getExtractionJobResult": "extraction.read",
-              "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover"}
+              "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
+              "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -426,7 +429,7 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
                     parameter.update(description="Optional correlation id, echoed on every response and never used as an idempotency key.",
                                      schema={"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"})
             for code in ("401", "403", "404", "422", "503"):
-                if code in operation["responses"] and "Relation" not in operation["operationId"] and "Extraction" not in operation["operationId"]:
+                if code in operation["responses"] and not any(name in operation["operationId"] for name in ("Relation", "Extraction", "Graph")):
                     _attach(operation, code, {"example": {"summary": sample["errors"][code]["summary"], "value": sample["errors"][code]["value"]}})
     base = spec["paths"]["/internal/v1/analysis-jobs"]["post"]
     base["requestBody"] = {"required": True, "content": {"application/json": {
@@ -462,4 +465,5 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     _attach(recover, "409", {"reconcileRequired": sample["errors"]["409.reconcileRequired"], "jobNotRecoverable": sample["errors"]["409.jobNotRecoverable"]})
     _document_relation(spec, relation_examples())
     extraction_doc.document(spec)
+    graph_doc.document(spec)
     return spec

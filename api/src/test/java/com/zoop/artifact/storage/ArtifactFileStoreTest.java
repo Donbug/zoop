@@ -448,4 +448,74 @@ class ArtifactFileStoreTest {
             assertArrayEquals(TEXT, session.read(file.uri(), file.sha256(), file.bytes()));
         }
     }
+
+    private List<String> snapshot() throws IOException {
+        try (Stream<Path> paths = Files.walk(root)) {
+            List<String> entries = new ArrayList<>();
+            for (Path path : paths.sorted().toList()) {
+                entries.add(root.relativize(path) + "|" + Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS) + "|"
+                        + Files.getLastModifiedTime(path, LinkOption.NOFOLLOW_LINKS) + "|"
+                        + (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) ? Files.size(path) : -1));
+            }
+            return entries;
+        }
+    }
+
+    @Test
+    void openingAStoreOnlyInspectsTheRootAndCreatesNothing() throws Exception {
+        Files.createDirectory(root.resolve("extracted_text"));
+        Files.setPosixFilePermissions(root.resolve("extracted_text"), OWNER_DIRECTORY);
+        List<String> before = snapshot();
+
+        ArtifactFileStore.at(root);
+
+        assertEquals(before, snapshot());
+        assertFalse(Files.exists(root.resolve(ArtifactFileStore.LOCK_FILE)));
+    }
+
+    @Test
+    void readVerifiedReadsWithoutASessionAndCreatesOrChangesNothing() throws Exception {
+        ArtifactFileStore.StoredFile file;
+        try (ArtifactFileStore.Session session = store.open()) {
+            file = session.put("extracted_text", NAME, TEXT);
+        }
+        Files.delete(root.resolve(ArtifactFileStore.LOCK_FILE));
+        List<String> before = snapshot();
+
+        assertArrayEquals(TEXT, store.readVerified(file.uri(), file.sha256(), file.bytes()));
+        assertEquals(ArtifactStoreException.Reason.CONFLICT, reason(() -> store.readVerified(file.uri(), "0".repeat(64), file.bytes())));
+        assertEquals(ArtifactStoreException.Reason.CONFLICT,
+                reason(() -> store.readVerified("artifact-root:extracted_text/missing-1.txt", file.sha256(), file.bytes())));
+        assertEquals(ArtifactStoreException.Reason.UNAVAILABLE, reason(() -> store.readVerified("/etc/passwd", file.sha256(), file.bytes())));
+
+        assertEquals(before, snapshot(), "no lock file, directory, temporary file or permission change may appear");
+        assertFalse(Files.exists(root.resolve(ArtifactFileStore.LOCK_FILE)));
+    }
+
+    @Test
+    void readVerifiedWorksWhileAnOperatorSessionHoldsTheLockAndKeepsEverySecurityCheck() throws Exception {
+        try (ArtifactFileStore.Session session = store.open()) {
+            ArtifactFileStore.StoredFile file = session.put("extracted_text", NAME, TEXT);
+            Path stored = root.resolve("extracted_text").resolve(NAME);
+
+            assertArrayEquals(TEXT, store.readVerified(file.uri(), file.sha256(), file.bytes()));
+
+            Files.setPosixFilePermissions(stored, PosixFilePermissions.fromString("rw-r--r--"));
+            assertEquals(ArtifactStoreException.Reason.UNAVAILABLE, reason(() -> store.readVerified(file.uri(), file.sha256(), file.bytes())));
+            Files.setPosixFilePermissions(stored, OWNER_FILE);
+            Files.setPosixFilePermissions(root.resolve("extracted_text"), PosixFilePermissions.fromString("rwxr-xr-x"));
+            assertEquals(ArtifactStoreException.Reason.UNAVAILABLE, reason(() -> store.readVerified(file.uri(), file.sha256(), file.bytes())));
+            Files.setPosixFilePermissions(root.resolve("extracted_text"), OWNER_DIRECTORY);
+
+            Files.delete(stored);
+            Path target = Files.write(root.resolve("extracted_text").resolve("target-1.txt"), TEXT);
+            Files.setPosixFilePermissions(target, OWNER_FILE);
+            Files.createSymbolicLink(stored, target);
+            assertEquals(ArtifactStoreException.Reason.CONFLICT, reason(() -> store.readVerified(file.uri(), file.sha256(), file.bytes())));
+        }
+        Files.setPosixFilePermissions(root, PosixFilePermissions.fromString("rwxrwxrwx"));
+        ArtifactStoreException.Reason reason = assertThrows(ArtifactStoreException.class,
+                () -> store.readVerified("artifact-root:extracted_text/" + NAME, "0".repeat(64), 0)).reason();
+        assertEquals(ArtifactStoreException.Reason.UNAVAILABLE, reason, "a root that became group/world writable is refused");
+    }
 }

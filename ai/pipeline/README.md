@@ -6,10 +6,11 @@
 | `zoop-ai-extract {run,submit,resume,inspect,cancel}` | `zoop_ai_pipeline.extraction_cli` | `zoop-extraction-s2-2` | `extraction.sqlite3` |
 | `zoop-ai-relation {run,submit,inspect,resume,review,revalidate,cancel}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
+| `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
 
-세 원장은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). 모두 authored replay 전용이며 live/네트워크 경로가 없습니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
+세 원장(ingestion/extraction/relation)은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). 이 세 프로세스는 authored replay 전용이며 live/네트워크 경로가 없습니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-graph`는 이들 위에서 **완료된 S3 job 하나**를 읽기 전용으로만 소비해 `graph.sqlite3`와 원장에 묶인 Neo4j 한 곳에만 쓰며(아래 절), 그 밖의 네트워크·모델·provider 호출은 없습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
 
-private PoC(`Donbug/investmate-poc` commit `fa446e7c72edfa06ec1a0e8e999199a21d31c695`)가 필요합니다. 로컬에서는 `gh auth setup-git` 등 git 인증, CI에서는 `ai-pipeline` job의 GitHub App 읽기 토큰(`scripts/private_poc_sync.py --project ai/pipeline`)으로 설치합니다. lxml 6.1.3·pypdf 6.19.0·pydantic 2.13.5·httpx 0.28.1은 BFF lock과 같은 버전입니다.
+private PoC(`Donbug/investmate-poc` commit `fa446e7c72edfa06ec1a0e8e999199a21d31c695`)가 필요합니다. 로컬에서는 `gh auth setup-git` 등 git 인증, CI에서는 `ai-pipeline` job의 GitHub App 읽기 토큰(`scripts/private_poc_sync.py --project ai/pipeline`)으로 설치합니다. lxml 6.1.3·pypdf 6.19.0·pydantic 2.13.5·httpx 0.28.1은 BFF lock과 같은 버전입니다. `neo4j==6.3.1`은 `zoop-ai-graph`가 직접 쓰는 의존성이며 PoC가 이미 lock에 끌고 오던 같은 버전을 직접 의존성으로 승격한 것입니다(새 패키지 아님). PoC의 Neo4j writer(`investmate.graph`)는 쓰지 않습니다.
 
 ```bash
 make pipeline-install   # uv sync --project ai/pipeline --frozen --group dev
@@ -57,7 +58,7 @@ PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/extra
 
 ## 독립 오프라인 관계·영향 후보와 HOLD 재검증 (S3, FS078·FS079)
 
-`zoop_ai_pipeline.relation_cli`의 `run/submit/resume/inspect/review/revalidate/cancel`은 **완료된 S2 job 하나**(`upstream:{jobId,inputDigest}`)를 extraction·ingestion의 읽기 전용 snapshot으로만 소비하고 전용 `--state-dir`의 `relation.sqlite3`에만 쓴다. 호출자가 후보 JSON을 보낼 수 없고 event/topic 후보·catalogue·문서는 서버 소유 registry로 다시 검증한 S2 결과에서만 온다. producer replay(`--replay`)와 **독립된** verifier replay(`--verifier-replay`)는 별도 파일·영수증이며 둘 다 authored 응답일 뿐 AI 의미 품질 주장이 아니다. 후보는 `approved=false`이며 `eligible`은 자동 증거 gate 통과이지 승인·게시가 아니다. 공개 OpenAPI·HTTP·UI·GraphDB·앱 등록·관리자 화면은 없다. 관계 유형(`SUPPLIES`·`INVESTS_IN`·`COMPETES_WITH`·`PARTICIPATES_IN`·`RELATES_TO_TOPIC`)은 FS055 공통 계약 확정 전의 보수적 임시 어휘다. 저장소 루트에서 재현한다.
+`zoop_ai_pipeline.relation_cli`의 `run/submit/resume/inspect/review/revalidate/cancel`은 **완료된 S2 job 하나**(`upstream:{jobId,inputDigest}`)를 extraction·ingestion의 읽기 전용 snapshot으로만 소비하고 전용 `--state-dir`의 `relation.sqlite3`에만 쓴다. 호출자가 후보 JSON을 보낼 수 없고 event/topic 후보·catalogue·문서는 서버 소유 registry로 다시 검증한 S2 결과에서만 온다. producer replay(`--replay`)와 **독립된** verifier replay(`--verifier-replay`)는 별도 파일·영수증이며 둘 다 authored 응답일 뿐 AI 의미 품질 주장이 아니다. 후보는 `approved=false`이며 `eligible`은 자동 증거 gate 통과이지 승인·게시가 아니다. 공개 OpenAPI·HTTP·UI·앱 등록·관리자 화면은 없고 이 CLI 자체는 그래프를 쓰지 않는다(완료된 job 하나의 **비공개** Neo4j stage는 별도 명령 `zoop-ai-graph`이며 아래 절, 활성 공개 상태 없음). 관계 유형(`SUPPLIES`·`INVESTS_IN`·`COMPETES_WITH`·`PARTICIPATES_IN`·`RELATES_TO_TOPIC`)은 FS055 공통 계약 확정 전의 보수적 임시 어휘다. 저장소 루트에서 재현한다.
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python -m pytest ai/pipeline/tests/test_relation.py ai/pipeline/tests/test_extraction.py ai/pipeline/tests/test_ingestion.py -q -p no:cacheprovider
@@ -86,3 +87,31 @@ PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/depen
 ```
 
 10/13 최종 로컬 작업 트리에서 전체 pipeline 시험 **208 passed**, `dependency_smoke.py`는 **status=passed, providerCalls=0, modelCalls=0**이었다. 실제 CLI에서 권한 철회 후 메타데이터 조회, 같은 job·입력이라도 다른 grant에 고정된 upstream의 불일치, 잘못된 원장·입력의 거부, 원문 미노출과 원장 무변경을 확인했다. 검토 후 추가한 회귀 15건도 모두 통과했다. 실행 조건·수정 전 재현 범위·남은 기능은 위 S4 계약을 따른다. 이번 변경의 원격 CI·운영 배포는 실행하지 않았다.
+
+## 비공개 S3 → Neo4j 버전 projection (FS080 일부, 게시·FS081 철회 아님)
+
+`zoop_ai_pipeline.graph_projection_cli`(설치 명령 `zoop-ai-graph`)는 완료되어 현재 전달 가능한 S3 job **하나**를 읽기 전용 seam(`relation.Store(existing=True)` + `Engine.inspect`)으로만 읽어 `versionId` 하나의 **불변 Neo4j version**으로 stage한다. 공개 활성화(FS059)·앱 등록·HTTP·증분 갱신·철회(FS081)·영향 라벨·두 기업 사이 경로는 없다. `ready`는 "stage되고 전체 검증됨"이며 출력의 `publication`은 항상 `not-published`다. canonical 매핑 파일은 운영자의 canonicalization **결정**이며 공개 승인·S2 SAME·topic 승인이 아니다.
+
+```sh
+# stdin은 JSON 한 개(<= 65,536B)다. init만 --graph-uri bolt://127.0.0.1:<port> 를 받고 자격은 환경 ZOOP_GRAPH_AUTH=none|basic, ZOOP_GRAPH_USER, ZOOP_GRAPH_PASSWORD 에서만 읽는다.
+zoop-ai-graph init    --state-dir DIR --graph-uri bolt://127.0.0.1:7687      # stdin {"schemaVersion":"zoop-graph-projection-1","storeId":"…","database":"neo4j"}; 비어 있는 별도 database 하나에 이 원장을 한 번 묶는다
+# 아래 freeze/project/read/focus는 --relation-state-dir --extraction-state-dir --ingestion-state-dir --sources --canonical이 모두 필요하다
+zoop-ai-graph freeze  --state-dir DIR …    # stdin {"schemaVersion":…,"versionId":"…","relation":{"jobId":"…","inputDigest":"<64hex>"}}   SQLite만, Neo4j 접촉 없음
+zoop-ai-graph project --state-dir DIR …    # stdin {"schemaVersion":…,"versionId":"…"}    단일 explicit transaction
+zoop-ai-graph read    --state-dir DIR …    # stdin {"schemaVersion":…,"versionId":"…"}    현재 gate + 전체 그래프 검증
+zoop-ai-graph focus   --state-dir DIR …    # stdin {"schemaVersion":…,"versionId":"…","companyId":"…","depth":1}   depth 1|2|3
+# 원천 flag가 없는 명령: recover(읽기만, unknown commit 정리, Neo4j 필요), inspect(원장만, Neo4j 호출 없음)
+```
+
+원장 `graph.sqlite3`는 자기 디렉터리(app·S1·세 원천 원장과 겹치면 `state_namespace_conflict`)에만 쓰며 읽기 전용 명령(`inspect`/`read`/`focus`)은 원장이 없을 때 상태를 만들지 않고 `graph_state_missing`으로 닫힌다. canonical 결정은 `--canonical` 파일(`zoop-graph-canonical-1`, 정확한 S2 upstream `(jobId, inputDigest)`·`kind`·S3 endpoint `ref`별 `canonicalId`·`decisionRef`)이 유일한 출처이고 매 명령이 새로 읽는다. 필수 endpoint 결정이 없거나 별칭 합침이 자기 관계·경로 붕괴를 만들면 **전체 freeze가 실패**한다. 자세한 wire·저장 형태·트랜잭션·복구·읽기 검증·오류 코드·한계는 [AI 실행 계약의 해당 절](../../docs/design/ai-system.md#s3--비공개-neo4j-버전-projection-fs080-일부게시fs081-철회-아님)을 따른다.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python -m pytest ai/pipeline/tests/test_graph_projection.py -q -p no:cacheprovider        # Neo4j 불필요
+# 실제 Neo4j 5의 격리된 빈 database가 필요하다(없으면 실패, skip 아님). 실행마다 --run-id의 version 접두로만 쓰고 전체 삭제를 하지 않는다.
+ZOOP_GRAPH_SMOKE_URI=bolt://127.0.0.1:<port> ZOOP_GRAPH_AUTH=none PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_projection_smoke.py   # make pipeline-graph-smoke도 같은 스크립트
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_projection_smoke.py --cleanup <runId>   # 실패한 실행의 version·store 마커를 이름으로만 제거
+# 독립 검토 R1–R4의 실제 Neo4j 회귀 11개: 비어 있는 별도 database가 필요하고 사례마다 자기 run id를 쓰며 정확한 이름으로만 정리한다.
+ZOOP_GRAPH_REGRESSION_URI=bolt://127.0.0.1:<port> ZOOP_GRAPH_AUTH=none PYTHONDONTWRITEBYTECODE=1 ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_projection_regression.py [--cases r1a,r3c,...]
+```
+
+**2026-10-15 최종 실행(로컬 작업 트리·미커밋, Main 실행. 커밋·푸시·원격 CI 없음).** `ai/pipeline` 시험 전체 265개가 통과했다. 실제 Neo4j 5.26 Community(격리된 `--rm` tmpfs 임시 컨테이너, 종료·정리 완료)에서 R1–R4 회귀 11개는 수정 전 11개 모두 RED로 재현됐고 수정 뒤 모두 통과했다. 새 빈 database의 정상 smoke는 다섯 관계 유형 전부, 노드 6·간선 6의 `v1`, 노드를 공유하지 않는 `v2`(`v1` 원본 바이트 불변), 깊이 1·2·3 focus, 반복 `init` 멱등, 권한 철회 withheld, unknown commit·SIGKILL 뒤 rollback·변조 fail-closed를 모두 통과했다. provider·모델 호출은 0이었고 원천 원장은 읽기 전용이었다. 활성 공개 상태는 없다(FS080 일부, FS081 철회 아님). **성능·지연·부하는 측정하지 않았고** 이 검증은 기능에 한정된다. 자세한 기록과 남은 범위는 위 AI 실행 계약의 시험 절을 따른다.

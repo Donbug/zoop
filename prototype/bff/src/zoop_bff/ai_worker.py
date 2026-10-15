@@ -46,6 +46,21 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(dumps(value).encode()).hexdigest()
 
 
+def _call_recipient(config: dict[str, Any]) -> str:
+    """The recipient one call proves: the fixed authored one for a replay, provider and endpoint revision for a live call."""
+    return config["provider"] if config["provider"] == "authored-replay" else config["provider"] + ":" + config["providerRevision"]
+
+
+def _verifier_call(result: dict[str, Any], artifact: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The semantic-verification call the artifact depends on. Generation and verification can have different recipients, so each
+    purpose is authorized against its own call and never against the generation call alone."""
+    if not artifact:
+        return None
+    verifier = next((a for a in result["artifacts"]
+                     if a["kind"] == "semantic-verification" and a["artifactId"] in artifact["dependencyRefs"]), None)
+    return next((c for c in result.get("calls", []) if verifier and c["attemptId"] == verifier["attemptId"]), None)
+
+
 def outlook_job(payload: dict[str, Any], context: dict[str, str]) -> dict[str, Any]:
     frozen = {**payload, "sourceId": context["sourceId"], "grantId": context["grantId"],
               "grantRevision": context["grantRevision"]}
@@ -266,7 +281,7 @@ class DocumentAnalysisStore:
             raise AnalysisImportError("outlook_validation_invalid")
         context = expected["input"]
         cfg = call["config"]
-        recipient = cfg["provider"] if cfg["provider"] == "authored-replay" else cfg["provider"] + ":" + cfg["providerRevision"]
+        recipient = _call_recipient(cfg)
         reason = self._grant(result.get("grant"), context["sourceId"], context["grantRevision"], "briefing-outlook", recipient)
         if reason or a["grantId"] != context["grantId"] or a["grantRevision"] != context["grantRevision"]:
             raise AnalysisImportError(reason or "outlook_grant_mismatch")
@@ -334,6 +349,9 @@ class DocumentAnalysisStore:
         call = next((c for c in result.get("calls", []) if artifact and c["attemptId"] == artifact["attemptId"]), None)
         recipient = "authored-replay" if request["mode"] == "replay" else (
             call["config"]["provider"] + ":" + call["config"]["providerRevision"] if call else "unresolved-recipient")
+        verify_call = _verifier_call(result, artifact)
+        verifier_recipient = "authored-replay" if request["mode"] == "replay" else (
+            verify_call["config"]["provider"] + ":" + verify_call["config"]["providerRevision"] if verify_call else "unresolved-recipient")
         execution_grant_reason = self._grant(
             execution_grant, source["sourceId"], request["input"]["grantRevision"], kind, recipient
         )
@@ -363,7 +381,7 @@ class DocumentAnalysisStore:
                 if not current_reason:
                     current_reason = self._grant(
                         current_grant, source["sourceId"], artifact["grantRevision"],
-                        "semantic-verification", recipient
+                        "semantic-verification", verifier_recipient
                     )
                 if current_reason:
                     status, reason = "withheld", current_reason
@@ -477,11 +495,15 @@ class DocumentAnalysisStore:
             elif not call:
                 reason = "artifact_receipt_missing"
             else:
-                cfg = call["config"]
-                recipient = cfg["provider"] if cfg["provider"] == "authored-replay" else cfg["provider"] + ":" + cfg["providerRevision"]
+                recipient = _call_recipient(call["config"])
                 reason = self._grant(grant, a["sourceRefs"][0]["sourceId"], row["grant_revision"], kind, recipient)
                 if not reason:
-                    reason = self._grant(grant, a["sourceRefs"][0]["sourceId"], row["grant_revision"], "semantic-verification", recipient)
+                    # The verifier may have another recipient than the generator: its purpose is checked against its own call.
+                    verifier_row = self.db.one("SELECT payload FROM document_analysis_calls WHERE job_id=? AND stage='semantic-verification'",
+                                               (row["job_id"],))
+                    reason = "semantic_receipt_missing" if not verifier_row else self._grant(
+                        grant, a["sourceRefs"][0]["sourceId"], row["grant_revision"], "semantic-verification",
+                        _call_recipient(json.loads(verifier_row["payload"])["config"]))
             if reason:
                 statuses[name] = {"status": "withheld", "reason": reason}
                 continue

@@ -3,7 +3,7 @@
   "info": {
     "title": "Zoop internal AI analysis transport",
     "version": "1.0.0",
-    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself."
+    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph."
   },
   "paths": {
     "/internal/v1/analysis-jobs": {
@@ -7873,6 +7873,734 @@
           }
         ]
       }
+    },
+    "/internal/v1/graph-versions/{versionId}": {
+      "get": {
+        "tags": [
+          "graph-versions"
+        ],
+        "summary": "Verified, content-free status of one allowlisted graph version",
+        "operationId": "getGraphVersionStatus",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "An allowlisted graph version id.",
+              "pattern": "^[A-Za-z0-9._:-]{1,120}$",
+              "title": "Versionid"
+            },
+            "description": "An allowlisted graph version id."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified status read from the pipeline during this request: identity, state, delivery and, only when current, digests and counts. Never a node, edge, evidence record or Issue count.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphVersionStatus"
+                },
+                "examples": {
+                  "current": {
+                    "summary": "The version verifies now",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "versionId": "graph-synthetic-main",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "delivery": {
+                        "state": "current",
+                        "reason": null
+                      },
+                      "verification": {
+                        "graphDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                        "payloadDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+                        "nodes": 6,
+                        "edges": 5
+                      },
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "withheld": {
+                    "summary": "A current authority gate refused delivery: identity, state and a reason code only",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "versionId": "graph-synthetic-main",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "source_unauthorized"
+                      },
+                      "verification": null,
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "notReady": {
+                    "summary": "The version is frozen but not projected yet",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "versionId": "graph-synthetic-main",
+                      "state": "frozen",
+                      "publication": "not-published",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "version_not_ready"
+                      },
+                      "verification": null,
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks `graph.read`; or version_not_allowed: the version is not listed for this principal (unknown and unlisted answer alike).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "scopeDenied": {
+                    "summary": "The principal lacks graph.read",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  },
+                  "versionNotAllowed": {
+                    "summary": "Not listed for this principal (unknown and unlisted answer alike)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "version_not_allowed",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "version_not_found: the operator listed the version but the graph ledger has none (an operator configuration gap), or route_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Listed by the operator but absent from the graph ledger",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "version_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "version_not_found",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "execution_unavailable: the graph configuration group is not enabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "The graph configuration group is not enabled",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: path, query parameter (unknown, duplicate, missing or out of range) or header validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Path or query validation",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": "depth"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty graph.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "runtimeBusy": {
+                    "summary": "A writer holds a ledger: retry later",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "runtime_busy",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "graph_busy",
+                        "field": null
+                      }
+                    }
+                  },
+                  "runtimeUnavailable": {
+                    "summary": "The graph database does not answer",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "graph_unavailable",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "graph.read"
+            ]
+          }
+        ]
+      }
+    },
+    "/internal/v1/graph-versions/{versionId}/focus": {
+      "get": {
+        "tags": [
+          "graph-versions"
+        ],
+        "summary": "One company's neighbourhood (depth 1 to 3) of an allowlisted graph version, only while it verifies now",
+        "operationId": "getGraphVersionFocus",
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "An allowlisted graph version id.",
+              "pattern": "^[A-Za-z0-9._:-]{1,120}$",
+              "title": "Versionid"
+            },
+            "description": "An allowlisted graph version id."
+          },
+          {
+            "name": "companyId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+              "description": "A company id of the version's canonical namespace.",
+              "title": "Companyid"
+            },
+            "description": "A company id of the version's canonical namespace."
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3
+              ]
+            },
+            "description": "Hop depth: exactly 1, 2 or 3."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The neighbourhood of one company, only while every delivery gate holds at this moment; otherwise `delivery.state` is `withheld` and graph, evidence and verification are null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphFocusResult"
+                },
+                "examples": {
+                  "current": {
+                    "summary": "Depth 1 around one company of a verified version",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "versionId": "graph-synthetic-main",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "delivery": {
+                        "state": "current",
+                        "reason": null
+                      },
+                      "focus": {
+                        "companyId": "SYNTH-1",
+                        "depth": 1,
+                        "found": true
+                      },
+                      "verification": {
+                        "graphDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                        "payloadDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+                        "nodes": 6,
+                        "edges": 5
+                      },
+                      "graph": {
+                        "nodes": [
+                          {
+                            "kind": "company",
+                            "id": "SYNTH-1",
+                            "distance": 0
+                          },
+                          {
+                            "kind": "company",
+                            "id": "SYNTH-3",
+                            "distance": 1
+                          }
+                        ],
+                        "edges": [
+                          {
+                            "relationId": "rel-1111111111111111111111111111111111111111111111111111111111111111",
+                            "type": "SUPPLIES",
+                            "direction": "directed",
+                            "connection": "direct",
+                            "subject": {
+                              "kind": "company",
+                              "id": "SYNTH-3"
+                            },
+                            "object": {
+                              "kind": "company",
+                              "id": "SYNTH-1"
+                            },
+                            "businessScope": null,
+                            "productScope": null,
+                            "validity": {
+                              "from": null,
+                              "until": null
+                            },
+                            "countries": [],
+                            "path": {
+                              "companyIds": []
+                            },
+                            "evidence": {
+                              "relation": [
+                                "ev-2222222222222222222222222222222222222222222222222222222222222222"
+                              ],
+                              "validity": [],
+                              "steps": [
+                                [],
+                                []
+                              ]
+                            },
+                            "sourceRelationCandidateIds": [
+                              "rc-3333333333333333333333333333333333333333333333333333333333333333"
+                            ]
+                          }
+                        ]
+                      },
+                      "evidence": [
+                        {
+                          "evidenceId": "ev-2222222222222222222222222222222222222222222222222222222222222222",
+                          "documentId": "synthetic-doc-1",
+                          "documentVersion": "v1",
+                          "rawVersion": "raw-1",
+                          "start": 12,
+                          "end": 48
+                        }
+                      ],
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "absent": {
+                    "summary": "A company that is not a node of the verified version: found=false, empty content",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "versionId": "graph-synthetic-main",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "delivery": {
+                        "state": "current",
+                        "reason": null
+                      },
+                      "focus": {
+                        "companyId": "SYNTH-9",
+                        "depth": 2,
+                        "found": false
+                      },
+                      "verification": {
+                        "graphDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                        "payloadDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+                        "nodes": 6,
+                        "edges": 5
+                      },
+                      "graph": {
+                        "nodes": [],
+                        "edges": []
+                      },
+                      "evidence": [],
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "withheld": {
+                    "summary": "Source rights were revoked: no graph, no evidence",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "versionId": "graph-synthetic-main",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "source_unauthorized"
+                      },
+                      "focus": {
+                        "companyId": "SYNTH-1",
+                        "depth": 1,
+                        "found": null
+                      },
+                      "verification": null,
+                      "graph": null,
+                      "evidence": null,
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks `graph.read`; or version_not_allowed: the version is not listed for this principal (unknown and unlisted answer alike).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "scopeDenied": {
+                    "summary": "The principal lacks graph.read",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  },
+                  "versionNotAllowed": {
+                    "summary": "Not listed for this principal (unknown and unlisted answer alike)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "version_not_allowed",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "version_not_found: the operator listed the version but the graph ledger has none (an operator configuration gap), or route_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Listed by the operator but absent from the graph ledger",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "version_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "version_not_found",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "execution_unavailable: the graph configuration group is not enabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "The graph configuration group is not enabled",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: path, query parameter (unknown, duplicate, missing or out of range) or header validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Path or query validation",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": "depth"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_binding_mismatch or internal_error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty graph.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphErrorEnvelope"
+                },
+                "examples": {
+                  "runtimeBusy": {
+                    "summary": "A writer holds a ledger: retry later",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "runtime_busy",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "graph_busy",
+                        "field": null
+                      }
+                    }
+                  },
+                  "runtimeUnavailable": {
+                    "summary": "The graph database does not answer",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-graph-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "graph_unavailable",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "graph.read"
+            ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -9370,6 +10098,573 @@
           "stage"
         ],
         "title": "Failure"
+      },
+      "GraphContent": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "title": "GraphContent"
+      },
+      "GraphDelivery": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "current",
+              "withheld"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "GraphDelivery"
+      },
+      "GraphEdge": {
+        "properties": {
+          "relationId": {
+            "type": "string",
+            "title": "Relationid"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "directed",
+              "symmetric"
+            ],
+            "title": "Direction"
+          },
+          "connection": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "indirect"
+            ],
+            "title": "Connection"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/GraphEndpoint"
+          },
+          "object": {
+            "$ref": "#/components/schemas/GraphEndpoint"
+          },
+          "businessScope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Businessscope"
+          },
+          "productScope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Productscope"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/GraphValidity"
+          },
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "path": {
+            "$ref": "#/components/schemas/GraphPath"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/GraphEdgeEvidence"
+          },
+          "sourceRelationCandidateIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sourcerelationcandidateids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relationId",
+          "type",
+          "direction",
+          "connection",
+          "subject",
+          "object",
+          "businessScope",
+          "productScope",
+          "validity",
+          "countries",
+          "path",
+          "evidence",
+          "sourceRelationCandidateIds"
+        ],
+        "title": "GraphEdge"
+      },
+      "GraphEdgeEvidence": {
+        "properties": {
+          "relation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relation"
+          },
+          "validity": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Validity"
+          },
+          "steps": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relation",
+          "validity",
+          "steps"
+        ],
+        "title": "GraphEdgeEvidence"
+      },
+      "GraphEndpoint": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "event",
+              "topic"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "GraphEndpoint"
+      },
+      "GraphErrorEnvelope": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-graph-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-graph-1"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "GraphErrorEnvelope"
+      },
+      "GraphEvidence": {
+        "properties": {
+          "evidenceId": {
+            "type": "string",
+            "title": "Evidenceid"
+          },
+          "documentId": {
+            "type": "string",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "title": "Documentversion"
+          },
+          "rawVersion": {
+            "type": "string",
+            "title": "Rawversion"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidenceId",
+          "documentId",
+          "documentVersion",
+          "rawVersion",
+          "start",
+          "end"
+        ],
+        "title": "GraphEvidence"
+      },
+      "GraphFocus": {
+        "properties": {
+          "companyId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Companyid"
+          },
+          "depth": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "title": "Depth"
+          },
+          "found": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found",
+            "description": "Whether the company is a node of the verified version. null while delivery is withheld."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "companyId",
+          "depth",
+          "found"
+        ],
+        "title": "GraphFocus"
+      },
+      "GraphFocusResult": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-graph-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-graph-1"
+          },
+          "versionId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,120}$",
+            "title": "Versionid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "frozen",
+              "reserved",
+              "unknown",
+              "ready",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "publication": {
+            "type": "string",
+            "const": "not-published",
+            "title": "Publication",
+            "default": "not-published"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/GraphDelivery"
+          },
+          "focus": {
+            "$ref": "#/components/schemas/GraphFocus"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphVerification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "graph": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraphEvidence"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "observedAt": {
+            "type": "string",
+            "title": "Observedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "versionId",
+          "state",
+          "delivery",
+          "focus",
+          "verification",
+          "graph",
+          "evidence",
+          "observedAt"
+        ],
+        "title": "GraphFocusResult"
+      },
+      "GraphNode": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "event",
+              "topic"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "distance": {
+            "type": "integer",
+            "title": "Distance",
+            "description": "Undirected hop distance from the focus company (0 for the company itself)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "distance"
+        ],
+        "title": "GraphNode"
+      },
+      "GraphPath": {
+        "properties": {
+          "companyIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Companyids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "companyIds"
+        ],
+        "title": "GraphPath"
+      },
+      "GraphValidity": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "from",
+          "until"
+        ],
+        "title": "GraphValidity"
+      },
+      "GraphVerification": {
+        "properties": {
+          "graphDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Graphdigest"
+          },
+          "payloadDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Payloaddigest"
+          },
+          "nodes": {
+            "type": "integer",
+            "title": "Nodes"
+          },
+          "edges": {
+            "type": "integer",
+            "title": "Edges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "graphDigest",
+          "payloadDigest",
+          "nodes",
+          "edges"
+        ],
+        "title": "GraphVerification",
+        "description": "What the pipeline verified for this very response: the stored graph is exactly the frozen one. Digests and counts only."
+      },
+      "GraphVersionStatus": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-graph-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-graph-1"
+          },
+          "versionId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,120}$",
+            "title": "Versionid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "frozen",
+              "reserved",
+              "unknown",
+              "ready",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "publication": {
+            "type": "string",
+            "const": "not-published",
+            "title": "Publication",
+            "default": "not-published"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/GraphDelivery"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GraphVerification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "title": "Observedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "versionId",
+          "state",
+          "delivery",
+          "verification",
+          "observedAt"
+        ],
+        "title": "GraphVersionStatus"
       },
       "JobStatus": {
         "properties": {
@@ -11204,6 +12499,10 @@
     {
       "name": "extraction-jobs",
       "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay only)."
+    },
+    {
+      "name": "graph-versions",
+      "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."
     }
   ]
 }

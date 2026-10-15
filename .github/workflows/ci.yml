@@ -193,6 +193,8 @@ jobs:
         run: make worker-install
       - name: Offline worker tests (no model token or external data)
         run: make worker-test worker-schema-check
+      - name: Korean verification authored-control gate (actual installed CLI, loopback only, no model token)
+        run: make evaluation-verification-check
       - name: Validate portable authored contract fixture
         run: python ai/worker/scripts/validate_contracts.py
   ai-service:

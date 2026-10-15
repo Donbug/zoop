@@ -28,8 +28,10 @@ from .wire import (DOCUMENT_KINDS, RETRYABLE, CallReceipt, Delivery, Dispatch, E
 
 MAX_PENDING = 1000
 CLI_SLOTS = 4
-# Runtime refusals at submit that prove no registration happened for this request.
-CONFIG_REFUSALS = frozenset({"stage_model_required", "provider_unsupported", "reasoning_effort_invalid"})
+# Runtime refusals at submit that prove no registration happened for this request: definite, deterministic stage-configuration
+# errors of the worker (including the native Jev selection). Anything not listed here stays an internal error.
+CONFIG_REFUSALS = frozenset({"stage_model_required", "provider_unsupported", "reasoning_effort_invalid",
+                             "native_model_unsupported", "native_verify_stale_model_setting", "native_verify_stale_effort_setting"})
 REGISTRY_REFUSALS = frozenset({"grant_registry_schema_invalid", "grant_revision_conflict"})
 
 

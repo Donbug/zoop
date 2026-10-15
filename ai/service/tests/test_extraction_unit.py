@@ -112,7 +112,9 @@ def test_a_complete_group_loads_and_hands_the_child_only_ownership_roots(tmp_pat
 def test_no_provider_key_url_model_or_live_switch_ever_reaches_the_child(tmp_path):
     ws = Workspace(tmp_path, replay=document_replay())
     live = {"ZOOP_AI_LIVE_ENABLED": "1", "ZOOP_AI_GLOBAL_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "k-secret", "ZOOP_AI_BASE_URL": "http://127.0.0.1:1",
-            "ZOOP_AI_PROVIDER": "openai", "ZOOP_AI_DOCUMENT_SUMMARY_MODEL": "m", "OPENAI_API_KEY": "k-other", "HTTPS_PROXY": "http://127.0.0.1:2"}
+            "ZOOP_AI_PROVIDER": "openai", "ZOOP_AI_DOCUMENT_SUMMARY_MODEL": "m", "OPENAI_API_KEY": "k-other", "HTTPS_PROXY": "http://127.0.0.1:2",
+            "ZOOP_AI_VERIFY_PROVIDER": "typesafe-native", "TYPESAFE_API_KEY": "k-jev-secret", "TYPESAFE_BASE_URL": "http://127.0.0.1:3/v1",
+            "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0"}
     extraction = load(extraction_env(ws, tmp_path, **live)).extraction
     assert extraction is not None
     assert not set(extraction.child_env) & (set(live) | {"HOME", "OPENAI_BASE_URL"}) and "k-secret" not in json.dumps(dict(extraction.child_env))

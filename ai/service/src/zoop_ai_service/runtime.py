@@ -30,6 +30,7 @@ CODE = re.compile(r"[a-z][a-z0-9_]{0,79}")
 class Deadlines:
     quick: float = 30.0   # submit/get/cancel; matches the worker's SQLite busy timeout
     long: float = 300.0   # run/resume
+    read: float = 45.0    # graph read/focus: the pipeline's Neo4j connect (5 s) and read transaction (30 s) limits, plus the ledgers
     grace: float = 5.0    # SIGTERM to SIGKILL
 
 

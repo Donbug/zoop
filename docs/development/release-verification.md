@@ -67,8 +67,8 @@ F03 도메인 구현은 회원 `6.2.5` 및 관리자 `6.10.1/6.10.13`, F05는 �
 | `ZOOP_SENTIMENT_MODEL` → `ZOOP_AI_DOCUMENT_SENTIMENT_MODEL` | 현재 예제는 비어 있다. 실제 선택 모델은 별도 승인한다. |
 | `ZOOP_SENTIMENT_REASONING_EFFORT` → `ZOOP_AI_DOCUMENT_SENTIMENT_REASONING_EFFORT` | 비어 있으면 provider 요청에서 effort 필드를 생략한다. |
 | 옛 회차 sentiment 설정 → `ZOOP_AI_BRIEFING_OUTLOOK_MODEL`, `ZOOP_AI_BRIEFING_OUTLOOK_REASONING_EFFORT` | 현재 둘 다 비어 있다. 문서 판정과 회차 판정은 별도 stage이며 하나의 모델 export를 자동 공유하지 않는다. |
-| 새 요약 / 새 의미 검증 | `ZOOP_AI_DOCUMENT_SUMMARY_MODEL/REASONING_EFFORT`, `ZOOP_AI_VERIFY_MODEL/REASONING_EFFORT`도 비어 있다. 문서 live 작업은 생성 stage와 VERIFY 양쪽 설정이 필요하다. |
-| provider / endpoint | `ZOOP_AI_PROVIDER=openai-compatible`, `ZOOP_AI_BASE_URL=https://api.openai.com/v1`은 공개 예제다. API key 값은 인수 문서에 싣지 않는다. endpoint와 grant recipient/providerRevision의 일치를 확인한다. |
+| 새 요약 / 새 의미 검증 | `ZOOP_AI_DOCUMENT_SUMMARY_MODEL/REASONING_EFFORT`도 비어 있다. 의미 검증은 기본 chat 검증기면 `ZOOP_AI_VERIFY_MODEL/REASONING_EFFORT`가 필요하고, 네이티브 Jev(`ZOOP_AI_VERIFY_PROVIDER=typesafe-native`)면 이 둘은 **비우고** `TYPESAFE_VALIDATION_MODEL=jev-1.14.0`·`TYPESAFE_API_KEY`가 필요하다. 문서 live 작업은 생성 stage와 VERIFY 양쪽 설정이 필요하다. |
+| provider / endpoint | `ZOOP_AI_PROVIDER=openai-compatible`, `ZOOP_AI_BASE_URL=https://api.openai.com/v1`, 네이티브 검증의 `TYPESAFE_BASE_URL=https://api.typesafe.ai/v1`은 공개 예제다. API key 값은 인수 문서에 싣지 않는다. endpoint와 grant recipient/providerRevision의 일치를 확인한다(생성은 `openai-compatible:<rev>`, 네이티브 검증은 `typesafe-native:<rev>`, 두 수신자 모두 grant에 있어야 한다). 네이티브 Jev 임계치는 잠정 값이며 보정되지 않았다. |
 | live / 호출 상한 | 예제 `ZOOP_AI_LIVE_ENABLED=0`, `ZOOP_AI_GLOBAL_MAX_CALLS=0`. live 활성화에는 명시적 `1`, 양수 durable 상한, stage model, 현재 권리 registry, 별도 전송·비용 승인이 모두 필요하다. 호출 수 상한은 금액 상한의 대체물이 아니다. |
 | 격리 합성 smoke | AI 문서 예시의 `ZOOP_QUOTE_PROVIDER=off`, `ZOOP_METRICS_PROVIDER=off`, `ZOOP_BRIEFING_SCHEDULER=0` 및 별도 `ZOOP_STATE_DIR/ZOOP_SNAPSHOT_PATH/ZOOP_COMPANY_CATALOG`를 사용한다. 실제 운영 설정이라고 옮기지 않는다. |
 | 인증·배포 설정 | `ZOOP_CORS_ORIGINS`, `ZOOP_COOKIE_SECURE`, 회원/관리자 session 정책·DB/상태 경로는 앱/운영 책임자가 환경별로 확정한다. localhost의 기본값·데모 계정·로컬 DSN을 production 값으로 사용하지 않는다. |

@@ -15,6 +15,8 @@ public enum ErrorCode {
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", true),
     INVALID_CURSOR(HttpStatus.UNPROCESSABLE_CONTENT, "유효하지 않은 커서입니다.", false),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다.", false),
+    EVIDENCE_UNAVAILABLE(HttpStatus.NOT_FOUND, "근거를 제공할 수 없습니다.", false),
+    VERSION_UNAVAILABLE(HttpStatus.CONFLICT, "요청한 고정 버전을 조회할 수 없습니다.", false),
     SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "요청한 정보를 일시적으로 사용할 수 없습니다.", true),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.", false);
 
