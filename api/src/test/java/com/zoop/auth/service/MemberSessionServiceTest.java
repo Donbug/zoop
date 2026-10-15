@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.zoop.auth.dto.SessionResponse;
 import com.zoop.auth.repository.MemberSessionRepository;
 import com.zoop.auth.repository.MemberSessionRow;
 import com.zoop.common.exception.CustomException;
@@ -38,7 +39,23 @@ class MemberSessionServiceTest {
         assertEquals(issued.response().csrfToken(), lookup.response().csrfToken());
         assertEquals("req-2", lookup.response().metadata().requestId());
         assertEquals("member-1", lookup.response().user().id());
+        assertEquals(new SessionResponse.Setup(false, false), lookup.response().setup());
         assertFalse(lookup.clearCookie());
+    }
+
+    @Test
+    void memberLookupReturnsLatestStoredSetupState() {
+        var issued = service.issue("member-1", null, "setup-state");
+        String hash = MemberSessionService.hashToken(issued.token());
+        var row = repository.rows.get(hash);
+        repository.rows.put(hash, new MemberSessionRow(row.id(), row.memberId(), row.kind(),
+                row.tokenHash(), row.csrfKeyId(), row.csrfVersion(), row.createdAt(), row.expiresAt(),
+                row.revokedAt(), row.memberStatus(), row.email(), row.displayName(), true, true));
+
+        var lookup = service.lookup(issued.token(), "setup-state-read");
+
+        assertEquals(new SessionResponse.Setup(true, true), lookup.response().setup());
+        assertEquals("member-1", lookup.response().user().id());
     }
 
     @Test
@@ -157,6 +174,8 @@ class MemberSessionServiceTest {
         var result = service.lookup(token, "req");
         assertFalse(result.response().authenticated());
         assertEquals("anonymous", result.response().kind());
+        assertNull(result.response().user());
+        assertNull(result.response().setup());
         assertNull(result.response().csrfToken());
         assertNull(result.response().expiresAt());
         assertTrue(result.clearCookie());

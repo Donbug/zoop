@@ -69,6 +69,8 @@ class SessionControllerTest {
         mvc.perform(get("/api/v1/auth/session").header("X-Request-ID", "request-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("anonymous"))
+                .andExpect(jsonPath("$.user").value((Object) null))
+                .andExpect(jsonPath("$.setup").value((Object) null))
                 .andExpect(jsonPath("$.csrfToken").value((Object) null))
                 .andExpect(header().doesNotExist("Set-Cookie"));
         mvc.perform(get("/api/v1/auth/session")
@@ -81,6 +83,8 @@ class SessionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("member"))
                 .andExpect(jsonPath("$.user.id").value("member-1"))
+                .andExpect(jsonPath("$.setup.completed").value(false))
+                .andExpect(jsonPath("$.setup.tutorialCompleted").value(false))
                 .andExpect(jsonPath("$.metadata.requestId").value("request-1"))
                 .andExpect(jsonPath("$.csrfToken").isString());
     }

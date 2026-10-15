@@ -98,6 +98,8 @@ class MemberSessionPostgresTest {
         var sessionA = service.issue(memberA, null, "owner-a-session");
         var sessionB = service.issue(memberB, null, "owner-b-session");
         var guest = service.issueGuest(null, "guest-session");
+        // The session token is issued before the setup change; lookup must read the current member row.
+        jdbc.update("UPDATE members SET completed = true, tutorial_completed = true WHERE id = ?", memberA);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(new SessionController(service))
                 .addFilters(new RequestIdFilter()).build();
 
@@ -106,20 +108,26 @@ class MemberSessionPostgresTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("member"))
                 .andExpect(jsonPath("$.user.id").value(memberA))
-                .andExpect(jsonPath("$.user.displayName").value("Owner A"));
+                .andExpect(jsonPath("$.user.displayName").value("Owner A"))
+                .andExpect(jsonPath("$.setup.completed").value(true))
+                .andExpect(jsonPath("$.setup.tutorialCompleted").value(true));
 
         mvc.perform(get("/api/v1/auth/session")
                         .cookie(new Cookie(SessionCookie.NAME, sessionB.token())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("member"))
                 .andExpect(jsonPath("$.user.id").value(memberB))
-                .andExpect(jsonPath("$.user.displayName").value("Owner B"));
+                .andExpect(jsonPath("$.user.displayName").value("Owner B"))
+                .andExpect(jsonPath("$.setup.completed").value(false))
+                .andExpect(jsonPath("$.setup.tutorialCompleted").value(false));
 
         mvc.perform(get("/api/v1/auth/session")
                         .cookie(new Cookie(SessionCookie.NAME, guest.token())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("guest"))
-                .andExpect(jsonPath("$.user").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.user").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.setup.completed").value(false))
+                .andExpect(jsonPath("$.setup.tutorialCompleted").value(false));
     }
 
     private String insertMember(String memberId, String displayName) {

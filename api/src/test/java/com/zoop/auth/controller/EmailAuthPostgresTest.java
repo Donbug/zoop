@@ -119,6 +119,16 @@ class EmailAuthPostgresTest {
                     .andReturn();
             String loginToken = token(relogin);
             assertNotEquals(signupToken, loginToken);
+            var loginResponse = json.readTree(relogin.getResponse().getContentAsString());
+            var sessionResponse = json.readTree(mvc.perform(get("/api/v1/auth/session")
+                            .cookie(new Cookie("zoop_session", loginToken)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.kind").value("member"))
+                    .andReturn().getResponse().getContentAsString());
+            assertEquals(loginResponse.path("user"), sessionResponse.path("user"));
+            assertEquals(loginResponse.path("setup"), sessionResponse.path("setup"));
+            assertFalse(sessionResponse.path("setup").path("completed").asBoolean());
+            assertFalse(sessionResponse.path("setup").path("tutorialCompleted").asBoolean());
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_rate_events WHERE scope = 'login_email_failure' AND subject_hash = ?",
                     Integer.class, subjectHash("login_email_failure", email)));
             mvc.perform(get("/api/v1/auth/session").cookie(new Cookie("zoop_session", signupToken)))

@@ -214,7 +214,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## getMemberSession · 회원·비회원 세션과 초기 설정 조회
 
-유효한 회원 또는 비회원 세션을 각각 member 또는 guest로 반환한다. guest는 user=null, setup.completed=false, setup.tutorialCompleted=false이며 튜토리얼 진행·완료·건너뛰기 상태를 서버에 저장하지 않는다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
+유효한 회원 세션은 해당 회원의 현재 저장된 초기 설정 상태와 함께 member로 반환한다. 유효한 비회원 세션은 guest로 반환하며 user=null, setup.completed=false, setup.tutorialCompleted=false이고 튜토리얼 진행·완료·건너뛰기 상태를 서버에 저장하지 않는다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 user=null, setup=null인 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -5758,7 +5758,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | authenticated | 필수 | boolean |  |
 | kind | 필수 | string {anonymous, guest, member} |  |
 | user | 필수 | [UserInfo](#schema-userinfo) / null |  |
-| setup | 필수 | [SetupState](#schema-setupstate) / null |  |
+| setup | 필수 | [SetupState](#schema-setupstate) / null | 회원은 해당 계정의 현재 저장 상태를 반환하고 guest는 두 값 모두 false다. anonymous에는 초기 설정 상태가 없어 null이다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 | csrfToken | 필수 | string, null | 인증 세션 쓰기에 사용하는 세션 결합 토큰. 무세션은 null. |
 | expiresAt | 필수 | string, null (date-time) |  |
@@ -5799,7 +5799,7 @@ changes nothing (a resent request is answered with the stored settings). The mod
 
 ### SetupState
 
-For guests, ``completed`` and ``tutorialCompleted`` are always false. Guest tutorial progress, completion, and skip state are never persisted; the client can run or replay the tutorial locally.
+For members, these booleans reflect the current persisted state of the authenticated member. For guests, both are always false and tutorial progress, completion, and skip state are never persisted; the client can run or replay the tutorial locally. Anonymous sessions have no setup state and return setup=null.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
