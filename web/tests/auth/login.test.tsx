@@ -114,6 +114,33 @@ beforeEach(() => {
 });
 
 describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
+  test('로그인은 됐지만 종목을 확인하지 못하면(설정 API 404) 추측하지 않고 시장 전체 지도를 고를 수 있다', async () => {
+    server.on('POST', '/api/v1/auth/login', () =>
+      json({ ...memberSession(true), metadata }),
+    );
+    server.on('GET', '/api/v1/me/settings', () =>
+      apiError(404, 'RESOURCE_NOT_FOUND'),
+    );
+    renderApp();
+    await screen.findByRole('heading', { name: '이메일로 로그인' });
+    const user = await fillAndSubmit('member@zoop.test', 'secret-pass');
+
+    expect(
+      await screen.findByText(
+        '계정 상태와 이동할 화면을 확인하지 못했어요. 다시 확인해 주세요.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: '로그인 상태 다시 확인' }),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole('button', { name: '시장 전체 지도로 가기' }),
+    );
+    expect((await screen.findByTestId('destination')).textContent).toBe(
+      '/?mode=all',
+    );
+  });
+
   test('초기 설정을 마치지 않은 회원은 로그인 후 초기 설정으로 간다', async () => {
     server.on('POST', '/api/v1/auth/login', () =>
       json({ ...memberSession(false), metadata }),
@@ -285,7 +312,10 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
     expect(screen.queryByTestId('destination')).toBeNull();
   });
 
-  test('회원가입과 소셜 로그인은 각 절차로 연결한다', async () => {
+  test('회원가입과 서버에 설정된 소셜 로그인만 각 절차로 연결한다', async () => {
+    server.on('GET', '/api/v1/auth/social/providers', () =>
+      json({ items: [{ id: 'google', name: 'Google' }], nextCursor: null }),
+    );
     renderApp();
     await screen.findByRole('heading', { name: '이메일로 로그인' });
 
@@ -294,14 +324,38 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
         .getByRole('link', { name: '이메일로 회원가입' })
         .getAttribute('href'),
     ).toBe('/signup');
+    // 서버는 허용 경로(/login·/signup·/)로만 돌려보내므로 로그인 화면으로 돌아와 FS006 분기를 잇는다.
     expect(
-      screen.getByRole('link', { name: '구글 로그인' }).getAttribute('href'),
-    ).toBe('/api/v1/auth/social/google/authorize?returnTo=%2F');
-    expect(
-      screen
-        .getByRole('link', { name: '카카오톡 로그인' })
-        .getAttribute('href'),
-    ).toBe('/api/v1/auth/social/kakao/authorize?returnTo=%2F');
+      (await screen.findByRole('link', { name: '구글 로그인' })).getAttribute(
+        'href',
+      ),
+    ).toBe('/api/v1/auth/social/google/authorize?returnTo=%2Flogin');
+    expect(screen.queryByRole('link', { name: '카카오톡 로그인' })).toBeNull();
+  });
+
+  test('소셜 제공자 목록을 불러오지 못하면 소셜 버튼을 두지 않는다', async () => {
+    server.on('GET', '/api/v1/auth/social/providers', () =>
+      apiError(503, 'SOURCE_UNAVAILABLE'),
+    );
+    renderApp();
+    await screen.findByRole('heading', { name: '이메일로 로그인' });
+    await waitFor(() =>
+      expect(server.calls('GET', '/api/v1/auth/social/providers')).toHaveLength(
+        1,
+      ),
+    );
+    expect(screen.queryByRole('link', { name: '구글 로그인' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '카카오톡 로그인' })).toBeNull();
+  });
+
+  test.each([
+    ['cancelled', '소셜 로그인을 취소했어요.'],
+    ['failed', '소셜 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.'],
+    ['email_required', /확인된 이메일을 받지 못했어요/],
+    ['link_required', /이미 이메일로 가입한 계정이에요/],
+  ])('소셜 인증 결과(%s)를 안내한다', async (result, message) => {
+    renderApp(`/login?social=${result}`);
+    expect(await screen.findByText(message)).toBeTruthy();
   });
 });
 

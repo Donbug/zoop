@@ -66,3 +66,15 @@ export async function listSignupTerms(): Promise<SignupTerm[]> {
     throw new ApiError(200, 'INVALID_TERMS', '약관을 확인하지 못했어요.');
   return terms;
 }
+
+export type SocialProvider = { id: SocialProviderId; name: string };
+
+/** listSocialProviders: 서버에 설정된 소셜 로그인 제공자. 설정되지 않은 제공자는 버튼을 두지 않는다. */
+export function listSocialProviders() {
+  return call<{ items: SocialProvider[]; nextCursor: string | null }>(
+    '/api/v1/auth/social/providers',
+    'GET',
+    undefined,
+    { skipAuth: true },
+  );
+}
