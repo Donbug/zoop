@@ -1,0 +1,265 @@
+{
+  "companies": [
+    {
+      "company_id": "ORG:OPENAI",
+      "name": "OpenAI",
+      "ticker": null,
+      "aliases": [],
+      "logo": "openai.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "ORG:ANTHROPIC",
+      "name": "Anthropic",
+      "ticker": null,
+      "aliases": [],
+      "logo": "anthropic.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:ASML",
+      "name": "ASML",
+      "ticker": "ASML",
+      "aliases": [
+        "ASML Holding"
+      ],
+      "logo": "asml.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NYSE:TSM",
+      "name": "TSMC",
+      "ticker": "TSM",
+      "aliases": [
+        "Taiwan Semiconductor Manufacturing",
+        "Taiwan Semiconductor"
+      ],
+      "logo": "tsmc.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:005930",
+      "name": "삼성전자",
+      "ticker": "005930",
+      "aliases": [
+        "Samsung Electronics",
+        "Samsung"
+      ],
+      "brand_color": "#1428A0",
+      "logo": "samsung.svg",
+      "brand_source": "https://www.samsung.com/us/about-us/brand-identity/logo/"
+    },
+    {
+      "company_id": "NASDAQ:NVDA",
+      "name": "NVIDIA",
+      "ticker": "NVDA",
+      "aliases": [
+        "Nvidia",
+        "엔비디아"
+      ],
+      "brand_color": "#76B900",
+      "logo": "nvidia.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:AMD",
+      "name": "AMD",
+      "ticker": "AMD",
+      "aliases": [
+        "Advanced Micro Devices"
+      ],
+      "brand_color": "#ED1C24",
+      "logo": "amd.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:AAPL",
+      "name": "Apple",
+      "ticker": "AAPL",
+      "aliases": [
+        "Apple, Inc."
+      ],
+      "brand_color": "#000000",
+      "logo": "apple.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:000660",
+      "name": "SK하이닉스",
+      "ticker": "000660",
+      "aliases": [
+        "SK hynix",
+        "SK Hynix"
+      ],
+      "logo": "sk-hynix.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:MU",
+      "name": "Micron",
+      "ticker": "MU",
+      "aliases": [
+        "Micron Technology"
+      ],
+      "logo": "micron.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:MSFT",
+      "name": "Microsoft",
+      "ticker": "MSFT",
+      "aliases": [
+        "Microsoft Corporation"
+      ],
+      "logo": "microsoft.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:035420",
+      "name": "네이버",
+      "ticker": "035420",
+      "aliases": [
+        "NAVER",
+        "Naver"
+      ],
+      "brand_color": "#03C75A",
+      "logo": "naver.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:035720",
+      "name": "카카오",
+      "ticker": "035720",
+      "aliases": [
+        "Kakao"
+      ],
+      "logo": "kakao.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:META",
+      "name": "Meta",
+      "ticker": "META",
+      "aliases": [
+        "Meta Platforms",
+        "Meta Platforms, Inc."
+      ],
+      "brand_color": "#0467DF",
+      "logo": "meta.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:AMZN",
+      "name": "Amazon",
+      "ticker": "AMZN",
+      "aliases": [
+        "Amazon.com",
+        "Amazon.com, Inc."
+      ],
+      "brand_color": "#FF9900",
+      "logo": "amazon.svg",
+      "brand_source": "https://pages.awscloud.com/rs/112-TZM-766/images/Amazon%20Global_Brand%20Guidelines_DF_v3.pdf"
+    },
+    {
+      "company_id": "KRX:064400",
+      "name": "LG CNS",
+      "ticker": "064400",
+      "aliases": [
+        "LG씨엔에스",
+        "엘지씨엔에스"
+      ],
+      "logo": "lg.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:018260",
+      "name": "삼성SDS",
+      "ticker": "018260",
+      "aliases": [
+        "삼성에스디에스",
+        "Samsung SDS"
+      ],
+      "logo": "samsung-sds.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:042700",
+      "name": "한미반도체",
+      "ticker": "042700",
+      "aliases": [
+        "Hanmi Semiconductor"
+      ],
+      "logo": "hanmi-semiconductor.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:000990",
+      "name": "DB하이텍",
+      "ticker": "000990",
+      "aliases": [
+        "DB HiTek",
+        "DB Hitek"
+      ],
+      "logo": "db-hitek.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "KRX:017670",
+      "name": "SK텔레콤",
+      "ticker": "017670",
+      "aliases": [
+        "SK Telecom",
+        "SKT"
+      ],
+      "logo": "sk-telecom.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:GOOGL",
+      "name": "Alphabet",
+      "ticker": "GOOGL",
+      "aliases": [
+        "Google",
+        "구글",
+        "알파벳"
+      ],
+      "brand_color": "#4285F4",
+      "logo": "alphabet.svg",
+      "brand_source": "https://partnermarketinghub.withgoogle.com"
+    },
+    {
+      "company_id": "NASDAQ:INTC",
+      "name": "Intel",
+      "ticker": "INTC",
+      "aliases": [
+        "Intel Corporation"
+      ],
+      "brand_color": "#0071C5",
+      "logo": "intel.svg",
+      "brand_source": "https://www.intel.com/content/www/us/en/newsroom/resources/press-kits-intel-overview.html"
+    },
+    {
+      "company_id": "NASDAQ:AVGO",
+      "name": "Broadcom",
+      "ticker": "AVGO",
+      "aliases": [
+        "Broadcom Inc."
+      ],
+      "brand_color": "#E31837",
+      "logo": "broadcom.svg",
+      "brand_source": null
+    },
+    {
+      "company_id": "NASDAQ:ARM",
+      "name": "Arm Holdings",
+      "ticker": "ARM",
+      "aliases": [
+        "Arm",
+        "ARM"
+      ],
+      "brand_color": "#0091BD",
+      "logo": "arm.svg",
+      "brand_source": null
+    }
+  ]
+}

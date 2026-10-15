@@ -1,11 +1,14 @@
 package com.zoop.company;
 
 import java.time.Instant;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
 import com.zoop.ZoopApplication;
+import com.zoop.company.catalog.CompanyCatalogImportService;
 import com.zoop.company.repository.CompanySearchPage;
 import com.zoop.company.repository.CompanySearchRepository;
 import com.zoop.company.repository.CompanySearchRow;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -34,6 +38,7 @@ class CompanyPostgresIntegrationTest {
     private static CompanySearchService service;
     private static CompanySearchRepository repository;
     private static String url;
+    private static int startupCompanyCount;
 
     @BeforeAll
     static void startApplicationAgainstDisposableDatabase() {
@@ -51,6 +56,7 @@ class CompanyPostgresIntegrationTest {
         jdbc = context.getBean(JdbcTemplate.class);
         service = context.getBean(CompanySearchService.class);
         repository = context.getBean(CompanySearchRepository.class);
+        startupCompanyCount = jdbc.queryForObject("SELECT count(*) FROM companies", Integer.class);
     }
 
     @AfterAll
@@ -82,8 +88,11 @@ class CompanyPostgresIntegrationTest {
 
     @Test
     void freshMigrationsAndJpaValidationSucceed() {
+        assertEquals(24, startupCompanyCount);
         assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
                 + "WHERE version='20261013153313'", Boolean.class));
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
+                + "WHERE version='20261015090000'", Boolean.class));
         assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT success FROM flyway_schema_history "
                 + "WHERE version='20261014102810'", Boolean.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM pg_extension WHERE extname='pg_trgm'", Integer.class));
@@ -98,6 +107,92 @@ class CompanyPostgresIntegrationTest {
                 + "JOIN pg_opclass op ON op.oid=i.indclass[0] "
                 + "WHERE i.indexrelid='public.ix_companies_search_text_trgm'::regclass", String.class));
         context.getBean(Flyway.class).validate();
+    }
+
+    @Test
+    void confirmedCatalogImportsTwentyFourCompaniesAndPreservesOtherRows() throws Exception {
+        var importer = context.getBean(CompanyCatalogImportService.class);
+        Path file = Path.of(getClass().getResource("/company/demo-companies.json").toURI());
+        jdbc.update("INSERT INTO companies (id, name) VALUES ('NYSE:PINS', 'Old seed company')");
+        jdbc.update("""
+                INSERT INTO companies (id, name, ticker, exchange_code, market, brand_source)
+                VALUES ('ORG:OPENAI', 'Old OpenAI', 'OLD', 'NYSE', 'stale', 'https://example.test/old')
+                """);
+        long before = repository.catalogRevision();
+
+        var imported = importer.importFile(file);
+        assertEquals(24, imported.total());
+        assertEquals(24, imported.changed());
+        assertEquals(0, imported.unchanged());
+        assertEquals(25, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id LIKE 'KRX:%' "
+                + "OR id LIKE 'NASDAQ:%' OR id LIKE 'NYSE:%' OR id LIKE 'TSE:%' "
+                + "OR id LIKE 'ORG:%'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='NYSE:PINS'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='special'", Integer.class));
+        assertEquals("005930", jdbc.queryForObject(
+                "SELECT ticker FROM companies WHERE id='KRX:005930'", String.class));
+        assertEquals("KRX", jdbc.queryForObject(
+                "SELECT exchange_code FROM companies WHERE id='KRX:005930'", String.class));
+        assertNull(jdbc.queryForObject("SELECT ticker FROM companies WHERE id='ORG:OPENAI'", String.class));
+        assertNull(jdbc.queryForObject("SELECT exchange_code FROM companies WHERE id='ORG:ANTHROPIC'", String.class));
+        assertNull(jdbc.queryForObject("SELECT market FROM companies WHERE id='ORG:OPENAI'", String.class));
+        assertNull(jdbc.queryForObject("SELECT brand_source FROM companies WHERE id='ORG:OPENAI'", String.class));
+        assertEquals("https://www.samsung.com/us/about-us/brand-identity/logo/", jdbc.queryForObject(
+                "SELECT brand_source FROM companies WHERE id='KRX:005930'", String.class));
+        assertEquals("/graph-assets/openai.svg", jdbc.queryForObject(
+                "SELECT logo_url FROM companies WHERE id='ORG:OPENAI'", String.class));
+        assertEquals("/graph-assets/alphabet.svg", jdbc.queryForObject(
+                "SELECT logo_url FROM companies WHERE id='NASDAQ:GOOGL'", String.class));
+        assertEquals("064400", jdbc.queryForObject(
+                "SELECT ticker FROM companies WHERE id='KRX:064400'", String.class));
+        assertEquals("Alphabet", jdbc.queryForObject(
+                "SELECT name FROM companies WHERE id='NASDAQ:GOOGL'", String.class));
+        assertEquals(List.of("ORG:OPENAI"), ids(search("openai")));
+        assertTrue(repository.catalogRevision() > before);
+        long after = repository.catalogRevision();
+
+        var repeated = importer.importFile(file);
+        assertEquals(0, repeated.changed());
+        assertEquals(24, repeated.unchanged());
+        assertEquals(after, repository.catalogRevision());
+    }
+
+    @Test
+    void duplicateCompanyIdsRejectWholeCatalogBeforeWriting(@TempDir Path directory) throws Exception {
+        Path file = directory.resolve("duplicate.json");
+        Files.writeString(file, """
+                {"companies":[
+                  {"company_id":"ORG:DUP","name":"First","ticker":null,"aliases":[]},
+                  {"company_id":"ORG:DUP","name":"Second","ticker":null,"aliases":[]}
+                ]}
+                """);
+        var importer = context.getBean(CompanyCatalogImportService.class);
+        long revision = repository.catalogRevision();
+
+        assertThrows(IllegalArgumentException.class, () -> importer.importFile(file));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id='ORG:DUP'", Integer.class));
+        assertEquals(revision, repository.catalogRevision());
+    }
+
+    @Test
+    void catalogImportPreservesCompanyReferencedByExistingAnalysis() throws Exception {
+        var importer = context.getBean(CompanyCatalogImportService.class);
+        Path file = Path.of(getClass().getResource("/company/demo-companies.json").toURI());
+        var transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+
+        transaction.execute(status -> {
+            jdbc.execute("CREATE TABLE company_catalog_reference_test (company_id text REFERENCES companies(id))");
+            jdbc.update("INSERT INTO companies (id, name) VALUES ('NYSE:PINS', 'Referenced company')");
+            jdbc.update("INSERT INTO company_catalog_reference_test (company_id) VALUES ('NYSE:PINS')");
+
+            importer.importFile(file);
+            assertEquals(1, jdbc.queryForObject(
+                    "SELECT count(*) FROM company_catalog_reference_test WHERE company_id='NYSE:PINS'", Integer.class));
+            assertEquals(1, jdbc.queryForObject(
+                    "SELECT count(*) FROM companies WHERE id='NYSE:PINS'", Integer.class));
+            status.setRollbackOnly();
+            return null;
+        });
     }
 
     private static void assertIndex(String name, String method, String keys, boolean unique, String predicate) {
