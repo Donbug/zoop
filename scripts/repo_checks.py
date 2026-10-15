@@ -51,16 +51,52 @@ ACTION_PINS = {
     "actions/create-github-app-token": "fee1f7d63c2ff003460e3d139729b119787bc349",
     "astral-sh/setup-uv": "d0cc045d04ccac9d8b7881df0226f9e82c39688e",
     "pnpm/action-setup": "b906affcce14559ad1aafd4ab0e942779e9f58b1",
+    "aws-actions/configure-aws-credentials": "e1253824e5c10ff9df46874f81ed3ec929e19cfd",
+    "aws-actions/amazon-ecr-login": "03f1aad4c6c7ffd436567f42f9384779290529bd",
+    "aws-actions/amazon-ecs-render-task-definition": "138c24f321fdbdf7edee4a685519d253cae2cdea",
+    "aws-actions/amazon-ecs-deploy-task-definition": "c465972ecbd160473f22e683363b422a5412a3de",
 }
 # Curated from action.yml at the pinned revisions. actionlint is a separate CI gate.
 ACTION_INPUTS = {
     "actions/checkout": {"ref", "persist-credentials"},
     "actions/setup-node": {"node-version"},
     "actions/setup-python": {"python-version"},
-    "actions/upload-artifact": {"name", "path", "if-no-files-found", "retention-days"},
-    "actions/create-github-app-token": {"app-id", "private-key", "owner", "repositories", "permission-contents"},
+    "actions/upload-artifact": {
+        "name",
+        "path",
+        "if-no-files-found",
+        "retention-days",
+    },
+    "actions/create-github-app-token": {
+        "app-id",
+        "private-key",
+        "owner",
+        "repositories",
+        "permission-contents",
+    },
     "astral-sh/setup-uv": {"enable-cache"},
-    "pnpm/action-setup": {"version", "run_install", "package_json_file"},
+    "pnpm/action-setup": {
+        "version",
+        "run_install",
+        "package_json_file",
+    },
+    "aws-actions/configure-aws-credentials": {
+        "role-to-assume",
+        "aws-region",
+        "role-session-name",
+    },
+    "aws-actions/amazon-ecr-login": set(),
+    "aws-actions/amazon-ecs-render-task-definition": {
+        "task-definition",
+        "container-name",
+        "image",
+    },
+    "aws-actions/amazon-ecs-deploy-task-definition": {
+        "task-definition",
+        "service",
+        "cluster",
+        "wait-for-service-stability",
+    },
 }
 
 
