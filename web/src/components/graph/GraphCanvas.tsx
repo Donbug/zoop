@@ -10,6 +10,7 @@ export default function GraphCanvas({
   selectedId: selected = null,
   onSelect,
   focusId = null,
+  highlightedEdgeIds = [],
   selectedEdgeId = null,
   onSelectEdge,
 }: {
@@ -17,6 +18,7 @@ export default function GraphCanvas({
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
+  highlightedEdgeIds?: string[];
   selectedEdgeId?: string | null;
   onSelectEdge?: (id: string) => void;
 }) {
@@ -51,6 +53,17 @@ export default function GraphCanvas({
           host.clientWidth,
           host.clientHeight,
           selected ?? focusId,
+          data.edges
+            .filter((edge) => highlightedEdgeIds.includes(edge.id))
+            .flatMap((edge) => [edge.source, edge.target]),
+        );
+        rendered.edges = rendered.edges?.map((edge) =>
+          highlightedEdgeIds.includes(String(edge.id))
+            ? {
+                ...edge,
+                style: { ...edge.style, stroke: '#b75b00', lineWidth: 4 },
+              }
+            : edge,
         );
         graph.setData(rendered);
         await graph.draw();
@@ -81,7 +94,7 @@ export default function GraphCanvas({
   });
   useEffect(() => {
     syncSelection();
-  }, [selected, selectedEdgeId, focusId]);
+  }, [selected, selectedEdgeId, focusId, highlightedEdgeIds]);
   useEffect(() => {
     const host = container.current;
     if (!host) return;

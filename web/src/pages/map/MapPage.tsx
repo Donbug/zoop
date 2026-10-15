@@ -14,6 +14,10 @@ import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
+import { useCompanyResource } from '@/hooks/useCompanyResource';
+import { companyUrl } from '@/apis/company/company';
+import { impactEdges, exactTime } from '@/components/company/detail-model';
+import type { Impact } from '@/types/company/detail';
 import { useAuth } from '@/hooks/useAuth';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
@@ -48,8 +52,32 @@ export default function MapPage() {
   const filter = readFilter(
     params.get('scope') ?? sessionStorage.getItem(FILTER_KEY),
   );
+  const companyId = params.get('companyId') ?? undefined;
+  const historical = companyId && exactTime(params.get('asOf'));
+  const asOf = historical ? params.get('asOf')! : undefined;
+  const graphVersion = historical
+    ? (params.get('graphVersion') ?? undefined)
+    : undefined;
+  const detailEventId = params.get('event');
+  const impact = useCompanyResource<Impact>(
+    historical && detailEventId
+      ? companyUrl(
+          companyId!,
+          `/issues/${encodeURIComponent(detailEventId)}/impact`,
+          { asOf, graphVersion },
+        )
+      : null,
+  );
+  const returnTo = params.get('returnTo');
   const { data, error, loading } = useGraphData(
-    { mode: requestedMode, personalFilter: filter },
+    {
+      mode: requestedMode,
+      personalFilter: filter,
+      companyId,
+      asOf,
+      graphVersion,
+      depth: params.get('depth') === '2' ? 2 : 1,
+    },
     token,
     retry,
   );
@@ -212,6 +240,20 @@ export default function MapPage() {
   return (
     <div className="relationship-map">
       <ServiceHeader />
+      {returnTo?.startsWith('/companies/') && (
+        <Link to={returnTo}>기업 상세로 돌아가기</Link>
+      )}
+      {historical && (
+        <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2 text-xs">
+          기업 상세에서 선택한 시점 · {asOf} · {graphVersion ?? '버전 미제공'}
+        </p>
+      )}
+      {impact.error && (
+        <p role="alert">
+          영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.
+          <button onClick={impact.retry}>영향 경로 다시 조회</button>
+        </p>
+      )}
       <main className="relationship-main">
         <section
           ref={mapRegion}
@@ -343,11 +385,15 @@ export default function MapPage() {
             {data ? (
               <GraphCanvas
                 data={data}
-                selectedId={selectedId}
+                selectedId={selectedId ?? detailEventId ?? companyId}
+                highlightedEdgeIds={impactEdges(data, impact.data)}
                 selectedEdgeId={edgeId}
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
-                focusId={params.get('focus')}
+                focusId={
+                  params.get('focus') ??
+                  (historical ? (detailEventId ?? companyId) : null)
+                }
               />
             ) : (
               <div className="relationship-canvas">
