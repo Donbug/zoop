@@ -40,6 +40,10 @@ public class MemberCsrfInterceptor implements HandlerInterceptor {
             }
         }
         if (token != null) {
+            String path = request.getRequestURI().substring(request.getContextPath().length());
+            if ("/api/v1/auth/logout".equals(path) && !sessions.isActiveSession(token)) {
+                return true;
+            }
             origins.verify(request);
             var headers = request.getHeaders("X-CSRF-Token");
             if (!headers.hasMoreElements()) {

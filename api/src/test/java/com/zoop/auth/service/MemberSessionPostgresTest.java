@@ -5,6 +5,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.zoop.auth.controller.SessionController;
+import com.zoop.auth.controller.LogoutController;
+import com.zoop.auth.config.MemberCsrfInterceptor;
+import com.zoop.auth.service.AuthOriginPolicy;
 import com.zoop.common.request.RequestIdFilter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
@@ -19,6 +22,7 @@ import jakarta.servlet.http.Cookie;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -128,6 +132,42 @@ class MemberSessionPostgresTest {
                 .andExpect(jsonPath("$.user").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.setup.completed").value(false))
                 .andExpect(jsonPath("$.setup.tutorialCompleted").value(false));
+    }
+
+    @Test
+    @Transactional
+    void logoutHttpRevokesOnlyTheCurrentMemberSessionAndClearsItsCookie() throws Exception {
+        String memberId = insertMember("logout-" + UUID.randomUUID(), "Logout Member");
+        var current = service.issue(memberId, null, "logout-current");
+        var other = service.issue(memberId, null, "logout-other");
+        var mvc = MockMvcBuilders.standaloneSetup(new LogoutController(service))
+                .addInterceptors(new MemberCsrfInterceptor(new AuthOriginPolicy("https://zoop.example"), service))
+                .addFilters(new RequestIdFilter()).build();
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie(SessionCookie.NAME, current.token()))
+                        .header("Origin", "https://zoop.example")
+                        .header("X-CSRF-Token", current.response().csrfToken()))
+                .andExpect(status().isNoContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+
+        assertTrue(service.lookup(current.token(), "logout-revoked").clearCookie());
+        assertTrue(service.lookup(other.token(), "logout-other-active").response().authenticated());
+    }
+
+    @Test
+    @Transactional
+    void logoutWithExpiredCookieReturnsNoContentWithoutCsrf() throws Exception {
+        var mvc = MockMvcBuilders.standaloneSetup(new LogoutController(service))
+                .addInterceptors(new MemberCsrfInterceptor(new AuthOriginPolicy("https://zoop.example"), service))
+                .addFilters(new RequestIdFilter()).build();
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie(SessionCookie.NAME, "x".repeat(43))))
+                .andExpect(status().isNoContent())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
     }
 
     private String insertMember(String memberId, String displayName) {
