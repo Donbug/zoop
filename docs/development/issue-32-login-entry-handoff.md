@@ -1,7 +1,7 @@
 # 이슈 #32 로그인 후 초기 진입 상태 인계
 
-**범위:** BE WBS 6.2.4 · FS001 · FS006 · NFS001  
-**화면 추적:** `D-AUT-01` · `D-ONB-01`  
+**범위:** BE WBS 6.2.4 · FS001 · FS006 · NFS001
+**화면 추적:** `D-AUT-01` · `D-ONB-01`
 **API 계약:** `docs/api/openapi.yaml`의 `getMemberSession`, `login_api_auth_login_post`
 
 ## 검증된 서버 동작
@@ -33,4 +33,3 @@
 
 - `make api-test api-build`
 - PostgreSQL 환경에서 `authIntegrationTest` 실행: 로그인 응답과 세션 재조회 일치, 최신 설정값, 회원 간 격리, 기존 로그인 실패·차단 계정 동작 확인
-
