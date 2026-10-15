@@ -1,6 +1,7 @@
 package com.zoop.auth.controller;
 
 import java.nio.charset.StandardCharsets;
+import java.net.InetAddress;
 import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -240,6 +241,7 @@ class EmailAuthPostgresTest {
 
     private void assertMalformedBodyLimit(String path, String scope, int limit) throws Exception {
         String ip = remoteIp();
+        String normalizedIp = InetAddress.getByName(ip).getHostAddress();
         try {
             for (int i = 0; i < limit; i++) {
                 mvc.perform(post(path).with(remote(ip)).header("Origin", ORIGIN)
@@ -254,10 +256,10 @@ class EmailAuthPostgresTest {
                     .andExpect(jsonPath("$.error.code").value("RATE_LIMITED"));
             assertEquals(limit, jdbc.queryForObject(
                     "SELECT count(*) FROM auth_rate_events WHERE scope = ? AND subject_hash = ?",
-                    Integer.class, scope, subjectHash(scope, ip)));
+                    Integer.class, scope, subjectHash(scope, normalizedIp)));
         } finally {
             jdbc.update("DELETE FROM auth_rate_events WHERE scope = ? AND subject_hash = ?",
-                    scope, subjectHash(scope, ip));
+                    scope, subjectHash(scope, normalizedIp));
         }
     }
 
