@@ -77,7 +77,7 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 
 온보딩은 원본에서 모두 /onboarding이다. 이번 구조에서는 직접 진입·뒤로 가기·단계 분리를 위해 하위 경로를 제안했다. 가입 성공/투자 여부에 따른 자동 분기와 완료 저장은 API 연결 시 구현한다. 현재 단계 내비게이션은 파일 골조를 확인하는 링크다.
 
-루트 /는 공개 지도다. 기존 /home은 /로, /search는 /stocks로, /detail/:id는 /companies/:id로 리다이렉트한다. 실제 관리자 세션 확인 API가 없으므로 현재 관리자 보호 주소는 /admin/login으로 안내된다.
+루트 /는 공개 지도다. 기존 /home은 /로, /search는 /stocks로, /detail/:id는 /companies/:id로 리다이렉트한다. 관리자 보호 주소는 서버 관리자 세션을 확인한 뒤, 세션이 없거나 만료되면 /admin/login으로 안내된다(A-ADM-05c). 회원 세션으로는 들어갈 수 없다.
 
 ## 4. 페이지 내부 컴포넌트 파일
 
@@ -164,17 +164,17 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 
 `src/stores/`에 아래 Zustand store를 실제 생성했다. persist는 쓰지 않는다(인증은 서버 세션 쿠키).
 
-| Store                | 변수와 초기값                                                                       | 공유 이유 / 생명주기                                                                                     | 현재 연결                                                  |
-| -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| useAuthStore         | status: 'checking'; session: null; member: null; onboardingCompleted: null          | 가드·헤더·개인 기능에서 인증 참조. `SessionResponse`의 회원·비회원·없음과 초기 설정 완료 여부, CSRF 토큰 | session API·loadSession, 로그아웃, useAuth, ProtectedRoute |
-| useAdminSessionStore | session: null; 검증 후 id/displayName/expiresAt                                     | 회원과 독립된 관리자 세션. 메모리만 사용                                                                 | AdminProtectedRoute, 실제 로그인/회수 API는 미연결         |
-| useOnboardingStore   | investmentStatus: null; virtualAccountId: null; watchlistIds: []                    | 여러 단계에서 공유하는 저장 전 초안                                                                      | 타입·setter·toggle·reset 정의, 입력/저장 UI 후속 연결      |
-| useGraphUiStore      | evidenceTarget: null; tutorialStep: null                                            | 지도 패널과 근거 창·튜토리얼 간 공유                                                                     | 근거 창 열림/닫힘, 튜토리얼 setter는 후속 단계 UI 연결     |
-| useAiChatStore       | isOpen: false; context: null; conversationId: null; draft: ''; recoveryStatus: idle | 지도 선택과 AI 서랍 공유, 닫아도 초안/맥락 유지                                                          | 지도에서 열기·닫기·초안, 대화 조회/전송은 미연결           |
+| Store                | 변수와 초기값                                                                       | 공유 이유 / 생명주기                                                                                     | 현재 연결                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| useAuthStore         | status: 'checking'; session: null; member: null; onboardingCompleted: null          | 가드·헤더·개인 기능에서 인증 참조. `SessionResponse`의 회원·비회원·없음과 초기 설정 완료 여부, CSRF 토큰 | session API·loadSession, 로그아웃, useAuth, ProtectedRoute                                |
+| useAdminSessionStore | status: 'checking'; session: null; admin: null; revision: 0                         | 회원과 독립된 관리자 세션(`AdminSession`: 관리자·만료·CSRF). 메모리만 사용                               | `apis/admin/auth.ts`(session·login·logout·adminCall), AdminProtectedRoute, AdminLoginPage |
+| useOnboardingStore   | investmentStatus: null; virtualAccountId: null; watchlistIds: []                    | 여러 단계에서 공유하는 저장 전 초안                                                                      | 타입·setter·toggle·reset 정의, 입력/저장 UI 후속 연결                                     |
+| useGraphUiStore      | evidenceTarget: null; tutorialStep: null                                            | 지도 패널과 근거 창·튜토리얼 간 공유                                                                     | 근거 창 열림/닫힘, 튜토리얼 setter는 후속 단계 UI 연결                                    |
+| useAiChatStore       | isOpen: false; context: null; conversationId: null; draft: ''; recoveryStatus: idle | 지도 선택과 AI 서랍 공유, 닫아도 초안/맥락 유지                                                          | 지도에서 열기·닫기·초안, 대화 조회/전송은 미연결                                          |
 
 `GraphTarget`은 company/issue/edge/path + id의 판별 유니온이다. 문자열 ID만 저장하며 문서·시세·응답 본문을 전역 상태에 복제하지 않는다.
 
-인증 정보 제거 시 온보딩·지도 UI·AI store도 reset한다. 관리자 세션은 회원 로그아웃과 독립적이다. 관리자 재진입 시 실제 서버 세션 회수는 구현해야 한다.
+인증 정보 제거 시 온보딩·지도 UI·AI store도 reset한다. 관리자 세션은 회원 로그아웃과 독립적이다. 관리자 화면은 진입 시 `GET /api/v1/admin/auth/session`으로 서버 세션을 회수하고, 만료 시각에 다시 확인한다. 관리자 API는 `adminCall`로 호출해 관리자 CSRF를 붙이고, 401이면 관리자 세션만 비운다.
 
 ### URL이 소유할 상태
 
