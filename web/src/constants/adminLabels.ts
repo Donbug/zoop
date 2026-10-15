@@ -1,3 +1,4 @@
+import type { StageStatus } from '@/types/admin/briefings';
 import type {
   DashboardGraphDbStatus,
   DashboardJobStatus,
@@ -37,4 +38,25 @@ export const graphDbStatusLabel: Record<DashboardGraphDbStatus, string> = {
   pending: '반영 대기',
   mismatch: '불일치',
   unavailable: '확인 불가',
+};
+
+export const stageStatusLabel: Record<StageStatus, string> = {
+  pending: '대기',
+  running: '진행 중',
+  done: '완료',
+  failed: '실패',
+  skipped: '건너뜀',
+};
+
+export const aiSourceLabel: Record<string, string> = {
+  measured: 'BFF 실측',
+  'job-runner': '작업 러너',
+  'ledger-db': '작업 원장',
+  document: '문서 기록',
+};
+
+export const policyGroupLabel: Record<string, string> = {
+  'strict-web': '엄격(웹 검증)',
+  'relaxed-no-web': '완화(웹 검증 없음)',
+  'admin-job': '관리자 작업',
 };

@@ -35,3 +35,24 @@ export function adminErrorMessage(error: Error) {
   }
   return '잠시 후 다시 시도해 주세요.';
 }
+
+/** 관리 작업(쓰기) 실패 문구. 회차·회원 화면이 함께 쓰므로 대상을 특정하지 않는다. */
+export function adminActionErrorMessage(error: Error) {
+  if (error instanceof ApiError) {
+    if (error.code === 'IDEMPOTENCY_CONFLICT')
+      return '이전 요청과 내용이 달라 처리하지 못했어요. 다시 시도해 주세요.';
+    if (error.code === 'ALREADY_PUBLISHED')
+      return '이미 발행된 회차예요. 상세를 새로 고친 뒤 확인해 주세요.';
+    if (error.status === 409)
+      return '상태가 바뀌어 처리하지 못했어요. 화면을 새로 고친 뒤 다시 시도해 주세요.';
+    if (error.status === 422 || error.code === 'INVALID_REQUEST')
+      return '입력 내용을 확인해 주세요.';
+    if (error.status === 429 || error.code === 'RATE_LIMITED')
+      return '요청이 많아요. 잠시 후 다시 시도해 주세요.';
+  }
+  return adminErrorMessage(error);
+}
+
+export const TEXTAREA = `min-h-20 w-full rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2.5 py-2 text-xs leading-relaxed text-zoop-ink focus:border-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
+export const SELECT = `h-9 w-full rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-2 text-xs text-zoop-ink disabled:opacity-60 ${FOCUS_RING}`;
+export const PRIMARY_BUTTON = `h-9 shrink-0 rounded-[3px] bg-zoop-ink px-3 text-xs font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${FOCUS_RING}`;
