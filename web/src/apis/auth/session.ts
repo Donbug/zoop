@@ -78,3 +78,17 @@ export function listSocialProviders() {
     { skipAuth: true },
   );
 }
+
+/**
+ * completeSocialSignup: 소셜 콜백이 검증해 둔 신규 인증(zoop_oauth_pending 쿠키)으로 가입을 마친다.
+ * 이메일·제공자는 서버가 보관한 값만 쓰고, 화면은 표시 이름과 약관 동의만 보낸다.
+ * 201이면 회원 세션 쿠키가 발급된다. 403은 인증 만료·없음, 409 SOCIAL_LINK_REQUIRED는 같은 이메일 계정이 이미 있음.
+ */
+export function completeSocialSignup(body: {
+  displayName?: string;
+  agreements: { id: string; version: string; accepted: boolean }[];
+}) {
+  return call<Session>('/api/v1/auth/social/signup', 'POST', body, {
+    skipAuth: true,
+  });
+}
