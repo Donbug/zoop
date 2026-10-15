@@ -147,6 +147,26 @@ describe('Issue35 · FS003 D-AUT-02', () => {
     expect(await screen.findByText('필수 약관에 동의해 주세요.')).toBeTruthy();
     expect(server.calls('POST', '/api/v1/auth/signup')).toHaveLength(0);
   });
+  it('blocks passwords shorter than the contract minimum (15) before sending', async () => {
+    open();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('이메일'), email);
+    await user.type(screen.getByLabelText('비밀번호'), 'short-pass-12');
+    await screen.findByLabelText('모두 동의');
+    await user.click(screen.getByLabelText('모두 동의'));
+    expect(
+      screen.getByText(
+        '15자 이상 128자 이하로 입력해 주세요. 흔한 비밀번호는 쓸 수 없어요.',
+      ),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '가입하고 시작하기' }));
+    expect(
+      await screen.findByText(
+        '비밀번호는 15자 이상 128자 이하로 입력해 주세요.',
+      ),
+    ).toBeTruthy();
+    expect(server.calls('POST', '/api/v1/auth/signup')).toHaveLength(0);
+  });
   it('sends actual term versions and preserves password spaces, verifies session, opens onboarding', async () => {
     open();
     const user = await fillSignup();
