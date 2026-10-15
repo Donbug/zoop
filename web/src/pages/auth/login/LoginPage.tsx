@@ -97,8 +97,8 @@ export default function LoginPage() {
   useEffect(() => {
     let alive = true;
     listSocialProviders().then(
-      (page) => {
-        if (alive) setProviders(page.items);
+      (items) => {
+        if (alive) setProviders(items);
       },
       () => undefined,
     );

@@ -69,12 +69,42 @@ export async function listSignupTerms(): Promise<SignupTerm[]> {
 
 export type SocialProvider = { id: SocialProviderId; name: string };
 
-/** listSocialProviders: 서버에 설정된 소셜 로그인 제공자. 설정되지 않은 제공자는 버튼을 두지 않는다. */
-export function listSocialProviders() {
-  return call<{ items: SocialProvider[]; nextCursor: string | null }>(
-    '/api/v1/auth/social/providers',
-    'GET',
-    undefined,
-    { skipAuth: true },
-  );
+/** listSocialProviders: 커서 전체를 순회한 소셜 로그인 제공자. */
+export async function listSocialProviders(): Promise<SocialProvider[]> {
+  const providers: SocialProvider[] = [];
+  const providerIds = new Set<SocialProviderId>();
+  const cursors = new Set<string>();
+  let cursor: string | null = null;
+
+  do {
+    const query: string = cursor ? `?${new URLSearchParams({ cursor })}` : '';
+    const page: {
+      items: SocialProvider[];
+      nextCursor: string | null;
+    } = await call(`/api/v1/auth/social/providers${query}`, 'GET', undefined, {
+      skipAuth: true,
+    });
+
+    for (const provider of page.items) {
+      if (providerIds.has(provider.id))
+        throw new ApiError(
+          200,
+          'INVALID_SOCIAL_PROVIDERS',
+          '소셜 로그인 방법을 확인하지 못했어요.',
+        );
+      providerIds.add(provider.id);
+      providers.push(provider);
+    }
+
+    cursor = page.nextCursor;
+    if (cursor && cursors.has(cursor))
+      throw new ApiError(
+        200,
+        'INVALID_SOCIAL_PROVIDERS',
+        '소셜 로그인 방법을 확인하지 못했어요.',
+      );
+    if (cursor) cursors.add(cursor);
+  } while (cursor);
+
+  return providers;
 }

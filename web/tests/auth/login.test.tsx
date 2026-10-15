@@ -308,8 +308,13 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
   });
 
   test('회원가입과 서버에 설정된 소셜 로그인만 각 절차로 연결한다', async () => {
-    server.on('GET', '/api/v1/auth/social/providers', () =>
-      json({ items: [{ id: 'google', name: 'Google' }], nextCursor: null }),
+    server.on('GET', '/api/v1/auth/social/providers', (request) =>
+      request.query.get('cursor') === 'providers-2'
+        ? json({ items: [{ id: 'kakao', name: 'Kakao' }], nextCursor: null })
+        : json({
+            items: [{ id: 'google', name: 'Google' }],
+            nextCursor: 'providers-2',
+          }),
     );
     renderApp();
     await screen.findByRole('heading', { name: '이메일로 로그인' });
@@ -325,7 +330,14 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
         'href',
       ),
     ).toBe('/api/v1/auth/social/google/authorize?returnTo=%2Flogin');
-    expect(screen.queryByRole('link', { name: '카카오톡 로그인' })).toBeNull();
+    expect(
+      (
+        await screen.findByRole('link', { name: '카카오톡 로그인' })
+      ).getAttribute('href'),
+    ).toBe('/api/v1/auth/social/kakao/authorize?returnTo=%2Flogin');
+    expect(server.calls('GET', '/api/v1/auth/social/providers')).toHaveLength(
+      2,
+    );
   });
 
   test('소셜 제공자 목록을 불러오지 못하면 소셜 버튼을 두지 않는다', async () => {
