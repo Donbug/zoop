@@ -9,9 +9,10 @@
 | 비회원 시작 | `POST /api/v1/auth/guest`가 guest 세션과 `zoop_session` 쿠키를 발급한다. 12시간 절대 만료이며 기존 guest 쿠키를 받으면 그 guest 행을 회전 폐기한다. 회원 행은 guest 시작 때문에 폐기하지 않는다. | `GuestSessionController`, `MemberSessionService.issueGuest`, `JdbcMemberSessionRepository.insertGuestSession` |
 | 세션 복구 | `GET /api/v1/auth/session`은 유효 guest에 `kind=guest`, `user=null`, `completed=false`, `tutorialCompleted=false`, 만료 시각, guest 결합 CSRF를 반환한다. 만료·폐기·무효 세션은 anonymous이며 무효 쿠키를 지운다. | `MemberSessionService.lookup`; `MemberSessionServiceTest` |
 | 튜토리얼 무저장 | guest의 완료 응답은 항상 false다. DB는 guest 행의 `tutorial_completed=true`를 거부한다. 계약상 튜토리얼 저장은 회원 전용이며, 해당 컨트롤러를 구현하면 등록된 권한 경계가 guest를 `403 MEMBER_REQUIRED`로 거부한다. 현재 이 API 모듈에는 튜토리얼 저장 컨트롤러가 없으므로 실제 HTTP 호출은 아직 구현된 동작이 아니다. 클라이언트는 진행·완료·건너뛰기 상태를 로컬에서만 관리한다. | `MemberAuthorizationInterceptor`; `V20261015120000__keep_guest_tutorial_state_unset.sql`; 서비스·권한 테스트 |
-| 개인 기능 | 인증 없음은 `401 AUTH_REQUIRED`, guest는 `403 MEMBER_REQUIRED`, 타 회원 소유 리소스는 `403 ACCESS_DENIED`다. 요청 본문의 회원 ID가 아니라 검증된 세션의 `MemberPrincipal`을 사용하고 리소스 로드 뒤 `requireOwner`를 적용한다. | `MemberSessionService.requireMember/requireOwner`; `MemberAuthorizationInterceptorTest` |
+| 세션의 개인 정보 | `GET /api/v1/auth/session`은 쿠키에 연결된 member만 반환하고 guest에는 `user=null`을 반환한다. PostgreSQL 통합 테스트가 회원 A/B의 쿠키별 응답과 guest 응답을 실제 컨트롤러 경로에서 확인한다. | `MemberSessionService.lookup`; `MemberSessionPostgresTest.sessionHttpResponseOnlyReturnsTheMemberBoundToTheCookie` |
+| 회원 전용 경계 기반 | 회원 전용으로 등록된 핸들러는 인증 없는 요청을 `401 AUTH_REQUIRED`, guest를 `403 MEMBER_REQUIRED`로 거부하며, 리소스 소유자와 principal이 다르면 `requireOwner`가 `403 ACCESS_DENIED`를 낸다. | `MemberSessionService.requireMember/requireOwner`; `MemberAuthorizationInterceptorTest`; `MemberSessionServiceTest` |
 
-현재 `api` 앱에는 `/me`, `/portfolio`, `/chat`, `/feedback`, 개인화 브리핑의 업무 컨트롤러가 없습니다. 경로가 추가될 때 `AuthRequestConfiguration`에 등록된 인터셉터가 경계를 적용하고, 각 저장소 조회는 인증 주체에 결합되어야 합니다. 그러므로 이번 API 단위 테스트는 권한 프리핸들러와 주체/소유자 검증을 확인하며 실제 개인 리소스 종단 간 테스트를 대신하지 않습니다.
+현재 `api` 앱에는 `/me`, `/portfolio`, `/chat`, `/feedback`, 개인화 브리핑의 업무 컨트롤러가 없고, `requireOwner`를 실제 리소스 조회에서 호출하는 코드도 없습니다. 따라서 세션 API의 개인 정보가 쿠키별로 격리되는 것은 검증됐지만, 개인 리소스의 타 회원 접근 차단은 아직 종단 간으로 검증되지 않았습니다. 해당 컨트롤러를 구현할 때 저장소 조회를 principal에 결합하고 HTTP/PostgreSQL 통합 테스트로 회원 A·회원 B·guest의 접근을 확인해야 합니다.
 
 ## 화면 ID 연결
 
@@ -45,5 +46,5 @@
 
 - `./gradlew test`: 전체 API 단위·웹 계층 테스트 통과.
 - 관련 테스트: `MemberSessionServiceTest`, `GuestSessionControllerTest`, `MemberAuthorizationInterceptorTest`, `SessionControllerTest`.
-- PostgreSQL 통합 테스트 `MemberSessionPostgresTest`는 `DB_URL`이 필요해 이번 실행에서는 검증하지 않았습니다. 실제 DB에서 guest 저장·회전·CHECK 제약을 확인해야 합니다.
+- `DB_URL=jdbc:postgresql://127.0.0.1:55439/zoop_auth_test ./api/gradlew -p api --console=plain authIntegrationTest`: 2026-10-15 Docker 임시 PostgreSQL에서 16개 통합 테스트 통과. guest 저장·회전·CHECK 제약 및 세션 HTTP 응답의 회원/guest 격리를 확인했습니다.
 - DB migration은 Flyway 순방향 변경입니다. 애플리케이션 롤백 시 새 guest/tutorial 기능 호출을 중단하고 기존 앱을 재배포합니다. 이미 적용된 CHECK 제약은 false 상태를 강제하며 기존 member/OAuth 행에는 영향을 주지 않습니다.
