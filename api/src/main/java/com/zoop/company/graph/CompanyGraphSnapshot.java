@@ -1,7 +1,6 @@
 package com.zoop.company.graph;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -15,13 +14,14 @@ public record CompanyGraphSnapshot(String graphVersion, Instant asOf, boolean co
         structuralIssues = List.copyOf(structuralIssues);
     }
 
-    public record CompanyIssueRef(String title, String issueId, LocalDate eventTime, String timePrecision,
+    /** eventTime keeps the precision named by timePrecision ("2026", "2026-09", a date or an instant). */
+    public record CompanyIssueRef(String title, String issueId, String eventTime, String timePrecision,
             String role, String assertionStatus, long evidenceCount, List<BasisOut> basis) {
         public CompanyIssueRef { basis = List.copyOf(basis); }
     }
 
     public record BasisOut(String edgeId, String relationType, String sourceUrl, Instant verifiedAt,
-            LocalDate validFrom, LocalDate validUntil, List<String> countries) {
+            String validFrom, String validUntil, List<String> countries) {
         public BasisOut { countries = List.copyOf(countries); }
     }
 
