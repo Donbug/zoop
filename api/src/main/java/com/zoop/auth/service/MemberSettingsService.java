@@ -90,6 +90,31 @@ public class MemberSettingsService {
         return response(updated, requestId);
     }
 
+    @Transactional
+    public SettingsResponse setWatchlistCompany(MemberPrincipal member, String companyId,
+            boolean watched, String requestId) {
+        if (companyId == null || companyId.isBlank()) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        var current = repository.findForUpdate(member.memberId())
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!repository.companiesExist(List.of(companyId))) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        boolean alreadyWatched = current.watchlistIds().contains(companyId);
+        if (alreadyWatched == watched) return response(current, requestId);
+        if (current.version() == Long.MAX_VALUE) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+
+        var changed = new ArrayList<>(current.watchlistIds());
+        if (watched) changed.add(companyId);
+        else changed.remove(companyId);
+        var watchlist = List.copyOf(changed);
+        long nextVersion = current.version() + 1;
+        repository.update(member.memberId(), current.mode(), current.investor(), current.completed(),
+                current.tutorialCompleted(), current.version(), nextVersion);
+        repository.replaceWatchlist(member.memberId(), watchlist);
+        return response(new MemberSettingsRow(current.mode(), current.investor(), current.completed(),
+                current.tutorialCompleted(), nextVersion, watchlist), requestId);
+    }
+
     private static boolean booleanPatch(JsonNode input, String field, boolean stored) {
         if (!input.has(field) || input.get(field).isNull()) return stored;
         if (!input.get(field).isBoolean()) throw new CustomException(ErrorCode.INVALID_REQUEST);

@@ -108,7 +108,7 @@ make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> a
 
 ## Swagger / OpenAPI
 
-Swagger UI와 생성 OpenAPI 문서는 기본적으로 비활성화되어 있습니다. 로컬에서 사용할 때는 위 로컬 HTTP 실행 절차처럼 `SPRING_PROFILES_ACTIVE=local`과 `ZOOP_SWAGGER_ENABLED=true`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서 Swagger를 켜야 한다면 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하세요.
+Swagger UI와 생성 OpenAPI 문서는 기본적으로 활성화되어 있습니다. 비활성화할 환경에서는 `ZOOP_SWAGGER_ENABLED=false`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서는 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하거나 환경변수로 비활성화하세요.
 
 `/v3/api-docs`는 **현재 Spring 컨트롤러에서 생성한 문서**입니다. 목표 계약의 정본은 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)이며, 아직 구현되지 않은 목표 경로는 생성 문서에 나타나지 않습니다. 다음 순서는 API에서 제공하는 Swagger UI를 같은 `localhost:8080` 주소로 열었을 때를 기준으로 합니다. 프론트 `localhost:3000`에서의 API 호출은 별도 Origin이므로 위 공통 CORS 설정을 사용합니다.
 

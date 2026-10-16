@@ -121,6 +121,31 @@ class MemberSettingsServiceTest {
                         """), "invalid")).getErrorCode());
     }
 
+    @Test
+    void watchlistTargetStateAddsRemovesAndMakesRetriesIdempotent() {
+        repository.existingCompanies = List.of("NASDAQ:NVDA", "KRX:005930");
+        repository.row = new MemberSettingsRow("watchlist", false, true, false, 4, List.of("NASDAQ:NVDA"));
+
+        var added = service.setWatchlistCompany(MEMBER, "KRX:005930", true, "add");
+        assertEquals(List.of("NASDAQ:NVDA", "KRX:005930"), added.watchlistIds());
+        assertEquals(5, added.version());
+        var repeated = service.setWatchlistCompany(MEMBER, "KRX:005930", true, "repeat");
+        assertEquals(5, repeated.version());
+
+        var removed = service.setWatchlistCompany(MEMBER, "NASDAQ:NVDA", false, "remove");
+        assertEquals(List.of("KRX:005930"), removed.watchlistIds());
+        assertEquals(6, removed.version());
+        assertEquals(2, repository.writeCount);
+    }
+
+    @Test
+    void watchlistTargetStateRejectsUnknownCompany() {
+        var error = assertThrows(CustomException.class,
+                () -> service.setWatchlistCompany(MEMBER, "NOPE", true, "unknown"));
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, error.getErrorCode());
+        assertEquals(0, repository.writeCount);
+    }
+
     private static tools.jackson.databind.JsonNode json(String source) {
         return StrictJson.parseObject(source).node();
     }
