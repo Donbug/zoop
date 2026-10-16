@@ -5783,8 +5783,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 
 ### SettingsUpdate
 
-Unset fields keep their stored value; ``version`` must equal the stored version unless the request
-changes nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null.
+Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
