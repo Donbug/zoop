@@ -394,6 +394,7 @@ def test_an_unreadable_allowlist_closes_with_a_retryable_503_and_no_child(tmp_pa
     ("graph_state_invalid", 503, "service_configuration_invalid"), ("canonical_registry_invalid", 503, "service_configuration_invalid"),
     ("state_namespace_conflict", 503, "service_configuration_invalid"), ("relation_state_missing", 503, "service_configuration_invalid"),
     ("input_or_configuration_invalid", 503, "service_configuration_invalid"), ("persistence_failed", 503, "service_configuration_invalid"),
+    ("analysis_contract_changed", 503, "service_configuration_invalid"),
     ("version_not_found", 404, "version_not_found"), ("something_new", 500, "internal_error"),
 ])
 def test_pipeline_refusals_map_to_stable_codes_and_never_to_an_empty_graph(tmp_path, code, status, public):

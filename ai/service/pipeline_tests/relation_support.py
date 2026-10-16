@@ -47,7 +47,7 @@ PRIVATE_KEYS = frozenset({
 def require_pipeline() -> None:
     """The pipeline targets fail, they never skip: a green run must mean the real pipeline ran."""
     for path in (PIPELINE_PYTHON, RELATION_CLI):
-        assert path.is_file() and os.access(path, os.X_OK), f"{path} is missing: run `make pipeline-install` (private PoC credential) before service-pipeline-test"
+        assert path.is_file() and os.access(path, os.X_OK), f"{path} is missing: run `make pipeline-install` before service-pipeline-test"
 
 
 @dataclass

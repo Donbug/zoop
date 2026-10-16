@@ -39,6 +39,26 @@ final class DocumentImportResultWriter {
                     ObjectNode grant = node.putObject("grant");
                     grant.put("grantId", imported.grantId());
                     grant.put("revision", imported.grantRevision());
+                    if (imported.collected() != null) {
+                        // Collected items only: authored results keep exactly their earlier keys.
+                        CollectedProvenance collected = imported.collected();
+                        node.put("publicationPrecision", imported.publicationPrecision());
+                        ObjectNode collection = node.putObject("collection");
+                        collection.put("provenance", CollectedProvenance.PROVENANCE);
+                        collection.put("collectionId", collected.collectionId());
+                        collection.put("receiptSha256", collected.receiptSha256());
+                        collection.put("bodySha256", collected.bodySha256());
+                        collection.put("fetchedAt", DateTimeFormatter.ISO_INSTANT.format(collected.fetchedAt()));
+                        collection.put("finalUrl", collected.finalUrl());
+                        collection.put("httpStatus", collected.httpStatus());
+                        collection.put("contentType", collected.contentType());
+                        collection.put("network", collected.network());
+                        collection.put("documentKind", collected.documentKind());
+                        ObjectNode declared = collection.putObject("declaredPublication");
+                        declared.put("precision", collected.declaredPrecision());
+                        declared.put("raw", collected.declaredRaw());
+                        declared.put("basis", collected.declaredBasis());
+                    }
                 }
                 case ItemResult.Failed failed -> {
                     node.put("status", "failed");
