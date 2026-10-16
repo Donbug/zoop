@@ -46,10 +46,11 @@ class CompanyPostgresIntegrationTest {
         if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/zoop_company_test_19")) {
             throw new IllegalStateException("Set ZOOP_COMPANY_TEST_DB_URL to the dedicated localhost zoop_company_test_19 database");
         }
+        String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
         context = new SpringApplicationBuilder(ZoopApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--spring.datasource.url=" + url,
-                        "--spring.datasource.username=company_test", "--spring.datasource.password=",
+                        "--spring.datasource.username=company_test", "--spring.datasource.password=" + password,
                         "--spring.jpa.hibernate.ddl-auto=validate", "--zoop.ai.client.enabled=false",
                         "--ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
                         "--ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
@@ -218,18 +219,19 @@ class CompanyPostgresIntegrationTest {
     void existingAuthSchemaCanUpgradeWithoutReapplyingOldMigrations() {
         String schema = "company_upgrade_" + java.util.UUID.randomUUID().toString().replace("-", "");
         String upgradeUrl = url + "?currentSchema=" + schema + ",public";
-        Flyway baseline = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+        String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+        Flyway baseline = Flyway.configure().dataSource(upgradeUrl, "company_test", password)
                 .schemas(schema).defaultSchema(schema)
                 .target("20261013000000").load();
         baseline.migrate();
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables "
                 + "WHERE table_schema=? AND table_name='companies'", Integer.class, schema));
-        Flyway catalog = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+        Flyway catalog = Flyway.configure().dataSource(upgradeUrl, "company_test", password)
                 .schemas(schema).defaultSchema(schema).target("20261013153313").load();
         catalog.migrate();
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".flyway_schema_history "
                 + "WHERE success AND version IN ('20261013153313', '20261014102810')", Integer.class));
-        Flyway upgrade = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+        Flyway upgrade = Flyway.configure().dataSource(upgradeUrl, "company_test", password)
                 .schemas(schema).defaultSchema(schema).load();
         upgrade.migrate();
         upgrade.validate();
@@ -383,7 +385,8 @@ class CompanyPostgresIntegrationTest {
             long revision = repository.catalogRevision();
             List<CompanySearchRow> before = repository.search("", null, null);
             // A separate connection commits between the revision read and the row read.
-            try (var connection = java.sql.DriverManager.getConnection(url, "company_test", "");
+            String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+            try (var connection = java.sql.DriverManager.getConnection(url, "company_test", password);
                  var statement = connection.createStatement()) {
                 statement.executeUpdate("UPDATE companies SET name='Concurrent rename' WHERE id='special'");
             } catch (java.sql.SQLException exception) {
