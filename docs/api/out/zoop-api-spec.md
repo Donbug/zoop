@@ -956,7 +956,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCompanyMetrics · 기업 주요 지표 조회
 
-기업 주요 지표 조회. 공급자가 제공한 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 주요 지표 조회. 최신 공급자 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. graphVersion 또는 asOf를 지정한 요청은 422 INVALID_REQUEST로 거절하며, 해당 시점의 과거 지표처럼 최신값을 반환하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
