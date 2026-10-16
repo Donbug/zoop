@@ -1,3 +1,4 @@
+import PriceChart from './PriceChart';
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,16 +19,17 @@ import type {
 } from '@/types/company/detail';
 import type { ChartPeriod } from '@/types/company';
 import type { GraphResponse } from '@/types/map/graph';
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import CompanyCatalog from './CompanyCatalog';
 import CompanyDocumentPanel from './CompanyDocumentPanel';
 import CompanyGraphPreview from './CompanyGraphPreview';
-import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import {
   periods,
   exactTime,
   timeRange,
   bucketKey,
   impactEdges,
+  selectTime,
   number,
   safeHref,
 } from './detail-model';
@@ -77,13 +79,15 @@ export default function CompanyWorkspace() {
     eventId = params.get('event');
   const invalid = !!asOf && !exactTime(asOf);
   const snapshot = { asOf, graphVersion: version };
+  const ready = !!asOf && !invalid;
+  const range = ready ? timeRange(asOf!, period) : {};
   const company = useCompanyResource<Company>(
     invalid ? null : companyUrl(id, '', snapshot),
     owner,
   );
   const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
   const prices = useCompanyResource<Prices>(
-    companyUrl(id, '/prices', { period }),
+    invalid ? null : companyUrl(id, '/prices', { period, ...range }),
   );
   const latestPoint =
     prices.data?.status === 'available'
@@ -118,8 +122,6 @@ export default function CompanyWorkspace() {
     prices.loading,
     period,
   ]);
-  const ready = !!asOf && !invalid;
-  const range = ready ? timeRange(asOf!, period) : {};
   const depth = params.get('depth') === '2' ? 2 : 1;
   const eventsQuery = new URLSearchParams({
     ...range,
@@ -186,6 +188,9 @@ export default function CompanyWorkspace() {
   function selectEvent(item: Events['items'][number], targetTab?: string) {
     updateQuery({
       event: item.id,
+      bucket: bucketKey(item, period),
+      document: null,
+      evidence: null,
       ...(targetTab
         ? { tab: targetTab, docScope: 'event', document: null, evidence: null }
         : {}),
@@ -346,7 +351,7 @@ export default function CompanyWorkspace() {
             </button>
           ))}
         </nav>
-        <section aria-label="시세 차트">
+        <section aria-label="시세 차트" data-screen-id="D-COM-06">
           <h2>시세 차트·기준 시점</h2>
           <nav aria-label="차트 기간">
             {periods.map((p) => (
@@ -365,6 +370,9 @@ export default function CompanyWorkspace() {
                   graphVersion: null,
                   event: null,
                   bucket: null,
+                  document: null,
+                  evidence: null,
+                  docScope: null,
                 })
               }
             >
@@ -389,9 +397,21 @@ export default function CompanyWorkspace() {
               <>
                 <PriceChart
                   points={prices.data.points}
-                  onSelect={(time) =>
-                    updateQuery({ asOf: time, event: null, bucket: null })
+                  asOf={asOf}
+                  period={period}
+                  groups={groups}
+                  selectedBucket={selectedBucket}
+                  selectedEvent={event.data}
+                  onBucket={(bucket) =>
+                    updateQuery({
+                      tab: 'events',
+                      bucket,
+                      event: null,
+                      document: null,
+                      evidence: null,
+                    })
                   }
+                  onSelect={(time) => updateQuery(selectTime(time))}
                 />
                 <p>
                   {prices.data.source.name} · {prices.data.currency} ·{' '}
@@ -417,9 +437,7 @@ export default function CompanyWorkspace() {
                               disabled={!exactTime(point.time)}
                               onClick={() =>
                                 updateQuery({
-                                  asOf: point.time,
-                                  event: null,
-                                  bucket: null,
+                                  ...selectTime(point.time),
                                 })
                               }
                             >
@@ -438,12 +456,28 @@ export default function CompanyWorkspace() {
           </p>
         </section>
         {tab === 'events' && (
-          <section aria-label="사건 타임라인">
+          <section aria-label="사건 타임라인" data-screen-id="D-COM-05">
             <h2>사건 타임라인</h2>
-            <Status resource={events} label="타임라인" />
+            {events.error && [401, 403].includes(events.errorStatus ?? 0) ? (
+              <p role="alert">이 시점의 사건을 조회할 권한이 없어요.</p>
+            ) : (
+              <Status resource={events} label="타임라인" />
+            )}
+            {!ready && (
+              <p role="status">타임라인의 기준 시점을 확인하고 있어요.</p>
+            )}
             {events.data && (
               <>
                 <Basis metadata={events.data.metadata} />
+                {events.data.metadata.partial && (
+                  <p role="status">
+                    일부 사건만 조회됐어요.{' '}
+                    <button onClick={events.retry}>타임라인 다시 조회</button>
+                  </p>
+                )}
+                {(events.data.metadata.failures ?? []).map((failure, index) => (
+                  <p key={index}>{failure.message}</p>
+                ))}
                 <p>
                   제공 사건 {events.data.items.length}건 · 시점 미상 제외{' '}
                   {events.data.metadata.excludedUnknownTime ?? 0}건
@@ -454,7 +488,14 @@ export default function CompanyWorkspace() {
                     <li key={key}>
                       <button
                         aria-pressed={selectedBucket === key}
-                        onClick={() => updateQuery({ bucket: key })}
+                        onClick={() =>
+                          updateQuery({
+                            bucket: key,
+                            event: null,
+                            document: null,
+                            evidence: null,
+                          })
+                        }
                       >
                         {key} · 사건 {items.length}건
                       </button>
@@ -656,7 +697,12 @@ export default function CompanyWorkspace() {
                     event: node,
                     document: null,
                     evidence: null,
-                    bucket: null,
+                    bucket: events.data?.items.find((item) => item.id === node)
+                      ? bucketKey(
+                          events.data.items.find((item) => item.id === node)!,
+                          period,
+                        )
+                      : null,
                   });
                 else {
                   const next = new URLSearchParams(params);
@@ -695,61 +741,5 @@ export default function CompanyWorkspace() {
         )}
       </aside>
     </div>
-  );
-}
-function PriceChart({
-  points,
-  onSelect,
-}: {
-  points: { time: string; close: number }[];
-  onSelect: (time: string) => void;
-}) {
-  if (!points.length) return <p>제공된 가격 봉이 없어요.</p>;
-  const values = points.map((p) => p.close),
-    min = Math.min(...values),
-    max = Math.max(...values);
-  const dots = points
-    .map(
-      (p, i) =>
-        `${15 + (i * 570) / Math.max(1, points.length - 1)},${180 - ((p.close - min) * 150) / (max - min || 1)}`,
-    )
-    .join(' ');
-  return (
-    <svg
-      className="h-auto w-full"
-      viewBox="0 0 600 210"
-      role="img"
-      aria-label="공급된 종가 차트"
-    >
-      <polyline points={dots} className="fill-none stroke-[#c52a39] stroke-2" />
-      {points.map((p, i) => (
-        <g
-          key={p.time}
-          role="button"
-          tabIndex={0}
-          aria-label={`차트 ${p.time} 선택`}
-          onClick={() => exactTime(p.time) && onSelect(p.time)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              if (exactTime(p.time)) onSelect(p.time);
-            }
-          }}
-        >
-          <circle
-            cx={15 + (i * 570) / Math.max(1, points.length - 1)}
-            cy={180 - ((p.close - min) * 150) / (max - min || 1)}
-            r={6}
-            className="fill-[#c52a39]"
-          />
-        </g>
-      ))}
-      <text x="12" y="205" className="text-[10px]">
-        {points[0].time}
-      </text>
-      <text x="588" y="205" textAnchor="end" className="text-[10px]">
-        {points.at(-1)?.time}
-      </text>
-    </svg>
   );
 }
