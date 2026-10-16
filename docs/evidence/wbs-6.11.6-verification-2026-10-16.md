@@ -81,10 +81,11 @@ DB_PASSWORD=<local test value>
 
 ## 4. Windows 실행 실패 분석
 
-동일 테스트를 네이티브 Windows에서 실행했을 때 다음 결과가 발생했다.
+이전 커밋 `71ff60214ab417c3e3deb7c41f958f96f4cc46a6`에서 동일 명령을 네이티브 Windows로 실행했을 때 다음 결과가 발생했다.
 
 | 항목 | 결과 |
 |---|---|
+| 실행 커밋 | `71ff60214ab417c3e3deb7c41f958f96f4cc46a6` |
 | 전체 테스트 | 427개 |
 | 실패 | 210개 |
 | 주요 예외 | `ConnectException` |
