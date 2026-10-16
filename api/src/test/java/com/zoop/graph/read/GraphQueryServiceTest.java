@@ -43,32 +43,15 @@ class GraphQueryServiceTest {
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
     private GraphQueryService service;
 
-    private static GraphVersionRecord record(String id, boolean active) {
-        return new GraphVersionRecord(id, 1, "fixture", "artifact-" + id, FixtureGraphSnapshotStore.URI_PREFIX + id + ".json",
-                FixtureGraphSnapshotStore.sha256(GraphReadFixtures.bytes(id)), active);
-    }
-
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        Map<String, GraphVersionRecord> versions = Map.of("fixture-2026-10-01", record("fixture-2026-10-01", false),
-                "fixture-2026-10-08", record("fixture-2026-10-08", true));
-        GraphVersionRepository repository = new GraphVersionRepository() {
-            public Optional<GraphVersionRecord> find(String id) { return Optional.ofNullable(versions.get(id)); }
-            public Optional<GraphVersionRecord> active() { return Optional.of(versions.get("fixture-2026-10-08")); }
-            public Optional<String> activeVersionIdAt(Instant asOf) {
-                if (asOf.isBefore(Instant.parse("2026-10-01T00:00:00Z"))) return Optional.empty();
-                return Optional.of(asOf.isBefore(Instant.parse("2026-10-08T00:00:00Z")) ? "fixture-2026-10-01" : "fixture-2026-10-08");
-            }
-            public boolean everActivated(String id) { return versions.containsKey(id); }
-        };
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class))).thenAnswer(call -> {
             String id = (String) ((SqlParameterSource) call.getArgument(1)).getValue("id");
             return id.startsWith("NASDAQ:") || id.startsWith("KRX:") || id.startsWith("NYSE:")
                     ? List.of(new Company(id, "catalog " + id, null, null)) : List.of();
         });
-        service = new GraphQueryService(new GraphVersionSelector(repository, Clock.fixed(NOW, ZoneOffset.UTC)),
-                new FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> exclusions, jdbc);
+        service = new GraphQueryService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
     }
 
     private GraphResponse all() {
@@ -142,14 +125,14 @@ class GraphQueryServiceTest {
 
     @Test
     void unreadableSnapshotIsSourceUnavailable() {
-        var broken = new GraphQueryService(new GraphVersionSelector(new GraphVersionRepository() {
+        var broken = new GraphQueryService(new PublicGraphReader(new GraphVersionSelector(new GraphVersionRepository() {
             public Optional<GraphVersionRecord> find(String id) { return Optional.empty(); }
             public Optional<GraphVersionRecord> active() {
                 return Optional.of(new GraphVersionRecord("v", 1, "fixture", "a", FixtureGraphSnapshotStore.URI_PREFIX + "gone.json", "0".repeat(64), true));
             }
             public Optional<String> activeVersionIdAt(Instant asOf) { return Optional.empty(); }
             public boolean everActivated(String id) { return false; }
-        }, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> exclusions, jdbc);
+        }, Clock.fixed(NOW, ZoneOffset.UTC)), new FixtureGraphSnapshotStore(getClass().getClassLoader()), () -> exclusions), jdbc);
         assertThrows(GraphSnapshotUnavailableException.class, () -> broken.getGraph(null, null, null, null, null, null, "r"));
     }
 
