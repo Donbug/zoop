@@ -1,4 +1,5 @@
 import type { Meta } from '@/types/company/detail';
+import type { GraphResponse } from '@/types/map/graph';
 import { ApiError, call } from '@/apis/auth/ApiService';
 export function companyUrl(
   id: string,
@@ -27,6 +28,28 @@ export async function readCompanyResource<T>(
       'VERSION_UNAVAILABLE',
       '요청한 공개 버전과 다른 자료를 받았어요.',
     );
+  const graphCompanyId = /^\/api\/v1\/companies\/([^/]+)\/graph$/.exec(
+    requested.pathname,
+  )?.[1];
+  if (graphCompanyId) {
+    const graph = first as GraphResponse;
+    const expectedDepth = Number(requested.searchParams.get('depth') ?? 1);
+    const expectedTime = Date.parse(requested.searchParams.get('asOf') ?? '');
+    const actualTime = Date.parse(graph.metadata?.asOf ?? '');
+    const focus = graph.metadata?.focusCompanyIds ?? [];
+    if (
+      !Number.isFinite(expectedTime) ||
+      actualTime !== expectedTime ||
+      graph.metadata?.depth !== expectedDepth ||
+      ((graph.nodes.length > 0 || focus.length > 0) &&
+        !focus.includes(decodeURIComponent(graphCompanyId)))
+    )
+      throw new ApiError(
+        502,
+        'INVALID_RESPONSE',
+        '요청한 기업·시점·관계 단계와 다른 그래프를 받았어요.',
+      );
+  }
   if (!paged) return first;
   type Page = {
     items: { id: string }[];

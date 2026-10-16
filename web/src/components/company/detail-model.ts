@@ -93,6 +93,7 @@ export function impactEdges(
     for (const e of graph.edges)
       if (
         !e.derived &&
+        e.assertionStatus === 'confirmed' &&
         e.evidenceIds.some(
           (evidence) =>
             impact.steps[i - 1].evidenceIds.includes(evidence) ||
