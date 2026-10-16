@@ -1,11 +1,13 @@
 """Offline authored examples only: no credentials, external sources or paid provider requests."""
 
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / "briefing_replay.py"
@@ -112,6 +114,40 @@ class ReplayTest(unittest.TestCase):
         result = replay.run(self.args(False), transport)
         self.assertEqual("OFFLINE_AUDIT_ONLY", result["status"])
         self.assertEqual([], transport.requests)
+
+    def test_weekly_real_execution_is_rejected_before_key_source_or_output_access(self):
+        existing_key = self.root / "existing-private-key.env"
+        existing_key.write_text("OPENAI_API_KEY=synthetic-never-read\n")
+        existing_key.chmod(0o600)
+        for index, key in enumerate((self.root / "missing-key.env", existing_key)):
+            args = self.args()
+            target = self.root / ("must-not-be-created-" + str(index))
+            args.output, args.key_file = str(target), str(key)
+            with patch.object(replay, "private_dir") as directories, \
+                    patch.object(replay, "regular") as reads, \
+                    patch.object(replay, "read_key") as keys, \
+                    patch.object(replay, "authenticated_transport") as network:
+                with self.assertRaisesRegex(replay.ReplayError, "^weekly_pool_execution_disabled_use_per_round$"):
+                    replay.run(args)
+                directories.assert_not_called()
+                reads.assert_not_called()
+                keys.assert_not_called()
+                network.assert_not_called()
+            self.assertFalse(target.exists())
+
+    def test_cli_main_rejects_weekly_paid_execution_without_side_effects(self):
+        target = self.root / "cli-must-not-create-output"
+        stderr = io.StringIO()
+        argv = [str(MODULE), "--sources", str(self.root / "missing-source.jsonl"), "--output", str(target),
+                "--key-file", str(self.root / "missing-key.env"), "--user-inbox-ref", "inbox/authored.md",
+                "--execute-authorized-development"]
+        with patch.object(replay.sys, "argv", argv), redirect_stderr(stderr), \
+                patch.object(replay, "authenticated_transport") as network, patch.object(replay, "read_key") as keys:
+            self.assertEqual(2, replay.main())
+            network.assert_not_called()
+            keys.assert_not_called()
+        self.assertEqual("weekly_pool_execution_disabled_use_per_round", json.loads(stderr.getvalue())["reason"])
+        self.assertFalse(target.exists())
 
     def test_entire_pipeline_and_same_output_resume_are_byte_identical(self):
         transport = AuthoredTransport()

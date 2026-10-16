@@ -83,7 +83,8 @@ final class BriefingSnapshotValidator {
     private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {
         text(value, "source"); timestamp(value, "asOf");
         same(localReplay ? nullableText(value, "graphVersion") : text(value, "graphVersion"), graphVersion);
-        if (localReplay) same(text(value, "source"), "zoop-briefing-development-replay");
+        if (localReplay) check(Set.of("zoop-briefing-development-replay", "zoop-briefing-publication-clock-simulation")
+                .contains(text(value, "source")));
         text(value, "requestId"); bool(value, "partial");
         JsonNode schedule = object(field(value, "schedule"));
         text(schedule, "morning"); text(schedule, "evening"); bool(schedule, "confirmed");

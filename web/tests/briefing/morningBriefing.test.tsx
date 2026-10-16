@@ -133,6 +133,25 @@ describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
       ).length,
     ).toBeGreaterThan(0);
   });
+  it.each(['published', 'not_ready'] as const)(
+    'labels a per-round historical simulation with status %s',
+    async (status) => {
+      const response = round({ status });
+      setup({
+        ...response,
+        metadata: {
+          ...response.metadata,
+          source: 'zoop-briefing-publication-clock-simulation',
+        },
+      });
+      const note = await screen.findByRole('note', {
+        name: '회차별 과거 시뮬레이션 안내',
+      });
+      expect(note.textContent).toContain('회차별로 나눈');
+      expect(note.textContent).toContain('당시 본문과');
+      expect(screen.queryByRole('note', { name: '개발 재생 안내' })).toBeNull();
+    },
+  );
   it.each(['not_ready', 'generating', 'failed', 'suspended'] as const)(
     'shows %s without exposing unpublished content',
     async (status) => {

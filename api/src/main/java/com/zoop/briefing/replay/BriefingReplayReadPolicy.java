@@ -37,14 +37,26 @@ public final class BriefingReplayReadPolicy {
             if (Files.size(manifest) > 8_000_000 || Files.size(grants) > 1_000_000) return false;
             StrictJson.Obj saved = StrictJson.parseObject(Files.readAllBytes(manifest));
             StrictJson.Obj marker = StrictJson.Obj.of(row.publicSnapshot()).object("replay");
-            if (!"development_replay".equals(saved.string("scope"))
-                    || !"development_replay".equals(marker.string("scope"))) return false;
+            String scope = saved.string("scope");
+            if (!List.of("development_replay", "publication_clock_simulation").contains(scope)
+                    || !scope.equals(marker.string("scope"))) return false;
             for (String field : List.of("runId", "sourceFileSha256", "bundleSha256", "userInboxRef")) {
                 if (!saved.string(field).equals(marker.string(field))) return false;
             }
+            if ("publication_clock_simulation".equals(scope)
+                    && (!saved.string("clockFileSha256").equals(marker.string("clockFileSha256"))
+                        || !marker.bool("retrospectiveBodies") || marker.bool("operationalCollectionGate"))) return false;
             if (!saved.string("grantsSha256").equals(Canonical.sha256(Files.readAllBytes(grants)))) return false;
             for (StrictJson.Obj round : saved.objects("rounds")) {
                 if (!round.string("id").equals(row.id())) continue;
+                if (round.isNull("payloadSha256")) {
+                    if (row.publishedAt() != null || !"publication_clock_simulation".equals(scope)) return false;
+                    Integer count = jdbc.queryForObject("""
+                            SELECT count(*) FROM briefing_rounds WHERE id=? AND published_at IS NULL AND published_payload IS NULL
+                                AND graph_version_id IS NULL AND encode(sha256(convert_to(public_snapshot::text,'UTF8')),'hex')=?
+                            """, Integer.class, row.id(), round.string("publicSnapshotSha256"));
+                    return Integer.valueOf(1).equals(count); // Header/mode disclosure only: it grants no published content.
+                }
                 Integer count = jdbc.queryForObject("""
                         SELECT count(*) FROM briefing_rounds WHERE id=? AND graph_version_id IS NULL
                         AND payload_sha256=? AND payload_sha256=encode(sha256(convert_to(published_payload::text,'UTF8')),'hex')

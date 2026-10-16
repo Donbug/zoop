@@ -177,6 +177,13 @@ public class BriefingQueryService {
         metadata.put("source", "zoop-briefing").put("asOf", clock.instant().toString()).putNull("graphVersion")
                 .put("requestId", requestId).put("partial", false);
         metadata.putArray("failures");
+        if (row != null && row.publishedAt() == null && BriefingReplayReadPolicy.marked(row) && replay.permits(row)
+                && "publication_clock_simulation".equals(row.publicSnapshot().path("replay").path("scope").asString())) {
+            metadata.put("source", "zoop-briefing-publication-clock-simulation").put("partial", true);
+            metadata.withArray("failures").addObject().put("section", "sourceCoverage").put("code", "SIMULATION_HELD")
+                    .put("message", "과거 발행시각 시뮬레이션에서 입력·선정·검증이 완료되지 않아 발행하지 않은 회차입니다.")
+                    .put("retryable", false).putNull("asOf");
+        }
         metadata.putObject("schedule").put("morning", "09:20").put("evening", "17:30").put("confirmed", true);
         metadata.putObject("selection").put("basis", "market").putNull("reason");
         String message = switch (status) {

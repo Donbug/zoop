@@ -1,0 +1,155 @@
+{
+  "type": "object",
+  "properties": {
+    "selected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "eventKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 3
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "companyNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "minItems": 0,
+            "maxItems": 20
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 240
+            },
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "quotes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 1600
+                  },
+                  "minItems": 1,
+                  "maxItems": 3
+                }
+              },
+              "required": [
+                "documentId",
+                "quotes"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "COMMON_POLICY",
+              "BROAD_MARKET",
+              "COMPANY",
+              "INSUFFICIENT"
+            ]
+          },
+          "affectedSectors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5
+          },
+          "transmission": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "eventKey",
+          "title",
+          "reason",
+          "importance",
+          "priority",
+          "companyNames",
+          "limitations",
+          "sources",
+          "scope",
+          "affectedSectors",
+          "transmission"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 3
+    },
+    "held": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          }
+        },
+        "required": [
+          "documentId",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 15
+    }
+  },
+  "required": [
+    "selected",
+    "held"
+  ],
+  "additionalProperties": false,
+  "description": "Per-round publication_clock_simulation output; independent request context and private recording."
+}

@@ -49,7 +49,8 @@ public class BriefingReplayConfiguration {
         BriefingReplayGuard.jdbcUrl(env.getProperty("spring.datasource.url"));
         BriefingReplaySettings settings = new BriefingReplaySettings(path(env, "source"), path(env, "bundle"),
                 path(env, "artifact-root"), path(env, "grants"), path(env, "manifest"),
-                required(env, "expected-source-sha256"), required(env, "user-inbox-ref"));
+                required(env, "expected-source-sha256"), required(env, "user-inbox-ref"),
+                env.getProperty("zoop.briefing.replay.clocks") == null ? null : path(env, "clocks"));
         return arguments -> {
             BriefingReplayImporter.ImportResult result = new BriefingReplayImporter(jdbc, transactions, settings).importBundle();
             System.out.println("Briefing development replay imported: " + result.documents() + " documents, "

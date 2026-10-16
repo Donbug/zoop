@@ -658,6 +658,8 @@ def generate_edition(client, selected, edition, authorization, repairs=1):
 
 
 def run(args, transport=None):
+    if args.execute_authorized_development and transport is None:
+        raise ReplayError("weekly_pool_execution_disabled_use_per_round")
     output = Path(args.output).resolve()
     private_dir(output)
     rows, audit = population(Path(args.sources), args.excerpt_chars)
