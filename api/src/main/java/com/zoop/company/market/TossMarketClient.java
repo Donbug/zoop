@@ -76,6 +76,9 @@ public class TossMarketClient {
                 before = text(candlePage.get("nextBefore"));
             }
             String sessionDate = asOf == null ? null : asOf.toString().substring(0, 10);
+            // The 52-week range only uses candles from the year ending on the quote's session date.
+            String windowStart = sessionDate == null ? null
+                    : java.time.LocalDate.parse(sessionDate).minusDays(365).toString();
             JsonNode current = null, previous = null;
             Double high52 = null, low52 = null;
             String oldestDate = null;
@@ -87,6 +90,7 @@ public class TossMarketClient {
                 if (sessionDate != null && day.equals(sessionDate)) current = candle;
                 if (sessionDate != null && day.compareTo(sessionDate) < 0 && (previous == null
                         || day.compareTo(text(previous.get("timestamp")).substring(0, 10)) > 0)) previous = candle;
+                if (windowStart == null || day.compareTo(windowStart) < 0 || day.compareTo(sessionDate) > 0) continue;
                 Double high = number(candle.get("highPrice")), low = number(candle.get("lowPrice"));
                 if (high != null) high52 = high52 == null ? high : Math.max(high52, high);
                 if (low != null) low52 = low52 == null ? low : Math.min(low52, low);

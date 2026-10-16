@@ -73,6 +73,15 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void fiftyTwoWeekRangeIgnoresCandlesOlderThanOneYear() {
+        // The stub's oldest candle (2025-10-14, high 999 / low 1) is one day outside the year ending 2026-10-15.
+        var quote = tossClient("test-client", "test-secret").quote("KRX:005930", "KRX", "005930").quote();
+
+        assertEquals(750.0, quote.fiftyTwoWeekHigh());
+        assertEquals(500.0, quote.fiftyTwoWeekLow());
+    }
+
+    @Test
     void tossWithoutCredentialsReturnsNotConnectedWithoutCallingProvider() {
         var result = tossClient("", "").quote("KRX:005930", "KRX", "005930");
 
@@ -165,7 +174,8 @@ class CompanyMarketClientsTest {
                 {"result":{"candles":[
                   {"timestamp":"2026-10-15T00:00:00Z","highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
                   {"timestamp":"2026-10-14T00:00:00Z","highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400},
-                  {"timestamp":"2025-10-15T00:00:00Z","highPrice":750,"lowPrice":500,"closePrice":550,"volume":1000}
+                  {"timestamp":"2025-10-15T00:00:00Z","highPrice":750,"lowPrice":500,"closePrice":550,"volume":1000},
+                  {"timestamp":"2025-10-14T00:00:00Z","highPrice":999,"lowPrice":1,"closePrice":600,"volume":900}
                 ]}}
                 """;
         if (path.equals("/api/stock/005930/integration")) return """
