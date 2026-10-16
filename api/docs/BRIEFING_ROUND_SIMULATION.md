@@ -34,6 +34,8 @@ date-only·공급자 추정·충돌·접속 실패·미관찰 시각은 정확�
 
 해당 회차의 원문에서 최대 세 이슈를 최종 선정하고 정확한 인용·Unicode offset·문서 버전을 고정한다. 출근 또는 퇴근 중 해당 형식만 작성한다. 모든 제목과 2~3개 문장을 별도 모델 호출로 검증하여 전부 `SUPPORTED` 및 상태·시간·숫자·투자 권유 검사를 통과해야 `PASS`다. 모델이 근거 부족을 `claims=[]`로 표시하면 생성 문장을 채우거나 검증 통과시키지 않고 `HELD_VALIDATION`으로 남긴다. 내용 보완은 같은 자료에서 최대 한 번이다.
 
+선정 응답이 HTTP 200·completed·사용량 확인 완료인데 인용이 원문 연속 부분문자열이 아닌 경우, 같은 고정 본문으로 **회차당 한 번** 별도 구조 보완 요청을 허용한다. 원 응답 SHA·원 요청 digest·priorSelection·오류명을 새 payload에 넣고 정확한 literal 복사를 요구한다. 코드가 번역·공백 정규화·의미 변경으로 인용을 고치지 않는다. 프롬프트·회차 identity·선정 기준도 바꾸지 않는다. 보완 응답도 검증을 통과해야 하며, 재차 부정확하거나 선택 가능한 근거가 없으면 해당 회차를 `HELD_VALIDATION`으로 남기고 다음 회차를 처리한다. 이는 생성 문안의 한 번 내용 보완과 별도다. HTTP 실패·pending·사용량 불명은 이 경로로 우회하거나 자동 재전송하지 않는다.
+
 `previous`는 바로 직전 회차의 **동일 시뮬레이션 PASS 결과**만 가리키며 `type=simulated_previous_output`, roundId·resultSha256을 연결한다. 직전 회차가 HELD·EMPTY이거나 첫 회차이면 unavailable이다. 더 오래된 성공본·임의 과거 전망으로 대체하지 않는다. 이전 AI 문장은 사실 근거나 실제 전망 적중의 증거가 아니다.
 
 실제 시장 지표·주가·전망 평가 자료가 없어 시장 요약·시장 지표·출근 대비 가격/전망 비교는 unavailable이다. 오늘·내일·장마감·새 시장 방향을 생성하지 않는다. graphVersion은 null이며 가짜 그래프 버전을 만들지 않는다.
@@ -53,13 +55,15 @@ python3 scripts/briefing_round_simulation.py \
 
 해당 시뮬레이션 전송 승인이 확보된 operator만 `--key-file /absolute/private/openai.env --execute-authorized-simulation`을 추가한다. 키는 0600, 출력 디렉터리는 0700이며 키·원문·원응답·번들은 공개 코드에 넣지 않는다. `--clock-html-root`로 HTML 폴더를 별도 지정할 수 있다.
 
-batch 30으로 현재 고정 자료를 감사한 계획은 확인 시각 547건 중 14창에 492건, 창 안 본문 중복 3건을 제외한 489건이다. 미확인 source는 334건이다. 모든 비어 있지 않은 회차에서 이슈를 선정하면 평가 24 + 선정 14 + 작성·검증 28 = **66호출**, 모든 회차를 한 번씩 내용 보완하면 최대 **94호출**이다. 실제 선정/보류에 따라 줄어들 수 있다. `--max-calls`는 전체 실행의 실제 reservation 상한이며 기본 100이다. 기본 계획이 명시 예산을 넘으면 키·transport 생성 전에 중단한다.
+batch 30으로 현재 고정 자료를 감사한 계획은 확인 시각 547건 중 14창에 492건, 창 안 본문 중복 3건을 제외한 489건이다. 미확인 source는 334건이다. 모든 비어 있지 않은 회차에서 이슈를 선정하면 평가 24 + 선정 14 + 작성·검증 28 = **66호출**, 모든 회차를 한 번씩 내용 보완하면 **94호출**이다. 여기에 회차별 선정 인용 구조 보완이 모두 필요하면 최대 14호출이 더해져 이론상 **108호출**이다. 감사 계획은 이 세 수치를 구분해 표시한다. 실제 선정/보류에 따라 줄어들 수 있다. `--max-calls`는 캐시 재개를 포함한 전체 실행의 실제 reservation 상한이며 기본 100이다. 100에 도달하면 새 요청을 보내지 않고 기록을 보존하며 중단한다. 더 큰 이론값을 이유로 상한을 자동 올리지 않는다. 기본 계획이 명시 예산을 넘으면 키·transport 생성 전에 중단한다.
 
 ## 고정 기록·번들 v2
 
 새 프롬프트 9개는 `api/src/main/resources/briefing/prompts/round-simulation/`에 있다. `run-identity.json`에는 `shortlistPolicy=eligible_or_full_body_hold_importance_gte2_v2`를 명시하므로 ELIGIBLE만 검토했던 이전 실행과 캐시를 섞지 않는다. 원본 SHA·clock SHA·각 창·입력 문서 버전 집합·프롬프트/스키마 SHA·승인·직전 PASS hash를 round identity로 고정하고 **모든 실제 요청**에 identity와 그 SHA를 넣는다. 기존 주간 출력·프롬프트·request cache를 공유하지 않는다.
 
 회차마다 private `identity.json`, `frozen-input.json`, 중요도·선정·생성 결과·round.json·바인딩을 저장한다. 완료된 request는 실제 request/response digest와 토큰 영수증을 확인하여 재사용하고, pending·실패·사용량 불명은 자동 재호출하지 않는다. 부분 round 기록을 복구할 때도 기존 실제 request context에서 영수증을 찾아 사용량을 누락하지 않는다.
+
+선정 인용 보완이 있으면 `round.selectionCorrections`에 원 요청/응답 SHA·보완 요청 digest·오류·단 한 번의 attempt·PASS/WITHHELD를 기록한다. 원래 잘못된 응답도 같은 selection stage의 전체 receipt와 원 파일로 보존한다. 캐시 재개 시 원/보완 응답을 각각 검증·재사용하며 이미 완료된 성공 회차를 새로 유료 실행하지 않는다.
 
 최종 `bundle-v2.json`의 schemaVersion은 `zoop-briefing-round-simulation-v2`다.
 

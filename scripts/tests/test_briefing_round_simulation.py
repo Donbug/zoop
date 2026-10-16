@@ -27,13 +27,18 @@ def response(value, request):
 
 
 class AuthoredTransport:
-    def __init__(self, held=False, insufficient=False, select_none=False, quote_marker=None, semantic_failure=None):
+    def __init__(self, held=False, insufficient=False, select_none=False, quote_marker=None, semantic_failure=None,
+                 quote_errors=0, quote_error_document=None, selection_transport_failure=None):
         self.requests = []
         self.held = held
         self.insufficient = insufficient
         self.select_none = select_none
         self.quote_marker = quote_marker
         self.semantic_failure = semantic_failure
+        self.quote_errors = quote_errors
+        self.quote_error_document = quote_error_document
+        self.selection_transport_failure = selection_transport_failure
+        self.quote_error_attempts = 0
 
     def __call__(self, raw):
         self.requests.append(raw)
@@ -47,6 +52,8 @@ class AuthoredTransport:
                 "headline": "합성 계약 계획", "reason": "직접 작성한 시험 원문", "scope": "COMPANY", "affectedSectors": [],
                 "transmission": "", "limitations": ["현재 선언 시각 기반 합성 과거 시뮬레이션"]} for row in data["documents"]}}
         elif stage == "round_simulation_selection":
+            if self.selection_transport_failure == "unknown":
+                raise OSError("authored unknown transport outcome")
             row = data["documents"][0]
             start = row["body"].index(self.quote_marker) if self.quote_marker else 0
             value = {"selected": [{"eventKey": row["documentId"], "title": "합성 계약 계획", "reason": "시험 원문의 계약 계획",
@@ -55,6 +62,11 @@ class AuthoredTransport:
                 "scope": "COMPANY", "affectedSectors": [], "transmission": ""}], "held": []}
             if self.select_none:
                 value = {"selected": [], "held": [{"documentId": row["documentId"], "reason": "전체 본문에도 확정 근거가 없어 보류"}]}
+            if self.quote_error_document in (None, row["documentId"]) and self.quote_error_attempts < self.quote_errors:
+                value["selected"][0]["sources"][0]["quotes"] = ["An authored English translation that is absent from the original Korean body."]
+                self.quote_error_attempts += 1
+            if self.selection_transport_failure == "http":
+                return 503, response(value, raw)[1]
         elif stage.endswith("_generation"):
             value = {"items": {row["issueId"]: {"issueId": row["issueId"], "rank": row["rank"], "title": "시험 기업의 계약 계획",
                 "titleEvidenceIds": [row["sources"][0]["evidenceId"]], "claims": [
@@ -258,6 +270,64 @@ class RoundSimulationTest(unittest.TestCase):
                 self.assertEqual(1, result["heldValidationRounds"])
                 self.assertEqual("HELD_VALIDATION", bundle["rounds"][0]["selectionStatus"])
                 self.assertIsNone(bundle["rounds"][0]["result"])
+
+    def test_known_inexact_quote_is_corrected_once_with_same_bodies_and_complete_history(self):
+        self.prepare([source("morning", "2026-10-02T09:00:00+09:00"), source("evening", "2026-10-02T10:00:00+09:00")])
+        transport = AuthoredTransport(quote_errors=1, quote_error_document="evening")
+        result = sim.run(self.args(True), transport)
+        self.assertEqual(2, result["selectedRounds"])
+        self.assertEqual(9, result["newPaidCalls"])
+        raw_bundle = (self.output / "bundle-v2.json").read_bytes()
+        bundle = sim.base.strict_load(raw_bundle)
+        morning, evening = bundle["rounds"][:2]
+        audit = evening["selectionCorrections"][0]
+        self.assertEqual("PASS", audit["status"])
+        self.assertEqual(5, len(evening["receipts"]))
+        calls = self.output / "calls"
+        original = sim.base.strict_load((calls / (audit["originalRequestDigest"] + ".request.json")).read_bytes())
+        corrected = sim.base.strict_load((calls / (audit["correctedRequestDigest"] + ".request.json")).read_bytes())
+        original_data, corrected_data = (sim.base.strict_load(value["input"]) for value in (original, corrected))
+        self.assertEqual(original_data["documents"], corrected_data["documents"])
+        self.assertEqual(original_data["contextSha256"], corrected_data["contextSha256"])
+        self.assertEqual(original["instructions"], corrected["instructions"])
+        self.assertEqual(audit["originalResponseSha256"], sim.digest((calls / (audit["originalRequestDigest"] + ".response.json")).read_bytes()))
+        self.assertEqual("citation_is_not_exact_original_substring", corrected_data["selectionStructuralCorrection"]["reason"])
+        citation = evening["selected"][0]["sources"][0]
+        self.assertEqual(source("evening", "2026-10-02T10:00:00+09:00")["body"][citation["start"]:citation["end"]], citation["quote"])
+        self.assertEqual(morning["resultSha256"], evening["previous"]["resultSha256"])
+        self.assertEqual(0, sim.run(self.args(True), transport)["newPaidCalls"])
+        self.assertEqual(9, len(transport.requests))
+        self.assertEqual(raw_bundle, (self.output / "bundle-v2.json").read_bytes())
+
+    def test_second_inexact_quote_holds_only_that_round_and_continues_without_older_previous(self):
+        self.prepare([source("morning", "2026-10-02T09:00:00+09:00"), source("evening", "2026-10-02T10:00:00+09:00")])
+        transport = AuthoredTransport(quote_errors=2)
+        result = sim.run(self.args(True), transport)
+        bundle = sim.base.strict_load((self.output / "bundle-v2.json").read_bytes())
+        morning, evening = bundle["rounds"][:2]
+        self.assertEqual(1, result["heldValidationRounds"])
+        self.assertEqual("HELD_VALIDATION", morning["selectionStatus"])
+        self.assertIsNone(morning["result"])
+        self.assertEqual(3, len(morning["receipts"]))
+        self.assertEqual("WITHHELD", morning["selectionCorrections"][0]["status"])
+        self.assertEqual("SELECTED", evening["selectionStatus"])
+        self.assertEqual("unavailable", evening["previous"]["status"])
+        self.assertEqual(7, result["newPaidCalls"])
+
+    def test_unknown_or_failed_selection_is_never_corrected_or_resent_from_cache(self):
+        self.prepare([source("morning", "2026-10-02T09:00:00+09:00")])
+        for failure in ("unknown", "http"):
+            with self.subTest(failure=failure):
+                args = self.args(True)
+                args.output = self.root / ("transport-" + failure)
+                transport = AuthoredTransport(selection_transport_failure=failure)
+                with self.assertRaises(sim.ReplayError):
+                    sim.run(args, transport)
+                self.assertEqual(2, len(transport.requests))
+                with self.assertRaises(sim.ReplayError):
+                    sim.run(args, transport)
+                self.assertEqual(2, len(transport.requests))
+                self.assertFalse((args.output / "bundle-v2.json").exists())
 
     def test_source_clock_or_html_tampering_fails_before_key_or_network(self):
         self.prepare([source("document", "2026-10-02T09:00:00+09:00")])

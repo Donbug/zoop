@@ -243,11 +243,7 @@ def shortlist_round(assessments, pool, maximum=12):
     return output
 
 
-def choose_round(client, candidates, pool, context, identity_sha):
-    selection_schema = schema("selection")
-    selection_schema["properties"]["selected"]["items"]["properties"]["sources"]["items"]["properties"]["documentId"]["enum"] = sorted({row["documentId"] for row in candidates})
-    reply = client.call("round_simulation_selection", {**context, "documents": candidates, "maximumIssues": 3},
-                        "selection.md", "selection.schema.json", max_output=12000, schema_override=selection_schema)
+def freeze_round_selection(reply, candidates, pool, identity_sha):
     choices = sorted(reply["selected"], key=lambda value: (-value["importance"], -value["priority"], value["eventKey"]))
     for value in choices:
         if value["importance"] == 3 and (value["scope"] not in {"COMMON_POLICY", "BROAD_MARKET"}
@@ -265,6 +261,49 @@ def choose_round(client, candidates, pool, context, identity_sha):
             citation["publicationClock"] = row["clockRecord"]
             citation["clockRecordSha256"] = row["clockRecordSha256"]
     return selected
+
+
+def choose_round(client, candidates, pool, context, identity_sha):
+    selection_schema = schema("selection")
+    selection_schema["properties"]["selected"]["items"]["properties"]["sources"]["items"]["properties"]["documentId"]["enum"] = sorted({row["documentId"] for row in candidates})
+    stage = "round_simulation_selection"
+    data = {**context, "documents": candidates, "maximumIssues": 3}
+    original_key = client.request_digest(stage, data, "selection.md", "selection.schema.json",
+                                         max_output=12000, schema_override=selection_schema)
+    reply = client.call(stage, data, "selection.md", "selection.schema.json",
+                        max_output=12000, schema_override=selection_schema)
+    try:
+        return freeze_round_selection(reply, candidates, pool, identity_sha), [], False
+    except ReplayError as error:
+        if str(error) != "citation_is_not_exact_original_substring":
+            raise
+    receipt, provider_response = client.inspect_recorded(original_key)
+    if receipt.get("status") != "completed" or provider_response.get("status") != "completed" \
+            or receipt.get("stage") != stage:
+        raise ReplayError("selection_correction_requires_known_completed_response")
+    correction = {"attempt": 1, "reason": "citation_is_not_exact_original_substring",
+                  "originalRequestDigest": original_key, "originalResponseSha256": receipt["responseSha256"],
+                  "priorSelection": reply, "sameFrozenBodies": True,
+                  "instruction": "Correct only with exact literal continuous substrings copied from the same documents.body. "
+                      "Never translate, normalize whitespace, paraphrase, invent facts, or relax selection criteria. "
+                      "Recheck the complete selection under the unchanged criteria. If exact supporting quotes cannot be copied, "
+                      "omit that issue and explain it in held. This is the only structural correction attempt."}
+    corrected_data = {**data, "selectionStructuralCorrection": correction}
+    corrected_key = client.request_digest(stage, corrected_data, "selection.md", "selection.schema.json",
+                                          max_output=12000, schema_override=selection_schema)
+    corrected = client.call(stage, corrected_data, "selection.md", "selection.schema.json",
+                            max_output=12000, schema_override=selection_schema)
+    audit = {key: correction[key] for key in ("attempt", "reason", "originalRequestDigest", "originalResponseSha256")}
+    audit.update({"correctedRequestDigest": corrected_key, "sameFrozenBodies": True, "status": "PASS"})
+    try:
+        selected = freeze_round_selection(corrected, candidates, pool, identity_sha)
+    except ReplayError as error:
+        audit.update({"status": "WITHHELD", "validationError": str(error)})
+        return [], [audit], True
+    if not selected:
+        audit.update({"status": "WITHHELD", "validationError": "selection_correction_has_no_supported_issue"})
+        return [], [audit], True
+    return selected, [audit], False
 
 
 def generate_round(client, selected, edition, context, max_repairs):
@@ -338,11 +377,15 @@ def run(args, transport=None):
         pool, input_sources, clock_refs, duplicates, coverage = pool_for_round(rows, spec, len(unknown))
         calls = (len(pool) + args.batch_size - 1) // args.batch_size + 3 if pool else 0
         plan_rounds.append({**spec, "sourceCoverage": coverage, "plannedCallsIfSelected": calls,
-                            "maximumCallsWithOneRepair": calls + 2 if pool and args.max_repairs else calls})
+                            "maximumCallsWithOneRepair": calls + 2 if pool and args.max_repairs else calls,
+                            "maximumSelectionStructuralCorrections": 1 if pool else 0})
         prepared.append((spec, pool, input_sources, clock_refs, duplicates, coverage))
     plan = {"mode": MODE, "runId": run_id, **source, "rounds": plan_rounds,
             "plannedCallsIfSelected": sum(row["plannedCallsIfSelected"] for row in plan_rounds),
             "maximumCallsWithOneRepair": sum(row["maximumCallsWithOneRepair"] for row in plan_rounds),
+            "maximumSelectionStructuralCorrections": sum(row["maximumSelectionStructuralCorrections"] for row in plan_rounds),
+            "theoreticalMaximumCallsIncludingSelectionCorrections": sum(row["maximumCallsWithOneRepair"] +
+                row["maximumSelectionStructuralCorrections"] for row in plan_rounds),
             "maxCalls": args.max_calls, "operationalCollectionGate": False, "retrospectiveBodies": True}
     output = Path(args.output).resolve()
     base.private_dir(output)
@@ -400,9 +443,14 @@ def run(args, transport=None):
                 base.save_json(directory / "assessments.json", assessments)
                 candidates = shortlist_round(assessments, pool)
                 base.save_json(directory / "shortlist.json", candidates)
-                selected = choose_round(client, candidates, pool, context, identity_sha) if candidates else []
+                selected, selection_corrections, selection_failed = choose_round(client, candidates, pool, context, identity_sha) \
+                    if candidates else ([], [], False)
+                if selection_corrections:
+                    record["selectionCorrections"] = selection_corrections
                 base.save_json(directory / "selected.json", selected)
-                if not selected:
+                if selection_failed:
+                    record["selectionStatus"] = "HELD_VALIDATION"
+                elif not selected:
                     record["selectionStatus"] = "HELD_SOURCE_COVERAGE" if unknown else "EMPTY_CONFIRMED"
                 else:
                     result = generate_round(client, selected, spec["edition"], context, args.max_repairs)
