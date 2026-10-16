@@ -9,7 +9,7 @@ import java.util.Objects;
  */
 public record PublicGraphSnapshot(int snapshotFormat, String versionId, String sourceBundleId, List<Company> companies,
         List<Issue> issues, List<Relation> relations, List<Article> articles, List<Evidence> evidence) {
-    public static final int FORMAT = 1;
+    public static final int FORMAT = 2;
 
     public PublicGraphSnapshot {
         Objects.requireNonNull(versionId, "versionId");
@@ -47,7 +47,17 @@ public record PublicGraphSnapshot(int snapshotFormat, String versionId, String s
         }
     }
 
-    public record Basis(String verifiedAt, String validFrom, String validUntil) { }
+    /**
+     * The structural path behind a STRUCTURALLY_RELATED_TO relation (AI handoff basis): its own id, the business
+     * relation type it rests on (e.g. SUPPLIES), when it was verified and valid, the countries it applies to, and the
+     * article version it was read from when the handoff names one.
+     */
+    public record Basis(String basisId, String relationType, String verifiedAt, String validFrom, String validUntil,
+            List<String> countries, String articleId, String articleVersion) {
+        public Basis {
+            countries = List.copyOf(countries);
+        }
+    }
 
     /**
      * Article version pinned to this snapshot; publishedAt keeps the provider precision ("2026-10-01" or an instant),
