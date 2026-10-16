@@ -52,12 +52,14 @@ class PortfolioPostgresTest {
         String memberId = insertMember();
         var member = new MemberSessionService.MemberPrincipal(memberId, "portfolio-test");
 
-        var profiles = service.listProfiles(null, 2, "profiles");
-        assertEquals(2, profiles.items().size());
+        var profiles = service.listProfiles(null, 1, "profiles");
+        assertEquals(1, profiles.items().size());
         assertNotNull(profiles.nextCursor());
-        assertEquals(1, service.listProfiles(profiles.nextCursor(), 2, "profiles-page-2").items().size());
-        assertTrue(service.getProfile("demo-empty", "empty").holdings().isEmpty());
-        assertNull(service.getProfile("demo-empty", "empty").cash());
+        var secondPage = service.listProfiles(profiles.nextCursor(), 1, "profiles-page-2");
+        assertEquals(1, secondPage.items().size());
+        assertNull(secondPage.nextCursor());
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.getProfile("demo-empty", "removed-profile"));
         for (var profile : catalog.all()) {
             for (var holding : profile.holdings()) {
                 assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM companies WHERE id = ?",
@@ -108,12 +110,21 @@ class PortfolioPostgresTest {
         mvc.perform(get("/api/v1/portfolio/mock-portfolios")
                         .cookie(new jakarta.servlet.http.Cookie(SessionCookie.NAME, issued.token())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(3))
-                .andExpect(jsonPath("$.items[2].holdingsCount").value(0));
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[1].holdingsCount").value(2));
 
         mvc.perform(get("/api/v1/portfolio/mock-portfolios")
                         .cookie(new jakarta.servlet.http.Cookie(SessionCookie.NAME, guest.token())))
                 .andExpect(status().isForbidden());
+
+        mvc.perform(post("/api/v1/portfolio/connections")
+                        .cookie(new jakarta.servlet.http.Cookie(SessionCookie.NAME, issued.token()))
+                        .header("Origin", ORIGIN)
+                        .header("X-CSRF-Token", issued.response().csrfToken())
+                        .header("Idempotency-Key", "http-connect-removed-profile")
+                        .contentType("application/json")
+                        .content("{\"mockPortfolioId\":\"demo-empty\"}"))
+                .andExpect(status().isNotFound());
 
         var connected = mvc.perform(post("/api/v1/portfolio/connections")
                         .cookie(new jakarta.servlet.http.Cookie(SessionCookie.NAME, issued.token()))
@@ -121,10 +132,10 @@ class PortfolioPostgresTest {
                         .header("X-CSRF-Token", issued.response().csrfToken())
                         .header("Idempotency-Key", "http-connect-1")
                         .contentType("application/json")
-                        .content("{\"mockPortfolioId\":\"demo-empty\"}"))
+                        .content("{\"mockPortfolioId\":\"demo-growth\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("connected"))
-                .andExpect(jsonPath("$.holdingsCount").value(0))
+                .andExpect(jsonPath("$.holdingsCount").value(2))
                 .andReturn();
         String connectionId = mapper.readTree(connected.getResponse().getContentAsString()).path("id").asText();
 

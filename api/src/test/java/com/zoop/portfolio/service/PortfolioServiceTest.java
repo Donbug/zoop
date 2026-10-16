@@ -35,13 +35,11 @@ class PortfolioServiceTest {
     }
 
     @Test
-    void catalogHasFixedSyntheticProfilesIncludingEmptyAndZeroVersusMissingCash() {
-        assertEquals(3, catalog.all().size());
+    void catalogHasTwoFixedSyntheticProfilesAndSupportsZeroCash() {
+        assertEquals(2, catalog.all().size());
         assertEquals(0, catalog.find("demo-balanced").orElseThrow().cash().amount().signum());
-        assertNull(catalog.find("demo-empty").orElseThrow().cash());
-        assertTrue(catalog.find("demo-empty").orElseThrow().holdings().isEmpty());
         assertEquals(2, catalog.page(null, 2).items().size());
-        assertNotNull(catalog.page(null, 2).nextCursor());
+        assertNull(catalog.page(null, 2).nextCursor());
     }
 
     @Test
@@ -75,23 +73,15 @@ class PortfolioServiceTest {
     }
 
     @Test
-    void portfolioDistinguishesUnconnectedFromConnectedEmptyProfileAndLeavesPricesUnavailable() {
+    void portfolioDistinguishesUnconnectedAndLeavesPricesUnavailable() {
         var initial = service.getMyPortfolio(MEMBER, "portfolio-1");
         assertFalse(initial.connected());
         assertNull(initial.connection());
         assertTrue(initial.holdings().isEmpty());
         assertNull(initial.valuation());
 
-        service.connect(MEMBER, "demo-empty", "connect-empty", "connect-req");
-        var connected = service.getMyPortfolio(MEMBER, "portfolio-2");
-        assertTrue(connected.connected());
-        assertEquals("demo-empty", connected.connection().mockPortfolioId());
-        assertTrue(connected.holdings().isEmpty());
-        assertEquals("available", connected.valuation().weightStatus());
-        assertEquals(0, connected.valuation().totalMarketValue().signum());
-
-        service.disconnect(MEMBER, connected.connection().id());
-        assertFalse(service.getMyPortfolio(MEMBER, "portfolio-3").connected());
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.connect(MEMBER, "demo-empty", "connect-empty", "connect-req")).getErrorCode());
     }
 
     @Test

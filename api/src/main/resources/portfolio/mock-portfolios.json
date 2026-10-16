@@ -21,13 +21,6 @@
         { "companyId": "KRX:005930", "name": "삼성전자", "ticker": "005930", "quantity": 30, "avgPrice": 71000, "avgPriceCurrency": "KRW" },
         { "companyId": "KRX:000660", "name": "SK하이닉스", "ticker": "000660", "quantity": 5, "avgPrice": 180000, "avgPriceCurrency": "KRW" }
       ]
-    },
-    {
-      "id": "demo-empty",
-      "label": "보유종목 없는 모의 프로필",
-      "accountId": "MOCK-KR-1003",
-      "cash": null,
-      "holdings": []
     }
   ]
 }
