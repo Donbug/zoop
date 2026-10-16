@@ -112,11 +112,3 @@ tasks.register('aiPipelineContractTest', Test) {
 		exceptionFormat 'full'
 	}
 }
-
-// Explicit development read only. Default tests/build/startup never fetch public market data.
-tasks.register('briefingMarketCapture', JavaExec) {
-    group = 'application'
-    description = 'Prefetches market indicators into a private immutable snapshot with --development-read.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.zoop.briefing.market.MarketCapture'
-}
