@@ -37,6 +37,8 @@ class CompanyMarketClientsTest {
         server.setExecutor(executor);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
+            // Count before replying: once the client has the response the test may assert immediately.
+            if (path.equals("/oauth2/token")) tokenRequests.incrementAndGet();
             int status = path.equals("/oauth2/token") ? tokenStatus : providerStatus;
             String rawQuery = exchange.getRequestURI().getRawQuery();
             if (path.equals("/api/v1/candles")) candleQueries.add(rawQuery);
@@ -45,7 +47,6 @@ class CompanyMarketClientsTest {
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, bytes.length);
             try (var output = exchange.getResponseBody()) { output.write(bytes); }
-            if (path.equals("/oauth2/token")) tokenRequests.incrementAndGet();
         });
         server.start();
     }
