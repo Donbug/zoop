@@ -1,4 +1,5 @@
 import PublishedBriefing from '@/components/briefing/PublishedBriefing';
+import BriefingRoundPicker from '@/components/briefing/BriefingRoundPicker';
 import { FOCUS_RING } from '@/components/briefing/briefingStyles';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
@@ -29,15 +30,9 @@ export default function BriefingPage() {
         className="mt-5 flex items-center gap-2.5 max-sm:flex-col max-sm:items-stretch"
         aria-label="브리핑 회차 선택"
       >
-        <label className="sr-only" htmlFor="briefing-date">
-          날짜
-        </label>
-        <input
-          id="briefing-date"
-          className={`h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs text-zoop-ink max-sm:w-full ${FOCUS_RING}`}
-          type="date"
-          value={date}
-          onChange={(event) => updateQuery({ date: event.target.value })}
+        <BriefingRoundPicker
+          date={date}
+          onChange={(next) => updateQuery({ date: next || null })}
         />
         <div className="flex h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px] max-sm:w-full">
           <button

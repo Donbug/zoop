@@ -145,7 +145,10 @@ export default function PublishedBriefing({
                 </p>
               </section>
               <MarketIndicators variables={result.marketVariables} />
-              <BriefingIssueList items={result.items} />
+              <BriefingIssueList
+                items={result.items}
+                graphHref={`/?round=${encodeURIComponent(result.id)}`}
+              />
               {result.edition === 'evening' && (
                 <BriefingComparison
                   since={result.sinceMorning}

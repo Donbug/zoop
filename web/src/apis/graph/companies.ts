@@ -1,3 +1,5 @@
+import type { EventContext } from '@/types/map/event';
+import { snapshotUrl, assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
 import { getCsrfToken } from '@/apis/auth/auth';
 import type { ApiResponse } from '@/apis/commonType';
@@ -29,7 +31,23 @@ async function read<T>(url: string): Promise<T> {
 export const companyUrl = (id: string) =>
   `/api/v1/companies/${encodeURIComponent(id)}`;
 
-export async function getCompany(id: string): Promise<CompanyDetail> {
+export async function getCompany(
+  id: string,
+  context: EventContext = {},
+): Promise<CompanyDetail> {
+  if (context.round) {
+    const company = await call<
+      CompanyDetail & {
+        metadata: { graphVersion: string | null; asOf: string };
+      }
+    >(snapshotUrl(companyUrl(id), context), 'GET', undefined, {
+      skipAuth: true,
+    });
+    if (company.id !== id)
+      throw new Error('요청한 기업과 응답이 일치하지 않습니다.');
+    assertSnapshot(company.metadata, context);
+    return company;
+  }
   if (usesCompanyMock)
     return fixture(async () =>
       (await import('@/mocks/company/fixture')).mockCompany(id),
