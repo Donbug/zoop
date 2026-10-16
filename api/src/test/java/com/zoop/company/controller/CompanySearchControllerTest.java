@@ -39,7 +39,7 @@ class CompanySearchControllerTest {
                 .thenReturn(new CompanyListResponse(
                         List.of(new CompanySummaryResponse("company-1", "Zoop", "ZOP", List.of("Zoop Corp"),
                                 "Tech", "#123456", "/logos/zoop.svg", 3)),
-                        new CompanyListMetadata("postgresql+neo4j", asOf, "graph-12", "req-company", false,
+                        new CompanyListMetadata("postgresql+public_graph_snapshot", asOf, "graph-12", "req-company", false,
                                 List.of()),
                         "opaque-next"));
 

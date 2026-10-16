@@ -33,10 +33,10 @@ class CompanySearchApiServiceTest {
         Instant asOf = Instant.parse("2026-10-14T01:00:00Z");
         var row = new CompanySearchRow("company-1", "ZOP", "KOSDAQ", "Zoop", "KR",
                 List.of("Zoop Corp"), "#123456", "/logos/zoop.svg", "Tech", 0);
-        var page = new CompanySearchPage(List.of(row), "next", null, null);
-        var pinned = new CompanySearchPage(List.of(row), "pinned-next", "graph-12", asOf);
+        var page = new CompanySearchPage(List.of(row), "next", null, null, false);
+        var pinned = new CompanySearchPage(List.of(row), "pinned-next", "graph-12", asOf, false);
         when(searchService.search("zoop", null, 10, null, null)).thenReturn(page);
-        when(issueCountQuery.countIssues(List.of("company-1"), null, null))
+        when(issueCountQuery.countIssues(List.of("company-1"), null, null, false))
                 .thenReturn(new CompanyIssueCountSnapshot("graph-12", asOf, Map.of("company-1", 3L)));
         when(searchService.pinGraphSnapshot(page, "graph-12", asOf)).thenReturn(pinned);
 
@@ -57,8 +57,8 @@ class CompanySearchApiServiceTest {
         var row = new CompanySearchRow("company-1", null, null, "Zoop", null,
                 List.of(), null, null, null, 2);
         when(searchService.search(null, null, null, null, null))
-                .thenReturn(new CompanySearchPage(List.of(row), null, null, null));
-        when(issueCountQuery.countIssues(List.of("company-1"), null, null))
+                .thenReturn(new CompanySearchPage(List.of(row), null, null, null, false));
+        when(issueCountQuery.countIssues(List.of("company-1"), null, null, false))
                 .thenReturn(new CompanyIssueCountSnapshot("graph-12",
                         Instant.parse("2026-10-14T01:00:00Z"), Map.of()));
 

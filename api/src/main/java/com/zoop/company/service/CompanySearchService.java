@@ -51,19 +51,20 @@ public class CompanySearchService {
             int pageLimit = limit != null ? limit : after == null ? 0 : after.limit();
             String pageGraphVersion = after != null && graphVersion == null ? after.graphVersion() : graphVersion;
             Instant pageAsOf = after != null && asOf == null ? after.asOf() : asOf;
+            boolean asOfRequested = after != null && asOf == null ? Boolean.TRUE.equals(after.asOfRequested()) : asOf != null;
             CompanySearchPosition sortPosition = after == null ? null
                     : new CompanySearchPosition(after.rank(), after.name(), after.id());
             List<CompanySearchRow> rows = repository.search(normalizedQuery, sortPosition,
                     pageLimit == 0 ? null : (long) pageLimit + 1);
             CompanySearchPage page;
             if (pageLimit == 0 || rows.size() <= pageLimit) {
-                page = new CompanySearchPage(rows, null, pageGraphVersion, pageAsOf);
+                page = new CompanySearchPage(rows, null, pageGraphVersion, pageAsOf, asOfRequested);
             } else {
                 List<CompanySearchRow> items = rows.subList(0, pageLimit);
                 CompanySearchRow last = items.get(items.size() - 1);
                 String next = encode(new Position(normalizedQuery, pageGraphVersion, pageAsOf, pageLimit,
-                        last.matchRank(), last.name(), last.id(), catalogRevision));
-                page = new CompanySearchPage(items, next, pageGraphVersion, pageAsOf);
+                        last.matchRank(), last.name(), last.id(), catalogRevision, asOfRequested));
+                page = new CompanySearchPage(items, next, pageGraphVersion, pageAsOf, asOfRequested);
             }
             log.debug("Company search completed: resultCount={}, hasNext={}, elapsedMs={}",
                     page.items().size(), page.nextCursor() != null,
@@ -79,9 +80,9 @@ public class CompanySearchService {
         if (nextCursor != null) {
             Position position = readPosition(nextCursor);
             nextCursor = encode(new Position(position.query(), graphVersion, asOf, position.limit(),
-                    position.rank(), position.name(), position.id(), position.catalogRevision()));
+                    position.rank(), position.name(), position.id(), position.catalogRevision(), page.asOfRequested()));
         }
-        return new CompanySearchPage(page.items(), nextCursor, graphVersion, asOf);
+        return new CompanySearchPage(page.items(), nextCursor, graphVersion, asOf, page.asOfRequested());
     }
 
     private String encode(Position position) {
@@ -123,7 +124,9 @@ public class CompanySearchService {
         }
     }
 
+    /** asOfRequested keeps a pinned read time apart from a requested one, so later pages filter like the first. */
     public record Position(String query, String graphVersion, Instant asOf,
-                           Integer limit, int rank, String name, String id, Long catalogRevision) {
+                           Integer limit, int rank, String name, String id, Long catalogRevision,
+                           Boolean asOfRequested) {
     }
 }

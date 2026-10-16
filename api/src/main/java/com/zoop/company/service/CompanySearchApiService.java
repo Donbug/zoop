@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CompanySearchApiService {
-    private static final String SOURCE = "postgresql+neo4j";
+    private static final String SOURCE = "postgresql+public_graph_snapshot";
 
     private final CompanySearchService searchService;
     private final CompanyIssueCountQuery issueCountQuery;
@@ -34,7 +34,7 @@ public class CompanySearchApiService {
         List<String> companyIds = page.items().stream().map(CompanySearchRow::id).toList();
         CompanyIssueCountSnapshot snapshot;
         try {
-            snapshot = issueCountQuery.countIssues(companyIds, page.graphVersion(), page.asOf());
+            snapshot = issueCountQuery.countIssues(companyIds, page.graphVersion(), page.asOf(), page.asOfRequested());
         } catch (CustomException exception) {
             throw exception;
         } catch (RuntimeException exception) {

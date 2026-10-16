@@ -104,7 +104,20 @@ class CompanySearchServiceTest {
 
         assertEquals("graph-7", next.graphVersion());
         assertEquals(asOf, next.asOf());
+        // A pinned read time is not a requested asOf: later pages must not start filtering by it.
+        assertFalse(next.asOfRequested());
         verify(repository, times(2)).search(eq("query"), any(), eq(2L));
+    }
+
+    @Test
+    void aRequestedAsOfStaysRequestedOnLaterPages() {
+        when(repository.search("query", null, 2L)).thenReturn(List.of(row("a"), row("b")));
+        Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
+        var first = service.search("query", null, 1, null, asOf);
+        var pinned = service.pinGraphSnapshot(first, "graph-7", asOf);
+
+        assertTrue(first.asOfRequested());
+        assertTrue(service.search("query", pinned.nextCursor(), null, null, null).asOfRequested());
     }
 
     private static void assertInvalidCursor(org.junit.jupiter.api.function.Executable executable) {
