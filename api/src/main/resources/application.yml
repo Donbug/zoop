@@ -17,9 +17,9 @@ spring:
 # Swagger and the generated OpenAPI document are enabled by default and can be disabled per environment.
 springdoc:
   api-docs:
-    enabled: ${ZOOP_SWAGGER_ENABLED:true}
+    enabled: ${ZOOP_SWAGGER_ENABLED:false}
   swagger-ui:
-    enabled: ${ZOOP_SWAGGER_ENABLED:true}
+    enabled: ${ZOOP_SWAGGER_ENABLED:false}
     path: /swagger-ui.html
 
 zoop:
