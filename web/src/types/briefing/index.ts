@@ -9,7 +9,13 @@ export type BriefingItem = Pick<
   | 'companies'
   | 'evidenceIds'
   | 'summary'
-> & { eventId: string; rank: number; reason: string; evidenceCount: number };
+> & {
+  eventId: string;
+  rank: number;
+  reason: string;
+  evidenceCount: number;
+  matchedCompanyIds?: string[];
+};
 export type MarketIndicator = {
   id: 'kospi' | 'kosdaq' | 'usdkrw';
   label: string;

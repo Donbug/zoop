@@ -47,3 +47,9 @@ These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), 
 - Distinct loading, failure/retry, empty and permission states. Never fabricate missing evidence, dates or direct business relations.
 - Evidence dialog blocks background interaction and returns to the selected panel; shared actions pass actual IDs, graph version and map URL.
 - Verify D-GRP-02/03/04/05 after shared recipe changes. Tests are in `tests/graph` and `tests/evidence`.
+
+## Published-result feedback
+
+Import `FeedbackButtons` from `@/components/common/FeedbackButtons` for member-only result feedback. Supply the feature, stable target ID, immutable target version and the confirmed saved value. Pass `undefined` until the saved vote has been read successfully; never turn a failed read into `none`. Provide a retry action alongside a read error. Keep this component keyed by the current member/session and result identity so pending responses and optional dislike reasons cannot cross accounts.
+
+The component uses existing Tailwind tokens, focus rings and native buttons with `aria-pressed`. It confirms the returned target/version/value before displaying a saved vote, preserves the last confirmed value on failure and retries the desired final state. Guest/checking sessions receive login/status guidance. See `PublishedBriefing` for paginated saved-vote reads and round/issue usage.
