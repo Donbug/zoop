@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.zoop.ZoopApplication;
+import com.zoop.graph.read.GraphQueryService;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
 import com.zoop.graph.version.GraphVersionConflictException;
@@ -120,6 +121,16 @@ class GraphVersionPostgresIntegrationTest {
                 """);
         assertThrows(IllegalStateException.class, () -> seeder.run(null));
         assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+    }
+
+    @Test
+    void getGraphReadsTheActiveFixtureVersionThroughTheRealDatabase() {
+        var response = context.getBean(GraphQueryService.class).getGraph(null, null, null, null, null, null, "it-1");
+        assertEquals("fixture-2026-10-08", response.metadata().graphVersion());
+        assertEquals(11, response.nodes().size());
+        var past = context.getBean(GraphQueryService.class)
+                .getGraph("all", null, null, null, null, "2026-10-05T00:00:00Z", "it-2");
+        assertEquals("fixture-2026-10-01", past.metadata().graphVersion());
     }
 
     @Test
