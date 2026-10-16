@@ -232,8 +232,8 @@ export default function CompanyDetailPanel(props: Props) {
                   <span>
                     52주 범위{' '}
                     <b>
-                      {number(quote.quote.week52Low)}–
-                      {number(quote.quote.week52High)}
+                      {number(quote.quote.fiftyTwoWeekLow)}–
+                      {number(quote.quote.fiftyTwoWeekHigh)}
                     </b>
                   </span>
                 </div>
