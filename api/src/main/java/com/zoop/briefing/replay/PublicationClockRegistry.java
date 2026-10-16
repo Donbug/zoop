@@ -35,8 +35,8 @@ final class PublicationClockRegistry {
                         || !sourceSha.equals(row.string("sourceFileSha256"))
                         || !source.path("url").stringValue().equals(row.string("url"))) bad();
                 if (!"verified_timestamp".equals(row.string("status"))) continue;
-                Instant timestamp = OffsetDateTime.parse(row.string("publishedAt")).toInstant();
-                OffsetDateTime.parse(row.string("checkedAt"));
+                Instant timestamp = awareTimestamp(row.string("publishedAt"));
+                awareTimestamp(row.string("checkedAt"));
                 if (row.count("httpStatus") != 200 || row.string("finalUrl").isBlank()) bad();
                 String hash = row.string("htmlSha256"); if (!hash.matches("[0-9a-f]{64}")) bad();
                 Path raw = path.getParent().resolve("html").resolve(hash + ".html");
@@ -45,19 +45,43 @@ final class PublicationClockRegistry {
                 if (!hash.equals(Canonical.sha256(htmlBytes))) bad();
                 boolean declared = false;
                 for (StrictJson.Obj declaration : row.objects("declarations")) {
-                    try { if (OffsetDateTime.parse(declaration.string("value")).toInstant().equals(timestamp)) declared = true; }
+                    try { if (sameObservedTimestamp(awareTimestamp(declaration.string("value")), timestamp)) declared = true; }
                     catch (java.time.DateTimeException ignored) { /* Date-only declarations are not timestamps. */ }
                 }
-                if (!declared) bad();
+                if (!declared) throw new IllegalArgumentException("Publisher declaration does not match recorded timestamp: " + id + " / " + timestamp);
                 if (source.has("originalPublicationVerified") && source.path("originalPublicationVerified").asBoolean()
                         && source.has("publishedAt") && !source.path("publishedAt").isNull()
-                        && !OffsetDateTime.parse(source.path("publishedAt").stringValue()).toInstant().equals(timestamp)) bad();
+                        && !sameObservedTimestamp(awareTimestamp(source.path("publishedAt").stringValue()), timestamp)) bad();
                 verified.put(key, new Clock(id, body, timestamp, Canonical.digest(row.node()), hash, row.node()));
                 html.putIfAbsent(hash, htmlBytes);
             }
         } catch (java.io.IOException unavailable) {
             throw new IllegalArgumentException("Publication clock evidence is unavailable", unavailable);
         }
+    }
+
+    /** Accept only explicit ISO offsets; compact offsets and ASCII spacing change notation, never the timezone. */
+    private static Instant awareTimestamp(String original) {
+        if (!original.matches("\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)? ?(?:Z|[+-]\\d{2}:?\\d{2})")) {
+            throw new java.time.DateTimeException("Publisher declaration is not an explicitly zoned ISO timestamp");
+        }
+        String normalized = original.charAt(10) == ' ' ? original.substring(0, 10) + "T" + original.substring(11) : original;
+        normalized = normalized.replaceFirst(" ([+-]\\d{2}:?\\d{2}|Z)$", "$1")
+                .replaceFirst("([+-]\\d{2})(\\d{2})$", "$1:$2");
+        return OffsetDateTime.parse(normalized).toInstant();
+    }
+
+    /** The Python observer stores microseconds; retain raw nanoseconds and refuse any resulting window change. */
+    private static boolean sameObservedTimestamp(Instant declaration, Instant recorded) {
+        if (declaration.equals(recorded)) return true;
+        Instant microsecond = declaration.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        if (!microsecond.equals(recorded.truncatedTo(java.time.temporal.ChronoUnit.MICROS))) return false;
+        var local = microsecond.atOffset(java.time.ZoneOffset.ofHours(9)).toLocalTime();
+        boolean cutoff = local.equals(java.time.LocalTime.of(9, 20)) || local.equals(java.time.LocalTime.of(17, 30));
+        if (cutoff && declaration.equals(microsecond) != recorded.equals(microsecond)) {
+            throw new IllegalArgumentException("Publisher precision truncation changes the briefing window");
+        }
+        return true;
     }
 
     private static void bad() { throw new IllegalArgumentException("Publication clock registry/source/HTML identity is invalid"); }
