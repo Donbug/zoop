@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
  * <li>asOf (only when requested): keep what was already published at that time inside the pinned version.</li>
  * <li>current exclusions: always, so a past version never re-exposes something withdrawn today.</li>
  * </ol>
- * Issues and relations whose evidence is all gone are dropped. Derived SHARES_ISSUE edges are computed afterwards.
+ * An issue is dropped once all of its evidence is gone; a relation of any type, FOLLOWS included, is dropped once any
+ * of its evidence is gone (a relation without evidence IDs is kept). Derived SHARES_ISSUE edges are computed afterwards.
  */
 public final class GraphSnapshotFilter {
     private GraphSnapshotFilter() {
@@ -47,7 +48,7 @@ public final class GraphSnapshotFilter {
         List<Relation> relations = s.relations().stream()
                 .filter(r -> !exclusions.relationIds().contains(r.relationId()))
                 .filter(r -> kept.contains(r.source()) && (!"FOLLOWS".equals(r.relationType()) || kept.contains(r.target())))
-                .filter(r -> "FOLLOWS".equals(r.relationType()) || evidenceIds.containsAll(r.evidenceIds()))
+                .filter(r -> evidenceIds.containsAll(r.evidenceIds()))
                 .filter(r -> asOf == null || !"STRUCTURALLY_RELATED_TO".equals(r.relationType())
                         || r.basis().stream().anyMatch(b -> !Instant.parse(b.verifiedAt()).isAfter(asOf)))
                 .toList();

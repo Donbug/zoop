@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -55,5 +57,31 @@ class GraphSnapshotFilterTest {
         PublicGraphSnapshot visible = GraphSnapshotFilter.apply(v2, null, excluded);
         assertTrue(visible.relations().stream().noneMatch(r -> r.relationId().equals("rel-fixture-01")));
         assertTrue(visible.evidence().stream().noneMatch(e -> e.evidenceId().equals(evidenceOfRel01)));
+    }
+
+    @Test
+    void withdrawnEvidenceRemovesAFollowsEdgeThatCitesIt() {
+        // rel-fixture-04's evidence is not geography evidence, so withdrawing it leaves both endpoint issues in place.
+        String evidenceId = v2.relations().stream().filter(r -> r.relationId().equals("rel-fixture-04"))
+                .findFirst().orElseThrow().evidenceIds().get(0);
+        // Same snapshot, but the FOLLOWS edge carries its own evidence ID.
+        PublicGraphSnapshot cited = new PublicGraphSnapshot(v2.snapshotFormat(), v2.versionId(), v2.sourceBundleId(),
+                v2.companies(), v2.issues(), v2.relations().stream().map(r -> "FOLLOWS".equals(r.relationType())
+                        ? new Relation(r.relationId(), r.relationType(), r.source(), r.target(), r.role(),
+                                r.assertionStatus(), List.of(evidenceId), r.basis())
+                        : r).toList(), v2.articles(), v2.evidence());
+        var excluded = new DisclosureExclusions(5, Set.of(), Set.of(), Set.of(evidenceId));
+
+        assertTrue(hasFollows(GraphSnapshotFilter.apply(cited, null, DisclosureExclusions.NONE)));
+        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(cited, null, excluded);
+        assertFalse(hasFollows(visible));
+        // The edge goes because of its evidence, not because an endpoint issue went.
+        assertTrue(issueIds(visible).containsAll(Set.of(HBM_EQUIP, HBM_SUPPLY)));
+        // A FOLLOWS edge without evidence IDs is still kept.
+        assertTrue(hasFollows(GraphSnapshotFilter.apply(v2, null, excluded)));
+    }
+
+    private static boolean hasFollows(PublicGraphSnapshot s) {
+        return s.relations().stream().anyMatch(r -> "FOLLOWS".equals(r.relationType()));
     }
 }
