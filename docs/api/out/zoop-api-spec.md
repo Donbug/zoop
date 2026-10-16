@@ -5783,8 +5783,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 
 ### SettingsUpdate
 
-Unset fields keep their stored value; ``version`` must equal the stored version unless the request
-changes nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null.
+Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. completed cannot be true unless investor has been answered and mode has been selected. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5792,7 +5791,7 @@ changes nothing (a resent request is answered with the stored settings). The mod
 | mode | 선택 | string {assets, watchlist} / null | assets/watchlist를 지정하면 방식을 선택한다. null 또는 생략은 현재 값을 변경하지 않는다. |
 | watchlistIds | 선택 | string[] / null |  |
 | tutorialCompleted | 선택 | boolean / null |  |
-| completed | 선택 | boolean / null |  |
+| completed | 선택 | boolean / null | Cannot be true unless investor has been answered and mode has been selected. Set false to clear completion. |
 | investor | 선택 | boolean / null | Answer to 'do you invest in stocks now?' |
 
 <a id="schema-setupstate"></a>
