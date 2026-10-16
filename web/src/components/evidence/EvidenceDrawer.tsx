@@ -108,6 +108,7 @@ export default function EvidenceDrawer({ onViewOnMap }: Props) {
     evidenceIds,
     target?.mapContext?.graphVersion,
     retry,
+    target?.mapContext,
   );
 
   useEffect(() => {

@@ -1,3 +1,5 @@
+import type { EventContext } from '@/types/map/event';
+import { snapshotUrl, assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
 import type { ImpactMockScenario } from '@/mocks/impact/fixture';
 import type { Impact } from '@/types/company/detail';
@@ -12,8 +14,9 @@ export function impactUrl(companyId: string, issueId: string) {
 export async function getCompanyIssueImpact(
   companyId: string,
   issueId: string,
+  context: EventContext = {},
 ): Promise<Impact> {
-  if (usesImpactMock) {
+  if (usesImpactMock && !context.round) {
     const { createMockImpact } = await import('@/mocks/impact/fixture');
     const scenario = import.meta.env.VITE_IMPACT_MOCK_SCENARIO as
       ImpactMockScenario | undefined;
@@ -23,7 +26,18 @@ export async function getCompanyIssueImpact(
     return createMockImpact(companyId, issueId, scenario);
   }
 
-  return call<Impact>(impactUrl(companyId, issueId), 'GET', undefined, {
-    skipAuth: true,
-  });
+  const impact = await call<Impact>(
+    snapshotUrl(impactUrl(companyId, issueId), context),
+    'GET',
+    undefined,
+    {
+      skipAuth: true,
+    },
+  );
+  if (context.round) {
+    if (impact.companyId !== companyId || impact.issueId !== issueId)
+      throw new Error('요청한 영향 경로와 응답이 일치하지 않습니다.');
+    assertSnapshot(impact.metadata, context);
+  }
+  return impact;
 }

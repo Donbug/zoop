@@ -1,3 +1,4 @@
+import type { EventContext } from '@/types/map/event';
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '@/apis/auth/ApiService';
 import { getEvidence } from '@/apis/evidence/evidence';
@@ -39,10 +40,12 @@ export function useEvidenceData(
   evidenceIds: string[],
   expectedGraphVersion: string | undefined,
   retry: number,
+  context: EventContext = {},
 ) {
+  const { round, asOf } = context;
   const ids = useMemo(() => [...new Set(evidenceIds)], [evidenceIds]);
   const idsKey = ids.join('\u001f');
-  const key = `${idsKey}:${expectedGraphVersion ?? ''}:${retry}`;
+  const key = `${idsKey}:${expectedGraphVersion ?? ''}:${round ?? ''}:${asOf ?? ''}:${retry}`;
   const [state, setState] = useState<{
     key: string;
     items: EvidenceResponse[];
@@ -56,39 +59,41 @@ export function useEvidenceData(
         active = false;
       };
     }
-    void Promise.allSettled(ids.map((id) => getEvidence(id))).then(
-      (results) => {
-        if (!active) return;
-        const items: EvidenceResponse[] = [];
-        const failures: EvidenceLoadFailure[] = [];
-        results.forEach((result, index) => {
-          const id = ids[index];
-          if (result.status === 'rejected') {
-            failures.push(toFailure(id, result.reason));
-            return;
-          }
-          if (
-            expectedGraphVersion &&
-            result.value.metadata.graphVersion !== expectedGraphVersion
-          ) {
-            failures.push({
-              id,
-              kind: 'unavailable',
-              message:
-                '현재 지도의 데이터 버전과 근거 버전이 달라 표시하지 않습니다.',
-              retryable: false,
-            });
-            return;
-          }
-          items.push(result.value);
-        });
-        setState({ key, items, failures });
-      },
-    );
+    void Promise.allSettled(
+      ids.map((id) =>
+        getEvidence(id, { round, asOf, graphVersion: expectedGraphVersion }),
+      ),
+    ).then((results) => {
+      if (!active) return;
+      const items: EvidenceResponse[] = [];
+      const failures: EvidenceLoadFailure[] = [];
+      results.forEach((result, index) => {
+        const id = ids[index];
+        if (result.status === 'rejected') {
+          failures.push(toFailure(id, result.reason));
+          return;
+        }
+        if (
+          expectedGraphVersion &&
+          result.value.metadata.graphVersion !== expectedGraphVersion
+        ) {
+          failures.push({
+            id,
+            kind: 'unavailable',
+            message:
+              '현재 지도의 데이터 버전과 근거 버전이 달라 표시하지 않습니다.',
+            retryable: false,
+          });
+          return;
+        }
+        items.push(result.value);
+      });
+      setState({ key, items, failures });
+    });
     return () => {
       active = false;
     };
-  }, [ids, key, expectedGraphVersion]);
+  }, [ids, key, expectedGraphVersion, round, asOf]);
 
   return state.key === key
     ? { items: state.items, failures: state.failures, loading: false }
