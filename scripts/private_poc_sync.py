@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 
-PROJECTS = ("prototype/bff", "ai/pipeline")
+PROJECTS = ("prototype/bff",)   # the only project that still pins the original PoC; ai/pipeline is native and needs no credential
 
 
 def main(argv: list[str] | None = None) -> int:

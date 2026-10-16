@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import extraction_doc, graph_doc
+from . import extraction_doc, graph_doc, handoff_doc
 from .relation_ledger import OperationRow
 from .relation_review import operation_status
 from .relation_wire import (SCHEMA as RELATION_SCHEMA, RelationErrorEnvelope, RelationJobContent, RelationJobStatus, RelationOperationStatus,
@@ -397,12 +397,13 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     spec = app.openapi()
     sample = examples()
     spec["info"] = {"title": "Zoop internal AI analysis transport", "version": "1.0.0",
-                    "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION).strip()}
+                    "description": (DESCRIPTION + "\n" + extraction_doc.DESCRIPTION + "\n" + graph_doc.DESCRIPTION + "\n" + handoff_doc.DESCRIPTION).strip()}
     spec["servers"] = [{"url": "http://127.0.0.1:8797", "description": "Loopback only. Never exposed directly; reach it through a co-located TLS proxy."}]
     spec["tags"] = [{"name": "analysis-jobs", "description": "S1 analysis jobs over the installed zoop-ai runtime."},
                     {"name": "relation-jobs", "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay only)."},
                     {"name": "extraction-jobs", "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay only)."},
-                    {"name": "graph-versions", "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."}]
+                    {"name": "graph-versions", "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."},
+                    {"name": "graph-handoffs", "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."}]
     components = spec["components"]
     components["securitySchemes"] = {"bearerAuth": {"type": "http", "scheme": "bearer",
                                                     "description": "Operator-issued token; the service holds only its SHA-256 digest. Roles are the route scopes."}}
@@ -416,7 +417,8 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
               "getRelationReviewOperation": "relation.read", "recoverRelationReviewOperation": "relation.recover",
               "submitExtractionJob": "extraction.submit", "getExtractionJobStatus": "extraction.read", "getExtractionJobResult": "extraction.read",
               "cancelExtractionJob": "extraction.cancel", "recoverExtractionJob": "extraction.recover",
-              "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read"}
+              "getGraphVersionStatus": "graph.read", "getGraphVersionFocus": "graph.read",
+              "getGraphHandoffStatus": "handoff.read", "getGraphHandoffBundle": "handoff.read"}
     for path in spec["paths"].values():
         for operation in path.values():
             operation["security"] = [{"bearerAuth": [scopes[operation["operationId"]]]}]
@@ -466,4 +468,5 @@ def build(app: Any, submit_example: dict[str, Any]) -> dict[str, Any]:
     _document_relation(spec, relation_examples())
     extraction_doc.document(spec)
     graph_doc.document(spec)
+    handoff_doc.document(spec)
     return spec

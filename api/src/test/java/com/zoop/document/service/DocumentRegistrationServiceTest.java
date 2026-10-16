@@ -227,6 +227,34 @@ class DocumentRegistrationServiceTest {
     }
 
     @Test
+    void aDayPrecisionVersionKeepsTheDateAndConflictsWithAnyOtherPrecision() {
+        RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());
+        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 14);
+        RegistrationCommand dated = new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(),
+                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, day, "day",
+                base.collectedAt(), base.pointer());
+
+        register(dated);
+        VersionRow stored = registry.state().versions().values().iterator().next();
+        assertNull(stored.publishedAt());
+        assertEquals(day, stored.publishedDate());
+        assertEquals("day", stored.publicationPrecision());
+        assertEquals(Presence.EXISTING, register(dated).version());
+
+        // The same version arriving as an instant, as unknown, or with another day is a different record, never a silent update.
+        RegistrationCommand instant = base;
+        RegistrationCommand unknown = new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(),
+                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null, null,
+                "unknown", base.collectedAt(), base.pointer());
+        RegistrationCommand otherDay = new RegistrationCommand(base.articleId(), base.version(), base.provider(), base.kind(),
+                base.textArtifactId(), base.storageUri(), base.sha256(), base.bytes(), base.title(), base.url(), null,
+                day.plusDays(1), "day", base.collectedAt(), base.pointer());
+        for (RegistrationCommand changed : new RegistrationCommand[] {instant, unknown, otherDay}) {
+            assertEquals(DocumentImportFailure.VERSION_CONFLICT, rejected(changed).failure());
+        }
+    }
+
+    @Test
     void observationLocalValuesAreNeitherComparedNorUpdated() {
         register(command("doc-a", 'a', PointerPolicy.keep()));
         RegistrationCommand base = command("doc-a", 'a', PointerPolicy.keep());

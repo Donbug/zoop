@@ -13,7 +13,7 @@ import pytest
 
 from scripts.extraction_smoke import (INGESTION_SCHEMA, PROMPT, Q3, Q3B, Kit, page, topic_citation, topic_replay, topic_response)
 from scripts.ingestion_smoke import exact_check
-from zoop_ai_pipeline import extraction_poc as poc
+from zoop_ai_pipeline import extraction_replay as analysis
 from zoop_ai_pipeline.extraction import Extractor, Fixtures, Store
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
 
@@ -143,7 +143,12 @@ def test_two_documents_same_event_keep_document_mention_and_event_identities_sep
     assert comparison["original"]["relation"] == comparison["effective"]["relation"] == "SAME" and len(comparison["citations"]) == 2
     assert {c["documentId"] for c in comparison["citations"]} == {w.refs["a1"]["documentId"], w.refs["a2"]["documentId"]}
     binding = second["binding"]["documents"][next(iter(second["binding"]["documents"]))]
-    assert second["binding"]["adapter"]["pocCommit"] and binding["articleVersion"] in {a.version for a in w.art.values()}
+    adapter, replay_binding = second["binding"]["adapter"], second["binding"]["replay"]
+    assert set(adapter) == {"version", "candidate", "fingerprint"} and adapter["version"] == "zoop-extraction-native-replay-1"
+    assert replay_binding == {"format": "zoop-analysis-replay-1", "synthetic": True, "recordingKind": "authored-test", "promptVersion": PROMPT,
+                              "analysisVersion": "authored-analysis-1", "fixtureHash": replay_binding["fixtureHash"]} and len(replay_binding["fixtureHash"]) == 64
+    assert not any(name in json.dumps(second["binding"]) for name in ("pocCommit", "analysisFingerprint", "contextRevision", "settingsDigest", "modelVersion"))
+    assert binding["articleVersion"] in {a.version for a in w.art.values()}
     assert second["comparisonScope"]["retrieval"] == "none" and second["usage"]["paidModelCalls"] == 0
     for citation in c1["citations"]:
         document = k.cli("inspect", k.selector("round-docs", documentId=citation["documentId"], documentVersion=citation["documentVersion"]), state="ingestion")["document"]
@@ -366,7 +371,7 @@ def test_same_job_different_input_or_fixture_conflicts_and_wire_is_closed(world)
         with pytest.raises(ExtractionFailure, match="job_input_conflict|replay_prompt_version_conflict"):
             k.job("run", changed, replay=replay)
     other = k.replay("other").extract(w.art["a1"], [w.mentions["a1"]])
-    other.doc["model_version"] = "authored-model-2"
+    other.doc["analysisVersion"] = "authored-analysis-2"
     with pytest.raises(ExtractionFailure, match="job_input_conflict"):
         k.job("run", request, replay=other.write())
     with pytest.raises(ExtractionFailure, match="replay_fixture_changed"):
@@ -477,7 +482,7 @@ def test_missing_authored_response_is_a_failure_not_a_fallback_or_call(world):
     with pytest.raises(ExtractionFailure, match="replay_provenance_conflict"):
         k.job("run", k.submit("job-prov", w.refs["a1"], source_kind="actual"), replay=empty)
     wrong = k.replay("wrong")
-    wrong.doc["prompt_version"] = "other"
+    wrong.doc["promptVersion"] = "other"
     with pytest.raises(ExtractionFailure, match="replay_prompt_version_conflict"):
         k.job("run", k.submit("job-prompt", w.refs["a1"]), replay=wrong.write())
 
@@ -597,7 +602,7 @@ def test_cancel_fences_a_stopped_job_and_resume_cannot_revive_it(world):
 def test_no_database_pipeline_graph_or_network_modules_are_loaded(world):
     import subprocess
     import sys
-    code = ("import sys\nfrom zoop_ai_pipeline import extraction, extraction_cli\nprint([m for m in sys.modules if m.startswith(('investmate.storage', 'investmate.pipeline', 'investmate.graph', 'psycopg', 'neo4j', 'zoop_bff', 'zoop_ai.'))] + (['zoop_ai'] if 'zoop_ai' in sys.modules else []))")
+    code = ("import sys\nfrom zoop_ai_pipeline import extraction, extraction_cli\nprint([m for m in sys.modules if m.split('.')[0] in {'investmate', 'psycopg', 'neo4j', 'zoop_bff', 'zoop_ai'}])")
     child = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True, cwd=world.kit.root, env={"PYTHONPATH": str(__import__("pathlib").Path(__file__).resolve().parents[1] / "src"), "PATH": "/usr/bin:/bin"})
     assert child.returncode == 0 and child.stdout.strip() == "[]", child.stderr
     assert PROMPT
@@ -775,7 +780,7 @@ def no_execution(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError("a submit reached execution")
 
-    for owner, name in ((Extractor, "_execute"), (Extractor, "_receipted"), (Extractor, "_reserve"), (Fixtures, "model"), (poc, "replay_model")):
+    for owner, name in ((Extractor, "_execute"), (Extractor, "_receipted"), (Extractor, "_reserve"), (Fixtures, "index"), (analysis, "index")):
         monkeypatch.setattr(owner, name, forbidden)
 
 
@@ -837,7 +842,7 @@ def test_submit_conflicts_with_a_changed_request_or_fixture_and_writes_nothing(w
     queued = k.job("submit", request, replay=replay)
     stored = rows(k)
     other = k.replay("other").extract(w.art["a1"], [w.mentions["a1"]])
-    other.doc["model_version"] = "authored-model-2"
+    other.doc["analysisVersion"] = "authored-analysis-2"
     for command, changed, fixture in (("submit", {**request, "snapshot": {"revision": "snapshot-2", "events": []}}, replay), ("submit", request, other.write()),
                                       ("run", {**request, "incoming": w.refs["a2"]}, replay), ("run", request, other.write())):
         with pytest.raises(ExtractionFailure, match="job_input_conflict"):
