@@ -106,7 +106,8 @@ export default function PublishedBriefing({
     values: Record<string, FeedbackValue>;
   } | null>(null);
   const feedbackKey =
-    published && memberId
+    // 결과 버전(graphVersion)이 없으면 평가를 버전에 연결할 수 없으므로 읽지도 않는다.
+    published?.graphVersion && memberId
       ? `${memberId}:${published.id}:${published.graphVersion}:${retry}:${feedbackAttempt}`
       : null;
   useEffect(() => {
@@ -255,17 +256,19 @@ export default function PublishedBriefing({
                     >
                       이 회차 관계 그래프에서 보기
                     </Link>
-                    <FeedbackButtons
-                      key={`${feedbackKey}:${item.eventId}`}
-                      feature="briefing_issue"
-                      targetId={`${result.id}/${item.eventId}`}
-                      targetVersion={result.graphVersion}
-                      subject={`핵심 이슈 ${item.rank}`}
-                      saved={saved(
-                        'briefing_issue',
-                        `${result.id}/${item.eventId}`,
-                      )}
-                    />
+                    {result.graphVersion && (
+                      <FeedbackButtons
+                        key={`${feedbackKey}:${item.eventId}`}
+                        feature="briefing_issue"
+                        targetId={`${result.id}/${item.eventId}`}
+                        targetVersion={result.graphVersion}
+                        subject={`핵심 이슈 ${item.rank}`}
+                        saved={saved(
+                          'briefing_issue',
+                          `${result.id}/${item.eventId}`,
+                        )}
+                      />
+                    )}
                   </div>
                 )}
               />
@@ -303,14 +306,20 @@ export default function PublishedBriefing({
               )}
               <section className={SECTION} aria-label="이 브리핑 평가">
                 <h3 className={SECTION_TITLE}>이 브리핑은 어땠나요?</h3>
-                <FeedbackButtons
-                  key={`${feedbackKey}:round`}
-                  feature="briefing_round"
-                  targetId={result.id}
-                  targetVersion={result.graphVersion}
-                  subject="이 브리핑 회차"
-                  saved={saved('briefing_round', result.id)}
-                />
+                {result.graphVersion ? (
+                  <FeedbackButtons
+                    key={`${feedbackKey}:round`}
+                    feature="briefing_round"
+                    targetId={result.id}
+                    targetVersion={result.graphVersion}
+                    subject="이 브리핑 회차"
+                    saved={saved('briefing_round', result.id)}
+                  />
+                ) : (
+                  <p className={NOTE}>
+                    이 회차는 결과 버전이 없어 평가를 남길 수 없어요.
+                  </p>
+                )}
               </section>
             </>
           )}

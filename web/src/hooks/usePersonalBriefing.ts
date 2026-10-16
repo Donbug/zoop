@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { getPersonalizedBriefing } from '@/apis/briefing/briefing';
+import { getWatchlistCompanyName } from '@/apis/onboarding/watchlist';
 import { getPortfolio } from '@/apis/portfolio/portfolio';
 import { getSettings } from '@/apis/settings/settings';
 import { useAsyncData } from '@/hooks/useAsyncData';
@@ -12,6 +13,8 @@ export type PersonalBasis =
       names: string[];
       weights: (number | null)[];
       valuationAt: string | null;
+      /** 비중을 계산하지 못한 이유(서버 안내). 비중이 있으면 null */
+      weightNote: string | null;
     }
   | { kind: 'watchlist'; count: number; ids: string[]; names: string[] }
   | { kind: 'none' };
@@ -63,24 +66,36 @@ export function usePersonalBriefing(round: BriefingResponse | null) {
     current();
     const holdings = portfolio.connected ? portfolio.holdings : [];
     let basis: PersonalBasis;
-    let ids: string[];
     if (holdings.length) {
-      ids = holdings.map((h) => h.companyId);
       basis = {
         kind: 'holdings',
         names: holdings.map((h) => h.name),
         weights: holdings.map((h) => h.weight ?? null),
         valuationAt: portfolio.valuation?.calculatedAt ?? null,
+        weightNote:
+          portfolio.valuation?.weightStatus === 'unavailable'
+            ? portfolio.valuation.weightUnavailableReason
+            : null,
       };
     } else {
       const settings = await getSettings();
       current();
-      ids = settings.watchlistIds;
+      const ids = settings.watchlistIds;
       const labels = new Map(
         round.items.flatMap((item) =>
           item.companies.map((company) => [company.id, company.name] as const),
         ),
       );
+      // 이 회차에 없는 관심 종목은 기업 상세에서 이름을 가져온다. 실패하면 ID를 그대로 보인다.
+      const missing = ids.filter((id) => !labels.has(id));
+      const fetched = await Promise.allSettled(
+        missing.map((id) => getWatchlistCompanyName(id)),
+      );
+      current();
+      fetched.forEach((outcome, i) => {
+        if (outcome.status === 'fulfilled')
+          labels.set(missing[i], outcome.value.name);
+      });
       basis = ids.length
         ? {
             kind: 'watchlist',
@@ -131,10 +146,9 @@ export function usePersonalBriefing(round: BriefingResponse | null) {
             (key) => !sameValue(item[key], round.items[i][key]),
           ) ||
           !Array.isArray(item.matchedCompanyIds) ||
+          // 기준 기업(보유·관심)과의 겹침은 서버가 정한다. 같은 발행본의 기업인지만 확인한다.
           item.matchedCompanyIds.some(
-            (id) =>
-              !ids.includes(id) ||
-              !item.companies.some((company) => company.id === id),
+            (id) => !item.companies.some((company) => company.id === id),
           ),
       )
     )

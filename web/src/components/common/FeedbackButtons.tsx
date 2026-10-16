@@ -203,19 +203,24 @@ function MemberFeedback({
       {failed && (
         <p
           role="alert"
-          className="flex flex-wrap items-center gap-2 text-[11px] text-[#b42318]"
+          className="flex flex-wrap items-center gap-2 text-[11px] text-zoop-alert"
         >
           {failed.error instanceof ApiError && failed.error.status === 409
             ? '결과가 바뀌어 평가를 저장하지 않았어요. 화면을 새로 고친 뒤 다시 평가해 주세요.'
             : '평가를 저장하지 못했어요. 이전 평가는 그대로예요.'}
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => void send(failed.value, failed.reason)}
-            className={`font-semibold text-zoop-ink underline ${FOCUS_RING}`}
-          >
-            다시 시도
-          </button>
+          {/* 409는 같은 버전으로 다시 보내도 거절되므로 새로 고침을 안내하고 다시 시도는 두지 않는다. */}
+          {!(
+            failed.error instanceof ApiError && failed.error.status === 409
+          ) && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => void send(failed.value, failed.reason)}
+              className={`font-semibold text-zoop-ink underline ${FOCUS_RING}`}
+            >
+              다시 시도
+            </button>
+          )}
         </p>
       )}
     </div>

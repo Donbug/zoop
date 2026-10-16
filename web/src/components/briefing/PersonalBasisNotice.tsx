@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import type { PersonalBriefingState } from '@/hooks/usePersonalBriefing';
 import { briefingTime } from '@/util/briefingTime';
@@ -27,6 +27,7 @@ export default function PersonalBasisNotice({
   dataAsOf: string | null;
   onRetry: () => void;
 }) {
+  const location = useLocation();
   if (checking)
     return (
       <p role="status" className="mt-4 text-xs text-zoop-muted">
@@ -37,7 +38,11 @@ export default function PersonalBasisNotice({
     return (
       <p className={`${EMPTY} mt-4`}>
         내 종목 기준 브리핑은 로그인한 회원만 볼 수 있어요.{' '}
-        <Link to="/login" className={LINK}>
+        <Link
+          to="/login"
+          state={{ from: `${location.pathname}${location.search}` }}
+          className={LINK}
+        >
           로그인하기
         </Link>
       </p>
@@ -101,6 +106,7 @@ export default function PersonalBasisNotice({
             )
             .join(', ')}{' '}
           · 비중 기준 {briefingTime(basis.valuationAt)}
+          {basis.weightNote && ` (${basis.weightNote})`}
         </span>
       )}
       · 기준 시점 {briefingTime(dataAsOf)} · 같은 발행본에서 내 종목과 겹치는

@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BriefingPage from '@/pages/briefing/BriefingPage';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -76,9 +76,9 @@ function signInMember(id = 'mem-1') {
   });
 }
 
-function setup(url = '/briefing') {
+function setup(url = '/briefing', latest: BriefingResponse = briefing()) {
   const server = createFakeServer();
-  server.on('GET', '/api/v1/briefings', () => json(briefing()));
+  server.on('GET', '/api/v1/briefings', () => json(latest));
   server.on('GET', '/api/v1/briefings/rounds', () =>
     json({ items: [], nextCursor: null }),
   );
@@ -237,20 +237,12 @@ describe('FS066-01 브리핑 평가', () => {
     );
   });
 
-  it('결과 버전이 바뀌어(409) 저장하지 못하면 이전 평가를 두고 다시 시도할 수 있다', async () => {
+  it('결과 버전이 바뀌어(409) 저장하지 못하면 이전 평가를 두고 새로 고침을 안내한다', async () => {
     signInMember();
     ({ server } = setup());
-    let attempts = 0;
-    server.on('PUT', '/api/v1/feedback', (request) => {
-      attempts += 1;
-      return attempts === 1
-        ? apiError(409, 'REVISION_CONFLICT')
-        : json({
-            ...(request.body as object),
-            targetVersion: 'v7',
-            reason: null,
-          });
-    });
+    server.on('PUT', '/api/v1/feedback', () =>
+      apiError(409, 'REVISION_CONFLICT'),
+    );
     const user = userEvent.setup();
 
     const round = await screen.findByRole('group', {
@@ -266,13 +258,95 @@ describe('FS066-01 브리핑 평가', () => {
       await screen.findByText(/결과가 바뀌어 평가를 저장하지 않았어요/),
     ).toBeTruthy();
     expect(up.getAttribute('aria-pressed')).toBe('false');
+    // 같은 버전으로 다시 보내도 거절되므로 다시 시도를 두지 않는다.
+    expect(
+      within(screen.getByRole('alert')).queryByRole('button', {
+        name: '다시 시도',
+      }),
+    ).toBeNull();
+    expect(server.calls('PUT', '/api/v1/feedback')).toHaveLength(1);
+  });
+
+  it('평가 저장 실패(503)는 같은 목표로 다시 시도한다', async () => {
+    signInMember();
+    ({ server } = setup());
+    let attempts = 0;
+    server.on('PUT', '/api/v1/feedback', (request) => {
+      attempts += 1;
+      return attempts === 1
+        ? apiError(503, 'SOURCE_UNAVAILABLE')
+        : json({ ...(request.body as object), reason: null });
+    });
+    const user = userEvent.setup();
+    const round = await screen.findByRole('group', {
+      name: '이 브리핑 회차 평가',
+    });
+    const up = within(round).getByRole('button', {
+      name: '이 브리핑 회차: 도움이 됐어요',
+    });
+    await waitFor(() => expect((up as HTMLButtonElement).disabled).toBe(false));
+    await user.click(up);
+
+    expect(await screen.findByText(/평가를 저장하지 못했어요/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '다시 시도' }));
     await waitFor(() => expect(up.getAttribute('aria-pressed')).toBe('true'));
-    expect(server.calls('PUT', '/api/v1/feedback')[1].body).toMatchObject({
+    const puts = server.calls('PUT', '/api/v1/feedback');
+    expect(puts).toHaveLength(2);
+    expect(puts[1].body).toMatchObject({
       feature: 'briefing_round',
       targetId: ROUND,
       value: 'up',
     });
+    const putInits = vi
+      .mocked(fetch)
+      .mock.calls.filter(([, init]) => init?.method === 'PUT')
+      .map(([, init]) => new Headers(init?.headers));
+    expect(putInits[1].get('X-CSRF-Token')).toBe('csrf-member');
+  });
+
+  it('저장을 기다리는 동안 다시 눌러도 한 번만 보낸다', async () => {
+    signInMember();
+    ({ server } = setup());
+    const pending = deferred<Response>();
+    server.on('PUT', '/api/v1/feedback', () => pending.promise);
+    const user = userEvent.setup();
+    const round = await screen.findByRole('group', {
+      name: '이 브리핑 회차 평가',
+    });
+    const up = within(round).getByRole('button', {
+      name: '이 브리핑 회차: 도움이 됐어요',
+    });
+    await waitFor(() => expect((up as HTMLButtonElement).disabled).toBe(false));
+    await user.click(up);
+    await user.click(up);
+    await act(async () =>
+      pending.resolve(
+        json({
+          feature: 'briefing_round',
+          targetId: ROUND,
+          value: 'up',
+          targetVersion: 'v7',
+          reason: null,
+        }),
+      ),
+    );
+    await waitFor(() => expect(up.getAttribute('aria-pressed')).toBe('true'));
+    expect(server.calls('PUT', '/api/v1/feedback')).toHaveLength(1);
+  });
+
+  it('결과 버전이 없는 회차는 평가를 읽거나 보내지 않고 이유를 알린다', async () => {
+    signInMember();
+    ({ server } = setup('/briefing', { ...briefing(), graphVersion: null }));
+
+    expect(
+      await screen.findByText(
+        '이 회차는 결과 버전이 없어 평가를 남길 수 없어요.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('group', { name: '이 브리핑 회차 평가' }),
+    ).toBeNull();
+    expect(server.calls('GET', '/api/v1/feedback')).toHaveLength(0);
   });
 });
 
@@ -331,10 +405,28 @@ describe('FS036 내 종목 기준 브리핑', () => {
     ).toBe('true');
   });
 
+  it('보유 종목이 있어도 서버가 관심 종목과 겹친다고 표시한 이슈는 그대로 보인다', async () => {
+    signInMember();
+    ({ server } = setup('/briefing?view=personal'));
+    server.on('GET', '/api/v1/portfolio', () => json(holdings(['SK하이닉스'])));
+    server.on('GET', '/api/v1/me/settings', () => json(settings(['samsung'])));
+    server.on('GET', '/api/v1/briefings/:id/personalized', () =>
+      json(briefing([item({ matchedCompanyIds: ['samsung'] })])),
+    );
+
+    expect(await screen.findByText('내 종목: 삼성전자')).toBeTruthy();
+    expect(
+      screen.queryByText(/내 종목 기준 결과를 불러오지 못했어요/),
+    ).toBeNull();
+  });
+
   it('보유 종목이 없으면 관심 종목을 기준으로 한다', async () => {
     signInMember();
     ({ server } = setup('/briefing?view=personal'));
     server.on('GET', '/api/v1/portfolio', () => json(holdings([])));
+    server.on('GET', '/api/v1/companies/:id', (request) =>
+      json({ id: request.params.id, name: 'NAVER' }),
+    );
     server.on('GET', '/api/v1/me/settings', () =>
       json(settings(['samsung', 'naver'])),
     );
@@ -343,7 +435,8 @@ describe('FS036 내 종목 기준 브리핑', () => {
     );
 
     expect(await screen.findByText('관심 종목 2개 기준')).toBeTruthy();
-    expect(screen.getByText(/삼성전자, naver/)).toBeTruthy();
+    // 이 회차에 없는 관심 종목은 기업 상세에서 이름을 가져온다.
+    expect(await screen.findByText(/삼성전자, NAVER/)).toBeTruthy();
   });
 
   it('보유·관심 종목이 모두 없으면 종목 설정이나 공통 브리핑을 안내하고 개인화를 요청하지 않는다', async () => {

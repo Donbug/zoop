@@ -26,7 +26,7 @@ import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 
 ## Tokens and proportions
 
-Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink`, `text-panel-muted`, `border-panel-line`, `border-panel-control`, `bg-panel-soft`, `rounded-panel` instead of repeating hex values.
+Tokens live in `src/index.css` under `@theme`. Use `font-panel`, `text-panel-ink`, `text-panel-muted`, `border-panel-line`, `border-panel-control`, `bg-panel-soft`, `rounded-panel` instead of repeating hex values. Error and warning text uses `text-zoop-alert`.
 
 | Element               | Baseline                                |
 | --------------------- | --------------------------------------- |
@@ -52,4 +52,4 @@ These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), 
 
 Import `FeedbackButtons` from `@/components/common/FeedbackButtons` for member-only result feedback. Supply the feature, stable target ID, immutable target version and the confirmed saved value. Pass `undefined` until the saved vote has been read successfully; never turn a failed read into `none`. Provide a retry action alongside a read error. Keep this component keyed by the current member/session and result identity so pending responses and optional dislike reasons cannot cross accounts.
 
-The component uses existing Tailwind tokens, focus rings and native buttons with `aria-pressed`. It confirms the returned target/version/value before displaying a saved vote, preserves the last confirmed value on failure and retries the desired final state. Guest/checking sessions receive login/status guidance. See `PublishedBriefing` for paginated saved-vote reads and round/issue usage.
+The component uses existing Tailwind tokens, focus rings and native buttons with `aria-pressed`. It confirms the returned target/version/value before displaying a saved vote, preserves the last confirmed value on failure and retries the desired final state. A 409 (result version changed) asks for a refresh instead of offering retry, because resending the same version is rejected again. Results without a version (`graphVersion: null`) show a note instead of the buttons. Guest/checking sessions receive login/status guidance. See `PublishedBriefing` for paginated saved-vote reads and round/issue usage.
