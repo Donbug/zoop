@@ -63,6 +63,9 @@ public class MemberSettingsService {
         boolean tutorialCompleted = booleanPatch(input, "tutorialCompleted", current.tutorialCompleted());
         List<String> watchlist = stringListPatch(input, current.watchlistIds());
         if (new HashSet<>(watchlist).size() != watchlist.size()) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        if (completed && (investor == null || mode == null)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
 
         boolean watchlistChanged = !watchlist.equals(current.watchlistIds());
         boolean unchanged = java.util.Objects.equals(mode, current.mode()) && java.util.Objects.equals(investor, current.investor())

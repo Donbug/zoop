@@ -15024,6 +15024,7 @@ components:
               type: "boolean"
             -
               type: "null"
+          description: "Cannot be true unless investor has been answered and mode has been selected. Set false to clear completion."
         investor:
           anyOf:
             -
@@ -15034,7 +15035,7 @@ components:
       type: "object"
       required:
         - "version"
-      description: "Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once."
+      description: "Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. completed cannot be true unless investor has been answered and mode has been selected. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once."
     SetupState:
       properties:
         completed:

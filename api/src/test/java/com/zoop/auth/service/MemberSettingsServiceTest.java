@@ -38,6 +38,18 @@ class MemberSettingsServiceTest {
     }
 
     @Test
+    void rejectsCompletingSettingsUntilInvestorAndModeAreSelected() {
+        var error = assertThrows(CustomException.class,
+                () -> service.update(MEMBER, json("""
+                        {"version":1,"completed":true}
+                        """), "incomplete"));
+
+        assertEquals(ErrorCode.INVALID_REQUEST, error.getErrorCode());
+        assertFalse(repository.row.completed());
+        assertEquals(0, repository.writeCount);
+    }
+
+    @Test
     void updatePersistsInvestorModeWatchlistAndIndependentTutorialState() {
         repository.existingCompanies = List.of("NASDAQ:NVDA", "KRX:005930");
         var response = service.update(MEMBER, json("""
@@ -54,13 +66,13 @@ class MemberSettingsServiceTest {
 
     @Test
     void explicitNullModeAndOmittedFieldsKeepStoredValues() {
-        repository.row = new MemberSettingsRow("watchlist", false, true, true, 4, List.of("NASDAQ:NVDA"));
+        repository.row = new MemberSettingsRow("watchlist", false, false, true, 4, List.of("NASDAQ:NVDA"));
         var response = service.update(MEMBER, json("""
                 {"version":4,"mode":null,"investor":null}
                 """), "req-3");
         assertEquals("watchlist", response.mode());
         assertNull(response.investor());
-        assertTrue(response.completed());
+        assertFalse(response.completed());
         assertTrue(response.tutorialCompleted());
         assertEquals(List.of("NASDAQ:NVDA"), response.watchlistIds());
         assertEquals(5, response.version());
