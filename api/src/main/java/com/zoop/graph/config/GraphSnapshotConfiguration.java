@@ -1,5 +1,7 @@
 package com.zoop.graph.config;
 
+import com.zoop.graph.read.DisclosureExclusionReader;
+import com.zoop.graph.read.DisclosureExclusions;
 import com.zoop.graph.snapshot.FixtureGraphSnapshotStore;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
@@ -30,6 +32,13 @@ public class GraphSnapshotConfiguration {
                 FixtureGraphSnapshotStore store) {
             return new FixtureGraphVersionSeeder(repository, store);
         }
+    }
+
+    /** No exclusion store exists yet (FS081 slice); nothing is excluded until it does. */
+    @Bean
+    @ConditionalOnMissingBean(DisclosureExclusionReader.class)
+    DisclosureExclusionReader noDisclosureExclusions() {
+        return () -> DisclosureExclusions.NONE;
     }
 
     /** No source configured: a registered version cannot be read, which is 503 and never an empty graph. */
