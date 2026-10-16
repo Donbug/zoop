@@ -47,9 +47,9 @@ class GraphQueryServiceTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class))).thenAnswer(call -> {
-            String id = (String) ((SqlParameterSource) call.getArgument(1)).getValue("id");
-            return id.startsWith("NASDAQ:") || id.startsWith("KRX:") || id.startsWith("NYSE:")
-                    ? List.of(new Company(id, "catalog " + id, null, null)) : List.of();
+            List<String> ids = (List<String>) ((SqlParameterSource) call.getArgument(1)).getValue("ids");
+            return ids.stream().filter(id -> id.startsWith("NASDAQ:") || id.startsWith("KRX:") || id.startsWith("NYSE:"))
+                    .map(id -> new Company(id, "catalog " + id, null, null)).toList();
         });
         service = new GraphQueryService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
     }
@@ -121,6 +121,43 @@ class GraphQueryServiceTest {
         assertEquals(ErrorCode.INVALID_REQUEST, failure("all", null, null, "yesterday"));
         assertEquals(ErrorCode.VERSION_UNAVAILABLE, failure("all", null, null, "2026-09-01T00:00:00Z"));
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure("personal", null, null, null));
+    }
+
+    @Test
+    void companyGraphAsOfCountsLiteralEdgesFromTheCompany() {
+        String at = "2026-10-12T09:00:00+09:00";
+        GraphResponse one = service.getCompanyGraphAsOf(HANMI, at, null, null, "r1");
+        assertEquals(Set.of(HANMI, HBM_EQUIP), nodeIds(one));
+        assertEquals(1, one.metadata().depth());
+        assertEquals(List.of(HANMI), one.metadata().focusCompanyIds());
+        // Two edges reach the issue's other company and the issue it is followed by, not that issue's companies.
+        GraphResponse two = service.getCompanyGraphAsOf(HANMI, at, 2, null, "r2");
+        assertEquals(Set.of(HANMI, HBM_EQUIP, "KRX:000660", HBM_SUPPLY), nodeIds(two));
+        assertTrue(two.edges().stream().noneMatch(e -> e.derived() && !nodeIds(two).containsAll(e.via())));
+    }
+
+    @Test
+    void companyGraphAsOfPinsTheVersionActiveAtThatTime() {
+        GraphResponse past = service.getCompanyGraphAsOf(NVDA, "2026-10-05T00:00:00Z", 1, null, "r");
+        assertEquals("fixture-2026-10-01", past.metadata().graphVersion());
+        assertEquals("2026-10-05T00:00:00Z", past.metadata().asOf());
+        assertEquals("all", past.metadata().mode());
+    }
+
+    @Test
+    void companyGraphAsOfRejectsWhatTheContractDoesNotAllow() {
+        for (String asOf : new String[] {null, "", "2026-10-05", "2026-10-05T00:00:00"}) {
+            assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                    () -> service.getCompanyGraphAsOf(NVDA, asOf, 1, null, "r")).getErrorCode(), String.valueOf(asOf));
+        }
+        for (int depth : new int[] {0, 3}) {
+            assertEquals(ErrorCode.INVALID_REQUEST, assertThrows(CustomException.class,
+                    () -> service.getCompanyGraphAsOf(NVDA, "2026-10-12T00:00:00Z", depth, null, "r")).getErrorCode());
+        }
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, assertThrows(CustomException.class,
+                () -> service.getCompanyGraphAsOf("ORG:NOPE", "2026-10-12T00:00:00Z", 1, null, "r")).getErrorCode());
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> service.getCompanyGraphAsOf(NVDA, "2026-09-01T00:00:00Z", 1, null, "r")).getErrorCode());
     }
 
     @Test
