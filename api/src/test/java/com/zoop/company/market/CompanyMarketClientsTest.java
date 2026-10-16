@@ -25,6 +25,10 @@ class CompanyMarketClientsTest {
     private volatile int tokenStatus = 200;
     private volatile int providerStatus = 200;
     private volatile boolean omitPriceTimestamp;
+    private volatile String priceTimestamp = "2026-10-15T06:30:00Z";
+    private volatile String lastPriceJson = "700";
+    private volatile boolean paginateCandles;
+    private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
     void startProviderStub() throws IOException {
@@ -34,7 +38,9 @@ class CompanyMarketClientsTest {
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().getPath();
             int status = path.equals("/oauth2/token") ? tokenStatus : providerStatus;
-            String body = response(path);
+            String rawQuery = exchange.getRequestURI().getRawQuery();
+            if (path.equals("/api/v1/candles")) candleQueries.add(rawQuery);
+            String body = response(path, rawQuery);
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, bytes.length);
@@ -91,13 +97,47 @@ class CompanyMarketClientsTest {
     }
 
     @Test
-    void tossPriceWithoutProviderTimestampIsUnavailableRatherThanAnIncompleteQuote() {
+    void tossPriceWithoutProviderTimestampKeepsThePriceWithNullAsOf() {
         omitPriceTimestamp = true;
         var result = tossClient("test-client", "test-secret").quote("KRX:005930", "KRX", "005930");
 
-        assertEquals("unavailable", result.status());
-        assertEquals("no_data", result.reasonCode());
-        assertNull(result.quote());
+        assertEquals("available", result.status());
+        assertEquals(700.0, result.quote().price());
+        assertNull(result.quote().asOf());
+        // Without an observation time the session day is unknown, so session-derived values are not guessed.
+        assertNull(result.quote().previousClose());
+        assertNull(result.quote().dayHigh());
+    }
+
+    @Test
+    void malformedPriceIsANonRetryableSourceFailureNotNoData() {
+        lastPriceJson = "\"not-a-price\"";
+
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").quote("KRX:005930", "KRX", "005930"));
+
+        assertFalse(error.retryable());
+    }
+
+    @Test
+    void sessionDayUsesTheMarketCalendarNotUtc() {
+        // 2026-10-14T23:30Z is 2026-10-15 08:30 in Seoul: the 10-15 candle is today and 10-14 is the previous close.
+        priceTimestamp = "2026-10-14T23:30:00Z";
+        var quote = tossClient("test-client", "test-secret").quote("KRX:005930", "KRX", "005930").quote();
+
+        assertEquals(650.0, quote.previousClose());
+        assertEquals(710.0, quote.dayHigh());
+        assertEquals(1234.0, quote.volume());
+    }
+
+    @Test
+    void candlePaginationCursorWithOffsetIsPercentEncoded() {
+        paginateCandles = true;
+        tossClient("test-client", "test-secret").quote("KRX:005930", "KRX", "005930");
+
+        assertEquals(2, candleQueries.size());
+        assertTrue(candleQueries.get(1).contains("before=2026-10-15T00%3A00%3A00%2B09%3A00")
+                || candleQueries.get(1).contains("before=2026-10-15T00:00:00%2B09:00"), candleQueries.get(1));
     }
 
     @Test
@@ -158,15 +198,20 @@ class CompanyMarketClientsTest {
 
     private String baseUrl() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
 
-    private String response(String path) {
+    private String response(String path, String rawQuery) {
         if (path.equals("/oauth2/token")) return """
                 {"access_token":"test-token","expires_in":3600}
                 """;
-        if (path.equals("/api/v1/prices")) return (omitPriceTimestamp ? """
-                {"result":[{"symbol":"005930","lastPrice":700,"currency":"KRW"}]}
-                """ : """
-                {"result":[{"symbol":"005930","lastPrice":700,"currency":"KRW","timestamp":"2026-10-15T06:30:00Z"}]}
-                """);
+        if (path.equals("/api/v1/prices")) return "{\"result\":[{\"symbol\":\"005930\",\"lastPrice\":" + lastPriceJson
+                + ",\"currency\":\"KRW\"" + (omitPriceTimestamp ? "" : ",\"timestamp\":\"" + priceTimestamp + "\"") + "}]}";
+        if (path.equals("/api/v1/candles") && paginateCandles && rawQuery != null && rawQuery.contains("before=")) return """
+                {"result":{"candles":[],"nextBefore":null}}
+                """;
+        if (path.equals("/api/v1/candles") && paginateCandles) return """
+                {"result":{"candles":[
+                  {"timestamp":"2026-10-15T00:00:00+09:00","highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
+                ],"nextBefore":"2026-10-15T00:00:00+09:00"}}
+                """;
         if (path.equals("/api/v1/stocks")) return """
                 {"result":[{"symbol":"005930","sharesOutstanding":1000}]}
                 """;

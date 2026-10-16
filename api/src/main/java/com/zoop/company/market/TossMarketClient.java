@@ -50,15 +50,16 @@ public class TossMarketClient {
             JsonNode priceRoot = get("/api/v1/prices", Map.of("symbols", code));
             JsonNode price = matching(priceRoot.path("result"), code);
             if (price == null) return CompanyQuoteResponse.unavailable(companyId, "unsupported_symbol", "토스증권에서 이 종목을 찾지 못했어요.");
-            Double last = number(price.get("lastPrice"));
-            String currency = text(price.get("currency"));
+            // Absent values are a normal "no data"; a present value in the wrong shape is a provider format failure.
+            Double last = strictNumber(price.get("lastPrice"));
+            String currency = strictText(price.get("currency"));
             if (last == null || currency == null) {
                 return CompanyQuoteResponse.unavailable(companyId, "no_data", "토스증권에 현재가 또는 통화 정보가 없어요.");
             }
-            Instant asOf = instant(text(price.get("timestamp")));
-            if (asOf == null) {
-                return CompanyQuoteResponse.unavailable(companyId, "no_data", "토스증권 시세 기준 시각이 없어요.");
-            }
+            // A missing observation time keeps the price with quote.asOf = null; an unreadable one is a format failure.
+            String timestamp = strictText(price.get("timestamp"));
+            Instant asOf = timestamp == null ? null : instant(timestamp);
+            if (timestamp != null && asOf == null) throw formatFailure();
             JsonNode stocks = get("/api/v1/stocks", Map.of("symbols", code));
             JsonNode stock = matching(stocks.path("result"), code);
             Double shares = stock == null ? null : number(stock.get("sharesOutstanding"));
@@ -75,7 +76,8 @@ public class TossMarketClient {
                 if (candles.isEmpty() || !candlePage.hasNonNull("nextBefore")) break;
                 before = text(candlePage.get("nextBefore"));
             }
-            String sessionDate = asOf == null ? null : asOf.toString().substring(0, 10);
+            // Daily candles are dated in the market's own calendar, so the quote's session day uses the same zone.
+            String sessionDate = asOf == null ? null : asOf.atZone(marketZone(exchange)).toLocalDate().toString();
             // The 52-week range only uses candles from the year ending on the quote's session date.
             String windowStart = sessionDate == null ? null
                     : java.time.LocalDate.parse(sessionDate).minusDays(365).toString();
@@ -131,8 +133,10 @@ public class TossMarketClient {
             final boolean firstAttempt = attempt == 0;
             var response = client.get().uri(uri -> {
                 var builder = uri.path(path);
-                params.forEach((key, value) -> builder.queryParam(key, value));
-                return builder.build();
+                // Values go through URI variables so reserved characters are encoded ("+09:00" -> "%2B09:00");
+                // a literal "+" would otherwise reach the provider as a space.
+                params.keySet().forEach(key -> builder.queryParam(key, "{" + key + "}"));
+                return builder.build(params);
             }).header("Authorization", "Bearer " + usedToken).accept(MediaType.APPLICATION_JSON)
                     .exchange((request, result) -> {
                         int code = result.getStatusCode().value();
@@ -201,6 +205,20 @@ public class TossMarketClient {
         if (node == null || node.isNull()) return null;
         try { double value = node.isNumber() ? node.doubleValue() : node.isString() ? Double.parseDouble(node.stringValue()) : Double.NaN;
             return Double.isFinite(value) ? value : null; } catch (NumberFormatException ignored) { return null; }
+    }
+    private static java.time.ZoneId marketZone(String exchange) {
+        return java.time.ZoneId.of("KRX".equals(exchange) ? "Asia/Seoul" : "America/New_York");
+    }
+    private static Double strictNumber(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        Double value = number(node);
+        if (value == null) throw formatFailure();
+        return value;
+    }
+    private static String strictText(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        if (!node.isString()) throw formatFailure();
+        return node.stringValue().isBlank() ? null : node.stringValue();
     }
     private static Instant instant(String value) {
         if (value == null) return null;
