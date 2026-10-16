@@ -125,11 +125,11 @@ class GraphVersionPostgresIntegrationTest {
 
     @Test
     void getGraphReadsTheActiveFixtureVersionThroughTheRealDatabase() {
-        var response = context.getBean(GraphQueryService.class).getGraph(null, null, null, null, null, null, "it-1");
+        var response = context.getBean(GraphQueryService.class).getGraph(null, null, null, null, null, null, null, null, "it-1");
         assertEquals("fixture-2026-10-08", response.metadata().graphVersion());
         assertEquals(11, response.nodes().size());
         var past = context.getBean(GraphQueryService.class)
-                .getGraph("all", null, null, null, null, "2026-10-05T00:00:00Z", "it-2");
+                .getGraph("all", null, null, null, null, "2026-10-05T00:00:00Z", null, null, "it-2");
         assertEquals("fixture-2026-10-01", past.metadata().graphVersion());
     }
 
