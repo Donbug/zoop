@@ -49,7 +49,10 @@ public record PublicGraphSnapshot(int snapshotFormat, String versionId, String s
 
     public record Basis(String verifiedAt, String validFrom, String validUntil) { }
 
-    /** Article version pinned to this snapshot; publishedAt keeps the provider precision ("2026-10-01" or an instant). */
+    /**
+     * Article version pinned to this snapshot; publishedAt keeps the provider precision ("2026-10-01" or an instant),
+     * or is null when the publication time is unknown (the article then never counts as published before an asOf).
+     */
     public record Article(String articleId, String version, String title, String url, String publishedAt) { }
 
     public record Evidence(String evidenceId, String articleId, String articleVersion, int start, int end) { }

@@ -95,7 +95,7 @@ public final class DisplayGraph {
     /** Newest event first, unknown time last; ties by newest article, then id (prototype {@code sort_recent}). */
     static final Comparator<Issue> RECENT = Comparator
             .comparing((Issue i) -> eventStart(i), Comparator.reverseOrder())
-            .thenComparing(Issue::latestPublishedAt, Comparator.reverseOrder())
+            .thenComparing(Issue::latestPublishedAt, Comparator.nullsLast(Comparator.reverseOrder()))
             .thenComparing(Issue::issueId);
 
     static String eventStart(Issue i) {

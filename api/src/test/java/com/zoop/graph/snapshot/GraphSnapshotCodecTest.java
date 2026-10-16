@@ -72,6 +72,18 @@ class GraphSnapshotCodecTest {
     }
 
     @Test
+    void unknownPublicationTimeIsKeptButAnOffsetLessTimeIsRejected() throws IOException {
+        // The AI handoff sends publishedAt=null for an unknown time (contract §0); the snapshot keeps it as unknown.
+        String json = v1().replace("\"publishedAt\": \"2026-09-25\"", "\"publishedAt\": null")
+                .replace("\"latestPublishedAt\": \"2026-09-25\"", "\"latestPublishedAt\": null");
+        PublicGraphSnapshot undated = GraphSnapshotCodec.read(json.getBytes(StandardCharsets.UTF_8), "fixture-2026-10-01");
+        assertTrue(undated.articles().stream().anyMatch(a -> a.publishedAt() == null));
+        // An offset-less time is not an instant: the AI side sends it as null, so a string here is malformed.
+        String local = v1().replace("\"publishedAt\": \"2026-09-25\"", "\"publishedAt\": \"2026-09-25T09:30:00\"");
+        assertEquals("snapshot_invalid:article_published_at", reason(local, "fixture-2026-10-01"));
+    }
+
+    @Test
     void precisionRulesCoverEveryOpenApiValue() {
         assertTrue(GraphSnapshotCodec.matchesPrecision("2026", "year"));
         assertTrue(GraphSnapshotCodec.matchesPrecision("2026-09", "month"));

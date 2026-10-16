@@ -62,7 +62,7 @@ public final class GraphSnapshotCodec {
         return new Issue(o.string("issueId"), o.string("label"), o.stringOrNull("eventTime"), o.string("timePrecision"),
                 optional(o, "action"), optional(o, "target"), o.string("geography"), o.string("geographyPolicyVersion"),
                 o.strings("geographyEvidenceIds"), o.strings("articleIds"), o.strings("evidenceIds"),
-                o.string("latestPublishedAt"));
+                o.stringOrNull("latestPublishedAt"));
     }
 
     private static Relation relation(Obj o) {
@@ -81,7 +81,7 @@ public final class GraphSnapshotCodec {
     private static Article article(Obj o) {
         o.exactly(Set.of("articleId", "version", "title", "url", "publishedAt"));
         return new Article(o.string("articleId"), o.string("version"), o.string("title"), o.string("url"),
-                o.string("publishedAt"));
+                o.stringOrNull("publishedAt"));
     }
 
     private static Evidence evidence(Obj o) {
@@ -106,7 +106,8 @@ public final class GraphSnapshotCodec {
             }
         }
         for (Article a : s.articles()) {
-            if (!isDateOrInstant(a.publishedAt())) throw invalid("article_published_at");
+            // null is an unknown publication time (kept, but never before an asOf); any other value must parse.
+            if (a.publishedAt() != null && !isDateOrInstant(a.publishedAt())) throw invalid("article_published_at");
         }
         for (Relation r : s.relations()) {
             for (Basis b : r.basis()) {
@@ -121,7 +122,9 @@ public final class GraphSnapshotCodec {
                 throw invalid("issue_geography_evidence");
             }
             if (!matchesPrecision(issue.eventTime(), issue.timePrecision())) throw invalid("issue_event_time");
-            if (!isDateOrInstant(issue.latestPublishedAt())) throw invalid("issue_published_at");
+            if (issue.latestPublishedAt() != null && !isDateOrInstant(issue.latestPublishedAt())) {
+                throw invalid("issue_published_at");
+            }
             if (!evidence.containsAll(issue.evidenceIds())) throw invalid("issue_evidence_reference");
             for (String articleId : issue.articleIds()) {
                 if (s.articles().stream().noneMatch(a -> a.articleId().equals(articleId))) {

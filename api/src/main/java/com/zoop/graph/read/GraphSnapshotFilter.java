@@ -61,9 +61,11 @@ public final class GraphSnapshotFilter {
     /**
      * A full timestamp counts once it is at or before asOf. A date-only value carries no time or zone, so it is compared
      * as a date: it counts only if it is before asOf's calendar date at UTC-12, the last zone to change date, and the
-     * same day never counts. The date is never given a time.
+     * same day never counts. The date is never given a time. An unknown time (null) never counts, so undated articles
+     * appear only without asOf.
      */
     static boolean publishedBy(String value, Instant asOf) {
+        if (value == null) return false;
         if (value.length() == 10) return LocalDate.parse(value).isBefore(LocalDate.ofInstant(asOf, LAST_DATE_LINE));
         return !Instant.parse(value).isAfter(asOf);
     }

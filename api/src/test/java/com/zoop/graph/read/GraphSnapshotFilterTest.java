@@ -7,9 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.zoop.graph.snapshot.GraphSnapshotCodec;
 import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -84,6 +86,25 @@ class GraphSnapshotFilterTest {
         assertTrue(issueIds(visible).containsAll(Set.of(HBM_EQUIP, HBM_SUPPLY)));
         // A FOLLOWS edge without evidence IDs is still kept.
         assertTrue(hasFollows(GraphSnapshotFilter.apply(v2, null, excluded)));
+    }
+
+    @Test
+    void undatedArticleShowsInTheCurrentGraphButNeverBeforeAnAsOf() {
+        // The AI handoff may send publishedAt=null (unknown); its issue then has no known publication time either.
+        String json = new String(GraphReadFixtures.bytes("fixture-2026-10-08"), StandardCharsets.UTF_8)
+                .replace("\"publishedAt\": \"2026-09-25\"", "\"publishedAt\": null")
+                .replace("\"latestPublishedAt\": \"2026-09-25\"", "\"latestPublishedAt\": null");
+        PublicGraphSnapshot undated = GraphSnapshotCodec.read(json.getBytes(StandardCharsets.UTF_8), "fixture-2026-10-08");
+
+        PublicGraphSnapshot current = GraphSnapshotFilter.apply(undated, null, DisclosureExclusions.NONE);
+        assertTrue(issueIds(current).contains(HBM_EQUIP));
+        assertTrue(current.articles().stream().anyMatch(a -> a.publishedAt() == null));
+        // Even an asOf long after every dated article leaves the undated one, and the issue resting on it, out.
+        PublicGraphSnapshot later = GraphSnapshotFilter.apply(undated, Instant.parse("2027-01-01T00:00:00Z"), DisclosureExclusions.NONE);
+        assertFalse(issueIds(later).contains(HBM_EQUIP));
+        assertTrue(later.articles().stream().noneMatch(a -> a.publishedAt() == null));
+        assertTrue(issueIds(later).contains(HBM_SUPPLY));
+        assertFalse(GraphSnapshotFilter.publishedBy(null, Instant.parse("2027-01-01T00:00:00Z")));
     }
 
     private static boolean hasFollows(PublicGraphSnapshot s) {
