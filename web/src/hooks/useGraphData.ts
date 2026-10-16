@@ -12,6 +12,7 @@ export function useGraphData(
     request.asOf,
     request.graphVersion,
     request.depth,
+    request.round,
   ]);
   const [state, setState] = useState<{
     data: GraphResponse | null;
@@ -21,7 +22,7 @@ export function useGraphData(
     snapshotKey: string;
   }>({ data: null, error: null, loading: true, session, snapshotKey });
   const latest = useRef(0);
-  const { mode, personalFilter, companyId, asOf, graphVersion, depth } =
+  const { mode, personalFilter, companyId, asOf, graphVersion, depth, round } =
     request;
   useEffect(() => {
     const sequence = ++latest.current;
@@ -47,6 +48,7 @@ export function useGraphData(
           asOf,
           graphVersion,
           depth,
+          round,
         });
         if (sequence === latest.current)
           setState({ data, error: null, loading: false, session, snapshotKey });
@@ -54,6 +56,7 @@ export function useGraphData(
         if (sequence === latest.current)
           setState((old) => ({
             ...old,
+            data: round ? null : old.data,
             loading: false,
             error:
               error instanceof Error
@@ -72,6 +75,7 @@ export function useGraphData(
     asOf,
     graphVersion,
     depth,
+    round,
     session,
     retry,
     snapshotKey,

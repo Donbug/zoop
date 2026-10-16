@@ -14,6 +14,14 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+# Swagger and the generated OpenAPI document are opt-in, including in production.
+springdoc:
+  api-docs:
+    enabled: ${ZOOP_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${ZOOP_SWAGGER_ENABLED:false}
+    path: /swagger-ui.html
+
 zoop:
   market:
     quote-provider: ${ZOOP_QUOTE_PROVIDER:toss}
@@ -25,6 +33,13 @@ zoop:
     naver-world-url: ${ZOOP_NAVER_WORLD_URL:https://api.stock.naver.com}
     naver-autocomplete-url: ${ZOOP_NAVER_AC_URL:https://ac.stock.naver.com}
     timeout: ${ZOOP_MARKET_TIMEOUT:5s}
+  api:
+    cors:
+      allowed-origins: ${ZOOP_API_CORS_ALLOWED_ORIGINS:}
+  auth:
+    allowed-origins: ${ZOOP_AUTH_ALLOWED_ORIGINS:}
+    allow-http-loopback-origins: false
+    session-cookie-secure: true
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.

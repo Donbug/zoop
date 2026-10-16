@@ -31,6 +31,7 @@ class MemberSessionServiceTest {
         var issued = service.issue("member-1", null, "req-1");
         assertEquals(43, issued.token().length());
         assertTrue(issued.cookie().toString().contains("SameSite=Lax"));
+        assertTrue(issued.cookie().toString().contains("; Secure"));
         assertFalse(repository.rows.containsKey(issued.token()));
         assertEquals(MemberSessionService.hashToken(issued.token()), repository.rows.keySet().iterator().next());
         assertEquals(NOW.plus(SessionCookie.LIFETIME), issued.response().expiresAt());
@@ -41,6 +42,18 @@ class MemberSessionServiceTest {
         assertEquals("member-1", lookup.response().user().id());
         assertEquals(new SessionResponse.Setup(false, false), lookup.response().setup());
         assertFalse(lookup.clearCookie());
+    }
+
+    @Test
+    void localHttpModeOmitsOnlyTheSecureCookieAttribute() {
+        var localService = new MemberSessionService(repository, keys, Clock.fixed(NOW, ZoneOffset.UTC), false);
+        var issued = localService.issue("member-local", null, "local-cookie");
+        String cookie = issued.cookie().toString();
+
+        assertFalse(cookie.contains("; Secure"));
+        assertTrue(cookie.contains("; HttpOnly"));
+        assertTrue(cookie.contains("SameSite=Lax"));
+        assertFalse(localService.clearCookie().toString().contains("; Secure"));
     }
 
     @Test
