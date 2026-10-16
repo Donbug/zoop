@@ -9,6 +9,7 @@ import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
 import com.zoop.graph.version.SelectedGraphVersion;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -16,7 +17,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * {@code getGraph} and {@code getCompanyGraphAsOf}: one pinned version read through {@link PublicGraphReader}, then
+ * {@code getGraph} (all and personal) and {@code getCompanyGraphAsOf}: one pinned version read through {@link PublicGraphReader}, then
  * the display edges and the node selection. Errors are never turned into an empty graph.
  */
 @Service
@@ -32,23 +33,44 @@ public class GraphQueryService {
         this.jdbc = jdbc;
     }
 
+    /**
+     * personal is the member's own companies, read by the caller after authentication; null in all mode. Personal
+     * mode centres on them (or on companyId) and marks holding/watch; all mode carries no personal data.
+     */
     public GraphResponse getGraph(String mode, String companyId, Integer depth, String round, String graphVersion,
-            String asOf, String requestId) {
+            String asOf, String personalFilter, PersonalCompanies.Ids personal, String requestId) {
         String resolvedMode = mode == null ? "all" : mode;
         if (!resolvedMode.equals("all") && !resolvedMode.equals("personal")) throw invalid();
         if (depth != null && depth < 1) throw invalid();
+        String filter = personalFilter == null ? "all" : personalFilter;
+        if (!List.of("all", "holdings", "watchlist").contains(filter)) throw invalid();
         Instant requestedAsOf = parseInstant(asOf);
-        if (resolvedMode.equals("personal")) {
-            // shortcut: personal mode needs the member holdings/watchlist read contract (#60); until it exists the
-            // personal source is reported unavailable instead of returning a public graph as if it were personal.
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        boolean isPersonal = resolvedMode.equals("personal");
+        if (isPersonal && personal == null) throw new IllegalStateException("personal mode without the member companies");
+        // A briefing round is a market-wide snapshot (prototype round_all_only).
+        if (isPersonal && round != null) throw invalid();
+
+        Map<String, Company> catalog = new HashMap<>(catalogCompanies(companyId == null ? List.of() : List.of(companyId)));
+        List<String> focus;
+        if (!isPersonal) {
+            focus = companyId == null ? List.of() : List.of(companyId);
+        } else {
+            List<String> own = catalogKnown(personal.select(filter), catalog);
+            focus = companyId != null ? List.of(companyId) : own;
         }
-        List<String> focus = companyId == null ? List.of() : List.of(companyId);
-        Map<String, Company> catalog = catalogCompanies(focus);
 
         PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, requestedAsOf);
-        GraphSelection.Result selection = GraphSelection.select(pinned.graph(), focus, depth, NODE_LIMIT);
-        return response(pinned, selection, catalog, focus, resolvedMode, depth, requestId);
+        // No own companies: an empty personal graph, never the whole market presented as personal.
+        GraphSelection.Result selection = isPersonal && focus.isEmpty()
+                ? new GraphSelection.Result(Map.of(), false)
+                : GraphSelection.select(pinned.graph(), focus, depth, NODE_LIMIT);
+        GraphResponse response = response(pinned, selection, catalog, focus, resolvedMode, depth, requestId,
+                isPersonal ? personal : null, isPersonal ? filter : null);
+        if (isPersonal && focus.isEmpty()) {
+            return new GraphResponse(response.nodes(), response.edges(),
+                    withEmptyReason(response.metadata(), "no_personal_stocks"));
+        }
+        return response;
     }
 
     /** Company timeline graph: asOf is required with an explicit offset, depth counts literal edges (1 or 2). */
@@ -65,17 +87,18 @@ public class GraphQueryService {
         // Two company hops always cover two literal edges; the literal walk then trims to the requested depth.
         GraphSelection.Result ego = GraphSelection.select(pinned.graph(), focus, 2, NODE_LIMIT);
         GraphSelection.Result selection = GraphSelection.neighbourhood(pinned.graph(), ego, companyId, hops);
-        return response(pinned, selection, catalog, focus, "all", hops, requestId);
+        return response(pinned, selection, catalog, focus, "all", hops, requestId, null, null);
     }
 
     private static GraphResponse response(PublicGraphReader.Pinned pinned, GraphSelection.Result selection,
-            Map<String, Company> catalog, List<String> focus, String mode, Integer depth, String requestId) {
+            Map<String, Company> catalog, List<String> focus, String mode, Integer depth, String requestId,
+            PersonalCompanies.Ids personal, String personalFilter) {
         DisplayGraph graph = pinned.graph();
         SelectedGraphVersion selected = pinned.selected();
         Map<String, Kind> picked = selection.nodes();
         List<GraphResponse.Node> nodes = picked.entrySet().stream()
                 .map(e -> e.getValue() == Kind.ISSUE ? issueNode(graph.issues.get(e.getKey()))
-                        : companyNode(graph.companies.getOrDefault(e.getKey(), catalog.get(e.getKey())), focus.contains(e.getKey())))
+                        : companyNode(graph.companies.getOrDefault(e.getKey(), catalog.get(e.getKey())), focus.contains(e.getKey()), personal))
                 .toList();
         List<GraphResponse.Edge> edges = graph.edges.values().stream()
                 .filter(e -> picked.containsKey(e.source()) && picked.containsKey(e.target()))
@@ -86,13 +109,18 @@ public class GraphQueryService {
         String emptyReason = edges.isEmpty() ? (focus.isEmpty() ? "no_approved_issues" : "no_related_issues") : null;
         return new GraphResponse(nodes, edges, new GraphResponse.Metadata("public_graph_snapshot",
                 selected.asOf().toString(), selected.version().id(), mode, selection.truncated(), emptyReason,
-                focus, depth, NODE_LIMIT, requestId, false, List.of(), null));
+                focus, depth, NODE_LIMIT, requestId, false, List.of(), personalFilter));
+    }
+
+    private static GraphResponse.Metadata withEmptyReason(GraphResponse.Metadata m, String emptyReason) {
+        return new GraphResponse.Metadata(m.source(), m.asOf(), m.graphVersion(), m.mode(), m.truncated(), emptyReason,
+                m.focusCompanyIds(), m.depth(), m.limit(), m.requestId(), m.partial(), m.failures(), m.personalFilter());
     }
 
     /** Focus companies must exist in the catalog; one missing from the version still appears with no relations. */
     private Map<String, Company> catalogCompanies(List<String> ids) {
         if (ids.isEmpty()) return Map.of();
-        Map<String, Company> found = new java.util.HashMap<>();
+        Map<String, Company> found = new HashMap<>();
         jdbc.query("SELECT id, name, brand_color, logo_url FROM companies WHERE id IN (:ids)",
                 new MapSqlParameterSource("ids", ids), (rs, n) -> new Company(rs.getString("id"),
                         rs.getString("name"), rs.getString("brand_color"), rs.getString("logo_url")))
@@ -101,8 +129,20 @@ public class GraphQueryService {
         return found;
     }
 
-    private static GraphResponse.Node companyNode(Company c, boolean focus) {
-        return new GraphResponse.Node(c.companyId(), "company", c.label(), focus, false, false, c.brandColor(),
+    /** The member's companies that the catalog knows; a stale id is left out instead of failing the whole graph. */
+    private List<String> catalogKnown(List<String> ids, Map<String, Company> catalog) {
+        if (ids.isEmpty()) return List.of();
+        jdbc.query("SELECT id, name, brand_color, logo_url FROM companies WHERE id IN (:ids)",
+                new MapSqlParameterSource("ids", ids), (rs, n) -> new Company(rs.getString("id"),
+                        rs.getString("name"), rs.getString("brand_color"), rs.getString("logo_url")))
+                .forEach(c -> catalog.put(c.companyId(), c));
+        return ids.stream().filter(catalog::containsKey).toList();
+    }
+
+    private static GraphResponse.Node companyNode(Company c, boolean focus, PersonalCompanies.Ids personal) {
+        boolean holding = personal != null && personal.holdings().contains(c.companyId());
+        boolean watch = personal != null && personal.watchlist().contains(c.companyId());
+        return new GraphResponse.Node(c.companyId(), "company", c.label(), focus, holding, watch, c.brandColor(),
                 c.logoUrl(), null, null, null, null, null, null);
     }
 
