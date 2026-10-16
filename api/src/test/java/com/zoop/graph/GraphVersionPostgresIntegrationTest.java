@@ -109,6 +109,18 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void changedBundledFixturesResetOnlyTheFixtureRowsAndSeedAgain() throws Exception {
+        // As if an older fixture file (e.g. snapshot format 1) had been seeded under the same id.
+        jdbc.update("UPDATE artifacts SET sha256 = ? WHERE id = 'artifact-fixture-2026-10-01'", "0".repeat(64));
+        seeder.run(null);
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM graph_versions", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM graph_activations", Integer.class));
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(3, context.getBean(GraphSnapshotStore.class)
+                .load(selector.select(null, "fixture-2026-10-01", null).version()).issues().size());
+    }
+
+    @Test
     void fixtureSeedingRefusesADatabaseWithImportedVersions() {
         jdbc.update("""
                 INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)

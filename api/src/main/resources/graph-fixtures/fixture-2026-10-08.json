@@ -1,5 +1,5 @@
 {
-  "snapshotFormat": 1,
+  "snapshotFormat": 2,
   "versionId": "fixture-2026-10-08",
   "sourceBundleId": null,
   "companies": [
@@ -182,9 +182,16 @@
       ],
       "basis": [
         {
+          "basisId": "basis-fixture-04",
+          "relationType": "SUPPLIES",
           "verifiedAt": "2026-09-29T00:00:00Z",
           "validFrom": "2026-09-01",
-          "validUntil": null
+          "validUntil": null,
+          "countries": [
+            "KR"
+          ],
+          "articleId": "art-hbm-equip",
+          "articleVersion": "v1"
         }
       ]
     },
@@ -212,9 +219,17 @@
       ],
       "basis": [
         {
+          "basisId": "basis-fixture-06",
+          "relationType": "USES",
           "verifiedAt": "2026-09-29T00:00:00Z",
           "validFrom": "2026-09-01",
-          "validUntil": null
+          "validUntil": null,
+          "countries": [
+            "TW",
+            "NL"
+          ],
+          "articleId": "art-euv-export",
+          "articleVersion": "v1"
         }
       ]
     },
@@ -230,9 +245,17 @@
       ],
       "basis": [
         {
+          "basisId": "basis-fixture-07",
+          "relationType": "USES",
           "verifiedAt": "2026-09-29T00:00:00Z",
           "validFrom": "2026-09-01",
-          "validUntil": null
+          "validUntil": null,
+          "countries": [
+            "KR",
+            "NL"
+          ],
+          "articleId": "art-euv-export",
+          "articleVersion": "v1"
         }
       ]
     },
@@ -270,9 +293,17 @@
       ],
       "basis": [
         {
+          "basisId": "basis-fixture-10",
+          "relationType": "PRODUCES",
           "verifiedAt": "2026-09-29T00:00:00Z",
           "validFrom": "2026-09-01",
-          "validUntil": null
+          "validUntil": null,
+          "countries": [
+            "TW",
+            "US"
+          ],
+          "articleId": "art-ai-accel",
+          "articleVersion": "v1"
         }
       ]
     }

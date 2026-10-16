@@ -114,9 +114,24 @@ class GraphSnapshotCodecTest {
     }
 
     @Test
+    void structuralBasisKeepsItsPathAndMustCiteAPinnedArticle() throws IOException {
+        var basis = GraphSnapshotCodec.read(v1().getBytes(StandardCharsets.UTF_8), "fixture-2026-10-01").relations().stream()
+                .filter(r -> r.relationId().equals("rel-fixture-04")).findFirst().orElseThrow().basis().get(0);
+        assertEquals("basis-fixture-04", basis.basisId());
+        assertEquals("SUPPLIES", basis.relationType());
+        assertEquals(java.util.List.of("KR"), basis.countries());
+        assertEquals("art-hbm-equip", basis.articleId());
+
+        String unpinned = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?\"articleVersion\": )\"v1\"", "$1\"v9\"");
+        assertEquals("snapshot_invalid:relation_basis_article", reason(unpinned, "fixture-2026-10-01"));
+        String half = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?\"articleVersion\": )\"v1\"", "$1null");
+        assertEquals("snapshot_invalid:relation_basis_article", reason(half, "fixture-2026-10-01"));
+    }
+
+    @Test
     void emptyGraphIsAValidSnapshot() {
         String json = """
-                {"snapshotFormat": 1, "versionId": "fixture-empty", "sourceBundleId": null, "companies": [],
+                {"snapshotFormat": 2, "versionId": "fixture-empty", "sourceBundleId": null, "companies": [],
                  "issues": [], "relations": [], "articles": [], "evidence": []}
                 """;
         PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(json.getBytes(StandardCharsets.UTF_8), "fixture-empty");

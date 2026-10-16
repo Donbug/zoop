@@ -74,8 +74,10 @@ public final class GraphSnapshotCodec {
     }
 
     private static Basis basis(Obj o) {
-        o.keys(Set.of("verifiedAt"), Set.of("validFrom", "validUntil"));
-        return new Basis(o.string("verifiedAt"), optional(o, "validFrom"), optional(o, "validUntil"));
+        o.keys(Set.of("basisId", "relationType", "verifiedAt", "countries"),
+                Set.of("validFrom", "validUntil", "articleId", "articleVersion"));
+        return new Basis(o.string("basisId"), o.string("relationType"), o.string("verifiedAt"), optional(o, "validFrom"),
+                optional(o, "validUntil"), o.strings("countries"), optional(o, "articleId"), optional(o, "articleVersion"));
     }
 
     private static Article article(Obj o) {
@@ -113,6 +115,12 @@ public final class GraphSnapshotCodec {
             for (Basis b : r.basis()) {
                 if (!isInstant(b.verifiedAt()) || !isDateOrNull(b.validFrom()) || !isDateOrNull(b.validUntil())) {
                     throw invalid("relation_basis_time");
+                }
+                if (b.basisId().isBlank() || b.relationType().isBlank()) throw invalid("relation_basis");
+                // Both or neither, and a named article version must be pinned in this snapshot.
+                if ((b.articleId() == null) != (b.articleVersion() == null)
+                        || (b.articleId() != null && !articles.contains(b.articleId() + "@" + b.articleVersion()))) {
+                    throw invalid("relation_basis_article");
                 }
             }
         }

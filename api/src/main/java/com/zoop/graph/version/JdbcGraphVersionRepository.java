@@ -61,6 +61,24 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
     }
 
     /**
+     * Removes every synthetic fixture version, its activations and artifacts, under the publication lock. Only for a
+     * fixture-only database whose bundled fixtures changed; refused when imported versions exist.
+     */
+    @Transactional
+    public int resetFixtures() {
+        jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
+        if (hasNonFixtureVersions()) throw new IllegalStateException("imported graph versions exist; fixtures are not reset");
+        var none = new MapSqlParameterSource();
+        jdbc.update("DELETE FROM graph_activations", none);
+        List<String> artifacts = jdbc.queryForList("SELECT snapshot_artifact_id FROM graph_versions", none, String.class);
+        int removed = jdbc.update("DELETE FROM graph_versions", none);
+        if (!artifacts.isEmpty()) {
+            jdbc.update("DELETE FROM artifacts WHERE id IN (:ids)", new MapSqlParameterSource("ids", artifacts));
+        }
+        return removed;
+    }
+
+    /**
      * Registers an immutable snapshot artifact and its version, then makes it the active pointer, all under the
      * publication lock in one transaction. Re-registering the same id with the same SHA-256 is a no-op; a different
      * hash for an existing id is refused instead of overwritten.
