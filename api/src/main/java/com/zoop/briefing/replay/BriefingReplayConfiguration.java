@@ -4,8 +4,10 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import com.zoop.document.evidence.config.DocumentReadProperties;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -15,6 +17,13 @@ import org.springframework.web.context.WebApplicationContext;
 
 @Configuration(proxyBeanMethods = false)
 public class BriefingReplayConfiguration {
+    /** Ready is published after every runner, including the confirmed-company catalog runner, has completed. */
+    @Bean
+    @ConditionalOnProperty(prefix = "zoop.briefing.replay", name = "import-enabled", havingValue = "true")
+    ApplicationListener<ApplicationReadyEvent> briefingReplayImportShutdown() {
+        return event -> event.getApplicationContext().close();
+    }
+
     @Bean
     BriefingReplayReadPolicy briefingReplayReadPolicy(Environment env, JdbcTemplate jdbc, DocumentReadProperties read) {
         boolean enabled = Boolean.parseBoolean(env.getProperty("zoop.briefing.replay.read-enabled", "false"));
