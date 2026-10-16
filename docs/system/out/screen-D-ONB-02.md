@@ -12,5 +12,6 @@
 | [FS009](feature-FS009.md) · [FS062](feature-FS062.md) | [listVirtualAccountProfiles](../../api/out/zoop-api-spec.md#listvirtualaccountprofiles) | GET /api/v1/portfolio/mock-portfolios | P1 |
 | [FS009](feature-FS009.md) · [FS062](feature-FS062.md) | [getVirtualAccountProfile](../../api/out/zoop-api-spec.md#getvirtualaccountprofile) | GET /api/v1/portfolio/mock-portfolios/{id} | P1 |
 | [FS009](feature-FS009.md) · [FS010](feature-FS010.md) · [FS062](feature-FS062.md) | [connectVirtualAccount](../../api/out/zoop-api-spec.md#connectvirtualaccount) | POST /api/v1/portfolio/connections | P1 |
+| [FS009](feature-FS009.md) · [FS062](feature-FS062.md) · [FS010](feature-FS010.md) · [FS039](feature-FS039.md) · [FS054](feature-FS054.md) | [getMyPortfolio](../../api/out/zoop-api-spec.md#getmyportfolio) | GET /api/v1/portfolio | P1 |
 
 공통 품질: [NFS001](feature-NFS001.md) · [NFS002](feature-NFS002.md) · [NFS004](feature-NFS004.md) · [NFS008](feature-NFS008.md) · [NFS003](feature-NFS003.md) · [NFS009](feature-NFS009.md)
