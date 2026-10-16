@@ -17,6 +17,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.zoop.common.request.RequestIdFilter;
 import com.zoop.auth.service.RateLimitedException;
 import org.springframework.http.HttpHeaders;
+import com.zoop.company.market.MarketDataException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -25,6 +26,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustom(CustomException exception, HttpServletRequest request) {
         return response(exception.getErrorCode(), request);
+    }
+
+    @ExceptionHandler(MarketDataException.class)
+    public ResponseEntity<ErrorResponse> handleMarketData(MarketDataException exception, HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(new ErrorResponse.Error(ErrorCode.SOURCE_UNAVAILABLE.name(),
+                ErrorCode.SOURCE_UNAVAILABLE.getMessage(), RequestIdFilter.currentId(request), exception.retryable()));
+        return ResponseEntity.status(ErrorCode.SOURCE_UNAVAILABLE.getStatus()).body(body);
     }
 
     @ExceptionHandler(RateLimitedException.class)
