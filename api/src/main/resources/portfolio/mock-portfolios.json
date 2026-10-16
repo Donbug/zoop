@@ -1,0 +1,33 @@
+{
+  "source": "synthetic-project-fixture",
+  "asOf": "2026-10-16T00:00:00Z",
+  "profiles": [
+    {
+      "id": "demo-growth",
+      "label": "성장형 모의 프로필",
+      "accountId": "MOCK-KR-1001",
+      "cash": { "amount": 2500000, "currency": "KRW" },
+      "holdings": [
+        { "companyId": "NASDAQ:NVDA", "name": "NVIDIA", "ticker": "NVDA", "quantity": 12, "avgPrice": 120.5, "avgPriceCurrency": "USD" },
+        { "companyId": "NASDAQ:MSFT", "name": "Microsoft", "ticker": "MSFT", "quantity": 4, "avgPrice": 410, "avgPriceCurrency": "USD" }
+      ]
+    },
+    {
+      "id": "demo-balanced",
+      "label": "균형형 모의 프로필",
+      "accountId": "MOCK-KR-1002",
+      "cash": { "amount": 0, "currency": "KRW" },
+      "holdings": [
+        { "companyId": "KRX:005930", "name": "삼성전자", "ticker": "005930", "quantity": 30, "avgPrice": 71000, "avgPriceCurrency": "KRW" },
+        { "companyId": "KRX:000660", "name": "SK하이닉스", "ticker": "000660", "quantity": 5, "avgPrice": 180000, "avgPriceCurrency": "KRW" }
+      ]
+    },
+    {
+      "id": "demo-empty",
+      "label": "보유종목 없는 모의 프로필",
+      "accountId": "MOCK-KR-1003",
+      "cash": null,
+      "holdings": []
+    }
+  ]
+}
