@@ -15,6 +15,8 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.auth.repository.MemberSessionRepository;
 import com.zoop.auth.repository.MemberSessionRow;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,11 +27,19 @@ public class MemberSessionService {
     private final MemberSessionRepository repository;
     private final CsrfKeyRing keyRing;
     private final Clock clock;
+    private final boolean sessionCookieSecure;
 
     public MemberSessionService(MemberSessionRepository repository, CsrfKeyRing keyRing, Clock clock) {
+        this(repository, keyRing, clock, true);
+    }
+
+    @Autowired
+    public MemberSessionService(MemberSessionRepository repository, CsrfKeyRing keyRing, Clock clock,
+            @Value("${zoop.auth.session-cookie-secure:true}") boolean sessionCookieSecure) {
         this.repository = repository;
         this.keyRing = keyRing;
         this.clock = clock;
+        this.sessionCookieSecure = sessionCookieSecure;
     }
 
     /** Called after member creation/authentication; the caller sets the cookie after transaction commit. */
@@ -45,7 +55,7 @@ public class MemberSessionService {
             repository.revokeMemberSession(hashToken(previousCookieToken), memberId, now);
         }
         MemberSessionRow row = repository.findByTokenHash(hash).orElseThrow();
-        return new IssuedSession(token, memberResponse(row, now, requestId));
+        return new IssuedSession(token, memberResponse(row, now, requestId), sessionCookieSecure);
     }
 
     /** Creates an unowned guest session; a prior guest token is rotated without revoking member sessions. */
@@ -60,7 +70,7 @@ public class MemberSessionService {
             repository.revokeGuestSession(hashToken(previousCookieToken), now);
         }
         MemberSessionRow row = repository.findByTokenHash(hash).orElseThrow();
-        return new IssuedSession(token, guestResponse(row, now, requestId));
+        return new IssuedSession(token, guestResponse(row, now, requestId), sessionCookieSecure);
     }
 
     @Transactional(readOnly = true)
@@ -222,9 +232,13 @@ public class MemberSessionService {
         }
     }
 
-    public record IssuedSession(String token, SessionResponse response) {
+    public record IssuedSession(String token, SessionResponse response, boolean secureCookie) {
+        public IssuedSession(String token, SessionResponse response) {
+            this(token, response, true);
+        }
+
         public ResponseCookie cookie() {
-            return SessionCookie.issue(token);
+            return SessionCookie.issue(token, secureCookie);
         }
 
         @Override
@@ -234,6 +248,10 @@ public class MemberSessionService {
     }
 
     public record SessionLookup(SessionResponse response, boolean clearCookie) {
+    }
+
+    public ResponseCookie clearCookie() {
+        return SessionCookie.clear(sessionCookieSecure);
     }
 
     public record SessionBinding(String memberId, String sessionId) {

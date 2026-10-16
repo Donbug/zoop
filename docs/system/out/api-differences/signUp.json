@@ -551,8 +551,8 @@
     "request:application/json.password": {
       "target": {
         "type": "string",
-        "minLength": 15,
-        "maxLength": 128
+        "minLength": 8,
+        "maxLength": 32
       },
       "bff": {
         "type": "string"

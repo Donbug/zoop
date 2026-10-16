@@ -5,6 +5,7 @@ import com.zoop.auth.dto.SocialAuthorizationResponse;
 import com.zoop.auth.dto.SocialLinkStartRequest;
 import com.zoop.auth.dto.SocialProvidersResponse;
 import com.zoop.auth.service.SocialAuthService;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -43,6 +44,8 @@ public class SocialAuthController {
     }
 
     @PostMapping("/{provider}/link/authorize")
+    @Operation(summary = "기존 회원 계정에 소셜 제공자 연결 시작",
+            description = "회원 세션, 세션 결합 X-CSRF-Token, 허용 Origin이 함께 필요합니다. Swagger UI에서는 HttpOnly 세션 쿠키를 설정할 수 없으므로 이 UI에서 직접 실행할 수 없습니다.")
     public ResponseEntity<SocialAuthorizationResponse> authorizeLink(@PathVariable String provider,
             @RequestBody SocialLinkStartRequest body,
             @CookieValue(name = SocialAuthService.PENDING_COOKIE, required = false) String pendingCookie,
