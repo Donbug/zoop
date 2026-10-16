@@ -15034,7 +15034,7 @@ components:
       type: "object"
       required:
         - "version"
-      description: "Unset fields keep their stored value; ``version`` must equal the stored version unless the request\nchanges nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null."
+      description: "Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once."
     SetupState:
       properties:
         completed:
