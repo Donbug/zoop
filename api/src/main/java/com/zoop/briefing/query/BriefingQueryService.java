@@ -11,10 +11,12 @@ import java.util.List;
 import com.zoop.briefing.storage.BriefingChange;
 import com.zoop.briefing.storage.BriefingRound;
 import com.zoop.briefing.storage.BriefingRoundRepository;
+import com.zoop.briefing.replay.BriefingReplayReadPolicy;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -29,12 +31,20 @@ public class BriefingQueryService {
     private final BriefingRoundRepository repository;
     private final Clock clock;
     private final BriefingContentAccess access;
+    private final BriefingReplayReadPolicy replay;
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access) {
+        this(repository, clock, access, BriefingReplayReadPolicy.disabled());
+    }
+
+    @Autowired
+    public BriefingQueryService(BriefingRoundRepository repository, Clock clock, BriefingContentAccess access,
+            BriefingReplayReadPolicy replay) {
         this.repository = repository;
         this.clock = clock;
         this.access = access;
+        this.replay = replay;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ, timeout = 5)
@@ -109,7 +119,7 @@ public class BriefingQueryService {
                         .put("reason", suspension == null ? null : suspension.reason());
             } else {
                 requireReadable(row, requestId);
-                BriefingSnapshotValidator.validate(row);
+                validateSnapshot(row);
                 // The company reader cannot prove whole-graph readiness. Until that owner is connected,
                 // expose the exact stored basis but never advertise a graph or fall back to the newest one.
                 out.put("status", "unavailable").put("message", "발행 당시 고정 그래프 조회가 아직 연결되지 않았습니다.")
@@ -122,7 +132,7 @@ public class BriefingQueryService {
     }
 
     private ObjectNode restore(BriefingRound row, List<BriefingChange> changes, String requestId) {
-        BriefingSnapshotValidator.validate(row);
+        validateSnapshot(row);
         var payload = row.payload();
         var out = mapper.createObjectNode();
         for (String field : List.of("id", "date", "edition", "scheduledAt", "generatedAt", "dataWindow", "graphVersion",
@@ -183,7 +193,12 @@ public class BriefingQueryService {
     }
 
     private void requireReadable(BriefingRound row, String requestId) {
+        if (BriefingReplayReadPolicy.marked(row) && !replay.permits(row)) unavailable();
         if (!"published".equals(row.status()) || !access.mayRead(row, requestId)) unavailable();
+    }
+
+    private void validateSnapshot(BriefingRound row) {
+        BriefingSnapshotValidator.validate(row, BriefingReplayReadPolicy.marked(row) && replay.permits(row));
     }
 
     private BriefingChange suspension(List<BriefingChange> changes) {

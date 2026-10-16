@@ -17,11 +17,15 @@ final class BriefingSnapshotValidator {
     private BriefingSnapshotValidator() { }
 
     static void validate(BriefingRound row) {
+        validate(row, false);
+    }
+
+    static void validate(BriefingRound row, boolean localReplay) {
         JsonNode p = object(row.payload());
         same(text(p, "id"), row.id()); same(text(p, "date"), row.date().toString());
         same(text(p, "edition"), row.edition());
         same(timestamp(p, "scheduledAt"), row.scheduledAt()); same(timestamp(p, "generatedAt"), row.generatedAt());
-        same(text(p, "graphVersion"), row.graphVersion());
+        same(localReplay ? nullableText(p, "graphVersion") : text(p, "graphVersion"), row.graphVersion());
         check(row.publishedAt() != null && row.generatedAt() != null && !row.publishedAt().isBefore(row.generatedAt()));
         nonNegativeRevision(p, "reviewRevision", false); nonNegativeRevision(p, "ruleRevision", true);
         int selectedFrom = integer(p, "selectedFrom", false);
@@ -61,7 +65,7 @@ final class BriefingSnapshotValidator {
         }
         String emptyReason = nullableText(p, "emptyReason");
         check(items.isEmpty() ? "no_issues_in_window".equals(emptyReason) : emptyReason == null);
-        metadata(object(field(p, "metadata")), row.graphVersion());
+        metadata(object(field(p, "metadata")), row.graphVersion(), localReplay);
         JsonNode outlook = field(p, "outlook");
         if (!outlook.isNull()) {
             object(outlook); choice(outlook, "label", LABELS); text(outlook, "rationale");
@@ -76,8 +80,10 @@ final class BriefingSnapshotValidator {
         else comparison(row.comparisonSnapshot());
     }
 
-    private static void metadata(JsonNode value, String graphVersion) {
-        text(value, "source"); timestamp(value, "asOf"); same(text(value, "graphVersion"), graphVersion);
+    private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {
+        text(value, "source"); timestamp(value, "asOf");
+        same(localReplay ? nullableText(value, "graphVersion") : text(value, "graphVersion"), graphVersion);
+        if (localReplay) same(text(value, "source"), "zoop-briefing-development-replay");
         text(value, "requestId"); bool(value, "partial");
         JsonNode schedule = object(field(value, "schedule"));
         text(schedule, "morning"); text(schedule, "evening"); bool(schedule, "confirmed");

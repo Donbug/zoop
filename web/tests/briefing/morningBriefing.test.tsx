@@ -94,9 +94,31 @@ function setup(response = round(), url = '/briefing') {
   return server;
 }
 describe('D-BRF-01 / FS028 FS030 FS031 FS033 FS035', () => {
+  it('labels a stored historical replay and preserves missing market data', async () => {
+    const response = round();
+    setup({
+      ...response,
+      graphVersion: null,
+      marketVariables: { status: 'unavailable', reason: '당시 지표 미수집' },
+      metadata: {
+        ...response.metadata,
+        source: 'zoop-briefing-development-replay',
+        graphVersion: null,
+      },
+    });
+    const note = await screen.findByRole('note', { name: '개발 재생 안내' });
+    expect(note.textContent).toContain('과거 수집 자료');
+    expect(note.textContent).toContain('동일한 자료');
+    expect(screen.getByText('당시 지표 미수집')).toBeTruthy();
+    expect(screen.queryByText('2,600 pt')).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: /합성 핵심 이슈/ }),
+    ).toBeTruthy();
+  });
   it('requests latest morning without a date and renders stored summary, times and fractional changes', async () => {
     const server = setup();
     await screen.findByText('합성 시장 요약');
+    expect(screen.queryByRole('note', { name: '개발 재생 안내' })).toBeNull();
     expect(server.requests[0].query.get('edition')).toBe('morning');
     expect(server.requests[0].query.has('date')).toBe(false);
     expect(screen.getByText('2,600 pt')).toBeTruthy();

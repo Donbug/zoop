@@ -120,6 +120,17 @@ export default function PublishedBriefing({
               {briefingTime(result.dataAsOf)}
             </p>
           </header>
+          {result.status === 'published' &&
+            result.metadata.source === 'zoop-briefing-development-replay' && (
+              <p
+                role="note"
+                aria-label="개발 재생 안내"
+                className={`${EMPTY} mt-4`}
+              >
+                과거 수집 자료로 생성·검증한 개발 재생본입니다. 출근·퇴근은
+                동일한 자료를 형식별로 작성했습니다.
+              </p>
+            )}
           {result.notice && (
             <p className={`${EMPTY} mt-4`} role="status">
               {result.notice.message}

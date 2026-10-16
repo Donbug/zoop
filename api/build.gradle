@@ -38,6 +38,7 @@ tasks.named('test') {
 		excludeTags 'ai-pipeline-contract'
 		excludeTags 'company-postgres'
 		excludeTags 'briefing-postgres'
+		excludeTags 'briefing-replay-postgres'
 	}
 }
 
@@ -88,6 +89,22 @@ tasks.register('briefingIntegrationTest', Test) {
 	doFirst {
 		if (!System.getenv('DB_URL')?.startsWith('jdbc:postgresql:')) {
 			throw new GradleException('Set DB_URL to a disposable PostgreSQL database for briefingIntegrationTest')
+		}
+	}
+	testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
+}
+
+// Development replay has a separate disposable database and never shares the public API test database.
+tasks.register('briefingReplayIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Verifies opt-in local briefing replay import, immutable storage and real HTTP reads.'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform { includeTags 'briefing-replay-postgres' }
+	outputs.upToDateWhen { false }
+	doFirst {
+		if (!System.getenv('DB_URL')?.startsWith('jdbc:postgresql:')) {
+			throw new GradleException('Set DB_URL to a disposable briefing_replay PostgreSQL database')
 		}
 	}
 	testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
