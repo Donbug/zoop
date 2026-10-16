@@ -4,7 +4,8 @@
 export type PersonalMapBasis = 'assets' | 'watchlist';
 
 export type MemberSettings = {
-  mode: PersonalMapBasis;
+  /** 초기 설정에서 개인 지도 기준을 고르기 전에는 null */
+  mode: PersonalMapBasis | null;
   watchlistIds: string[];
   tutorialCompleted: boolean;
   completed: boolean;
