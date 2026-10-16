@@ -13,6 +13,7 @@ import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
+import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
@@ -85,8 +86,9 @@ export default function MapPage() {
   const impactParts = params.get('impact')?.split(',') ?? [];
   const impactCompanyId = impactParts.length === 2 ? impactParts[0] : null;
   const impactIssueId = impactParts.length === 2 ? impactParts[1] : null;
-  const impact = useImpactPath(impactCompanyId, impactIssueId);
   const returnTo = params.get('returnTo');
+  const round =
+    requestedMode === 'all' ? (params.get('round') ?? undefined) : undefined;
   const { data, error, loading } = useGraphData(
     {
       mode: requestedMode,
@@ -95,6 +97,7 @@ export default function MapPage() {
       asOf,
       graphVersion,
       depth: params.get('depth') === '2' ? 2 : 1,
+      round,
     },
     token,
     retry,
@@ -112,7 +115,9 @@ export default function MapPage() {
     data?.nodes.find((node) => node.id === selectedId) ?? null;
   const companyNode = selectedNode?.kind === 'company' ? selectedNode : null;
   const eventId =
-    selectedId && (data || !loading) && selectedNode?.kind !== 'company'
+    selectedId &&
+    (data || (!round && !loading)) &&
+    selectedNode?.kind !== 'company'
       ? selectedId
       : null;
   const mapRegion = useRef<HTMLElement>(null);
@@ -183,11 +188,16 @@ export default function MapPage() {
     [updateQuery],
   );
   const eventContext = {
-    round: params.get('round') ?? undefined,
+    round,
     graphVersion:
       params.get('graphVersion') ?? data?.metadata.graphVersion ?? undefined,
     asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
   };
+  const impact = useImpactPath(
+    round && !data ? null : impactCompanyId,
+    round && !data ? null : impactIssueId,
+    round ? eventContext : undefined,
+  );
   function selectEdge(id: string) {
     if (
       document.activeElement instanceof HTMLElement &&
@@ -310,7 +320,13 @@ export default function MapPage() {
     });
   }
   return (
-    <div className="relationship-map">
+    <div
+      className={
+        round
+          ? 'relationship-map min-w-0! max-sm:[&_.relationship-header]:h-auto! max-sm:[&_.relationship-header]:flex-wrap! max-sm:[&_.relationship-header]:gap-2! max-sm:[&_.relationship-header]:py-2! max-sm:[&_.relationship-header_nav]:order-last max-sm:[&_.relationship-header_nav]:w-full max-sm:[&_.relationship-header_nav]:overflow-x-auto max-sm:[&_.relationship-toolbar]:max-w-full max-sm:[&_.relationship-toolbar]:overflow-x-auto'
+          : 'relationship-map'
+      }
+    >
       <ServiceHeader />
       {returnTo?.startsWith('/companies/') && (
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
@@ -326,6 +342,7 @@ export default function MapPage() {
           <button onClick={historicalImpact.retry}>영향 경로 다시 조회</button>
         </p>
       )}
+      {round && <BriefingSnapshotBanner roundId={round} />}
       <main className="relationship-main">
         <section
           ref={mapRegion}
@@ -347,7 +364,9 @@ export default function MapPage() {
                         ? 'D-GRP-03'
                         : appliedMode === 'personal'
                           ? 'D-GRP-01b'
-                          : 'D-GRP-01'
+                          : round
+                            ? 'D-BRF-04'
+                            : 'D-GRP-01'
           }
         >
           <div className="relationship-toolbar">
@@ -514,6 +533,7 @@ export default function MapPage() {
               <CompanyDetailPanel
                 key={companyNode.id}
                 companyId={companyNode.id}
+                context={round ? eventContext : undefined}
                 fallback={companyNode}
                 relatedCompanies={relatedCompanies}
                 token={token}

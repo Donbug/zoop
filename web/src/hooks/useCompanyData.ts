@@ -1,3 +1,4 @@
+import type { EventContext } from '@/types/map/event';
 import { useEffect, useState } from 'react';
 import {
   getCompany,
@@ -14,13 +15,17 @@ export type CompanyDataState = {
   loading: boolean;
   errors: Partial<Record<keyof CompanyPanelData, string>>;
   companyId?: string | null;
+  contextKey?: string;
 };
 
 export function useCompanyData(
   companyId: string | null,
   token: string | null,
   retry = 0,
+  context: EventContext = {},
 ): CompanyDataState {
+  const { round, graphVersion, asOf } = context;
+  const contextKey = JSON.stringify([round, graphVersion, asOf, token]);
   const [state, setState] = useState<CompanyDataState>({
     data: null,
     loading: false,
@@ -32,9 +37,15 @@ export function useCompanyData(
     let current = true;
     void Promise.resolve().then(async () => {
       if (!current) return;
-      setState({ data: null, loading: true, errors: {}, companyId });
+      setState({
+        data: null,
+        loading: true,
+        errors: {},
+        companyId,
+        contextKey,
+      });
       const tasks = {
-        company: getCompany(companyId),
+        company: getCompany(companyId, { round, graphVersion, asOf }),
         quote: getCompanyQuote(companyId),
         metrics: getCompanyMetrics(companyId),
         prices: getCompanyPrices(companyId),
@@ -67,16 +78,17 @@ export function useCompanyData(
         loading: false,
         errors,
         companyId,
+        contextKey,
       });
     });
     return () => {
       current = false;
     };
-  }, [companyId, token, retry]);
+  }, [companyId, token, retry, round, graphVersion, asOf, contextKey]);
 
   if (!companyId)
     return { data: null, loading: false, errors: {}, companyId: null };
-  return state.companyId === companyId
+  return state.companyId === companyId && state.contextKey === contextKey
     ? state
     : { data: null, loading: true, errors: {}, companyId };
 }

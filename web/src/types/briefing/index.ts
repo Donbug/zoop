@@ -83,3 +83,36 @@ export type BriefingResponse = {
   }[];
   metadata: EventDetail['metadata'];
 };
+
+/** listBriefingRounds 한 줄(BriefingRoundRef). 공개 이력은 발행·제공 중단 회차만 담는다. */
+export type BriefingRoundRef = {
+  id: string;
+  date: string;
+  edition: BriefingEdition;
+  status: 'published' | 'suspended';
+  publishedAt: string | null;
+};
+
+export type BriefingRoundsResponse = {
+  items: BriefingRoundRef[];
+  nextCursor: string | null;
+};
+
+/** getBriefingGraphBasis: 회차가 발행될 때의 그래프 기준(FS032). available이 아니면 읽을 그래프가 없다. */
+export type BriefingGraphBasis = {
+  roundId: string;
+  date: string;
+  edition: BriefingEdition;
+  status: 'available' | 'suspended' | 'unavailable' | 'not_published';
+  /** available이 아닐 때 사용자에게 보일 안내 */
+  message: string | null;
+  /** 제공 중단 회차에 관리자가 적은 사유 */
+  reason: string | null;
+  publishedAt: string | null;
+  /** 회차 데이터 창의 끝(KST). 보여 주는 관계·근거의 기준 시각 */
+  dataAsOf: string | null;
+  graphVersion: string | null;
+  keyIssueIds: string[];
+  companyIds: string[];
+  correctionCount: number;
+};
