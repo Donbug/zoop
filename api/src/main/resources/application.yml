@@ -20,7 +20,7 @@ zoop:
     toss-client-id: ${ZOOP_TOSS_CLIENT_ID:}
     toss-client-secret: ${ZOOP_TOSS_CLIENT_SECRET:}
     toss-base-url: ${ZOOP_TOSS_BASE_URL:https://openapi.tossinvest.com}
-    metrics-provider: ${ZOOP_METRICS_PROVIDER:naver}
+    metrics-provider: ${ZOOP_METRICS_PROVIDER:off}
     naver-domestic-url: ${ZOOP_NAVER_DOMESTIC_URL:https://m.stock.naver.com}
     naver-world-url: ${ZOOP_NAVER_WORLD_URL:https://api.stock.naver.com}
     naver-autocomplete-url: ${ZOOP_NAVER_AC_URL:https://ac.stock.naver.com}
