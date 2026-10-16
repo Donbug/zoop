@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
  * of its evidence is gone (a relation without evidence IDs is kept). Derived SHARES_ISSUE edges are computed afterwards.
  */
 public final class GraphSnapshotFilter {
+    private static final ZoneOffset LAST_DATE_LINE = ZoneOffset.ofHours(-12);
+
     private GraphSnapshotFilter() {
     }
 
@@ -57,14 +59,12 @@ public final class GraphSnapshotFilter {
     }
 
     /**
-     * A full timestamp counts once it is at or before asOf. A date-only value carries no time, so it counts only once
-     * that calendar day has ended everywhere (UTC-12), instead of inventing a midnight in some zone.
+     * A full timestamp counts once it is at or before asOf. A date-only value carries no time or zone, so it is compared
+     * as a date: it counts only if it is before asOf's calendar date at UTC-12, the last zone to change date, and the
+     * same day never counts. The date is never given a time.
      */
     static boolean publishedBy(String value, Instant asOf) {
-        if (value.length() == 10) {
-            Instant dayEndedEverywhere = LocalDate.parse(value).plusDays(1).atStartOfDay(ZoneOffset.ofHours(-12)).toInstant();
-            return !dayEndedEverywhere.isAfter(asOf);
-        }
+        if (value.length() == 10) return LocalDate.parse(value).isBefore(LocalDate.ofInstant(asOf, LAST_DATE_LINE));
         return !Instant.parse(value).isAfter(asOf);
     }
 

@@ -24,9 +24,14 @@ class GraphSnapshotFilterTest {
 
     @Test
     void dateOnlyPublicationCountsOnlyAfterThatDayEndedEverywhere() {
-        // Article dated 2026-09-25 (no time): not provably published until 2026-09-26T12:00Z (end of the day at UTC-12).
+        // Article dated 2026-09-25 (no time): counts only once asOf's date at UTC-12 is after it; the same day never counts.
+        assertFalse(GraphSnapshotFilter.publishedBy("2026-09-25", Instant.parse("2026-09-25T23:00:00Z")));
         assertFalse(GraphSnapshotFilter.publishedBy("2026-09-25", Instant.parse("2026-09-26T11:59:59Z")));
         assertTrue(GraphSnapshotFilter.publishedBy("2026-09-25", Instant.parse("2026-09-26T12:00:00Z")));
+        // The contract example: asOf 2026-10-02T09:00+09:00 is 2026-10-01 at UTC-12.
+        Instant kstMorning = Instant.parse("2026-10-02T00:00:00Z");
+        assertTrue(GraphSnapshotFilter.publishedBy("2026-09-30", kstMorning));
+        assertFalse(GraphSnapshotFilter.publishedBy("2026-10-01", kstMorning));
         assertTrue(GraphSnapshotFilter.publishedBy("2026-09-22T01:00:00Z", Instant.parse("2026-09-22T01:00:00Z")));
     }
 
