@@ -11,7 +11,7 @@ x-zoop-common-rules:
   versioning: "모든 정식 HTTP 경로는 /api/v1로 시작한다. 호환되지 않는 변경은 새 경로 버전으로 분리한다. operationId는 문서·추적표의 안정된 식별자다."
   authentication: "회원과 관리자 세션은 별도 HttpOnly·Secure 쿠키(zoop_session, zoop_admin_session)로 구분한다. 세션 쿠키는 서버에서 검증한다. 개인 리소스는 매번 소유권을 검증한다. 비회원은 전체 그래프·공개 기업·공개 브리핑을 읽을 수 있지만 개인화·질문·평가는 불가하다. 쿠키 인증 쓰기는 Origin 검증과 세션에 결합된 X-CSRF-Token을 요구한다. POST 로그인·가입·비회원 시작·소셜 가입 완료·명시적 소셜 연결 시작에는 허용 Origin을 적용한다. 브라우저 탐색 GET인 소셜 authorize/callback은 Origin을 인증 근거로 사용하지 않고 state·브라우저 pending 쿠키·nonce·PKCE·등록 redirect URI로 보호한다. 회원/관리자 로그아웃에서 해당 활성 세션이 있으면 같은 쿠키·Origin·세션 결합 CSRF를 반드시 검증하며 실패는 403 ACCESS_DENIED다. CSRF가 없거나 틀렸다고 무세션 분기로 우회하지 않는다. 해당 세션이 없거나 무효/만료이면 다른 세션을 변경하지 않고 204와 해당 쿠키만 제거한다. OpenAPI의 선택 인증/선택 헤더는 이 조건부 런타임 검증을 자동 강제하지 않는다."
   sessionLifecycle: "회원 로그아웃은 현재 회원 세션만 폐기하고 관리자 로그아웃은 현재 관리자 세션만 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다."
-  signupPolicy: "2026-10-14 사용자 확정: 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 15~128 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md."
+  signupPolicy: "2026-10-14 사용자 확정(비밀번호 길이는 2026-10-16 변경): 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 8~32 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md."
   socialAuthPolicy: "이슈 #30 Task 1 구현 기준은 docs/development/social-auth-policy-2026-10-15.md. 이미 연결된 (provider, subject)는 이메일 변경과 무관하게 기존 회원으로 로그인한다. 최초 소셜 가입은 검증된 이메일과 서비스 필수 약관 동의 후 완료한다. 동일 이메일 기존 회원은 이메일 일치만으로 연결하지 않으며, 기존 계정 로그인 후 세션 결합 CSRF·Origin을 검증한 명시적 연결 OAuth 왕복에서만 연결한다. 일반 authorize/callback은 브라우저 탐색 GET이므로 Origin을 인증 근거로 사용하지 않고 state·pending 쿠키·nonce·PKCE·등록 redirect URI·만료·일회성 소비로 검증한다."
   authOriginAndRateLimit: "POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 쿠키 인증 쓰기는 정확한 허용 Origin을 요구하며 null/누락/불허 Origin은 403 ACCESS_DENIED다. 탐색 GET 소셜 authorize/callback은 Origin 필수 규칙의 예외이며 별도 OAuth 왕복 검증을 적용한다. 운영 목록은 환경별 HTTPS Origin으로 설정하고 자격증명 CORS 와일드카드는 허용하지 않는다. 이메일 가입은 IP 10회/1시간·email_key 5회/1시간의 모든 시도, 이메일 로그인은 IP 100회/15분의 모든 시도와 email_key 20회/15분의 실패를 공유 원장에서 원자적으로 제한한다. 성공한 이메일 로그인은 email_key 실패 카운터를 초기화한다. 소셜 시작은 IP 및 브라우저 결합 키 기준 한도를 별도 운영 설정으로 적용한다. 초과 시 429 RATE_LIMITED와 초 단위 Retry-After를 보낸다. 신뢰 IP는 지정 프록시에서만 취한다."
   errors: "오류는 application/json의 {error:{code,message,requestId,retryable,details?}}다. HTTP 상태와 안정된 대문자 오류 코드를 함께 사용한다. 빈 자료·근거 부족은 성공 결과이고 외부 장애와 구분한다. 보유량·분모 없음·시세 미제공을 0으로 대체하지 않는다."
@@ -15052,8 +15052,8 @@ components:
           type: "string"
         password:
           type: "string"
-          minLength: 15
-          maxLength: 128
+          minLength: 8
+          maxLength: 32
         displayName:
           type: "string"
         agreements:

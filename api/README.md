@@ -39,7 +39,8 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `SERVER_PORT` | 애플리케이션 포트 (기본값 8080) |
 | `ZOOP_AUTH_CSRF_ACTIVE_KEY_ID` | 새 회원·비회원 세션의 CSRF 서명 키 ID. 예: `local-v1` |
 | `ZOOP_AUTH_CSRF_KEYS` | `키ID=base64url(32바이트 이상)` 목록. 키 회전 중에는 쉼표로 이전 키도 유지 |
-| `ZOOP_AUTH_ALLOWED_ORIGINS` | 가입·로그인·비회원 시작 및 회원/비회원 쿠키가 붙은 쓰기 요청을 허용할 정확한 HTTPS Origin 목록(쉼표 구분). 빈 값은 전부 거절 |
+| `ZOOP_AUTH_ALLOWED_ORIGINS` | 가입·로그인·비회원 시작 및 회원/비회원 쿠키가 붙은 쓰기 요청을 허용할 정확한 Origin 목록(쉼표 구분). 일반 프로필은 HTTPS만, 로컬 프로필은 loopback HTTP도 허용. 빈 값은 전부 거절 |
+| `ZOOP_API_CORS_ALLOWED_ORIGINS` | `/api/**` 전체에 적용할 브라우저 CORS 허용 Origin 목록(쉼표 구분). 비어 있으면 CORS 매핑을 등록하지 않음 |
 | `ZOOP_AUTH_TRUSTED_PROXIES` | `X-Forwarded-For`를 제공할 수 있는 프록시의 숫자 IP 목록(쉼표 구분). 빈 값은 전달 헤더 무시 |
 | `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` | 선택. 내부 AI transport 클라이언트(S1/S2/S3 가족별, 기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정)과 [S2·S3 절](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트) |
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
@@ -48,13 +49,33 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
+### 로컬 HTTP 브라우저 테스트
+
+`application-local.yml`은 로컬 프로필에서만 `http://localhost:3000` 프론트의 `/api/**` CORS 요청을 허용하고 세션 쿠키의 `Secure` 속성을 끕니다. 인증 Origin 검증에는 프론트와 API에서 직접 여는 Swagger UI의 Origin(`http://localhost:8080`)을 모두 허용합니다. 백엔드 포트를 바꾸면 API Origin도 같은 포트로 지정하세요. 일반 프로필의 HTTPS Origin 검증과 보안 쿠키 설정은 그대로 적용됩니다.
+
+`api/.env.example`의 `ZOOP_AUTH_ALLOWED_ORIGINS`는 빈 값이므로, `.env`를 불러온 **뒤** 로컬 테스트 값을 지정해야 합니다. 다음 명령은 저장소 루트에서 실행합니다.
+
+```sh
+set -a
+. ./api/.env
+set +a
+export SPRING_PROFILES_ACTIVE=local
+export ZOOP_SWAGGER_ENABLED=true
+export ZOOP_AUTH_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+export ZOOP_API_CORS_ALLOWED_ORIGINS=http://localhost:3000
+docker compose --env-file api/.env -f api/compose.local.yaml up -d --wait
+./api/gradlew -p api bootRun
+```
+
+Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 API와 같은 Origin으로 열리므로 CORS 허용 목록에 API 주소를 추가할 필요가 없습니다. 프론트에서 직접 호출할 때는 프론트 담당자가 API 주소를 `http://localhost:8080`으로 지정하고 쿠키 요청에 credentials를 포함해야 합니다. 다른 출처나 `/api/**` 바깥 경로가 필요하면 공통 설정인 `common/config/ApiCorsConfiguration.java`와 `zoop.api.cors.allowed-origins`를 검토하세요.
+
 회원·비회원 세션용 키를 로컬에서 생성해 `api/.env`의 `ZOOP_AUTH_CSRF_KEYS`에 `local-v1=<출력값>` 형식으로 넣으세요. `python3 -c 'import secrets,base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("="))'`로 생성할 수 있습니다. 키 설정이 없거나 32바이트 미만이면 서버 기동이 실패합니다. 운영에서는 비밀 저장소로 두 환경변수를 주입하고, 키를 교체할 때 아직 살아 있는 세션이 참조하는 이전 키를 목록에 보관합니다. 이 값과 세션 쿠키 원문은 로그나 저장소에 남기지 마세요.
 
 `/`의 404는 정상입니다. 서버 로그의 `Started ZoopApplication`과 DB·Flyway 초기화를 확인하세요. 잘못된 DB 설정에서는 기동이 실패해야 합니다.
 
 본개발 가입 화면은 공개 `GET /api/v1/auth/terms`로 현재 제공 가능한 약관을 조회해야 합니다. `limit`와 응답의 `nextCursor`로 다음 페이지를 요청할 수 있으며, `limit`을 생략하면 전체 목록을 반환합니다. 약관 시행 전에는 항목 자체는 조회되지만 `body`와 `version`이 `null`, `bodyAvailable`이 `false`입니다. 이번 승인 본문의 시행일은 2026-10-13 17:00 KST입니다. 가입 로직은 유효한 필수 약관 본문이 제공되기 전에는 완료되면 안 됩니다.
 
-`POST /api/v1/auth/signup`은 현재 유효한 필수 약관 버전과 실제 동의를 확인한 뒤 회원·동의·세션을 한 트랜잭션에 저장하고 `201 SessionResponse`와 보안 쿠키를 반환합니다. `POST /api/v1/auth/login`은 이메일·비밀번호로 활성 회원을 인증해 `200 SessionResponse`와 새 보안 쿠키를 반환합니다. 잘못된 자격 증명은 `401 INVALID_CREDENTIALS`, 비밀번호가 맞는 차단 계정은 `403 MEMBER_BLOCKED`입니다. 가입·로그인 입력과 응답 형식은 [OpenAPI](../docs/api/openapi.yaml)를 따릅니다.
+`POST /api/v1/auth/signup`은 현재 유효한 필수 약관 버전과 실제 동의를 확인한 뒤 회원·동의·세션을 한 트랜잭션에 저장하고 `201 SessionResponse`와 보안 쿠키를 반환합니다. 새 비밀번호는 8~32 Unicode code point이며, 제어 문자와 등록된 흔한 비밀번호는 거절합니다. `POST /api/v1/auth/login`은 이메일·비밀번호로 활성 회원을 인증해 `200 SessionResponse`와 새 보안 쿠키를 반환합니다. 잘못된 자격 증명은 `401 INVALID_CREDENTIALS`, 비밀번호가 맞는 차단 계정은 `403 MEMBER_BLOCKED`입니다. 가입·로그인 입력과 응답 형식은 [OpenAPI](../docs/api/openapi.yaml)를 따릅니다.
 
 `POST /api/v1/auth/guest`는 허용 Origin을 확인한 뒤 비회원 세션을 발급하고 `200 SessionResponse`와 `zoop_session` 쿠키를 반환합니다. 회원가입이나 로그인이 필요하지 않습니다. 회원과 비회원 세션은 12시간 절대 만료를 사용합니다. guest 응답은 `kind=guest`, `authenticated=true`, `user=null`, `setup.completed=false`, `setup.tutorialCompleted=false`입니다. guest는 전체 그래프와 공개 기업·브리핑을 읽을 수 있지만 계좌 연결, 관심종목 저장, 개인화 조회, AI 질문·평가를 할 수 없습니다.
 
@@ -84,6 +105,46 @@ make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> a
 ```
 
 `aiContractTest`와 `aiPipelineContractTest`는 기본 `test`에서 제외되며 각각 `make api-ai-smoke`, `api/scripts/ai_pipeline_gate.py`(`make api-ai-pipeline-smoke`)가 서비스를 띄워 매니페스트를 넘길 때만 통과합니다. 매니페스트가 없으면 skip이 아니라 실패합니다. 후자는 새 합성 운영자 세계와 설치된 pipeline이 필요합니다(`make pipeline-install service-install`; 없으면 실패).
+
+## Swagger / OpenAPI
+
+Swagger UI와 생성 OpenAPI 문서는 기본적으로 비활성화되어 있습니다. 로컬에서 사용할 때는 위 로컬 HTTP 실행 절차처럼 `SPRING_PROFILES_ACTIVE=local`과 `ZOOP_SWAGGER_ENABLED=true`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서 Swagger를 켜야 한다면 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하세요.
+
+`/v3/api-docs`는 **현재 Spring 컨트롤러에서 생성한 문서**입니다. 목표 계약의 정본은 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)이며, 아직 구현되지 않은 목표 경로는 생성 문서에 나타나지 않습니다. 다음 순서는 API에서 제공하는 Swagger UI를 같은 `localhost:8080` 주소로 열었을 때를 기준으로 합니다. 프론트 `localhost:3000`에서의 API 호출은 별도 Origin이므로 위 공통 CORS 설정을 사용합니다.
+
+### 인증 API 시험 순서
+
+1. `GET /api/v1/auth/terms`를 실행해 유효한 필수 약관의 `id`와 `version`을 확인합니다. 승인 본문이 없는 항목은 가입에 사용할 수 없습니다.
+2. `POST /api/v1/auth/signup`에 새 이메일, 8~32 Unicode code point의 비밀번호와 필수 약관별 실제 동의를 보냅니다. 예시는 아래와 같으며 `version`은 바로 조회한 응답값으로 교체합니다. 이미 만든 계정이면 `POST /api/v1/auth/login`에 같은 이메일·비밀번호를 보내세요. 가입 성공은 201, 로그인 성공은 200과 `Set-Cookie: zoop_session=...`을 반환합니다.
+3. `GET /api/v1/auth/session`을 실행해 `authenticated: true`, `kind: "member"`와 `csrfToken`을 확인합니다. `kind: "anonymous"`이면 브라우저 개발자 도구에서 쿠키 저장 여부와 요청에 쿠키가 실렸는지 확인합니다. 로그인 성공 응답만으로 후속 요청의 쿠키 전송을 확인한 것은 아닙니다.
+4. 로그아웃은 아래 절차로 실행한 뒤 세션을 다시 조회해 `kind: "anonymous"`를 확인합니다. 활성 회원 쿠키 없이 받은 로그아웃 204는 회원 세션 폐기의 증거가 아닙니다.
+
+```json
+{
+  "email": "swagger-local@example.test",
+  "password": "LocalDemo#2026",
+  "displayName": "Swagger Tester",
+  "agreements": [
+    {"id": "service", "version": "조회한 service 버전", "accepted": true},
+    {"id": "privacy", "version": "조회한 privacy 버전", "accepted": true}
+  ]
+}
+```
+
+`Authorize`에 보이는 `zoop_session_cookie`와 `X-CSRF-Token`은 현재 **스키마 정의만 있으며 작업에 적용되지 않았습니다.** 여기에 값을 넣어도 Swagger의 로그아웃 요청에 CSRF 헤더가 붙지 않습니다. `zoop_session`은 HttpOnly 쿠키라 Swagger UI에서 직접 지정할 수 없고, 같은 호스트에서 로그인한 브라우저가 API 요청에 자동으로 보냅니다. 유효한 쿠키가 붙은 쓰기 요청은 허용 Origin과 그 세션의 `X-CSRF-Token`을 함께 요구합니다.
+
+현재 생성된 Swagger의 로그아웃 작업에는 CSRF 헤더 입력란이 없습니다. 같은 Swagger 탭의 개발자 도구 Console에서 `GET /api/v1/auth/session` 응답의 `csrfToken`을 넣고 아래 요청을 보내세요. 브라우저가 `Origin`과 세션 쿠키를 전송하므로 `Origin` 또는 `Cookie` 헤더를 직접 입력하지 않습니다.
+
+```js
+const response = await fetch('/api/v1/auth/logout', {
+  method: 'POST',
+  headers: { 'X-CSRF-Token': '<세션 응답의 csrfToken>' },
+  credentials: 'same-origin',
+});
+console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
+```
+
+개발자 도구 Network에서 로그아웃 요청의 `Origin`, `Cookie`, `X-CSRF-Token`과 응답의 쿠키 `Max-Age=0`을 확인한 뒤, Swagger에서 `GET /api/v1/auth/session`을 다시 실행합니다. 활성 세션에서 토큰이 누락되거나 틀리거나 Origin이 허용되지 않으면 403 `ACCESS_DENIED`가 예상됩니다. 목표 계약의 로그아웃에는 조건부 `X-CSRF-Token` 선택 헤더가 정의돼 있지만, 현재 생성 문서에 입력란을 추가하는 작업은 별도입니다.
 
 ## 공통 오류 처리
 
