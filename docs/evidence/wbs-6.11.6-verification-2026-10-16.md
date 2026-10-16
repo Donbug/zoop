@@ -113,13 +113,101 @@ DB_PASSWORD=<local test value>
 | NF-API-003 | 인증되지 않은 세션 조회 | anonymous 응답 계약 확인, 보호 API는 별도 검증 필요 | PARTIAL |
 | NF-API-004 | 권한 없는 관리자 요청 | 관리자 인증 구현 상태 확인 필요 | BLOCKED |
 | NF-API-005 | 잘못된 요청값 | 잘못된 `asOf`, 빈 `companyId`, 잘못된 cursor의 422 확인 | PASS |
-| NF-API-006 | DB 일시 장애 후 복구 | 전용 장애 주입 필요 | PENDING |
+| NF-API-006 | DB 일시 장애 후 복구 | PostgreSQL 중단 시 500 응답 확인, DB 재시작 후 API 재시작 없이 200 복구 | PARTIAL |
 | NF-API-007 | 내부 자료원 장애 | `SOURCE_UNAVAILABLE`, HTTP 503, `retryable=true` 확인 | PASS |
 | NF-API-008 | timeout 및 실제 재시도 | retryable 응답 계약만 확인, 실제 재시도는 미검증 | PARTIAL |
+| NF-API-009 | DB 장애 응답 계약 | `INTERNAL_ERROR`, HTTP 500, `retryable=false`, 약 30초 응답 확인 | OBSERVED |
 | NF-PERF-001 | 응답시간 p50/p95/max | 측정 harness 필요 | PENDING |
 | NF-PERF-002 | 동시 요청 C=1/5/10 | 실행 가능한 API 확정 필요 | PENDING |
 | NF-WEB-001 | 로딩·빈 데이터·실패 화면 | 프론트 연동 완료 후 검증 | BLOCKED |
 | NF-E2E-001 | 실패 후 재시도 및 복구 | 프론트·백엔드 연동 완료 후 검증 | BLOCKED |
+
+### DB 일시 장애 및 자동 복구 검증
+
+#### 검증 정보
+
+| 항목 | 값 |
+|---|---|
+| 실행 브랜치 | `test/151-db-recovery` |
+| 실행 커밋 | `fedec002a262ca26d7c0118ef71489eba9b6428b` |
+| 대상 API | `GET /api/v1/auth/terms` |
+| 애플리케이션 실행 환경 | 네이티브 Windows |
+| Java | Eclipse Temurin JDK 21 |
+| 데이터 접근 | `JdbcTermRepository`의 PostgreSQL 조회 |
+| DB 연결 | `localhost:5432` |
+| 장애 주입 | PostgreSQL 컨테이너 중단 |
+| 복구 방법 | PostgreSQL 컨테이너 재시작 |
+| API 재시작 | 하지 않음 |
+| 데이터 변경 | 없음 |
+| 외부 API 호출 | 없음 |
+
+API 실행에 필요한 CSRF 키는 로컬 PowerShell 세션에서만 임시 생성해 주입했다.
+키 값은 파일, 로그 및 Git 저장소에 기록하지 않았다.
+
+#### 정상 상태
+
+PostgreSQL이 정상인 상태에서 약관 조회 API를 호출했다.
+
+| 항목 | 결과 |
+|---|---|
+| PostgreSQL 상태 | `healthy` |
+| HTTP 상태 | 200 |
+| 응답시간 | 864.29ms |
+| 조회 결과 | 약관 2개 |
+| `nextCursor` | `null` |
+| 판정 | PASS |
+
+첫 요청에서 측정된 43초대 값은 PowerShell 보안 확인 입력 대기 시간이 포함된 값이므로 측정 결과에서 제외했다.
+
+#### 장애 주입 결과
+
+실행 중인 API는 유지하고 PostgreSQL 컨테이너만 중단한 뒤 동일 API를 호출했다.
+
+```powershell
+docker compose --env-file api/.env.example -f api/compose.local.yaml stop postgres
+```
+
+| 항목 | 결과 |
+|---|---|
+| PostgreSQL 상태 | `Exited (0)` |
+| HTTP 상태 | 500 |
+| 응답시간 | 30.0564초 |
+| 오류 코드 | `INTERNAL_ERROR` |
+| `retryable` | `false` |
+| request ID | `c9cb7f00-569e-486d-9f6f-2ed6918b0a76` |
+
+DB 중단 시 요청 실패는 감지됐지만 약 30초 후 일반 내부 오류로 응답했다. 일시적인 DB 장애임에도 HTTP 503이 아닌 500이 반환됐고, 클라이언트가 재시도할 수 있는 상황임에도 `retryable=false`가 반환됐다.
+
+#### 자동 복구 결과
+
+API 프로세스를 종료하거나 재시작하지 않은 상태에서 PostgreSQL 컨테이너만 다시 시작했다.
+
+```powershell
+docker compose --env-file api/.env.example -f api/compose.local.yaml start postgres
+```
+
+| 항목 | 결과 |
+|---|---|
+| PostgreSQL 상태 | `healthy` |
+| `healthy` 확인까지 측정값 | 약 10.01초 |
+| API 재시작 | 하지 않음 |
+| 복구 후 HTTP 상태 | 200 |
+| 복구 후 응답시간 | 74.993ms |
+| 복구 후 조회 결과 | 약관 2개 |
+| 판정 | PASS |
+
+`healthy` 확인 시간에는 수동 명령 실행 및 확인 전환 시간이 포함돼 있으므로 정밀한 DB 기동 성능 지표로 사용하지 않는다.
+
+PostgreSQL 복구 후 애플리케이션을 재시작하지 않아도 HikariCP가 사용 가능한 연결을 다시 확보하고 동일 API가 정상 응답했다.
+
+#### 판정
+
+- DB 중단에 따른 요청 실패는 정상적으로 관찰됐다.
+- PostgreSQL 재시작 후 API 재시작 없이 DB 연결이 자동 복구됐다.
+- 데이터 손실이나 변경은 발생하지 않았다.
+- DB 장애 중 응답이 HTTP 500과 `retryable=false`로 반환되는 점은 개선이 필요하다.
+- 약 30초의 장애 응답시간은 timeout 정책과 함께 재검토해야 한다.
+- 자동 복구는 PASS이지만 장애 응답 계약이 보완되지 않아 NF-API-006의 전체 상태는 PARTIAL로 판정한다.
 
 ### 기존 테스트 추적
 
@@ -167,9 +255,12 @@ DB_PASSWORD=<local test value>
 
 ## 7. 현재 결론
 
-- 최신 커밋의 API 전체 테스트는 정상 통과했다.
+- 기준 커밋 `f28ff16bcb941657004fb646a9cedb87a3e40dee`의 API 전체 테스트는 정상 통과했다.
 - 네이티브 Windows 실패는 Linux 재검증 결과 환경 차이로 판정했다.
 - 현재 코드 회귀 결함은 발견되지 않았다.
 - 실제 성능 측정 도구는 아직 저장소에 존재하지 않는다.
 - 프론트엔드 및 백엔드 연동과 배포가 완료되지 않아 E2E 및 운영 성능 판정은 보류한다.
-- 다음 작업은 실행 가능한 API를 선정하여 장애·예외 case를 개별 검증하는 것이다.
+- PostgreSQL 중단 시 약관 조회 API는 약 30초 후 HTTP 500과 `retryable=false`를 반환했다.
+- PostgreSQL 재시작 후 API를 재시작하지 않아도 동일 요청이 HTTP 200으로 자동 복구됐다.
+- DB 장애 응답을 HTTP 503과 재시도 가능한 오류로 처리할지 팀 검토가 필요하다.
+- 다음 작업은 DB 장애 응답 계약과 timeout 정책을 검토하고, 보호 API 및 실제 재시도 동작을 추가 검증하는 것이다.
