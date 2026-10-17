@@ -3,6 +3,7 @@ package com.zoop.briefing.replay;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
@@ -165,5 +166,34 @@ class BriefingMarketEnrichmentTest {
     @Test void differentRoundAndNewsResultHashFailBeforeAnyArtifactRead() {
         record.put("newsResultSha256", "d".repeat(64)); assertThrows(IllegalArgumentException.class,
                 () -> BriefingReplayImporter.validateMarketRecord(StrictJson.Obj.of(record), StrictJson.Obj.of(news), "inbox/authored.md", directory));
+    }
+    @Test void enrichmentPublicationUsesSavedSummaryFetchAndReceiptTimesDeterministically() {
+        record.set("summaryResult", summary(true));
+        record.putArray("receipts").addObject().put("finishedAt", "2026-10-17T00:11:00Z");
+        Instant newsGenerated = Instant.parse("2026-10-16T00:00:00Z");
+        byte[] before = StrictJson.write(record);
+        var first = BriefingReplayImporter.marketPublicationTimes(newsGenerated, StrictJson.Obj.of(record));
+        assertEquals(Instant.parse("2026-10-17T00:10:00Z"), first.generatedAt());
+        assertEquals(Instant.parse("2026-10-17T00:11:00Z"), first.publishedAt());
+        assertEquals(first.publishedAt(), first.artifactCreatedAt());
+        assertEquals(first, BriefingReplayImporter.marketPublicationTimes(newsGenerated, StrictJson.Obj.of(record)));
+        assertArrayEquals(before, StrictJson.write(record));
+    }
+    @Test void missingSummaryStillPublishesAfterMarketFetchAndNeverBackdatesNewerNews() {
+        record.putNull("summaryResult"); record.putArray("receipts").addObject().put("status", "unknown");
+        Instant oldNews = Instant.parse("2026-10-16T00:00:00Z");
+        var missing = BriefingReplayImporter.marketPublicationTimes(oldNews, StrictJson.Obj.of(record));
+        assertEquals(oldNews, missing.generatedAt()); assertEquals(Instant.parse("2026-10-17T00:00:00Z"), missing.publishedAt());
+        Instant newerNews = Instant.parse("2026-10-18T00:00:00Z");
+        var newer = BriefingReplayImporter.marketPublicationTimes(newerNews, StrictJson.Obj.of(record));
+        assertEquals(newerNews, newer.generatedAt()); assertEquals(newerNews, newer.publishedAt());
+    }
+    @Test void withheldSummaryProducerTimeIsPreservedAndMalformedReceiptTimeCannotBeGuessed() {
+        record.set("summaryResult", summary(false)); record.putArray("receipts");
+        var times = BriefingReplayImporter.marketPublicationTimes(Instant.parse("2026-10-16T00:00:00Z"), StrictJson.Obj.of(record));
+        assertEquals(Instant.parse("2026-10-17T00:10:00Z"), times.generatedAt());
+        ((ArrayNode) record.get("receipts")).addObject().put("finishedAt", "not-a-timestamp");
+        assertThrows(java.time.format.DateTimeParseException.class, () -> BriefingReplayImporter.marketPublicationTimes(
+                Instant.parse("2026-10-16T00:00:00Z"), StrictJson.Obj.of(record)));
     }
 }

@@ -270,12 +270,17 @@ public final class BriefingReplayImporter {
                 blobs.put(namespace + "-verification-" + index, blob("verification_receipt", StrictJson.write(result.object("verification").node())));
                 ObjectNode comparison = "morning".equals(edition) ? null : StrictJson.newObject().put("status", "unavailable")
                         .put("reason", "직전 모의 결과는 입력 문맥으로만 연결했습니다. 실제 출근 대비 장중 변화·전망 성과 평가는 없습니다.");
+                Instant published = generated;
                 if (marketRounds.containsKey(id)) {
                     StrictJson.Obj enrichment = marketRounds.get(id);
                     applyMarketEnrichment(payload, snapshot, enrichment);
                     registerMarketBlobs(namespace + "-market-" + index, enrichment, blobs);
+                    MarketPublicationTimes times = marketPublicationTimes(generated, enrichment);
+                    generated = times.generatedAt(); published = times.publishedAt();
+                    payload.put("generatedAt", generated.toString());
+                    if (times.artifactCreatedAt().isAfter(created)) created = times.artifactCreatedAt();
                 }
-                publications.add(new Round(id, date, edition, cutoff, from, generated, generated, payload, snapshot, comparison));
+                publications.add(new Round(id, date, edition, cutoff, from, generated, published, payload, snapshot, comparison));
                 for (Issue issue : selected.values()) for (Citation citation : issue.citations()) {
                     Citation prior = citations.putIfAbsent(citation.id(), citation); require(prior == null || prior.equals(citation), "simulation_evidence_conflict");
                 }
@@ -633,6 +638,24 @@ public final class BriefingReplayImporter {
         ArrayNode evidence = saved.putArray("evidenceIds"); Set<String> ids = new LinkedHashSet<>();
         for (StrictJson.Obj claim : summary.objects("claims")) ids.addAll(claim.strings("evidenceIds")); ids.forEach(evidence::add);
         lineage.put("summaryResultSha256", record.string("summaryResultSha256")).put("scopeNote", summary.string("scopeNote"));
+    }
+
+    record MarketPublicationTimes(Instant generatedAt, Instant publishedAt, Instant artifactCreatedAt) { }
+
+    /** Saved producer times determine the new enrichment publication; re-import never advances a clock. */
+    static MarketPublicationTimes marketPublicationTimes(Instant newsGeneratedAt, StrictJson.Obj record) {
+        Instant generated = newsGeneratedAt;
+        if (!record.isNull("summaryResult")) {
+            Instant summaryGenerated = Instant.parse(record.object("summaryResult").string("generatedAt"));
+            if (summaryGenerated.isAfter(generated)) generated = summaryGenerated;
+        }
+        Instant published = Instant.parse(record.object("marketSnapshot").string("fetchedAt"));
+        if (generated.isAfter(published)) published = generated;
+        for (StrictJson.Obj receipt : record.objects("receipts")) if (receipt.has("finishedAt") && !receipt.isNull("finishedAt")) {
+            Instant finished = Instant.parse(receipt.string("finishedAt"));
+            if (finished.isAfter(published)) published = finished;
+        }
+        return new MarketPublicationTimes(generated, published, published);
     }
 
     private static void validateSimulationIdentity(StrictJson.Obj bundle, StrictJson.Obj round) {
