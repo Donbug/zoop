@@ -38,6 +38,23 @@ class GraphSnapshotFilterTest {
     }
 
     @Test
+    void structuralBasisMustBeVerifiedAndWithinItsValidityDatesAtAsOf() {
+        Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
+        assertTrue(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", "2026-09-01", null), asOf));
+        assertFalse(GraphSnapshotFilter.validAt(basis("2026-10-06T00:00:00Z", "2026-09-01", null), asOf));
+        // Not yet valid: validFrom has not begun everywhere (UTC-12 is still 2026-10-04).
+        assertFalse(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", "2026-10-05", null), asOf));
+        assertTrue(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", "2026-10-04", null), asOf));
+        // Expired: validUntil (exclusive) has already begun somewhere (UTC+14 is 2026-10-05).
+        assertFalse(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", null, "2026-10-05"), asOf));
+        assertTrue(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", null, "2026-10-06"), asOf));
+    }
+
+    private static PublicGraphSnapshot.Basis basis(String verifiedAt, String validFrom, String validUntil) {
+        return new PublicGraphSnapshot.Basis("b", "SUPPLIES", verifiedAt, validFrom, validUntil, List.of(), null, null);
+    }
+
+    @Test
     void asOfKeepsOnlyWhatWasPublishedInsideThePinnedVersion() {
         PublicGraphSnapshot early = GraphSnapshotFilter.apply(v2, Instant.parse("2026-10-01T00:00:00Z"), DisclosureExclusions.NONE);
         assertFalse(issueIds(early).contains(AI_ACCEL));
