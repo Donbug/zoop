@@ -167,6 +167,11 @@ class GraphQueryServiceTest {
     }
 
     @Test
+    void allModeIgnoresPersonalFilterEvenAnUnknownValue() {
+        assertEquals("all", service.getGraph("all", null, null, null, null, null, "friends", null, "r").metadata().mode());
+    }
+
+    @Test
     void allModeCarriesNoPersonalFlags() {
         assertTrue(all().nodes().stream().noneMatch(n -> n.holding() || n.watch()));
         assertNull(all().metadata().personalFilter());
