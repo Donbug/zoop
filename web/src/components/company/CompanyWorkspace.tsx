@@ -63,6 +63,13 @@ function Status<T>({
   );
 }
 function fixedFailure(status: number | null, code: string | null) {
+  if (
+    status === 401 ||
+    status === 403 ||
+    code === 'ACCESS_DENIED' ||
+    code === 'MEMBER_REQUIRED'
+  )
+    return '이 자료를 조회할 권한이 없어요.';
   if (status === 404 || code === 'RESOURCE_NOT_FOUND')
     return '해당 자료가 없어요.';
   if (status === 409 || code === 'VERSION_UNAVAILABLE')
@@ -113,7 +120,8 @@ function PriceChange({
 
 /** 타임라인에 한 번에 보이는 시간 버킷 수 */
 const BUCKET_PAGE = 10;
-const bucketElementId = (key: string) => `bucket-${key.replace(/[^w-]/g, '_')}`;
+const bucketElementId = (key: string) =>
+  `bucket-${key.replace(/[^\w-]/g, '_')}`;
 
 /** 사건 시점 지도의 기준 시각. 현재 기준 시점보다 늦을 수 없다. */
 function eventReferenceTime(
@@ -240,7 +248,11 @@ export default function CompanyWorkspace() {
   const selectedBucket = params.get('bucket');
   // 최근 버킷부터. 시각을 알 수 없는 버킷은 맨 뒤에 둔다.
   const sortedGroups = [...groups].sort(([a], [b]) =>
-    /^d/.test(a) === /^d/.test(b) ? b.localeCompare(a) : /^d/.test(a) ? -1 : 1,
+    /^\d/.test(a) === /^\d/.test(b)
+      ? b.localeCompare(a)
+      : /^\d/.test(a)
+        ? -1
+        : 1,
   );
   // 사건이 많은 기간(예: 1년)에는 최근 버킷부터 나눠 보여 준다. 선택한 버킷은 항상 보인다.
   const bucketScope = `${period}|${asOf ?? ''}`;

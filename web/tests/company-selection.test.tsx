@@ -137,6 +137,23 @@ test('a bucket-start bar before from is kept; only bars after the cutoff are rej
   expect(prices.points).toEqual(points);
 });
 
+test('a price bar older than one requested interval is rejected', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: 'fixture-company',
+      period: '1m',
+      points: [{ time: '2026-09-14T06:30:00Z', close: 90 }],
+    }),
+  );
+  await expect(
+    readCompanyResource(
+      `/api/v1/companies/fixture-company/prices?period=1m&from=2026-09-16T06:30:00Z&to=${props.asOf}`,
+    ),
+  ).rejects.toThrow('조회 범위 밖');
+});
+
 test('a day-precision event gets a marker on the same KST day in the 1w chart', () => {
   const dayEvent: Event = {
     ...event,
