@@ -1,5 +1,5 @@
 {
-  "snapshotFormat": 2,
+  "snapshotFormat": 3,
   "versionId": "fixture-2026-10-08",
   "sourceBundleId": null,
   "companies": [
@@ -66,6 +66,15 @@
         "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395",
         "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"
       ],
+      "assertionStatus": "reported",
+      "mentions": [
+        {
+          "mentionId": "men-fixture-hbm-supply-1",
+          "articleId": "art-hbm-supply",
+          "articleVersion": "v1"
+        }
+      ],
+      "representativeMentionId": "men-fixture-hbm-supply-1",
       "latestPublishedAt": "2026-09-22T01:00:00Z"
     },
     {
@@ -86,6 +95,13 @@
       "evidenceIds": [
         "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c",
         "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf"
+      ],
+      "mentions": [
+        {
+          "mentionId": "men-fixture-hbm-equip-1",
+          "articleId": "art-hbm-equip",
+          "articleVersion": "v1"
+        }
       ],
       "latestPublishedAt": "2026-09-25"
     },
@@ -109,6 +125,20 @@
         "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62",
         "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e"
       ],
+      "period": "2026-09/2026-12",
+      "mentions": [
+        {
+          "mentionId": "men-fixture-euv-export-1",
+          "articleId": "art-euv-export",
+          "articleVersion": "v1"
+        },
+        {
+          "mentionId": "men-fixture-euv-export-2",
+          "articleId": "art-euv-export",
+          "articleVersion": "v1"
+        }
+      ],
+      "representativeMentionId": "men-fixture-euv-export-1",
       "latestPublishedAt": "2026-09-28T03:30:00Z"
     },
     {
@@ -129,6 +159,13 @@
       "evidenceIds": [
         "ev-3dfec567fd2b09acb8f7f37802f212e506fa2373d2dda8cd2a940cd9f21484fc",
         "ev-ad0886d0b329f92985f80ed213d6a2b204c804c0240f311e32b02a7fb4c0a500"
+      ],
+      "mentions": [
+        {
+          "mentionId": "men-fixture-ai-accel-1",
+          "articleId": "art-ai-accel",
+          "articleVersion": "v1"
+        }
       ],
       "latestPublishedAt": "2026-10-05T09:00:00Z"
     }
