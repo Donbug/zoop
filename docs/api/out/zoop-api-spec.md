@@ -1427,7 +1427,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getAdminSession · 관리자 세션 조회
 
-관리자 세션 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 세션 조회. zoop_admin_session 쿠키만 검사하며 회원 세션과 분리된다. 활성 세션은 idleExpiresAt까지의 유휴 만료와 expiresAt까지의 절대 만료를 적용한다(기본 30분/8시간). 만료 세션은 expired 및 expiredReason(idle|absolute)을 반환하고 해당 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1453,7 +1453,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## logInAdmin · 관리자 로그인
 
-관리자 로그인.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+활성 admin 계정의 이메일/비밀번호로 로그인한다. 성공 시 HttpOnly·SameSite=Lax zoop_admin_session 쿠키와 세션 결합 CSRF 토큰을 반환한다. 회원 쿠키와 별개이며 이전 관리자 세션은 폐기된다. 실패 응답은 계정 존재 여부를 숨기고 IP 및 이메일 기준 시도를 제한한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1481,7 +1481,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## logOutAdmin · 관리자 로그아웃
 
-관리자 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_admin_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_admin_session 쿠키만 제거하며 회원 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
+관리자 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_admin_session이 있으면 동일 쿠키·허용 Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_admin_session 쿠키만 제거하며 회원 세션/쿠키에는 영향을 주지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
