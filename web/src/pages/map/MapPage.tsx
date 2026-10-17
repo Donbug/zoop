@@ -133,6 +133,19 @@ export default function MapPage() {
     if (tutorialOpen && tutorialStep === null) setTutorialStep(1);
     if (!tutorialOpen && tutorialStep !== null) setTutorialStep(null);
   }, [setTutorialStep, tutorialOpen, tutorialStep]);
+  // FS015: 튜토리얼을 마치거나 건너뛰지 않은 회원은 지도에 들어오면 한 번 자동으로 연다.
+  // 완료·건너뛰기는 PUT /api/v1/auth/tutorial로 계정에 저장되어 다음부터는 열지 않는다.
+  const tutorialPending = useAuthStore(
+    (state) =>
+      state.session?.kind === 'member' &&
+      state.session.setup?.tutorialCompleted === false,
+  );
+  const autoTutorial = useRef(false);
+  useEffect(() => {
+    if (!tutorialPending || autoTutorial.current || tutorialOpen) return;
+    autoTutorial.current = true;
+    updateQuery({ tour: '1' }, { replace: true });
+  }, [tutorialPending, tutorialOpen, updateQuery]);
   useEffect(() => {
     if (previousEvent.current && !selectedPanel) {
       (opener.current?.isConnected

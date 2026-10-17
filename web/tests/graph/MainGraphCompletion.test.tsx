@@ -162,6 +162,34 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     expect(setTutorialCompleted).not.toHaveBeenCalled();
   });
 
+  it('FS015: 튜토리얼을 마치지 않은 회원은 지도에 들어오면 자동으로 열고, 마친 회원은 열지 않는다', async () => {
+    member();
+    const router = setup('/?mode=all');
+    expect(
+      await screen.findByRole('heading', { name: '지도 움직이기' }),
+    ).toBeTruthy();
+    expect(new URLSearchParams(router.state.location.search).get('tour')).toBe(
+      '1',
+    );
+  });
+
+  it('튜토리얼을 마친 회원에게는 자동으로 열지 않는다', async () => {
+    member();
+    const session = useAuthStore.getState().session!;
+    useAuthStore.setState({
+      session: {
+        ...session,
+        setup: { completed: true, tutorialCompleted: true },
+      },
+    });
+    const router = setup('/?mode=all');
+    await screen.findByTestId('graph-canvas');
+    expect(screen.queryByRole('heading', { name: '지도 움직이기' })).toBeNull();
+    expect(new URLSearchParams(router.state.location.search).has('tour')).toBe(
+      false,
+    );
+  });
+
   it('회원 완료는 상태 API 성공 후에만 화면을 닫는다', async () => {
     member();
     vi.mocked(setTutorialCompleted).mockResolvedValue(

@@ -53,14 +53,17 @@ export function getCompanyQuote(id: string): Promise<CompanyQuoteSummary> {
   );
 }
 
-/** CompanyDetail 중 관심 종목 행에 쓰는 값만. metadata 등 나머지는 생략한다. */
+/** CompanyDetail 중 관심 종목 행에 쓰는 값만. 나머지는 생략한다. */
 type CompanyDetailResponse = {
   id: string;
   name: string;
   ticker: string | null;
   directIssues: { issueId: string }[];
   structuralIssues: { issueId: string }[];
+  metadata?: { failures?: { section?: string | null }[] };
 };
+
+const ISSUE_SECTIONS = new Set(['directIssues', 'structuralIssues']);
 
 /**
  * 관심 종목 행 표시용 기업 요약.
@@ -79,10 +82,14 @@ export async function getCompanyBrief(id: string): Promise<CompanyBrief> {
       (issue) => issue.issueId,
     ),
   );
+  // 사건 섹션을 서버가 실패로 표시하면 빈 목록을 0건으로 세지 않고 미제공(null)으로 둔다.
+  const issuesUnavailable = (detail.metadata?.failures ?? []).some((failure) =>
+    ISSUE_SECTIONS.has(failure.section ?? ''),
+  );
   return {
     id: detail.id,
     name: detail.name,
     ticker: detail.ticker,
-    issueCount: issueIds.size,
+    issueCount: issuesUnavailable ? null : issueIds.size,
   };
 }
