@@ -48,7 +48,11 @@ function Status<T>({
   if (resource.loading) return <p role="status">{label} 불러오는 중…</p>;
   if (!resource.error) return null;
   // 계약의 오류 코드별 안내. 다시 보내도 같은 결과인 오류(없음·버전 없음·조건 오류)에는 다시 시도를 두지 않는다.
-  const fixed = fixedFailure(resource.errorStatus, resource.errorCode);
+  const fixed = fixedFailure(
+    resource.errorStatus,
+    resource.errorCode,
+    resource.errorRetryable,
+  );
   return (
     <div role="alert">
       <p>
@@ -62,13 +66,20 @@ function Status<T>({
     </div>
   );
 }
-function fixedFailure(status: number | null, code: string | null) {
+function fixedFailure(
+  status: number | null,
+  code: string | null,
+  retryable: boolean | null,
+) {
   if (status === 404 || code === 'RESOURCE_NOT_FOUND')
     return '해당 자료가 없어요.';
   if (status === 409 || code === 'VERSION_UNAVAILABLE')
     return '이 기준 시점의 공개 자료가 없어요. [최신 시점]으로 돌아가 확인해 주세요.';
   if (status === 422 || code === 'INVALID_REQUEST')
     return '조회 조건을 확인해 주세요.';
+  // F05: 공급자 인증·형식 문제처럼 다시 보내도 같은 장애는 다시 시도를 두지 않는다.
+  if (retryable === false)
+    return '자료 공급원의 설정이나 응답 형식 문제로 지금은 확인할 수 없어요.';
   return null;
 }
 function Basis({ metadata }: { metadata: Meta | undefined }) {
@@ -80,6 +91,14 @@ function Basis({ metadata }: { metadata: Meta | undefined }) {
     </p>
   ) : null;
 }
+/** A02: 사건과 이 기업 사이의 직접 승인 관계. 빈 배열은 직접 관계가 확인되지 않은 사건(2-hop 등)이다. */
+const RELATION_LABEL: Record<string, string> = {
+  INVOLVES: '직접 관련',
+  STRUCTURALLY_RELATED_TO: '구조적 관련',
+};
+const relationLabel = (types: string[]) =>
+  types.map((type) => RELATION_LABEL[type] ?? type).join(' · ');
+
 /** 사건·문서·기업 정보 탭(밑줄형) */
 const TAB =
   'flex-1 rounded-none! border-0! border-b-2! border-transparent! bg-transparent! py-2.5! text-sm! text-zoop-muted aria-pressed:border-zoop-ink! aria-pressed:bg-transparent! aria-pressed:font-semibold aria-pressed:text-zoop-ink!';
@@ -639,7 +658,7 @@ export default function CompanyWorkspace() {
                           >
                             <p className="text-[11px] text-zoop-muted">
                               문서 {item.articleCount}건 ·{' '}
-                              {item.relationTypes.join(', ') ||
+                              {relationLabel(item.relationTypes) ||
                                 '직접 관계 미확인'}
                             </p>
                             <button
