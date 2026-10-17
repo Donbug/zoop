@@ -23,7 +23,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class SocialAuthCallbackService {
@@ -183,8 +182,7 @@ public class SocialAuthCallbackService {
     }
 
     private ResponseEntity<Void> redirect(String returnTo, String result, boolean clearCookie, boolean secureCookie) {
-        String location = UriComponentsBuilder.fromPath(returnTo)
-                .queryParam("social", result).build().encode().toUriString();
+        String location = settings.frontendLocation(returnTo, result);
         ResponseEntity.BodyBuilder response = ResponseEntity.status(302).header(HttpHeaders.LOCATION, location);
         if (clearCookie) response.header(HttpHeaders.SET_COOKIE, ResponseCookie.from(SocialAuthService.PENDING_COOKIE, "")
                 .secure(secureCookie).httpOnly(true).sameSite("Lax").path("/api/v1/auth/social")

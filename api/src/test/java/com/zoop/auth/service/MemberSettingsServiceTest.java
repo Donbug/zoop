@@ -146,6 +146,38 @@ class MemberSettingsServiceTest {
         assertEquals(0, repository.writeCount);
     }
 
+    @Test
+    void tutorialTargetStateChangesOnceAndPreservesOtherSettings() {
+        repository.row = new MemberSettingsRow("assets", true, true, false, 5, List.of("NASDAQ:NVDA"));
+
+        var completed = service.setTutorialCompleted(MEMBER, true, "tutorial-complete");
+        assertTrue(completed.tutorialCompleted());
+        assertEquals("assets", completed.mode());
+        assertTrue(completed.completed());
+        assertEquals(List.of("NASDAQ:NVDA"), completed.watchlistIds());
+        assertEquals(6, completed.version());
+
+        var replay = service.setTutorialCompleted(MEMBER, true, "tutorial-replay");
+        assertTrue(replay.tutorialCompleted());
+        assertEquals(6, replay.version());
+
+        var reset = service.setTutorialCompleted(MEMBER, false, "tutorial-reset");
+        assertFalse(reset.tutorialCompleted());
+        assertEquals(7, reset.version());
+        assertEquals(2, repository.writeCount);
+    }
+
+    @Test
+    void tutorialTargetStateRejectsVersionOverflowWithoutSaving() {
+        repository.row = new MemberSettingsRow("watchlist", false, true, false, Long.MAX_VALUE, List.of());
+
+        var error = assertThrows(CustomException.class,
+                () -> service.setTutorialCompleted(MEMBER, true, "tutorial-overflow"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
+        assertEquals(0, repository.writeCount);
+    }
+
     private static tools.jackson.databind.JsonNode json(String source) {
         return StrictJson.parseObject(source).node();
     }

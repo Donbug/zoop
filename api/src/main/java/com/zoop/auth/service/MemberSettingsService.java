@@ -115,6 +115,20 @@ public class MemberSettingsService {
                 current.tutorialCompleted(), nextVersion, watchlist), requestId);
     }
 
+    @Transactional
+    public SettingsResponse setTutorialCompleted(MemberPrincipal member, boolean completed, String requestId) {
+        var current = repository.findForUpdate(member.memberId())
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (current.tutorialCompleted() == completed) return response(current, requestId);
+        if (current.version() == Long.MAX_VALUE) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+
+        long nextVersion = current.version() + 1;
+        repository.update(member.memberId(), current.mode(), current.investor(), current.completed(), completed,
+                current.version(), nextVersion);
+        return response(new MemberSettingsRow(current.mode(), current.investor(), current.completed(), completed,
+                nextVersion, current.watchlistIds()), requestId);
+    }
+
     private static boolean booleanPatch(JsonNode input, String field, boolean stored) {
         if (!input.has(field) || input.get(field).isNull()) return stored;
         if (!input.get(field).isBoolean()) throw new CustomException(ErrorCode.INVALID_REQUEST);
