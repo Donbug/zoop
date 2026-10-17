@@ -42,6 +42,10 @@ zoop:
     session-cookie-secure: true
     social:
       frontend-origin: ${ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN:}
+  admin:
+    session:
+      idle-timeout: ${ZOOP_ADMIN_IDLE_TIMEOUT:30m}
+      absolute-timeout: ${ZOOP_ADMIN_ABSOLUTE_TIMEOUT:8h}
   graph:
     snapshot:
       # Public graph snapshot source: none (default; reads fail closed) or fixture (local/dev synthetic data only).

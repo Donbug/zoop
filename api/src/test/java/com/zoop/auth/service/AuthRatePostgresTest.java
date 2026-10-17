@@ -56,6 +56,16 @@ class AuthRatePostgresTest {
         }
     }
 
+    @Test
+    void concurrentAdminLoginFailuresCannotPassEmailBoundary() throws Exception {
+        String email = "admin-failure-" + UUID.randomUUID() + "@example.com";
+        try {
+            assertEquals(20, race(21, index -> limiter.recordAdminLoginFailure(email)));
+        } finally {
+            clear("admin_login_email_failure", email);
+        }
+    }
+
     private int race(int count, Attempt attempt) throws Exception {
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(count)) {
