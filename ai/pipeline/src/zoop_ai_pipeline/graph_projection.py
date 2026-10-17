@@ -66,6 +66,84 @@ USAGE = {"providerCalls": 0, "modelCalls": 0}
 _STORE_WITHHOLDS = frozenset({"graph_store_identity_mismatch", "graph_store_foreign_data", "graph_store_schema_mismatch"})
 
 
+# ---------------------------------------------------------------------------------------------- pure placement and target rules -----
+
+def checked_root(root: Path, *upstream_roots: Path) -> Path:
+    """The absolute ledger directory, after the ownership rules every graph command shares (pure: nothing is created, opened or locked): disjoint from
+    the app, S1 and retired-prototype roots and from every given source ledger (`state_namespace_conflict`; an installed package without configured
+    ownership roots is `state_ownership_unconfigured`), and no symlinked component, dangling or not (`state_namespace_invalid`)."""
+    root = Path(os.path.abspath(root))
+    forbidden = [*reserved_state_roots(), *(Path(os.path.abspath(p)) for p in upstream_roots)]
+    if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
+        raise ExtractionFailure("state_namespace_conflict")
+    for parent in [*reversed(root.parents), root]:
+        if parent.is_symlink():
+            raise ExtractionFailure("state_namespace_invalid")
+    return root
+
+
+def ours_only(root: Path) -> list[Path]:
+    """The entries of an existing ledger directory; anything that is not exactly this ledger's own file set (or is a symlink) is `state_namespace_conflict`."""
+    entries = list(root.iterdir())
+    if any(p.name not in _FILES or p.is_symlink() for p in entries):
+        raise ExtractionFailure("state_namespace_conflict")
+    return entries
+
+
+def ledger_state(root: Path) -> str:
+    """`absent` (no directory, or an empty one: `init` would create the ledger) or `present` (some ledger file exists), by directory listing only: no
+    SQLite open, no lock, no chmod, no creation. A path that is not a directory, or a directory holding anything foreign, is `state_namespace_conflict`."""
+    if not os.path.lexists(root):
+        return "absent"
+    if not root.is_dir():
+        raise ExtractionFailure("state_namespace_conflict")
+    return "present" if ours_only(root) else "absent"
+
+
+def tolerated_schema(facts: dict) -> bool:
+    """Only objects of this schema (by name) may already exist in a database `init` can bind (an interrupted earlier `init` leaves some of them)."""
+    expected_constraints, expected_indexes = neo.expected_schema()
+    return set(facts["constraints"]) <= set(expected_constraints) and set(facts["indexes"]) <= set(expected_indexes)
+
+
+def refuse_unbound_target(facts: dict, database: str) -> None:
+    """The ONE rule deciding whether a probed database may be bound by a ledger that has no binding yet. `init` and `preflight` both call it, so they
+    cannot diverge: wrong database name -> identity mismatch; any node, relationship, store marker or foreign schema object -> not empty; an object
+    with an expected NAME but another definition -> schema mismatch (all BEFORE any intent, DDL or store marker)."""
+    if facts["database"].lower() != database.lower():
+        raise ExtractionFailure("graph_store_identity_mismatch")
+    if facts["nodes"] or facts["relationships"] or facts["stores"] or not tolerated_schema(facts):
+        raise ExtractionFailure("graph_store_not_empty")
+    if neo.schema_conflicts(facts["constraints"], facts["indexes"]):
+        raise ExtractionFailure("graph_store_schema_mismatch")
+
+
+def preflight(request: Init, uri: str, state_dir: Path) -> dict:
+    """Read-only candidate check for `init`; it binds nothing and writes nothing anywhere.
+
+    It never creates, chmods, opens or locks a ledger, runs no DDL and no write transaction, and uses only the closed read statements of the adapter's
+    own `probe()`. A ledger already present at `state_dir` is refused (`graph_store_already_bound`): re-verifying a bound store is the idempotent `init`
+    re-run, and a read-only check must never adopt or interpret a ledger. What it proves: the target answers over the intended transport (TLS is
+    certificate-verified for `bolt+s`) with the given credentials, is a supported Neo4j 5 server, selects the requested database and holds no data. What
+    it cannot prove: that the user may run DDL, or that the database stays unchanged until `init`."""
+    root = checked_root(state_dir)
+    if ledger_state(root) != "absent":
+        raise ExtractionFailure("graph_store_already_bound")
+    auth = neo.read_auth(uri)
+    graph = neo.Graph(uri, request.database, auth)
+    try:
+        facts = neo.probe(graph)
+    finally:
+        graph.close()
+    refuse_unbound_target(facts, request.database)
+    return {"schemaVersion": SCHEMA,
+            "preflight": {"result": "eligible-empty-target", "ddlPermission": "unverified", "tls": "verified" if neo.is_secure(uri) else "loopback-plain",
+                          "ledger": "absent", "server": facts["server"], "database": facts["database"], "dbId": facts["dbId"],
+                          "counts": {"nodes": facts["nodes"], "relationships": facts["relationships"]},
+                          "schemaObjects": {"constraints": len(facts["constraints"]), "indexes": len(facts["indexes"])}},
+            "usage": USAGE}
+
+
 # ---------------------------------------------------------------------------------------------- ledger -------------------------------
 
 class Store:
@@ -76,13 +154,7 @@ class Store:
     lock, opens the file immutable and read-only, creates nothing and refuses a hot WAL (a writer command must settle it first)."""
 
     def __init__(self, root: Path, *upstream_roots: Path, mode: str = "write"):
-        root = Path(os.path.abspath(root))
-        forbidden = [*reserved_state_roots(), *(Path(os.path.abspath(p)) for p in upstream_roots)]
-        if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
-            raise ExtractionFailure("state_namespace_conflict")
-        for parent in [*reversed(root.parents), root]:
-            if parent.exists() and parent.is_symlink():
-                raise ExtractionFailure("state_namespace_invalid")
+        root = checked_root(root, *upstream_roots)
         if mode == "read":
             self._open_existing(root)
             return
@@ -90,8 +162,7 @@ class Store:
             root.mkdir(mode=0o700, parents=True, exist_ok=True)
         elif not root.is_dir() or not (root / "graph.sqlite3").is_file() or not (root / "graph.lock").is_file():
             raise ExtractionFailure("graph_state_missing")
-        if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
-            raise ExtractionFailure("state_namespace_conflict")
+        ours_only(root)
         os.chmod(root, 0o700)
         self.lock = os.open(root / "graph.lock", os.O_RDWR | os.O_NOFOLLOW | (os.O_CREAT if mode == "create" else 0), 0o600)
         os.fchmod(self.lock, 0o600)
@@ -132,8 +203,7 @@ class Store:
         database, lock = root / "graph.sqlite3", root / "graph.lock"
         if not root.is_dir() or not database.is_file() or not lock.is_file():
             raise ExtractionFailure("graph_state_missing")
-        if any(p.name not in _FILES or p.is_symlink() for p in root.iterdir()):
-            raise ExtractionFailure("state_namespace_conflict")
+        ours_only(root)
         self.lock = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW)
         try:
             fcntl.flock(self.lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
@@ -604,19 +674,14 @@ class Projector:
         graph = neo.Graph(uri, request.database, auth)
         try:
             facts = neo.probe(graph)
-            if facts["database"].lower() != request.database.lower() or (binding is not None and facts["dbId"] != binding["dbId"]):
+            if binding is None:
+                refuse_unbound_target(facts, request.database)   # the same rule `preflight` applies; refused before any intent, DDL or store marker
+            elif facts["database"].lower() != request.database.lower() or facts["dbId"] != binding["dbId"]:
                 raise ExtractionFailure("graph_store_identity_mismatch")
             if binding is not None and self.store.meta("store-ready") is not None:
                 server = neo.verify_binding(graph, self.store.ready_binding())
                 return self._init_result(binding, server)
-            expected_schema = neo.expected_schema()
-            tolerated = set(facts["constraints"]) <= set(expected_schema[0]) and set(facts["indexes"]) <= set(expected_schema[1])
             if binding is None:
-                if facts["nodes"] or facts["relationships"] or facts["stores"] or not tolerated:
-                    raise ExtractionFailure("graph_store_not_empty")
-                if neo.schema_conflicts(facts["constraints"], facts["indexes"]):
-                    # An object with an expected NAME but another definition: refused BEFORE any intent, DDL or store marker.
-                    raise ExtractionFailure("graph_store_schema_mismatch")
                 binding = {"uri": uri, "database": request.database, "dbId": facts["dbId"], "storeId": request.store_id, "owner": uuid.uuid4().hex,
                            "schema": STORE_SCHEMA, "server": facts["server"]}
                 self.store.bind(binding)
@@ -629,7 +694,7 @@ class Projector:
                     if not (len(facts["stores"]) == 1 and facts["stores"][0]["l"] == [neo.STORE_LABEL] and facts["stores"][0]["p"] == ours
                             and facts["nodes"] == 1 and facts["relationships"] == 0):
                         raise ExtractionFailure("graph_store_not_empty")
-                elif facts["nodes"] or facts["relationships"] or not tolerated:
+                elif facts["nodes"] or facts["relationships"] or not tolerated_schema(facts):
                     raise ExtractionFailure("graph_store_not_empty")
                 if neo.schema_conflicts(facts["constraints"], facts["indexes"]):
                     raise ExtractionFailure("graph_store_schema_mismatch")   # same, for an interrupted init: before any DDL

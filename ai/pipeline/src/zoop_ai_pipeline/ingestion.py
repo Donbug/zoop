@@ -13,7 +13,9 @@ from pydantic import ValidationError
 
 from . import ingestion_parsers as parsers
 from .ingestion_contracts import (SCHEMA, reserved_state_roots, MAX_INPUT, Authority, Export, IngestionFailure, Inspect, Item,
-    Manifest, Registry, Run, byte_hash, canonical, digest, now, read_file, timestamp)
+    Manifest, Receipt, Registry, Run, byte_hash, canonical, digest, now, read_file, timestamp)
+
+PROVENANCE = {"authored-files": "authored_control", "collected-http": "collected_http"}
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS blobs(hash TEXT PRIMARY KEY, data BLOB NOT NULL);
@@ -250,6 +252,9 @@ class Ingestor:
             try:
                 item = Item.model_validate(data)
                 parsers.normalize_url(item.url, source.allowed_hosts)
+                if (item.collection is not None) != (source.adapter == "collected-http"):
+                    # Collected records need a recorded acquisition; authored fixtures can never claim one.
+                    raise IngestionFailure("collection_provenance_conflict")
                 if item.candidate_id in candidate_ids:
                     raise IngestionFailure("candidate_identity_duplicate")
                 candidate_ids.add(item.candidate_id)
@@ -260,6 +265,27 @@ class Ingestor:
             self._authorize(row)
             with self.store.transaction(lambda: self._authorize(row)):
                 self.db.execute("INSERT INTO candidates(round,source,page,ordinal,data,error) VALUES(?,?,?,?,?,?)", (*key, canonical(data), error))
+
+    def _receipt(self, row, source, item, ref, url) -> bytes:
+        """The hash-pinned acquisition record behind a collected item, bound to this exact source, scope, candidate and grant revision.
+
+        An unsigned operator-local file can still be forged by whoever controls the input namespace; this check proves the record
+        is internally consistent with the bytes and the registry, not that a network fetch happened."""
+        collected = item.collection
+        saved = self.store.one("SELECT data FROM blobs WHERE hash=?", (collected.receipt.sha256,))
+        raw = saved["data"] if saved is not None else self.authority.fixture(source, collected.receipt, MAX_INPUT)
+        try:
+            receipt = Receipt.model_validate_json(raw)
+        except ValidationError as exc:
+            raise IngestionFailure("collection_receipt_invalid") from exc
+        grant, scope_id = source.grant, Run.model_validate_json(row["request"]).scope_id
+        bound = ((receipt.collection_id, receipt.source_id, receipt.scope_id, receipt.candidate_id, receipt.grant_id, receipt.grant_revision, receipt.requested_url),
+                 (collected.collection_id, row["source"], scope_id, item.candidate_id, grant.grant_id, grant.revision, url))
+        observed = ((receipt.final_url, receipt.fetched_at, receipt.http_status, receipt.content_type, receipt.media_type, receipt.body_sha256, receipt.network),
+                    (collected.final_url, collected.fetched_at, collected.http_status, collected.content_type, item.media_type, collected.body_sha256, collected.network))
+        if byte_hash(raw) != collected.receipt.sha256 or bound[0] != bound[1] or observed[0] != observed[1] or ref.sha256 != collected.body_sha256:
+            raise IngestionFailure("collection_receipt_invalid")
+        return raw
 
     def _candidate(self, row, candidate, source, scope, manifest):
         key = (row["id"], row["source"], candidate["page"], candidate["ordinal"])
@@ -280,6 +306,7 @@ class Ingestor:
             saved = self.store.one("""SELECT b.data FROM candidates c JOIN raw_versions r ON r.id=c.raw_version
                 JOIN blobs b ON b.hash=r.raw_hash WHERE c.round=? AND c.source=? AND r.raw_hash=? LIMIT 1""",
                 (row["id"], row["source"], ref.sha256))
+            receipt = self._receipt(row, source, item, ref, url) if item.collection is not None else None
             raw = saved["data"] if saved is not None else self.authority.fixture(source, ref)
             if byte_hash(raw) != ref.sha256:
                 raise IngestionFailure("saved_response_hash_mismatch")
@@ -287,6 +314,8 @@ class Ingestor:
             with self.store.transaction(lambda: self._authorize(row)):
                 document, ambiguity = self._identity(row["source"], item.supplier_document_id, url, key)
                 raw_hash = self.store.blob(raw)
+                if receipt is not None:
+                    self.store.blob(receipt)
                 raw_version = digest([document, raw_hash, item.metadata()])
                 new_raw = self.store.one("SELECT 1 FROM raw_versions WHERE id=?", (raw_version,)) is None
                 self.db.execute("INSERT OR IGNORE INTO raw_versions VALUES(?,?,?,?)", (raw_version, document, raw_hash, canonical(item.metadata())))
@@ -306,7 +335,7 @@ class Ingestor:
             current = self.store.one("SELECT ambiguity FROM candidates WHERE round=? AND source=? AND page=? AND ordinal=?", key)
             if not item.supplier_document_id and current["ambiguity"] == "source_identity_ambiguous":
                 raise IngestionFailure("source_identity_ambiguous")
-            parsed = parsers.prepare(raw, item.media_type, url, scope.article_xpath)
+            parsed = parsers.prepare(raw, item.media_type, scope.article_xpath)
         except IngestionFailure as exc:
             self._authorize(row)
             held_content = None
@@ -418,7 +447,7 @@ class Ingestor:
                     private = json.loads(held["content"])
                     public_ref["preparationMetadata"] = {k: private[k] for k in ("rawArtifactId", "representationHash", "limitations", "pageCount", "emptyPageCount") if k in private}
             refs_output.append(public_ref)
-        return {"schemaVersion": SCHEMA, "roundId": rid, "sourceId": source, "inputDigest": row["input_digest"],
+        return {"schemaVersion": SCHEMA, "roundId": rid, "sourceId": source, "provenance": PROVENANCE[json.loads(row["config"])["adapter"]], "inputDigest": row["input_digest"],
                 "state": row["state"], "phase": row["phase"], "checkpoint": {"revision": cp["revision"], "continuation": cp["cursor"], "through": cp["through_time"], "roundRevision": row["expected_revision"]},
                 "checkedWindow": request["window"], "timestampLimitations": json.loads(row["config"])["scope"]["timestampLimitations"],
                 "counts": {k: counts[k] or 0 for k in counts.keys()}, "completion": row["completion"],
@@ -499,6 +528,10 @@ class Ingestor:
             "url": parsers.normalize_url(item.url, source.allowed_hosts), "title": item.title, "publishedAt": item.published_at,
             "modifiedAt": item.modified_at, "sourceRevision": item.source_revision, "mediaType": item.media_type},
             "grant": {"grantId": grant.grant_id, "revision": grant.revision}, "document": projection, "locatorMetadata": metadata}
+        if item.collection is not None:
+            # Collected observations alone add provenance + acquisition facts. An authored export keeps exactly the keys the closed
+            # application importer (IngestionExportParser) accepts, so its absence of these keys means "authored control".
+            result["observation"].update(provenance=PROVENANCE["collected-http"], collection=item.collection.wire())
         self._authorize(row, operations)
         return result
 

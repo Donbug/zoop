@@ -7,7 +7,8 @@ import pytest
 
 from extraction_support import ExtractionService, ExtractionWorkspace, make_service, terminate_extraction
 from relation_support import RelationService, RelationWorkspace, World, build_world, terminate_relation, tree
-from support import remove_tree
+from real_handoff_support import HandoffWorld, RealWorkspace, build_handoff_world
+from support import ServiceProcess, remove_tree
 
 
 @pytest.fixture(scope="session")
@@ -91,3 +92,30 @@ def start_extraction(tmp_path: Path, world: World) -> Callable[..., ExtractionSe
             terminate_relation(workspace)
     for workspace in workspaces.values():
         remove_tree(workspace.root)
+
+
+@pytest.fixture(scope="session")
+def handoff_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
+    """One fresh actual two-S3-job operator world with two frozen handoffs, built once by the pipeline's interpreter."""
+    return build_handoff_world(tmp_path_factory.mktemp("handoff-world"))
+
+
+@pytest.fixture
+def start_handoff(tmp_path: Path, handoff_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """Factory for services over the real `zoop-ai-handoff`. The shared ledgers are checked byte for byte after every test: the service only reads them."""
+    before = handoff_world.ledgers()
+    started: list[ServiceProcess] = []
+
+    def factory(exports: list[dict], *, env: dict[str, str | None] | None = None, launcher_env: dict[str, str] | None = None) -> tuple[RealWorkspace, ServiceProcess]:
+        root = tmp_path / f"hws{len(started)}"
+        workspace = RealWorkspace(root, handoff_world, exports)
+        service = ServiceProcess(workspace, env=workspace.env(**(env or {})), launcher=bool(launcher_env), launcher_env=launcher_env)
+        started.append(service)
+        return workspace, service.start()
+
+    yield factory
+    for service in started:
+        service.close()
+    for service in started:
+        remove_tree(service.workspace.root)
+    assert handoff_world.ledgers() == before, "a read-only handoff door changed an operator ledger"

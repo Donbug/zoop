@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .extraction import Extractor, Fixtures, Sources, Store
+from .extraction import Extractor, Fixtures, Sources, Store, open_legacy_history
 from .extraction_contracts import MAX_COMMAND, MAX_REPLAY, SCHEMA, ExtractionFailure, Selector, Submit, canonical
 from .ingestion_contracts import Authority, IngestionFailure, read_file
 
@@ -42,13 +42,28 @@ def main() -> int:
         if args.command == "submit" and args.topic_replay:
             # The topic fixture is not part of the frozen job; only its stage-time `resume` may name it.
             raise ExtractionFailure("fixture_not_allowed")
-        if args.command in {"run", "submit"} and args.replay is None:
-            raise ExtractionFailure("replay_fixture_required")
-        fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
-                            read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
-        authority = Authority(args.sources)
-        store = Store(args.state_dir, args.ingestion_state_dir)
-        extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
+        legacy = open_legacy_history(args.state_dir, args.ingestion_state_dir, request.job_id)
+        if legacy is not None:
+            # A stored pre-cutover job is history. Decide that from the ledger alone, BEFORE any fixture is required or parsed, any source authority is
+            # read, or a writer is opened: inspect and the refusals use the read-only store, cancel (the one allowed change) takes the writer lock and
+            # re-checks the identity there. No fixture, registry or source is consulted on this path.
+            fixtures = Fixtures(None, None)
+            if args.command == "cancel":
+                legacy.close()
+                store = Store(args.state_dir, args.ingestion_state_dir)
+                extractor = Extractor(store, Sources(args.ingestion_state_dir, None))
+                extractor.require_legacy(request.job_id)
+            else:
+                store = legacy
+                extractor = Extractor(store, Sources(args.ingestion_state_dir, None))
+        else:
+            if args.command in {"run", "submit"} and args.replay is None:
+                raise ExtractionFailure("replay_fixture_required")
+            fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
+                                read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
+            authority = Authority(args.sources)
+            store = Store(args.state_dir, args.ingestion_state_dir)
+            extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
         if args.command == "run":
             result = extractor.run(request, fixtures)
         elif args.command == "submit":

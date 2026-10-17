@@ -8,6 +8,7 @@ import com.zoop.auth.service.LoginService;
 import com.zoop.auth.service.SessionCookie;
 import com.zoop.auth.service.SignupService;
 import com.zoop.common.request.RequestIdFilter;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +34,8 @@ public class EmailAuthController {
     }
 
     @PostMapping("/signup")
+    @Operation(summary = "이메일 회원가입",
+            description = "정확히 허용된 Origin이 필요합니다. 성공 시 201과 회원 세션 쿠키를 반환합니다. 요청·응답 계약의 목표 명세는 docs/api/openapi.yaml을 참고하세요.")
     public ResponseEntity<SessionResponse> signup(@Valid @RequestBody SignupRequest body,
             @CookieValue(name = SessionCookie.NAME, required = false) String previousToken,
             HttpServletRequest request) {
@@ -44,6 +47,8 @@ public class EmailAuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "이메일 로그인",
+            description = "정확히 허용된 Origin이 필요합니다. 성공 시 200과 회원 세션 쿠키를 반환합니다. 요청·응답 계약의 목표 명세는 docs/api/openapi.yaml을 참고하세요.")
     public ResponseEntity<SessionResponse> login(@Valid @RequestBody LoginRequest body,
             @CookieValue(name = SessionCookie.NAME, required = false) String previousToken,
             HttpServletRequest request) {

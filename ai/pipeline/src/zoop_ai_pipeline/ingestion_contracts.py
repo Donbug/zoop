@@ -179,7 +179,7 @@ class Scope(Wire):
 
 class Source(Wire):
     source_id: str = Field(min_length=1)
-    adapter: Literal["authored-files"]
+    adapter: Literal["authored-files", "collected-http"]
     input_root: str = Field(min_length=1)
     allowed_hosts: list[str] = Field(min_length=1, max_length=100)
     scopes: list[Scope] = Field(min_length=1, max_length=100)
@@ -260,6 +260,73 @@ class Manifest(Wire):
         return self
 
 
+class Published(Wire):
+    """The publication time exactly as the operator declared it. Nothing here is read from the page or guessed."""
+    raw: str | None
+    precision: Literal["instant", "day", "unresolved", "unknown"]
+    date: str | None
+    basis: str = Field(min_length=1, max_length=200)
+
+
+class Collected(Wire):
+    """Item-level proof that these bytes came from one recorded HTTP acquisition (never set on authored fixtures)."""
+    provenance: Literal["collected_http"]
+    collection_id: str = Field(min_length=1, max_length=100)
+    receipt: FileRef
+    fetched_at: str
+    final_url: str = Field(min_length=1, max_length=4000)
+    http_status: int = Field(ge=200, le=299)
+    content_type: str = Field(max_length=200)
+    body_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    document_kind: Literal["news", "disclosure"]
+    # `synthetic_loopback` marks bytes served by a local synthetic test server (policy `syntheticLoopback`); it is never an external document.
+    network: Literal["external", "synthetic_loopback"]
+    published: Published
+
+    @model_validator(mode="after")
+    def instant(self):
+        timestamp(self.fetched_at)
+        return self
+
+
+class Robots(Wire):
+    url: str = Field(max_length=4000)
+    status: int
+
+
+class Receipt(Wire):
+    """One acquisition, hash-pinned by Collected.receipt. Contains no request header other than the user agent, no cookie, no credential."""
+    schema_version: Literal["zoop-collection-receipt-1"]
+    collection_id: str
+    source_id: str
+    scope_id: str
+    candidate_id: str
+    grant_id: str
+    grant_revision: str
+    requested_url: str
+    final_url: str
+    redirects: list[str] = Field(max_length=10)
+    http_status: int
+    content_type: str
+    media_type: Literal["text/html", "application/pdf"]
+    content_length: str | None
+    etag: str | None
+    last_modified: str | None
+    server_date: str | None
+    body_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    body_bytes: int = Field(ge=0)
+    fetched_at: str
+    user_agent: str
+    network: Literal["external", "synthetic_loopback"]
+    robots: list[Robots] = Field(max_length=10)
+    request_count: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def instant(self):
+        timestamp(self.fetched_at)
+        return self
+
+
 class Item(Wire):
     candidate_id: str = Field(min_length=1, max_length=200)
     supplier_document_id: str | None = Field(default=None, min_length=1, max_length=500)
@@ -270,16 +337,22 @@ class Item(Wire):
     published_at: str | None
     modified_at: str | None
     source_revision: str | None
+    collection: Collected | None = None
 
     @model_validator(mode="after")
     def dates(self):
         for value in (self.published_at, self.modified_at):
             if value is not None:
                 timestamp(value)
+        if self.collection is not None:
+            declared = self.collection.published
+            if self.published_at != (declared.raw if declared.precision == "instant" else None):
+                raise ValueError("published time must be the declared instant, never an inferred one")
         return self
 
     def metadata(self):
-        return {k: v for k, v in self.wire().items() if k not in {"candidateId", "bodyRef", "url", "supplierDocumentId"}}
+        # Collection facts describe one observation; they are not part of the immutable raw-version identity.
+        return {k: v for k, v in self.wire().items() if k not in {"candidateId", "bodyRef", "url", "supplierDocumentId", "collection"}}
 
 
 def read_file(path: Path, maximum: int) -> bytes:

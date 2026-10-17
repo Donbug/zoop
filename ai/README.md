@@ -5,7 +5,7 @@
 | 프로젝트 | 패키지 | 의존성 | 하는 일 | 실행 |
 | --- | --- | --- | --- | --- |
 | [`worker/`](worker/README.md) | `zoop_ai` | 공개 패키지만(pydantic, httpx). **토큰 불필요** | S1 문서 요약·감성·의미 검증·briefing-outlook의 영속 JSON CLI | `zoop-ai` |
-| [`pipeline/`](pipeline/README.md) | `zoop_ai_pipeline` | 고정된 private PoC(`Donbug/investmate-poc`@`fa446e7`) + lxml/pypdf + `neo4j==6.3.1`(graph 전용 직접 의존성) | S2-1 원문 준비, S2-2 이벤트·주제 후보, S3 관계·영향 후보(오프라인, replay 전용), S4 일부: S2/S3 읽기 전용 의존 대상 조회(변경된 문서·source·grant → 영향 job·후보 나열, 철회 아님), FS080 일부: 완료된 S3 job 하나를 **비공개** 불변 Neo4j version으로 stage(`zoop-ai-graph`, 서버 소유 canonical 결정·단일 explicit transaction·복구·매 read 전체 검증. 공개·활성화·FS081 철회 아님) | `zoop-ai-ingest`, `zoop-ai-extract`, `zoop-ai-relation`, `zoop-ai-dependents`, `zoop-ai-graph` |
+| [`pipeline/`](pipeline/README.md) | `zoop_ai_pipeline` | 공개 패키지만(pydantic, httpx, lxml, pypdf, `neo4j==6.3.1`(graph 전용 직접 의존성)). **토큰·private PoC 불필요** | S2-1 원문 준비, S2-2 이벤트·주제 후보, S3 관계·영향 후보(네이티브 오프라인, replay 전용), S4 일부: S2/S3 읽기 전용 의존 대상 조회(변경된 문서·source·grant → 영향 job·후보 나열, 철회 아님), FS080 일부: 완료된 S3 job 하나를 **비공개** 불변 Neo4j version으로 stage(`zoop-ai-graph`, 서버 소유 canonical 결정·단일 explicit transaction·복구·매 read 전체 검증. 공개·활성화·FS081 철회 아님) | `zoop-ai-collect`, `zoop-ai-ingest`, `zoop-ai-extract`, `zoop-ai-relation`, `zoop-ai-dependents`, `zoop-ai-graph`, `zoop-ai-handoff` |
 | [`service/`](service/README.md) | `zoop_ai_service` | 공개 패키지만(fastapi, uvicorn, pydantic — BFF·worker lock의 기존 정확한 버전). **토큰 불필요**. S2·S3 시험·smoke만 설치된 `ai/pipeline/.venv`를 요구한다(lock에는 넣지 않음) | S1용 앱→AI **내부 HTTP transport**(loopback 전용, 제출·조회·결과·취소·복구)와 별도 가족의 S2 추출 job·S3 관계 job(둘 다 기본 꺼짐). 설치된 `zoop-ai`·`zoop-ai-extract`·`zoop-ai-relation` CLI만 호출. 로컬 준비 상태이며 배포는 승인되지 않음 | `zoop-ai-service` |
 
 공통 규칙
@@ -18,7 +18,7 @@
 명령(저장소 루트)
 ```bash
 make worker-install worker-test worker-schema-check worker-build
-make pipeline-install pipeline-test pipeline-smoke pipeline-build   # private PoC 접근 필요
+make pipeline-install pipeline-test pipeline-smoke pipeline-build   # 공개 의존성만, private PoC·토큰 불필요(수집·원문 준비·S2/S3/S4·graph·handoff 전부, replay 전용)
 make pipeline-graph-smoke                                           # 격리된 빈 Neo4j 5 database 필요(ZOOP_GRAPH_SMOKE_URI·ZOOP_GRAPH_AUTH), 없으면 실패
 make service-install service-test service-smoke service-openapi-check service-build   # 공개 의존성만, 토큰 없음
 make service-pipeline-test service-pipeline-smoke                    # S3 relation job: 설치된 pipeline(make pipeline-install)이 있어야 하며 없으면 실패

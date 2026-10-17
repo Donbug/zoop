@@ -79,19 +79,27 @@ worker-test:
 	$(WORKER_PYTHON) -m pytest ai/worker/tests
 worker-build:
 	$(UV) build --project ai/worker --out-dir /tmp/zoop-ai-build
+# Native, replay-only pipeline (collection, ingestion, S2-2, S3, S4, graph, handoff): public dependencies only, no private Git access or token.
 pipeline-install:
 	$(UV) sync --project ai/pipeline --frozen --group dev
 pipeline-test:
 	$(PIPELINE_PYTHON) -m pytest ai/pipeline/tests
 pipeline-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/ingestion_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/collection_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/extraction_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py
 .PHONY: pipeline-graph-smoke
 # Requires an explicitly configured, isolated empty Neo4j test database.
 pipeline-graph-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_projection_smoke.py
+.PHONY: pipeline-graph-tls-smoke
+# Local only, explicit opt-in: creates its own throwaway PKI and private loopback Neo4j containers from the digest-pinned, already pulled neo4j:5.26.32 image
+# (never pulls, never touches foreign containers), proves preflight/init and the full graph smoke over bolt+s, and removes exactly what it created.
+pipeline-graph-tls-smoke:
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_tls_smoke.py --manage-containers
 pipeline-build:
 	$(UV) build --project ai/pipeline --out-dir /tmp/zoop-ai-pipeline-build
 service-install:
@@ -106,10 +114,13 @@ service-pipeline-test:
 service-pipeline-smoke:
 	$(SERVICE_PYTHON) ai/service/scripts/extraction_service_smoke.py
 	$(SERVICE_PYTHON) ai/service/scripts/relation_service_smoke.py
-.PHONY: service-graph-smoke
+.PHONY: service-graph-smoke service-handoff-smoke
 # Requires an explicitly configured, isolated empty Neo4j test database.
 service-graph-smoke:
 	$(SERVICE_PYTHON) ai/service/scripts/graph_service_smoke.py
+# The read-only handoff routes over the real installed zoop-ai-handoff and an actual two-S3-job synthetic world (needs `make pipeline-install` AND `make service-install`; no Neo4j; fails, never skips).
+service-handoff-smoke:
+	$(SERVICE_PYTHON) ai/service/scripts/handoff_service_smoke.py
 service-openapi-check:
 	$(SERVICE_PYTHON) ai/service/scripts/export_openapi.py --check
 service-build:
