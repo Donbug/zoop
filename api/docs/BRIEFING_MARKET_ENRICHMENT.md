@@ -51,3 +51,7 @@ python3 scripts/briefing_market_enrichment.py \
 새 bundle은 기존 `BriefingReplayImporter`로 **새** `briefing_replay` 테스트 DB에 넣고 새 artifact-root/grants/manifest로 조회한다. 기존 발행 결과에 덮어쓰면 거절된다.
 
 검증: `python3 -m unittest discover -s scripts/tests`, API `test`/`briefingReplayIntegrationTest`, React 브리핑 시험·lint·build. D-BRF-01·02의 주요 시장 지표는 일별 기준일과 은행 고시값을 표시한다.
+
+## 생성 Swagger의 union 스키마
+
+`BriefingResponse`의 JSON 스냅샷 필드에는 oneOf 참조가 사용된다. 실제 Springdoc 문서가 이 참조만 만들고 AnalysisSummary/MarketVariables/SinceMorning 본문을 누락하는 경우를 방지하기 위해 `BriefingOpenApiConfiguration`에서 문서용 모델과 하위 스키마를 명시적으로 등록한다. Swagger 활성화 정책은 변경하지 않는다. 통합 시험은 실제 `/v3/api-docs`의 reference enum과 모든 로컬 스키마 참조의 해소까지 검사한다.

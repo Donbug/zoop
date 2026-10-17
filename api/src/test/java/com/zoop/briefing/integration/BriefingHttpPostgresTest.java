@@ -322,6 +322,14 @@ class BriefingHttpPostgresTest {
         assertEquals("getBriefingGraphBasis", doc.json().at("/paths/~1api~1v1~1briefings~1{id}~1graph/get/operationId").asText());
         assertTrue(doc.json().at("/components/schemas/BriefingResponse").has("properties"));
         assertTrue(doc.json().at("/components/schemas/BriefingResponse/properties/marketSummary").isObject());
+        for (String name : java.util.List.of("AnalysisSummary", "MarketVariables", "MarketIndicator", "SinceMorning"))
+            assertTrue(doc.json().at("/components/schemas/" + name).has("properties"), name);
+        assertTrue(doc.json().at("/components/schemas/MarketIndicator/properties/valueKind/enum").values().stream()
+                .anyMatch(value -> "reference".equals(value.asText())));
+        for (JsonNode reference : doc.json().findValues("$ref")) {
+            String path = reference.asText();
+            if (path.startsWith("#/components/schemas/")) assertFalse(doc.json().at(path.substring(1)).isMissingNode(), path);
+        }
     }
 
     @Test
