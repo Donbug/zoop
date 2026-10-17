@@ -29,6 +29,10 @@ public class MemberCsrfInterceptor implements HandlerInterceptor {
             return true;
         }
         String token = null;
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        if (path.startsWith("/api/v1/admin/")) {
+            return true;
+        }
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if (SessionCookie.NAME.equals(cookie.getName())) {
@@ -40,7 +44,6 @@ public class MemberCsrfInterceptor implements HandlerInterceptor {
             }
         }
         if (token != null) {
-            String path = request.getRequestURI().substring(request.getContextPath().length());
             if ("/api/v1/auth/logout".equals(path) && !sessions.isActiveSession(token)) {
                 return true;
             }

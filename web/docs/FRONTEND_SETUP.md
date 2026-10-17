@@ -123,7 +123,12 @@ VITE_API_BASE_URL=https://api.example.com
 
 4. `pnpm --dir web dev`로 띄운 `https://localhost:5173/login`을 브라우저에서 열고, 자체 서명 인증서 경고는 이 로컬 주소에 한해 진행한다.
 
-현재 `api/`에 구현된 인증 API는 가입·로그인·세션 조회·약관·소셜(Google·카카오) 시작·콜백·소셜 가입이다. 로그아웃(`POST /api/v1/auth/logout`), 비회원 세션(`POST /api/v1/auth/guest`), 로그인 후 이동을 정하는 `GET /api/v1/me/settings`·`GET /api/v1/portfolio`는 아직 없어 404다. 그래서 초기 설정을 마친 회원은 로그인 후 종목을 확인하지 못해 이동할 화면을 정하지 못하고, 로그인 화면에서 [로그인 상태 다시 확인]만 할 수 있다(FS006: 추측하지 않음). 소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다. 콜백은 개발 서버 주소를 거쳐야 로그인·가입 화면으로 돌아온다.
+현재 `api/`에는 인증(가입·로그인·로그아웃·비회원·세션·약관·소셜), 튜토리얼 상태(`PUT /api/v1/auth/tutorial`), 초기 설정(`GET·PUT /api/v1/me/settings`), 관심 종목(`PUT /api/v1/me/watchlist/{id}`), 가상 계좌(`/api/v1/portfolio`·모의 계좌·연결·해제), 기업 검색·상세·시세·지표, 전체 관계 지도(`GET /api/v1/graph`)가 구현되어 있다. 그래서 가입 → 투자 여부 → 가상 계좌 → 관심 종목 → 지도 튜토리얼까지 실제 API로 진행된다. 개인 지도(`mode=personal`)는 아직 503이고, 기업 가격·문서·사건 API는 아직 404다.
+
+- API를 `SPRING_PROFILES_ACTIVE=local`로 띄우면 `ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN`(소셜 로그인 후 돌아올 개발 서버 주소, 예: `https://localhost:5173`)이 필요하다. 없으면 API가 시작하지 않는다.
+- 관계 지도를 보려면 API를 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`로 띄우고(합성 그래프), `web/.env.local`에 `VITE_GRAPH_DATA_SOURCE=api`를 둔다. 이 값은 테스트에도 적용되므로 `vitest`는 `VITE_GRAPH_DATA_SOURCE=mock`으로 실행한다.
+
+소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다. 콜백은 개발 서버 주소를 거쳐야 로그인·가입 화면으로 돌아온다.
 
 - 키는 팀이 함께 쓰는 개발용 OAuth 클라이언트 하나를 쓰고 Git에 넣지 않는다. `api/.env`를 바꾸면 API를 다시 시작해야 반영된다.
 - Google: OAuth 클라이언트의 **승인된 리디렉션 URI**에 위 주소를 그대로 등록한다. `api/.env`의 client ID가 그 클라이언트의 것이어야 한다. 동의 화면 사용자 유형이 **내부**이면 개인 Gmail은 `org_internal`로 막히므로, **외부 + 테스트** 상태로 두고 테스트 사용자를 등록한다.

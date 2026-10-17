@@ -52,6 +52,113 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('D-GRP-01 hover emphasizes incident nodes/edges without selecting or redrawing the viewport', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    render(<GraphCanvas data={data} onSelect={onSelect} />);
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    const draws = canvas.draw.mock.calls.length;
+    const layouts = canvas.setData.mock.calls.length;
+    const edge = data.edges.find(
+      (item) => item.source === 'mock-issue-1' && item.target === 'NASDAQ:NVDA',
+    )!;
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    await waitFor(() =>
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          'NASDAQ:NVDA': ['hovered'],
+          'mock-issue-1': ['related'],
+          [edge.id]: ['related'],
+          'KRX:005380': ['inactive'],
+        }),
+      ),
+    );
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(canvas.draw).toHaveBeenCalledTimes(draws);
+    expect(canvas.setData).toHaveBeenCalledTimes(layouts);
+    expect(canvas.focusElement).not.toHaveBeenCalled();
+    expect(canvas.created).toHaveBeenCalledOnce();
+  });
+
+  it('D-GRP-01 moving between nodes ignores stale leave and restores the clicked selection on exit', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const shared = data.edges.find(
+      (edge) => edge.relationType === 'SHARES_ISSUE',
+    )!;
+    render(
+      <GraphCanvas
+        data={data}
+        selectedId="KRX:005930"
+        selectedEdgeId={shared.id}
+      />,
+    );
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'mock-issue-1' },
+      }),
+    );
+    await act(async () =>
+      canvas.handlers.get('node:pointerleave')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    await waitFor(() =>
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          'mock-issue-1': ['hovered'],
+          'KRX:005930': ['related', 'selected'],
+        }),
+      ),
+    );
+    await act(async () =>
+      canvas.handlers.get('canvas:pointerleave')!({ target: { id: 'canvas' } }),
+    );
+    await waitFor(() =>
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          'mock-issue-1': [],
+          'KRX:005930': ['selected'],
+          [shared.id]: ['selected'],
+        }),
+      ),
+    );
+    expect(canvas.created).toHaveBeenCalledOnce();
+  });
+
+  it('D-GRP-01 hover cannot brighten nodes outside an explicit focus scope', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} focusId="NASDAQ:NVDA" focusHops={1} />);
+    await waitFor(() => expect(canvas.setElementState).toHaveBeenCalled());
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'KRX:005380' },
+      }),
+    );
+    expect(canvas.setElementState).toHaveBeenLastCalledWith(
+      expect.objectContaining({ 'KRX:005380': [] }),
+    );
+    await act(async () =>
+      canvas.handlers.get('node:pointerenter')!({
+        target: { id: 'NASDAQ:NVDA' },
+      }),
+    );
+    await waitFor(() =>
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ 'NASDAQ:NVDA': ['hovered'] }),
+      ),
+    );
+  });
+
   it('D-GRP-04 selects eligible edges via canvas/keyboard and never recreates the viewport', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelectEdge = vi.fn();

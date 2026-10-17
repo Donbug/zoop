@@ -47,7 +47,12 @@ export default function StockList({
                 {row.name}
               </p>
               <p className="mt-[3px] font-inter text-[11px] text-zoop-muted">
-                {[row.ticker, `승인 사건 ${row.issueCount}건`]
+                {[
+                  row.ticker,
+                  row.issueCount === null
+                    ? '사건 수 미제공'
+                    : `승인 사건 ${row.issueCount}건`,
+                ]
                   .filter(Boolean)
                   .join(' · ')}
                 {pendingId === row.id && ' · 저장 중'}

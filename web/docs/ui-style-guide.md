@@ -1,5 +1,9 @@
 # Shared detail panel styles
 
+## Auth and onboarding header
+
+Use `SlimHeader` from `@/components/common/SlimHeader` for D-AUT-01/02, D-ONB-01/02 and D-WAT-01/01b. It matches Figma 619:1087 using Tailwind zoop tokens and local icons. Keep `ServiceHeader` for the normal service navigation. Tutorial cards (D-GRP-T~T5) occupy their own left column rather than covering the map legend. D-GRP-07 reuses `panelStyles` for the two-company path rail; see `WIREFRAME_ALIGNMENT_20261017.md` for its snapshot-bound semantics.
+
 Read before editing frontend UI. Baseline: D-GRP-03 company side panel, Figma 619:6729. Applies to D-GRP-02 event, D-GRP-04 relation, D-GRP-05 evidence. Wireframes remain the navigation reference; this guide unifies the visual primitives, not the data semantics.
 
 ## Import and reuse
