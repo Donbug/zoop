@@ -1,16 +1,14 @@
 package com.zoop.portfolio.dto;
 
 import java.math.BigDecimal;
-import com.zoop.portfolio.model.MockHolding;
 
 public record HoldingOut(String companyId, String name, String ticker, BigDecimal quantity,
-        BigDecimal avgPrice, String avgPriceCurrency, Unavailable quote,
+        BigDecimal avgPrice, String avgPriceCurrency, QuoteState quote,
         BigDecimal marketValue, BigDecimal weight) {
-    public static HoldingOut from(MockHolding holding) {
-        return new HoldingOut(holding.companyId(), holding.name(), holding.ticker(), holding.quantity(),
-                holding.avgPrice(), holding.avgPriceCurrency(),
-                new Unavailable("unavailable", "quote_source_not_configured"), null, null);
+    public sealed interface QuoteState permits Available, Unavailable {
+        String status();
     }
-
-    public record Unavailable(String status, String reason) { }
+    public record Available(String status, BigDecimal price, String currency,
+            java.time.Instant asOf, String sourceName) implements QuoteState { }
+    public record Unavailable(String status, String reason) implements QuoteState { }
 }

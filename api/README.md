@@ -46,6 +46,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
 | `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
 | `ZOOP_DOCUMENT_READ_GRANTS` `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT` | 선택. 공개 `GET /api/v1/evidence/{id}`(운영 플래그와 독립, 읽기 전용). `GRANTS`는 operator의 flat S1 grant registry 파일로 요청마다 읽으며 미설정이면 그 읽기는 503, `ARTIFACT_ROOT`는 캐시로 돌려준 요약의 exact receipt 한 건을 읽을 때만 필요합니다(미설정이면 그 경우만 503). 값이 있는데 정규화된 절대 경로가 아니거나 없으면 기동 실패. 규칙은 [문서 분석 § 근거 읽기](docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현) |
+| `ZOOP_GRAPH_SNAPSHOT_SOURCE` | 선택. 공개 그래프 스냅샷을 어디서 읽을지 정합니다. 기본 `none`: 등록된 버전이 있어도 스냅샷 읽기는 503 `SOURCE_UNAVAILABLE`이고, 버전이 없으면 409 `VERSION_UNAVAILABLE`입니다(빈 그래프로 대체하지 않음). `fixture`: **local/dev 전용**이며, 기동 시 `src/main/resources/graph-fixtures/`의 합성 스냅샷 2개를 `graph_versions`에 등록·활성화합니다(제목 `[합성]`, 실제 뉴스 아님). 이미 가져온(non-fixture) 버전이 있는 DB에서는 기동을 거절합니다. AI 인계 묶음을 수입한 실제 스냅샷 source는 후속입니다. 규칙은 [그래프 조회 계약 결정](../docs/api/graph-read-contract-proposal.md) §0 |
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
@@ -108,7 +109,7 @@ make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> a
 
 ## Swagger / OpenAPI
 
-Swagger UI와 생성 OpenAPI 문서는 기본적으로 비활성화되어 있습니다. 로컬에서 사용할 때는 위 로컬 HTTP 실행 절차처럼 `SPRING_PROFILES_ACTIVE=local`과 `ZOOP_SWAGGER_ENABLED=true`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서 Swagger를 켜야 한다면 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하세요.
+Swagger UI와 생성 OpenAPI 문서는 기본적으로 활성화되어 있습니다. 비활성화할 환경에서는 `ZOOP_SWAGGER_ENABLED=false`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서는 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하거나 환경변수로 비활성화하세요.
 
 `/v3/api-docs`는 **현재 Spring 컨트롤러에서 생성한 문서**입니다. 목표 계약의 정본은 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)이며, 아직 구현되지 않은 목표 경로는 생성 문서에 나타나지 않습니다. 다음 순서는 API에서 제공하는 Swagger UI를 같은 `localhost:8080` 주소로 열었을 때를 기준으로 합니다. 프론트 `localhost:3000`에서의 API 호출은 별도 Origin이므로 위 공통 CORS 설정을 사용합니다.
 

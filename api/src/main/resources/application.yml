@@ -14,7 +14,7 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-# Swagger and the generated OpenAPI document are opt-in, including in production.
+# Swagger and the generated OpenAPI document are enabled by default and can be disabled per environment.
 springdoc:
   api-docs:
     enabled: ${ZOOP_SWAGGER_ENABLED:false}
@@ -40,6 +40,10 @@ zoop:
     allowed-origins: ${ZOOP_AUTH_ALLOWED_ORIGINS:}
     allow-http-loopback-origins: false
     session-cookie-secure: true
+  graph:
+    snapshot:
+      # Public graph snapshot source: none (default; reads fail closed) or fixture (local/dev synthetic data only).
+      source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.

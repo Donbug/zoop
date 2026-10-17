@@ -1,5 +1,6 @@
 package com.zoop.document.importer;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -89,14 +90,21 @@ public final class DocumentImporter {
 
     private ItemResult importItem(ArtifactFileStore.Session session, int index, ImportItem item) {
         VerifiedDocument document = parser.parse(exporter.export(item.observation()), item.observation());
+        CollectedProvenance collected = document.collected();
+        if (collected != null && !collected.documentKind().equals(item.kind().wire())) {
+            // The operator declared one kind when collecting and another when importing: refuse instead of choosing.
+            throw new DocumentImportException(DocumentImportFailure.ARTICLE_KIND_CONFLICT);
+        }
         ArtifactFileStore.StoredFile file = storeText(session, document);
+        // A collected document's time of observation is the actual fetch time, not the later ledger receipt time.
+        Instant collectedAt = collected != null ? collected.fetchedAt() : document.observedAt();
         RegistrationOutcome outcome;
         try {
             outcome = registration.register(new RegistrationCommand(
                     document.observation().documentId(), document.observation().documentVersion(),
                     document.observation().sourceId(), item.kind(), document.textArtifactId(), file.uri(), file.sha256(),
-                    file.bytes(), document.title(), document.url(), document.publishedAt(), document.observedAt(),
-                    item.pointer()));
+                    file.bytes(), document.title(), document.url(), document.publishedAt(), document.publishedDate(),
+                    document.publicationPrecision(), collectedAt, item.pointer()));
         } catch (DocumentImportException rolledBack) {
             if (session.discard(file)) {
                 log.info("document import item {} removed the text file it had created", index);
@@ -109,7 +117,8 @@ public final class DocumentImporter {
         return new ItemResult.Imported(index, document.observation().documentId(),
                 document.observation().documentVersion(), document.textArtifactId(), outcome.article(),
                 outcome.artifact(), RegistrationOutcome.Presence.of(file.created()), outcome.version(), outcome.pointer(),
-                outcome.currentVersion(), outcome.collectedAt(), document.grantId(), document.grantRevision());
+                outcome.currentVersion(), outcome.collectedAt(), document.grantId(), document.grantRevision(),
+                document.publicationPrecision(), collected);
     }
 
     private static ArtifactFileStore.StoredFile storeText(ArtifactFileStore.Session session, VerifiedDocument document) {

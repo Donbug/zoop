@@ -1,10 +1,10 @@
-# ai/service — 내부 HTTP transport (S1 분석, S2 추출, S3 관계 job)
+# ai/service — 내부 HTTP transport (S1 분석, S2 추출, S3 관계 job, 읽기 전용 그래프·handoff)
 
 앱 백엔드가 S1 분석(`document-summary`, `document-sentiment`, `semantic-verification`, `briefing-outlook`, 계약 `zoop-ai-s1-1`)을 제출·조회·취소·복구하는 **내부 전용 HTTP 서비스**입니다. 같은 프로세스가 별도 리소스 가족으로 S2 이벤트·토픽 후보 job(`/internal/v1/extraction-jobs`, 기본 꺼짐)과 S3 관계·영향 후보 job(`/internal/v1/relation-jobs`, 기본 꺼짐)도 노출합니다. FastAPI/uvicorn이며 **설치된 `zoop-ai`(S2는 `zoop-ai-extract`, S3는 `zoop-ai-relation`) CLI만** 호출합니다. `zoop_ai`·`zoop_ai_pipeline`·BFF를 import하지 않고 worker의 `worker.sqlite3`와 pipeline의 `extraction.sqlite3`·`relation.sqlite3`·`ingestion.sqlite3`를 열지 않습니다. 런타임 원장이 작업 상태의 유일한 출처이고 이 서비스는 소유자·멱등·고정된 승인 신원·dispatch 상태만 별도 `service.sqlite3`(S1), `extraction-jobs.sqlite3`(S2), `relation-jobs.sqlite3`(S3)에 둡니다.
 
 > **로컬 준비 상태입니다.** 배포·보안 그룹·TLS 프록시는 확인되지 않았고 승인되지 않았습니다. 원격 CI는 `5cf208e`의 [실행 38226220631](https://github.com/Donbug/zoop/actions/runs/38226220631)에서 8개 작업이 모두 통과했고 실제 Java 클라이언트 → 이 서비스 → 설치된 `zoop-ai` replay 종단 시험을 포함합니다. Spring 전송 클라이언트(`api/src/main/java/com/zoop/ai`)가 이 HTTP를 소비하고, S1 문서 요약·기업 판정은 operator 전용 비웹 실행([문서 분석](../../api/docs/DOCUMENT_ANALYSIS.md))이 결과를 앱 PostgreSQL에 저장합니다(로컬 구현·검증). 공개 인증, 분석을 읽는 공개 경로, S2·S3·`briefing-outlook` 결과의 앱 import, 배포는 아직 없습니다. 실제 모델 호출, 외부 뉴스, 실제 토큰은 쓰지 않았습니다. **S2 extraction job 라우트와 S3 relation job 라우트(아래 별도 절)는 이후 추가했고 원격 CI에서 실행된 결과는 아직 관측하지 않았습니다. 이 두 가족도 Spring 전송 클라이언트(`ExtractionClient`·`RelationClient`)가 로컬에서 소비하며 실제 서비스·설치된 pipeline replay 종단 gate(`api/scripts/ai_pipeline_gate.py`)로 검증했지만, S2·S3 결과의 앱 DB 저장·import와 사용자 격리·공개 endpoint는 없습니다.** S2-1 수집(`zoop-ai-ingest`)은 운영자 파일 입력이므로 HTTP로 열지 않습니다. S2-2 추출(`zoop-ai-extract`)은 호출자가 스냅샷·카탈로그·fixture를 보낼 수 없는 **서버 사전 승인 요청** 참조 모델로만 엽니다.
 
-> **경계.** 이 서비스는 pipeline의 비공개 Neo4j 버전 projection(`zoop-ai-graph`, FS080 일부)을 **읽기 전용 두 라우트**(`/internal/v1/graph-versions`, 아래 별도 절)로만 감쌉니다. 버전 생성(`init`·`freeze`·`project`·`recover`)·게시·활성화·FS081 철회·목록·호출자 Cypher는 없고, Neo4j write 자격과 쓰기 명령은 pipeline 운영자 프로세스만 갖습니다. 공개 API·Spring 클라이언트·활성 포인터는 없습니다([pipeline README](../pipeline/README.md), [AI 실행 계약](../../docs/design/ai-system.md), [백엔드 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)).
+> **경계.** 이 서비스는 pipeline의 비공개 Neo4j 버전 projection(`zoop-ai-graph`, FS080 일부)을 **읽기 전용 두 라우트**(`/internal/v1/graph-versions`, 아래 별도 절)로만 감싸고, 별개로 AI handoff bundle의 **읽기 전용 두 라우트**(`/internal/v1/graph-handoffs`, 아래 절)를 제공합니다. 버전 생성(`init`·`freeze`·`project`·`recover`)·게시·활성화·FS081 철회·목록·호출자 Cypher는 없고, Neo4j write 자격과 쓰기 명령은 pipeline 운영자 프로세스만 갖습니다. 공개 API·Spring 클라이언트·활성 포인터는 없습니다([pipeline README](../pipeline/README.md), [AI 실행 계약](../../docs/design/ai-system.md), [백엔드 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)).
 
 ```bash
 make service-install           # uv sync --project ai/service --frozen --group dev (공개 의존성만, 토큰 없음)
@@ -13,6 +13,7 @@ make service-smoke             # 실제 프로세스 smoke (replay 4종 + recove
 make service-openapi-check     # docs/api/internal-ai-openapi.{json,yaml} 생성 drift
 make service-pipeline-test     # S2 extraction + S3 relation job: 실제 uvicorn + 설치된 zoop-ai-extract·zoop-ai-relation + 새 운영자 세계 (make pipeline-install 필요, 없으면 실패)
 make service-pipeline-smoke    # 같은 조건의 실제 프로세스 smoke (S2 제출·조회·승인/fixture 회전·모호 child·재시작 → 명시적 S3 허용 → S3, S3 조회·격리·철회·모호 child·재시작, 검수 allow→재검증·reject·충돌·크래시 복구)
+make service-handoff-smoke     # 읽기 전용 handoff 두 route: 실제 uvicorn + 설치된 zoop-ai-handoff + S3 job 두 개 세계(Neo4j 불필요, pipeline 설치 없으면 실패)
 make service-build             # wheel/sdist
 ai/service/.venv/bin/python -m zoop_ai_service.main   # 또는 zoop-ai-service (아래 환경 설정 필요)
 ```
@@ -169,6 +170,29 @@ stdout 로그는 요청마다 JSON 한 줄(requestId, principal, 라우트 템�
 
 **시험.** `tests/test_graph_unit.py`(설정 닫힘·allowlist 엄격성·exit 해석·투영·전달 규칙·신선도 순서·예시), `tests/test_graph_http.py`(실제 uvicorn + 시험 소유 stand-in 명령: 고정 argv·최소 환경·쿼리 검증·withheld·busy·deadline·동시성·로그), `pipeline_tests/test_graph_real_cli.py`(실제 `zoop-ai-graph`, Neo4j 없이 가능한 거절 경로)는 기본 `service-test`/`service-pipeline-test`에 들어갑니다. 실제 Neo4j 종단은 `scripts/graph_service_smoke.py`(환경이 없으면 skip이 아니라 **실패**)입니다: 운영자 세계를 `graph_tool_bench.py prepare`로 만들고, 서비스 HTTP 응답을 직접 실행한 CLI(oracle)와 손으로 쓴 기대값에 대조하며, principal 격리·digest 불일치·focus 1~3·없는 회사·source 철회·canonical 변경·심은 손상(fail closed)·쓰기 락 busy·실제 deadline·비밀 비노출·원장 불변을 확인합니다.
 
+## AI handoff bundle 읽기 (`/internal/v1/graph-handoffs`)
+
+설치된 `zoop-ai-handoff export` 위의 **네 번째 별도 가족**입니다(스키마 `zoop-ai-internal-handoff-1`, scope `handoff.read` 하나). `graph.read` 가족과 변수·scope·allowlist를 공유하지 않으며 기본은 꺼져 있고 **공개 경로가 아닙니다**. 서비스는 어떤 것도 쓰지 않고(handoff·원장·캐시·source 쓰기, 모델·네트워크 호출 없음) `freeze`·`recover`·`inspect`를 호출할 수 없으며(고정 argv는 `export`뿐), `zoop_ai_pipeline`·SQLite를 import하거나 열지 않습니다. 앱 import·활성화·공개는 하지 않고 응답의 `publication`은 항상 `not-published`, `appImport`는 항상 `pending`입니다.
+
+| 라우트 | scope | 응답 |
+|---|---|---|
+| `GET /internal/v1/graph-handoffs/{handoffId}` | `handoff.read` | 200 `HdStatus`: 신원·`state`·`delivery`와, current일 때만 `verification`(manifest·bundle·content digest, 바이트 수, bundle 자신의 개수, source job 수, provenance 선언). 노드·source id·제목·본문 없음 |
+| `GET /internal/v1/graph-handoffs/{handoffId}/bundle` | `handoff.read` | 200 `HdBundle`: 위와 같은 형제 필드 + current이고 두 pin이 맞을 때만 `manifest`(freeze 때 원장에 동결된 manifest 본문, 닫힌 모델 `HandoffManifest`)와 `bundle`(`zoop-graph-handoff-bundle-1` 전체). 백엔드는 이 한 응답으로 `sha256(canonical(manifest))`=`manifestDigest`와 `sha256(canonical(bundle))`=`bundleDigest`를 모두 재계산합니다. 서비스는 manifest 누락·미지 필드(500 `runtime_contract_mismatch`)와 digest·handoffId·선언·정책 버전·파일 해시·source 핀 불일치(500 `runtime_binding_mismatch`)를 거절하며 status·withheld에는 manifest가 없습니다 |
+
+쿼리 파라미터는 **하나도 허용하지 않습니다**(422). 목록·생성·복구 route는 없습니다.
+
+**설정(10개 모두 있어야 켜지는 그룹, S2/S3·graph와 별개).** `ZOOP_AI_SERVICE_HANDOFF_COMMAND`(설치된 `zoop-ai-handoff` 절대 경로), `ZOOP_AI_HANDOFF_STATE_DIR`(운영자가 `freeze`로 만든 handoff 원장 루트, 읽기 전용으로만 넘김), `ZOOP_AI_HANDOFF_RELATION_STATE_DIR`·`ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR`·`ZOOP_AI_HANDOFF_INGESTION_STATE_DIR`(존재하는 디렉터리), `ZOOP_AI_SERVICE_HANDOFF_SOURCES`, 매니페스트가 sha256으로 고정한 운영자 파일 `ZOOP_AI_SERVICE_HANDOFF_CANONICAL`·`ZOOP_AI_SERVICE_HANDOFF_DECISIONS`·`ZOOP_AI_SERVICE_HANDOFF_BINDINGS`, `ZOOP_AI_SERVICE_HANDOFF_EXPORTS`(아래 allowlist), 그리고 모든 그룹이 쓰는 `ZOOP_STATE_DIR`. 일부만 있거나 값이 잘못되면 필드 이름과 사유 코드만 내고 시작을 거부합니다(`handoff_group_incomplete`·`handoff_roots_overlap`·`handoff_source_inconsistent`). S2/S3 그룹이 같은 프로세스에 있으면 같은 루트·registry여야 하고(다르면 시작 거부) 같은 gate를 공유합니다. child 환경은 소유 환경(`ZOOP_STATE_DIR`·`ZOOP_AI_WORKER_STATE_DIR`)만이며 그래프 자격·provider 키·토큰 digest·모델 설정은 들어가지 않습니다.
+
+**handoff allowlist(`ZOOP_AI_SERVICE_HANDOFF_EXPORTS`).** handoff id는 라벨일 뿐이므로 운영자가 principal별로 정확한 `{handoffId, manifestDigest, bundleDigest}`(둘 다 필수 sha256 pin: manifest 해시와 canonical bundle 바이트 해시)를 `{"schemaVersion":"zoop-ai-handoff-exports-1","handoffs":[…]}`로 적습니다. 알 수 없는 키·pin 누락·중복 `(principal, handoffId)`·모르는 principal은 시작을 거부합니다. 목록에 없으면(없는 id·다른 principal의 것 포함) 같은 403 `handoff_not_allowed`를 child 전에 돌려줍니다. 파일은 요청마다 다시 읽고 slot·gate 대기 뒤 child 시작 전, child 응답 직후 답의 어떤 부분이든 쓰기 전, 내용 조립 직전에 다시 읽어 바뀌었으면 403입니다.
+
+**전달 규칙.** 내용은 아래가 **모두** 성립할 때만 나갑니다. (1) 생산자가 `ready`·`delivery.status=current`를 말하고(운영자 파일 3개의 매니페스트 pin, S3 권한·S2 upstream pin·grant, 사용한 검수 revision, 재구성한 content digest를 매 export마다 다시 검증), (2) 받은 bundle의 canonical 바이트 sha256이 생산자 receipt와 **운영자 `bundleDigest` pin** 둘 다와 같고 manifest digest가 `manifestDigest` pin과 같으며, (3) bundle이 모든 중첩 수준에서 **닫힌 모델**(`handoff_wire.Bundle`)을 통과하고 모델이 다시 내보낸 canonical 바이트가 해시한 바이트와 정확히 같을 때. 아니면 **200 + `delivery.state=withheld`**와 사유(`source_unauthorized`·`upstream_changed`·`canonical_mapping_changed`·`decisions_changed`·`bindings_changed`·`review_revision_changed`·`handoff_content_changed`·`handoff_not_ready`·`handoff_pin_mismatch` …)만 있고 `verification`·`bundle`은 null입니다(개수·source id도 없음). 생산자 receipt와 받은 바이트가 서로 어긋나면 500 `runtime_binding_mismatch`, 닫힌 모델이 거부하면(모르는 중첩 필드, 타입·범위 위반 — **digest와 pin을 새 내용에 맞춰 갱신했어도**) 500 `runtime_contract_mismatch`입니다. 둘 다 재시도해도 바뀌지 않으므로 retryable이 아닙니다. 검사들은 서로 다른 시각의 읽기라 그 사이의 철회는 잡지 못하고 이미 나간 내용은 회수되지 않습니다.
+
+**bundle 바이트.** `bundle`은 생산자의 산출물 그대로이며 서비스가 추가·삭제·기본값 보정·정규화하는 것은 없습니다(`exclude_unset`로 입력 키만 되돌리고, 되돌린 canonical 문자열이 받은 것과 다르면 거부). `verification.bundleDigest`는 canonical JSON(키 정렬, `,`·`:` 구분자, 비ASCII 비이스케이프)의 UTF-8 바이트 sha256입니다. 숫자는 음이 아닌 정수뿐이고 키는 ASCII뿐이라 어떤 언어의 JSON 파서 + 같은 직렬화도 같은 digest를 냅니다(`pipeline_tests`와 smoke가 JavaScript로 다시 계산해 확인). 서비스 필드(`appImport`·`delivery`·`verification`·`observedAt`)는 `bundle` 밖의 형제입니다. 제목·URL·label·관측·grant 같은 source 유래 값은 데이터이며 권한의 근거가 아닙니다: 전달 여부는 현재 `delivery.state`와 운영자 pin만이 정합니다. 닫힌 모델은 키 집합·타입·패턴·크기 한도(구조)를 고정하고, 참조 닫힘·id 공식·개수·권한 같은 의미 규칙은 생산자가 쓰기 전과 매 export마다 검증하며 서비스는 반복하지 않습니다.
+
+**한도와 오류.** 생산자의 bundle 상한은 canonical 6 MiB이고 서비스는 child stdout을 16 MiB까지 읽습니다(넘으면 잘라 보내지 않고 503 `runtime_unavailable`). child는 요청당 하나이고 자동 재시도는 없으며 동시 child는 2개(초과 시 503 `service_busy`), deadline 45초입니다. writer가 원장을 잡은 상태(`handoff_busy`·`relation_busy`·`extraction_busy`·`ingestion_busy`)는 503 `runtime_busy`, 손상·변경된 artifact·운영자 파일·소유 설정·복구 필요(`handoff_recovery_required`)는 503 `service_configuration_invalid`, 목록에 있으나 원장에 없는 id는 404 `handoff_not_found`입니다. 모든 503은 `Retry-After`를 갖고 빈 bundle로 답하지 않습니다.
+
+**시험.** `tests/test_handoff_unit.py`(설정 닫힘·allowlist 엄격성·exit·canonical 줄 해석·닫힌 모델을 모든 노드에서 변조·전달 규칙·예시), `tests/test_handoff_http.py`(실제 uvicorn + 시험 소유 stand-in 명령: 고정 argv·최소 환경·pin·중첩 모르는 필드·바이트 동일 중계·JS digest·withheld·busy·deadline·동시성·로그), `pipeline_tests/test_handoff_real_cli.py`(실제 `zoop-ai-handoff`와 S3 job 두 개 세계: CLI export와 바이트 동일, 생산자 검증기 통과, 권한 철회·운영자 파일 변경 withheld→복원)는 기본 `service-test`/`service-pipeline-test`에 들어갑니다. 종단 smoke는 `make service-handoff-smoke`(`scripts/handoff_service_smoke.py`, Neo4j 불필요, pipeline 설치가 없으면 skip이 아니라 **실패**)입니다. 생성된 [내부 OpenAPI](../../docs/api/internal-ai-openapi.yaml)가 계약이며 백엔드 사용 주의는 [인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)에 있습니다.
+
 ## 네트워크와 한계
 
 - 서비스는 `127.0.0.1`에만 묻습니다. 운영에서는 같은 호스트/네임스페이스의 HTTPS reverse proxy가 TLS, 본문 2,000,000B 상한, `Authorization` 비로깅을 맡고 App SG에서만 접근되게 해야 합니다. **이는 가정이며 관측·배포한 사실이 없습니다**(WBS 6.11.2/8의 실관측 과제).
@@ -197,7 +221,7 @@ stdout 로그는 요청마다 JSON 한 줄(requestId, principal, 라우트 템�
 
 ### S3 relation job 시험 (설치된 pipeline 필요, `make service-pipeline-test` / `service-pipeline-smoke`)
 
-`pipeline_tests/`는 **기본 `service-test`와 분리**돼 있습니다(서비스 lock에 private pipeline이 없고 CI `ai-service` job에는 토큰이 없기 때문). `ai/pipeline/.venv`(`make pipeline-install`, private PoC 자격 필요)가 없으면 **skip이 아니라 실패**합니다. 시험은 pipeline 인터프리터로 `build_world.py`를 실행해 실제 `zoop-ai-ingest` subprocess와 READY S2 job, 실제 저장 후보에서 도출한 authored producer/verifier fixture로 **새 운영자 세계**를 만들고, 서비스는 설치된 `zoop-ai-relation`으로만 연결합니다. 서비스 코드는 `zoop_ai_pipeline`을 import하지 않습니다. 운영자의 ingestion·extraction 디렉터리는 모든 시험 뒤 바이트·mode·크기가 같아야 합니다.
+`pipeline_tests/`는 **기본 `service-test`와 분리**돼 있습니다(서비스 lock에 pipeline이 없기 때문). `ai/pipeline/.venv`(`make pipeline-install`, 공개 의존성만·토큰 불필요)가 없으면 **skip이 아니라 실패**합니다. 시험은 pipeline 인터프리터로 `build_world.py`를 실행해 실제 `zoop-ai-ingest` subprocess와 READY S2 job, 실제 저장 후보에서 도출한 authored producer/verifier fixture로 **새 운영자 세계**를 만들고, 서비스는 설치된 `zoop-ai-relation`으로만 연결합니다. 서비스 코드는 `zoop_ai_pipeline`을 import하지 않습니다. 운영자의 ingestion·extraction 디렉터리는 모든 시험 뒤 바이트·mode·크기가 같아야 합니다.
 
 | 파일 | 증명 |
 |---|---|

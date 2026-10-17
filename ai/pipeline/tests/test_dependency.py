@@ -25,6 +25,7 @@ from scripts.dependency_smoke import build, by, dep, document, grant, labels, li
 from scripts.extraction_smoke import page
 from scripts.ingestion_smoke import json_bytes
 from scripts.relation_smoke import MAIN_TEXT, build_world, tree
+from tests.legacy_ledger import copy_as_legacy
 from zoop_ai_pipeline import dependency_cli, relation
 from zoop_ai_pipeline.dependency_contracts import MAX_COMMAND, SCHEMA
 from zoop_ai_pipeline.extraction import Extractor, Fixtures, Sources
@@ -332,10 +333,10 @@ def test_the_audit_hook_used_for_process_checks_really_aborts_network_use_and_wr
 
 
 def test_no_database_pipeline_graph_or_network_modules_are_loaded_by_the_dependents_command(shared):
-    code = ("import sys\nfrom zoop_ai_pipeline import dependency_cli\nprint([m for m in sys.modules if m.startswith(('investmate.storage', 'investmate.pipeline', 'investmate.graph', "
+    code = ("import sys\nfrom zoop_ai_pipeline import dependency_cli\nprint([m for m in sys.modules if m.startswith(('investmate', "
             "'psycopg', 'neo4j', 'zoop_bff', 'zoop_ai.', 'socket', 'httpx', 'requests'))] + (['zoop_ai'] if 'zoop_ai' in sys.modules else []))")
     child = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True, cwd=shared.kit.root, env={"PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"), "PATH": "/usr/bin:/bin"})
-    assert child.returncode == 0 and "investmate.pipeline" not in child.stdout and "zoop_bff" not in child.stdout and "neo4j" not in child.stdout, child.stderr + child.stdout
+    assert child.returncode == 0 and "investmate" not in child.stdout and "zoop_bff" not in child.stdout and "neo4j" not in child.stdout, child.stderr + child.stdout
 
 
 # ---------------------------------------------------------------- fail closed ------------------------------------------
@@ -588,6 +589,17 @@ def test_a_scanned_upstream_that_is_not_the_ready_job_s3_was_built_from_is_unres
         report, _ = invoke(ledgers, request, extraction="extraction-stopped")
         assert report["identity"]["bound"] is True and report["relation"]["jobs"] == [], request
         assert [(u["jobId"], u["code"], u["upstream"]) for u in report["relation"]["unresolved"]] == [("rel-main", MISMATCH, pinned), ("rel-stopped", MISMATCH, pinned)], request
+
+
+def test_a_legacy_job_is_reported_identity_only_beside_native_jobs_and_the_report_does_not_fail(shared, ledgers):
+    main = shared.refs["main"]
+    baseline, _ = invoke(ledgers, document(main))
+    copy_as_legacy(ledgers, "s2-job", "s2-legacy")
+    report, _ = invoke(ledgers, document(main))
+    assert report["extraction"]["scannedJobs"] == baseline["extraction"]["scannedJobs"] + 1
+    native, legacy = by(report["extraction"]["jobs"], "jobId", "s2-job"), by(report["extraction"]["jobs"], "jobId", "s2-legacy")
+    assert legacy["state"] == "ready" and {k: v for k, v in legacy.items() if k not in {"jobId", "inputDigest"}} == {k: v for k, v in native.items() if k not in {"jobId", "inputDigest"}}
+    assert native == by(baseline["extraction"]["jobs"], "jobId", "s2-job") and report["relation"] == baseline["relation"]
 
 
 def mutate(root: Path, name: str, *statements: tuple) -> None:
