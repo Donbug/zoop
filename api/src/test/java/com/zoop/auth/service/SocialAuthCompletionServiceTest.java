@@ -54,7 +54,7 @@ class SocialAuthCompletionServiceTest {
         members = mock(MemberAuthRepository.class);
         sessions = mock(MemberSessionService.class);
         var settings = new SocialAuthSettings(Duration.ofMinutes(10), 30, 10, "/login,/signup,/", true,
-                "google-client", "google-secret", "http://localhost:8080/api/v1/auth/social/google/callback",
+                "http://localhost:5173", "google-client", "google-secret", "http://localhost:8080/api/v1/auth/social/google/callback",
                 "kakao-client", "kakao-secret", "http://localhost:8080/api/v1/auth/social/kakao/callback");
         service = new SocialAuthCompletionService(pending, identities, members, sessions, settings,
                 mapper, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -72,7 +72,7 @@ class SocialAuthCompletionServiceTest {
 
         var response = service.complete(row, COOKIE, null, "request-1");
 
-        assertEquals("/login", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         assertTrue(response.getHeaders().get(HttpHeaders.SET_COOKIE).stream().anyMatch(value -> value.startsWith("zoop_session=")));
         assertTrue(response.getHeaders().get(HttpHeaders.SET_COOKIE).stream().anyMatch(value -> value.startsWith("zoop_oauth_pending=")));
         verify(sessions).issue("member-id", null, "request-1");
@@ -90,7 +90,7 @@ class SocialAuthCompletionServiceTest {
 
         var response = service.complete(row, COOKIE, null, "request-1");
 
-        assertEquals("/login?social=link_required", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=link_required", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(sessions, never()).issue(anyString(), any(), anyString());
         verify(identities, never()).insert(anyString(), anyString(), anyString(), anyString(), any(Instant.class));
         verify(pending).consumeIdentityVerified(eq("flow-id"), anyString(), any(Instant.class));
@@ -107,7 +107,7 @@ class SocialAuthCompletionServiceTest {
 
         var response = service.complete(row, COOKIE, null, "request-1");
 
-        assertEquals("/signup?social=pending", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/signup?social=pending", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         String cookie = response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
         assertTrue(cookie.startsWith("zoop_oauth_pending="));
         assertTrue(cookie.contains("HttpOnly"));
@@ -132,7 +132,7 @@ class SocialAuthCompletionServiceTest {
 
         var response = service.complete(row, COOKIE, null, "request-1");
 
-        assertEquals("/login?social=email_required", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=email_required", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(members, never()).findByEmailKey(anyString());
         verify(pending, never()).rotateToConsent(anyString(), anyString(), anyString(), anyString(),
                 any(Instant.class), any(Instant.class));
@@ -150,7 +150,7 @@ class SocialAuthCompletionServiceTest {
 
         var response = service.complete(row, COOKIE, "S".repeat(43), "request-1");
 
-        assertEquals("/login?social=linked", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=linked", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(identities).insert(anyString(), eq("member-id"), eq("google"), eq("subject-1"), eq(NOW));
         verify(sessions, never()).issue(anyString(), any(), anyString());
     }
@@ -165,7 +165,7 @@ class SocialAuthCompletionServiceTest {
 
         var changed = service.complete(changedSession, COOKIE, "S".repeat(43), "request-1");
 
-        assertEquals("/login?social=failed", changed.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=failed", changed.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(members, never()).findLinkTargetById(anyString());
         verify(identities, never()).insert(anyString(), anyString(), anyString(), anyString(), any(Instant.class));
 
@@ -180,7 +180,7 @@ class SocialAuthCompletionServiceTest {
 
         var emailMismatch = service.complete(mismatch, COOKIE, "S".repeat(43), "request-1");
 
-        assertEquals("/login?social=failed", emailMismatch.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=failed", emailMismatch.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(identities, never()).insert(anyString(), anyString(), anyString(), anyString(), any(Instant.class));
     }
 
@@ -197,7 +197,7 @@ class SocialAuthCompletionServiceTest {
 
         var conflict = service.complete(row, COOKIE, "S".repeat(43), "request-1");
 
-        assertEquals("/login?social=failed", conflict.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=failed", conflict.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(identities, never()).insert(anyString(), anyString(), anyString(), anyString(), any(Instant.class));
 
         reset(pending, sessions, members, identities);
@@ -211,7 +211,7 @@ class SocialAuthCompletionServiceTest {
 
         var retry = service.complete(row, COOKIE, "S".repeat(43), "request-1");
 
-        assertEquals("/login?social=linked", retry.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("http://localhost:5173/login?social=linked", retry.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(identities, never()).insert(anyString(), anyString(), anyString(), anyString(), any(Instant.class));
         verify(sessions, never()).issue(anyString(), any(), anyString());
     }
