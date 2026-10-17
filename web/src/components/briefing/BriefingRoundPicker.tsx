@@ -169,7 +169,7 @@ export default function BriefingRoundPicker({
         </button>
       )}
       {state.error && state.rounds.length > 0 && (
-        <p role="alert" className="text-[10px] text-[#b42318]">
+        <p role="alert" className="text-[10px] text-zoop-alert">
           이전 회차를 불러오지 못했어요.
         </p>
       )}
