@@ -1,4 +1,5 @@
 import type { Meta } from '@/types/company/detail';
+import type { GraphResponse } from '@/types/map/graph';
 import { ApiError, call } from '@/apis/auth/ApiService';
 export function companyUrl(
   id: string,
@@ -19,6 +20,81 @@ export async function readCompanyResource<T>(
     skipAuth: !url.startsWith('/api/v1/portfolio'),
   });
   const requested = new URL(url, 'http://localhost');
+  const companyId = /^\/api\/v1\/companies\/([^/]+)$/.exec(
+    requested.pathname,
+  )?.[1];
+  if (
+    companyId &&
+    (first as { id?: unknown }).id !== decodeURIComponent(companyId)
+  )
+    throw new ApiError(
+      502,
+      'INVALID_RESPONSE',
+      '요청한 기업과 다른 자료를 받았어요.',
+    );
+  const eventId = /^\/api\/v1\/events\/([^/]+)$/.exec(requested.pathname)?.[1];
+  const impactIds =
+    /^\/api\/v1\/companies\/([^/]+)\/issues\/([^/]+)\/impact$/.exec(
+      requested.pathname,
+    );
+  if (eventId && (first as { id?: string }).id !== decodeURIComponent(eventId))
+    throw new ApiError(
+      502,
+      'INVALID_RESPONSE',
+      '요청한 사건과 다른 자료를 받았어요.',
+    );
+  if (impactIds) {
+    const impact = first as { companyId: string; issueId: string };
+    if (
+      impact.companyId !== decodeURIComponent(impactIds[1]) ||
+      impact.issueId !== decodeURIComponent(impactIds[2])
+    )
+      throw new ApiError(
+        502,
+        'INVALID_RESPONSE',
+        '요청한 기업·사건과 다른 영향 경로를 받았어요.',
+      );
+  }
+  const priceCompany = /^\/api\/v1\/companies\/([^/]+)\/prices$/.exec(
+    requested.pathname,
+  )?.[1];
+  if (priceCompany) {
+    const prices = first as {
+      status: string;
+      companyId: string;
+      period: string;
+      points: { time: string }[];
+    };
+    if (
+      prices.status === 'available' &&
+      (prices.companyId !== decodeURIComponent(priceCompany) ||
+        prices.period !== requested.searchParams.get('period'))
+    )
+      throw new ApiError(
+        502,
+        'INVALID_RESPONSE',
+        '요청한 기업·기간과 다른 차트를 받았어요.',
+      );
+    if (prices.status === 'available') {
+      const from = requested.searchParams.get('from');
+      const to = requested.searchParams.get('to');
+      if (
+        prices.points.some((point) => {
+          const at = Date.parse(point.time);
+          return (
+            !Number.isFinite(at) ||
+            (from !== null && at < Date.parse(from)) ||
+            (to !== null && at > Date.parse(to))
+          );
+        })
+      )
+        throw new ApiError(
+          502,
+          'INVALID_RESPONSE',
+          '선택한 조회 범위 밖의 가격 자료를 받았어요.',
+        );
+    }
+  }
   const payload = first as { metadata?: { graphVersion?: string | null } };
   const expectedVersion = requested.searchParams.get('graphVersion');
   if (expectedVersion && payload.metadata?.graphVersion !== expectedVersion)
@@ -27,6 +103,42 @@ export async function readCompanyResource<T>(
       'VERSION_UNAVAILABLE',
       '요청한 공개 버전과 다른 자료를 받았어요.',
     );
+  const expectedAsOf = requested.searchParams.get('asOf');
+  const validatesSelectionTime =
+    /^\/api\/v1\/events(?:\/[^/]+)?$/.test(requested.pathname) || !!impactIds;
+  if (
+    expectedAsOf &&
+    validatesSelectionTime &&
+    Date.parse(
+      (first as { metadata?: { asOf?: string } }).metadata?.asOf ?? '',
+    ) !== Date.parse(expectedAsOf)
+  )
+    throw new ApiError(
+      502,
+      'INVALID_RESPONSE',
+      '선택한 기준 시점과 다른 자료를 받았어요.',
+    );
+  const graphCompanyId = /^\/api\/v1\/companies\/([^/]+)\/graph$/.exec(
+    requested.pathname,
+  )?.[1];
+  if (graphCompanyId) {
+    const graph = first as GraphResponse;
+    const expectedDepth = Number(requested.searchParams.get('depth') ?? 1);
+    const expectedTime = Date.parse(requested.searchParams.get('asOf') ?? '');
+    const actualTime = Date.parse(graph.metadata?.asOf ?? '');
+    const focus = graph.metadata?.focusCompanyIds ?? [];
+    if (
+      !Number.isFinite(expectedTime) ||
+      actualTime !== expectedTime ||
+      graph.metadata?.depth !== expectedDepth ||
+      !focus.includes(decodeURIComponent(graphCompanyId))
+    )
+      throw new ApiError(
+        502,
+        'INVALID_RESPONSE',
+        '요청한 기업·시점·관계 단계와 다른 그래프를 받았어요.',
+      );
+  }
   if (!paged) return first;
   type Page = {
     items: { id: string }[];

@@ -2,6 +2,8 @@ package com.zoop.portfolio.service;
 
 import java.time.Clock;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,11 +31,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class PortfolioService {
     private final MockPortfolioCatalog catalog;
     private final PortfolioConnectionRepository repository;
+    private final PortfolioQuoteProvider quoteProvider;
     private final Clock clock;
 
-    public PortfolioService(MockPortfolioCatalog catalog, PortfolioConnectionRepository repository, Clock clock) {
+    public PortfolioService(MockPortfolioCatalog catalog, PortfolioConnectionRepository repository,
+            PortfolioQuoteProvider quoteProvider, Clock clock) {
         this.catalog = catalog;
         this.repository = repository;
+        this.quoteProvider = quoteProvider;
         this.clock = clock;
     }
 
@@ -116,18 +121,75 @@ public class PortfolioService {
             MockPortfolio profile = catalog.find(row.mockPortfolioId())
                     .orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
             var connectionInfo = connectionInfo(row, profile);
-            var holdings = profile.holdings().stream().map(HoldingOut::from).toList();
-            PortfolioValuation valuation = profile.holdings().isEmpty()
-                    ? new PortfolioValuation(clock.instant(), null, BigDecimal.ZERO, "available", null, null)
-                    : new PortfolioValuation(clock.instant(), null, null, "unavailable", "missing_price",
-                            "모의 보유수량은 고정값이며 현재 평가가격은 제공되지 않습니다.");
-            return new PortfolioResponse(true, connectionInfo, holdings, profile.asOf(), valuation, metadata(requestId));
+            var valued = value(profile);
+            return new PortfolioResponse(true, connectionInfo, valued.holdings(), profile.asOf(),
+                    valued.valuation(), metadata(requestId));
         } catch (CustomException exception) {
             throw exception;
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
     }
+
+    private ValuedPortfolio value(MockPortfolio profile) {
+        var priced = new ArrayList<PricedHolding>();
+        boolean missingPrice = false;
+        String currency = null;
+        boolean mixedCurrency = false;
+        BigDecimal total = BigDecimal.ZERO;
+        for (var holding : profile.holdings()) {
+            var quote = quoteProvider.quote(holding);
+            if (!quote.available() || quote.price() == null || quote.price().signum() < 0
+                    || quote.currency() == null || quote.currency().isBlank()) {
+                missingPrice = true;
+                priced.add(new PricedHolding(holding, quote, null));
+                continue;
+            }
+            BigDecimal marketValue = holding.quantity().multiply(quote.price());
+            total = total.add(marketValue);
+            if (currency == null) currency = quote.currency();
+            else if (!currency.equals(quote.currency())) mixedCurrency = true;
+            priced.add(new PricedHolding(holding, quote, marketValue));
+        }
+
+        var calculatedAt = clock.instant();
+        String unavailableCode = missingPrice ? "missing_price"
+                : mixedCurrency ? "mixed_currency" : total.signum() == 0 ? "zero_total" : null;
+        boolean weightsAvailable = unavailableCode == null;
+        var holdings = new ArrayList<HoldingOut>();
+        for (var item : priced) {
+            var holding = item.holding();
+            HoldingOut.QuoteState quoteState = item.marketValue() != null
+                    ? new HoldingOut.Available("available", item.quote().price(), item.quote().currency(),
+                            item.quote().asOf(), item.quote().sourceName())
+                    : new HoldingOut.Unavailable("unavailable",
+                            item.quote().unavailableCode() == null ? "missing_price" : item.quote().unavailableCode());
+            BigDecimal weight = weightsAvailable
+                    ? item.marketValue().divide(total, MathContext.DECIMAL128) : null;
+            holdings.add(new HoldingOut(holding.companyId(), holding.name(), holding.ticker(), holding.quantity(),
+                    holding.avgPrice(), holding.avgPriceCurrency(), quoteState, item.marketValue(), weight));
+        }
+        BigDecimal totalMarketValue = missingPrice || mixedCurrency ? null : total;
+        String totalCurrency = missingPrice || mixedCurrency ? null : currency;
+        var valuation = new PortfolioValuation(calculatedAt, totalCurrency, totalMarketValue,
+                weightsAvailable ? "available" : "unavailable", unavailableCode,
+                unavailableReason(unavailableCode));
+        return new ValuedPortfolio(List.copyOf(holdings), valuation);
+    }
+
+    private static String unavailableReason(String code) {
+        if (code == null) return null;
+        return switch (code) {
+            case "missing_price" -> "하나 이상의 보유종목에서 현재 평가가격을 제공할 수 없습니다.";
+            case "mixed_currency" -> "서로 다른 통화의 평가금액은 합산하지 않습니다.";
+            case "zero_total" -> "총 평가금액이 0이면 보유 비중을 계산할 수 없습니다.";
+            default -> throw new IllegalArgumentException("Unknown valuation status: " + code);
+        };
+    }
+
+    private record PricedHolding(com.zoop.portfolio.model.MockHolding holding,
+            PortfolioQuoteProvider.QuoteResult quote, BigDecimal marketValue) { }
+    private record ValuedPortfolio(List<HoldingOut> holdings, PortfolioValuation valuation) { }
 
     private ConnectionResponse connectionResponse(String id, MockPortfolio profile,
             java.time.Instant connectedAt, String requestId) {

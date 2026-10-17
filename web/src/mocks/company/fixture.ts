@@ -85,8 +85,8 @@ export function mockQuote(id: string): CompanyQuote {
       dayHigh: krw ? 72400 : 189.2,
       dayLow: krw ? 70400 : 183.8,
       volume: krw ? 18923401 : 46810221,
-      week52High: krw ? 88800 : 212.19,
-      week52Low: krw ? 51200 : 112.33,
+      fiftyTwoWeekHigh: krw ? 88800 : 212.19,
+      fiftyTwoWeekLow: krw ? 51200 : 112.33,
     },
   };
 }

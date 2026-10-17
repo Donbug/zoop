@@ -18,11 +18,9 @@ from pathlib import Path
 PIPELINE = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(PIPELINE)]
 
-from investmate.domain import IssueSnapshot, Mention  # noqa: E402
-
 from scripts.ingestion_smoke import OfflineFixture, exact_check, json_bytes, ownership_env  # noqa: E402
-from zoop_ai_pipeline import extraction_poc as poc  # noqa: E402
-from zoop_ai_pipeline.extraction_contracts import SCHEMA, Catalogue, digest  # noqa: E402
+from zoop_ai_pipeline import extraction_replay as analysis  # noqa: E402
+from zoop_ai_pipeline.extraction_contracts import REPLAY_FORMAT, SCHEMA, Catalogue, Mention, digest  # noqa: E402
 
 PROMPT = "zoop-extraction-authored-1"
 INGESTION_SCHEMA = "zoop-ingestion-s2-1"
@@ -74,7 +72,7 @@ class Kit(OfflineFixture):
             store.close()
 
     def article(self, ref: dict):
-        return poc.article(self.export(ref), True)
+        return analysis.article(self.export(ref), True)
 
     # ---- authored contents -----------------------------------------------------------------------------------
     @staticmethod
@@ -91,8 +89,9 @@ class Kit(OfflineFixture):
                 "assertion_status": status, "participants": [{"company_id": "SYNTH-1", "name": "합성기업", "role": "issuer"}],
                 "evidence": evidence, "keywords": [], "background": False, "countries": []}
 
-    def settings(self, prompt: str = PROMPT):
-        return poc.settings(prompt, Catalogue.model_validate(CATALOGUE))
+    @staticmethod
+    def catalogue() -> Catalogue:
+        return Catalogue.model_validate(CATALOGUE)
 
     def replay(self, name: str) -> "Replay":
         return Replay(self, name)
@@ -126,7 +125,7 @@ class Kit(OfflineFixture):
         if forbid_execution:
             hook = ("from zoop_ai_pipeline.extraction import Fixtures\n"
                     "def _forbidden(*a, **k):\n os._exit(76)\n"
-                    "Extractor._execute = Extractor._reserve = Extractor._receipted = Fixtures.model = _forbidden\n")
+                    "Extractor._execute = Extractor._reserve = Extractor._receipted = Fixtures.index = _forbidden\n")
         if crash:
             kind, _, argument = crash.partition(":")
             hook = {
@@ -171,16 +170,18 @@ class Kit(OfflineFixture):
 
 
 class Replay:
-    """Authored investmate-replay-v2 builder using the installed pure request/key functions."""
+    """Authored zoop-analysis-replay-1 builder: each response is keyed by the digest of the exact request it answers (production preimages)."""
 
     def __init__(self, kit: Kit, name: str, *, synthetic: bool = True, prompt: str = PROMPT):
-        self.kit, self.name, self.settings = kit, name, kit.settings(prompt)
-        self.doc = {"format": "investmate-replay-v2", "synthetic": synthetic, "prompt_version": prompt, "model_version": "authored-model-1",
-                    "analysis_version": "authored-analysis-1", "embedding_version": "authored-embedding-1", "records": []}
+        self.kit, self.name, self.prompt, self.catalogue = kit, name, prompt, kit.catalogue()
+        self.doc = {"format": REPLAY_FORMAT, "synthetic": synthetic, "recordingKind": "authored-test", "promptVersion": prompt,
+                    "analysisVersion": "authored-analysis-1", "records": []}
+
+    def _record(self, stage: str, request: dict, response) -> None:
+        self.doc["records"].append({"stage": stage, "requestDigest": analysis.request_digest(stage, request, self.doc["analysisVersion"]), "response": response})
 
     def extract(self, article, mentions: list[dict], *, response=None) -> "Replay":
-        self.doc["records"].append({"stage": "extract", "input": poc.extract_input(article, self.settings),
-                                    "response": response if response is not None else {"mentions": mentions}})
+        self._record("extract", analysis.extract_input(article, self.prompt, self.catalogue), response if response is not None else {"mentions": mentions})
         return self
 
     def compare(self, mention: dict, event_id: str, members: list[tuple[dict, object, dict]], article, relation: str, reason: str, evidence: list[dict]) -> "Replay":
@@ -190,9 +191,8 @@ class Replay:
             if digest(ref) not in seen:
                 seen.add(digest(ref))
                 articles.append(member_article)
-        issue = IssueSnapshot(issue_id=event_id, mentions=[Mention.model_validate(m) for _, _, m in members], articles=articles)
-        self.doc["records"].append({"stage": "compare", "input": poc.compare_input(Mention.model_validate(mention), issue, article),
-                                    "response": {"relation": relation, "reason": reason, "evidence": evidence}})
+        request = analysis.compare_input(Mention.model_validate(mention), event_id, [Mention.model_validate(m) for _, _, m in members], articles, article)
+        self._record("compare", request, {"relation": relation, "reason": reason, "evidence": evidence})
         return self
 
     def write(self) -> Path:
@@ -417,7 +417,7 @@ def smoke(root: Path) -> dict:
     live = {**submitted, "provenance": {**submitted["provenance"], "executionMode": "live", "recordingKind": "provider"}}
     assert kit.run("submit", live, replay=r12, expected=2)["error"]["code"] == "live_mode_unsupported"
     other12 = kit.replay("r-submit-other").extract(art["a1"], [m1])
-    other12.doc["model_version"] = "authored-model-2"
+    other12.doc["analysisVersion"] = "authored-analysis-2"
     for changed, fixture in (({**submitted, "snapshot": {"revision": "snapshot-2", "events": []}}, r12), (submitted, other12.write())):
         assert kit.run("submit", changed, replay=fixture, expected=2, forbid_execution=True)["error"]["code"] == "job_input_conflict"
     assert kit.run("inspect", sel12) == queued

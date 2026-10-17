@@ -38,17 +38,18 @@ tasks.named('test') {
 		excludeTags 'ai-pipeline-contract'
 		excludeTags 'company-postgres'
 		excludeTags 'briefing-postgres'
+		excludeTags 'graph-postgres'
 	}
 }
 
 // Explicit integration gate against a disposable PostgreSQL database (see docs/COMPANY_SEARCH_TESTING.md).
 tasks.register('companyIntegrationTest', Test) {
 	group = 'verification'
-	description = 'Verifies company migrations, JPA startup and catalog search against isolated PostgreSQL.'
+	description = 'Verifies company and graph version migrations, JPA startup, catalog search and graph version selection against isolated PostgreSQL.'
 	testClassesDirs = sourceSets.test.output.classesDirs
 	classpath = sourceSets.test.runtimeClasspath
 	useJUnitPlatform {
-		includeTags 'company-postgres'
+		includeTags 'company-postgres', 'graph-postgres'
 	}
 	outputs.upToDateWhen { false }
 	testLogging {

@@ -234,7 +234,7 @@ def smoke(root):
         assert kit.cli("resume", kit.selector(), state=name, expected=2)["error"]["code"] == "state_namespace_conflict"
         assert sentinel.read_bytes() == b"untouched state sentinel"
     assert all(p.name.startswith("ingestion.") for p in (kit.root / "state").iterdir())
-    return {"schemaVersion": SCHEMA, "status": "passed", "preparedDocuments": 2, "interruptionBoundaries": ["receipt", "raw", "version", "checkpoint"], "providerCalls": 0, "modelCalls": 0, "appAndS1State": "sentinels unchanged; dedicated ingestion files only", "originalPoc": "installed pinned parsers only; no original state imported", "checks": ["same cursor replay", "new body version", "distinct supplier documents", "zero/failure/partial/parse hold", "resume without saved input files", "stale checkpoint", "complete registry revocation/omission", "HTML entity/tail/repeated Korean emoji coordinates", "PDF repeated page text and empty page", "S1 exact accepts mapped and rejects generated separators"]}
+    return {"schemaVersion": SCHEMA, "status": "passed", "preparedDocuments": 2, "interruptionBoundaries": ["receipt", "raw", "version", "checkpoint"], "providerCalls": 0, "modelCalls": 0, "appAndS1State": "sentinels unchanged; dedicated ingestion files only", "originalPoc": "not imported: native URL/HTML/PDF preparation, no original state", "checks": ["same cursor replay", "new body version", "distinct supplier documents", "zero/failure/partial/parse hold", "resume without saved input files", "stale checkpoint", "complete registry revocation/omission", "HTML entity/tail/repeated Korean emoji coordinates", "PDF repeated page text and empty page", "S1 exact accepts mapped and rejects generated separators"]}
 
 
 def review_smoke(root):

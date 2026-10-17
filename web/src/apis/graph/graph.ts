@@ -1,6 +1,7 @@
 import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
 import { assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
+import { readCompanyResource } from '@/apis/company/company';
 import { isMember } from '@/apis/auth/auth';
 import type { GraphRequest, GraphResponse } from '@/types/map/graph';
 import type { MockScenario } from '@/mocks/graph/response';
@@ -53,11 +54,8 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
       depth: String(request.depth ?? 1),
     });
     if (request.graphVersion) query.set('graphVersion', request.graphVersion);
-    return call<GraphResponse>(
+    return readCompanyResource<GraphResponse>(
       `/api/v1/companies/${encodeURIComponent(request.companyId)}/graph?${query}`,
-      'GET',
-      undefined,
-      { skipAuth: true },
     );
   }
   if (usesGraphMock) {

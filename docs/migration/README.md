@@ -56,7 +56,7 @@ React를 바꾼다고 BFF나 worker도 바꿀 필요는 없다. Spring을 선택
 | BE | 다시 구현 | 세션/CSRF/error/idempotency HTTP adapter, Repository, clock/scheduler, `graph_versions.py`, `briefing_rounds.py`, worker transport | Spring 등 다른 언어에서는 transaction·concurrency·쓰기 호환성을 새 저장 구현에서 증명한다. SQLite 테이블 이름을 공개 계약으로 삼지 않는다. |
 | BE | prototype-only 폐기 | 모의 계정 seed/IdP, 데모 회차 재생, sandbox 경로, 임시 무키 공급원 전제 | 가상 보유 기능의 요구 자체를 폐기하지 않는다. 모의 데이터를 본인 실계좌로 승격하지 않는다. Yahoo/Naver 임시 연결을 운영 권리로 채택하지 않는다. |
 | worker | 그대로 복사 가능(동일 스택만) | `ai/worker/src/zoop_ai/`의 확정 구현과 고정 PoC 공개 port adapter | Python 유지 시만 해당한다. S1 병행 구현 범위와 future stage를 구분한다. |
-| worker | 그대로 복사 가능(동일 스택만) | `ai/pipeline/src/zoop_ai_pipeline/`(S2-1/S2-2/S3 오프라인 CLI)와 고정 private PoC 의존 | Python·동일 PoC 접근이 있을 때만 해당한다. S1 worker와 서로 import하지 않는 별도 프로젝트이며 replay 전용이다. |
+| worker | 그대로 복사 가능(동일 스택만) | `ai/pipeline/src/zoop_ai_pipeline/`(S2-1/S2-2/S3/S4·graph·handoff 오프라인 CLI, 네이티브 replay 전용·공개 의존성만) | Python을 유지할 때만 해당한다. S1 worker와 서로 import하지 않는 별도 프로젝트이며 원본 PoC·private 접근이 필요 없다. 이전 PoC 어댑터 binding으로 저장된 S2 job은 읽기용 기록이고 새 job으로 명시 재제출해야 한다. |
 | worker | 계약·fixture·디자인 토큰만 이식 | versioned JSON Schema, 합성 입력/출력, evidence offset·grant·artifact·receipt 의미 | 다른 런타임이 소비하는 wire 계약. 모델/프롬프트/정책 revision과 input digest도 보존한다. |
 | worker | 다시 구현 | CLI와 그 위의 선택 HTTP transport(`ai/service`는 같은 Python 스택 한정 참고 구현), provider, job/fence/receipt/budget storage, exact/semantic validation adapter | 다른 런타임 선택 시 필요한 책임이다. HTTP를 다시 구현하면 소유자 결속(owner reservation→등록→accept), 현재 grant 재확인 후 결과 전달, 명시적 recover와 reconciling 정산 분리를 재증명한다. public API read에서 분석을 재실행하지 않는다. |
 | worker | prototype-only 폐기 | authored replay 실행 설정, 로컬 경로 가정, 임시 테스트 policy | replay fixture는 회귀 검증 자료로 보존한다. replay 결과·0 paid call을 실제 provider 품질/과금 보장으로 표시하지 않는다. |

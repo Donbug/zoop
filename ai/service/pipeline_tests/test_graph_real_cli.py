@@ -30,7 +30,7 @@ STATES = {"ver-frozen": "frozen", "ver-reserved": "reserved", "ver-unknown": "un
 def real_graph(tmp_path: Path) -> Callable[..., tuple[GraphWorkspace, ServiceProcess]]:
     """A service over the real `zoop-ai-graph` and a ledger with one version per state. `ver-absent` is listed but not in the ledger and `ver-other` is
     in the ledger but listed for nobody."""
-    assert GRAPH_CLI.is_file() and os.access(GRAPH_CLI, os.X_OK), f"{GRAPH_CLI} is missing: run `make pipeline-install` (private PoC credential)"
+    assert GRAPH_CLI.is_file() and os.access(GRAPH_CLI, os.X_OK), f"{GRAPH_CLI} is missing: run `make pipeline-install`"
     started: list[ServiceProcess] = []
 
     def factory(*, extra: dict[str, str] | None = None) -> tuple[GraphWorkspace, ServiceProcess]:

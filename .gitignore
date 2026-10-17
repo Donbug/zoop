@@ -15,6 +15,7 @@
 
 # Python
 .venv/
+.venv-public/
 __pycache__/
 *.pyc
 .pytest_cache/

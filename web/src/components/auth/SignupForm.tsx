@@ -81,7 +81,7 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
             : flow.error === 'RATE_LIMITED'
               ? '요청이 많아요. 잠시 후 다시 시도해 주세요.'
               : flow.error === 'INVALID_REQUEST'
-                ? '입력한 가입 정보를 확인해 주세요. 비밀번호는 15자 이상이고 흔한 비밀번호는 쓸 수 없어요.'
+                ? '입력한 가입 정보를 확인해 주세요. 비밀번호는 8자 이상 32자 이하이며 제어 문자와 흔한 비밀번호는 쓸 수 없어요.'
                 : flow.error && flow.error.match(/^[A-Z_]+$/)
                   ? '가입하지 못했어요. 입력 내용을 확인하고 다시 시도해 주세요.'
                   : flow.error);
@@ -153,10 +153,10 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
             setValidation('올바른 이메일 형식을 입력해 주세요.');
             return;
           }
-          // SignupRequest.password: 15~128자(docs/api/openapi.yaml). 흔한 비밀번호는 서버가 거절한다.
+          // SignupRequest.password: 8~32 Unicode code point, trim 없음. 제어 문자·흔한 비밀번호는 서버가 거절한다.
           const length = [...password].length;
-          if (length < 15 || length > 128) {
-            setValidation('비밀번호는 15자 이상 128자 이하로 입력해 주세요.');
+          if (length < 8 || length > 32) {
+            setValidation('비밀번호는 8자 이상 32자 이하로 입력해 주세요.');
             return;
           }
           if (!consentReady) {
@@ -210,8 +210,8 @@ export default function SignupForm({ social = false }: { social?: boolean }) {
               aria-describedby="signup-password-rule"
             />
             <p id="signup-password-rule" className={authNote}>
-              15자 이상 128자 이하로 입력해 주세요. 흔한 비밀번호는 쓸 수
-              없어요.
+              8자 이상 32자 이하로 입력해 주세요. 공백은 그대로 사용되며, 제어
+              문자와 흔한 비밀번호는 쓸 수 없어요.
             </p>
           </>
         )}

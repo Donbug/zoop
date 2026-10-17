@@ -144,6 +144,7 @@ class CiGateTests(unittest.TestCase):
 
     def test_missing_or_skipped_job_fails_for_every_required_job(self):
         self.assertIn("ai-pipeline", require_ci.REQUIRED_JOBS)
+        self.assertNotIn("ai-pipeline-public", require_ci.REQUIRED_JOBS)
         self.assertIn("ai-worker", require_ci.REQUIRED_JOBS)
         self.assertIn("ai-service", require_ci.REQUIRED_JOBS)
         self.assertIn("api", require_ci.REQUIRED_JOBS)
@@ -263,10 +264,11 @@ class SecretAndCredentialTests(unittest.TestCase):
             with self.subTest(project=project), patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(SystemExit, "cannot be skipped"):
                 private_poc_sync.main(["--project", project])
 
-    def test_private_sync_rejects_unregistered_project(self):
-        with patch.dict(os.environ, {"POC_READ_TOKEN": "synthetic-fixture"}, clear=True), self.assertRaises(SystemExit) as raised:
-            private_poc_sync.main(["--project", "ai/worker"])
-        self.assertEqual(raised.exception.code, 2)
+    def test_private_sync_rejects_every_project_but_the_bff_including_the_now_native_pipeline(self):
+        for project in ("ai/worker", "ai/pipeline"):
+            with self.subTest(project=project), patch.dict(os.environ, {"POC_READ_TOKEN": "synthetic-fixture"}, clear=True), self.assertRaises(SystemExit) as raised:
+                private_poc_sync.main(["--project", project])
+            self.assertEqual(raised.exception.code, 2)
 
     def test_private_preflight_fails_closed_and_cleans_askpass(self):
         observed = []
@@ -282,7 +284,7 @@ class SecretAndCredentialTests(unittest.TestCase):
             return reject(command, **kwargs)
         with patch.dict(os.environ, {"POC_READ_TOKEN": "synthetic-fixture"}, clear=True), patch.object(private_poc_sync.subprocess, "run", side_effect=intercepted):
             with self.assertRaisesRegex(SystemExit, "read preflight failed"):
-                private_poc_sync.main(["--project", "ai/pipeline"])
+                private_poc_sync.main(["--project", "prototype/bff"])
         self.assertTrue(observed)
         self.assertTrue(all(not helper.exists() for helper in observed))
 

@@ -11,10 +11,15 @@ public sealed interface ItemResult {
 
     int index();
 
-    /** The item's document version is registered and its transaction committed. */
+    /**
+     * The item's document version is registered and its transaction committed. {@code publicationPrecision} is what the registry
+     * stored ({@code datetime}, {@code day} or {@code unknown}); {@code collected} is null for authored fixtures and otherwise the
+     * acquisition facts of the HTTP collection (an unsigned operator-owned record, not proof of a fetch and not a license).
+     */
     record Imported(int index, String documentId, String documentVersion, String textArtifactId, Presence article,
             Presence artifact, Presence artifactFile, Presence version, PointerResult pointer, String currentVersion,
-            Instant collectedAt, String grantId, String grantRevision) implements ItemResult {
+            Instant collectedAt, String grantId, String grantRevision, String publicationPrecision,
+            CollectedProvenance collected) implements ItemResult {
     }
 
     /**

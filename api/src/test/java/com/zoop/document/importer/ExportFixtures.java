@@ -85,6 +85,51 @@ final class ExportFixtures {
         return root;
     }
 
+    static final String FETCHED_AT = "2026-10-13T23:59:58.123456+00:00";
+
+    /**
+     * Rewrites an authored export into the shape {@code zoop-ai-ingest export} emits for an observation collected over HTTP: the
+     * two extra observation keys, a closed {@code collection} object, and a {@code publishedAt} that is the declared instant only
+     * for the {@code instant} precision (a day or an offset-less time never becomes an instant). The Python side pins the same key
+     * sets in tests/test_collection.py.
+     */
+    static ObjectNode collected(ObjectNode export, String documentKind, String precision, String raw) {
+        ObjectNode observation = observationOf(export);
+        observation.put("provenance", "collected_http");
+        ObjectNode collection = observation.putObject("collection");
+        collection.put("provenance", "collected_http");
+        collection.put("collectionId", "collect-1");
+        ObjectNode receipt = collection.putObject("receipt");
+        receipt.put("file", "collections/collect-1/receipts/" + hex64('7') + ".json");
+        receipt.put("sha256", hex64('7'));
+        collection.put("fetchedAt", FETCHED_AT);
+        collection.put("finalUrl", observation.get("url").stringValue());
+        collection.put("httpStatus", 200);
+        collection.put("contentType", "text/html; charset=utf-8");
+        collection.put("bodySha256", export.get("locatorMetadata").get("rawHash").stringValue());
+        collection.put("documentKind", documentKind);
+        collection.put("network", "synthetic_loopback");
+        ObjectNode published = collection.putObject("published");
+        if (raw == null) {
+            published.putNull("raw");
+        } else {
+            published.put("raw", raw);
+        }
+        published.put("precision", precision);
+        if ("day".equals(precision)) {
+            published.put("date", raw);
+        } else {
+            published.putNull("date");
+        }
+        published.put("basis", "declared by the operator");
+        if ("instant".equals(precision)) {
+            observation.put("publishedAt", raw);
+        } else {
+            observation.putNull("publishedAt");
+        }
+        return export;
+    }
+
     static byte[] bytes(JsonNode node) {
         return JSON.writeValueAsBytes(node);
     }

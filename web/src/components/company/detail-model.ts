@@ -15,7 +15,21 @@ export const exactTime = (value: string | null | undefined) =>
   !!value &&
   /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value));
-export function bucketKey(event: Event, period: ChartPeriod): string {
+// One URL transition clears dependent selections before historical reads begin.
+export function selectTime(time: string) {
+  return {
+    asOf: time,
+    event: null,
+    bucket: null,
+    document: null,
+    evidence: null,
+    docScope: null,
+  };
+}
+export function bucketKey(
+  event: Pick<Event, 'eventTime' | 'timePrecision'>,
+  period: ChartPeriod,
+): string {
   if (
     !event.eventTime ||
     ['unknown', 'year', 'month'].includes(event.timePrecision)
@@ -54,8 +68,10 @@ export function bucketKey(event: Event, period: ChartPeriod): string {
   return day;
 }
 export function timeRange(asOf: string, period: ChartPeriod) {
+  // Calendar periods follow the API's Asia/Seoul date boundary, even at KST midnight.
+  const kstOffset = 9 * 60 * 60 * 1000;
   const end = new Date(asOf),
-    start = new Date(asOf);
+    start = new Date(Date.parse(asOf) + kstOffset);
   if (period === '1d') start.setUTCDate(start.getUTCDate() - 1);
   if (period === '1w') start.setUTCDate(start.getUTCDate() - 7);
   if (period === '1m') {
@@ -72,7 +88,10 @@ export function timeRange(asOf: string, period: ChartPeriod) {
     start.setUTCFullYear(start.getUTCFullYear() - 1);
     if (start.getUTCMonth() !== month) start.setUTCDate(0);
   }
-  return { from: start.toISOString(), to: end.toISOString() };
+  return {
+    from: new Date(start.getTime() - kstOffset).toISOString(),
+    to: end.toISOString(),
+  };
 }
 export function impactEdges(
   graph: GraphResponse,
@@ -80,6 +99,12 @@ export function impactEdges(
 ): string[] {
   if (
     !impact ||
+    !impact.steps.some(
+      (step) => step.id === impact.companyId && step.kind === 'company',
+    ) ||
+    !impact.steps.some(
+      (step) => step.id === impact.issueId && step.kind === 'issue',
+    ) ||
     impact.metadata.partial ||
     graph.metadata.partial ||
     impact.metadata.graphVersion !== graph.metadata.graphVersion ||
@@ -93,6 +118,7 @@ export function impactEdges(
     for (const e of graph.edges)
       if (
         !e.derived &&
+        e.assertionStatus === 'confirmed' &&
         e.evidenceIds.some(
           (evidence) =>
             impact.steps[i - 1].evidenceIds.includes(evidence) ||

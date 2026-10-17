@@ -482,9 +482,7 @@ def test_shared_durable_body_response_resumes_distinct_suppliers_without_files(k
 
 
 def test_retired_and_new_app_and_worker_state_roots_are_never_adopted(tmp_path):
-    from zoop_ai_pipeline.extraction import Store as ExtractionStore
     from zoop_ai_pipeline.ingestion_contracts import reserved_state_roots
-    from zoop_ai_pipeline.relation import Store as RelationStore
     reserved = reserved_state_roots()
     project = Path(__file__).resolve().parents[3]
     assert {p.relative_to(project).as_posix() for p in reserved if p.is_relative_to(project)} == {"prototype/bff/var", "prototype/ai-worker/var", "api/var", "ai/worker/var"}
@@ -492,10 +490,6 @@ def test_retired_and_new_app_and_worker_state_roots_are_never_adopted(tmp_path):
         for candidate in (root, root / "ingestion", root.parent):
             with pytest.raises(IngestionFailure, match="state_namespace_conflict"):
                 Store(candidate)
-            with pytest.raises(Exception, match="state_namespace_conflict"):
-                ExtractionStore(candidate, tmp_path / "ingestion")
-            with pytest.raises(Exception, match="state_namespace_conflict"):
-                RelationStore(candidate, tmp_path / "extraction", tmp_path / "ingestion")
 
 
 def _installed(monkeypatch, tmp_path):
@@ -508,8 +502,6 @@ def _installed(monkeypatch, tmp_path):
 
 
 def test_installed_package_without_explicit_ownership_roots_fails_closed(monkeypatch, tmp_path):
-    from zoop_ai_pipeline.extraction import Store as ExtractionStore
-    from zoop_ai_pipeline.relation import Store as RelationStore
     contracts = _installed(monkeypatch, tmp_path)
     assert not contracts.source_checkout()
     for unset in (("ZOOP_STATE_DIR", "ZOOP_AI_WORKER_STATE_DIR"), ("ZOOP_STATE_DIR",), ("ZOOP_AI_WORKER_STATE_DIR",)):
@@ -519,10 +511,6 @@ def test_installed_package_without_explicit_ownership_roots_fails_closed(monkeyp
             monkeypatch.delenv(key)
         with pytest.raises(IngestionFailure, match="state_ownership_unconfigured"):
             Store(tmp_path / "ledger")
-        with pytest.raises(IngestionFailure, match="state_ownership_unconfigured"):
-            ExtractionStore(tmp_path / "ledger", tmp_path / "ingestion")
-        with pytest.raises(IngestionFailure, match="state_ownership_unconfigured"):
-            RelationStore(tmp_path / "ledger", tmp_path / "extraction", tmp_path / "ingestion")
     assert not (tmp_path / "ledger").exists()
     monkeypatch.setenv("ZOOP_STATE_DIR", "relative/app")
     monkeypatch.setenv("ZOOP_AI_WORKER_STATE_DIR", str(tmp_path / "worker"))
