@@ -4,10 +4,11 @@ Spring 백엔드에서 내부 AI 서비스의 그래프 조회 API 두 개를 �
 
 ## 지금 상태 (사실)
 
-- **비공개·미게시·미활성입니다.** 내부 서비스(`127.0.0.1`, 앞단 TLS 프록시는 미배포)의 읽기 전용 API입니다. 공개 `/api/v1/graph`·`/api/v1/admin/graph/versions`는 구현하지 않으며 **활성 버전 포인터도 없습니다.** 응답의 `publication`은 항상 `not-published`입니다. `delivery.state=current`는 “이번 요청에서 검증됨”이지 “앱이 보여 주는 활성 버전”이 아닙니다. 게시·활성화(FS059)·전체 철회(FS081)는 이번 작업에 포함되지 않았습니다.
-- **Java 클라이언트는 아직 없습니다**(`api/src`에 Neo4j·GraphDB 클라이언트·`CompanyIssueCountQuery` 구현 없음, `EvidenceService`는 `graphVersion` null·고정 읽기 `VERSION_UNAVAILABLE`). 이 문서는 클라이언트를 만들 때의 계약입니다. 기본 꺼져 있고 서버 설정 그룹이 있어야 켜집니다(꺼져 있으면 인증 뒤 409 `execution_unavailable`).
-- 운영자가 버전을 만들고 서버 allowlist에 올립니다. 앱·이 서비스는 버전을 **만들거나 찾거나 나열하지 못합니다**(목록 라우트 없음).
-- 실제 로컬 HTTP 서버 → 설치된 graph CLI → 격리된 Neo4j 5.26 경로의 smoke를 통과했습니다. 1~3홉·권한 분리·digest 불일치·원천 권한 철회·canonical 변경·그래프 변조·원장 잠금·시간 초과를 확인했습니다. 원천 원장 변경과 모델 호출은 없었습니다. **로컬 검증이며 커밋·원격 CI·배포는 아직 하지 않았습니다.**
+- **이 AI 서비스는 비공개·미게시·미활성입니다.** 내부 서비스(`127.0.0.1`, 앞단 TLS 프록시는 미배포)의 읽기 전용 API이며 활성 버전 포인터도 없습니다. 응답의 `publication`은 항상 `not-published`입니다. `delivery.state=current`는 “이번 요청에서 검증됨”이지 “앱이 보여 주는 활성 버전”이 아닙니다. 게시·활성화(FS059)·전체 철회(FS081)는 이 서비스에 포함되지 않았습니다.
+- **Spring 쪽 현재 상태(main 코드 기준).** 공개 `GET /api/v1/graph`, `graph_versions`·`graph_activations`(활성 포인터 포함) 스키마, 버전 선택기, `PublicGraphReader`와 `CompanyIssueCountQuery` 구현(`GraphCompanyIssueCounts`)이 이미 있습니다. 다만 스냅샷 source는 `ZOOP_GRAPH_SNAPSHOT_SOURCE`의 기본 `none`(스냅샷 읽기 503 `SOURCE_UNAVAILABLE`, 버전 없으면 409 `VERSION_UNAVAILABLE`)이거나 local/dev 전용 합성 `fixture`뿐입니다. main에는 **AI handoff bundle을 수입해 `graph_versions`에 실제 스냅샷을 등록하는 경로, 활성화 경로, `/api/v1/admin/graph/versions` 관리 route가 없습니다**(`api/src`에서 확인). Spring은 Neo4j에 접속하지 않으며 Neo4j 자격·Neo4j/GraphDB 클라이언트를 갖지 않습니다. 이 서비스의 `graph-versions` HTTP(`graph.read`)를 소비하는 Java 클라이언트도 없습니다. 이 문서의 `graph-versions` 절은 그런 클라이언트를 만들 때의 계약입니다. `graph.read`는 기본 꺼져 있고 서버 설정 그룹이 있어야 켜집니다(꺼져 있으면 인증 뒤 409 `execution_unavailable`).
+- **로컬 작업 트리의 operator 스테이징 import(미게시, 합성 데이터 종단 검증 완료).** 위 main 상태에 더해, 아직 게시·병합되지 않은 로컬 작업으로 `com.zoop.graph.importer`(operator 전용 비웹 실행)가 구현되어 있습니다. 설치된 CLI `zoop-ai-handoff export`/`zoop-ai-ingest export --require-store`의 현재 결과를 앱 DB·앱 텍스트와 대조해 handoff 하나를 **비활성** `graph_versions` 행, `graph_snapshot`·`verification_receipt` artifact, `evidence` 행으로 등록합니다. 이 스테이징은 이 서비스의 handoff HTTP나 `graph-versions` HTTP가 아니라 CLI를 직접 실행하며 HTTP 경로가 없습니다. **하지 않는 것:** 활성화(`graph_activations`·`graph_versions.active` 쓰기, 결과의 `nextActivation=unsupported`), `/api/v1/admin/graph/versions` 관리 route, `getEvidence`의 graph 근거 경로(여전히 미등록 취급)와 공개 제외 오버레이, AWS 배포·IAM·DNS·Fargate. 스냅샷은 기존 `snapshotFormat 1`의 읽기 투영일 뿐이며, 원본 manifest·bundle 전체와 앱이 검증한 항목은 `verification_receipt`에 그대로 보존됩니다(투영이 원본을 대체하지 않음). `quote_verified`는 인용 무결성만이며 의미 검증이 아닙니다. 명령·설정·규칙은 [api README의 그래프 handoff 스테이징 import](../README.md#그래프-handoff-스테이징-import)를 따르며 이 문서에서 반복하지 않습니다.
+- 운영자가 AI 버전을 만들고 서버 allowlist에 올립니다. 이 AI 읽기 서비스는 버전을 **만들거나 찾거나 나열하지 못합니다**(목록 라우트 없음). 앱의 operator 스테이징 명령은 전달받은 handoff를 별도의 비활성 앱 버전으로 등록합니다.
+- 실제 로컬 HTTP 서버 → 설치된 graph CLI → 격리된 Neo4j 5.26 경로의 smoke를 통과했습니다(2026-10-15 로컬 실행 기록이며 현재 `main`의 재검증이 아닙니다). 1~3홉·권한 분리·digest 불일치·원천 권한 철회·canonical 변경·그래프 변조·원장 잠금·시간 초과를 확인했습니다. 원천 원장 변경과 모델 호출은 없었습니다. 이 서비스 구현은 이후 PR #213에서 `main`에 병합됐지만, 배포·실제 데이터 운영은 하지 않았습니다.
 
 ## 호출
 
@@ -105,7 +106,7 @@ status는 노드·간선·증거를 담지 않습니다. **Issue 수는 없습�
 ## 하지 말 것 / 아직 없는 것 (공개 상태 매핑)
 
 - 공개 `GraphDbStatus`(`neo4j`, `lastCompletedAt`, `checkedAt`), `Neo4jStatus`(`reachable\|unreachable`, `issuesInLedger`, `issuesProjected`, `missingIssueIds`, `staleIssueIds`, `error`), `GraphDbVersionState`(`reflected\|pending\|unknown`)에 **대응하는 생산자가 없습니다.** 현재 투영은 S3 관계 그래프이고 Neo4j 상태 모델은 Issue 기준이라 **서로 다른 모델**입니다. 이 서비스의 `state`/`delivery`를 `reflected` 등으로 대응시킬지는 윤서진(그래프 writer·canonical 스키마)과 정세빈이 정할 사항이며 이 slice는 결정하지 않았고, **Issue 수는 추정하지 않습니다.** `reachable`을 흉내 내려면 별도의 상태 명령이 pipeline에 필요합니다(요청 사항).
-- 앱 활성 포인터(`/api/v1/admin/graph/versions/{id}/activate`)·공개 `/api/v1/graph` 질의·`CompanyIssueCountQuery` 구현은 이 서비스가 제공하지 않습니다.
+- 앱 활성 포인터를 바꾸는 관리 route(`/api/v1/admin/graph/versions/{id}/activate`)와 이 AI 서비스 기반 공개 그래프 질의는 이 서비스가 제공하지 않습니다. 공개 `/api/v1/graph`와 `CompanyIssueCountQuery` 구현은 Spring 쪽에 있으며(위 "Spring 쪽 현재 상태") 이 서비스의 응답에 의존하지 않습니다.
 - 목록·검색·임의 Cypher·버전 생성·`recover`·삭제는 없습니다.
 
 ## 역할 (사용자 확정)
@@ -145,7 +146,7 @@ ZOOP_GRAPH_AUTH=none make service-graph-smoke
 
 2026-10-15 Main 실행: 실제 HTTP smoke의 9개 점검 묶음이 통과했습니다. 처음에는 smoke가 요청한 `companyId`의 정상 에코를 내용 유출로 오판했습니다. 응답의 허용 필드·정확한 에코·내용 null을 각각 검사하도록 시험을 수정한 뒤 같은 시나리오가 통과했습니다. 서비스 동작을 느슨하게 바꾸지 않았습니다. 운영 인증·TLS·실제 규모의 부하·Spring 공개 API는 이 시험으로 검증되지 않았습니다.
 
-## 개발 환경 Neo4j 운영자 실행 (Infra 질문 5개 답변 · 제안 · 로컬 작업 트리·미커밋·미배포)
+## 개발 환경 Neo4j 운영자 실행 (Infra 질문 5개 답변 · 제안 · 코드는 PR #213으로 main 병합 · 인프라는 미배포)
 
 이 절의 이름·경로·명령은 **제안**입니다. `neo4j.dev.zoop.internal`은 지금 존재하는 DNS 레코드가 아니며, AWS 배포·IAM·SSM 승인은 보류입니다. 아래 `preflight`와 TLS smoke는 로컬 Community 5.26 TLS + 기본 인증 증명이지 AWS·Fargate·RBAC·`GraphDbStatus` 준비 증명이 아닙니다(사실 근거: `ai/pipeline`의 `graph_projection*.py`, `graph_neo4j.py`, `scripts/graph_tls_smoke.py`).
 
@@ -178,9 +179,9 @@ run init        # 멱등 재확인(원장·Neo4j 불변)
 
 **로컬 TLS 증명(실제 Neo4j, 명시 옵트인, `make pipeline-graph-tls-smoke`).** `ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_tls_smoke.py --manage-containers`는 임시 PKI와 자기 컨테이너(공식 `neo4j@sha256:f1e52d4dc6da122468c4a3c1050a4f5e117f6d3268625237c34d49166f0d6082` = 5.26.32, pull하지 않음, `127.0.0.1`만 게시, 사용 통계 보고 끔)로 `preflight`(좋은 CA·이름·인증)와 7개 부정 사례(CA 변수 없음·다른 CA·이름 불일치·TLS REQUIRED 서버에 평문 Bolt·잘못된 비밀번호 한 번·TLS에 `auth=none`·안전하지 않은 URI)와 `init`/반복/`preflight` 거절을 확인하고, 이어서 기존 전체 graph smoke와 회귀를 **새 빈 컨테이너마다** TLS로 실행한 뒤 만든 컨테이너와 키를 모두 지웁니다. 이미 가진 서버에는 `ZOOP_GRAPH_TLS_SMOKE_URI/_CA/_WRONG_CA`와 `--stage`를 씁니다(스크립트 도움말 참조).
 
-**Fargate·배포 게이트(사실 근거, 새 기능 아님).** 현재 AI 서비스는 `127.0.0.1:8797`에만 바인딩하고(Infra 정의는 8000), `/health`가 없으며, `ai`용 Dockerfile이 없고, 원장이 영구 로컬 SQLite를 요구하며, graph child는 `SSL_CERT_FILE`을 받지 않아(컨테이너라면 이미지의 OS 신뢰 저장소에 CA가 있거나 변수 전달을 검토된 코드로 추가해야 함) 지금은 Fargate에 올릴 수 없습니다. API의 7687 보안그룹 ingress는 Spring이 Neo4j 비밀을 갖지 않으므로 불필요해 보이며(Infra 권고), `origin/main`의 pipeline이 로컬 cutover 푸시 전까지 private-PoC 의존성을 가지는 점도 게이트입니다. **AWS 배포는 보류입니다.**
+**Fargate·배포 게이트(사실 근거, 새 기능 아님).** 현재 AI 서비스는 `127.0.0.1:8797`에만 바인딩하고(Infra 정의는 8000), `/health`가 없으며, `ai`용 Dockerfile이 없고, 원장이 영구 로컬 SQLite를 요구하며, graph child는 `SSL_CERT_FILE`을 받지 않아(컨테이너라면 이미지의 OS 신뢰 저장소에 CA가 있거나 변수 전달을 검토된 코드로 추가해야 함) 지금은 Fargate에 올릴 수 없습니다. API의 7687 보안그룹 ingress는 Spring이 Neo4j 비밀을 갖지 않으므로 불필요해 보입니다(Infra 권고). 이전에 게이트였던 private-PoC 의존성은 AI pipeline의 로컬 cutover가 PR #213(`main`)으로 병합되면서 해소됐고 기본 설치는 공개 의존성만 씁니다. **AWS 배포는 보류입니다.**
 
-**실행 기록(2026-10-16, 로컬 작업 트리·미커밋, Main 실행).** `ai/pipeline` 시험 665개가 통과했고, 로컬 TLS smoke(`--manage-containers`, 실행 `dd2cfee7`, digest 고정 `neo4j@sha256:f1e52d4d…` 5.26.32 Community)는 `cases`·`smoke`·`regression` 3단계를 모두 통과했습니다(`bolt+s`, 기본 인증, 단계마다 새 빈 컨테이너, 명령 출력 JSON 34개에서 비밀·자격 필드·대상·경로 노출 없음, 컨테이너와 임시 PKI 제거). `preflight`는 올바른 CA·이름·인증에서 `eligible-empty-target`이었고 CA 변수 없음·다른 CA·이름 불일치·평문 Bolt·잘못된 비밀번호·`auth=none`·안전하지 않은 URI는 각각 기존 안정 코드로 거절됐으며 ledger·상태·Neo4j 변경은 없었습니다. 설치된(비편집) wheel에서 소유권 변수가 없거나 비었거나 상대 경로이면 `state_ownership_unconfigured`(소켓 이벤트 0, 상태 0)였고, 올바른 변수와 닫힌 포트는 `graph_unavailable`로 이유가 바뀌었습니다. **이는 로컬 Community 5.26 TLS·기본 인증 증명이며 AWS·Fargate·RBAC·SSM·실제 DNS·`GraphDbStatus` 준비 증명이 아닙니다.** AWS 배포는 보류입니다.
+**실행 기록(2026-10-16, 당시 로컬 작업 트리 시점의 Main 실행 이력이며 현재 `main` HEAD의 재검증이 아님).** `ai/pipeline` 시험 665개가 통과했고, 로컬 TLS smoke(`--manage-containers`, 실행 `dd2cfee7`, digest 고정 `neo4j@sha256:f1e52d4d…` 5.26.32 Community)는 `cases`·`smoke`·`regression` 3단계를 모두 통과했습니다(`bolt+s`, 기본 인증, 단계마다 새 빈 컨테이너, 명령 출력 JSON 34개에서 비밀·자격 필드·대상·경로 노출 없음, 컨테이너와 임시 PKI 제거). `preflight`는 올바른 CA·이름·인증에서 `eligible-empty-target`이었고 CA 변수 없음·다른 CA·이름 불일치·평문 Bolt·잘못된 비밀번호·`auth=none`·안전하지 않은 URI는 각각 기존 안정 코드로 거절됐으며 ledger·상태·Neo4j 변경은 없었습니다. 설치된(비편집) wheel에서 소유권 변수가 없거나 비었거나 상대 경로이면 `state_ownership_unconfigured`(소켓 이벤트 0, 상태 0)였고, 올바른 변수와 닫힌 포트는 `graph_unavailable`로 이유가 바뀌었습니다. **이는 로컬 Community 5.26 TLS·기본 인증 증명이며 AWS·Fargate·RBAC·SSM·실제 DNS·`GraphDbStatus` 준비 증명이 아닙니다.** AWS 배포는 보류입니다.
 
 **남은 인프라 선행 조건.** (a) CA 방식·키 보관자·서버 키를 EC2에 두는 방법·회전·만료 담당(오프라인 CA 또는 AWS Private CA), (b) 운영자 IAM의 SSM 포트 포워딩 승인과 비밀을 가져오는 방법, SSM 에이전트 등록 확인, (c) Community 수용 또는 Enterprise 결정, (d) dump/load의 `dbId` 보존 관측, (e) 운영자 호스트의 디스크 암호화·접근·백업(원장에 원천 유래 데이터), (f) 이미지 digest 기록(`sha256:f1e52d4d…`는 5.26.32 태그와 같은 다이제스트로 Main이 로컬에서 확인).
 
@@ -190,17 +191,17 @@ run init        # 멱등 재확인(원장·Neo4j 불변)
 
 위의 비공개 S3 그래프 읽기와 **별개**입니다. 앱이 공개 그래프(`company`/`issue` 노드, `INVOLVES`·`STRUCTURALLY_RELATED_TO`·`FOLLOWS`)를 만들 때 소비하는 **AI 측 산출물**입니다. 설계·근거 규칙 전문은 [AI 설계 문서의 해당 절](../../docs/design/ai-system.md#s2s3--공개-그래프-handoff-bundle-ai-측-생산물-앱-importㆍ활성화는-백엔드-소유)입니다.
 
-| | 현재(AI 로컬 구현, 로컬 작업 트리·미커밋·**보수 후 시험·smoke 결과는 Main 확인 대기**) | 계획/미결정(백엔드·계약 소유) |
+| | 현재(AI 구현. PR #213으로 `main` 병합 완료. 아래 시험·smoke 수치는 당시 이력이며 현재 HEAD 재검증이 아님) | 계획/미결정(백엔드·계약 소유) |
 |---|---|---|
-| 생산 | 설치 명령 `zoop-ai-handoff {freeze,inspect,recover,export}`가 둘 이상의 S3 job을 고정해 불변 bundle 생성 | 앱 `graph_versions` 행·활성화·`GET /api/v1/graph*` 공개 읽기 |
+| 생산 | 설치 명령 `zoop-ai-handoff {freeze,inspect,recover,export}`가 둘 이상의 S3 job을 고정해 불변 bundle 생성 | bundle을 앱 `graph_versions`의 실제 스냅샷 행으로 **비활성 등록**하는 operator 비웹 스테이징 import는 로컬 작업 트리에 구현(미게시·최종 검증 대기, [api README](../README.md#그래프-handoff-스테이징-import)). **활성화**는 미결정·미구현(공개 `GET /api/v1/graph`와 fixture 기반 `graph_versions`는 main에 이미 있음) |
 | 상태 | `publication=not-published`, `readiness={app:"import-pending", evidenceRegistration:"not-registered", publicActivation:"none", graphDb:"none"}` | `GraphDbStatus`/`Neo4jStatus`/`GraphDbVersionState` 대응 생산자 없음(**만들어 채우지 마세요**) |
-| 근거 | 앱 호환 evidence id를 **제안**하고 좌표·`quoteSha256`·locator를 제공 | 앱 import의 텍스트·해시 검증, `evidence` 행 등록, `getEvidence`의 graph evidence 경로(현재는 미등록 id를 제공하지 않음) |
+| 근거 | 앱 호환 evidence id를 **제안**하고 좌표·`quoteSha256`·locator를 제공 | 앱 텍스트 기준 인용 해시 검증과 `evidence` 행 등록은 위 로컬 스테이징 import가 수행(인용 무결성만, 의미 검증 아님; 미게시). `getEvidence`의 graph evidence 경로와 공개 제외 오버레이는 없음(현재는 graph 근거를 미등록 취급) |
 | 시각 | `publishedAt`/`observedAt`/`eventTime`/`verifiedAt`을 따로 보존 | `asOf` 정책(버전 선택 vs 고정 버전 안 disclosure 필터) |
 
 ## 소유 경계
 
 - **AI(pipeline):** 원천(S2/S3) 읽기·권한 재검증·projection·bundle·`recover`. 앱 DB, 공개 route, Neo4j 상태를 쓰지 않습니다.
-- **백엔드(정세빈):** bundle 소비, 앱 article/company 대조, evidence 등록, 그래프 버전 행·활성화, 공개 읽기·상태. 앱에 **가변 후보 사본을 두지 않습니다**(ERD 원천 소유: 후보는 원천에서 읽음). bundle은 import 입력일 뿐 앱의 활성 버전이 아닙니다.
+- **백엔드(정세빈):** bundle 소비, 앱 article/company 대조, evidence 등록, 그래프 버전 행·활성화, 공개 읽기·상태. 앱에 **가변 후보 사본을 두지 않습니다**(ERD 원천 소유: 후보는 원천에서 읽음). bundle은 import 입력일 뿐 앱의 활성 버전이 아닙니다. 이 중 대조·evidence 등록·**비활성** 버전 행 등록은 로컬 작업 트리(미게시)의 operator 스테이징 import가 담당하고, 활성화·공개 route·`getEvidence` graph 경로·상태 모델은 아직 백엔드 몫으로 남아 있습니다.
 - **운영자(서버 소유):** canonical registry, 공개 결정 파일, 앱 문서 바인딩 파일. 호출자(HTTP/UI)가 고를 수 없습니다.
 
 ## 하위 프로세스 계약
@@ -239,6 +240,8 @@ zoop-ai-handoff inspect --state-dir DIR < {"schemaVersion":"zoop-ai-handoff-1","
 
 ## 앱 import가 해야 할 것 (AI가 확인하지 않은 것 = `appImportPending`)
 
+**현재 상태(로컬 작업 트리, 미게시·최종 검증 대기).** 아래 1·2·4와 3의 `evidence` 행 삽입은 operator 스테이징 import가 수행하며(대조 항목은 article version의 제목·URL·게시 시각 정밀도, 앱 텍스트와 export 텍스트의 byte 일치·인용 코드 포인트 해시, 회사 ID·이름; 정확한 규칙은 [api README](../README.md#그래프-handoff-스테이징-import)) 결과는 **비활성** 버전입니다. 5(활성화·`asOf` 정책·상태 모델)와 3의 `getEvidence` graph 경로는 구현되지 않았습니다. AI가 확인하지 않은 항목이라는 아래 구분은 AI 산출물 기준이며 그대로입니다.
+
 1. `articles[]`의 `(articleId, articleVersion)`이 앱 `articles`/`article_versions`에 있고 `title`·`url`·`publishedAt`(+정밀도)이 **그 버전의** 값과 같은지(현재 최신 버전이 아님). 문서 import 매핑: `articles.id=documentId`, `article_versions.version=documentVersion`([문서 import](DOCUMENT_IMPORT.md)).
 2. 각 evidence의 `[start,end)`를 **앱이 저장한 본문**에서 코드 포인트로 잘라 sha256이 `quoteSha256`과 같은지, 바인딩의 `textSha256`(앱 `artifacts.sha256`과 같아야 함)이 앱 저장 텍스트와 같은지. AI는 **원천** 텍스트만 검증했고 앱 텍스트는 보지 않았습니다.
 3. `evidence` 행 등록(불변, `input_kind=body`, `quote_verified`, `raw_locator_ids`)은 이 id로 **import가 직접 삽입하거나 동일성 검증**해야 합니다. 이 id는 "준비됨"이며 등록·공개된 것이 아닙니다. 현재 `getEvidence`는 `ev-`+64hex라도 S1 summary 인용만 제공하므로 graph evidence를 제공하려면 pinned 경로(버전 소속·권한 overlay·인용 표시 grant)가 별도로 필요합니다(**남은 작업**).
@@ -263,19 +266,27 @@ ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_handoff_smoke.py --write-
 | `bundle-wrong-article-version.json` | evidence의 articleVersion이 articles와 불일치 — 거부 |
 | `bundle-shares-issue-edge.json` | 저장 `SHARES_ISSUE` 간선 — 거부 |
 
-**검증 결과(2026-10-16, 로컬 작업 트리).** pipeline 전체 365개 테스트와 두 S2/S3 작업을 사용하는 실제 CLI smoke가 통과했습니다. 독립 검토의 6개 결함은 15개 실패 시나리오로 먼저 재현한 뒤 수정했으며, 중첩 스키마 변조는 19개 독립 사례로 검사했습니다. export 중 권한/운영자 파일 변경, 문서 간 동일 mention ID, 유효기간만 증명하는 별도 근거, 중복 관측의 URL 충돌, 외부 원장 채택·변경을 거절합니다. 생성한 유효 export는 검증기를 통과했고 위 잘못된 bundle 5종은 모두 거절됐습니다. source 원장의 bytes·권한·mtime은 유지됐고 provider/model 호출은 0이었습니다. `public-check`는 생성물 275개 drift 0·hard error 0·문서 테스트 21개 통과이며 기존 경고는 보존했습니다.
+**검증 결과(2026-10-16, 병합 전 로컬 작업 트리 이력).** pipeline 전체 365개 테스트와 두 S2/S3 작업을 사용하는 실제 CLI smoke가 통과했습니다. 독립 검토의 6개 결함은 15개 실패 시나리오로 먼저 재현한 뒤 수정했으며, 중첩 스키마 변조는 19개 독립 사례로 검사했습니다. export 중 권한/운영자 파일 변경, 문서 간 동일 mention ID, 유효기간만 증명하는 별도 근거, 중복 관측의 URL 충돌, 외부 원장 채택·변경을 거절합니다. 생성한 유효 export는 검증기를 통과했고 위 잘못된 bundle 5종은 모두 거절됐습니다. source 원장의 bytes·권한·mtime은 유지됐고 provider/model 호출은 0이었습니다. `public-check`는 생성물 275개 drift 0·hard error 0·문서 테스트 21개 통과이며 기존 경고는 보존했습니다.
 
-이 결과는 AI 생산자 경로의 검증입니다. 앱 import·`getEvidence` 소비·공개 활성화·운영자 수동 단언의 공개 수용 정책·실제 데이터 품질은 완료된 것으로 처리하지 않습니다. 관련 #52/#53/#75/#78/#79의 전체 종료 근거도 아닙니다. 이번 변경은 아직 커밋·푸시하지 않았습니다.
+이 결과는 AI 생산자 경로의 검증입니다. 앱 import·`getEvidence` 소비·공개 활성화·운영자 수동 단언의 공개 수용 정책·실제 데이터 품질은 완료된 것으로 처리하지 않습니다. 관련 #52/#53/#75/#78/#79의 전체 종료 근거도 아닙니다. 이 변경은 이후 PR #213(`main`)에 병합됐습니다.
+
+이후 앱 쪽 **비활성 스테이징 import**가 로컬 작업 트리에 별도로 구현됐지만(위 "지금 상태"), 이 절의 병합 전 검증 이력이나 AI 생산자 검증에 포함되지 않으며 공개 활성화·`getEvidence` 소비를 완료로 바꾸지 않습니다.
 
 ## 아직 결정되지 않은 공개 계약 (AI가 정하지 않음)
 
 `STRUCTURALLY_RELATED_TO`의 수동 단언 수용과 이슈별 적용성 verifier, geography verdict의 성격, `asOf` 의미, company–company 구조 간선의 공개 유형, graph evidence의 `getEvidence` 경로와 인용 표시 grant, 활성화 전제와 `graphDb` 상태 모델, `FOLLOWS`의 independent verifier 필요 여부.
 
+**유효기간 끝 경계(2026-10-17 로컬 수정).** 생산자의 사건 적용성 판정은 `validFrom <= eventTime의 날짜 < validUntil`로 종료일을 제외합니다. 공개 FS042의 `start <= asOf < end`와 끝 경계 방향을 맞췄지만, `eventTime`과 `asOf`는 서로 다른 기준이므로 대체하지 않습니다. 현재 main의 `GraphSnapshotFilter`는 구조 근거의 `verifiedAt`만 검사하며 공개 조회의 유효기간 필터는 백엔드 후속 작업입니다. 날짜는 원래 `YYYY-MM-DD`를 보존하고 자정이나 다음 날을 추정하지 않습니다. 원천의 “D일까지”를 곧바로 종료 경계 D로 옮기지 않으며, null은 종료 시점 미상이지 영구 유효의 보장이 아닙니다.
+
+이전 포함 규칙으로 동결된 묶음은 원본을 고치지 않습니다. 현재 규칙으로 재계산한 내용이 달라지면 export가 `handoff_content_changed`로 내용을 차단하며, 새 `handoffId`로 다시 동결해야 합니다. 경계 회귀는 수정 전 1개 실패·6개 통과를 확인했고, 수정 후 handoff·relation 시험 174개와 설치된 CLI smoke가 통과했습니다. CLI에서는 종료일 당일 제외·다음 날 종료인 관계 유지·원래 날짜 보존을 확인했습니다. 모델·공급자 호출은 없었습니다.
+
 ---
 
 # handoff bundle 내부 HTTP 읽기 (AI 소유, 읽기 전용) — 현재 구현과 백엔드 사용 주의
 
-2026-10-16 AI 측이 위의 하위 프로세스 계약을 **읽기 전용 내부 HTTP**로 감싸 두었습니다(로컬 작업 트리·미커밋·배포 없음; 앞단 TLS 프록시는 미배포). 이는 백엔드 [PR #189](https://github.com/Donbug/zoop/pull/189)(`docs/api/graph-read-contract-proposal.md`)가 "AI 측 인계 묶음"으로 합의한 단위를 **AI가 소유한 읽기 경로로 제공**한 것입니다. **백엔드의 Java 수입기·앱 스냅샷·활성화·공개 API를 대신하지 않으며**, 위 "앱 import가 해야 할 것"은 그대로 백엔드 몫입니다. 기존 비공개 그래프 읽기(`graph-versions`, scope `graph.read`)와는 **별개 가족**입니다(변수·scope·allowlist 공유 없음).
+2026-10-16 AI 측이 위의 하위 프로세스 계약을 **읽기 전용 내부 HTTP**로 감싸 두었고 PR #213으로 `main`에 병합됐습니다(배포 없음; 앞단 TLS 프록시는 미배포). 이는 백엔드 [PR #189](https://github.com/Donbug/zoop/pull/189)(`docs/api/graph-read-contract-proposal.md`)가 "AI 측 인계 묶음"으로 합의한 단위를 **AI가 소유한 읽기 경로로 제공**한 것입니다. **백엔드의 Java 수입기·앱 스냅샷 등록·활성화·관리 API를 대신하지 않으며**, 위 "앱 import가 해야 할 것"은 그대로 백엔드 몫입니다. 이 HTTP는 Neo4j 자격이 필요 없고 `graph.read`는 선택·기본 꺼짐입니다. 기존 비공개 그래프 읽기(`graph-versions`, scope `graph.read`)와는 **별개 가족**입니다(변수·scope·allowlist 공유 없음).
+
+**업데이트(로컬 작업 트리, 미게시).** 위 문단은 그대로 유효합니다. 백엔드의 비활성 스테이징 import(`com.zoop.graph.importer`)는 이 HTTP 읽기를 호출하지 않고 설치된 CLI를 직접 실행하며, 이 HTTP는 변경되지 않았습니다. 활성화·관리 API는 여전히 없습니다.
 
 | 요청 | scope | 의미 |
 |---|---|---|
@@ -322,7 +333,7 @@ PR #189의 확정 사항(§0)은 방향이 같습니다: AI 인계 ID≠앱 `gra
 
 | 주제 | PR #189 | AI handoff 구현 | 결정 필요 |
 |---|---|---|---|
-| 인계 경로 | "인계 계약 v1은 서진님 작성 대기", 현재 전체 export 없음(§1 구현 범위) | `zoop-ai-handoff` + 위 HTTP로 manifest 고정·전체 내용·digest 제공(로컬, 미커밋) | 백엔드가 이 읽기 HTTP를 수입 경로로 채택할지, 파일 전달로 할지 |
+| 인계 경로 | "인계 계약 v1은 서진님 작성 대기", 현재 전체 export 없음(§1 구현 범위) | `zoop-ai-handoff` + 위 HTTP로 manifest 고정·전체 내용·digest 제공(`main` 병합, 배포 없음) | 백엔드가 이 읽기 HTTP를 수입 경로로 채택할지, 파일 전달로 할지(로컬 스테이징 import는 HTTP가 아니라 설치된 CLI를 직접 실행하므로 이 결정과 별개) |
 | manifest | manifest(원천 작업·input digest·원천/검수 revision·canonical 매핑·정책 버전) + 내용 | **`/bundle` 응답의 `manifest`가 동결된 manifest 본문**(위 형식)이며 `sha256(canonical(manifest))`가 `manifestDigest`와 같습니다. bundle에도 `manifestDigest`, `sources[]`, `policy.files`, `policy.version`이 그대로 있습니다 | 없음(스키마는 생성된 OpenAPI의 `HandoffManifest`) |
 | 표시 ID와 AI ID | 앱이 공개 표시 ID(간선·evidence·graph version)를 결정 | bundle의 `issues[].id`·`companies[].id`·`relations[].id`·`evidence[].id`는 **AI handoff 계약의 ID**(원천 ID 보존)이며 **앱 표시 ID와 같다고 주장하지 않습니다**. 앱 importer는 `(type, source, target)`으로 묶고 `basis`·`evidenceIds`·`sourceRefs`를 합집합하되 사실을 조용히 버리지 않습니다. 실제 공개 ID의 바이트 정의는 백엔드 계약이며 여기서 바꾸지 않습니다 | 백엔드의 공개 ID 계산·매핑 |
 | 표시 간선 ID | `edge-`+SHA-256(`relationType`,source,target) (§0) | `INVOLVES`·`FOLLOWS`는 `edge-`+digest(`{type,source,target}`), **`STRUCTURALLY_RELATED_TO`는 preimage에 `basis`(관계 키 목록)가 포함**됨. 동일한 구성요소라도 정규 JSON·키 이름 등 바이트 정의가 합의되기 전에는 공개 표시 ID와 같다고 보장하지 않음. 원천 관계 id는 `sourceRefs[]`/`basis[].sourceRelation`(`rc-…`) | 앱의 표시 간선 ID 계산·그룹핑과 AI 인계 관계 ID를 구분하고, 통일하려면 preimage까지 함께 확정 |
@@ -350,3 +361,19 @@ ai/service/.venv/bin/python ai/service/scripts/export_openapi.py [--check]   # d
 2026-10-16 Main 실행: 서비스 전체 870개 중 최초 869개가 통과했고, 나머지 1개는 두 번째 handoff의 응답·digest가 첫 번째 것을 가리키던 시험 fixture를 고친 뒤 단독 재실행해 통과했습니다(서비스의 결속 검사는 유지). 설치된 실제 pipeline 통합 시험 115개, 내부 OpenAPI 재생성 일치 검사, 실제 HTTP→CLI handoff smoke도 통과했습니다. smoke는 두 원천 작업의 bundle이 CLI·생산자 검증기·JS canonical digest와 일치함을 확인했고, 권한 철회·pin 불일치·busy·동시 호출 제한·deadline·중첩 필드 위조·정보 노출을 검사했습니다. 원천 원장은 변경되지 않았고 provider/model 호출은 0이었습니다. `public-check`는 생성물 275개 drift 0·hard error 0·문서 시험 21개 통과이며 기존 경고는 보존했습니다. 운영 인증·TLS·실제 데이터 규모·Spring 소비자·앱 import는 검증되지 않았습니다.
 
 후속 manifest 본문 인계 검증: producer handoff 시험은 최초 101개 통과 후 손상 주입 fixture의 보호 trigger를 시험용 DB에서만 해제해 나머지 1개도 통과했습니다. HTTP handoff 단위·실제 HTTP·실제 CLI 통합 시험 238개와 OpenAPI 일치 검사, 전체 HTTP smoke가 통과했습니다. 응답 하나에서 frozen manifest와 bundle의 digest를 각각 재계산하고 source/file pin이 맞는지 확인하며, 바뀐 pin·빠진 manifest는 내용을 반환하지 않습니다. 기존 bundle artifact bytes는 바꾸지 않았습니다.
+
+## 2026-10-17 로컬 스테이징 검증
+
+- Java `test assemble`: 전체 640개 중 606개 통과·34개 제외, 실패 0. 별도 PostgreSQL importer 통합 시험 9개 통과.
+- 실제 설치된 AI CLI → Spring 실행 jar → 임시 PostgreSQL → 공개 그래프 HTTP 경로의 smoke 13단계 통과: 원문 3건, 근거 6개, handoff 2개를 비활성 버전 2개로 등록했습니다. 활성화 쓰기는 0건이며 기존 기본·asOf 그래프는 계속 조회되고, 새 비활성 버전 직접 조회는 409 `VERSION_UNAVAILABLE`입니다.
+- 동일 입력 재실행은 행·파일을 바꾸지 않았고, 잘못된 pin·저장 권리 누락·원천 권한 철회는 거절됐습니다. AI 원장의 바이트·권한·수정 시각은 유지됐습니다.
+- 검토에서 발견한 앱 문서 상태 변경 경합, 미검증 근거 재사용, 응답 유실 후 재시도 시 가변 기업 표시값에 따른 파일 충돌은 회귀 3개가 실패하는 것을 확인한 뒤 수정했습니다. PostgreSQL 시험은 문서 행 잠금과 동시 철회 직렬화도 확인했습니다.
+- 공급자·모델 호출 0건. 임시 DB 컨테이너는 제거했습니다. 실제 뉴스·운영 권한·AWS·공개 활성화·PR #217의 스냅샷 형식 3 연동은 이 결과에 포함되지 않습니다.
+
+## 2026-10-18 마감: CI 검증 경로 연결(로컬, 미게시)
+
+`make api-graph-handoff-import-smoke`를 추가하고 기존 CI `api` job에 연결했습니다. 기존 PostgreSQL 서비스 안에 전용 빈 `zoop_graph_import_smoke` DB를 만들며, 회사·인증 통합 시험의 DB와 분리합니다. 새 job·외부 서비스·모델 키는 추가하지 않았고, 기존 `companyIntegrationTest`의 graph-postgres 시험도 유지합니다. 설치·빌드는 smoke가 자동으로 수행하지 않으므로 [api README](../README.md)의 선행 명령과 환경변수를 사용하세요.
+
+새 Make 명령으로 실제 CLI·jar·PostgreSQL·HTTP smoke 13단계를 다시 통과했습니다. workflow YAML·고정 action 입력·Bash 문법 검사와 저장소 도구 시험 42개도 통과했습니다. 임시 컨테이너는 제거했습니다. 로컬 DB는 PostgreSQL 17이며 CI의 PostgreSQL 16.13 및 GitHub runner에서의 실행은 아직 확인하지 않았습니다. 원격 CI 통과나 배포 완료를 뜻하지 않습니다.
+
+다음 연결 작업은 PR #217 병합 후 스냅샷 형식 3에 수입기와 smoke를 함께 맞추는 것입니다. 현재 확인한 PR은 OPEN(`1304ddfcc09c6d04da5130629d2f55ad601ae2c9`)이며, 해당 PR의 작업 파일은 수정하지 않았습니다. 공개 활성화·graph 근거 조회·철회 처리는 별도 후속 범위입니다.

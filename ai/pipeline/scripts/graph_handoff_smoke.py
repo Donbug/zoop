@@ -37,7 +37,26 @@ EVT_A2 = "합성기업이 3분기 공급 계약 체결을 공개했다."
 QB = "합성기업은 4분기 신규 공장 착공을 알렸다."
 GEO_B = "착공은 미국에서 이뤄진다."
 QB3 = "합성투자는 해외 합작 공장 지분을 인수했다."
-VALID2 = "공급 계약은 2026년 1월 1일부터 2026년 12월 31일까지 유효하다."
+
+
+def korean_date(day: str) -> str:
+    year, month, date = (int(part) for part in day.split("-"))
+    return f"{year}년 {month}월 {date}일"
+
+
+def validity_sentence(valid_from: str | None, valid_until: str | None) -> str | None:
+    """The one sentence of document b that proves a validity window. It states the end EXPLICITLY as an exclusive end (FS042: `validFrom <= time <
+    validUntil`); a source that only says "through D" does not prove `validUntil = D` and would need a reviewed exclusive end date instead."""
+    if valid_from and valid_until:
+        return f"공급 계약은 {korean_date(valid_from)}에 시작되어 {korean_date(valid_until)}에 종료되며, 종료일 당일에는 유효하지 않다."
+    if valid_from:
+        return f"공급 계약은 {korean_date(valid_from)}에 시작되며 종료일은 밝혀지지 않았다."
+    if valid_until:
+        return f"공급 계약은 {korean_date(valid_until)}에 종료되며, 종료일 당일에는 유효하지 않고 시작일은 밝혀지지 않았다."
+    return None
+
+
+VALID2 = validity_sentence("2026-01-01", "2026-12-31")
 EVT_IN = "합성기업은 2026년 10월 신규 투자 계획을 밝혔다."
 EVT_Y = "합성기업은 2026년 9월 해외 공급 계약을 체결했다."
 GEO_Y = "계약은 국내 시장 중심이다."
@@ -51,20 +70,23 @@ REVIEWER = "reviewer-a"                                                         
 
 # ---------------------------------------------------------------- the authored world (also used by the unit tests) -----------------
 
-def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False) -> SimpleNamespace:
+def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
+                valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30") -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
-    dated: rel-b also holds an eligible SUPPLIES basis whose validity dates are proven ONLY by a sentence in another document (b)."""
+    dated: rel-b also holds an eligible SUPPLIES basis whose validity dates are proven ONLY by a sentence in another document (b); `valid_from`/`valid_until`
+    (None = unknown, no sentence, no citation) are that basis's validity and `event_time` is the supply issue's event time in BOTH of its documents."""
     kit = RelKit(root)
+    valid_text = validity_sentence(valid_from, valid_until) if dated else None
     d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A)},
                                      {"supplier": "supplier-a2", "html": page(EVT_A2)},
-                                     {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((VALID2,) if dated else ())), "published": None}])
+                                     {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}])
     refs = {"a": d1, "a2": d2, "b": d3}
     art = {name: kit.article(ref) for name, ref in refs.items()}
-    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time="2026-09-30"), "countries": ["KR"]}
+    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": ["KR"]}
     second = {} if a2_differs else {"title": "합성 공급 계약"}
-    m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time="2026-09-30",
+    m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time=event_time,
                           **({"title": "합성 공급 계약 체결 공개"} | second)), "countries": list(a2_countries)}
     m_b = {**kit.mention(art["b"], "m-b", [kit.evidence(art["b"], QB)], period="2026Q4", title="합성 공장 착공", action="공장 착공 알림", event_time="2026-11-15"),
            "countries": ["US"]}
@@ -96,10 +118,10 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
             proposal("PARTICIPATES_IN", co("SYNTH-2"), ev(evc["b"]), [cite(wb, "b", QB)]),
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b3"]), [cite(wb, "b", QB3)]),
             *([proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wb, "a", SUP)], product="배터리 부품",
-                        validity={"from": "2026-01-01", "until": "2026-12-31", "citations": [cite(wb, "b", VALID2)]})] if dated else [])])}
+                        validity={"from": valid_from, "until": valid_until, "citations": [cite(wb, "b", valid_text)] if valid_text else []})] if dated else [])])}
     for name, out in jobs.items():
         assert out["state"] == "ready", (name, out.get("failure"))
-    world.jobs, world.dated = jobs, dated
+    world.jobs, world.dated, world.valid_text, world.event_time = jobs, dated, valid_text, event_time
     return world
 
 
@@ -147,7 +169,7 @@ def source_events(world) -> list:
 def structural_binding(world, *, decision_version: str = "v1", job: str = "rel-a") -> str:
     """Hand-written copy of the attestation preimage the operator reviewed (issue source events, basis relation with its S3 revision, decision version)."""
     r = find(world.jobs[job], "SUPPLIES", "SYNTH-3", "SYNTH-1")
-    return digest({"policy": POLICY, "issue": "issue:supply", "company": "co:synth-3", "decisionVersion": decision_version, "eventTime": "2026-09-30",
+    return digest({"policy": POLICY, "issue": "issue:supply", "company": "co:synth-3", "decisionVersion": decision_version, "eventTime": getattr(world, "event_time", "2026-09-30"),
                    "geography": "domestic", "sourceEvents": source_events(world),
                    "basis": [{"jobId": job, "relationCandidateId": r["relationCandidateId"], "relationKey": r["relationKey"], "type": "SUPPLIES",
                               "revision": r["eligibility"]["revision"]}]})
@@ -337,6 +359,27 @@ class Operator:
         return {"schemaVersion": "zoop-ai-handoff-1", "handoffId": handoff_id}
 
 
+def validity_end_exclusive(root: Path) -> str:
+    """FS042 `validFrom <= time < validUntil` through the installed CLI: the supply issue's event time is 2026-09-30. A basis whose validity ENDS that day is
+    excluded visibly, one that ends the next day is exported unchanged (`validUntil` verbatim, nothing shifted)."""
+    for name, valid_until in (("end-on-event-day", "2026-09-30"), ("end-after-event-day", "2026-10-01")):
+        world = build_world(root.parent / f"validity-{name}", dated=True, valid_until=valid_until)
+        write_operator(world)
+        operator = Operator(world)
+        operator.cli("freeze", manifest_doc(world, "validity-1", file_hashes(world.root)))
+        out = operator.cli("export", operator.sel("validity-1"))
+        assert out["delivery"]["status"] == "current", (name, out["delivery"])
+        bundle = out["bundle"]
+        structural = [r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"]
+        items = {(i["kind"], i["id"]): i["code"] for i in bundle["exclusions"]["items"]}
+        if name == "end-on-event-day":
+            assert not structural and items[("structural", "issue:supply>co:synth-3")] == "basis_validity_outside_event_time", (name, items)
+        else:
+            assert len(structural) == 1 and structural[0]["basis"][0]["validUntil"] == valid_until, (name, structural)
+            assert ("structural", "issue:supply>co:synth-3") not in items, (name, items)
+    return "FS042 end-exclusive validity via CLI: a basis ending on the event day is excluded (basis_validity_outside_event_time), one ending the next day is exported with validUntil verbatim"
+
+
 def smoke(root: Path, fixture: Path | None) -> dict:
     world = build_world(root)
     write_operator(world)
@@ -407,6 +450,7 @@ def smoke(root: Path, fixture: Path | None) -> dict:
 
     assert {name: tree(root / name) for name in ("ingestion", "extraction", "relation")} == sources_before
     checks.append("source ledgers byte/mode/mtime identical after every command")
+    checks.append(validity_end_exclusive(root))
 
     if fixture is not None:
         write_fixture(fixture, exported, withheld)

@@ -242,6 +242,21 @@ jobs:
         run: make service-install
       - name: Real Java client -> ai/service -> zoop-ai replay gate (synthetic in-memory credentials, no model call, no PostgreSQL)
         run: make api-ai-smoke
+      - name: Bootstrap the ai/pipeline runtime for the graph handoff import smoke (public dependencies, no token)
+        run: make pipeline-install
+      - name: Create a dedicated empty database for the graph handoff import smoke (the shared test database is never reused)
+        env:
+          PG_CONTAINER: ${{ job.services.company-postgres.id }}
+        run: docker exec "$PG_CONTAINER" psql -X -v ON_ERROR_STOP=1 -U company_test -d zoop_company_test_19 -c 'CREATE DATABASE zoop_graph_import_smoke'
+      - name: Real installed zoop-ai-handoff/-ingest -> built jar -> PostgreSQL graph handoff import smoke (synthetic, no model call, no activation)
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.company-postgres.ports['5432'] }}/zoop_graph_import_smoke
+          DB_USERNAME: company_test
+          DB_PASSWORD: ci-trust-auth-unused
+          GRAPH_IMPORT_PSQL_CONTAINER: ${{ job.services.company-postgres.id }}
+          GRAPH_IMPORT_DB_USER: company_test
+          GRAPH_IMPORT_DB_NAME: zoop_graph_import_smoke
+        run: make api-graph-handoff-import-smoke
   required-ci:
     name: required-ci
     if: always()
