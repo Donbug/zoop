@@ -769,21 +769,34 @@ test('graph issue selection clears previous document/evidence while retaining ta
   expect(within(region).getByRole('img').getAttribute('viewBox')).toBe(view);
 });
 
-test('D-COM-04 permission failure stays separate from retryable graph outages', async () => {
-  server.on('GET', '/api/v1/companies/:id/graph', () =>
-    apiError(403, 'ACCESS_DENIED'),
-  );
-  open(pinned);
-  const region = screen.getByRole('complementary', {
-    name: '시점 기반 관계 그래프',
-  });
-  await within(region).findByText(
-    '이 시점의 기업 관계를 조회할 권한이 없어요.',
-  );
+test('D-COM-04 version, missing and outage failures are told apart; only outages offer retry', async () => {
+  let failure = apiError(409, 'VERSION_UNAVAILABLE');
+  server.on('GET', '/api/v1/companies/:id/graph', () => failure);
+  const view = open(pinned);
+  const region = () =>
+    screen.getByRole('complementary', { name: '시점 기반 관계 그래프' });
+  await within(region()).findByText(/이 기준 시점의 공개 자료가 없어요/);
   expect(
-    within(region).queryByRole('button', { name: '관계 그래프 다시 조회' }),
+    within(region()).queryByRole('button', { name: '관계 그래프 다시 조회' }),
   ).toBeNull();
-  expect(within(region).queryByRole('img')).toBeNull();
+  view.unmount();
+
+  failure = apiError(404, 'RESOURCE_NOT_FOUND');
+  const missing = open(pinned);
+  await within(region()).findByText(/해당 자료가 없어요/);
+  expect(
+    within(region()).queryByRole('button', { name: '관계 그래프 다시 조회' }),
+  ).toBeNull();
+  missing.unmount();
+
+  failure = apiError(503, 'SOURCE_UNAVAILABLE');
+  open(pinned);
+  expect(
+    await within(region()).findByRole('button', {
+      name: '관계 그래프 다시 조회',
+    }),
+  ).toBeTruthy();
+  expect(within(region()).queryByRole('img')).toBeNull();
 });
 
 test('unconfirmed business assertions are excluded from actual impact paths', () => {
@@ -919,10 +932,15 @@ test('late timeline response from the former period is discarded after a period 
   ).toBeTruthy();
 });
 
-test('timeline denied and partial retry states preserve historical URL', async () => {
-  server.on('GET', '/api/v1/events', () => apiError(403, 'ACCESS_DENIED'));
+test('timeline version failure and partial retry states preserve historical URL', async () => {
+  server.on('GET', '/api/v1/events', () =>
+    apiError(409, 'VERSION_UNAVAILABLE'),
+  );
   const view = open(pinned);
-  await screen.findByText('이 시점의 사건을 조회할 권한이 없어요.');
+  await screen.findByText(/이 기준 시점의 공개 자료가 없어요/);
+  expect(
+    screen.queryByRole('button', { name: '타임라인 다시 조회' }),
+  ).toBeNull();
   view.unmount();
   server.on('GET', '/api/v1/events', () =>
     json({

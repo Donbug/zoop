@@ -11,7 +11,7 @@ export default function CompanyCatalog() {
   }>(`/api/v1/companies?${new URLSearchParams({ q: query })}`, '', true);
   return (
     <aside
-      className="min-w-0 border-r border-[var(--zoop-line)] p-4 [&_input]:w-full [&_label]:text-xs [&_li]:border-b [&_li]:border-[var(--zoop-line)] [&_li]:py-2.5 [&_small]:block [&_small]:text-[var(--zoop-faint)] max-md:max-h-[220px] max-md:overflow-auto max-md:border-r-0 max-md:border-b"
+      className="min-w-0 border-r border-zoop-line p-4 [&_input]:w-full [&_label]:text-xs [&_li]:border-b [&_li]:border-zoop-line [&_li]:py-2.5 [&_small]:block [&_small]:text-zoop-faint max-md:max-h-[220px] max-md:overflow-auto max-md:border-r-0 max-md:border-b"
       aria-label="기업 선택"
     >
       <h2>기업 검색</h2>

@@ -114,7 +114,7 @@ function Analysis({
         )
       )}
       {value.analysisProvenance?.sourceKind === 'synthetic' && (
-        <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2">
+        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2">
           합성 테스트 분석입니다. 실제 뉴스 분석 결과가 아닙니다.
         </p>
       )}
@@ -199,7 +199,7 @@ export default function CompanyDocumentPanel() {
     <section
       aria-label="뉴스·공시"
       data-screen-id="D-COM-02"
-      className="[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--zoop-line)] [&_blockquote]:bg-[var(--zoop-wash)] [&_blockquote]:p-3 [&_blockquote]:text-xs [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold"
+      className="[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-zoop-line [&_blockquote]:bg-zoop-wash [&_blockquote]:p-3 [&_blockquote]:text-xs [&_blockquote]:leading-[1.7] [&_blockquote]:wrap-anywhere [&_summary]:cursor-pointer [&_h4]:font-semibold"
     >
       <h2>뉴스·공시 · 근거 문서</h2>
       <nav aria-label="문서 종류">
