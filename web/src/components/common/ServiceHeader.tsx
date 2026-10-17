@@ -4,7 +4,7 @@ import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import './service-shell.css';
 
 const menus = [
-  { to: '/?mode=all', label: '지도', icon: 'map' },
+  { to: '/', label: '지도', icon: 'map' },
   { to: '/stocks', label: '종목', icon: 'search' },
   { to: '/briefing', label: '브리핑', icon: 'briefing' },
   { to: '/my', label: '내 종목', icon: 'bookmark' },
@@ -20,13 +20,13 @@ export default function ServiceHeader({
   const member = useAuthStore((s) => s.member);
   return (
     <header className="relationship-header">
-      <NavLink to="/?mode=all" className="relationship-logo">
+      <NavLink to="/" className="relationship-logo">
         <strong>줍</strong>
         <span>Zoop</span>
       </NavLink>
       <nav aria-label={navLabel}>
         {menus.map((menu) => (
-          <NavLink key={menu.to} to={menu.to} end={menu.icon === 'map'}>
+          <NavLink key={menu.to} to={menu.to} end={menu.to === '/'}>
             <GraphIcon name={menu.icon} size={15} />
             {menu.label}
           </NavLink>

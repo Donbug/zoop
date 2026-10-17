@@ -12,7 +12,7 @@ export default function BottomNav() {
           <li key={menu.to} className="flex-1">
             <NavLink
               to={menu.to}
-              end={menu.to === '/?mode=all'}
+              end={menu.to === '/'}
               className={({ isActive }) =>
                 `flex h-16 items-center justify-center text-sm ${
                   isActive ? 'font-semibold text-black' : 'text-gray-400'

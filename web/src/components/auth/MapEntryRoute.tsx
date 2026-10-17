@@ -5,16 +5,6 @@ import { useAuth } from '@/hooks/useAuth';
 export default function MapEntryRoute() {
   const auth = useAuth();
   const location = useLocation();
-  // The service entry always shows its start screen, even with a saved session.
-  // Explicit map URLs remain available after login or guest start.
-  if (!location.search)
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={{ from: location, startScreen: true }}
-      />
-    );
   if (auth.checking)
     return (
       <p role="status" className="p-6 text-sm text-zoop-muted">

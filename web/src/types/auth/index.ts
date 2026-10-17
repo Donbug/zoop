@@ -46,7 +46,6 @@ export type AuthState = {
 };
 
 export type LoginLocationState = {
-  startScreen?: boolean;
   from?: {
     pathname?: string;
     search?: string;

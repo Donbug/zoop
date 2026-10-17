@@ -35,18 +35,23 @@ function open(entry = '/?mode=all&select=node%3AKRX%3A005930') {
   );
 }
 it.each(['member', 'guest'])(
-  'shows the start screen at the service root even for a saved %s session',
-  async (kind) => {
+  'keeps a confirmed %s session on the map at the service root',
+  (kind) => {
     vi.mocked(useAuth).mockReturnValue({
       ...useAuth(),
       isAuthenticated: kind === 'member',
       isGuest: kind === 'guest',
     });
     open('/');
-    expect(await screen.findByText(/로그인 시작/)).toBeTruthy();
-    expect(screen.queryByText('시장 지도')).toBeNull();
+    expect(screen.getByText('시장 지도')).toBeTruthy();
+    expect(screen.queryByText(/로그인 시작/)).toBeNull();
   },
 );
+it('shows login at the service root when there is no session', async () => {
+  open('/');
+  expect(await screen.findByText(/로그인 시작/)).toBeTruthy();
+  expect(screen.queryByText('시장 지도')).toBeNull();
+});
 it('D-AUT-01 sends a first-time visitor to login and preserves the requested map URL', async () => {
   open();
   expect((await screen.findByText(/로그인 시작/)).textContent).toContain(

@@ -5,7 +5,7 @@ export default function DesktopHeader() {
   return (
     <header className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex h-16 max-w-screen-xl items-center justify-between px-8">
-        <NavLink to="/?mode=all" className="text-xl font-bold text-gray-950">
+        <NavLink to="/" className="text-xl font-bold text-gray-950">
           zoop
         </NavLink>
         <nav aria-label="데스크톱 주 메뉴">
@@ -14,7 +14,7 @@ export default function DesktopHeader() {
               <li key={menu.to}>
                 <NavLink
                   to={menu.to}
-                  end={menu.to === '/?mode=all'}
+                  end={menu.to === '/'}
                   className={({ isActive }) =>
                     isActive
                       ? 'font-semibold text-gray-950'
