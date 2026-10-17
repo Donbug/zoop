@@ -173,7 +173,8 @@ public final class BriefingReplayImporter {
         StrictJson.Obj authorization = bundle.object("authorization");
         require(scope.equals(authorization.string("scope")) && !authorization.bool("productionAuthorized")
                 && sourceSha.equals(authorization.string("sourceSha256"))
-                && settings.userInboxRef().equals(authorization.string("userInboxRef")), "simulation_authorization");
+                && (bundle.has("marketEnrichment") || settings.userInboxRef().equals(authorization.string("userInboxRef"))), "simulation_authorization");
+        Map<String, StrictJson.Obj> marketRounds = validateMarketEnrichment(bundle, settings.userInboxRef(), settings.bundle().getParent());
         Map<String, Source> pool = sources(sourceBytes);
         Map<String, JsonNode> sourceNodes = new LinkedHashMap<>(); pool.forEach((key, value) -> sourceNodes.put(key, value.row().node()));
         PublicationClockRegistry clocks = new PublicationClockRegistry(settings.clocks(), sourceSha, clockSha, sourceNodes);
@@ -269,6 +270,11 @@ public final class BriefingReplayImporter {
                 blobs.put(namespace + "-verification-" + index, blob("verification_receipt", StrictJson.write(result.object("verification").node())));
                 ObjectNode comparison = "morning".equals(edition) ? null : StrictJson.newObject().put("status", "unavailable")
                         .put("reason", "직전 모의 결과는 입력 문맥으로만 연결했습니다. 실제 출근 대비 장중 변화·전망 성과 평가는 없습니다.");
+                if (marketRounds.containsKey(id)) {
+                    StrictJson.Obj enrichment = marketRounds.get(id);
+                    applyMarketEnrichment(payload, snapshot, enrichment);
+                    registerMarketBlobs(namespace + "-market-" + index, enrichment, blobs);
+                }
                 publications.add(new Round(id, date, edition, cutoff, from, generated, generated, payload, snapshot, comparison));
                 for (Issue issue : selected.values()) for (Citation citation : issue.citations()) {
                     Citation prior = citations.putIfAbsent(citation.id(), citation); require(prior == null || prior.equals(citation), "simulation_evidence_conflict");
@@ -279,6 +285,8 @@ public final class BriefingReplayImporter {
             ids.add(id);
         }
         require(accounted.equals(allReceipts.keySet()), "simulation_unowned_paid_receipt");
+        if (bundle.has("marketEnrichment")) for (var receipt : simulationReceiptLedger(bundle.object("marketEnrichment").objects("receipts")).entrySet())
+            require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "market_enrichment_receipt_reuses_news_request");
         blobs.put(namespace + "-bundle", blob("ai_submit", bundleBytes));
         blobs.put(namespace + "-clocks", blob("verification_receipt", clocks.bytes));
         clocks.html.forEach((sha, content) -> blobs.put(namespace + "-html-" + sha.substring(0, 24), new Blob("raw_document", content, "text/html; charset=utf-8")));
@@ -322,6 +330,309 @@ public final class BriefingReplayImporter {
             publish(settings.grants(), grantBytes); publish(settings.manifest(), StrictJson.write(manifest));
             return new ImportResult(run, List.copyOf(ids), documents.size(), citations.size(), blobs.size(), Boolean.TRUE.equals(existed));
         }
+    }
+
+    /** Add-on artifacts preserve every original news identity/result and are imported into a separate replay DB. */
+    static Map<String, StrictJson.Obj> validateMarketEnrichment(StrictJson.Obj bundle, String userInboxRef, Path output) {
+        Map<String, StrictJson.Obj> result = new LinkedHashMap<>();
+        if (!bundle.has("marketEnrichment")) return result;
+        StrictJson.Obj layer = bundle.object("marketEnrichment");
+        require("zoop-briefing-market-enrichment-v1".equals(layer.string("schemaVersion"))
+                && "raw-json-sha256-v1".equals(layer.string("digestScheme"))
+                && userInboxRef.equals(layer.string("userInboxRef")), "market_enrichment_authorization");
+        ObjectNode baseline = (ObjectNode) bundle.node().deepCopy(); baseline.remove("marketEnrichment");
+        require(Canonical.digest(baseline).equals(layer.string("baselineBundleSha256")), "market_enrichment_baseline_hash");
+        Map<String, StrictJson.Obj> published = new LinkedHashMap<>();
+        for (StrictJson.Obj round : bundle.objects("rounds")) if ("SELECTED".equals(round.string("selectionStatus")))
+            require(published.putIfAbsent(round.string("roundId"), round) == null, "market_enrichment_duplicate_news_round");
+        Map<String, JsonNode> all = simulationReceiptLedger(layer.objects("receipts")); Set<String> accounted = new HashSet<>();
+        for (StrictJson.Obj record : layer.objects("rounds")) {
+            String id = record.string("roundId"); StrictJson.Obj news = published.get(id);
+            require(news != null && result.putIfAbsent(id, record) == null, "market_enrichment_round_scope");
+            validateMarketRecord(record, news, userInboxRef, output);
+            for (var receipt : simulationReceiptLedger(record.objects("receipts")).entrySet())
+                require(receipt.getValue().equals(all.get(receipt.getKey())) && accounted.add(receipt.getKey()), "market_enrichment_receipt_owner");
+        }
+        require(result.keySet().equals(published.keySet()) && accounted.equals(all.keySet()), "market_enrichment_round_or_receipt_coverage");
+        return result;
+    }
+
+    static void validateMarketRecord(StrictJson.Obj record, StrictJson.Obj news, String inbox, Path output) {
+        require(news.string("roundId").equals(record.string("roundId")) && news.string("date").equals(record.string("date"))
+                && news.string("edition").equals(record.string("edition"))
+                && news.object("window").string("to").equals(record.string("cutoff"))
+                && news.string("resultSha256").equals(record.string("newsResultSha256")), "market_enrichment_news_binding");
+        StrictJson.Obj snapshot = record.object("marketSnapshot");
+        marketArtifact(output, "snapshots", record.string("marketSnapshotSha256"), snapshot.node());
+        validateMarketSnapshot(snapshot, record);
+        validateMarketRawValues(snapshot, output);
+        StrictJson.Obj context = record.object("context").keys(Set.of("roundId", "date", "edition", "cutoff", "newsResultSha256", "marketSnapshotSha256", "userInboxRef"), Set.of("promptArtifacts"));
+        require(Canonical.digest(context.node()).equals(record.string("contextSha256")) && inbox.equals(context.string("userInboxRef")), "market_enrichment_context_hash");
+        if (context.has("promptArtifacts")) {
+            StrictJson.Obj prompts = context.object("promptArtifacts").exactly(Set.of("generation.md", "generation.schema.json", "verification.md", "verification.schema.json"));
+            for (String name : prompts.node().propertyNames()) try (var stream = BriefingReplayImporter.class.getResourceAsStream("/briefing/prompts/market-summary/" + name)) {
+                require(stream != null && Canonical.sha256(stream.readAllBytes()).equals(prompts.string(name)), "market_enrichment_prompt_hash");
+            } catch (IOException error) { throw new IllegalArgumentException("Market summary prompt unavailable", error); }
+        }
+        for (String key : List.of("roundId", "date", "edition", "cutoff", "newsResultSha256", "marketSnapshotSha256"))
+            require(record.string(key).equals(context.string(key)), "market_enrichment_context_binding");
+        for (StrictJson.Obj raw : snapshot.objects("rawRefs")) {
+            byte[] bytes = marketRaw(output, raw.string("sha256"));
+            require(bytes.length == raw.count("bytes"), "market_enrichment_raw_size");
+        }
+        Map<String, JsonNode> receipts = simulationReceiptLedger(record.objects("receipts"));
+        for (JsonNode value : receipts.values()) {
+            StrictJson.Obj receipt = StrictJson.Obj.of(value);
+            require(Set.of("market_summary_generation", "market_summary_verification").contains(receipt.string("stage")), "market_enrichment_receipt_stage");
+            if (!receipt.bool("usageKnown")) require(receipt.isNull("inputTokens") && receipt.isNull("outputTokens"), "market_enrichment_unknown_usage_null");
+        }
+        if (record.isNull("summaryResult")) {
+            require(record.isNull("summaryResultSha256"), "market_enrichment_absent_result_hash"); return;
+        }
+        StrictJson.Obj summary = record.object("summaryResult");
+        marketArtifact(output, "summaries", record.string("summaryResultSha256"), summary.node());
+        validateMarketSummary(summary, news, snapshot);
+        if (!summary.objects("claims").isEmpty()) validateMarketSummaryRecordings(record, news, receipts, output);
+    }
+
+    static Set<String> validateMarketSnapshot(StrictJson.Obj snapshot, StrictJson.Obj record) {
+        require("zoop-briefing-market-snapshot-v1".equals(snapshot.string("schemaVersion"))
+                && "historical_snapshot".equals(snapshot.string("scope")) && !snapshot.bool("operationalCollectionGate"), "market_snapshot_schema");
+        for (String key : List.of("date", "edition", "cutoff")) require(record.string(key).equals(snapshot.object("round").string(key)), "market_snapshot_round_binding");
+        Instant cutoff = Instant.parse(record.string("cutoff")); LocalDate cutoffDate = cutoff.atZone(KST).toLocalDate();
+        Instant fetched = Instant.parse(snapshot.string("fetchedAt")); StrictJson.Obj variables = snapshot.object("marketVariables");
+        require("available".equals(variables.string("status")) && cutoff.equals(Instant.parse(variables.string("referenceAt")))
+                && !Instant.parse(variables.string("rateCutoffAt")).isAfter(cutoff)
+                && fetched.equals(Instant.parse(variables.string("collectedAt"))), "market_snapshot_cutoff");
+        Set<String> ids = new HashSet<>(), available = new HashSet<>(), backed = new HashSet<>();
+        for (StrictJson.Obj raw : snapshot.objects("rawRefs")) {
+            require(raw.string("sha256").matches("[0-9a-f]{64}") && (raw.count("bytes") > 0
+                    || (raw.has("httpStatus") && raw.count("httpStatus") != 200)), "market_snapshot_raw_ref");
+            text(raw, "source"); require(raw.string("url").startsWith("https://"), "market_snapshot_raw_url");
+            for (String id : raw.strings("indicatorIds")) require(Set.of("kospi", "kosdaq", "usdkrw").contains(id) && backed.add(id), "market_snapshot_raw_indicator");
+        }
+        for (StrictJson.Obj indicator : variables.objects("indicators")) {
+            String id = indicator.string("id"), status = indicator.string("status");
+            require(Set.of("kospi", "kosdaq", "usdkrw").contains(id) && ids.add(id)
+                    && ("usdkrw".equals(id) ? "KRW" : "pt").equals(indicator.string("unit"))
+                    && Set.of("ok", "delayed", "unavailable", "failed").contains(status), "market_indicator_identity");
+            text(indicator, "label");
+            for (String key : List.of("value", "change", "changeRate")) require(indicator.isNull(key)
+                    || (indicator.raw(key).isNumber() && Double.isFinite(indicator.raw(key).doubleValue())), "market_indicator_number");
+            if (!indicator.isNull("observedAt")) require(!Instant.parse(indicator.string("observedAt")).isAfter(cutoff), "market_indicator_future_observation");
+            if (!indicator.isNull("observedDate")) require(!LocalDate.parse(indicator.string("observedDate")).isAfter(cutoffDate), "market_indicator_future_date");
+            if (Set.of("ok", "delayed").contains(status)) {
+                require(!indicator.isNull("value") && !indicator.isNull("observedDate") && !indicator.isNull("source")
+                        && Set.of("close", "latest").contains(indicator.string("valueKind")) && backed.contains(id), "market_indicator_available_binding");
+                if (indicator.isNull("observedAt")) require("close".equals(indicator.string("valueKind"))
+                        && (!LocalDate.parse(indicator.string("observedDate")).equals(cutoffDate) || !cutoff.atZone(KST).toLocalTime().isBefore(LocalTime.of(15, 30))), "market_indicator_unavailable_same_day_close");
+                StrictJson.Obj source = indicator.object("source");
+                require(Set.of("yahoo", "naver", "toss").contains(source.string("provider")), "market_indicator_provider");
+                text(source, "name"); text(source, "symbol"); source.bool("official"); source.stringOrNull("delayNote"); source.stringOrNull("url");
+                available.add(id);
+            } else require(indicator.isNull("value") && indicator.isNull("change") && indicator.isNull("changeRate")
+                    && !text(indicator, "reason").isBlank(), "market_indicator_unavailable_not_zero");
+            if (!indicator.isNull("baseline")) {
+                StrictJson.Obj baseline = indicator.object("baseline");
+                require(baseline.raw("value").isNumber() && Double.isFinite(baseline.raw("value").doubleValue())
+                        && !LocalDate.parse(baseline.string("date")).isAfter(cutoffDate), "market_indicator_baseline");
+                String at = baseline.stringOrNull("at"); if (at != null && at.contains("T")) require(!Instant.parse(at).isAfter(cutoff), "market_indicator_future_baseline");
+            }
+            indicator.stringOrNull("reason"); indicator.stringOrNull("reasonCode");
+        }
+        require(ids.equals(Set.of("kospi", "kosdaq", "usdkrw")), "market_snapshot_three_indicators");
+        return available;
+    }
+
+    /** Daily bar timestamps identify rows; they are never presented as the close's observation timestamp. */
+    static void validateMarketRawValues(StrictJson.Obj snapshot, Path output) {
+        StrictJson.Obj normalization = snapshot.object("normalization");
+        require("decimal-half-up-2dp".equals(normalization.string("values"))
+                && "difference-of-normalized-values".equals(normalization.string("change"))
+                && "change/baseline".equals(normalization.string("changeRate")), "market_normalization_policy");
+        Map<String, StrictJson.Obj> indicators = new LinkedHashMap<>(), refs = new LinkedHashMap<>();
+        for (StrictJson.Obj value : snapshot.object("marketVariables").objects("indicators"))
+            if (Set.of("ok", "delayed").contains(value.string("status"))) indicators.put(value.string("id"), value);
+        for (StrictJson.Obj ref : snapshot.objects("rawRefs")) refs.put(ref.string("sha256"), ref);
+        Instant cutoff = Instant.parse(snapshot.object("round").string("cutoff")); Set<String> bound = new HashSet<>();
+        for (StrictJson.Obj binding : snapshot.objects("indicatorBindings")) {
+            String id = binding.string("id"), sha = binding.string("rawSha256"); StrictJson.Obj indicator = indicators.get(id), ref = refs.get(sha);
+            require(indicator != null && bound.add(id) && ref != null && ref.strings("indicatorIds").contains(id), "market_raw_binding_identity");
+            byte[] raw = marketRaw(output, sha); int selectedIndex = binding.count("sourceRowIndex");
+            Map<LocalDate, java.math.BigDecimal> values = new LinkedHashMap<>(); List<LocalDate> rowDates = new ArrayList<>();
+            boolean fx = "usdkrw".equals(id);
+            if (fx) {
+                require("day".equals(binding.string("precision")) && "closePrice".equals(binding.string("field"))
+                        && "naver".equals(indicator.object("source").string("provider")), "market_fx_raw_format");
+                StrictJson.Obj list = StrictJson.parseObject("{\"rows\":" + new String(raw, StandardCharsets.UTF_8) + "}");
+                for (StrictJson.Obj row : list.objects("rows")) {
+                    LocalDate date = LocalDate.parse(row.string("localTradedAt")); rowDates.add(date);
+                    java.math.BigDecimal value;
+                    try { value = new java.math.BigDecimal(row.string("closePrice").replace(",", "")).setScale(2, java.math.RoundingMode.HALF_UP); }
+                    catch (NumberFormatException error) { throw new IllegalArgumentException("market_fx_raw_number", error); }
+                    require(values.putIfAbsent(date, value) == null, "market_raw_duplicate_date");
+                }
+            } else {
+                require("session_close".equals(binding.string("precision")) && "close".equals(binding.string("field"))
+                        && "yahoo".equals(indicator.object("source").string("provider")), "market_index_raw_format");
+                List<StrictJson.Obj> results = StrictJson.parseObject(raw).object("chart").objects("result"); require(results.size() == 1, "market_yahoo_result_count");
+                StrictJson.Obj feed = results.getFirst(); require(("kospi".equals(id) ? "^KS11" : "^KQ11").equals(feed.object("meta").string("symbol")), "market_yahoo_symbol");
+                JsonNode stamps = feed.array("timestamp"), closes = feed.object("indicators").objects("quote").getFirst().array("close");
+                require(stamps.size() == closes.size(), "market_yahoo_row_coverage");
+                for (int index = 0; index < stamps.size(); index++) {
+                    JsonNode stamp = stamps.get(index), close = closes.get(index);
+                    require(stamp.isIntegralNumber() && stamp.canConvertToLong(), "market_yahoo_timestamp");
+                    LocalDate date = Instant.ofEpochSecond(stamp.longValue()).atZone(KST).toLocalDate(); rowDates.add(date);
+                    if (close.isNull()) continue;
+                    require(close.isNumber() && Double.isFinite(close.doubleValue()), "market_yahoo_raw_number");
+                    require(values.putIfAbsent(date, close.decimalValue().setScale(2, java.math.RoundingMode.HALF_UP)) == null, "market_raw_duplicate_date");
+                }
+            }
+            LocalDate sourceDate = LocalDate.parse(binding.string("sourceDate"));
+            require(selectedIndex < rowDates.size() && sourceDate.equals(rowDates.get(selectedIndex))
+                    && sourceDate.toString().equals(indicator.string("observedDate")) && values.containsKey(sourceDate)
+                    && "close".equals(indicator.string("valueKind")) && indicator.isNull("observedAt"), "market_raw_selected_row");
+            Instant upper = marketUpperBound(sourceDate, fx);
+            require(upper.equals(Instant.parse(binding.string("availabilityUpperBound"))) && !upper.isAfter(cutoff), "market_raw_future_availability");
+            LocalDate latest = values.keySet().stream().filter(date -> !marketUpperBound(date, fx).isAfter(cutoff)).max(LocalDate::compareTo).orElseThrow();
+            require(latest.equals(sourceDate) && values.get(sourceDate).compareTo(indicator.raw("value").decimalValue()) == 0, "market_raw_value_or_latest_row");
+            LocalDate previous = values.keySet().stream().filter(date -> date.isBefore(sourceDate)).max(LocalDate::compareTo).orElse(null);
+            if (previous == null) require(indicator.isNull("baseline") && indicator.isNull("change") && indicator.isNull("changeRate"), "market_raw_absent_baseline");
+            else {
+                StrictJson.Obj baseline = indicator.object("baseline"); java.math.BigDecimal baselineValue = values.get(previous);
+                require(previous.toString().equals(baseline.string("date")) && baselineValue.compareTo(baseline.raw("value").decimalValue()) == 0, "market_raw_baseline_value");
+                java.math.BigDecimal change = values.get(sourceDate).subtract(baselineValue);
+                require(!indicator.isNull("change") && Math.abs(change.doubleValue() - indicator.raw("change").doubleValue()) <= 1e-9, "market_raw_change");
+                if (baselineValue.signum() == 0) require(indicator.isNull("changeRate"), "market_raw_zero_baseline_rate");
+                else require(!indicator.isNull("changeRate") && Math.abs(change.doubleValue() / baselineValue.doubleValue() - indicator.raw("changeRate").doubleValue()) <= 1e-9, "market_raw_change_rate");
+            }
+        }
+        require(bound.equals(indicators.keySet()), "market_raw_binding_coverage");
+    }
+
+    private static Instant marketUpperBound(LocalDate date, boolean fx) {
+        return fx ? date.plusDays(1).atStartOfDay(KST).toInstant() : date.atTime(15, 30).atZone(KST).toInstant();
+    }
+
+    static void validateMarketSummary(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj snapshot) {
+        Instant.parse(summary.string("generatedAt")); text(summary, "scopeNote");
+        Set<String> evidence = new HashSet<>(); for (StrictJson.Obj selected : news.objects("selected"))
+            for (StrictJson.Obj source : selected.objects("sources")) evidence.add(source.string("evidenceId"));
+        Set<String> indicators = new HashSet<>(); for (StrictJson.Obj indicator : snapshot.object("marketVariables").objects("indicators"))
+            if (Set.of("ok", "delayed").contains(indicator.string("status"))) indicators.add(indicator.string("id"));
+        List<String> texts = new ArrayList<>(); Set<String> targets = new HashSet<>(), citedNews = new HashSet<>();
+        List<StrictJson.Obj> claims = summary.objects("claims");
+        String status = summary.object("verification").string("status");
+        require(Set.of("PASS", "WITHHELD").contains(status), "market_summary_verification_status");
+        if (claims.isEmpty() && "WITHHELD".equals(status)) {
+            require(summary.isNull("text") && summary.isNull("summary") && summary.isNull("resultVersion"), "market_summary_withheld_content"); return;
+        }
+        require(claims.size() >= 2 && claims.size() <= 4, "market_summary_claim_count");
+        for (int index = 0; index < claims.size(); index++) {
+            StrictJson.Obj claim = claims.get(index); texts.add(text(claim, "text"));
+            List<String> refs = claim.strings("evidenceIds"), ids = claim.strings("indicatorIds");
+            require((!refs.isEmpty() || !ids.isEmpty()) && evidence.containsAll(refs) && indicators.containsAll(ids)
+                    && new HashSet<>(refs).size() == refs.size() && new HashSet<>(ids).size() == ids.size(), "market_summary_foreign_reference");
+            String claimId = "market:claim:" + index; require(claimId.equals(claim.string("claimId")), "market_summary_claim_id");
+            citedNews.addAll(refs); targets.add(claimId);
+        }
+        texts.add(summary.string("scopeNote"));
+        if ("PASS".equals(status)) require(String.join("\n", texts).equals(summary.string("text")), "market_summary_unverified_text");
+        else require(summary.isNull("text") && summary.isNull("summary") && summary.isNull("resultVersion"), "market_summary_withheld_content");
+        StrictJson.Obj verification = summary.object("verification");
+        Set<String> checked = new HashSet<>(); boolean supported = true;
+        for (StrictJson.Obj check : verification.objects("checks")) {
+            require(checked.add(text(check, "targetId")) && Set.of("SUPPORTED", "UNSUPPORTED", "UNCERTAIN").contains(check.string("verdict")), "market_summary_check_identity");
+            supported &= "SUPPORTED".equals(check.string("verdict")) && check.bool("noUnsupportedNumbers")
+                    && check.bool("noUnsupportedCausality") && check.bool("temporalAppropriate") && check.bool("noInvestmentAdvice"); text(check, "reason");
+        }
+        require(checked.equals(targets) && ("PASS".equals(status) == supported), "market_summary_verification_coverage");
+        if ("PASS".equals(status)) require(!citedNews.isEmpty(), "market_summary_news_evidence_required");
+    }
+
+    private static void validateMarketSummaryRecordings(StrictJson.Obj record, StrictJson.Obj news, Map<String, JsonNode> receipts, Path output) {
+        StrictJson.Obj summary = record.object("summaryResult");
+        for (String field : List.of("generationRequestDigest", "verificationRequestDigest")) {
+            String digest = summary.string(field); JsonNode node = receipts.get(digest); require(node != null, "market_summary_final_receipt_missing");
+            StrictJson.Obj receipt = StrictJson.Obj.of(node); String stage = "generationRequestDigest".equals(field)
+                    ? "market_summary_generation" : "market_summary_verification";
+            require(stage.equals(receipt.string("stage")) && success(receipt) && receipt.bool("usageKnown") && receipt.count("httpStatus") == 200, "market_summary_final_receipt_failed");
+            byte[] requestBytes = read(output.resolve("calls").resolve(digest + ".request.json"));
+            require(digest.equals(Canonical.sha256(requestBytes)), "market_summary_request_hash");
+            StrictJson.Obj request = StrictJson.parseObject(requestBytes), data = StrictJson.parseObject(request.string("input"));
+            require(stage.equals(request.object("text").object("format").string("name"))
+                    && receipt.string("model").equals(request.string("model"))
+                    && record.string("contextSha256").equals(data.string("contextSha256"))
+                    && record.object("context").node().equals(data.object("context").node())
+                    && record.object("marketSnapshot").node().equals(data.object("marketSnapshot").node())
+                    && news.array("selected").equals(data.array("selected"))
+                    && news.object("result").array("items").equals(data.array("newsItems")), "market_summary_request_context");
+            byte[] responseBytes = read(output.resolve("calls").resolve(digest + ".response.json"));
+            require(Canonical.sha256(responseBytes).equals(receipt.string("responseSha256")), "market_summary_response_hash");
+            StrictJson.Obj response = StrictJson.parseObject(responseBytes); List<String> texts = new ArrayList<>();
+            require(receipt.string("status").equals(response.string("status")) && receipt.string("responseId").equals(response.string("id"))
+                    && receipt.count("inputTokens") == response.object("usage").count("input_tokens")
+                    && receipt.count("outputTokens") == response.object("usage").count("output_tokens"), "market_summary_response_usage");
+            for (StrictJson.Obj message : response.objects("output")) if ("message".equals(message.string("type")))
+                for (StrictJson.Obj content : message.objects("content")) {
+                    require(!"refusal".equals(content.string("type")), "market_summary_provider_refusal");
+                    if ("output_text".equals(content.string("type"))) texts.add(content.string("text"));
+                }
+            require(texts.size() == 1, "market_summary_one_output_required"); StrictJson.Obj actual = StrictJson.parseObject(texts.getFirst());
+            if ("generationRequestDigest".equals(field)) {
+                ArrayNode projected = StrictJson.newArray(); for (StrictJson.Obj claim : summary.objects("claims")) {
+                    ObjectNode value = (ObjectNode) claim.node().deepCopy(); value.remove("claimId"); projected.add(value);
+                }
+                require(actual.array("claims").equals(projected), "market_summary_generated_content_binding");
+            } else {
+                require(data.object("draft").array("claims").equals(summary.array("claims")), "market_summary_verified_draft_binding");
+                Set<String> checked = new HashSet<>(); for (StrictJson.Obj check : summary.object("verification").objects("checks")) {
+                    String target = check.string("targetId"); checked.add(target);
+                    require(check.node().equals(actual.object("checks").raw(target)), "market_summary_verifier_binding");
+                }
+                actual.object("checks").exactly(checked);
+            }
+        }
+        require(!summary.string("generationRequestDigest").equals(summary.string("verificationRequestDigest")), "market_summary_request_identity");
+    }
+
+    private static byte[] marketArtifact(Path output, String kind, String sha, JsonNode expected) {
+        require(sha.matches("[0-9a-f]{64}"), "market_artifact_digest"); byte[] bytes = read(output.resolve("market").resolve(kind).resolve(sha + ".json"));
+        require(Canonical.sha256(bytes).equals(sha) && StrictJson.parseObject(bytes).node().equals(expected), "market_artifact_hash_or_content"); return bytes;
+    }
+
+    private static byte[] marketRaw(Path output, String sha) {
+        require(sha.matches("[0-9a-f]{64}"), "market_raw_digest"); byte[] bytes = read(output.resolve("market/raw").resolve(sha + ".bin"));
+        require(Canonical.sha256(bytes).equals(sha), "market_raw_hash"); return bytes;
+    }
+
+    private void registerMarketBlobs(String namespace, StrictJson.Obj record, Map<String, Blob> blobs) {
+        Path output = settings.bundle().getParent();
+        blobs.put(namespace + "-snapshot", blob("briefing_input", marketArtifact(output, "snapshots", record.string("marketSnapshotSha256"), record.object("marketSnapshot").node())));
+        blobs.put(namespace + "-context", blob("briefing_input", StrictJson.write(record.object("context").node())));
+        if (!record.isNull("summaryResult")) blobs.put(namespace + "-summary", blob("analysis_result",
+                marketArtifact(output, "summaries", record.string("summaryResultSha256"), record.object("summaryResult").node())));
+        for (StrictJson.Obj ref : record.object("marketSnapshot").objects("rawRefs")) blobs.put(namespace + "-raw-" + ref.string("sha256"),
+                new Blob("raw_document", marketRaw(output, ref.string("sha256")), "application/octet-stream"));
+    }
+
+    static void applyMarketEnrichment(ObjectNode payload, ObjectNode snapshot, StrictJson.Obj record) {
+        payload.set("marketVariables", record.object("marketSnapshot").object("marketVariables").node().deepCopy());
+        ObjectNode lineage = snapshot.putObject("marketEnrichment").put("contextSha256", record.string("contextSha256"))
+                .put("marketSnapshotSha256", record.string("marketSnapshotSha256"));
+        lineage.set("context", record.object("context").node().deepCopy());
+        ArrayNode failures = (ArrayNode) payload.path("metadata").path("failures");
+        for (int index = failures.size() - 1; index >= 0; index--) if ("marketVariables".equals(failures.get(index).path("section").stringValue())) failures.remove(index);
+        failure(failures, "marketVariables", "RETROSPECTIVE_DAILY_SNAPSHOT", "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.");
+        if (record.isNull("summaryResult") || !"PASS".equals(record.object("summaryResult").object("verification").string("status"))) {
+            snapshot.putObject("marketSummary").put("status", "unavailable").put("reason", "시장 요약의 생성·근거 검증을 통과하지 않아 공개하지 않습니다."); return;
+        }
+        StrictJson.Obj summary = record.object("summaryResult");
+        ObjectNode saved = snapshot.putObject("marketSummary").put("text", summary.string("text")).put("generatedAt", summary.string("generatedAt"))
+                .put("resultVersion", summary.string("resultVersion"));
+        ArrayNode evidence = saved.putArray("evidenceIds"); Set<String> ids = new LinkedHashSet<>();
+        for (StrictJson.Obj claim : summary.objects("claims")) ids.addAll(claim.strings("evidenceIds")); ids.forEach(evidence::add);
+        lineage.put("summaryResultSha256", record.string("summaryResultSha256")).put("scopeNote", summary.string("scopeNote"));
     }
 
     private static void validateSimulationIdentity(StrictJson.Obj bundle, StrictJson.Obj round) {
