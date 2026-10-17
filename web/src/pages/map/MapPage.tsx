@@ -140,14 +140,17 @@ export default function MapPage() {
       state.session?.kind === 'member' &&
       state.session.setup?.tutorialCompleted === false,
   );
-  const autoTutorial = useRef(false);
+  const tutorialMemberId = useAuthStore(selectMemberId);
+  const autoTutorial = useRef({ memberId: tutorialMemberId, opened: false });
   useEffect(() => {
+    if (autoTutorial.current.memberId !== tutorialMemberId)
+      autoTutorial.current = { memberId: tutorialMemberId, opened: false };
     // 이번 방문에 이미 열렸던 튜토리얼(주소의 tour=1 포함)은 닫은 뒤 다시 자동으로 열지 않는다.
-    if (tutorialOpen) autoTutorial.current = true;
-    if (!tutorialPending || autoTutorial.current) return;
-    autoTutorial.current = true;
+    if (tutorialOpen) autoTutorial.current.opened = true;
+    if (!tutorialPending || autoTutorial.current.opened) return;
+    autoTutorial.current.opened = true;
     updateQuery({ tour: '1' }, { replace: true });
-  }, [tutorialPending, tutorialOpen, updateQuery]);
+  }, [tutorialMemberId, tutorialPending, tutorialOpen, updateQuery]);
   useEffect(() => {
     if (previousEvent.current && !selectedPanel) {
       (opener.current?.isConnected

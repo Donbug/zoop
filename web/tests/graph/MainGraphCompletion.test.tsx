@@ -190,6 +190,38 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     );
   });
 
+  it('같은 지도에서 회원이 바뀌면 새 회원의 미완료 튜토리얼을 연다', async () => {
+    member();
+    const router = setup('/?mode=all');
+    await screen.findByRole('heading', { name: '지도 움직이기' });
+    await router.navigate('/?mode=all');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: '지도 움직이기' }),
+      ).toBeNull(),
+    );
+
+    useAuthStore.getState().setSession({
+      authenticated: true,
+      kind: 'member',
+      user: {
+        id: 'member-2',
+        email: 'member-2@zoop.test',
+        displayName: '새 회원',
+      },
+      setup: { completed: true, tutorialCompleted: false },
+      csrfToken: 'csrf-2',
+      expiresAt: null,
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: '지도 움직이기' }),
+    ).toBeTruthy();
+    expect(new URLSearchParams(router.state.location.search).get('tour')).toBe(
+      '1',
+    );
+  });
+
   it('회원 완료는 상태 API 성공 후에만 화면을 닫는다', async () => {
     member();
     vi.mocked(setTutorialCompleted).mockResolvedValue(
