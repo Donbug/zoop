@@ -136,6 +136,28 @@ test.each(['focus', 'depth', 'version', 'time', 'missing-depth'] as const)(
   },
 );
 
+test('an empty relationship result still identifies the requested focus company', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/companies/:id/graph', () =>
+    json({
+      ...graph,
+      nodes: [],
+      edges: [],
+      metadata: {
+        ...graph.metadata,
+        asOf: '2026-10-01T00:00:00Z',
+        graphVersion: 'fixture-v1',
+        focusCompanyIds: [],
+      },
+    }),
+  );
+  await expect(
+    readCompanyResource(
+      `/api/v1/companies/${encodeURIComponent(focus.id)}/graph?asOf=2026-10-01T00%3A00%3A00Z&depth=1&graphVersion=fixture-v1`,
+    ),
+  ).rejects.toThrow('기업·시점·관계 단계');
+});
+
 test('equivalent KST timestamp is accepted and historical map uses the same guard', async () => {
   const server = createFakeServer();
   server.on('GET', '/api/v1/companies/:id/graph', () =>

@@ -53,8 +53,7 @@ export async function readCompanyResource<T>(
       !Number.isFinite(expectedTime) ||
       actualTime !== expectedTime ||
       graph.metadata?.depth !== expectedDepth ||
-      ((graph.nodes.length > 0 || focus.length > 0) &&
-        !focus.includes(decodeURIComponent(graphCompanyId)))
+      !focus.includes(decodeURIComponent(graphCompanyId))
     )
       throw new ApiError(
         502,
