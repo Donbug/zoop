@@ -27,7 +27,6 @@ public final class DisplayGraph {
     static final String FOLLOWS_SUMMARY = "후속 사건";
     static final String ROLE_FALLBACK = "직접 관련";
     static final String STRUCTURAL_FALLBACK = "구조적 관계";
-    private static final int MAX_ROLE_CHARS = 14;
 
     public record Edge(String id, String source, String target, String relationType, String role, String summary,
             String assertionStatus, boolean derived, List<String> via, List<String> evidenceIds,
@@ -59,9 +58,10 @@ public final class DisplayGraph {
         for (List<Relation> rels : grouped.values()) {
             Relation first = rels.get(0);
             String id = edgeId(first.relationType(), first.source(), first.target());
-            String role = rels.stream().map(Relation::role).filter(Objects::nonNull).findFirst().orElse(null);
+            List<String> roles = rels.stream().map(Relation::role).filter(Objects::nonNull).toList();
+            String role = roles.isEmpty() ? null : RoleLabels.display(roles.get(0));
             g.edges.put(id, new Edge(id, first.source(), first.target(), first.relationType(), role,
-                    summary(first.relationType(), role), rels.stream().map(Relation::assertionStatus)
+                    summary(first.relationType(), roles), rels.stream().map(Relation::assertionStatus)
                             .filter(Objects::nonNull).findFirst().orElse(null), false, List.of(),
                     rels.stream().flatMap(r -> r.evidenceIds().stream()).distinct().toList(),
                     rels.stream().map(Relation::relationId).toList()));
@@ -111,9 +111,11 @@ public final class DisplayGraph {
         return companyIssues.getOrDefault(companyId, Set.of()).stream().map(issues::get).sorted(RECENT).toList();
     }
 
-    private static String summary(String relationType, String role) {
+    /** The first role with a Korean label (prototype {@code _role_summary}); an unknown phrase falls back. */
+    private static String summary(String relationType, List<String> roles) {
         if ("FOLLOWS".equals(relationType)) return FOLLOWS_SUMMARY;
-        if (role != null && !role.isBlank() && role.length() <= MAX_ROLE_CHARS) return role;
+        String label = roles.stream().map(RoleLabels::label).filter(Objects::nonNull).findFirst().orElse(null);
+        if (label != null) return label;
         return "STRUCTURALLY_RELATED_TO".equals(relationType) ? STRUCTURAL_FALLBACK : ROLE_FALLBACK;
     }
 

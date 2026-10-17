@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.zoop.auth.service.MemberSessionService;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.exception.GlobalExceptionHandler;
@@ -21,14 +22,16 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class GraphControllerTest {
     private final GraphQueryService service = mock(GraphQueryService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new GraphController(service))
+    private final MemberSessionService sessions = mock(MemberSessionService.class);
+    private final PersonalCompanies personalCompanies = mock(PersonalCompanies.class);
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new GraphController(service, sessions, personalCompanies))
             .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
 
     @Test
     void responseKeepsEveryContractFieldIncludingNulls() throws Exception {
         var company = new GraphResponse.Node("KRX:000660", "company", "SK하이닉스", false, false, false, null, null,
                 null, null, null, null, null, null);
-        when(service.getGraph(eq("all"), isNull(), isNull(), isNull(), isNull(), isNull(), any())).thenReturn(
+        when(service.getGraph(eq("all"), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any())).thenReturn(
                 new GraphResponse(List.of(company), List.of(), new GraphResponse.Metadata("public_graph_snapshot",
                         "2026-10-16T12:00:00Z", "fixture-2026-10-08", "all", false, "no_approved_issues", List.of(),
                         null, 500, "req-1", false, List.of(), null)));
@@ -45,11 +48,21 @@ class GraphControllerTest {
     }
 
     @Test
+    void personalModeNeedsAMemberSessionButAllModeDoesNot() throws Exception {
+        when(sessions.requireMember(isNull())).thenThrow(new CustomException(ErrorCode.AUTH_REQUIRED));
+        mvc.perform(get("/api/v1/graph").param("mode", "personal"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+        mvc.perform(get("/api/v1/graph").param("mode", "all"));
+        org.mockito.Mockito.verify(sessions, org.mockito.Mockito.times(1)).requireMember(any());
+    }
+
+    @Test
     void nonNumericDepthAndMissingVersionMapToContractErrors() throws Exception {
         mvc.perform(get("/api/v1/graph").param("depth", "two"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
-        when(service.getGraph(any(), any(), any(), any(), eq("v-missing"), any(), any()))
+        when(service.getGraph(any(), any(), any(), any(), eq("v-missing"), any(), any(), any(), any()))
                 .thenThrow(new CustomException(ErrorCode.VERSION_UNAVAILABLE));
         mvc.perform(get("/api/v1/graph").param("graphVersion", "v-missing"))
                 .andExpect(status().isConflict())

@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  */
 public final class GraphSnapshotFilter {
     private static final ZoneOffset LAST_DATE_LINE = ZoneOffset.ofHours(-12);
+    private static final ZoneOffset FIRST_DATE_LINE = ZoneOffset.ofHours(14);
 
     private GraphSnapshotFilter() {
     }
@@ -52,10 +53,24 @@ public final class GraphSnapshotFilter {
                 .filter(r -> kept.contains(r.source()) && (!"FOLLOWS".equals(r.relationType()) || kept.contains(r.target())))
                 .filter(r -> evidenceIds.containsAll(r.evidenceIds()))
                 .filter(r -> asOf == null || !"STRUCTURALLY_RELATED_TO".equals(r.relationType())
-                        || r.basis().stream().anyMatch(b -> !Instant.parse(b.verifiedAt()).isAfter(asOf)))
+                        || r.basis().stream().anyMatch(b -> validAt(b, asOf)))
                 .toList();
         return new PublicGraphSnapshot(s.snapshotFormat(), s.versionId(), s.sourceBundleId(), s.companies(), issues,
                 relations, s.articles().stream().filter(a -> articles.contains(articleKey(a))).toList(), evidence);
+    }
+
+    /**
+     * A structural basis holds at asOf when it was verified by then and asOf is inside its validity dates (catalog
+     * FS042: valid from <= asOf < valid until). Dates carry no zone, so both ends are read conservatively: validFrom
+     * counts once that day has begun everywhere (UTC-12), validUntil ends the basis as soon as that day begins
+     * anywhere (UTC+14).
+     */
+    static boolean validAt(PublicGraphSnapshot.Basis b, Instant asOf) {
+        if (Instant.parse(b.verifiedAt()).isAfter(asOf)) return false;
+        if (b.validFrom() != null && LocalDate.parse(b.validFrom()).isAfter(LocalDate.ofInstant(asOf, LAST_DATE_LINE))) {
+            return false;
+        }
+        return b.validUntil() == null || LocalDate.ofInstant(asOf, FIRST_DATE_LINE).isBefore(LocalDate.parse(b.validUntil()));
     }
 
     /**
@@ -71,9 +86,11 @@ public final class GraphSnapshotFilter {
     }
 
     private static Issue withEvidence(Issue i, Set<String> evidenceIds) {
-        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.action(), i.target(), i.geography(),
-                i.geographyPolicyVersion(), i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(),
-                i.articleIds(), i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.latestPublishedAt());
+        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(),
+                i.action(), i.target(), i.geography(), i.geographyPolicyVersion(),
+                i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(), i.articleIds(),
+                i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.mentions(),
+                i.representativeMentionId(), i.latestPublishedAt());
     }
 
     private static String articleKey(Article a) {

@@ -7,6 +7,7 @@ import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Company;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Evidence;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
+import com.zoop.graph.snapshot.PublicGraphSnapshot.MentionRef;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -58,11 +59,15 @@ public final class GraphSnapshotCodec {
 
     private static Issue issue(Obj o) {
         o.keys(Set.of("issueId", "label", "eventTime", "timePrecision", "geography", "geographyPolicyVersion",
-                "geographyEvidenceIds", "articleIds", "evidenceIds", "latestPublishedAt"), Set.of("action", "target"));
+                "geographyEvidenceIds", "articleIds", "evidenceIds", "mentions", "latestPublishedAt"),
+                Set.of("period", "assertionStatus", "action", "target", "representativeMentionId"));
         return new Issue(o.string("issueId"), o.string("label"), o.stringOrNull("eventTime"), o.string("timePrecision"),
-                optional(o, "action"), optional(o, "target"), o.string("geography"), o.string("geographyPolicyVersion"),
-                o.strings("geographyEvidenceIds"), o.strings("articleIds"), o.strings("evidenceIds"),
-                o.stringOrNull("latestPublishedAt"));
+                optional(o, "period"), optional(o, "assertionStatus"), optional(o, "action"), optional(o, "target"),
+                o.string("geography"), o.string("geographyPolicyVersion"), o.strings("geographyEvidenceIds"),
+                o.strings("articleIds"), o.strings("evidenceIds"), o.objects("mentions").stream().map(m -> {
+                    m.exactly(Set.of("mentionId", "articleId", "articleVersion"));
+                    return new MentionRef(m.string("mentionId"), m.string("articleId"), m.string("articleVersion"));
+                }).toList(), optional(o, "representativeMentionId"), o.stringOrNull("latestPublishedAt"));
     }
 
     private static Relation relation(Obj o) {
@@ -74,8 +79,10 @@ public final class GraphSnapshotCodec {
     }
 
     private static Basis basis(Obj o) {
-        o.keys(Set.of("verifiedAt"), Set.of("validFrom", "validUntil"));
-        return new Basis(o.string("verifiedAt"), optional(o, "validFrom"), optional(o, "validUntil"));
+        o.keys(Set.of("basisId", "relationType", "verifiedAt", "countries"),
+                Set.of("validFrom", "validUntil", "articleId", "articleVersion"));
+        return new Basis(o.string("basisId"), o.string("relationType"), o.string("verifiedAt"), optional(o, "validFrom"),
+                optional(o, "validUntil"), o.strings("countries"), optional(o, "articleId"), optional(o, "articleVersion"));
     }
 
     private static Article article(Obj o) {
@@ -114,6 +121,12 @@ public final class GraphSnapshotCodec {
                 if (!isInstant(b.verifiedAt()) || !isDateOrNull(b.validFrom()) || !isDateOrNull(b.validUntil())) {
                     throw invalid("relation_basis_time");
                 }
+                if (b.basisId().isBlank() || b.relationType().isBlank()) throw invalid("relation_basis");
+                // Both or neither, and a named article version must be pinned in this snapshot.
+                if ((b.articleId() == null) != (b.articleVersion() == null)
+                        || (b.articleId() != null && !articles.contains(b.articleId() + "@" + b.articleVersion()))) {
+                    throw invalid("relation_basis_article");
+                }
             }
         }
         for (Issue issue : s.issues()) {
@@ -126,6 +139,17 @@ public final class GraphSnapshotCodec {
                 throw invalid("issue_published_at");
             }
             if (!evidence.containsAll(issue.evidenceIds())) throw invalid("issue_evidence_reference");
+            Set<String> mentionIds = new HashSet<>();
+            for (MentionRef m : issue.mentions()) {
+                // A mention cites one of the issue's own pinned articles, so the asOf filter on articles also covers it.
+                if (!mentionIds.add(m.mentionId()) || !issue.articleIds().contains(m.articleId())
+                        || !articles.contains(m.articleId() + "@" + m.articleVersion())) {
+                    throw invalid("issue_mention_reference");
+                }
+            }
+            if (issue.representativeMentionId() != null && !mentionIds.contains(issue.representativeMentionId())) {
+                throw invalid("issue_representative_mention");
+            }
             for (String articleId : issue.articleIds()) {
                 if (s.articles().stream().noneMatch(a -> a.articleId().equals(articleId))) {
                     throw invalid("issue_article_reference");
