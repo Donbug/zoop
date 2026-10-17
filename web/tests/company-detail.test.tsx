@@ -281,6 +281,25 @@ function open(query = '') {
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
 
+test('D-COM-03 shares the company request and restores the info tab after a map round trip', async () => {
+  server.on('GET', '/api/v1/companies/:id', () =>
+    json({ ...company, legalName: '합성 정식 법인명' }),
+  );
+  const query = `${pinned}&period=1w&tab=info&event=issue-a&bucket=2026-10-05`;
+  open(query);
+  const info = await screen.findByRole('region', { name: '기업 기준정보' });
+  await within(info).findByText('합성 정식 법인명');
+  expect(server.calls('GET', '/api/v1/companies/:id')).toHaveLength(1);
+  await userEvent.click(screen.getByRole('link', { name: '지도에서 보기' }));
+  await userEvent.click(
+    await screen.findByRole('link', { name: '기업 상세로 돌아가기' }),
+  );
+  await screen.findByText('합성 정식 법인명');
+  expect(screen.getByTestId('address').textContent).toBe(
+    `/companies/${encodeURIComponent(id)}${query}`,
+  );
+});
+
 test('direct URL defaults to one month and supplied timestamp/version; quote stays latest', async () => {
   open();
   await screen.findByRole('heading', { name: '합성 기업' });
