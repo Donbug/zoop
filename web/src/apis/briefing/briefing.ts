@@ -43,3 +43,11 @@ export async function getBriefingGraphBasis(roundId: string) {
     throw new Error('요청한 브리핑 회차와 응답이 일치하지 않습니다.');
   return basis;
 }
+
+/** getPersonalizedBriefing (FS036): 같은 발행본에 본인 기준 기업과 겹치는 기업(matchedCompanyIds)을 표시한다. 회원 본인만. */
+export function getPersonalizedBriefing(roundId: string) {
+  return call<BriefingResponse>(
+    `/api/v1/briefings/${encodeURIComponent(roundId)}/personalized`,
+    'GET',
+  );
+}

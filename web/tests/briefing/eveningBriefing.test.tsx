@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
   act,
   fireEvent,
@@ -6,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BriefingPage from '@/pages/briefing/BriefingPage';
 import type {
@@ -20,6 +21,11 @@ import {
   deferred,
   json,
 } from '../support/fakeServer';
+
+beforeEach(() => {
+  // Public briefing tests start after guest-session resolution; bootstrap has its own test.
+  useAuthStore.getState().clearSession();
+});
 
 // 합성 fixture. 와이어프레임 D-BRF-02(2026-09-17 퇴근)의 예시 수치를 따른다.
 const kospi: MarketIndicator = {

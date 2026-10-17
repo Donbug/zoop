@@ -364,7 +364,9 @@ class BriefingHttpPostgresTest {
             upgrade.validate();
             assertEquals(0, upgrade.migrate().migrationsExecuted);
             assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + upgradeSchema + ".artifacts WHERE id='synthetic-upgrade-artifact'", Integer.class));
-            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + upgradeSchema + ".flyway_schema_history WHERE version='20261016170000' AND success", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + upgradeSchema + ".flyway_schema_history WHERE version='20261017230000' AND success", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + upgradeSchema + ".flyway_schema_history WHERE version='20261016170000' AND description='create graph versions' AND success", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema=? AND table_name='graph_versions'", Integer.class, upgradeSchema));
             assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema=? AND table_name='briefing_rounds'", Integer.class, upgradeSchema));
         } finally {
             jdbc.execute("DROP SCHEMA IF EXISTS " + upgradeSchema + " CASCADE");

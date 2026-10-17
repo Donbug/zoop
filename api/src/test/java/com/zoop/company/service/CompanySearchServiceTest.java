@@ -3,6 +3,8 @@ package com.zoop.company.service;
 import java.time.Instant;
 import java.util.List;
 
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import com.zoop.company.repository.CompanySearchRepository;
 import com.zoop.company.repository.CompanySearchRow;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,24 +51,24 @@ class CompanySearchServiceTest {
         Instant asOf = Instant.parse("2026-10-13T00:00:00Z");
         when(repository.search("query", null, 2L)).thenReturn(List.of(row("a"), row("b")));
         String cursor = service.search("query", null, 1, "graph-1", asOf).nextCursor();
-        assertThrows(IllegalArgumentException.class, () -> service.search("query", cursor, 2, "graph-1", asOf));
-        assertThrows(IllegalArgumentException.class, () -> service.search("query", cursor, 1, "graph-2", asOf));
-        assertThrows(IllegalArgumentException.class, () -> service.search("query", cursor, 1, "graph-1", asOf.plusSeconds(1)));
+        assertInvalidCursor(() -> service.search("query", cursor, 2, "graph-1", asOf));
+        assertInvalidCursor(() -> service.search("query", cursor, 1, "graph-2", asOf));
+        assertInvalidCursor(() -> service.search("query", cursor, 1, "graph-1", asOf.plusSeconds(1)));
         when(repository.normalize("different")).thenReturn("different");
-        assertThrows(IllegalArgumentException.class, () -> service.search("different", cursor, 1, "graph-1", asOf));
+        assertInvalidCursor(() -> service.search("different", cursor, 1, "graph-1", asOf));
     }
 
     @Test
     void malformedAndEmptyCursorsAreRejected() {
         for (String cursor : List.of("", " ", "!invalid!", "bnVsbA", "e30")) {
-            assertThrows(IllegalArgumentException.class, () -> service.search("query", cursor, 1, null, null), cursor);
+            assertInvalidCursor(() -> service.search("query", cursor, 1, null, null), cursor);
         }
     }
 
     @Test
     void nonPositiveLimitIsRejectedBeforeDatabaseAccess() {
-        assertThrows(IllegalArgumentException.class, () -> service.search("query", null, 0, null, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("query", null, -1, null, null));
+        assertThrows(CustomException.class, () -> service.search("query", null, 0, null, null));
+        assertThrows(CustomException.class, () -> service.search("query", null, -1, null, null));
         verifyNoInteractions(repository);
     }
 
@@ -76,7 +78,7 @@ class CompanySearchServiceTest {
         String cursor = service.search("query", null, 1, null, null).nextCursor();
         when(repository.catalogRevision()).thenReturn(2L);
         clearInvocations(repository);
-        assertThrows(IllegalArgumentException.class, () -> service.search("query", cursor, 1, null, null));
+        assertInvalidCursor(() -> service.search("query", cursor, 1, null, null));
         verify(repository, never()).search(anyString(), any(), any());
     }
 
@@ -87,10 +89,44 @@ class CompanySearchServiceTest {
                 """;
         String cursor = java.util.Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        var exception = assertThrows(IllegalArgumentException.class,
-                () -> service.search("query", cursor, 1, null, null));
-        assertTrue(exception.getMessage().contains("restart search without a cursor"));
+        assertInvalidCursor(() -> service.search("query", cursor, 1, null, null));
         verify(repository, never()).search(anyString(), any(), any());
+    }
+
+    @Test
+    void cursorPinsResolvedGraphSnapshotWhenClientOnlySendsOpaqueCursor() {
+        when(repository.search("query", null, 2L)).thenReturn(List.of(row("a"), row("b")));
+        var first = service.search("query", null, 1, null, null);
+        Instant asOf = Instant.parse("2026-10-14T01:00:00Z");
+        var pinned = service.pinGraphSnapshot(first, "graph-7", asOf);
+
+        var next = service.search("query", pinned.nextCursor(), null, null, null);
+
+        assertEquals("graph-7", next.graphVersion());
+        assertEquals(asOf, next.asOf());
+        // A pinned read time is not a requested asOf: later pages must not start filtering by it.
+        assertFalse(next.asOfRequested());
+        verify(repository, times(2)).search(eq("query"), any(), eq(2L));
+    }
+
+    @Test
+    void aRequestedAsOfStaysRequestedOnLaterPages() {
+        when(repository.search("query", null, 2L)).thenReturn(List.of(row("a"), row("b")));
+        Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
+        var first = service.search("query", null, 1, null, asOf);
+        var pinned = service.pinGraphSnapshot(first, "graph-7", asOf);
+
+        assertTrue(first.asOfRequested());
+        assertTrue(service.search("query", pinned.nextCursor(), null, null, null).asOfRequested());
+    }
+
+    private static void assertInvalidCursor(org.junit.jupiter.api.function.Executable executable) {
+        assertInvalidCursor(executable, "cursor");
+    }
+
+    private static void assertInvalidCursor(org.junit.jupiter.api.function.Executable executable, String message) {
+        var exception = assertThrows(CustomException.class, executable, message);
+        assertEquals(ErrorCode.INVALID_CURSOR, exception.getErrorCode());
     }
 
     private static CompanySearchRow row(String id) {

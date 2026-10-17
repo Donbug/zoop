@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/stores/useAuthStore';
 import {
   act,
   fireEvent,
@@ -6,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BriefingPage from '@/pages/briefing/BriefingPage';
 import type { BriefingResponse, MarketIndicator } from '@/types/briefing';
@@ -16,6 +17,11 @@ import {
   apiError,
   deferred,
 } from '../support/fakeServer';
+
+beforeEach(() => {
+  // Public briefing tests start after guest-session resolution; bootstrap has its own test.
+  useAuthStore.getState().clearSession();
+});
 
 const unavailable = {
   status: 'unavailable',

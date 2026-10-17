@@ -54,7 +54,7 @@ public final class CsrfKeyRing {
         if (key == null) {
             return Optional.empty();
         }
-        if (!sessionKind.matches("member|guest|oauth_pending")
+        if (!sessionKind.matches("member|guest|admin|oauth_pending")
                 || !sessionId.matches("[A-Za-z0-9_-]{1,128}") || version < 1) {
             throw new IllegalArgumentException("Invalid CSRF session identity");
         }

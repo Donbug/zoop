@@ -72,7 +72,8 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" \
  "items":[{"index":0,"status":"imported","documentId":"…","documentVersion":"…","textArtifactId":"…",
            "article":"created|existing","artifact":"created|existing","artifactFile":"created|existing","version":"created|existing",
            "currentVersion":{"result":"unchanged|moved|already-current","value":"<version>|null"},
-           "collectedAt":"2026-10-14T01:02:03.456789Z","grant":{"grantId":"…","revision":"…"}},
+           "collectedAt":"2026-10-14T01:02:03.456789Z","grant":{"grantId":"…","revision":"…"},
+           "publicationPrecision":"datetime|day|unknown","collection":{"provenance":"collected_http","collectionId":"…","receiptSha256":"…","bodySha256":"…","fetchedAt":"…","finalUrl":"…","httpStatus":200,"contentType":"…","network":"external|synthetic_loopback","documentKind":"news|disclosure","declaredPublication":{"precision":"instant|day|unresolved|unknown","raw":"…|null","basis":"…"}}},
           {"index":1,"status":"failed","failure":{"code":"current_version_conflict","currentVersion":"…|null"}},
           {"index":2,"status":"not_attempted"}]}
 ```
@@ -109,9 +110,9 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" \
 | `articles.access_status` | 새로 만들 때만 `available`. 이후 변경하지 않음 |
 | `article_versions.version` | `documentVersion` 그대로 |
 | `title` / `url` | export의 `title`(빈 문자열 유지) / 정규화된 `url` |
-| `published_at`, `published_date`, `publication_precision` | `publishedAt` 있음 → (그 시각, NULL, `datetime`), 없음 → (NULL, NULL, `unknown`). `day`는 만들지 않고 자정을 지어내지 않음 |
+| `published_at`, `published_date`, `publication_precision` | authored export: `publishedAt` 있음 → (그 시각, NULL, `datetime`), 없음 → (NULL, NULL, `unknown`). **수집(collected_http) export**는 선언된 정밀도를 그대로 따른다: `instant` → (그 시각, NULL, `datetime`), `day` → (NULL, **그 날짜**, `day`; 자정·시간대를 지어내지 않음), `unresolved`(오프셋 없는 시각)·`unknown` → (NULL, NULL, `unknown`). `unresolved`의 선언 원문은 DB에 칸이 없으므로 결과 문서의 `collection.declaredPublication`에만 남는다 |
 | `publisher`, `raw_artifact_id` | NULL (내보내지 않음) |
-| `collected_at` | **처음 등록된 관찰**의 `observedAt`(원장 page 수신 시각). import·replay 시각이 아님 |
+| `collected_at` | **처음 등록된 관찰**의 시각. authored export는 `observedAt`(원장 page 수신 시각), **collected_http export는 실제 HTTP 수집 시각 `collection.fetchedAt`**. import·replay 시각이 아님 |
 | `artifacts.id` | `textArtifactId` 그대로 (`text-<documentVersion>`) |
 | `artifacts.kind` / `media_type` | `extracted_text` / `text/plain; charset=utf-8` |
 | `artifacts.storage_uri` | `artifact-root:extracted_text/<textArtifactId>.txt` (상대 URI. 절대 경로 없음) |
@@ -174,6 +175,22 @@ smoke는 grant에서 `read`·`store`·`quote-display` 중 **하나씩만** 뺀 �
 
 **업그레이드 확인:** 같은 smoke를 `--upgrade-from <버전>`(예: 팀의 최신 기업 migration `20261014102810`)과 함께 **빈 DB**에서 실행하면, 먼저 기존 `spring.flyway.target`(`SPRING_FLYWAY_TARGET`)로 그 버전까지만 적용해 문서 테이블이 아직 없음을 확인하고(이 제한 실행은 JPA 검증이 실패해도 무방하며 Flyway 기록만 봅니다), 이어서 전체 시나리오를 돌립니다. 마지막에 `V20261014120000`이 그 버전 뒤에 성공으로 적용돼 마지막 행인지 검사합니다. 로컬 문서 migration은 처음 `V20261014100000`으로 작성했으나 팀의 `V20261014102810`이 먼저 병합돼 `V20261014120000__create_document_registry.sql`로 이름을 바꿨습니다(공유·적용된 적 없는 파일이라 안전). 아래 ‘실행 결과’는 이름 변경 전 버전의 기록이며 변경 후 DB 적용·업그레이드는 새로 실행해야 합니다.
 
+**수집 문서 smoke (`document_import_collected_smoke.py`).** 위 smoke는 authored fixture만 쓰므로, 실제 로컬 HTTP 서버 → 설치된 `zoop-ai-collect` → `zoop-ai-ingest` → 빌드된 jar → PostgreSQL 경로는 별도 스크립트가 확인합니다(기본 pipeline 환경 `ai/pipeline/.venv`(`make pipeline-install`), 공개 의존성만·private PoC·키·외부 네트워크·모델 호출 없음; `investmate`가 import되지 않음을 스스로 검사). **위 smoke가 채운 DB가 아닌 빈 전용 DB**가 필요합니다.
+
+```sh
+DB_URL=jdbc:postgresql://127.0.0.1:<port>/<db> DB_USERNAME=<user> DB_PASSWORD=<dummy> \
+  ai/pipeline/.venv/bin/python api/scripts/document_import_collected_smoke.py \
+    --jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar \
+    --ingest-cli "$PWD/ai/pipeline/.venv/bin/zoop-ai-ingest" --collect-cli "$PWD/ai/pipeline/.venv/bin/zoop-ai-collect" \
+    --psql-container <container> --db-user <user> --db-name <db>
+```
+
+날짜만(`day`)·오프셋 있는 시각(`instant`)·오프셋 없는 시각(`unresolved`)·미선언(`unknown`) 문서 4개를 실제 수집·import합니다. `collected_at`은 실제 `fetchedAt`이며, day는 DATE만 저장하고 instant는 UTC instant로 보존합니다. unresolved/unknown은 시각을 만들지 않고 unknown으로 저장하며 원문 선언과 해석 근거는 결과 `collection.declaredPublication`에 남깁니다. 서버 bytes·수집 시간 창·receipt·DB 행·artifact hash/파일을 대조하고, 잘못된 kind 및 변조된 수집 메타데이터는 행·파일 변경 없이 거절합니다.
+
+**2026-10-16 Main 실행:** PostgreSQL 17.11의 새 전용 DB에서 **10단계, import JVM 22회, 문서 4개, 거절 사례 20건**이 통과했습니다. 같은 import는 행·파일을 다시 쓰지 않았고 수집 디렉터리와 원천 원장은 불변이었습니다. 실제 공급원·모델 호출은 0이며 공개 의존성 환경에 `investmate`가 없음을 확인했습니다.
+
+처음에는 새 인증 설정 때문에 smoke의 비웹 기동이 실패해 임시 CSRF key ring을 실행 환경에만 생성하도록 보완했습니다. 이후 성공한 import가 JVM을 종료하지 않는 문제를 관측했고, thread dump에서 인증 정리 scheduler의 non-daemon thread를 확인했습니다. `AuthRateCleanup`을 웹 애플리케이션에서만 등록하도록 수정한 뒤 비웹 정상 종료, 웹 scheduler 유지, 위 전체 수입 시나리오 통과를 확인했습니다. 인증 보호를 끄거나 timeout을 늘리지는 않았습니다.
+
 ### 실행 결과 (2026-10-14, 로컬·미커밋)
 
 - Java 시험 157개가 실패·skip 없이 통과했고 `assemble`이 성공했습니다. 설치된 `zoop-ai-ingest` 변경(`--require-store`)을 포함한 pipeline 시험 229개도 통과했습니다.
@@ -187,7 +204,8 @@ smoke는 grant에서 `read`·`store`·`quote-display` 중 **하나씩만** 뺀 �
 
 - 이 migration(`V20261014120000`)과 `artifacts`·`articles`·`article_versions`의 소유는 **로컬 제안**이며 담당 합의 전까지 확정이 아닙니다(소유 담당은 [migration 담당 경계](../../docs/development/api-migration-ownership.md)에서 확정). 다른 브랜치의 migration과 버전이 겹치면 병합 전에 이 파일의 이름만 바꿉니다. 첫 작성자는 이 경로이며 다른 기능은 `artifacts`를 다시 정의하지 말고 참조합니다.
 - 문서를 읽는 기능(`listCompanyDocuments`, `getEvidence` 등)은 저장 행을 권한으로 쓰면 안 됩니다. 응답 때마다 `articles.provider`의 **현재** grant와 `access_status='available'`을 다시 확인해야 하고, `current_version IS NULL`을 “현재 버전 없음”으로 다루며 시각으로 대체하면 안 됩니다. `getEvidence`는 이 규칙대로 읽습니다([문서 분석](DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)); `listCompanyDocuments`는 아직 없습니다.
-- `articles.provider_key`·`lineage_key`·`publisher`·`raw_artifact_id`와 `day` 정밀도는 S2-1이 값을 내보낼 때까지 비어 있습니다.
+- `articles.provider_key`·`lineage_key`·`publisher`·`raw_artifact_id`는 S2-1이 값을 내보낼 때까지 비어 있습니다. `day` 정밀도는 `zoop-ai-collect`로 수집한 export가 날짜만 선언했을 때 채워집니다.
+- **수집 provenance(collected_http).** S2-1 export의 `observation`에 `provenance`·`collection` 키가 **둘 다** 있으면 그 관찰은 `zoop-ai-collect`가 HTTP로 가져온 것이고(authored export에는 두 키가 없고 이전과 정확히 같다), `IngestionExportParser`는 `collection`의 닫힌 키 집합(`provenance`, `collectionId`, `receipt{file,sha256}`, `fetchedAt`, `finalUrl`, `httpStatus`(2xx), `contentType`, `bodySha256`(= `locatorMetadata.rawHash`), `documentKind`, `network`, `published{raw,precision,date,basis}`)과 선언된 게시 시각·`publishedAt`의 일관성을 엄격히 검증하고 어긋나면 `export_invalid`/`published_at_unsupported`입니다. 요청 `kind`가 수집 때 선언된 `documentKind`와 다르면 `article_kind_conflict`입니다. 이 사실은 결과 문서의 `collection` 객체(`publicationPrecision`과 함께; 수집 항목에만 있고 authored 결과 키는 그대로)로 보존·보고되며 버리지 않습니다. `network: "synthetic_loopback"`은 로컬 합성 시험 서버의 바이트이며 외부 문서로 취급·표시하면 안 됩니다. receipt는 서명되지 않은 운영자 소유 기록이라 **일관성 증거일 뿐 암호학적 증명이나 license가 아닙니다**(권한은 grant가 정합니다).
 - `collected_at`·`url`은 가장 이른 관찰이 아니라 **처음 등록된** 관찰의 값입니다(행이 불변이라서).
 - 파일 저장소는 로컬 파일시스템 한 곳입니다. 보존·삭제 정책(ERD가 정하지 않음)과 원격 저장소는 없습니다.
 - 이 변경의 범위 밖: `getEvidence` 외의 읽기 API, 분석·그래프·공개 반영. (`getEvidence`는 이 import가 아니라 문서 분석 쪽에서 구현합니다.)

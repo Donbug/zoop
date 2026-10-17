@@ -294,7 +294,7 @@
 | BFF_PATH_DIFFERENCE | difference | getAdminSession | 목표 /api/v1/admin/auth/session ↔ BFF /api/admin/auth/session |  |
 | BFF_FIELD_DIFFERENCE | difference | getAdminSession | 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | logInAdmin | 목표 /api/v1/admin/auth/login ↔ BFF /api/admin/auth/login |  |
-| BFF_FIELD_DIFFERENCE | difference | logInAdmin | 목표만 197 · BFF만 6 · 형식/필수/권한 변경 5 |  |
+| BFF_FIELD_DIFFERENCE | difference | logInAdmin | 목표만 198 · BFF만 6 · 형식/필수/권한 변경 5 |  |
 | BFF_PATH_DIFFERENCE | difference | logOutAdmin | 목표 /api/v1/admin/auth/logout ↔ BFF /api/admin/auth/logout |  |
 | BFF_FIELD_DIFFERENCE | difference | logOutAdmin | 목표만 162 · BFF만 0 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminDashboard | 목표 /api/v1/admin/dashboard ↔ BFF /api/admin/dashboard |  |

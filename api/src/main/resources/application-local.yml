@@ -10,3 +10,12 @@ zoop:
     allowed-origins: ${ZOOP_AUTH_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
     allow-http-loopback-origins: true
     session-cookie-secure: false
+    social:
+      frontend-origin: ${ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN:http://localhost:5173}
+
+springdoc:
+  api-docs:
+    enabled: ${ZOOP_SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${ZOOP_SWAGGER_ENABLED:true}
+    path: /swagger-ui.html

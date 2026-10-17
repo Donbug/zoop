@@ -97,7 +97,7 @@ export default function MarketIndicators({
               <p className="flex items-center gap-2">
                 <strong className="text-xs">{label}</strong>
                 {item && item.status !== 'ok' && (
-                  <span className="text-[10px] font-semibold text-[#b42318]">
+                  <span className="text-[10px] font-semibold text-zoop-alert">
                     {statuses[item.status]}
                   </span>
                 )}

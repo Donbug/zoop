@@ -8,6 +8,7 @@ import { getPortfolio } from '@/apis/portfolio/portfolio';
 import { getSettings } from '@/apis/settings/settings';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { CompanySearchTerms } from '@/types/company';
 
 const CONNECT_PARAM = 'account';
@@ -20,6 +21,37 @@ const CONNECT_VALUE = 'connect';
 //   연결 성공·취소·브라우저 뒤로 가기 모두 내 종목으로 돌아온다.
 export default function MyStocksPage() {
   const { logout } = useAuth();
+  const revision = useAuthStore((s) => s.sessionRevision);
+  const logoutLock = useRef<number | null>(null);
+  const active = useRef(true);
+  const [logoutState, setLogoutState] = useState<{
+    revision: number;
+    status: 'pending' | 'error';
+  } | null>(null);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const logoutStatus =
+    logoutState?.revision === revision ? logoutState.status : null;
+  async function handleLogout() {
+    if (logoutLock.current === revision) return;
+    logoutLock.current = revision;
+    setLogoutState({ revision, status: 'pending' });
+    try {
+      await logout();
+    } catch {
+      if (
+        active.current &&
+        useAuthStore.getState().sessionRevision === revision
+      )
+        setLogoutState({ revision, status: 'error' });
+    } finally {
+      if (logoutLock.current === revision) logoutLock.current = null;
+    }
+  }
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
@@ -82,9 +114,27 @@ export default function MyStocksPage() {
             terms={terms}
             onTermsChange={setTerms}
           />
-          <button type="button" onClick={logout} className="underline">
-            로그아웃
-          </button>
+          <div className="mt-4 flex flex-col items-start gap-2">
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={logoutStatus === 'pending'}
+              aria-busy={logoutStatus === 'pending'}
+              className="text-xs text-zoop-ink underline underline-offset-4 disabled:cursor-progress disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
+            >
+              {logoutStatus === 'pending'
+                ? '로그아웃하고 있어요'
+                : logoutStatus === 'error'
+                  ? '로그아웃 다시 시도'
+                  : '로그아웃'}
+            </button>
+            {logoutStatus === 'error' && (
+              <p role="alert" className="text-xs text-red-700">
+                로그아웃하지 못했어요. 로그인 상태가 유지되고 있어요. 다시
+                시도해 주세요.
+              </p>
+            )}
+          </div>
         </PageShell>
       </div>
     </>

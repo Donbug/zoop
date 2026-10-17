@@ -45,7 +45,7 @@ class SocialAuthServiceTest {
         mapper = JsonMapper.builder().build();
         sessions = mock(MemberSessionService.class);
         SocialAuthSettings settings = new SocialAuthSettings(Duration.ofMinutes(10), 30, 10,
-                "/login,/signup,/", false, "google-client", "google-secret",
+                "/login,/signup,/", false, "https://web.example.com", "google-client", "google-secret",
                 "https://api.example.com/api/v1/auth/social/google/callback",
                 "kakao-client", "kakao-secret", "https://api.example.com/api/v1/auth/social/kakao/callback");
         service = new SocialAuthService(pending, settings, rates, mapper,
@@ -140,7 +140,7 @@ class SocialAuthServiceTest {
     @Test
     void insecureRedirectsAreOptInAndRestrictedToLoopbackHosts() {
         SocialAuthSettings local = new SocialAuthSettings(Duration.ofMinutes(10), 30, 10,
-                "/login,/signup,/", true, "google-client", "google-secret",
+                "/login,/signup,/", true, "http://localhost:5173", "google-client", "google-secret",
                 "http://localhost:8080/api/v1/auth/social/google/callback",
                 "kakao-client", "kakao-secret", "http://127.0.0.1:8080/api/v1/auth/social/kakao/callback");
         assertTrue(local.providerConfigured(local.provider("google")));
@@ -148,13 +148,13 @@ class SocialAuthServiceTest {
         assertFalse(local.pendingCookieSecure(local.provider("google")));
 
         SocialAuthSettings secureOnly = new SocialAuthSettings(Duration.ofMinutes(10), 30, 10,
-                "/login,/signup,/", false, "google-client", "google-secret",
+                "/login,/signup,/", false, "https://web.example.com", "google-client", "google-secret",
                 "http://localhost:8080/api/v1/auth/social/google/callback",
                 "kakao-client", "kakao-secret", "http://127.0.0.1:8080/api/v1/auth/social/kakao/callback");
         assertFalse(secureOnly.providerConfigured(secureOnly.provider("google")));
 
         SocialAuthSettings notLoopback = new SocialAuthSettings(Duration.ofMinutes(10), 30, 10,
-                "/login,/signup,/", true, "google-client", "google-secret",
+                "/login,/signup,/", true, "http://localhost:5173", "google-client", "google-secret",
                 "http://dev.example.com/api/v1/auth/social/google/callback",
                 "kakao-client", "kakao-secret", "https://api.example.com/api/v1/auth/social/kakao/callback");
         assertFalse(notLoopback.providerConfigured(notLoopback.provider("google")));

@@ -38,7 +38,7 @@ STATUS_KEYS = {"schemaVersion", "jobId", "inputDigest", "approval", "provenance"
                "dispatch", "next", "acceptedAt", "observedAt"}
 # What a status, an error or a withheld result may never carry (pipeline keys and stored identity).
 PRIVATE_KEYS = frozenset({"binding", "fixtureHash", "requestDigest", "responseDigest", "creatorJobId", "rawVersion", "textArtifactId", "rawLocatorIds",
-                          "sourceSegments", "groupDigest", "snapshotDigest", "requestKey", "original", "calls", "replay", "settingsDigest", "adapter"})
+                          "sourceSegments", "groupDigest", "snapshotDigest", "requestKey", "original", "calls", "replay", "adapter"})
 # Keys a DELIVERED result may carry that the strict projection must never add: stored identity of the pipeline's artifacts.
 CONTENT_PRIVATE = frozenset({"binding", "fixtureHash", "requestDigest", "responseDigest", "creatorJobId", "textArtifactId", "rawLocatorIds", "sourceSegments",
                              "groupDigest", "snapshotDigest", "requestKey", "inputKind", "rawVersion"})

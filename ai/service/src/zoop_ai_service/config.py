@@ -13,13 +13,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import extraction_access, graph_access, grants, relation_access
+from . import extraction_access, graph_access, grants, handoff_access, relation_access
 
 ANALYSIS_SCOPES = ("analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover")
 RELATION_SCOPES = ("relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review")
 EXTRACTION_SCOPES = ("extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover")
 GRAPH_SCOPES = ("graph.read",)
-SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES)
+HANDOFF_SCOPES = ("handoff.read",)
+SCOPES = (*ANALYSIS_SCOPES, *RELATION_SCOPES, *EXTRACTION_SCOPES, *GRAPH_SCOPES, *HANDOFF_SCOPES)
 PRINCIPAL = re.compile(r"[a-z][a-z0-9-]{0,62}")
 DIGEST = re.compile(r"[0-9a-f]{64}")
 HOST = "127.0.0.1"
@@ -55,6 +56,13 @@ GRAPH_SWITCH = ("ZOOP_AI_SERVICE_GRAPH_COMMAND", "ZOOP_AI_GRAPH_STATE_DIR", "ZOO
                 "ZOOP_AI_GRAPH_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_GRAPH_SOURCES", "ZOOP_AI_SERVICE_GRAPH_CANONICAL", "ZOOP_AI_SERVICE_GRAPH_VERSIONS")
 GRAPH_VARS = (*GRAPH_SWITCH, "ZOOP_GRAPH_AUTH")
 GRAPH_CREDENTIALS = ("ZOOP_GRAPH_USER", "ZOOP_GRAPH_PASSWORD")
+# The read-only handoff door is a fourth, separate all-or-nothing group (scope `handoff.read`, none of the graph.read variables). It runs the installed
+# `zoop-ai-handoff export` only and needs no credential: the handoff reads the S2/S3/ingestion ledgers, the source registry and three operator files, never
+# the Neo4j graph, so no ZOOP_GRAPH_* value reaches its child. Its own source roots and registry are named here (naming them never switches the S2/S3
+# groups on); when an S2/S3 group is configured they must be exactly the same paths, because the handoff reads the very ledgers those groups write.
+HANDOFF_VARS = ("ZOOP_AI_SERVICE_HANDOFF_COMMAND", "ZOOP_AI_HANDOFF_STATE_DIR", "ZOOP_AI_HANDOFF_RELATION_STATE_DIR", "ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR",
+                "ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", "ZOOP_AI_SERVICE_HANDOFF_SOURCES", "ZOOP_AI_SERVICE_HANDOFF_CANONICAL",
+                "ZOOP_AI_SERVICE_HANDOFF_DECISIONS", "ZOOP_AI_SERVICE_HANDOFF_BINDINGS", "ZOOP_AI_SERVICE_HANDOFF_EXPORTS")
 
 
 class ConfigError(Exception):
@@ -112,6 +120,22 @@ class GraphConfig:
 
 
 @dataclass(frozen=True)
+class HandoffConfig:
+    command: Path
+    state_dir: Path             # the handoff ledger (handoff.sqlite3 + artifacts): operator-written by `freeze`/`recover`, the pipeline opens it read-only
+    relation_state_dir: Path    # S3 ledger the handoff was frozen from: read-only here
+    extraction_state_dir: Path
+    ingestion_state_dir: Path
+    sources_path: Path
+    canonical_path: Path        # operator files pinned by their sha256 in every manifest; the pipeline re-reads and compares them on every export
+    decisions_path: Path
+    bindings_path: Path
+    exports_path: Path          # server-owned per-principal pin allowlist (zoop-ai-handoff-exports-1), re-read on every request
+    shared_gate: bool           # an S2/S3 group of this process writes ledgers the handoff reads: serialize behind their gate (static, never guessed)
+    child_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     principals: tuple[Principal, ...]
     state_dir: Path
@@ -125,6 +149,7 @@ class ServiceConfig:
     relation: RelationConfig | None = None
     extraction: ExtractionConfig | None = None
     graph: GraphConfig | None = None
+    handoff: HandoffConfig | None = None
 
     @property
     def transport_dir(self) -> Path:
@@ -361,6 +386,50 @@ def _graph(environ: Mapping[str, str], principals: tuple[Principal, ...], state_
                        {**_child_env(app_state, worker_state), "ZOOP_GRAPH_AUTH": mode, **secrets})
 
 
+def _handoff(environ: Mapping[str, str], principals: tuple[Principal, ...], state_dir: Path, worker_state: Path, relation: RelationConfig | None,
+             extraction: ExtractionConfig | None, graph: GraphConfig | None) -> HandoffConfig | None:
+    """All-or-nothing, like the other groups, and without any credential. Every root and file is validated here; the allowlist is validated completely
+    (the same strict rules apply again on every request). The handoff root must exist: only the operator's `zoop-ai-handoff freeze` creates it."""
+    if not any(name in environ for name in HANDOFF_VARS):
+        return None
+    for name in HANDOFF_VARS:
+        if name not in environ:
+            raise ConfigError(name, "handoff_group_incomplete")
+    command = _file(environ["ZOOP_AI_SERVICE_HANDOFF_COMMAND"], "ZOOP_AI_SERVICE_HANDOFF_COMMAND", executable=True)
+    app_state = _absolute(environ.get("ZOOP_STATE_DIR"), "ZOOP_STATE_DIR")
+    roots = {name: _existing_dir(environ[name], name) for name in ("ZOOP_AI_HANDOFF_STATE_DIR", "ZOOP_AI_HANDOFF_RELATION_STATE_DIR",
+                                                                   "ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR", "ZOOP_AI_HANDOFF_INGESTION_STATE_DIR")}
+    _disjoint({"ZOOP_AI_SERVICE_STATE_DIR": state_dir, "ZOOP_AI_WORKER_STATE_DIR": worker_state, "ZOOP_STATE_DIR": app_state, **roots}, "handoff_roots_overlap")
+    if graph is not None and _overlaps(roots["ZOOP_AI_HANDOFF_STATE_DIR"], graph.state_dir):
+        raise ConfigError("ZOOP_AI_HANDOFF_STATE_DIR", "handoff_roots_overlap")
+    sources = _file(environ["ZOOP_AI_SERVICE_HANDOFF_SOURCES"], "ZOOP_AI_SERVICE_HANDOFF_SOURCES")
+    files = {name: _file(environ[name], name) for name in ("ZOOP_AI_SERVICE_HANDOFF_CANONICAL", "ZOOP_AI_SERVICE_HANDOFF_DECISIONS",
+                                                           "ZOOP_AI_SERVICE_HANDOFF_BINDINGS")}
+    exports = _file(environ["ZOOP_AI_SERVICE_HANDOFF_EXPORTS"], "ZOOP_AI_SERVICE_HANDOFF_EXPORTS")
+    try:
+        handoff_access.load(exports, [p.name for p in principals])
+    except handoff_access.AccessError as error:
+        raise ConfigError("ZOOP_AI_SERVICE_HANDOFF_EXPORTS", error.code) from None
+    same: list[tuple[str, Path, Path]] = []
+    if relation is not None:
+        same += [("ZOOP_AI_HANDOFF_RELATION_STATE_DIR", roots["ZOOP_AI_HANDOFF_RELATION_STATE_DIR"], relation.state_dir),
+                 ("ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR"], relation.extraction_state_dir),
+                 ("ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_INGESTION_STATE_DIR"], relation.ingestion_state_dir),
+                 ("ZOOP_AI_SERVICE_HANDOFF_SOURCES", sources, relation.sources_path)]
+    if extraction is not None:
+        same += [("ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR"], extraction.state_dir),
+                 ("ZOOP_AI_HANDOFF_INGESTION_STATE_DIR", roots["ZOOP_AI_HANDOFF_INGESTION_STATE_DIR"], extraction.ingestion_state_dir),
+                 ("ZOOP_AI_SERVICE_HANDOFF_SOURCES", sources, extraction.sources_path)]
+    for name, mine, theirs in same:
+        if mine != theirs:
+            raise ConfigError(name, "handoff_source_inconsistent")
+    # The child environment is the plain ownership environment: no graph credential, provider key or token digest is ever copied into it.
+    return HandoffConfig(command, roots["ZOOP_AI_HANDOFF_STATE_DIR"], roots["ZOOP_AI_HANDOFF_RELATION_STATE_DIR"], roots["ZOOP_AI_HANDOFF_EXTRACTION_STATE_DIR"],
+                         roots["ZOOP_AI_HANDOFF_INGESTION_STATE_DIR"], sources, files["ZOOP_AI_SERVICE_HANDOFF_CANONICAL"],
+                         files["ZOOP_AI_SERVICE_HANDOFF_DECISIONS"], files["ZOOP_AI_SERVICE_HANDOFF_BINDINGS"], exports,
+                         relation is not None or extraction is not None, _child_env(app_state, worker_state))
+
+
 def load(environ: Mapping[str, str]) -> ServiceConfig:
     principals = _principals(environ.get("ZOOP_AI_SERVICE_PRINCIPALS"))
     state_dir = _absolute(environ.get("ZOOP_AI_SERVICE_STATE_DIR"), "ZOOP_AI_SERVICE_STATE_DIR")
@@ -394,4 +463,5 @@ def load(environ: Mapping[str, str]) -> ServiceConfig:
     relation = _relation(environ, principals, state_dir, worker_state, relation_enabled)
     extraction = _extraction(environ, principals, state_dir, worker_state)
     graph = _graph(environ, principals, state_dir, worker_state, relation, extraction)
-    return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph)
+    handoff = _handoff(environ, principals, state_dir, worker_state, relation, extraction, graph)
+    return ServiceConfig(principals, state_dir, worker_state, command, grants_path, replay, port, live, child, relation, extraction, graph, handoff)

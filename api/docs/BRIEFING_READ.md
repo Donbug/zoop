@@ -18,7 +18,7 @@ API 실행 시 `ZOOP_SWAGGER_ENABLED=true`이면 `/swagger-ui.html`과 `/v3/api-
 
 ## 저장·권한 계약
 
-후속 migration `V20261016170000__create_briefing_read_storage.sql`이 `briefing_rounds`와 `briefing_changes`를 추가한다. 기존 적용 migration 및 공통 `artifacts`·문서 등록부를 변경하지 않는다.
+후속 migration `V20261017230000__create_briefing_read_storage.sql`이 `briefing_rounds`와 `briefing_changes`를 추가한다. 기존 적용 migration 및 공통 `artifacts`·문서 등록부를 변경하지 않는다.
 
 - `published_payload`: 발행 당시 `BriefingPayload`. 회차·창·버전·이슈 최대 3개·필수 중첩 구조를 검증한다. 공개 후 원문·창·비교 결과는 불변이다.
 - `public_snapshot.marketSummary`: 발행 당시 실제 시장 요약 또는 생산자가 없다는 `unavailable` 사유. 조회 시 생성하지 않는다.
@@ -77,3 +77,7 @@ DB 환경변수를 위 폐기용 DB로 지정한 상태에서 실행한다. HTTP
 ```
 
 검증 범위는 DB 저장값 복원, 현재 권한 철회, 상태별 본문 숨김, 이력 커서, 잘못된 입력, 원문·해시 불변, 정정·중단 이력, Swagger·CORS 및 공통 요청 ID다. 실제 운영 자료·권한 승인과 정시 생성·자동 발행 완료를 증명하는 시험은 아니다.
+
+## 미병합 개발 migration의 버전 충돌 정리
+
+최신 main의 graph migration이 `20261016170000`을 사용하므로, 이 PR의 미병합 briefing migration은 `20261017230000`으로 배치했다. SQL 내용은 같다. main의 이미 반영된 migration을 수정하거나 Flyway repair/checksum 변경으로 우회하지 않는다. 이전 PR 버전을 적용한 폐기용 로컬 DB는 이력 보존용으로 유지하고, 새 버전 검증/서버는 새 개발 DB를 사용한다. 실제 공유 DB에 구 버전 briefing migration을 수동 적용한 경우에는 먼저 이력과 데이터를 확인한 별도 이행이 필요하며 자동 변경하지 않는다. 그래프·관리자 테이블이 최신 main에 추가됐지만, 이번 충돌 정리는 해당 FK/운영 그래프 연결을 새로 구현하는 작업이 아니다.

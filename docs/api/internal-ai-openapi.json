@@ -3,7 +3,7 @@
   "info": {
     "title": "Zoop internal AI analysis transport",
     "version": "1.0.0",
-    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph."
+    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph.\n\n**Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only\nfamily over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle\n(`zoop-graph-handoff-bundle-1`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It\nwrites nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied\npath, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409\n`execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side\nartifact; the application's article/text/evidence/catalog verification, snapshot registration and activation are the backend's and are not claimed here.\n\n**Which handoffs a caller may read.** A handoff id is only a label, so the operator lists per principal the exact `{handoffId, manifestDigest, bundleDigest}`\n(both SHA-256 pins are required) in a server-owned allowlist that is re-read on every request and again before anything of the answer is used. A handoff that is\nnot listed for the caller answers 403 `handoff_not_allowed` before any child process is touched, with one answer for \"unknown\", \"exists but not yours\" and\n\"listed for another principal\". A listed handoff that the ledger does not have answers 404 `handoff_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the handoff verifies *now*: the producer re-checks on every export the S3 authority and S2 upstream pins, grants and\nrights, the used review revisions, the three operator files against the manifest pins and the rebuilt content digest; the service then hashes the canonical\nbytes of the bundle it received, requires the result to equal the producer's receipt **and** the operator's pins, parses it through a closed model (unknown\nfields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with\n`delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,\n`canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch` ...) and nothing else:\nno `verification` (so no count, source id or digest) and no `bundle`. A withheld answer is not an error and not an empty bundle; do not import it and do not\ntreat it as \"no data\". The checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and nothing\nrecalls content a caller already received.\n\n**The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical\nUTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python\n`json.dumps(sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False)`). All numbers are non-negative integers and all keys ASCII, so any JSON parser followed by that\nserialisation reproduces the same bytes and the same digest, whatever the language; do not normalise, drop or add a field before hashing. Every key the service\nadds (`appImport`, `observedAt`, `verification`, `delivery`) is a sibling of `bundle`, never inside it. Strings that came from sources (titles, URLs, labels,\nobservation and grant metadata, `sourceKind`) are data the producer recorded, never an authority: nothing in them proves or extends a right, and the pins and the\ncurrent `delivery.state` are the only delivery gates.\n\n**The manifest bytes.** `manifest` is the operator's frozen manifest exactly as the producer's ledger stored it at freeze time (never rebuilt from today's files or\nconfiguration): schema, handoff id, source-kind declaration, policy version, the S3/S2 source pins with their review digests and the three operator-file SHA-256\nhashes. It holds no path and no secret. Its canonical bytes (same canonicalisation as the bundle) hash to `verification.manifestDigest`, which equals\n`bundle.manifestDigest`. The service refuses (500 `runtime_binding_mismatch`) a manifest whose digest, handoff id, declaration, policy version, file hashes or\nsource pins disagree with the bundle or the producer's receipt, and (500 `runtime_contract_mismatch`) a missing manifest or any unknown field at any level. A\nbackend therefore recomputes both digests from ONE authenticated response. `manifest` is a sibling of `bundle`; status and withheld answers never carry it.\n\n**Status.** `GET /{handoffId}` runs the same full export gate chain and returns identity, `state`, `delivery`, `appImport` and, only when current,\n`verification` (manifest, bundle and content digests, bundle size, the bundle's own counts, number of source jobs, provenance declaration). It carries no\nnode, source id, text or title.\n\n**Bundle.** `GET /{handoffId}/bundle` returns the same fields plus `manifest` and `bundle`. The response is bounded by the producer's 6 MiB bundle limit; the\nservice reads at most 16 MiB from its child, so an oversized answer is a 503 (`runtime_unavailable`), never a truncated bundle.\n\n**Busy and unavailable.** An operator writer holding a ledger (`handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`;\nunusable server configuration or operator state (damaged or altered artifact, operator file, ownership, ledger recovery needed) is 503\n`service_configuration_invalid`; too many concurrent reads (at most 2 children) is 503 `service_busy`; a missed 45 s deadline or an unreadable answer is 503\n`runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service\nknows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle."
   },
   "paths": {
     "/internal/v1/analysis-jobs": {
@@ -8601,10 +8601,2894 @@
           }
         ]
       }
+    },
+    "/internal/v1/graph-handoffs/{handoffId}": {
+      "get": {
+        "tags": [
+          "graph-handoffs"
+        ],
+        "summary": "Verified, content-free status of one allowlisted AI handoff",
+        "operationId": "getGraphHandoffStatus",
+        "parameters": [
+          {
+            "name": "handoffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "An allowlisted handoff id.",
+              "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+              "title": "Handoffid"
+            },
+            "description": "An allowlisted handoff id."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified status read from the producer during this request: identity, state, delivery and, only when current, digests and the bundle's own counts. Never a bundle, a source id or a title.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdStatus"
+                },
+                "examples": {
+                  "current": {
+                    "summary": "The handoff verifies now and matches the operator's pins",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "handoffId": "handoff-synthetic-1",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "appImport": "pending",
+                      "delivery": {
+                        "state": "current",
+                        "reason": null,
+                        "checkedAt": "2026-10-16T03:00:00.123456+00:00"
+                      },
+                      "verification": {
+                        "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
+                        "bundleDigest": "387a34a9afbd40213ed9380211565e01053af02a7a897a9cc6604446065fb43d",
+                        "contentDigest": "2524fbfddf15e4f4c1bc6e7cc112ac3cfc06cf6afca265043bbbd878d090ce0c",
+                        "bundleBytes": 6992,
+                        "counts": {
+                          "companies": 1,
+                          "issues": 1,
+                          "relations": {
+                            "INVOLVES": 1,
+                            "STRUCTURALLY_RELATED_TO": 0,
+                            "FOLLOWS": 0
+                          },
+                          "evidence": 1,
+                          "articles": 1,
+                          "exclusions": 0
+                        },
+                        "sources": 1,
+                        "provenance": {
+                          "declaredSourceKind": "synthetic",
+                          "observedSourceKind": "synthetic",
+                          "executionMode": "replay",
+                          "recordingKind": "authored-test"
+                        }
+                      },
+                      "observedAt": "2026-10-16T03:00:00Z"
+                    }
+                  },
+                  "withheld": {
+                    "summary": "A current authority gate refused delivery: identity, state and a reason code only",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "handoffId": "handoff-synthetic-1",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "appImport": "pending",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "source_unauthorized",
+                        "checkedAt": null
+                      },
+                      "verification": null,
+                      "observedAt": "2026-10-16T03:00:00Z"
+                    }
+                  },
+                  "pinMismatch": {
+                    "summary": "The ledger holds another bundle than the one the operator reviewed (pins differ)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "handoffId": "handoff-synthetic-1",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "appImport": "pending",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "handoff_pin_mismatch",
+                        "checkedAt": null
+                      },
+                      "verification": null,
+                      "observedAt": "2026-10-16T03:00:00Z"
+                    }
+                  },
+                  "notReady": {
+                    "summary": "The handoff is reserved (an interrupted freeze) and not exportable until the operator recovers it",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "handoffId": "handoff-synthetic-1",
+                      "state": "reserved",
+                      "publication": "not-published",
+                      "appImport": "pending",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "handoff_not_ready",
+                        "checkedAt": null
+                      },
+                      "verification": null,
+                      "observedAt": "2026-10-16T03:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks `handoff.read`; or handoff_not_allowed: the handoff is not listed for this principal (unknown, unlisted and another principal's answer alike).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "scopeDenied": {
+                    "summary": "The principal lacks handoff.read",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  },
+                  "handoffNotAllowed": {
+                    "summary": "Not listed for this principal (unknown, unlisted and another principal's answer alike)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "handoff_not_allowed",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "handoff_not_found: the operator listed the handoff but the handoff ledger has none (an operator configuration gap), or route_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Listed by the operator but absent from the handoff ledger",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "handoff_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "handoff_not_found",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "execution_unavailable: the handoff configuration group is not enabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "The handoff configuration group is not enabled",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: path, query parameter (any is refused) or header validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Path or query validation",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": "handoffId"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error (not retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "The producer's answer is not the contract this service knows (for example an unknown nested field)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "runtime_contract_mismatch",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty bundle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "runtimeBusy": {
+                    "summary": "A writer holds a ledger: retry later",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "runtime_busy",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "handoff_busy",
+                        "field": null
+                      }
+                    }
+                  },
+                  "runtimeUnavailable": {
+                    "summary": "The child missed its deadline or answered unreadably",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  },
+                  "serviceConfigurationInvalid": {
+                    "summary": "The stored artifact or an operator file needs an operator",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "service_configuration_invalid",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "handoff_artifact_invalid",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "handoff.read"
+            ]
+          }
+        ]
+      }
+    },
+    "/internal/v1/graph-handoffs/{handoffId}/bundle": {
+      "get": {
+        "tags": [
+          "graph-handoffs"
+        ],
+        "summary": "The whole bundle of an allowlisted AI handoff, only while it verifies now and matches the operator's pins",
+        "operationId": "getGraphHandoffBundle",
+        "parameters": [
+          {
+            "name": "handoffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "An allowlisted handoff id.",
+              "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+              "title": "Handoffid"
+            },
+            "description": "An allowlisted handoff id."
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,128}$"
+            },
+            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The frozen manifest and the whole bundle, only while every delivery gate holds at this moment; otherwise `delivery.state` is `withheld` and `verification`, `manifest` and `bundle` are null. `manifest` hashes (canonical bytes) to `verification.manifestDigest` and `bundle` to `verification.bundleDigest`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdBundle"
+                },
+                "examples": {
+                  "current": {
+                    "summary": "The whole bundle, only while every delivery gate holds at this moment",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "handoffId": "handoff-synthetic-1",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "appImport": "pending",
+                      "delivery": {
+                        "state": "current",
+                        "reason": null,
+                        "checkedAt": "2026-10-16T03:00:00.123456+00:00"
+                      },
+                      "verification": {
+                        "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
+                        "bundleDigest": "387a34a9afbd40213ed9380211565e01053af02a7a897a9cc6604446065fb43d",
+                        "contentDigest": "2524fbfddf15e4f4c1bc6e7cc112ac3cfc06cf6afca265043bbbd878d090ce0c",
+                        "bundleBytes": 6992,
+                        "counts": {
+                          "companies": 1,
+                          "issues": 1,
+                          "relations": {
+                            "INVOLVES": 1,
+                            "STRUCTURALLY_RELATED_TO": 0,
+                            "FOLLOWS": 0
+                          },
+                          "evidence": 1,
+                          "articles": 1,
+                          "exclusions": 0
+                        },
+                        "sources": 1,
+                        "provenance": {
+                          "declaredSourceKind": "synthetic",
+                          "observedSourceKind": "synthetic",
+                          "executionMode": "replay",
+                          "recordingKind": "authored-test"
+                        }
+                      },
+                      "observedAt": "2026-10-16T03:00:00Z",
+                      "manifest": {
+                        "schemaVersion": "zoop-ai-handoff-1",
+                        "handoffId": "handoff-synthetic-1",
+                        "sourceKind": "synthetic",
+                        "policyVersion": "zoop-public-projection-policy-1",
+                        "sources": [
+                          {
+                            "relation": {
+                              "jobId": "s3-synthetic-relation",
+                              "inputDigest": "1111111111111111111111111111111111111111111111111111111111111111"
+                            },
+                            "upstream": {
+                              "jobId": "s2-synthetic-extraction",
+                              "inputDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                              "digest": "9999999999999999999999999999999999999999999999999999999999999999"
+                            },
+                            "reviewDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                          }
+                        ],
+                        "files": {
+                          "canonical": "6666666666666666666666666666666666666666666666666666666666666666",
+                          "decisions": "7777777777777777777777777777777777777777777777777777777777777777",
+                          "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
+                        }
+                      },
+                      "bundle": {
+                        "schemaVersion": "zoop-graph-handoff-bundle-1",
+                        "handoffId": "handoff-synthetic-1",
+                        "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
+                        "provenance": {
+                          "declaredSourceKind": "synthetic",
+                          "observedSourceKind": "synthetic",
+                          "executionMode": "replay",
+                          "recordingKind": "authored-test"
+                        },
+                        "policy": {
+                          "version": "zoop-public-projection-policy-1",
+                          "files": {
+                            "canonical": "6666666666666666666666666666666666666666666666666666666666666666",
+                            "decisions": "7777777777777777777777777777777777777777777777777777777777777777",
+                            "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
+                          },
+                          "evidenceIdKind": "graph-body-span",
+                          "offsetUnit": "unicode_code_point",
+                          "geography": "operator-field-verdict",
+                          "structural": "manual-operator-review",
+                          "sequence": "s2-comparison-with-operator-decision"
+                        },
+                        "sources": [
+                          {
+                            "relation": {
+                              "jobId": "s3-synthetic-relation",
+                              "inputDigest": "1111111111111111111111111111111111111111111111111111111111111111"
+                            },
+                            "upstream": {
+                              "jobId": "s2-synthetic-extraction",
+                              "inputDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                              "digest": "9999999999999999999999999999999999999999999999999999999999999999"
+                            },
+                            "reviewDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                            "policies": {
+                              "producer": "zoop-relation-producer-1",
+                              "verifier": "zoop-relation-verifier-1",
+                              "impactProducer": "zoop-impact-producer-1",
+                              "impactVerifier": "zoop-impact-verifier-1",
+                              "policy": "zoop-relation-policy-1",
+                              "revalidationPolicy": "zoop-revalidation-1",
+                              "impactPolicy": "zoop-impact-policy-1"
+                            },
+                            "reviewUsed": [
+                              [
+                                "rc-4444444444444444444444444444444444444444444444444444444444444444",
+                                1
+                              ]
+                            ],
+                            "audit": {
+                              "s3Relations": 1,
+                              "eligibility": {
+                                "eligible": 1,
+                                "hold": 0,
+                                "reject": 0,
+                                "pending": 0
+                              },
+                              "reviewPending": 0,
+                              "impactCandidates": 0,
+                              "eligibleNotPublicByType": {
+                                "SUPPLIES": 0
+                              }
+                            }
+                          }
+                        ],
+                        "companies": [
+                          {
+                            "id": "KRX:005930",
+                            "canonicalId": "co:synth-1",
+                            "label": "합성기업",
+                            "decisionRef": "canon-2026-10-16:company"
+                          }
+                        ],
+                        "issues": [
+                          {
+                            "id": "issue:synthetic-supply",
+                            "canonicalId": "issue:supply",
+                            "title": "합성 공급 계약",
+                            "action": "공급 계약 발표",
+                            "target": null,
+                            "eventTime": "2026-09-30",
+                            "timePrecision": "day",
+                            "period": null,
+                            "assertionStatus": null,
+                            "geography": {
+                              "value": "domestic",
+                              "decisionRef": "geo-2026-10-16:1",
+                              "decisionVersion": "v1",
+                              "policyVersion": "zoop-public-projection-policy-1",
+                              "countries": [
+                                "KR"
+                              ],
+                              "verification": "operator-field-verdict",
+                              "evidenceIds": [
+                                "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
+                              ],
+                              "basis": [
+                                {
+                                  "upstream": {
+                                    "jobId": "s2-synthetic-extraction",
+                                    "inputDigest": "2222222222222222222222222222222222222222222222222222222222222222"
+                                  },
+                                  "kind": "event-candidate",
+                                  "ref": "evc-3333333333333333333333333333333333333333333333333333333333333333",
+                                  "mentionId": "m-synthetic-1",
+                                  "documentId": "synthetic-doc-1",
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                  "observation": {
+                                    "roundId": "round-1",
+                                    "sourceId": "source-1",
+                                    "page": 1,
+                                    "ordinal": 0,
+                                    "documentId": "synthetic-doc-1",
+                                    "rawVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                    "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  },
+                                  "countries": [
+                                    "KR"
+                                  ]
+                                }
+                              ]
+                            },
+                            "evidenceIds": [
+                              "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
+                            ],
+                            "sourceEvents": [
+                              {
+                                "upstream": {
+                                  "jobId": "s2-synthetic-extraction",
+                                  "inputDigest": "2222222222222222222222222222222222222222222222222222222222222222"
+                                },
+                                "kind": "event-candidate",
+                                "ref": "evc-3333333333333333333333333333333333333333333333333333333333333333",
+                                "mentionId": "m-synthetic-1",
+                                "documentId": "synthetic-doc-1",
+                                "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                "observation": {
+                                  "roundId": "round-1",
+                                  "sourceId": "source-1",
+                                  "page": 1,
+                                  "ordinal": 0,
+                                  "documentId": "synthetic-doc-1",
+                                  "rawVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                }
+                              }
+                            ],
+                            "decisionRef": "issue-2026-10-16:1",
+                            "representative": null
+                          }
+                        ],
+                        "relations": [
+                          {
+                            "id": "edge-598c6cc670a3a559743e1364d69d811a7b341e64eea8b2eda04d4f170c4051aa",
+                            "type": "INVOLVES",
+                            "source": "issue:synthetic-supply",
+                            "target": "KRX:005930",
+                            "role": null,
+                            "assertionStatus": null,
+                            "evidenceIds": [
+                              "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
+                            ],
+                            "basis": [],
+                            "provenance": {
+                              "origin": "s3-relation",
+                              "s3SemanticValidation": "independent-verifier-supported-all-claims"
+                            },
+                            "decisionRef": null,
+                            "sourceRefs": [
+                              {
+                                "kind": "s3-relation",
+                                "jobId": "s3-synthetic-relation",
+                                "id": "rc-4444444444444444444444444444444444444444444444444444444444444444"
+                              }
+                            ]
+                          }
+                        ],
+                        "evidence": [
+                          {
+                            "id": "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d",
+                            "kind": "graph-body-span",
+                            "articleId": "doc-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                            "articleVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "start": 12,
+                            "end": 48,
+                            "offsetUnit": "unicode_code_point",
+                            "quoteSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                            "rawLocatorIds": [
+                              "loc-1"
+                            ],
+                            "source": {
+                              "documentId": "synthetic-doc-1",
+                              "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                              "rawVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                              "textArtifactId": "text-artifact-1",
+                              "sourceEvidenceId": "ev-ffffffffffffffffffffffffffffffff",
+                              "inputKind": "body"
+                            }
+                          }
+                        ],
+                        "articles": [
+                          {
+                            "articleId": "doc-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                            "articleVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "documentId": "synthetic-doc-1",
+                            "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "rawVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                            "title": "합성 공급 계약 체결",
+                            "url": "https://example.invalid/news/1",
+                            "publishedAt": "2026-09-30T01:00:00+00:00",
+                            "publicationPrecision": "datetime",
+                            "observations": [
+                              {
+                                "roundId": "round-1",
+                                "sourceId": "source-1",
+                                "page": 1,
+                                "ordinal": 0,
+                                "observedAt": "2026-09-30T02:00:00+00:00",
+                                "grant": {
+                                  "grantId": "grant-1",
+                                  "revision": "1"
+                                }
+                              }
+                            ]
+                          }
+                        ],
+                        "exclusions": {
+                          "counts": {},
+                          "items": []
+                        },
+                        "counts": {
+                          "companies": 1,
+                          "issues": 1,
+                          "relations": {
+                            "INVOLVES": 1,
+                            "STRUCTURALLY_RELATED_TO": 0,
+                            "FOLLOWS": 0
+                          },
+                          "evidence": 1,
+                          "articles": 1,
+                          "exclusions": 0
+                        },
+                        "checks": {
+                          "producerConfirmed": [
+                            "s3_authority_current",
+                            "s2_upstream_pinned",
+                            "review_state_pinned",
+                            "operator_files_pinned",
+                            "provenance_observed_equals_declared",
+                            "evidence_exact_resolved_against_source_text",
+                            "app_binding_text_digest_equals_source_text",
+                            "bundle_schema_and_closure_validated",
+                            "artifact_written_and_hashed"
+                          ],
+                          "appImportPending": [
+                            "article_and_version_exist_in_app",
+                            "app_text_sha256_equals_binding",
+                            "app_text_span_hash_equals_evidence_quoteSha256",
+                            "article_title_url_publishedAt_equal_bundle",
+                            "company_ids_exist_in_app_catalog_with_equal_label",
+                            "evidence_rows_registered_in_app",
+                            "getEvidence_graph_evidence_path",
+                            "graph_version_row_and_activation",
+                            "asOf_policy"
+                          ]
+                        },
+                        "readiness": {
+                          "app": "import-pending",
+                          "evidenceRegistration": "not-registered",
+                          "publicActivation": "none",
+                          "graphDb": "none"
+                        },
+                        "digests": {
+                          "content": "2524fbfddf15e4f4c1bc6e7cc112ac3cfc06cf6afca265043bbbd878d090ce0c"
+                        }
+                      }
+                    }
+                  },
+                  "withheld": {
+                    "summary": "Source rights were revoked: no manifest, no bundle, no counts",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "handoffId": "handoff-synthetic-1",
+                      "state": "ready",
+                      "publication": "not-published",
+                      "appImport": "pending",
+                      "delivery": {
+                        "state": "withheld",
+                        "reason": "source_unauthorized",
+                        "checkedAt": null
+                      },
+                      "verification": null,
+                      "observedAt": "2026-10-16T03:00:00Z",
+                      "manifest": null,
+                      "bundle": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "authentication_required: missing, malformed or unknown bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Missing, malformed or unknown bearer token",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "authentication_required",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Bearer",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "scope_denied: the principal lacks `handoff.read`; or handoff_not_allowed: the handoff is not listed for this principal (unknown, unlisted and another principal's answer alike).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "scopeDenied": {
+                    "summary": "The principal lacks handoff.read",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "scope_denied",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  },
+                  "handoffNotAllowed": {
+                    "summary": "Not listed for this principal (unknown, unlisted and another principal's answer alike)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "handoff_not_allowed",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "handoff_not_found: the operator listed the handoff but the handoff ledger has none (an operator configuration gap), or route_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Listed by the operator but absent from the handoff ledger",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "handoff_not_found",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "handoff_not_found",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "execution_unavailable: the handoff configuration group is not enabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "The handoff configuration group is not enabled",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "execution_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_request: path, query parameter (any is refused) or header validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "Path or query validation",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "invalid_request",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": "handoffId"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error (not retryable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "example": {
+                    "summary": "The producer's answer is not the contract this service knows (for example an unknown nested field)",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "runtime_contract_mismatch",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty bundle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HdErrorEnvelope"
+                },
+                "examples": {
+                  "runtimeBusy": {
+                    "summary": "A writer holds a ledger: retry later",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "runtime_busy",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "handoff_busy",
+                        "field": null
+                      }
+                    }
+                  },
+                  "runtimeUnavailable": {
+                    "summary": "The child missed its deadline or answered unreadably",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "runtime_unavailable",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      }
+                    }
+                  },
+                  "serviceConfigurationInvalid": {
+                    "summary": "The stored artifact or an operator file needs an operator",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-handoff-1",
+                      "error": {
+                        "code": "service_configuration_invalid",
+                        "retryable": true,
+                        "requestId": "req-0001",
+                        "runtimeCode": "handoff_artifact_invalid",
+                        "field": null
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying with the same key and body.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "handoff.read"
+            ]
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "BArticle": {
+        "properties": {
+          "articleId": {
+            "type": "string",
+            "pattern": "^doc-[a-f0-9]{64}$",
+            "title": "Articleid"
+          },
+          "articleVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Articleversion"
+          },
+          "documentId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          },
+          "rawVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rawversion"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Url"
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publishedat"
+          },
+          "publicationPrecision": {
+            "type": "string",
+            "enum": [
+              "datetime",
+              "day",
+              "unknown"
+            ],
+            "title": "Publicationprecision"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/BObservation"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Observations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "articleId",
+          "articleVersion",
+          "documentId",
+          "documentVersion",
+          "rawVersion",
+          "title",
+          "url",
+          "publishedAt",
+          "publicationPrecision",
+          "observations"
+        ],
+        "title": "BArticle"
+      },
+      "BAudit": {
+        "properties": {
+          "s3Relations": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "S3Relations"
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/BEligibility"
+          },
+          "reviewPending": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Reviewpending"
+          },
+          "impactCandidates": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Impactcandidates"
+          },
+          "eligibleNotPublicByType": {
+            "patternProperties": {
+              "^[A-Za-z0-9._:-]{1,200}$": {
+                "type": "integer",
+                "minimum": 0.0
+              }
+            },
+            "type": "object",
+            "title": "Eligiblenotpublicbytype"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "s3Relations",
+          "eligibility",
+          "reviewPending",
+          "impactCandidates",
+          "eligibleNotPublicByType"
+        ],
+        "title": "BAudit"
+      },
+      "BBasis": {
+        "properties": {
+          "sourceRelation": {
+            "$ref": "#/components/schemas/BSourceRelation"
+          },
+          "relationKey": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Relationkey"
+          },
+          "relationType": {
+            "type": "string",
+            "const": "SUPPLIES",
+            "title": "Relationtype"
+          },
+          "validFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validfrom"
+          },
+          "validUntil": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validuntil"
+          },
+          "countries": {
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Countries"
+          },
+          "verifiedAt": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Verifiedat"
+          },
+          "sourceArticles": {
+            "items": {
+              "$ref": "#/components/schemas/BSourceArticle"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Sourcearticles"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string",
+              "pattern": "^ev-[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Evidenceids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceRelation",
+          "relationKey",
+          "relationType",
+          "validFrom",
+          "validUntil",
+          "countries",
+          "verifiedAt",
+          "sourceArticles",
+          "evidenceIds"
+        ],
+        "title": "BBasis"
+      },
+      "BBindingDetail": {
+        "properties": {
+          "expectedBindingDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expectedbindingdigest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expectedBindingDigest"
+        ],
+        "title": "BBindingDetail"
+      },
+      "BChecks": {
+        "properties": {
+          "producerConfirmed": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]{1,100}$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Producerconfirmed"
+          },
+          "appImportPending": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_]{1,100}$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Appimportpending"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "producerConfirmed",
+          "appImportPending"
+        ],
+        "title": "BChecks"
+      },
+      "BCompany": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Id"
+          },
+          "canonicalId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Canonicalid"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Label"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "canonicalId",
+          "label",
+          "decisionRef"
+        ],
+        "title": "BCompany"
+      },
+      "BConflictDetail": {
+        "properties": {
+          "fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "action",
+                "target",
+                "eventTime",
+                "period",
+                "assertionStatus"
+              ]
+            },
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "BConflictDetail"
+      },
+      "BCounts": {
+        "properties": {
+          "companies": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Companies"
+          },
+          "issues": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Issues"
+          },
+          "relations": {
+            "$ref": "#/components/schemas/BRelationCounts"
+          },
+          "evidence": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Evidence"
+          },
+          "articles": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Articles"
+          },
+          "exclusions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Exclusions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "companies",
+          "issues",
+          "relations",
+          "evidence",
+          "articles",
+          "exclusions"
+        ],
+        "title": "BCounts"
+      },
+      "BDigests": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "BDigests"
+      },
+      "BEligibility": {
+        "properties": {
+          "eligible": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Eligible"
+          },
+          "hold": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Hold"
+          },
+          "reject": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Reject"
+          },
+          "pending": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Pending"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "eligible",
+          "hold",
+          "reject",
+          "pending"
+        ],
+        "title": "BEligibility"
+      },
+      "BEvidence": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^ev-[a-f0-9]{64}$",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "graph-body-span",
+            "title": "Kind"
+          },
+          "articleId": {
+            "type": "string",
+            "pattern": "^doc-[a-f0-9]{64}$",
+            "title": "Articleid"
+          },
+          "articleVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Articleversion"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "End"
+          },
+          "offsetUnit": {
+            "type": "string",
+            "const": "unicode_code_point",
+            "title": "Offsetunit"
+          },
+          "quoteSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Quotesha256"
+          },
+          "rawLocatorIds": {
+            "items": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Rawlocatorids"
+          },
+          "source": {
+            "$ref": "#/components/schemas/BEvidenceSource"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "articleId",
+          "articleVersion",
+          "start",
+          "end",
+          "offsetUnit",
+          "quoteSha256",
+          "rawLocatorIds",
+          "source"
+        ],
+        "title": "BEvidence"
+      },
+      "BEvidenceSource": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          },
+          "rawVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rawversion"
+          },
+          "textArtifactId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Textartifactid"
+          },
+          "sourceEvidenceId": {
+            "type": "string",
+            "pattern": "^ev-[a-f0-9]{32}$",
+            "title": "Sourceevidenceid"
+          },
+          "inputKind": {
+            "type": "string",
+            "const": "body",
+            "title": "Inputkind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentId",
+          "documentVersion",
+          "rawVersion",
+          "textArtifactId",
+          "sourceEvidenceId",
+          "inputKind"
+        ],
+        "title": "BEvidenceSource"
+      },
+      "BExclusionItem": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "issue",
+              "relation",
+              "structural",
+              "follows"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Id"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Code"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BConflictDetail"
+              },
+              {
+                "$ref": "#/components/schemas/BBindingDetail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "jobId",
+          "code"
+        ],
+        "title": "BExclusionItem"
+      },
+      "BExclusions": {
+        "properties": {
+          "counts": {
+            "patternProperties": {
+              "^[A-Za-z0-9._:-]{1,200}$": {
+                "type": "integer",
+                "minimum": 0.0
+              }
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BExclusionItem"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "counts",
+          "items"
+        ],
+        "title": "BExclusions"
+      },
+      "BFollowsProvenance": {
+        "properties": {
+          "origin": {
+            "type": "string",
+            "const": "s2-comparison-with-operator-decision",
+            "title": "Origin"
+          },
+          "s3SemanticValidation": {
+            "type": "string",
+            "const": "none",
+            "title": "S3Semanticvalidation"
+          },
+          "s2Relation": {
+            "type": "string",
+            "const": "FOLLOWS",
+            "title": "S2Relation"
+          },
+          "evidenceGate": {
+            "type": "string",
+            "const": "exact-source-citation-in-incoming-article",
+            "title": "Evidencegate"
+          },
+          "groupDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Groupdigest"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          },
+          "decisionVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionversion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origin",
+          "s3SemanticValidation",
+          "s2Relation",
+          "evidenceGate",
+          "groupDigest",
+          "decisionRef",
+          "decisionVersion"
+        ],
+        "title": "BFollowsProvenance"
+      },
+      "BGeography": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "domestic",
+              "international"
+            ],
+            "title": "Value"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          },
+          "decisionVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionversion"
+          },
+          "policyVersion": {
+            "type": "string",
+            "const": "zoop-public-projection-policy-1",
+            "title": "Policyversion"
+          },
+          "countries": {
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Countries"
+          },
+          "verification": {
+            "type": "string",
+            "const": "operator-field-verdict",
+            "title": "Verification"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string",
+              "pattern": "^ev-[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Evidenceids"
+          },
+          "basis": {
+            "items": {
+              "$ref": "#/components/schemas/BGeographyBasis"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Basis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "decisionRef",
+          "decisionVersion",
+          "policyVersion",
+          "countries",
+          "verification",
+          "evidenceIds",
+          "basis"
+        ],
+        "title": "BGeography"
+      },
+      "BGeographyBasis": {
+        "properties": {
+          "upstream": {
+            "$ref": "#/components/schemas/BJob"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "event-candidate",
+              "snapshot-event"
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Ref"
+          },
+          "mentionId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Mentionid"
+          },
+          "documentId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          },
+          "observation": {
+            "$ref": "#/components/schemas/BObservationRef"
+          },
+          "countries": {
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Countries"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "upstream",
+          "kind",
+          "ref",
+          "mentionId",
+          "documentId",
+          "documentVersion",
+          "observation",
+          "countries"
+        ],
+        "title": "BGeographyBasis"
+      },
+      "BGrant": {
+        "properties": {
+          "grantId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Grantid"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "grantId",
+          "revision"
+        ],
+        "title": "BGrant"
+      },
+      "BInvolvesProvenance": {
+        "properties": {
+          "origin": {
+            "type": "string",
+            "const": "s3-relation",
+            "title": "Origin"
+          },
+          "s3SemanticValidation": {
+            "type": "string",
+            "const": "independent-verifier-supported-all-claims",
+            "title": "S3Semanticvalidation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origin",
+          "s3SemanticValidation"
+        ],
+        "title": "BInvolvesProvenance"
+      },
+      "BIssue": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Id"
+          },
+          "canonicalId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Canonicalid"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Title"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "eventTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventtime"
+          },
+          "timePrecision": {
+            "type": "string",
+            "enum": [
+              "year",
+              "month",
+              "day",
+              "datetime",
+              "unknown"
+            ],
+            "title": "Timeprecision"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "assertionStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assertionstatus"
+          },
+          "geography": {
+            "$ref": "#/components/schemas/BGeography"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string",
+              "pattern": "^ev-[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Evidenceids"
+          },
+          "sourceEvents": {
+            "items": {
+              "$ref": "#/components/schemas/BSourceEvent"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Sourceevents"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          },
+          "representative": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BSourceEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "canonicalId",
+          "title",
+          "action",
+          "target",
+          "eventTime",
+          "timePrecision",
+          "period",
+          "assertionStatus",
+          "geography",
+          "evidenceIds",
+          "sourceEvents",
+          "decisionRef",
+          "representative"
+        ],
+        "title": "BIssue"
+      },
+      "BJob": {
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Jobid"
+          },
+          "inputDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Inputdigest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "jobId",
+          "inputDigest"
+        ],
+        "title": "BJob"
+      },
+      "BObservation": {
+        "properties": {
+          "roundId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Roundid"
+          },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Sourceid"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Page"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ordinal"
+          },
+          "observedAt": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Observedat"
+          },
+          "grant": {
+            "$ref": "#/components/schemas/BGrant"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "roundId",
+          "sourceId",
+          "page",
+          "ordinal",
+          "observedAt",
+          "grant"
+        ],
+        "title": "BObservation"
+      },
+      "BObservationRef": {
+        "properties": {
+          "roundId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Roundid"
+          },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Sourceid"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Page"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ordinal"
+          },
+          "documentId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Documentid"
+          },
+          "rawVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Rawversion"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "roundId",
+          "sourceId",
+          "page",
+          "ordinal",
+          "documentId",
+          "rawVersion",
+          "documentVersion"
+        ],
+        "title": "BObservationRef"
+      },
+      "BPolicy": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "zoop-public-projection-policy-1",
+            "title": "Version"
+          },
+          "files": {
+            "$ref": "#/components/schemas/BPolicyFiles"
+          },
+          "evidenceIdKind": {
+            "type": "string",
+            "const": "graph-body-span",
+            "title": "Evidenceidkind"
+          },
+          "offsetUnit": {
+            "type": "string",
+            "const": "unicode_code_point",
+            "title": "Offsetunit"
+          },
+          "geography": {
+            "type": "string",
+            "const": "operator-field-verdict",
+            "title": "Geography"
+          },
+          "structural": {
+            "type": "string",
+            "const": "manual-operator-review",
+            "title": "Structural"
+          },
+          "sequence": {
+            "type": "string",
+            "const": "s2-comparison-with-operator-decision",
+            "title": "Sequence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "files",
+          "evidenceIdKind",
+          "offsetUnit",
+          "geography",
+          "structural",
+          "sequence"
+        ],
+        "title": "BPolicy"
+      },
+      "BPolicyFiles": {
+        "properties": {
+          "canonical": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Canonical"
+          },
+          "decisions": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Decisions"
+          },
+          "bindings": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Bindings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "canonical",
+          "decisions",
+          "bindings"
+        ],
+        "title": "BPolicyFiles"
+      },
+      "BProvenance": {
+        "properties": {
+          "declaredSourceKind": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "actual"
+            ],
+            "title": "Declaredsourcekind"
+          },
+          "observedSourceKind": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "actual"
+            ],
+            "title": "Observedsourcekind"
+          },
+          "executionMode": {
+            "type": "string",
+            "const": "replay",
+            "title": "Executionmode"
+          },
+          "recordingKind": {
+            "type": "string",
+            "const": "authored-test",
+            "title": "Recordingkind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "declaredSourceKind",
+          "observedSourceKind",
+          "executionMode",
+          "recordingKind"
+        ],
+        "title": "BProvenance"
+      },
+      "BReadiness": {
+        "properties": {
+          "app": {
+            "type": "string",
+            "const": "import-pending",
+            "title": "App"
+          },
+          "evidenceRegistration": {
+            "type": "string",
+            "const": "not-registered",
+            "title": "Evidenceregistration"
+          },
+          "publicActivation": {
+            "type": "string",
+            "const": "none",
+            "title": "Publicactivation"
+          },
+          "graphDb": {
+            "type": "string",
+            "const": "none",
+            "title": "Graphdb"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "app",
+          "evidenceRegistration",
+          "publicActivation",
+          "graphDb"
+        ],
+        "title": "BReadiness"
+      },
+      "BRelation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "INVOLVES",
+              "STRUCTURALLY_RELATED_TO",
+              "FOLLOWS"
+            ],
+            "title": "Type"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Target"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "assertionStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assertionstatus"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string",
+              "pattern": "^ev-[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Evidenceids"
+          },
+          "basis": {
+            "items": {
+              "$ref": "#/components/schemas/BBasis"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Basis"
+          },
+          "provenance": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BInvolvesProvenance"
+              },
+              {
+                "$ref": "#/components/schemas/BStructuralProvenance"
+              },
+              {
+                "$ref": "#/components/schemas/BFollowsProvenance"
+              }
+            ],
+            "title": "Provenance",
+            "discriminator": {
+              "propertyName": "origin",
+              "mapping": {
+                "manual-operator-review": "#/components/schemas/BStructuralProvenance",
+                "s2-comparison-with-operator-decision": "#/components/schemas/BFollowsProvenance",
+                "s3-relation": "#/components/schemas/BInvolvesProvenance"
+              }
+            }
+          },
+          "decisionRef": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionref"
+          },
+          "sourceRefs": {
+            "items": {
+              "$ref": "#/components/schemas/BSourceRef"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Sourcerefs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "source",
+          "target",
+          "role",
+          "assertionStatus",
+          "evidenceIds",
+          "basis",
+          "provenance",
+          "decisionRef",
+          "sourceRefs"
+        ],
+        "title": "BRelation"
+      },
+      "BRelationCounts": {
+        "properties": {
+          "INVOLVES": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Involves"
+          },
+          "STRUCTURALLY_RELATED_TO": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Structurally Related To"
+          },
+          "FOLLOWS": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Follows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "INVOLVES",
+          "STRUCTURALLY_RELATED_TO",
+          "FOLLOWS"
+        ],
+        "title": "BRelationCounts"
+      },
+      "BSource": {
+        "properties": {
+          "relation": {
+            "$ref": "#/components/schemas/BJob"
+          },
+          "upstream": {
+            "$ref": "#/components/schemas/BUpstream"
+          },
+          "reviewDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Reviewdigest"
+          },
+          "policies": {
+            "$ref": "#/components/schemas/BSourcePolicies"
+          },
+          "reviewUsed": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "string",
+                  "pattern": "^rc-[a-f0-9]{64}$"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1.0
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Reviewused"
+          },
+          "audit": {
+            "$ref": "#/components/schemas/BAudit"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relation",
+          "upstream",
+          "reviewDigest",
+          "policies",
+          "reviewUsed",
+          "audit"
+        ],
+        "title": "BSource"
+      },
+      "BSourceArticle": {
+        "properties": {
+          "articleId": {
+            "type": "string",
+            "pattern": "^doc-[a-f0-9]{64}$",
+            "title": "Articleid"
+          },
+          "articleVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Articleversion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "articleId",
+          "articleVersion"
+        ],
+        "title": "BSourceArticle"
+      },
+      "BSourceEvent": {
+        "properties": {
+          "upstream": {
+            "$ref": "#/components/schemas/BJob"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "event-candidate",
+              "snapshot-event"
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Ref"
+          },
+          "mentionId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Mentionid"
+          },
+          "documentId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          },
+          "observation": {
+            "$ref": "#/components/schemas/BObservationRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "upstream",
+          "kind",
+          "ref",
+          "mentionId",
+          "documentId",
+          "documentVersion",
+          "observation"
+        ],
+        "title": "BSourceEvent"
+      },
+      "BSourcePolicies": {
+        "properties": {
+          "producer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Producer"
+          },
+          "verifier": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Verifier"
+          },
+          "impactProducer": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impactproducer"
+          },
+          "impactVerifier": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impactverifier"
+          },
+          "policy": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Policy"
+          },
+          "revalidationPolicy": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Revalidationpolicy"
+          },
+          "impactPolicy": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impactpolicy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "producer",
+          "verifier",
+          "impactProducer",
+          "impactVerifier",
+          "policy",
+          "revalidationPolicy",
+          "impactPolicy"
+        ],
+        "title": "BSourcePolicies"
+      },
+      "BSourceRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "s2-comparison",
+              "s3-relation"
+            ],
+            "title": "Kind"
+          },
+          "jobId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Jobid"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "jobId",
+          "id"
+        ],
+        "title": "BSourceRef"
+      },
+      "BSourceRelation": {
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Jobid"
+          },
+          "relationCandidateId": {
+            "type": "string",
+            "pattern": "^rc-[a-f0-9]{64}$",
+            "title": "Relationcandidateid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "jobId",
+          "relationCandidateId"
+        ],
+        "title": "BSourceRelation"
+      },
+      "BStructuralProvenance": {
+        "properties": {
+          "origin": {
+            "type": "string",
+            "const": "manual-operator-review",
+            "title": "Origin"
+          },
+          "s3SemanticValidation": {
+            "type": "string",
+            "const": "none",
+            "title": "S3Semanticvalidation"
+          },
+          "status": {
+            "type": "string",
+            "const": "operator-asserted",
+            "title": "Status"
+          },
+          "reviewer": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Reviewer"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          },
+          "decisionVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionversion"
+          },
+          "bindingDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Bindingdigest"
+          },
+          "basisEligibility": {
+            "type": "string",
+            "const": "s3-independent-verifier-supported-all-claims",
+            "title": "Basiseligibility"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "origin",
+          "s3SemanticValidation",
+          "status",
+          "reviewer",
+          "decisionRef",
+          "decisionVersion",
+          "bindingDigest",
+          "basisEligibility"
+        ],
+        "title": "BStructuralProvenance"
+      },
+      "BUpstream": {
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Jobid"
+          },
+          "inputDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Inputdigest"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "jobId",
+          "inputDigest",
+          "digest"
+        ],
+        "title": "BUpstream"
+      },
+      "BmSource": {
+        "properties": {
+          "relation": {
+            "$ref": "#/components/schemas/BJob"
+          },
+          "upstream": {
+            "$ref": "#/components/schemas/BUpstream"
+          },
+          "reviewDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Reviewdigest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relation",
+          "upstream",
+          "reviewDigest"
+        ],
+        "title": "BmSource"
+      },
+      "Bundle": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-graph-handoff-bundle-1",
+            "title": "Schemaversion"
+          },
+          "handoffId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Handoffid"
+          },
+          "manifestDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Manifestdigest"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/BProvenance"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/BPolicy"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/BSource"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Sources"
+          },
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/BCompany"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Companies"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/BIssue"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Issues"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/BRelation"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Relations"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/BEvidence"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "title": "Evidence"
+          },
+          "articles": {
+            "items": {
+              "$ref": "#/components/schemas/BArticle"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Articles"
+          },
+          "exclusions": {
+            "$ref": "#/components/schemas/BExclusions"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BCounts"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/BChecks"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/BReadiness"
+          },
+          "digests": {
+            "$ref": "#/components/schemas/BDigests"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "handoffId",
+          "manifestDigest",
+          "provenance",
+          "policy",
+          "sources",
+          "companies",
+          "issues",
+          "relations",
+          "evidence",
+          "articles",
+          "exclusions",
+          "counts",
+          "checks",
+          "readiness",
+          "digests"
+        ],
+        "title": "Bundle",
+        "description": "The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."
+      },
       "CallConfig": {
         "properties": {
           "provider": {
@@ -10666,6 +13550,315 @@
         ],
         "title": "GraphVersionStatus"
       },
+      "HandoffManifest": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-handoff-1",
+            "title": "Schemaversion"
+          },
+          "handoffId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Handoffid"
+          },
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "actual"
+            ],
+            "title": "Sourcekind"
+          },
+          "policyVersion": {
+            "type": "string",
+            "const": "zoop-public-projection-policy-1",
+            "title": "Policyversion"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/BmSource"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Sources"
+          },
+          "files": {
+            "$ref": "#/components/schemas/BPolicyFiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "handoffId",
+          "sourceKind",
+          "policyVersion",
+          "sources",
+          "files"
+        ],
+        "title": "HandoffManifest",
+        "description": "The operator's frozen manifest exactly as the producer's ledger stores it (closed at every level): pins and file hashes only, no path or secret.\nIts canonical JSON bytes hash to `verification.manifestDigest` and to the bundle's `manifestDigest`."
+      },
+      "HdBundle": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-handoff-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-handoff-1"
+          },
+          "handoffId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Handoffid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "reserved",
+              "ready",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "publication": {
+            "type": "string",
+            "const": "not-published",
+            "title": "Publication",
+            "default": "not-published"
+          },
+          "appImport": {
+            "type": "string",
+            "const": "pending",
+            "title": "Appimport",
+            "default": "pending"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/HdDelivery"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HdVerification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "title": "Observedat"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffManifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bundle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "handoffId",
+          "state",
+          "delivery",
+          "verification",
+          "observedAt",
+          "manifest",
+          "bundle"
+        ],
+        "title": "HdBundle",
+        "description": "The status fields plus the frozen `manifest` and the whole `bundle`, only while delivery is current. `manifest` and `bundle` are the producer's own\nartifacts exactly: the canonical JSON bytes of `manifest` hash to `verification.manifestDigest` (= `bundle.manifestDigest`), those of `bundle` to\n`verification.bundleDigest`, so the application can recompute both from this one response. Nothing the service adds is part of either; every\nservice field is a sibling."
+      },
+      "HdDelivery": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "current",
+              "withheld"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "checkedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?\\+00:00$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkedat",
+            "description": "The producer's own time of the current-authority check. null while withheld."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "HdDelivery"
+      },
+      "HdErrorEnvelope": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-handoff-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-handoff-1"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "HdErrorEnvelope"
+      },
+      "HdStatus": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "zoop-ai-internal-handoff-1",
+            "title": "Schemaversion",
+            "default": "zoop-ai-internal-handoff-1"
+          },
+          "handoffId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Handoffid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "reserved",
+              "ready",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "publication": {
+            "type": "string",
+            "const": "not-published",
+            "title": "Publication",
+            "default": "not-published"
+          },
+          "appImport": {
+            "type": "string",
+            "const": "pending",
+            "title": "Appimport",
+            "default": "pending"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/HdDelivery"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HdVerification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "title": "Observedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "handoffId",
+          "state",
+          "delivery",
+          "verification",
+          "observedAt"
+        ],
+        "title": "HdStatus"
+      },
+      "HdVerification": {
+        "properties": {
+          "manifestDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Manifestdigest"
+          },
+          "bundleDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Bundledigest",
+            "description": "SHA-256 of the canonical UTF-8 bytes of the bundle; equals the operator's pin."
+          },
+          "contentDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Contentdigest"
+          },
+          "bundleBytes": {
+            "type": "integer",
+            "title": "Bundlebytes"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BCounts"
+          },
+          "sources": {
+            "type": "integer",
+            "title": "Sources",
+            "description": "Number of S3 source jobs the handoff was frozen from."
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/BProvenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "manifestDigest",
+          "bundleDigest",
+          "contentDigest",
+          "bundleBytes",
+          "counts",
+          "sources",
+          "provenance"
+        ],
+        "title": "HdVerification",
+        "description": "What was verified for this very response: digests of the received bytes and the counts the bundle itself reports. No source id, text or title."
+      },
       "JobStatus": {
         "properties": {
           "schemaVersion": {
@@ -12503,6 +15696,10 @@
     {
       "name": "graph-versions",
       "description": "Read-only, nonpublic S3 graph version status and company focus over operator-listed versions, through the installed zoop-ai-graph pipeline (no write, no model)."
+    },
+    {
+      "name": "graph-handoffs",
+      "description": "Read-only, nonpublic AI handoff status and whole-bundle delivery over operator-pinned handoffs, through the installed zoop-ai-handoff export command (no write, no model, no network)."
     }
   ]
 }

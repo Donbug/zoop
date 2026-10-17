@@ -46,6 +46,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
 | `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
 | `ZOOP_DOCUMENT_READ_GRANTS` `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT` | 선택. 공개 `GET /api/v1/evidence/{id}`(운영 플래그와 독립, 읽기 전용). `GRANTS`는 operator의 flat S1 grant registry 파일로 요청마다 읽으며 미설정이면 그 읽기는 503, `ARTIFACT_ROOT`는 캐시로 돌려준 요약의 exact receipt 한 건을 읽을 때만 필요합니다(미설정이면 그 경우만 503). 값이 있는데 정규화된 절대 경로가 아니거나 없으면 기동 실패. 규칙은 [문서 분석 § 근거 읽기](docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현) |
+| `ZOOP_GRAPH_SNAPSHOT_SOURCE` | 선택. 공개 그래프 스냅샷을 어디서 읽을지 정합니다. 기본 `none`: 등록된 버전이 있어도 스냅샷 읽기는 503 `SOURCE_UNAVAILABLE`이고, 버전이 없으면 409 `VERSION_UNAVAILABLE`입니다(빈 그래프로 대체하지 않음). `fixture`: **local/dev 전용**이며, 기동 시 `src/main/resources/graph-fixtures/`의 합성 스냅샷 2개를 `graph_versions`에 등록·활성화합니다(제목 `[합성]`, 실제 뉴스 아님). 이미 가져온(non-fixture) 버전이 있는 DB에서는 기동을 거절합니다. AI 인계 묶음을 수입한 실제 스냅샷 source는 후속입니다. 규칙은 [그래프 조회 계약 결정](../docs/api/graph-read-contract-proposal.md) §0 |
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
 
@@ -81,11 +82,31 @@ Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 API와 같은 Origin
 
 `GET /api/v1/auth/session`은 `zoop_session` 쿠키가 없으면 `anonymous`를 반환하고 새 세션을 만들지 않습니다. 유효한 회원 쿠키는 회원·설정 상태, 유효한 비회원 쿠키는 guest 상태와 함께 만료 시각·세션 결합 CSRF 토큰을 반환합니다. 만료·폐기·무효 쿠키는 `Max-Age=0`으로 제거합니다. 세션 토큰 원문은 쿠키로만 전달하고 DB에는 SHA-256 해시만 저장합니다. guest 튜토리얼 진행·완료·건너뛰기는 서버에 저장하지 않으며 응답의 `tutorialCompleted`는 항상 `false`입니다.
 
-회원 전용 경계는 [이슈 #31 인계 문서](../docs/development/issue-31-guest-access-handoff.md)에 연결돼 있습니다. 개인 API는 세션에서 얻은 `MemberPrincipal`을 사용하고 리소스 소유자와 일치하는지 확인해야 합니다. 계약상 `PUT /api/v1/auth/tutorial`은 회원 전용이며 guest의 상태 저장은 금지합니다. 이 API 모듈에는 아직 튜토리얼 저장 컨트롤러가 없고, 구현 시 등록된 회원 권한 인터셉터가 guest를 `403 MEMBER_REQUIRED`로 거절합니다.
+회원 전용 경계는 [이슈 #31 인계 문서](../docs/development/issue-31-guest-access-handoff.md)에 연결돼 있습니다. 개인 API는 세션에서 얻은 `MemberPrincipal`을 사용하고 리소스 소유자와 일치하는지 확인해야 합니다. `PUT /api/v1/auth/tutorial`은 회원의 튜토리얼 완료 목표 상태를 저장하고 최신 `SessionResponse`를 반환합니다. 같은 상태의 재요청은 버전을 다시 올리지 않으며, 상태가 바뀌면 회원 설정 버전이 한 번 증가합니다. guest는 저장 없이 `403 MEMBER_REQUIRED`, 세션이 없으면 `401 AUTH_REQUIRED`를 반환합니다.
 
-회원 또는 비회원 쿠키가 붙은 `/api/v1/**` 쓰기 요청은 허용 Origin과 단일 `X-CSRF-Token` 헤더를 검사합니다. 토큰은 현재 활성 세션에 결합되어야 하며 누락·불일치·만료·폐기·중복 쿠키/헤더는 `403 ACCESS_DENIED`입니다. 가입·로그인·비회원 시작은 세션 발급 전 Origin을 별도로 검사합니다. 쿠키가 없는 요청의 인증·권한은 각 업무 API에서 강제해야 합니다. 관리자 쿠키의 CSRF 검증은 관리자 인증 구현 범위입니다.
+회원 또는 비회원 쿠키가 붙은 `/api/v1/**` 쓰기 요청은 허용 Origin과 단일 `X-CSRF-Token` 헤더를 검사합니다. 토큰은 현재 활성 세션에 결합되어야 하며 누락·불일치·만료·폐기·중복 쿠키/헤더는 `403 ACCESS_DENIED`입니다. 가입·로그인·비회원 시작은 세션 발급 전 Origin을 별도로 검사합니다. 관리자 경로는 회원 CSRF 인터셉터에서 분리해 별도 `zoop_admin_session` 및 관리자 전용 세션 결합 CSRF 검증을 사용합니다. 관리자 세션은 30분 유휴/8시간 절대 만료이며 `ZOOP_ADMIN_IDLE_TIMEOUT`, `ZOOP_ADMIN_ABSOLUTE_TIMEOUT`으로 조정할 수 있습니다. 관리자 로그인은 IP 100회/15분 및 이메일 비교키 실패 20회/15분으로 제한합니다. 관리자 쿠키가 붙은 쓰기에는 허용 Origin도 필수입니다.
 
 가입·로그인 POST는 Origin이 정확히 허용 목록에 있어야 합니다. 누락·`null`·불일치 Origin은 `403 ACCESS_DENIED`이며 `Referer`로 대체하지 않습니다. 클라이언트 IP는 기본적으로 직접 연결 주소를 사용하고, 명시한 프록시에서 온 요청만 `X-Forwarded-For`의 신뢰 체인을 해석합니다. 프록시는 외부에서 받은 전달 헤더를 제거하거나 덮어써야 합니다. 가입은 IP 10회/시간·이메일 비교키 5회/시간, 로그인은 IP 100회/15분·이메일 비교키 실패 20회/15분을 PostgreSQL의 이동 창 기록으로 제한합니다. 허용 Origin의 요청은 본문 파싱 전에 IP 시도를 기록하므로 잘못된 JSON·이메일 형식도 IP 제한에 포함됩니다. 유효한 이메일의 가입 시도는 이후 이메일 비교키에도 기록합니다. 거절된 요청은 `429 RATE_LIMITED`와 초 단위 `Retry-After`를 받습니다. 로그인 성공은 해당 이메일 실패 카운터를 초기화합니다. 기록은 1시간 후 정리됩니다.
+
+## 관리자 계정 프로비저닝
+
+관리자 계정은 migration이나 웹 API로 생성하지 않는다. DB 연결과 운영 CSRF 키 설정을 준비한 뒤,
+웹 서버를 열지 않는 `admin-provision` 프로필을 패키징된 애플리케이션으로 실행한다.
+
+```sh
+./api/gradlew -p api bootJar
+java -jar api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar \
+  --spring.main.web-application-type=none \
+  --spring.profiles.active=admin-provision \
+  --zoop.admin.provision.email=admin@example.com \
+  --zoop.admin.provision.display-name='운영 관리자'
+```
+
+비밀번호와 확인값은 터미널에서 화면에 표시되지 않게 입력한다. 비밀번호를 명령행 인자, 환경변수,
+셸 기록 또는 `.env` 파일로 전달하는 방식은 지원하지 않는다. 대화형 터미널이 아니거나 두 입력이
+다르면 계정을 만들지 않는다. 이메일이 이미 등록된 경우에도 덮어쓰지 않고 실패하며, 성공과 중복
+거절은 `audit_logs`에 남는다. 생성되는 계정은 `role=admin`, `status=active`이고 관리자 API의 모든
+작업 권한을 갖는다. 차단·재활성화와 비밀번호 교체는 이 생성 명령의 범위가 아니다.
 
 ## 빌드
 
@@ -108,7 +129,7 @@ make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> a
 
 ## Swagger / OpenAPI
 
-Swagger UI와 생성 OpenAPI 문서는 기본적으로 비활성화되어 있습니다. 로컬에서 사용할 때는 위 로컬 HTTP 실행 절차처럼 `SPRING_PROFILES_ACTIVE=local`과 `ZOOP_SWAGGER_ENABLED=true`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서 Swagger를 켜야 한다면 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하세요.
+Swagger UI와 생성 OpenAPI 문서는 기본적으로 활성화되어 있습니다. 비활성화할 환경에서는 `ZOOP_SWAGGER_ENABLED=false`를 설정하세요. API가 8080 포트에서 실행 중이면 `http://localhost:8080/swagger-ui.html`에서 UI를, `http://localhost:8080/v3/api-docs`에서 생성된 OpenAPI JSON을 볼 수 있습니다. `SERVER_PORT`를 바꾸면 두 URL과 `ZOOP_AUTH_ALLOWED_ORIGINS`의 API Origin도 같은 포트로 바꾸세요. 운영에서는 애플리케이션 또는 프록시에서 두 경로의 공개 범위를 제한하거나 환경변수로 비활성화하세요.
 
 `/v3/api-docs`는 **현재 Spring 컨트롤러에서 생성한 문서**입니다. 목표 계약의 정본은 [`docs/api/openapi.yaml`](../docs/api/openapi.yaml)이며, 아직 구현되지 않은 목표 경로는 생성 문서에 나타나지 않습니다. 다음 순서는 API에서 제공하는 Swagger UI를 같은 `localhost:8080` 주소로 열었을 때를 기준으로 합니다. 프론트 `localhost:3000`에서의 API 호출은 별도 Origin이므로 위 공통 CORS 설정을 사용합니다.
 
@@ -190,7 +211,7 @@ WHERE id IN ('KRX:005930', 'ORG:OPENAI', 'ORG:ANTHROPIC') ORDER BY id;
 
 ## 스키마와 DB 종료
 
-JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 첫 migration은 당시 설계에 따라 `members`, `member_credentials`, `member_sessions`를 생성합니다. 이어지는 [`V20261013000000__align_auth_identity_with_erd_v6.sql`](src/main/resources/db/migration/V20261013000000__align_auth_identity_with_erd_v6.sql)이 비어 있는 인증 스키마를 [ERD v6](../docs/erd/zoop-core-erd-v6.md)에 맞춰 변경합니다. [`V20261013010000__allow_unselected_member_mode.sql`](src/main/resources/db/migration/V20261013010000__allow_unselected_member_mode.sql)은 가입 직후 온보딩 방식을 고르지 않은 회원을 `members.mode=NULL`로 저장할 수 있도록 합니다. [`V20261013020000__create_terms.sql`](src/main/resources/db/migration/V20261013020000__create_terms.sql)은 약관 항목·버전·동의 기록 테이블과 기간 중복 방지 제약을 만듭니다. [`V20261013030000__register_term_catalog.sql`](src/main/resources/db/migration/V20261013030000__register_term_catalog.sql)은 필수 `service`·`privacy` 마스터만 등록합니다. [`V20261013040000__register_approved_term_versions.sql`](src/main/resources/db/migration/V20261013040000__register_approved_term_versions.sql)은 [공개용 약관](../docs/legal/README.md)의 두 본문을 버전 `2026-10-13.1`로 등록하고 2026-10-13 17:00 KST부터 효력이 생기게 합니다. 적용 후 비밀번호 해시와 회원 설정은 `members`에 있고 `member_credentials`는 없습니다. 대응 Entity는 `com.zoop.auth.entity`에 있습니다. 소셜·관리자 테이블은 아직 없습니다. 후속 스키마 변경은 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
+JPA는 `ddl-auto: validate`, Flyway는 활성화되어 있습니다. 첫 migration은 당시 설계에 따라 `members`, `member_credentials`, `member_sessions`를 생성합니다. 이어지는 [`V20261013000000__align_auth_identity_with_erd_v6.sql`](src/main/resources/db/migration/V20261013000000__align_auth_identity_with_erd_v6.sql)이 비어 있는 인증 스키마를 [ERD v6](../docs/erd/zoop-core-erd-v6.md)에 맞춰 변경합니다. [`V20261013010000__allow_unselected_member_mode.sql`](src/main/resources/db/migration/V20261013010000__allow_unselected_member_mode.sql)은 가입 직후 온보딩 방식을 고르지 않은 회원을 `members.mode=NULL`로 저장할 수 있도록 합니다. [`V20261013020000__create_terms.sql`](src/main/resources/db/migration/V20261013020000__create_terms.sql)은 약관 항목·버전·동의 기록 테이블과 기간 중복 방지 제약을 만듭니다. [`V20261013030000__register_term_catalog.sql`](src/main/resources/db/migration/V20261013030000__register_term_catalog.sql)은 필수 `service`·`privacy` 마스터만 등록합니다. [`V20261013040000__register_approved_term_versions.sql`](src/main/resources/db/migration/V20261013040000__register_approved_term_versions.sql)은 [공개용 약관](../docs/legal/README.md)의 두 본문을 버전 `2026-10-13.1`로 등록하고 2026-10-13 17:00 KST부터 효력이 생기게 합니다. 적용 후 비밀번호 해시와 회원 설정은 `members`에 있고 `member_credentials`는 없습니다. 대응 Entity는 `com.zoop.auth.entity`에 있습니다. 관리자 인증 migration [`V20261017100000__create_admin_auth.sql`](src/main/resources/db/migration/V20261017100000__create_admin_auth.sql)은 `admins`, `admin_sessions`, `audit_logs`와 관리자 로그인 제한 scope를 추가하지만 계정은 생성하지 않습니다. 후속 스키마 변경은 `src/main/resources/db/migration/`에 Flyway SQL을 추가합니다. 자동 테이블 생성이나 프로토타입 DB 재사용으로 대신하지 않습니다.
 
 DB를 종료하되 데이터를 유지하려면 다음을 실행합니다.
 

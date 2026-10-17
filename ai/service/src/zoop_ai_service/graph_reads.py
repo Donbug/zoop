@@ -45,7 +45,7 @@ UNAVAILABLE_CODES = frozenset({"graph_unavailable", "graph_query_failed"})
 CONFIG_CODES = frozenset({"graph_auth_failed", "graph_auth_unconfigured", "graph_server_unsupported", "graph_store_unbound", "graph_state_missing",
                           "graph_state_invalid", "graph_recovery_required", "ledger_version_unknown", "state_ownership_unconfigured",
                           "canonical_registry_invalid", "input_or_configuration_invalid", "persistence_failed", "graph_internal_failure",
-                          "poc_contract_changed"})
+                          "analysis_contract_changed"})
 
 
 class GraphError(ApiError):
