@@ -194,7 +194,7 @@ public class SocialAuthCompletionService {
     }
 
     private ResponseEntity<Void> redirect(String path, String result, String cookie, boolean secure, String... extraCookies) {
-        String location = result == null ? path : path + "?social=" + result;
+        String location = settings.frontendLocation(path, result);
         var response = ResponseEntity.status(302).header(HttpHeaders.LOCATION, location);
         if (cookie != null) response.header(HttpHeaders.SET_COOKIE, cookie);
         else response.header(HttpHeaders.SET_COOKIE, clearPending(secure));

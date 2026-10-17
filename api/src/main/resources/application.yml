@@ -40,6 +40,8 @@ zoop:
     allowed-origins: ${ZOOP_AUTH_ALLOWED_ORIGINS:}
     allow-http-loopback-origins: false
     session-cookie-secure: true
+    social:
+      frontend-origin: ${ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN:}
   graph:
     snapshot:
       # Public graph snapshot source: none (default; reads fail closed) or fixture (local/dev synthetic data only).
