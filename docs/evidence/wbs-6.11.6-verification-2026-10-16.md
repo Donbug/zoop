@@ -115,7 +115,7 @@ DB_PASSWORD=<local test value>
 | NF-API-005 | 잘못된 요청값 | 잘못된 `asOf`, 빈 `companyId`, 잘못된 cursor의 422 확인 | PASS |
 | NF-API-006 | DB 일시 장애 후 복구 | PostgreSQL 중단 시 500 응답 확인, DB 재시작 후 API 재시작 없이 200 복구 | PARTIAL |
 | NF-API-007 | 내부 자료원 장애 | `SOURCE_UNAVAILABLE`, HTTP 503, `retryable=true` 확인 | PASS |
-| NF-API-008 | timeout 및 실제 재시도 | retryable 응답 계약만 확인, 실제 재시도는 미검증 | PARTIAL |
+| NF-API-008 | timeout 및 재시도 정책 | retryable 응답과 Retry-After를 보존하고, POST 및 결과 불명 timeout을 자동 재시도하지 않음을 테스트로 확인 | PASS |
 | NF-API-009 | DB 장애 응답 계약 | `INTERNAL_ERROR`, HTTP 500, `retryable=false`, 약 30초 응답 확인 | OBSERVED |
 | NF-API-010 | 게스트의 회원 전용 API 접근 | 게스트 세션 생성 후 `GET /api/v1/me/settings` 호출 시 HTTP 403, `MEMBER_REQUIRED` 확인 | PASS |
 | NF-PERF-001 | 응답시간 p50/p95/max | 로컬 k6 측정 결과 전체 회차 p95 27.14ms 이하, HTTP 실패 0건 | PASS |
@@ -281,6 +281,39 @@ HTTP 403 `ACCESS_DENIED`로 거부됐다. 로컬 검증용 Origin을 명시적�
 확인했다. 차단 회원, 타 회원 자원 소유권 불일치 및 관리자 권한은 별도
 검증 대상으로 유지한다.
 
+### AI 요청 timeout 및 재시도 정책 검증
+
+#### 검증 정보
+
+| 항목 | 값 |
+|---|---|
+| 실행 브랜치 | `test/151-performance-retry-verification` |
+| 실행 커밋 | `64e42ac67dde7492dc5e862ef2f352805ac3f0b0` |
+| 검증 대상 | AI 분석 및 추출 HTTP 클라이언트 |
+| 검증 방식 | 로컬 Stub AI 서버를 이용한 단위 테스트 |
+| 외부 AI 호출 | 없음 |
+| 실제 사용자 데이터 사용 | 없음 |
+| 테스트 결과 | `BUILD SUCCESSFUL` |
+| 실행 시간 | 23초 |
+
+#### 검증한 테스트
+
+| 테스트 | 검증 내용 | 결과 |
+|---|---|---|
+| `retryableRefusalKeepsRetryAfterAndRuntimeCodeAndFieldAndIsNeverRetried` | HTTP 503의 `retryable`, `Retry-After`, 오류 정보를 보존하고 요청 횟수가 1회인지 확인 | PASS |
+| `timeoutIsBoundedExplicitUnknownAndNotRetried` | AI 분석 요청 timeout을 제한된 시간 안에 종료하고 자동 재시도하지 않는지 확인 | PASS |
+| `aSlowServiceIsATimeoutThatMayHaveRegisteredTheJobAndIsNeverRetried` | 추출 요청이 서버에 등록됐을 가능성이 있는 timeout에서 중복 POST를 수행하지 않는지 확인 | PASS |
+
+#### 판정
+
+현재 AI HTTP 클라이언트에는 Spring Retry, Resilience4j, `RetryTemplate`, `@Retryable` 기반의 자동 재시도가 구현돼 있지 않다.
+
+`retryable=true`는 요청을 즉시 반복한다는 의미가 아니라 호출자에게 전달되는 재시도 가능성 정보다. 특히 AI 작업 생성과 같은 POST 요청은 timeout이 발생해도 서버에 작업이 등록됐을 가능성이 있으므로 자동 재시도를 수행하면 중복 작업이 생성될 수 있다.
+
+테스트에서는 retryable HTTP 503 및 결과가 불명확한 timeout 상황에서도 Stub 서버가 받은 요청이 1회임을 확인한다. 따라서 현재 계약은 오류 정보와 `Retry-After`를 보존하되 부작용 가능성이 있는 요청을 자동 재시도하지 않는 것이다.
+
+이 검증은 자동 재시도가 발생하는지를 확인한 것이 아니라, 중복 작업 방지를 위해 자동 재시도를 하지 않는 정책이 지켜지는지를 확인한 결과다. 실제 외부 AI 서비스와의 운영 장애 복구 및 조회 요청의 호출자 측 backoff 재시도는 배포 환경에서 별도로 검증해야 한다.
+
 ### 기존 테스트 추적
 
 - `SessionControllerTest`
@@ -360,4 +393,6 @@ $env:DURATION = "300s"
 - NF-PERF-001과 NF-PERF-002는 로컬 검증 범위에서 PASS로 판정한다.
 - 프론트엔드와 백엔드 연동 및 실제 배포가 완료되지 않아 E2E와 AWS 운영 성능 판정은 보류한다.
 - DB 장애 응답을 HTTP 503과 재시도 가능한 오류로 처리할지 팀 검토가 필요하다.
-- 다음 작업은 DB 장애 응답 계약과 timeout 정책을 검토하고 실제 재시도 동작을 검증하는 것이다.
+- 다음 작업은 DB 장애 응답의 HTTP 503·timeout 정책을 팀과 검토하고, 실제 배포 후 외부 서비스 장애 및 E2E 복구 동작을 검증하는 것이다.
+- AI HTTP 클라이언트는 retryable 응답과 `Retry-After`를 보존하지만 부작용 가능성이 있는 POST와 결과 불명 timeout은 자동 재시도하지 않는다.
+- 관련 단위 테스트 3개가 통과했으며 NF-API-008은 현재 재시도 정책 검증 범위에서 PASS로 판정한다.
