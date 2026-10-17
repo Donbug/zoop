@@ -1,5 +1,5 @@
 export const mainMenus = [
-  { to: '/', label: '지도' },
+  { to: '/?mode=all', label: '지도' },
   { to: '/stocks', label: '종목' },
   { to: '/briefing', label: '브리핑' },
   { to: '/my', label: '내 종목' },

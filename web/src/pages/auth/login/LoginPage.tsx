@@ -72,6 +72,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = fromPath(location.state as LoginLocationState | null);
+  const startScreen = Boolean(
+    (location.state as LoginLocationState | null)?.startScreen,
+  );
   const auth = useAuth();
   const flow = useAuthCompletion();
   const active = useRef(true);
@@ -112,6 +115,7 @@ export default function LoginPage() {
     if (
       auth.status !== 'ready' ||
       !auth.isAuthenticated ||
+      startScreen ||
       started ||
       autoStarted.current
     )
@@ -119,7 +123,7 @@ export default function LoginPage() {
     autoStarted.current = true;
     setStarted(true);
     void flow.run(undefined, undefined, from);
-  }, [auth.status, auth.isAuthenticated, started, flow, from]);
+  }, [auth.status, auth.isAuthenticated, started, flow, from, startScreen]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -22,9 +22,9 @@ function LoginTarget() {
   const location = useLocation();
   return <p>로그인 시작 {location.state?.from?.search}</p>;
 }
-function open() {
+function open(entry = '/?mode=all&select=node%3AKRX%3A005930') {
   render(
-    <MemoryRouter initialEntries={['/?mode=all&select=node%3AKRX%3A005930']}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/" element={<MapEntryRoute />}>
           <Route index element={<p>시장 지도</p>} />
@@ -34,6 +34,19 @@ function open() {
     </MemoryRouter>,
   );
 }
+it.each(['member', 'guest'])(
+  'shows the start screen at the service root even for a saved %s session',
+  async (kind) => {
+    vi.mocked(useAuth).mockReturnValue({
+      ...useAuth(),
+      isAuthenticated: kind === 'member',
+      isGuest: kind === 'guest',
+    });
+    open('/');
+    expect(await screen.findByText(/로그인 시작/)).toBeTruthy();
+    expect(screen.queryByText('시장 지도')).toBeNull();
+  },
+);
 it('D-AUT-01 sends a first-time visitor to login and preserves the requested map URL', async () => {
   open();
   expect((await screen.findByText(/로그인 시작/)).textContent).toContain(

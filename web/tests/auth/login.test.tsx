@@ -270,6 +270,25 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
       '/?mode=personal',
     );
   });
+  test('서비스 시작 화면에서는 저장된 회원 세션이 있어도 로그인 선택을 기다리고 로그인 성공 후 지도로 간다', async () => {
+    server.on('GET', '/api/v1/auth/session', () =>
+      json({ ...memberSession(true), metadata }),
+    );
+    server.on('POST', '/api/v1/auth/login', () =>
+      json({ ...memberSession(true), metadata }),
+    );
+    renderApp({ pathname: '/login', state: { startScreen: true } });
+    await waitFor(() => expect(useAuthStore.getState().status).toBe('ready'));
+    expect(
+      screen.getByRole('heading', { name: '이메일로 로그인' }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('destination')).toBeNull();
+    expect(server.calls('GET', '/api/v1/portfolio')).toHaveLength(0);
+    await fillAndSubmit('member@zoop.test', 'secret-pass');
+    expect((await screen.findByTestId('destination')).textContent).toBe(
+      '/?mode=personal',
+    );
+  });
 });
 
 describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
