@@ -133,6 +133,13 @@ api-ai-smoke:
 .PHONY: api-ai-pipeline-smoke
 api-ai-pipeline-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_pipeline_gate.py
+# Real installed zoop-ai-handoff/-ingest -> built jar -> PostgreSQL, 13 steps, no provider/model call, no activation. Needs `make pipeline-install api-build` first (not run
+# automatically; fails, never skips) and DB_URL/DB_USERNAME/DB_PASSWORD for a dedicated EMPTY loopback database (no default; the script refuses a non-empty one and never cleans it).
+# Optional: GRAPH_IMPORT_PSQL_CONTAINER (docker exec psql instead of host psql), GRAPH_IMPORT_DB_USER, GRAPH_IMPORT_DB_NAME (default to DB_USERNAME and the DB_URL database).
+API_JAR ?= api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar
+.PHONY: api-graph-handoff-import-smoke
+api-graph-handoff-import-smoke:
+	$(PIPELINE_PYTHON) api/scripts/graph_handoff_import_smoke.py --jar $(API_JAR) --handoff-cli "$(CURDIR)/ai/pipeline/.venv/bin/zoop-ai-handoff" --ingest-cli "$(CURDIR)/ai/pipeline/.venv/bin/zoop-ai-ingest" $(if $(GRAPH_IMPORT_PSQL_CONTAINER),--psql-container $(GRAPH_IMPORT_PSQL_CONTAINER)) $(if $(GRAPH_IMPORT_DB_USER),--db-user $(GRAPH_IMPORT_DB_USER)) $(if $(GRAPH_IMPORT_DB_NAME),--db-name $(GRAPH_IMPORT_DB_NAME))
 api-build:
 	$(API_GRADLE) assemble
 package-artifacts:

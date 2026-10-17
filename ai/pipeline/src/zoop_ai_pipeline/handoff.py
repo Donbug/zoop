@@ -537,6 +537,14 @@ ISSUE_FIELDS = (("title", "title"), ("action", "action"), ("target", "target"), 
                 ("assertion_status", "assertionStatus"))
 
 
+def outside_validity(when: str, validity: dict) -> bool:
+    """FS042: a relation is valid for `validFrom <= time < validUntil` (start inclusive, END EXCLUSIVE), compared by written calendar date (`when` has at least
+    day precision). A null bound is unknown, never infinite or a default, and never excludes. S3 `validUntil` is the exclusive end the source states; a source
+    that only says "through D" is not converted here (no +1 day, no midnight)."""
+    day = when[:10]
+    return bool((validity["from"] and day < validity["from"][:10]) or (validity["until"] and day >= validity["until"][:10]))
+
+
 class Planner:
     """The pure (given loaded sources and operator files) projection. Every S3/S2 item the operator intended to publish is either emitted or excluded
     with a visible code; nothing is guessed, merged by last-wins or inferred from company/ticker/exchange/language."""
@@ -767,7 +775,7 @@ class Planner:
             if validity["from"] or validity["until"]:
                 if not when or len(when) < 10:
                     raise Skip("basis_validity_unprovable")
-                if (validity["from"] and when[:10] < validity["from"][:10]) or (validity["until"] and when[:10] > validity["until"][:10]):
+                if outside_validity(when, validity):
                     raise Skip("basis_validity_outside_event_time")
             if r["countries"] and not countries <= set(r["countries"]):
                 raise Skip("basis_countries_mismatch")

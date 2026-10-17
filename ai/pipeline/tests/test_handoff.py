@@ -55,6 +55,15 @@ collision_same = world_fixture("collide-same", collide=True, a2_differs=False)  
 collision_title = world_fixture("collide-title", collide=True, a2_differs=True)                         # ... with a differing title
 collision_us = world_fixture("collide-us", collide=True, a2_differs=False, a2_countries=("US",))       # ... with a differing country field
 dated_world = world_fixture("dated", dated=True)                                                        # structural basis whose validity is proven only in document b
+# The supply issue's event time is 2026-09-30 in both of its documents. Each variant is a REAL ingestion + S2 + S3 world whose validity sentence (document b) states
+# an explicit EXCLUSIVE end, so the S3 value `validUntil` is exactly what the source says (never "through D" silently read as D).
+until_on_event_day = world_fixture("until-on-event-day", dated=True, valid_until="2026-09-30")          # [2026-01-01, 2026-09-30): the event day is not inside
+until_after_event_day = world_fixture("until-after-event-day", dated=True, valid_until="2026-10-01")     # [2026-01-01, 2026-10-01): the event day is inside
+from_on_event_day = world_fixture("from-on-event-day", dated=True, valid_from="2026-09-30", valid_until=None)      # [2026-09-30, unknown end): start is inclusive
+from_after_event_day = world_fixture("from-after-event-day", dated=True, valid_from="2026-10-01", valid_until=None)
+event_time_unknown = world_fixture("event-time-unknown", dated=True, event_time=None)                    # a dated basis cannot be compared with a missing event time
+event_time_month = world_fixture("event-time-month", dated=True, event_time="2026-09")                  # nor with a month-precision one (no midnight/first-of-month guess)
+event_time_unknown_undated = world_fixture("event-time-unknown-undated", dated=True, event_time=None, valid_from=None, valid_until=None)
 
 
 @pytest.fixture(scope="module")
@@ -894,6 +903,92 @@ def test_h3_a_validity_document_without_a_verified_binding_excludes_the_structur
     assert "issue:supply-2026q3" in issue_ids(bundle), name                           # the supply issue itself does not need document b
     assert excluded(bundle).get(("structural", "issue:supply>co:synth-3")) == code, (name, excluded(bundle))
     assert not any(r["type"] == "STRUCTURALLY_RELATED_TO" for r in bundle["relations"])
+
+
+# ---- FS042: a basis is valid for `validFrom <= eventTime < validUntil` (end-exclusive); unknown bounds stay unknown ----------------------------------
+
+STRUCTURAL = ("structural", "issue:supply>co:synth-3")
+
+
+def structural_edges(bundle: dict) -> list:
+    return [r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"]
+
+
+def test_validity_ending_on_the_event_day_excludes_the_structural_basis(until_on_event_day, tmp_path):
+    rig = Rig(until_on_event_day, tmp_path)
+    bundle = rig.bundle()
+    assert next(i for i in bundle["issues"] if i["id"] == "issue:supply-2026q3")["eventTime"] == "2026-09-30"
+    assert not structural_edges(bundle)
+    assert excluded(bundle)[STRUCTURAL] == "basis_validity_outside_event_time"
+    assert any(r["type"] == "INVOLVES" and r["source"] == "issue:supply-2026q3" for r in bundle["relations"])      # the issue itself is not affected
+
+
+def test_validity_ending_the_day_after_the_event_keeps_the_basis_verbatim(until_after_event_day, tmp_path):
+    bundle = Rig(until_after_event_day, tmp_path).bundle()
+    (edge,) = structural_edges(bundle)
+    assert (edge["basis"][0]["validFrom"], edge["basis"][0]["validUntil"]) == ("2026-01-01", "2026-10-01")
+    assert STRUCTURAL not in excluded(bundle)
+
+
+def test_validity_starting_on_the_event_day_keeps_the_basis_and_an_unknown_end_stays_null(from_on_event_day, tmp_path):
+    bundle = Rig(from_on_event_day, tmp_path).bundle()
+    (edge,) = structural_edges(bundle)
+    assert (edge["basis"][0]["validFrom"], edge["basis"][0]["validUntil"]) == ("2026-09-30", None)
+    assert STRUCTURAL not in excluded(bundle)
+
+
+def test_validity_starting_after_the_event_day_excludes_the_basis(from_after_event_day, tmp_path):
+    bundle = Rig(from_after_event_day, tmp_path).bundle()
+    assert not structural_edges(bundle)
+    assert excluded(bundle)[STRUCTURAL] == "basis_validity_outside_event_time"
+
+
+@pytest.mark.parametrize("fixture,precision", [("event_time_unknown", "unknown"), ("event_time_month", "month")])
+def test_a_dated_basis_is_unprovable_for_an_event_time_without_day_precision(request, tmp_path, fixture, precision):
+    world = request.getfixturevalue(fixture)
+    bundle = Rig(world, tmp_path).bundle()
+    assert next(i for i in bundle["issues"] if i["id"] == "issue:supply-2026q3")["timePrecision"] == precision
+    assert not structural_edges(bundle)
+    assert excluded(bundle)[STRUCTURAL] == "basis_validity_unprovable"
+
+
+def test_an_undated_basis_needs_no_event_time_and_keeps_both_bounds_unknown(event_time_unknown_undated, tmp_path):
+    bundle = Rig(event_time_unknown_undated, tmp_path).bundle()
+    (edge,) = structural_edges(bundle)
+    assert (edge["basis"][0]["validFrom"], edge["basis"][0]["validUntil"]) == (None, None)
+    assert next(i for i in bundle["issues"] if i["id"] == "issue:supply-2026q3")["eventTime"] is None
+
+
+def inclusive_end(when: str, validity: dict) -> bool:
+    """The producer predicate as it was before FS042 was settled (END INCLUSIVE). Used ONLY to freeze a legacy artifact; the bundle is validated as usual."""
+    return bool((validity["from"] and when[:10] < validity["from"][:10]) or (validity["until"] and when[:10] > validity["until"][:10]))
+
+
+def stored(rig) -> dict:
+    """Everything a handoff persists: ledger rows, attempts and artifact bytes."""
+    return {"handoffs": rig.sql("SELECT * FROM handoffs ORDER BY handoff_id"), "attempts": rig.sql("SELECT * FROM attempts ORDER BY handoff_id, n"),
+            "files": {p.name: p.read_bytes() for p in sorted((rig.state / "bundles").iterdir())}}
+
+
+def test_a_bundle_frozen_under_the_inclusive_end_is_withheld_never_served_as_end_exclusive_and_is_preserved(until_on_event_day, tmp_path):
+    rig = Rig(until_on_event_day, tmp_path)
+    with mock.patch("zoop_ai_pipeline.handoff.outside_validity", inclusive_end):
+        legacy = rig.bundle()
+    assert [r["basis"][0]["validUntil"] for r in structural_edges(legacy)] == ["2026-09-30"]          # the legacy artifact keeps a basis ending on its event day
+    before = stored(rig)
+    assert len(before["files"]) == 1
+
+    out = rig.run("export", rig.sel(), expected=2)
+    assert out["delivery"] == {"status": "withheld", "code": "handoff_content_changed"} and out["state"] == "ready"
+    assert set(out) == {"schemaVersion", "handoffId", "state", "publication", "delivery", "usage"}                  # no bundle, manifest or counts
+    assert rig.run("inspect", rig.sel())["state"] == "ready"                                                         # the stored artifact still verifies as frozen
+    assert rig.freeze()["receipt"]["bundleDigest"] == json.loads(before["handoffs"][0][6])["bundleDigest"]          # same request echoes the same receipt
+    assert stored(rig) == before                                                                                     # nothing was rewritten, regenerated or deleted
+
+    fresh = rig.bundle("h2")                                                                                         # the operator re-freezes under a new ID
+    assert not structural_edges(fresh) and excluded(fresh)[STRUCTURAL] == "basis_validity_outside_event_time"
+    assert {k: v for k, v in stored(rig)["files"].items() if k in before["files"]} == before["files"]
+
 
 
 # ---- H4: every frozen observation of a document version is kept and checked for metadata consistency -----------------------------
