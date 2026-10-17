@@ -197,7 +197,13 @@ beforeEach(() => {
       points: [
         { time: old, open: 100, high: 115, low: 90, close: 110, volume: null },
         { time, open: 110, high: 130, low: 100, close: 120, volume: null },
-      ],
+      ].filter(
+        (point) =>
+          (!r.query.get('from') ||
+            Date.parse(point.time) >= Date.parse(r.query.get('from')!)) &&
+          (!r.query.get('to') ||
+            Date.parse(point.time) <= Date.parse(r.query.get('to')!)),
+      ),
     }),
   );
   server.on('GET', '/api/v1/events', (r) =>
@@ -742,7 +748,7 @@ test('graph issue selection clears previous document/evidence while retaining ta
   expect(address).toContain('period=1w');
   expect(address).not.toContain('document=');
   expect(address).not.toContain('evidence=');
-  expect(address).not.toContain('bucket=');
+  expect(address).toContain('bucket=2026-10-05T03%3A00%3A00.000Z');
   expect(within(region).getByRole('img').getAttribute('viewBox')).toBe(view);
 });
 
@@ -790,4 +796,246 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
       impact,
     ),
   ).toEqual([]);
+});
+
+test('D-COM-05/06: every period shares exact chart/timeline from/to and pins graph context', async () => {
+  open(pinned);
+  for (const [period, label, interval] of [
+    ['1m', '1개월', '1d'],
+    ['1d', '1일', '5m'],
+    ['1w', '1주', '1h'],
+    ['1y', '1년', '1wk'],
+  ]) {
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    await waitFor(() =>
+      expect(
+        server
+          .calls('GET', '/api/v1/companies/:id/prices')
+          .at(-1)
+          ?.query.get('period'),
+      ).toBe(period),
+    );
+    await screen.findByRole('img', { name: '공급된 종가 차트' });
+    const pricesRequest = server
+      .calls('GET', '/api/v1/companies/:id/prices')
+      .at(-1)!;
+    const eventsRequest = server.calls('GET', '/api/v1/events').at(-1)!;
+    expect(pricesRequest.query.get('from')).toBe(
+      eventsRequest.query.get('from'),
+    );
+    expect(pricesRequest.query.get('to')).toBe(eventsRequest.query.get('to'));
+    expect(eventsRequest.query.get('asOf')).toBe(time);
+    expect(eventsRequest.query.get('graphVersion')).toBe('v1');
+    expect(screen.getByText(new RegExp(`${interval} 해상도`))).toBeTruthy();
+  }
+});
+
+test('chart count marker expands both events without changing public cutoff; event synchronizes graph', async () => {
+  open(pinned);
+  await userEvent.click(
+    await screen.findByRole('button', {
+      name: '차트 사건 2026-10-05 · 사건 2건',
+    }),
+  );
+  expect(screen.getByRole('button', { name: '합성 사건 A' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: '합성 사건 B' })).toBeTruthy();
+  expect(screen.getByTestId('address').textContent).toContain(
+    `asOf=${encodeURIComponent(time)}`,
+  );
+  await userEvent.click(screen.getByRole('button', { name: '합성 사건 A' }));
+  await screen.findByRole('heading', { name: '합성 사건 A' });
+  expect(
+    screen
+      .getByRole('button', { name: '차트 사건 2026-10-05 · 사건 2건' })
+      .getAttribute('aria-pressed'),
+  ).toBe('true');
+  expect(
+    screen
+      .getByRole('button', { name: `차트 ${old} 선택` })
+      .getAttribute('aria-pressed'),
+  ).toBe('true');
+  const region = screen.getByRole('complementary', {
+    name: '시점 기반 관계 그래프',
+  });
+  expect(
+    within(region)
+      .getByRole('button', { name: '사건 · 합성 사건 A' })
+      .getAttribute('aria-pressed'),
+  ).toBe('true');
+});
+
+test('chart time transition clears dependent event/document/evidence and keeps tab', async () => {
+  open(
+    `${pinned}&tab=info&event=issue-a&bucket=2026-10-05&document=old&evidence=old&docScope=event`,
+  );
+  await userEvent.click(
+    await screen.findByRole('button', { name: `차트 ${old} 선택` }),
+  );
+  await waitFor(() =>
+    expect(
+      server.calls('GET', '/api/v1/events').at(-1)?.query.get('asOf'),
+    ).toBe(old),
+  );
+  const address = screen.getByTestId('address').textContent!;
+  for (const key of [
+    'event=',
+    'bucket=',
+    'document=',
+    'evidence=',
+    'docScope=',
+  ])
+    expect(address).not.toContain(key);
+  expect(address).toContain('tab=info');
+  expect(address).toContain('graphVersion=v1');
+});
+
+test('late timeline response from former cutoff is discarded after chart selection', async () => {
+  const pending = deferred<Response>();
+  server.on('GET', '/api/v1/events', (r) =>
+    r.query.get('asOf') === time
+      ? pending.promise
+      : json({
+          items: [events[0]],
+          unknownTimeItems: [],
+          nextCursor: null,
+          metadata: {
+            ...metadata,
+            asOf: old,
+            total: 1,
+            excludedUnknownTime: 0,
+          },
+        }),
+  );
+  open(pinned);
+  await userEvent.click(
+    await screen.findByRole('button', { name: `차트 ${old} 선택` }),
+  );
+  await screen.findByRole('button', { name: '2026-10-05 · 사건 1건' });
+  await act(async () =>
+    pending.resolve(
+      json({
+        items: events,
+        unknownTimeItems: [],
+        nextCursor: null,
+        metadata: { ...metadata, total: 2, excludedUnknownTime: 0 },
+      }),
+    ),
+  );
+  expect(
+    screen.queryByRole('button', { name: '2026-10-05 · 사건 2건' }),
+  ).toBeNull();
+  expect(
+    screen.getByRole('button', { name: '2026-10-05 · 사건 1건' }),
+  ).toBeTruthy();
+});
+
+test('timeline denied and partial retry states preserve historical URL', async () => {
+  server.on('GET', '/api/v1/events', () => apiError(403, 'ACCESS_DENIED'));
+  const view = open(pinned);
+  await screen.findByText('이 시점의 사건을 조회할 권한이 없어요.');
+  view.unmount();
+  server.on('GET', '/api/v1/events', () =>
+    json({
+      items: events,
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        total: 2,
+        excludedUnknownTime: 0,
+        partial: true,
+        failures: [
+          {
+            section: 'events',
+            code: 'SOURCE_UNAVAILABLE',
+            message: '합성 부분 장애',
+          },
+        ],
+      },
+    }),
+  );
+  open(pinned);
+  await screen.findByText('합성 부분 장애');
+  await userEvent.click(
+    screen.getByRole('button', { name: '타임라인 다시 조회' }),
+  );
+  await waitFor(() =>
+    expect(server.calls('GET', '/api/v1/events')).toHaveLength(3),
+  );
+  expect(
+    server.calls('GET', '/api/v1/events').at(-1)?.query.get('graphVersion'),
+  ).toBe('v1');
+  expect(screen.getByTestId('address').textContent).toContain(
+    `asOf=${encodeURIComponent(time)}`,
+  );
+});
+
+test('different issue or company impact cannot highlight the selected event', async () => {
+  server.on('GET', '/api/v1/companies/:id/issues/:issueId/impact', () =>
+    json({
+      companyId: 'wrong-company',
+      issueId: 'wrong-event',
+      steps: [],
+      metadata,
+    }),
+  );
+  open(`${pinned}&event=issue-a`);
+  await screen.findByText(/요청한 기업·사건과 다른 영향 경로/);
+});
+
+test('mismatched chart company/period is rejected rather than shown as selected series', async () => {
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: 'wrong',
+      period: '1y',
+      interval: '1d',
+      points: [],
+      source,
+      currency: 'KRW',
+    }),
+  );
+  open(pinned);
+  await screen.findByText(/요청한 기업·기간과 다른 차트/);
+  expect(screen.queryByRole('img', { name: '공급된 종가 차트' })).toBeNull();
+});
+
+test('chart bucket marker opens event cards from the info tab without altering cutoff', async () => {
+  open(`${pinned}&tab=info`);
+  await userEvent.click(
+    await screen.findByRole('button', {
+      name: '차트 사건 2026-10-05 · 사건 2건',
+    }),
+  );
+  expect(screen.getByTestId('address').textContent).toContain('tab=events');
+  expect(screen.getByTestId('address').textContent).toContain(
+    `asOf=${encodeURIComponent(time)}`,
+  );
+  expect(screen.getByRole('button', { name: '합성 사건 B' })).toBeTruthy();
+});
+
+test('selected graph version rejects a response that omits snapshot metadata', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', () => {
+    const withoutMetadata: Partial<GraphResponse> = { ...graph };
+    delete withoutMetadata.metadata;
+    return json(withoutMetadata);
+  });
+  open(pinned);
+  await screen.findByText(/요청한 공개 버전과 다른 자료를 받았어요/);
+  expect(
+    screen.queryByRole('img', { name: '기준 시점 기업 관계 그래프' }),
+  ).toBeNull();
+});
+
+test('FS040 calendar ranges clamp month and leap year at the Korean midnight boundary', () => {
+  expect(timeRange('2026-03-31T00:00:00+09:00', '1m')).toEqual({
+    from: '2026-02-27T15:00:00.000Z',
+    to: '2026-03-30T15:00:00.000Z',
+  });
+  expect(timeRange('2024-02-29T00:00:00+09:00', '1y').from).toBe(
+    '2023-02-27T15:00:00.000Z',
+  );
+  expect(timeRange('2026-03-30T15:00:00Z', '1m')).toEqual(
+    timeRange('2026-03-31T00:00:00+09:00', '1m'),
+  );
 });
