@@ -91,6 +91,63 @@ class BriefingQueryServiceTest {
         assertEquals("unavailable", result.path("marketVariables").path("status").asString());
     }
 
+    private BriefingRound marketRound(Consumer<ObjectNode> transform) {
+        return round("morning", "published", payload -> {
+            var market = payload.putObject("marketVariables").put("status", "available")
+                    .put("referenceAt", MORNING.toString()).put("rateCutoffAt", MORNING.toString())
+                    .put("collectedAt", MORNING.toString());
+            var indicators = market.putArray("indicators");
+            ObjectNode fx = null;
+            for (String id : List.of("kospi", "kosdaq", "usdkrw")) {
+                boolean bank = "usdkrw".equals(id);
+                var indicator = indicators.addObject().put("id", id).put("label", id)
+                        .put("unit", bank ? "KRW" : "pt").put("status", "delayed").put("value", 1300.0)
+                        .put("valueKind", "close").put("observedDate", DATE.minusDays(1).toString())
+                        .putNull("observedAt").putNull("change").putNull("changeRate").putNull("baseline")
+                        .putNull("reason").putNull("reasonCode");
+                indicator.putObject("source").put("provider", bank ? "naver" : "yahoo")
+                        .put("symbol", bank ? "FX_USDKRW" : id).put("name", "Synthetic source")
+                        .put("official", false).putNull("delayNote").put("url", bank
+                                ? "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?pageSize=40&page=1"
+                                : "https://example.invalid/index");
+                if (bank) fx = indicator;
+            }
+            transform.accept(fx);
+        });
+    }
+
+    @Test void legacyBankReferenceIsProjectedWithoutChangingStoredPublication() {
+        var row = marketRound(ignored -> { }); var original = row.payload().deepCopy();
+        when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        var result = service.get(DATE, "morning", "request");
+        assertEquals("reference", result.path("marketVariables").path("indicators").get(2).path("valueKind").asString());
+        assertEquals("close", result.path("marketVariables").path("indicators").get(0).path("valueKind").asString());
+        assertEquals(original, row.payload());
+        ((ObjectNode) result.path("marketVariables").path("indicators").get(2)).put("value", 0.0);
+        assertEquals(original, row.payload());
+        assertEquals(1300.0, service.get(DATE, "morning", "again").path("marketVariables").path("indicators").get(2).path("value").doubleValue());
+    }
+
+    @Test void explicitReferenceIsAcceptedAndUnknownCloseOrLatestAreNotRelabeled() {
+        for (String mode : List.of("reference", "foreign_close", "latest")) {
+            var row = marketRound(fx -> {
+                if ("reference".equals(mode)) fx.put("valueKind", "reference");
+                if ("foreign_close".equals(mode)) ((ObjectNode) fx.get("source")).put("url", "https://example.invalid/fx");
+                if ("latest".equals(mode)) fx.put("valueKind", "latest").put("observedAt", MORNING.minusSeconds(1).toString());
+            });
+            when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+            String expected = "foreign_close".equals(mode) ? "close" : mode;
+            assertEquals(expected, service.get(DATE, "morning", "request").path("marketVariables").path("indicators").get(2).path("valueKind").asString());
+        }
+    }
+
+    @Test void bankReferenceCannotBeAssignedToAnIndex() {
+        var row = marketRound(ignored -> { });
+        ((ObjectNode) row.payload().path("marketVariables").path("indicators").get(0)).put("valueKind", "reference");
+        when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        assertUnavailable(() -> service.get(DATE, "morning", "request"));
+    }
+
     @Test void latestComesFromDatabaseEvenAcrossNonGenerationDays() {
         var row = published(); when(repository.latest(null, "morning")).thenReturn(Optional.of(row));
         var result = service.get(null, "morning", "request");

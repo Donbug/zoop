@@ -4909,9 +4909,9 @@ One indicator as it stood when the round was generated. ``status`` separates wha
 | unit | 필수 | string {pt, KRW} |  |
 | status | 필수 | string {ok, delayed, unavailable, failed} |  |
 | value | 필수 | number / null |  |
-| valueKind | 필수 | string {close, latest} / null | close = the session's closing value; latest = the last observation before the cut-off |
+| valueKind | 필수 | string {close, latest, reference} / null | close = the session's closing value; latest = the last observation before the cut-off; reference = a bank-published reference exchange rate, not a market close. Legacy Naver FX_USDKRW daily bank values stored as close are exposed as reference without modifying the publication snapshot. |
 | observedDate | 필수 | string / null | KST date of the value actually used |
-| observedAt | 필수 | string (date-time) / null | KST time of the value actually used; null for a daily close |
+| observedAt | 필수 | string (date-time) / null | KST time of the value actually used; null for a daily close or a date-only bank reference. Do not fabricate an observation time. |
 | baseline | 필수 | [IndicatorBaseline](#schema-indicatorbaseline) / null |  |
 | change | 필수 | number / null |  |
 | changeRate | 필수 | number / null | change / baseline.value as a fraction (0.0123 = +1.23%) |

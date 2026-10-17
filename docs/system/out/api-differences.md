@@ -36,7 +36,7 @@
 | listEvents | /api/v1/events | /api/events | 목표만 113 · BFF만 39 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. / 현재 BFF EventSummary에는 요청 companyId 맥락의 relationTypes가 없다. items/unknownTimeItems 양쪽을 같은 승인 간선·공개 버전/asOf로 변환해야 하며 간접 2-hop을 직접 관계로 승격하지 않는다. |
 | getEvent | /api/v1/events/{id} | /api/events/{id} | 목표만 134 · BFF만 52 · 형식/필수/권한 변경 6 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getEvidence | /api/v1/evidence/{id} | /api/evidence/{id} | 목표만 125 · BFF만 55 · 형식/필수/권한 변경 16 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| getBriefing | /api/v1/briefings | /api/briefings | 목표만 128 · BFF만 60 · 형식/필수/권한 변경 20 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getBriefing | /api/v1/briefings | /api/briefings | 목표만 128 · BFF만 60 · 형식/필수/권한 변경 21 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listBriefingRounds | /api/v1/briefings/rounds | /api/briefings/rounds | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 6 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | getBriefingGraphBasis | /api/v1/briefings/{id}/graph | /api/briefings/{id}/graph | 목표만 97 · BFF만 30 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | createConversation | /api/v1/chat/sessions/{id} | /api/chat/sessions/{id} | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
@@ -67,7 +67,7 @@
 | cancelAnalysisJob | /api/v1/admin/jobs/{job_id}/cancel | /api/admin/jobs/{job_id}/cancel | 목표만 162 · BFF만 30 · 형식/필수/권한 변경 15 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 로컬 PoC 명령·샌드박스·호출 예산 필드는 정식 서버 계약에서 제외한다. |
 | getAiUsage | /api/v1/admin/ai-usage | /api/admin/ai-usage | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listAdminBriefingRounds | /api/v1/admin/briefings | /api/admin/briefings | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| getAdminBriefingRound | /api/v1/admin/briefings/{round_id} | /api/admin/briefings/{round_id} | 목표만 147 · BFF만 37 · 형식/필수/권한 변경 26 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getAdminBriefingRound | /api/v1/admin/briefings/{round_id} | /api/admin/briefings/{round_id} | 목표만 147 · BFF만 37 · 형식/필수/권한 변경 27 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | reprocessBriefingRound | /api/v1/admin/briefings/{round_id}/reprocess | /api/admin/briefings/{round_id}/reprocess | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | appendBriefingCorrection | /api/v1/admin/briefings/{round_id}/corrections | /api/admin/briefings/{round_id}/corrections | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | setBriefingSuspension | /api/v1/admin/briefings/{round_id}/suspension | /api/admin/briefings/{round_id}/suspension | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |

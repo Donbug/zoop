@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Public reads only restore a preserved original; neither a source nor a model is called here. */
@@ -143,7 +144,7 @@ public class BriefingQueryService {
         out.set("dataAsOf", payload.get("dataWindow").get("end").deepCopy());
         out.set("marketSummary", row.publicSnapshot().get("marketSummary").deepCopy());
         var market = payload.get("marketVariables");
-        out.set("marketVariables", market.isNull() ? unavailableSection("발행 당시 시장 지표가 저장되지 않았습니다.") : market.deepCopy());
+        out.set("marketVariables", market.isNull() ? unavailableSection("발행 당시 시장 지표가 저장되지 않았습니다.") : publicMarketVariables(market));
         out.set("sinceMorning", row.comparisonSnapshot() == null ? mapper.nullNode() : row.comparisonSnapshot().deepCopy());
         var corrections = out.putArray("corrections");
         for (var change : changes) {
@@ -155,6 +156,24 @@ public class BriefingQueryService {
         out.putNull("notice");
         ((ObjectNode) out.get("metadata")).put("requestId", requestId);
         return out;
+    }
+
+    /** Contract projection only: legacy bank daily references were stored under the old close enum. */
+    private static JsonNode publicMarketVariables(JsonNode stored) {
+        JsonNode copy = stored.deepCopy();
+        if (!"available".equals(copy.path("status").asString())) return copy;
+        for (JsonNode indicator : copy.path("indicators")) {
+            JsonNode source = indicator.path("source");
+            if ("usdkrw".equals(indicator.path("id").asString())
+                    && "close".equals(indicator.path("valueKind").asString())
+                    && indicator.path("observedAt").isNull()
+                    && "naver".equals(source.path("provider").asString())
+                    && "FX_USDKRW".equals(source.path("symbol").asString())
+                    && source.path("url").asString("").startsWith("https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?")) {
+                ((ObjectNode) indicator).put("valueKind", "reference");
+            }
+        }
+        return copy;
     }
 
     private ObjectNode empty(LocalDate date, String edition, BriefingRound row, String requestId, String status,

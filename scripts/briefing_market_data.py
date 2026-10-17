@@ -160,7 +160,7 @@ def snapshot(round_definition, receipts, output):
         if eligible:
             current, prior = eligible[-1], eligible[-2] if len(eligible) > 1 else None
             delayed = indicator == "usdkrw" or current["date"] != day.isoformat()
-            item.update({"status": "delayed" if delayed else "ok", "value": float(current["value"]), "valueKind": "close",
+            item.update({"status": "delayed" if delayed else "ok", "value": float(current["value"]), "valueKind": "reference" if indicator == "usdkrw" else "close",
                          "observedDate": current["date"], "reasonCode": None,
                          "reason": "회차 마감 전에 확정 가능한 직전 날짜의 일별 고시환율입니다. 당일 고시 마감 시각은 확인되지 않았습니다."
                             if indicator == "usdkrw" else "회차 마감 전 가장 최근 확인된 거래일 종가입니다. 장중 시세는 제공하지 않습니다."})

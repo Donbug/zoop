@@ -68,8 +68,17 @@ describe('D-BRF-01·02 저장된 주요 시장 지표', () => {
     expect(card('원/달러').getByText('▲ +8.5원 (+0.62%)')).toBeTruthy();
   });
 
-  it('labels a delayed bank daily FX reference without inventing a market close time', () => {
-    render(
+  it('keeps an actual FX close distinct from an explicitly timed bank reference', () => {
+    const { rerender } = render(
+      <MarketIndicators
+        variables={{
+          status: 'available',
+          indicators: [indicator({ id: 'usdkrw', unit: 'KRW' })],
+        }}
+      />,
+    );
+    expect(card('원/달러').getByText('2026-10-13 종가')).toBeTruthy();
+    rerender(
       <MarketIndicators
         variables={{
           status: 'available',
@@ -77,38 +86,62 @@ describe('D-BRF-01·02 저장된 주요 시장 지표', () => {
             indicator({
               id: 'usdkrw',
               unit: 'KRW',
-              status: 'delayed',
-              value: 1375.5,
-              observedDate: '2026-10-12',
-              observedAt: null,
-              baseline: { value: 1369.25, date: '2026-10-09', at: null },
-              change: 6.25,
-              changeRate: 0.0046,
-              source: {
-                name: '네이버 금융 · 하나은행',
-                official: false,
-                delayNote: '은행 일별 고시값 · 고시 시각 미제공',
-              },
-              reason: '이전 날짜의 고시값을 사용했어요.',
+              valueKind: 'reference',
+              observedAt: '2026-10-13T14:30:00+09:00',
             }),
           ],
         }}
       />,
     );
-
-    const fx = card('원/달러');
-    expect(fx.getByText('지연')).toBeTruthy();
-    expect(fx.getByText('2026-10-12 일별 고시값')).toBeTruthy();
-    expect(fx.getByText('2026-10-09 대비')).toBeTruthy();
-    expect(fx.getByText('▲ +6.25원 (+0.46%)')).toBeTruthy();
-    expect(fx.getByText('이전 날짜의 고시값을 사용했어요.')).toBeTruthy();
-    expect(
-      fx.getByText(
-        '출처 네이버 금융 · 하나은행 · 비공식 · 은행 일별 고시값 · 고시 시각 미제공',
-      ),
-    ).toBeTruthy();
-    expect(fx.queryByText(/종가|KST/)).toBeNull();
+    expect(card('원/달러').getByText(/14:30 KST 고시값/)).toBeTruthy();
+    expect(card('원/달러').queryByText(/종가/)).toBeNull();
   });
+
+  it.each(['reference', 'close'] as const)(
+    'labels bank daily FX kind %s without inventing a market close time',
+    (valueKind) => {
+      render(
+        <MarketIndicators
+          variables={{
+            status: 'available',
+            indicators: [
+              indicator({
+                id: 'usdkrw',
+                unit: 'KRW',
+                status: 'delayed',
+                value: 1375.5,
+                valueKind,
+                observedDate: '2026-10-12',
+                observedAt: null,
+                baseline: { value: 1369.25, date: '2026-10-09', at: null },
+                change: 6.25,
+                changeRate: 0.0046,
+                source: {
+                  name: '네이버 금융 · 하나은행',
+                  official: false,
+                  delayNote: '은행 일별 고시값 · 고시 시각 미제공',
+                },
+                reason: '이전 날짜의 고시값을 사용했어요.',
+              }),
+            ],
+          }}
+        />,
+      );
+
+      const fx = card('원/달러');
+      expect(fx.getByText('지연')).toBeTruthy();
+      expect(fx.getByText('2026-10-12 일별 고시값')).toBeTruthy();
+      expect(fx.getByText('2026-10-09 대비')).toBeTruthy();
+      expect(fx.getByText('▲ +6.25원 (+0.46%)')).toBeTruthy();
+      expect(fx.getByText('이전 날짜의 고시값을 사용했어요.')).toBeTruthy();
+      expect(
+        fx.getByText(
+          '출처 네이버 금융 · 하나은행 · 비공식 · 은행 일별 고시값 · 고시 시각 미제공',
+        ),
+      ).toBeTruthy();
+      expect(fx.queryByText(/종가|KST/)).toBeNull();
+    },
+  );
 
   it('keeps the stored observation and baseline times for a timestamped FX value', () => {
     render(

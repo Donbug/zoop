@@ -74,6 +74,12 @@ class MarketDataTests(unittest.TestCase):
             if binding["id"] != "usdkrw":
                 self.assertEqual("2026-10-02T15:30:00+09:00", binding["availabilityUpperBound"])
 
+    def test_bank_daily_reference_has_its_own_kind_instead_of_a_market_close(self):
+        indicators = {x["id"]: x for x in self.snapshot()["marketVariables"]["indicators"]}
+        self.assertEqual("reference", indicators["usdkrw"]["valueKind"])
+        self.assertEqual("close", indicators["kospi"]["valueKind"])
+        self.assertIsNone(indicators["usdkrw"]["observedAt"])
+
     def test_provider_no_bar_day_carries_latest_without_inventing_calendar(self):
         result = self.snapshot(round_("2026-10-04", "evening"))
         for row in result["marketVariables"]["indicators"]:

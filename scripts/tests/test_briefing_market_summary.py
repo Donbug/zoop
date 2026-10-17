@@ -212,6 +212,19 @@ class MarketSummaryTests(unittest.TestCase):
         result = summary.generate_market_summary(self.client(Transport()), current)
         self.assertEqual("PASS", result["verification"]["status"])
 
+    def test_explicit_bank_reference_is_accepted_but_index_reference_is_rejected(self):
+        current = data()
+        fx = current["marketSnapshot"]["marketVariables"]["indicators"][2]
+        fx.update({"status": "delayed", "value": 1300.0, "valueKind": "reference", "observedDate": "2026-10-07", "observedAt": None,
+                   "baseline": None, "change": None, "changeRate": None})
+        current["context"]["marketSnapshotSha256"] = base.digest(base.canonical(current["marketSnapshot"]))
+        result = summary.generate_market_summary(self.client(Transport()), current)
+        self.assertEqual("PASS", result["verification"]["status"])
+        current["marketSnapshot"]["marketVariables"]["indicators"][0]["valueKind"] = "reference"
+        current["context"]["marketSnapshotSha256"] = base.digest(base.canonical(current["marketSnapshot"]))
+        with self.assertRaisesRegex(summary.MarketSummaryError, "unit_or_kind_invalid"):
+            summary.generate_market_summary(self.client(Transport()), current)
+
     def test_missing_value_cannot_be_zero_filled_or_cited(self):
         current = data()
         current["marketSnapshot"]["marketVariables"]["indicators"][1]["value"] = 0

@@ -102,6 +102,12 @@ class BriefingMarketEnrichmentTest {
     @Test void actualNormalizedRawValuesAndPartialMissingIndicatorAreAccepted() {
         assertEquals(Set.of("kospi", "usdkrw"), BriefingReplayImporter.validateMarketSnapshot(StrictJson.Obj.of(snapshot), StrictJson.Obj.of(record))); validateRaw();
     }
+    @Test void explicitBankReferenceKindRetainsTheSameRawValueAndCutoffRules() {
+        card("usdkrw").put("valueKind", "reference"); validateSnapshot(); validateRaw();
+        card("kospi").put("valueKind", "reference");
+        assertThrows(IllegalArgumentException.class, this::validateSnapshot);
+        assertThrows(IllegalArgumentException.class, this::validateRaw);
+    }
     @Test void emptyFailedTransportReceiptPreservesMissingValueWithoutInventingZero() throws Exception {
         String sha = raw(new byte[0]);
         ObjectNode failure = ((ArrayNode) snapshot.get("rawRefs")).addObject().put("source", "yahoo")

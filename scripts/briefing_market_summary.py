@@ -114,7 +114,8 @@ def _prepare(data):
         if variables["status"] != "available" or not _finite(indicator.get("value")):
             raise MarketSummaryError("market_summary_indicator_value_invalid")
         if indicator.get("unit") != ("KRW" if indicator["id"] == "usdkrw" else "pt") \
-                or indicator.get("valueKind") not in {"close", "latest"}:
+                or indicator.get("valueKind") not in {"close", "latest", "reference"} \
+                or (indicator.get("valueKind") == "reference" and indicator["id"] != "usdkrw"):
             raise MarketSummaryError("market_summary_indicator_unit_or_kind_invalid")
         try:
             observed_date = datetime.strptime(indicator["observedDate"], "%Y-%m-%d").date()
@@ -126,7 +127,7 @@ def _prepare(data):
             observed = _aware(indicator["observedAt"])
             if observed > cutoff or observed.astimezone(KST).date() != observed_date:
                 raise MarketSummaryError("market_summary_indicator_clock_mismatch")
-        elif indicator["valueKind"] != "close":
+        elif indicator["valueKind"] not in {"close", "reference"}:
             raise MarketSummaryError("market_summary_latest_indicator_time_missing")
         baseline = indicator.get("baseline")
         if baseline is not None:

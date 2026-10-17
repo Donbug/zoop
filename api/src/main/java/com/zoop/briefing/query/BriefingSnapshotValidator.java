@@ -125,7 +125,8 @@ final class BriefingSnapshotValidator {
             same(text(indicator, "unit"), "usdkrw".equals(id) ? "KRW" : "pt");
             String status = choice(indicator, "status", Set.of("ok", "delayed", "unavailable", "failed"));
             JsonNode quote = field(indicator, "value"); numberOrNull(quote);
-            String kind = nullableText(indicator, "valueKind"); check(kind == null || Set.of("close", "latest").contains(kind));
+            String kind = nullableText(indicator, "valueKind"); check(kind == null || Set.of("close", "latest", "reference").contains(kind));
+            check(!"reference".equals(kind) || "usdkrw".equals(id));
             String date = nullableText(indicator, "observedDate"); if (date != null) LocalDate.parse(date);
             Instant at = nullableTimestamp(indicator, "observedAt"); check(at == null || !at.isAfter(cutoff));
             numberOrNull(field(indicator, "change")); numberOrNull(field(indicator, "changeRate"));

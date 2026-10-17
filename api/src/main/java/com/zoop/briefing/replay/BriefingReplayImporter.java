@@ -428,8 +428,9 @@ public final class BriefingReplayImporter {
             if (!indicator.isNull("observedDate")) require(!LocalDate.parse(indicator.string("observedDate")).isAfter(cutoffDate), "market_indicator_future_date");
             if (Set.of("ok", "delayed").contains(status)) {
                 require(!indicator.isNull("value") && !indicator.isNull("observedDate") && !indicator.isNull("source")
-                        && Set.of("close", "latest").contains(indicator.string("valueKind")) && backed.contains(id), "market_indicator_available_binding");
-                if (indicator.isNull("observedAt")) require("close".equals(indicator.string("valueKind"))
+                        && Set.of("close", "latest", "reference").contains(indicator.string("valueKind")) && backed.contains(id), "market_indicator_available_binding");
+                require(!"reference".equals(indicator.string("valueKind")) || "usdkrw".equals(id), "market_reference_indicator_identity");
+                if (indicator.isNull("observedAt")) require(Set.of("close", "reference").contains(indicator.string("valueKind"))
                         && (!LocalDate.parse(indicator.string("observedDate")).equals(cutoffDate) || !cutoff.atZone(KST).toLocalTime().isBefore(LocalTime.of(15, 30))), "market_indicator_unavailable_same_day_close");
                 StrictJson.Obj source = indicator.object("source");
                 require(Set.of("yahoo", "naver", "toss").contains(source.string("provider")), "market_indicator_provider");
@@ -496,7 +497,8 @@ public final class BriefingReplayImporter {
             LocalDate sourceDate = LocalDate.parse(binding.string("sourceDate"));
             require(selectedIndex < rowDates.size() && sourceDate.equals(rowDates.get(selectedIndex))
                     && sourceDate.toString().equals(indicator.string("observedDate")) && values.containsKey(sourceDate)
-                    && "close".equals(indicator.string("valueKind")) && indicator.isNull("observedAt"), "market_raw_selected_row");
+                    && ("close".equals(indicator.string("valueKind")) || (fx && "reference".equals(indicator.string("valueKind"))))
+                    && indicator.isNull("observedAt"), "market_raw_selected_row");
             Instant upper = marketUpperBound(sourceDate, fx);
             require(upper.equals(Instant.parse(binding.string("availabilityUpperBound"))) && !upper.isAfter(cutoff), "market_raw_future_availability");
             LocalDate latest = values.keySet().stream().filter(date -> !marketUpperBound(date, fx).isAfter(cutoff)).max(LocalDate::compareTo).orElseThrow();
