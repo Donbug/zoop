@@ -4,11 +4,8 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.read.GraphSelection.Kind;
 import com.zoop.graph.read.dto.GraphResponse;
-import com.zoop.graph.snapshot.GraphSnapshotStore;
-import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Company;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Issue;
-import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.SelectedGraphVersion;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -28,16 +25,11 @@ public class GraphQueryService {
     /** Node cap recorded in metadata.limit (prototype value; revisit after measuring real snapshot sizes). */
     static final int NODE_LIMIT = 500;
 
-    private final GraphVersionSelector selector;
-    private final GraphSnapshotStore store;
-    private final DisclosureExclusionReader exclusions;
+    private final PublicGraphReader reader;
     private final NamedParameterJdbcTemplate jdbc;
 
-    public GraphQueryService(GraphVersionSelector selector, GraphSnapshotStore store,
-            DisclosureExclusionReader exclusions, NamedParameterJdbcTemplate jdbc) {
-        this.selector = selector;
-        this.store = store;
-        this.exclusions = exclusions;
+    public GraphQueryService(PublicGraphReader reader, NamedParameterJdbcTemplate jdbc) {
+        this.reader = reader;
         this.jdbc = jdbc;
     }
 
@@ -54,11 +46,9 @@ public class GraphQueryService {
         }
         Optional<Company> catalogFocus = companyId == null ? Optional.empty() : Optional.of(catalogCompany(companyId));
 
-        SelectedGraphVersion selected = selector.select(round, graphVersion, requestedAsOf);
-        PublicGraphSnapshot snapshot = store.load(selected.version());
-        PublicGraphSnapshot visible = GraphSnapshotFilter.apply(snapshot,
-                selected.asOfRequested() ? selected.asOf() : null, exclusions.current());
-        DisplayGraph graph = DisplayGraph.of(visible);
+        PublicGraphReader.Pinned pinned = reader.read(round, graphVersion, requestedAsOf);
+        SelectedGraphVersion selected = pinned.selected();
+        DisplayGraph graph = pinned.graph();
         List<String> focus = companyId == null ? List.of() : List.of(companyId);
         GraphSelection.Result selection = GraphSelection.select(graph, focus, depth, NODE_LIMIT);
 
