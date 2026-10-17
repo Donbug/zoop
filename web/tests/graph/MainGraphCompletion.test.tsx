@@ -204,9 +204,17 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     await waitFor(() =>
       expect(setTutorialCompleted).toHaveBeenCalledWith(true),
     );
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(router.state.location.search).has('tour'),
+      ).toBe(false),
+    );
+    // 저장 응답의 세션이 아직 미완료여도, 이번 방문에 연 튜토리얼을 다시 자동으로 열지 않는다.
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(new URLSearchParams(router.state.location.search).has('tour')).toBe(
       false,
     );
+    expect(screen.queryByRole('heading', { name: '지도 움직이기' })).toBeNull();
   });
 });
 

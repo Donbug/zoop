@@ -142,7 +142,9 @@ export default function MapPage() {
   );
   const autoTutorial = useRef(false);
   useEffect(() => {
-    if (!tutorialPending || autoTutorial.current || tutorialOpen) return;
+    // 이번 방문에 이미 열렸던 튜토리얼(주소의 tour=1 포함)은 닫은 뒤 다시 자동으로 열지 않는다.
+    if (tutorialOpen) autoTutorial.current = true;
+    if (!tutorialPending || autoTutorial.current) return;
     autoTutorial.current = true;
     updateQuery({ tour: '1' }, { replace: true });
   }, [tutorialPending, tutorialOpen, updateQuery]);
