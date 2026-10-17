@@ -42,10 +42,11 @@ public class GraphQueryService {
         String resolvedMode = mode == null ? "all" : mode;
         if (!resolvedMode.equals("all") && !resolvedMode.equals("personal")) throw invalid();
         if (depth != null && depth < 1) throw invalid();
-        String filter = personalFilter == null ? "all" : personalFilter;
-        if (!List.of("all", "holdings", "watchlist").contains(filter)) throw invalid();
         Instant requestedAsOf = parseInstant(asOf);
         boolean isPersonal = resolvedMode.equals("personal");
+        // personalFilter applies to personal mode only; all mode ignores it (contract).
+        String filter = personalFilter == null ? "all" : personalFilter;
+        if (isPersonal && !List.of("all", "holdings", "watchlist").contains(filter)) throw invalid();
         if (isPersonal && personal == null) throw new IllegalStateException("personal mode without the member companies");
         // A briefing round is a market-wide snapshot (prototype round_all_only).
         if (isPersonal && round != null) throw invalid();
