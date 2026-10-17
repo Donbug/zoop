@@ -49,7 +49,7 @@ class SocialAuthCallbackServiceTest {
         completion = mock(SocialAuthCompletionService.class);
         mapper = JsonMapper.builder().build();
         SocialAuthSettings settings = new SocialAuthSettings(Duration.ofMinutes(10), 30, 10,
-                "/login,/signup,/", false, "google-client", "google-secret",
+                "/login,/signup,/", false, "https://web.example.com", "google-client", "google-secret",
                 "https://api.example.com/api/v1/auth/social/google/callback",
                 "kakao-client", "kakao-secret", "https://api.example.com/api/v1/auth/social/kakao/callback");
         service = new SocialAuthCallbackService(pending, settings, gateway, verifier, mapper,
@@ -70,12 +70,12 @@ class SocialAuthCallbackServiceTest {
                 .thenAnswer(call -> Optional.of(new OAuthPendingRow("flow-id", hash(COOKIE),
                         call.getArgument(2), NOW, NOW.plusSeconds(600))));
         when(completion.complete(any(), anyString(), any(), anyString()))
-                .thenReturn(ResponseEntity.status(302).header(HttpHeaders.LOCATION, "/login").build());
+                .thenReturn(ResponseEntity.status(302).header(HttpHeaders.LOCATION, "https://web.example.com/login").build());
 
         var response = service.callback("google", STATE, "provider-code", null, COOKIE, null, "request-1");
 
         assertEquals(302, response.getStatusCode().value());
-        assertEquals("/login", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("https://web.example.com/login", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(completion).complete(any(), org.mockito.ArgumentMatchers.eq(COOKIE),
                 org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("request-1"));
         verify(pending).claimAuthorization(anyString(), anyString(), org.mockito.ArgumentMatchers.eq("google"), any(Instant.class));
@@ -106,12 +106,13 @@ class SocialAuthCallbackServiceTest {
                 .thenAnswer(call -> Optional.of(new OAuthPendingRow("flow-id", hash(COOKIE),
                         call.getArgument(2), NOW, NOW.plusSeconds(600))));
         when(completion.complete(any(), anyString(), any(), anyString()))
-                .thenReturn(ResponseEntity.status(302).header(HttpHeaders.LOCATION, "/login?social=linked").build());
+                .thenReturn(ResponseEntity.status(302)
+                        .header(HttpHeaders.LOCATION, "https://web.example.com/login?social=linked").build());
 
         var response = service.callback("google", STATE, "provider-code", null, COOKIE,
                 "M".repeat(43), "request-link");
 
-        assertEquals("/login?social=linked", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("https://web.example.com/login?social=linked", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         ArgumentCaptor<OAuthPendingRow> verifiedRow = ArgumentCaptor.forClass(OAuthPendingRow.class);
         verify(completion).complete(verifiedRow.capture(), org.mockito.ArgumentMatchers.eq(COOKIE),
                 org.mockito.ArgumentMatchers.eq("M".repeat(43)), org.mockito.ArgumentMatchers.eq("request-link"));
@@ -125,7 +126,7 @@ class SocialAuthCallbackServiceTest {
     void callbackStateMismatchDoesNotExchangeAuthorizationCodeAndClearsPending() {
         var response = service.callback("google", "X".repeat(43), "provider-code", null, COOKIE, null, "request-1");
 
-        assertEquals("/login?social=failed", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("https://web.example.com/login?social=failed", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         assertTrue(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE).contains("Max-Age=0"));
         verify(gateway, never()).exchange(anyString(), anyString(), anyString(), anyString());
         verify(pending).deleteByTokenHash(anyString());
@@ -146,7 +147,7 @@ class SocialAuthCallbackServiceTest {
 
         var response = service.callback("kakao", STATE, "provider-code", null, COOKIE, null, "request-1");
 
-        assertEquals("/login?social=failed", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("https://web.example.com/login?social=failed", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(pending).consumeClaimedCallback(anyString(), anyString(), any(Instant.class));
         verify(pending, never()).completeVerification(anyString(), anyString(), anyString(), any(Instant.class));
     }
@@ -159,7 +160,7 @@ class SocialAuthCallbackServiceTest {
 
         var response = service.callback("google", STATE, null, "access_denied", COOKIE, null, "request-1");
 
-        assertEquals("/login?social=cancelled", response.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("https://web.example.com/login?social=cancelled", response.getHeaders().getFirst(HttpHeaders.LOCATION));
         verify(pending).consumeClaimedCallback(anyString(), anyString(), any(Instant.class));
         verify(gateway, never()).exchange(anyString(), anyString(), anyString(), anyString());
     }
