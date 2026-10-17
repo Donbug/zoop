@@ -82,7 +82,7 @@ Swagger UI는 `http://localhost:8080/swagger-ui.html`에서 API와 같은 Origin
 
 `GET /api/v1/auth/session`은 `zoop_session` 쿠키가 없으면 `anonymous`를 반환하고 새 세션을 만들지 않습니다. 유효한 회원 쿠키는 회원·설정 상태, 유효한 비회원 쿠키는 guest 상태와 함께 만료 시각·세션 결합 CSRF 토큰을 반환합니다. 만료·폐기·무효 쿠키는 `Max-Age=0`으로 제거합니다. 세션 토큰 원문은 쿠키로만 전달하고 DB에는 SHA-256 해시만 저장합니다. guest 튜토리얼 진행·완료·건너뛰기는 서버에 저장하지 않으며 응답의 `tutorialCompleted`는 항상 `false`입니다.
 
-회원 전용 경계는 [이슈 #31 인계 문서](../docs/development/issue-31-guest-access-handoff.md)에 연결돼 있습니다. 개인 API는 세션에서 얻은 `MemberPrincipal`을 사용하고 리소스 소유자와 일치하는지 확인해야 합니다. 계약상 `PUT /api/v1/auth/tutorial`은 회원 전용이며 guest의 상태 저장은 금지합니다. 이 API 모듈에는 아직 튜토리얼 저장 컨트롤러가 없고, 구현 시 등록된 회원 권한 인터셉터가 guest를 `403 MEMBER_REQUIRED`로 거절합니다.
+회원 전용 경계는 [이슈 #31 인계 문서](../docs/development/issue-31-guest-access-handoff.md)에 연결돼 있습니다. 개인 API는 세션에서 얻은 `MemberPrincipal`을 사용하고 리소스 소유자와 일치하는지 확인해야 합니다. `PUT /api/v1/auth/tutorial`은 회원의 튜토리얼 완료 목표 상태를 저장하고 최신 `SessionResponse`를 반환합니다. 같은 상태의 재요청은 버전을 다시 올리지 않으며, 상태가 바뀌면 회원 설정 버전이 한 번 증가합니다. guest는 저장 없이 `403 MEMBER_REQUIRED`, 세션이 없으면 `401 AUTH_REQUIRED`를 반환합니다.
 
 회원 또는 비회원 쿠키가 붙은 `/api/v1/**` 쓰기 요청은 허용 Origin과 단일 `X-CSRF-Token` 헤더를 검사합니다. 토큰은 현재 활성 세션에 결합되어야 하며 누락·불일치·만료·폐기·중복 쿠키/헤더는 `403 ACCESS_DENIED`입니다. 가입·로그인·비회원 시작은 세션 발급 전 Origin을 별도로 검사합니다. 쿠키가 없는 요청의 인증·권한은 각 업무 API에서 강제해야 합니다. 관리자 쿠키의 CSRF 검증은 관리자 인증 구현 범위입니다.
 
