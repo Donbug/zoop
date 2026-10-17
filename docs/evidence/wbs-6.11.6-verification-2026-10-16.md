@@ -110,13 +110,14 @@ DB_PASSWORD=<local test value>
 | NF-ENV-002 | Windows POSIX 권한 미지원 | 파일 관련 테스트 연쇄 실패 확인 | OBSERVED |
 | NF-ENV-003 | Linux POSIX 환경 재검증 | 코드 수정 없이 전체 통과 | PASS |
 | NF-API-002 | 빈 데이터·null 응답 | `SessionControllerTest`, `EvidenceControllerTest` | PASS |
-| NF-API-003 | 인증되지 않은 세션 조회 | anonymous 응답 계약 확인, 보호 API는 별도 검증 필요 | PARTIAL |
+| NF-API-003 | 인증되지 않은 사용자의 보호 API 접근 | `GET /api/v1/me/settings` 호출 시 HTTP 401, `AUTH_REQUIRED` 확인 | PASS |
 | NF-API-004 | 권한 없는 관리자 요청 | 관리자 인증 구현 상태 확인 필요 | BLOCKED |
 | NF-API-005 | 잘못된 요청값 | 잘못된 `asOf`, 빈 `companyId`, 잘못된 cursor의 422 확인 | PASS |
 | NF-API-006 | DB 일시 장애 후 복구 | PostgreSQL 중단 시 500 응답 확인, DB 재시작 후 API 재시작 없이 200 복구 | PARTIAL |
 | NF-API-007 | 내부 자료원 장애 | `SOURCE_UNAVAILABLE`, HTTP 503, `retryable=true` 확인 | PASS |
 | NF-API-008 | timeout 및 실제 재시도 | retryable 응답 계약만 확인, 실제 재시도는 미검증 | PARTIAL |
 | NF-API-009 | DB 장애 응답 계약 | `INTERNAL_ERROR`, HTTP 500, `retryable=false`, 약 30초 응답 확인 | OBSERVED |
+| NF-API-010 | 게스트의 회원 전용 API 접근 | 게스트 세션 생성 후 `GET /api/v1/me/settings` 호출 시 HTTP 403, `MEMBER_REQUIRED` 확인 | PASS |
 | NF-PERF-001 | 응답시간 p50/p95/max | 측정 harness 필요 | PENDING |
 | NF-PERF-002 | 동시 요청 C=1/5/10 | 실행 가능한 API 확정 필요 | PENDING |
 | NF-WEB-001 | 로딩·빈 데이터·실패 화면 | 프론트 연동 완료 후 검증 | BLOCKED |
@@ -208,6 +209,77 @@ PostgreSQL 복구 후 애플리케이션을 재시작하지 않아도 HikariCP�
 - DB 장애 중 응답이 HTTP 500과 `retryable=false`로 반환되는 점은 개선이 필요하다.
 - 약 30초의 장애 응답시간은 timeout 정책과 함께 재검토해야 한다.
 - 자동 복구는 PASS이지만 장애 응답 계약이 보완되지 않아 NF-API-006의 전체 상태는 PARTIAL로 판정한다.
+### 보호 API 인증·회원 권한 검증
+
+#### 검증 정보
+
+| 항목 | 값 |
+|---|---|
+| 검증일 | 2026-10-17 |
+| 실행 브랜치 | `main` |
+| 실행 커밋 | `694ae4349e0914c3344f9a69ec942a3da1b7857d` |
+| 대상 API | `GET /api/v1/me/settings` |
+| 게스트 생성 API | `POST /api/v1/auth/guest` |
+| 보호 방식 | `MemberAuthorizationInterceptor` |
+| 보호 경로 | `/api/v1/me/**` |
+| 데이터 | 로컬 합성 세션 |
+| 실제 사용자 데이터 | 없음 |
+| 외부 API 호출 | 없음 |
+
+#### 기존 자동화 테스트
+
+다음 인증 경계 테스트를 실행했다.
+
+```powershell
+.\api\gradlew.bat -p api test `
+  --tests "com.zoop.auth.controller.MemberAuthorizationInterceptorTest" `
+  --tests "com.zoop.auth.controller.AuthRequestBoundaryTest"
+```
+
+| 항목 | 결과 |
+|---|---|
+| 빌드 결과 | `BUILD SUCCESSFUL` |
+| 실행 시간 | 41초 |
+| 정상 회원 principal 부착 | PASS |
+| 게스트 세션 거부 | PASS |
+| 중복 세션 쿠키 거부 | PASS |
+| 인증 요청 경계 검사 | PASS |
+
+#### 익명 사용자 검증
+
+세션 쿠키 없이 회원 설정 조회 API를 호출했다.
+
+| 항목 | 결과 |
+|---|---|
+| HTTP 상태 | 401 |
+| 오류 코드 | `AUTH_REQUIRED` |
+| `retryable` | `false` |
+| 응답시간 | 158.868ms |
+| 판정 | PASS |
+
+#### 게스트 사용자 검증
+
+허용된 로컬 Origin에서 게스트 세션을 생성한 뒤 해당 세션으로 회원 설정 조회 API를 호출했다.
+
+| 항목 | 결과 |
+|---|---|
+| 게스트 생성 HTTP 상태 | 200 |
+| 게스트 생성 응답시간 | 248.573ms |
+| 세션 종류 | `guest` |
+| 보호 API HTTP 상태 | 403 |
+| 오류 코드 | `MEMBER_REQUIRED` |
+| `retryable` | `false` |
+| 보호 API 응답시간 | 25.871ms |
+| 판정 | PASS |
+
+인증 관련 POST 요청은 `ZOOP_AUTH_ALLOWED_ORIGINS`가 비어 있으면
+HTTP 403 `ACCESS_DENIED`로 거부됐다. 로컬 검증용 Origin을 명시적으로
+허용한 후에만 게스트 세션이 정상 생성됐다. 이는 인증 요청의 Origin
+경계가 기본 거부 방식으로 적용되고 있음을 보여준다.
+
+이번 검증으로 익명 사용자와 게스트가 회원 전용 API에 접근할 수 없음을
+확인했다. 차단 회원, 타 회원 자원 소유권 불일치 및 관리자 권한은 별도
+검증 대상으로 유지한다.
 
 ### 기존 테스트 추적
 
