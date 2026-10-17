@@ -121,7 +121,7 @@ class RoundSimulationTest(unittest.TestCase):
 
     def args(self, execute=False):
         values = ["--sources", str(self.sources), "--clocks", str(self.clocks), "--output", str(self.output),
-                  "--user-inbox-ref", "inbox/authored-publication-simulation.md"]
+                  "--user-inbox-ref", "inbox/authored-publication-simulation.md", "--quality-policy", "legacy-v1"]
         if execute:
             values.append("--execute-authorized-simulation")
         return sim.parser().parse_args(values)

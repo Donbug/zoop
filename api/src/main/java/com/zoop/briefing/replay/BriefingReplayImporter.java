@@ -40,6 +40,7 @@ public final class BriefingReplayImporter {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final int MAX_FILE_BYTES = 128 * 1024 * 1024;
     private static final List<String> EDITIONS = List.of("morning", "evening");
+    private static final Set<String> NOVELTY_STAGES = Set.of("round_simulation_novelty", "round_simulation_novelty_verification");
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final BriefingReplaySettings settings;
@@ -177,6 +178,8 @@ public final class BriefingReplayImporter {
         Map<String, JsonNode> sourceNodes = new LinkedHashMap<>(); pool.forEach((key, value) -> sourceNodes.put(key, value.row().node()));
         PublicationClockRegistry clocks = new PublicationClockRegistry(settings.clocks(), sourceSha, clockSha, sourceNodes);
         List<StrictJson.Obj> definitions = bundle.objects("rounds"); require(definitions.size() == 14, "simulation_fourteen_rounds");
+        boolean qualityV2 = simulationQualityV2(definitions.getFirst().object("identity"));
+        ArrayNode noveltyHistory = StrictJson.newArray();
         String namespace = "brf-sim-" + Canonical.sha256(run).substring(0, 16);
         Map<String, Source> documents = new LinkedHashMap<>(); Map<String, Citation> citations = new LinkedHashMap<>();
         Map<String, Blob> blobs = new LinkedHashMap<>(); List<Round> publications = new ArrayList<>();
@@ -200,6 +203,7 @@ public final class BriefingReplayImporter {
             else require("available".equals(previous.string("status")) && priorId.equals(previous.string("roundId"))
                     && priorSha.equals(previous.string("resultSha256")), "simulation_previous_hash");
             validateSimulationIdentity(bundle, definition);
+            require(simulationQualityV2(definition.object("identity")) == qualityV2, "simulation_quality_policy_drift");
             List<PublicationClockRegistry.Clock> windowClocks = clocks.verified.values().stream()
                     .filter(clock -> clock.publishedAt().isAfter(from) && !clock.publishedAt().isAfter(cutoff)).toList();
             Map<String, Source> inputs = simulationInputs(definition, pool, clocks, windowClocks);
@@ -212,6 +216,11 @@ public final class BriefingReplayImporter {
             for (var receipt : receipts.entrySet()) require(receipt.getValue().equals(allReceipts.get(receipt.getKey()))
                     && accounted.add(receipt.getKey()), "simulation_round_receipt_owner");
             Map<String, Issue> selected = selections(definition, inputs, true);
+            if (qualityV2) {
+                validateSimulationNovelty(definition, noveltyHistory, receipts);
+                if (definition.has("noveltyAudit") && definition.object("noveltyAudit").bool("modelCalled"))
+                    validateSimulationNoveltyRecording(definition, receipts, inputs);
+            }
             String state = definition.string("selectionStatus");
             ObjectNode marker = StrictJson.newObject().put("scope", scope).put("runId", run).put("sourceFileSha256", sourceSha)
                     .put("clockFileSha256", clockSha).put("bundleSha256", bundleSha).put("userInboxRef", settings.userInboxRef())
@@ -233,7 +242,7 @@ public final class BriefingReplayImporter {
                         || ("EMPTY_CONFIRMED".equals(state) && selected.isEmpty())), "simulation_selection_state");
                 StrictJson.Obj result = definition.object("result"); validateGeneration(result, selected);
                 require(Canonical.digest(result.node()).equals(definition.string("resultSha256")), "simulation_result_hash");
-                validateSimulationSuccessReceipts(edition, result, receipts);
+                validateSimulationSuccessReceipts(edition, result, receipts, qualityV2);
                 Instant generated = Instant.parse(result.string("generatedAt")); if (generated.isAfter(created)) created = generated;
                 Round base = round(namespace, edition, date, date.minusDays(1), sourceSha, bundleSha, run,
                         definition.object("identity"), selected, result, inputs, generated);
@@ -265,6 +274,7 @@ public final class BriefingReplayImporter {
                     Citation prior = citations.putIfAbsent(citation.id(), citation); require(prior == null || prior.equals(citation), "simulation_evidence_conflict");
                 }
                 priorId = selected.isEmpty() ? null : id; priorSha = selected.isEmpty() ? null : definition.string("resultSha256");
+                if (qualityV2 && "SELECTED".equals(state)) appendSimulationNoveltyHistory(noveltyHistory, definition);
             }
             ids.add(id);
         }
@@ -326,14 +336,183 @@ public final class BriefingReplayImporter {
                 && Canonical.digest(round.array("inputSources")).equals(identity.string("candidateInputSha256")), "simulation_frozen_context");
         require(Instant.parse(identity.object("baseline").string("from")).equals(LocalDate.of(2026, 10, 1).atTime(17, 30).atZone(KST).toInstant())
                 && "simulation_baseline_not_service_first_round".equals(identity.object("baseline").string("meaning")), "simulation_baseline");
-        List<String> names = List.of("importance.md", "selection.md", "generation-morning.md", "generation-evening.md", "verification.md",
-                "importance.schema.json", "selection.schema.json", "generation.schema.json", "verification.schema.json");
+        List<String> names = new ArrayList<>(List.of("importance.md", "selection.md", "generation-morning.md", "generation-evening.md", "verification.md",
+                "importance.schema.json", "selection.schema.json", "generation.schema.json", "verification.schema.json"));
+        if (simulationQualityV2(identity)) names.addAll(List.of("selection-v2.md", "selection-v2.schema.json",
+                "generation-v2-morning.md", "generation-v2-evening.md", "novelty.md", "novelty.schema.json", "novelty-verification.md"));
         StrictJson.Obj prompts = identity.object("promptArtifacts"); prompts.exactly(Set.copyOf(names));
         for (String name : names) {
             try (var stream = BriefingReplayImporter.class.getResourceAsStream("/briefing/prompts/round-simulation/" + name)) {
                 require(stream != null && Canonical.sha256(stream.readAllBytes()).equals(prompts.string(name)), "simulation_prompt_hash");
             } catch (IOException unavailable) { throw new IllegalArgumentException("Simulation prompt is unavailable", unavailable); }
         }
+    }
+
+    static boolean simulationQualityV2(StrictJson.Obj identity) {
+        if (!identity.has("qualityPolicy")) {
+            require(!identity.has("noveltyHistorySha256"), "simulation_legacy_novelty_identity");
+            return false;
+        }
+        require("novelty-recovery-v2".equals(identity.string("qualityPolicy")), "simulation_quality_policy");
+        require(identity.string("noveltyHistorySha256").matches("[0-9a-f]{64}"), "simulation_novelty_history_digest");
+        return true;
+    }
+
+    /** The history is reconstructed only from previously validated SELECTED/PASS results in chronological order. */
+    static void appendSimulationNoveltyHistory(ArrayNode history, StrictJson.Obj round) {
+        require("SELECTED".equals(round.string("selectionStatus"))
+                && "PASS".equals(round.object("result").object("verification").string("status")), "simulation_novelty_history_not_published");
+        for (StrictJson.Obj selected : round.objects("selected")) {
+            StrictJson.Obj generated = round.object("result").objects("items").stream()
+                    .filter(item -> item.string("issueId").equals(selected.string("issueId"))).findFirst().orElseThrow();
+            ObjectNode item = history.addObject().put("roundId", round.string("roundId")).put("issueId", selected.string("issueId"))
+                    .put("eventKey", selected.has("eventKey") ? selected.string("eventKey") : "").put("title", generated.string("title"));
+            item.set("companyNames", selected.array("companyNames").deepCopy());
+            item.set("claims", generated.array("claims").deepCopy());
+            ArrayNode sources = item.putArray("sources");
+            for (StrictJson.Obj source : selected.objects("sources")) {
+                ObjectNode projected = sources.addObject();
+                for (String field : List.of("documentId", "bodySha256", "quote", "evidenceId", "url"))
+                    if (source.has(field)) projected.set(field, source.raw(field).deepCopy());
+            }
+        }
+    }
+
+    static void validateSimulationNovelty(StrictJson.Obj round, ArrayNode history, Map<String, JsonNode> receipts) {
+        StrictJson.Obj identity = round.object("identity");
+        String historySha = Canonical.digest(history);
+        require(historySha.equals(identity.string("noveltyHistorySha256")), "simulation_novelty_history_hash");
+        if (!round.has("noveltyAudit")) {
+            require(round.objects("selected").isEmpty(), "simulation_selected_novelty_audit_required");
+            require(receipts.values().stream().noneMatch(value -> NOVELTY_STAGES.contains(StrictJson.Obj.of(value).string("stage"))),
+                    "simulation_novelty_receipt_without_audit");
+            return;
+        }
+        StrictJson.Obj audit = round.object("noveltyAudit");
+        require("pass_history_event_novelty_v2".equals(audit.string("policy"))
+                && round.string("identitySha256").equals(audit.string("contextSha256"))
+                && historySha.equals(audit.string("historySha256"))
+                && audit.string("candidateInputSha256").matches("[0-9a-f]{64}"), "simulation_novelty_audit_binding");
+        List<String> historyIds = new ArrayList<>(); Map<String, StrictJson.Obj> old = new LinkedHashMap<>();
+        for (JsonNode node : history) {
+            StrictJson.Obj item = StrictJson.Obj.of(node); String id = item.string("issueId");
+            require(old.putIfAbsent(id, item) == null, "simulation_novelty_duplicate_history_issue"); historyIds.add(id);
+        }
+        require(historyIds.equals(audit.strings("historyIssueIds")), "simulation_novelty_history_ids");
+        Map<String, String> inputHashes = new LinkedHashMap<>();
+        for (StrictJson.Obj source : round.objects("inputSources")) inputHashes.put(source.string("documentId"), source.string("bodySha256"));
+        Set<String> seen = new HashSet<>(); List<String> kept = new ArrayList<>(), excluded = new ArrayList<>();
+        Map<String, JsonNode> modelDecisions = new LinkedHashMap<>();
+        for (StrictJson.Obj decision : audit.objects("decisions")) {
+            decision.exactly(Set.of("documentId", "decision", "matchedIssueId", "reason", "delta", "quoteIds", "method"));
+            String document = text(decision, "documentId"), status = decision.string("decision"), method = decision.string("method");
+            String match = decision.stringOrNull("matchedIssueId"); List<String> quotes = decision.strings("quoteIds");
+            require(inputHashes.containsKey(document) && seen.add(document)
+                    && Set.of("NEW_EVENT", "MATERIAL_UPDATE", "REPEAT", "UNCERTAIN").contains(status)
+                    && (match == null || old.containsKey(match)) && !decision.string("reason").isBlank()
+                    && decision.string("reason").length() <= 500 && decision.string("delta").length() <= 700
+                    && quotes.size() <= 8 && new HashSet<>(quotes).size() == quotes.size(), "simulation_novelty_decision");
+            if ("no_history_no_model".equals(method)) require(history.isEmpty() && "NEW_EVENT".equals(status)
+                    && match == null && quotes.isEmpty(), "simulation_novelty_no_history_decision");
+            else if ("deterministic_body_digest".equals(method)) require("REPEAT".equals(status) && match != null
+                    && quotes.isEmpty() && old.get(match).objects("sources").stream()
+                    .anyMatch(source -> inputHashes.get(document).equals(source.string("bodySha256"))), "simulation_novelty_digest_repeat");
+            else {
+                require("model_evidence_comparison".equals(method) && !history.isEmpty(), "simulation_novelty_method");
+                if ("NEW_EVENT".equals(status)) require(match == null && !quotes.isEmpty(), "simulation_novelty_new_evidence");
+                if ("MATERIAL_UPDATE".equals(status)) require(match != null && !quotes.isEmpty()
+                        && !decision.string("delta").isBlank(), "simulation_novelty_material_delta");
+                if ("REPEAT".equals(status)) require(match != null, "simulation_novelty_repeat_match");
+                ObjectNode raw = (ObjectNode) decision.node().deepCopy(); raw.remove("method"); modelDecisions.put(document, raw);
+            }
+            if (Set.of("NEW_EVENT", "MATERIAL_UPDATE").contains(status)) {
+                require(old.values().stream().flatMap(item -> item.objects("sources").stream())
+                        .noneMatch(source -> inputHashes.get(document).equals(source.string("bodySha256"))), "simulation_novelty_kept_exact_repeat");
+                kept.add(document);
+            } else excluded.add(document);
+        }
+        require(seen.size() <= 30 && kept.equals(audit.strings("keptDocumentIds"))
+                && excluded.equals(audit.strings("excludedDocumentIds")), "simulation_novelty_partition");
+        if (audit.bool("modelCalled")) {
+            require(audit.bool("verificationCalled"), "simulation_novelty_verification_required");
+            StrictJson.Obj initial = audit.object("rawModelResponse").exactly(Set.of("decisions"));
+            initial.object("decisions").exactly(modelDecisions.keySet());
+            StrictJson.Obj verified = audit.object("rawVerificationResponse").exactly(Set.of("decisions"));
+            StrictJson.Obj decisions = verified.object("decisions").exactly(modelDecisions.keySet());
+            require(!modelDecisions.isEmpty(), "simulation_novelty_model_empty");
+            modelDecisions.forEach((document, value) -> require(value.equals(decisions.raw(document)), "simulation_novelty_verified_decision_binding"));
+            for (String stage : NOVELTY_STAGES) require(receipts.values().stream().map(StrictJson.Obj::of)
+                    .anyMatch(receipt -> stage.equals(receipt.string("stage")) && success(receipt)
+                            && receipt.bool("usageKnown") && receipt.count("httpStatus") == 200), "simulation_novelty_receipt_required");
+        } else require(modelDecisions.isEmpty() && audit.isNull("rawModelResponse") && !audit.bool("verificationCalled")
+                && audit.isNull("rawVerificationResponse") && receipts.values().stream()
+                .noneMatch(value -> NOVELTY_STAGES.contains(StrictJson.Obj.of(value).string("stage"))), "simulation_novelty_unexpected_model");
+        for (StrictJson.Obj selected : round.objects("selected")) for (StrictJson.Obj source : selected.objects("sources"))
+            require(kept.contains(source.string("documentId")), "simulation_novelty_selected_rejected_document");
+    }
+
+    /** An audit cannot substitute a different model answer or an unbound candidate body for the paid recording. */
+    private void validateSimulationNoveltyRecording(StrictJson.Obj round, Map<String, JsonNode> receipts, Map<String, Source> inputs) {
+        StrictJson.Obj audit = round.object("noveltyAudit"); Set<String> bound = new HashSet<>();
+        Path calls = settings.bundle().getParent().resolve("calls");
+        for (JsonNode node : receipts.values()) {
+            StrictJson.Obj receipt = StrictJson.Obj.of(node);
+            String stage = receipt.string("stage");
+            if (!NOVELTY_STAGES.contains(stage)) continue;
+            boolean verification = "round_simulation_novelty_verification".equals(stage);
+            String responseField = verification ? "rawVerificationResponse" : "rawModelResponse";
+            String key = receipt.string("requestDigest");
+            byte[] requestBytes = read(calls.resolve(key + ".request.json"));
+            require(key.equals(Canonical.sha256(requestBytes)), "simulation_novelty_request_recording_hash");
+            StrictJson.Obj request = StrictJson.parseObject(requestBytes), data = StrictJson.parseObject(request.string("input"));
+            require(stage.equals(request.object("text").object("format").string("name"))
+                    && receipt.string("model").equals(request.string("model"))
+                    && round.string("identitySha256").equals(data.string("contextSha256"))
+                    && round.string("identitySha256").equals(Canonical.digest(data.object("context").node()))
+                    && audit.string("historySha256").equals(data.string("noveltyHistorySha256"))
+                    && audit.string("historySha256").equals(Canonical.digest(data.array("noveltyHistory")))
+                    && audit.string("policy").equals(data.string("noveltyPolicy"))
+                    && audit.string("candidateInputSha256").equals(data.string("noveltyCandidateInputSha256")), "simulation_novelty_request_binding");
+            if (verification) require(data.object("priorNoveltyDecisions").node().equals(audit.object("rawModelResponse").node()),
+                    "simulation_novelty_verification_prior_binding");
+            Set<String> recordedDocuments = new HashSet<>();
+            for (StrictJson.Obj document : data.objects("documents")) {
+                String documentId = document.string("documentId"), bodySha = document.string("bodySha256"), body = document.string("body");
+                Source source = inputs.get(documentId + "\u0000" + bodySha);
+                require(recordedDocuments.add(documentId) && source != null && source.body().equals(body)
+                        && Canonical.sha256(body).equals(bodySha), "simulation_novelty_recorded_body_binding");
+                Set<String> quoteIds = new HashSet<>();
+                for (StrictJson.Obj quote : document.objects("quoteCatalog")) {
+                    int start = quote.count("start"), end = quote.count("end");
+                    require(quoteIds.add(text(quote, "quoteId")) && documentId.equals(quote.string("documentId"))
+                            && start < end && end <= body.codePointCount(0, body.length())
+                            && quote.string("text").equals(body.substring(body.offsetByCodePoints(0, start), body.offsetByCodePoints(0, end))),
+                            "simulation_novelty_recorded_quote_binding");
+                }
+                StrictJson.Obj decision = audit.object(responseField).object("decisions").object(documentId);
+                require(quoteIds.containsAll(decision.strings("quoteIds")), "simulation_novelty_decision_quote_membership");
+            }
+            require(recordedDocuments.equals(Set.copyOf(audit.object(responseField).object("decisions").node().propertyNames())),
+                    "simulation_novelty_recorded_document_coverage");
+            if (!success(receipt) || !receipt.bool("usageKnown") || receipt.count("httpStatus") != 200) continue;
+            byte[] responseBytes = read(calls.resolve(key + ".response.json"));
+            require(Canonical.sha256(responseBytes).equals(receipt.string("responseSha256")), "simulation_novelty_response_recording_hash");
+            StrictJson.Obj response = StrictJson.parseObject(responseBytes); List<String> texts = new ArrayList<>();
+            require(receipt.string("status").equals(response.string("status")) && receipt.string("responseId").equals(response.string("id"))
+                    && receipt.count("inputTokens") == response.object("usage").count("input_tokens")
+                    && receipt.count("outputTokens") == response.object("usage").count("output_tokens"), "simulation_novelty_recorded_receipt_binding");
+            for (StrictJson.Obj output : response.objects("output")) {
+                if (!"message".equals(output.string("type"))) continue;
+                for (StrictJson.Obj content : output.objects("content")) {
+                    require(!"refusal".equals(content.string("type")), "simulation_novelty_provider_refusal");
+                    if ("output_text".equals(content.string("type"))) texts.add(content.string("text"));
+                }
+            }
+            require(texts.size() == 1 && StrictJson.parseObject(texts.getFirst()).node().equals(audit.object(responseField).node()),
+                    "simulation_novelty_recorded_response_binding");
+            bound.add(stage);
+        }
+        require(bound.equals(NOVELTY_STAGES), "simulation_novelty_model_recording_required");
     }
 
     private static Map<String, Source> simulationInputs(StrictJson.Obj round, Map<String, Source> pool,
@@ -392,17 +571,17 @@ public final class BriefingReplayImporter {
         }
     }
 
-    private static void validateSimulationSuccessReceipts(String edition, StrictJson.Obj result, Map<String, JsonNode> receipts) {
+    private static void validateSimulationSuccessReceipts(String edition, StrictJson.Obj result, Map<String, JsonNode> receipts, boolean qualityV2) {
         Set<String> stages = new HashSet<>();
         String generation = "round_simulation_" + edition + "_generation", verification = "round_simulation_" + edition + "_verification";
         Set<String> expected = Set.of("round_simulation_importance", "round_simulation_selection", generation, verification);
         for (JsonNode value : receipts.values()) {
             StrictJson.Obj receipt = StrictJson.Obj.of(value);
-            require(expected.contains(receipt.string("stage")), "simulation_receipt_phase_scope");
+            require(expected.contains(receipt.string("stage")) || (qualityV2 && NOVELTY_STAGES.contains(receipt.string("stage"))), "simulation_receipt_phase_scope");
             // Earlier failed/incomplete/unknown paid attempts remain accounting, never a successful result.
             if (success(receipt) && receipt.bool("usageKnown") && receipt.has("httpStatus")
                     && !receipt.isNull("httpStatus") && receipt.count("httpStatus") == 200) {
-                text(receipt, "responseId"); stages.add(receipt.string("stage"));
+                text(receipt, "responseId"); if (expected.contains(receipt.string("stage"))) stages.add(receipt.string("stage"));
             }
         }
         require(stages.equals(expected), "simulation_phase_coverage");

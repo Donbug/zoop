@@ -18,6 +18,14 @@ SHORTLIST_POLICY = "eligible_or_full_body_hold_importance_gte2_v2"
 KST = timezone(timedelta(hours=9))
 BASELINE = "2026-10-01T17:30:00+09:00"
 canonical, digest, ReplayError = base.canonical, base.digest, base.ReplayError
+QUALITY_V2 = "novelty-recovery-v2"
+
+
+def helper(name):
+    spec = importlib.util.spec_from_file_location("_zoop_" + name, Path(__file__).with_name(name + ".py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def aware(value):
@@ -143,6 +151,9 @@ class SimulationClient(base.ResponsesClient):
     """Uses only new simulation resources/output; no weekly prompts or recording lookup."""
     def request(self, stage, data, prompt_name, schema_name, max_output=12000, schema_override=None):
         instructions = base.regular(PROMPTS / prompt_name).decode("utf-8")
+        expected_prompt = data.get("context", {}).get("promptArtifacts", {}).get(prompt_name)
+        if expected_prompt is not None and digest(instructions.encode()) != expected_prompt:
+            raise ReplayError("simulation_prompt_changed_after_input_freeze")
         schema = base.strict_load(canonical(schema_override)) if schema_override is not None \
                  else base.strict_load(base.regular(PROMPTS / schema_name))
         request = {"model": base.MODEL, "store": False, "max_output_tokens": max_output, "instructions": instructions,
@@ -264,6 +275,8 @@ def freeze_round_selection(reply, candidates, pool, identity_sha):
 
 
 def choose_round(client, candidates, pool, context, identity_sha):
+    if context.get("qualityPolicy") == QUALITY_V2:
+        return choose_round_v2(client, candidates, pool, context, identity_sha), [], False
     selection_schema = schema("selection")
     selection_schema["properties"]["selected"]["items"]["properties"]["sources"]["items"]["properties"]["documentId"]["enum"] = sorted({row["documentId"] for row in candidates})
     stage = "round_simulation_selection"
@@ -306,6 +319,50 @@ def choose_round(client, candidates, pool, context, identity_sha):
     return selected, [audit], False
 
 
+def choose_round_v2(client, candidates, pool, context, identity_sha):
+    quality = helper("briefing_quality")
+    candidates = quality.catalog_candidates(candidates)
+    selection_schema = schema("selection-v2")
+    source_properties = selection_schema["properties"]["selected"]["items"]["properties"]["sources"]["items"]["properties"]
+    source_properties["documentId"]["enum"] = sorted(row["documentId"] for row in candidates)
+    source_properties["quoteIds"]["items"]["enum"] = sorted(q["quoteId"] for row in candidates for q in row["quoteCatalog"])
+    data = {**context, "documents": candidates, "maximumIssues": 3}
+    if context.get("operatorRecovery"):
+        recovery = helper("briefing_http_recovery")
+        data = recovery.recovery_data(data, context["operatorRecovery"])
+        key = client.request_digest("round_simulation_selection", data, "selection-v2.md", "selection-v2.schema.json",
+                                    max_output=12000, schema_override=selection_schema)
+        ledger = client.calls.parent.parent / "recovery-ledger"
+        base.private_dir(ledger)
+        marker = ledger / (context["operatorRecovery"]["originalRequestDigest"] + ".json")
+        reservation = {"recovery": context["operatorRecovery"], "replacementRequestDigest": key,
+                       "outputDirectory": str(client.calls.parent)}
+        if marker.exists() and base.strict_load(base.regular(marker)) != reservation:
+            raise ReplayError("recovery_original_already_attempted")
+        base.save_json(marker, reservation)
+    reply = client.call("round_simulation_selection", data,
+                        "selection-v2.md", "selection-v2.schema.json", max_output=12000, schema_override=selection_schema)
+    decisions = {d["documentId"]: d for d in context.get("noveltyAudit", {}).get("decisions", [])}
+    for choice in reply["selected"]:
+        for source in choice["sources"]:
+            decision = decisions.get(source["documentId"], {})
+            if decision.get("decision") in {"REPEAT", "UNCERTAIN"}:
+                raise ReplayError("repeat_or_uncertain_source_selected")
+            if decision.get("decision") == "MATERIAL_UPDATE" and not set(source["quoteIds"]) & set(decision["quoteIds"]):
+                raise ReplayError("selected_update_missing_delta_quote")
+    try:
+        restored = quality.restore_selection(reply, candidates)
+    except quality.QualityError as error:
+        raise ReplayError(str(error)) from error
+    selected = freeze_round_selection(restored, candidates, pool, identity_sha)
+    choices = sorted(restored["selected"], key=lambda value: (-value["importance"], -value["priority"], value["eventKey"]))
+    for item, choice in zip(selected, choices):
+        item["eventKey"] = choice["eventKey"]
+        item["quoteBindingPolicy"] = "server_literal_catalog_v2"
+        item["novelty"] = [decisions[source["documentId"]] for source in choice["sources"] if source["documentId"] in decisions]
+    return selected
+
+
 def generate_round(client, selected, edition, context, max_repairs):
     last_draft, last_validation, attempts = None, None, []
     generation_key, verification_key = None, None
@@ -314,10 +371,18 @@ def generate_round(client, selected, edition, context, max_repairs):
                 "priorDraft": last_draft, "priorValidation": last_validation}
         generation_schema = keyed_schema("generation", "items", [row["issueId"] for row in selected], "issueId",
                                           {row["issueId"]: row["rank"] for row in selected})
+        generation_prompt = "generation-" + edition + ".md"
+        if context.get("qualityPolicy") == QUALITY_V2:
+            generation_prompt = "generation-v2-" + edition + ".md"
+            for row in selected:
+                properties = generation_schema["properties"]["items"]["properties"][row["issueId"]]["properties"]
+                ids = sorted({source["evidenceId"] for source in row["sources"]})
+                properties["titleEvidenceIds"]["items"]["enum"] = ids
+                properties["claims"]["items"]["properties"]["evidenceIds"]["items"]["enum"] = ids
         generation_key = client.request_digest("round_simulation_" + edition + "_generation", data,
-            "generation-" + edition + ".md", "generation.schema.json", max_output=8000, schema_override=generation_schema)
+            generation_prompt, "generation.schema.json", max_output=8000, schema_override=generation_schema)
         draft = client.call("round_simulation_" + edition + "_generation", data,
-                            "generation-" + edition + ".md", "generation.schema.json", max_output=8000,
+                            generation_prompt, "generation.schema.json", max_output=8000,
                             schema_override=generation_schema)
         if type(draft.get("items")) is dict:
             draft = {"items": [draft["items"][row["issueId"]] for row in selected]}
@@ -365,20 +430,27 @@ def previous_context(prior):
 
 def run(args, transport=None):
     rows, unknown, source = load_inputs(Path(args.sources), Path(args.clocks), Path(args.clock_html_root) if args.clock_html_root else None)
-    prompt_artifacts = {path.name: digest(base.regular(path)) for path in sorted(PROMPTS.iterdir()) if path.is_file()}
+    quality_v2 = args.quality_policy == QUALITY_V2
+    legacy_prompts = {"importance.md", "importance.schema.json", "selection.md", "selection.schema.json",
+                      "generation-morning.md", "generation-evening.md", "generation.schema.json", "verification.md", "verification.schema.json"}
+    prompt_names = legacy_prompts | ({"selection-v2.md", "selection-v2.schema.json", "novelty.md", "novelty.schema.json",
+                                     "generation-v2-morning.md", "generation-v2-evening.md", "novelty-verification.md"} if quality_v2 else set())
+    prompt_artifacts = {name: digest(base.regular(PROMPTS / name)) for name in sorted(prompt_names)}
     authorization = {"scope": MODE, "sourceSha256": source["sourceFileSha256"], "userInboxRef": args.user_inbox_ref,
                      "productionAuthorized": False}
     run_identity = {"mode": MODE, **source, "authorization": authorization, "promptArtifacts": prompt_artifacts,
                     "batchSize": args.batch_size, "maxRepairs": args.max_repairs, "shortlistPolicy": SHORTLIST_POLICY,
                     "windows": windows()}
+    if quality_v2:
+        run_identity["qualityPolicy"] = QUALITY_V2
     run_id = "brf-round-simulation-" + digest(canonical(run_identity))[:20]
     plan_rounds, prepared = [], []
     for spec in windows():
         pool, input_sources, clock_refs, duplicates, coverage = pool_for_round(rows, spec, len(unknown))
-        calls = (len(pool) + args.batch_size - 1) // args.batch_size + 3 if pool else 0
+        calls = (len(pool) + args.batch_size - 1) // args.batch_size + 3 + (2 if quality_v2 else 0) if pool else 0
         plan_rounds.append({**spec, "sourceCoverage": coverage, "plannedCallsIfSelected": calls,
                             "maximumCallsWithOneRepair": calls + 2 if pool and args.max_repairs else calls,
-                            "maximumSelectionStructuralCorrections": 1 if pool else 0})
+                            "maximumSelectionStructuralCorrections": 1 if pool and not quality_v2 else 0})
         prepared.append((spec, pool, input_sources, clock_refs, duplicates, coverage))
     plan = {"mode": MODE, "runId": run_id, **source, "rounds": plan_rounds,
             "plannedCallsIfSelected": sum(row["plannedCallsIfSelected"] for row in plan_rounds),
@@ -408,11 +480,14 @@ def run(args, transport=None):
         client = SimulationClient(output, transport or base.authenticated_transport(Path(args.key_file)), args.max_calls)
         for spec, pool, input_sources, clock_refs, duplicates, coverage in prepared:
             previous, previous_result = previous_context(rounds[-1] if rounds else None)
+            history = helper("briefing_quality").published_history(rounds, spec["window"]["from"]) if quality_v2 else []
             identity = {"mode": MODE, "runId": run_id, "sourceFileSha256": source["sourceFileSha256"],
                         "clockFileSha256": source["clockFileSha256"], **spec, "contextVersion": "round-simulation-v1",
                         "candidateInputSha256": digest(canonical(input_sources)), "promptArtifacts": prompt_artifacts,
                         "previous": previous, "operationalCollectionGate": False, "authorization": authorization,
                         "baseline": {"from": BASELINE, "meaning": "simulation_baseline_not_service_first_round"}}
+            if quality_v2:
+                identity.update({"qualityPolicy": QUALITY_V2, "noveltyHistorySha256": digest(canonical(history))})
             identity_sha = digest(canonical(identity))
             round_id = "sim-" + spec["date"] + "-" + spec["edition"] + "-" + identity_sha[:12]
             directory = output / (spec["date"] + "-" + spec["edition"])
@@ -430,6 +505,8 @@ def run(args, transport=None):
                 rounds.append(saved)
                 continue
             context = model_context(identity, identity_sha, previous_result)
+            if quality_v2:
+                context.update({"qualityPolicy": QUALITY_V2, "noveltyHistory": history})
             frozen_pool = [{key: value for key, value in row.items() if key != "clockTime"} for row in pool]
             base.save_json(directory / "frozen-input.json", {**context, "documents": frozen_pool})
             record = {"roundId": round_id, **spec, "identity": identity, "identitySha256": identity_sha,
@@ -442,6 +519,15 @@ def run(args, transport=None):
                 assessments = assess_round(client, pool, context, args.batch_size, args.workers)
                 base.save_json(directory / "assessments.json", assessments)
                 candidates = shortlist_round(assessments, pool)
+                if quality_v2 and candidates:
+                    candidates = helper("briefing_quality").catalog_candidates(candidates)
+                    try:
+                        candidates, novelty_audit = helper("briefing_novelty").filter_candidates(client, candidates, history, context)
+                    except ValueError as error:
+                        raise ReplayError(str(error)) from error
+                    record["noveltyAudit"] = novelty_audit
+                    base.save_json(directory / "novelty-audit.json", novelty_audit)
+                    context["noveltyAudit"] = novelty_audit
                 base.save_json(directory / "shortlist.json", candidates)
                 selected, selection_corrections, selection_failed = choose_round(client, candidates, pool, context, identity_sha) \
                     if candidates else ([], [], False)
@@ -500,6 +586,7 @@ def parser():
     result.add_argument("--workers", type=base.bounded(1, 3), default=3, metavar="1..3")
     result.add_argument("--max-repairs", type=int, default=1, choices=(0, 1))
     result.add_argument("--max-calls", type=base.bounded(1, 100), default=100, metavar="1..100")
+    result.add_argument("--quality-policy", choices=("legacy-v1", QUALITY_V2), default=QUALITY_V2)
     return result
 
 
