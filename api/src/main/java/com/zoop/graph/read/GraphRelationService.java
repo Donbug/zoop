@@ -52,7 +52,7 @@ public class GraphRelationService {
                 pinned.selected().version().id(), requestId, false, List.of());
         return new EdgeDetail(edge.id(), edge.relationType(), edge.derived(), !edge.derived(),
                 endpoint(graph, edge.source()), endpoint(graph, edge.target()), edge.role(), edge.summary(),
-                sources.stream().map(Relation::role).filter(Objects::nonNull).distinct().toList(),
+                sources.stream().map(Relation::role).filter(Objects::nonNull).map(RoleLabels::display).distinct().toList(),
                 edge.assertionStatus(), edge.evidenceIds(),
                 sources.stream().flatMap(r -> r.basis().stream())
                         .map(b -> GraphCompanySnapshotReader.basisOut(b, articles)).toList(),
