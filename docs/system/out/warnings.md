@@ -272,7 +272,7 @@
 | BFF_PATH_DIFFERENCE | difference | getEvidence | 목표 /api/v1/evidence/{id} ↔ BFF /api/evidence/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getEvidence | 목표만 125 · BFF만 55 · 형식/필수/권한 변경 16 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefing | 목표 /api/v1/briefings ↔ BFF /api/briefings |  |
-| BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 128 · BFF만 60 · 형식/필수/권한 변경 20 |  |
+| BFF_FIELD_DIFFERENCE | difference | getBriefing | 목표만 128 · BFF만 60 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | listBriefingRounds | 목표 /api/v1/briefings/rounds ↔ BFF /api/briefings/rounds |  |
 | BFF_FIELD_DIFFERENCE | difference | listBriefingRounds | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | getBriefingGraphBasis | 목표 /api/v1/briefings/{id}/graph ↔ BFF /api/briefings/{id}/graph |  |
@@ -334,7 +334,7 @@
 | BFF_PATH_DIFFERENCE | difference | listAdminBriefingRounds | 목표 /api/v1/admin/briefings ↔ BFF /api/admin/briefings |  |
 | BFF_FIELD_DIFFERENCE | difference | listAdminBriefingRounds | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminBriefingRound | 목표 /api/v1/admin/briefings/{round_id} ↔ BFF /api/admin/briefings/{round_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getAdminBriefingRound | 목표만 147 · BFF만 37 · 형식/필수/권한 변경 26 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAdminBriefingRound | 목표만 147 · BFF만 37 · 형식/필수/권한 변경 27 |  |
 | BFF_PATH_DIFFERENCE | difference | reprocessBriefingRound | 목표 /api/v1/admin/briefings/{round_id}/reprocess ↔ BFF /api/admin/briefings/{round_id}/reprocess |  |
 | BFF_FIELD_DIFFERENCE | difference | reprocessBriefingRound | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 |  |
 | BFF_PATH_DIFFERENCE | difference | appendBriefingCorrection | 목표 /api/v1/admin/briefings/{round_id}/corrections ↔ BFF /api/admin/briefings/{round_id}/corrections |  |

@@ -199,6 +199,29 @@ export default function PublishedBriefing({
               {briefingTime(result.dataAsOf)}
             </p>
           </header>
+          {result.status === 'published' &&
+            result.metadata.source === 'zoop-briefing-development-replay' && (
+              <p
+                role="note"
+                aria-label="개발 재생 안내"
+                className={`${EMPTY} mt-4`}
+              >
+                과거 수집 자료로 생성·검증한 개발 재생본입니다. 출근·퇴근은
+                동일한 자료를 형식별로 작성했습니다.
+              </p>
+            )}
+          {result.metadata.source ===
+            'zoop-briefing-publication-clock-simulation' && (
+            <p
+              role="note"
+              aria-label="회차별 과거 시뮬레이션 안내"
+              className={`${EMPTY} mt-4`}
+            >
+              확인된 원발행 시각을 기준으로 회차별로 나눈 과거 시뮬레이션입니다.
+              실제 수집은 나중에 이뤄졌으며, 당시 본문과 같은 버전인지는
+              확인되지 않았습니다.
+            </p>
+          )}
           {result.notice && (
             <p className={`${EMPTY} mt-4`} role="status">
               {result.notice.message}

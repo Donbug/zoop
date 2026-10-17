@@ -13054,9 +13054,10 @@ components:
               enum:
                 - "close"
                 - "latest"
+                - "reference"
             -
               type: "null"
-          description: "close = the session's closing value; latest = the last observation before the cut-off"
+          description: "close = the session's closing value; latest = the last observation before the cut-off; reference = a bank-published reference exchange rate, not a market close. Legacy Naver FX_USDKRW daily bank values stored as close are exposed as reference without modifying the publication snapshot."
         observedDate:
           anyOf:
             -
@@ -13071,7 +13072,7 @@ components:
               format: "date-time"
             -
               type: "null"
-          description: "KST time of the value actually used; null for a daily close"
+          description: "KST time of the value actually used; null for a daily close or a date-only bank reference. Do not fabricate an observation time."
         baseline:
           anyOf:
             -

@@ -10,12 +10,14 @@ import java.util.Map;
 import java.util.Set;
 
 import com.zoop.briefing.storage.BriefingRound;
+import com.zoop.briefing.replay.BriefingReplayReadPolicy;
 import com.zoop.common.json.StrictJson;
 import com.zoop.document.analysis.GrantRegistry;
 import com.zoop.document.evidence.config.DocumentReadProperties;
 import com.zoop.document.evidence.service.DocumentReadGrants;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -31,16 +33,25 @@ public class DocumentBriefingContentAccess implements BriefingContentAccess {
     private final JdbcTemplate jdbc;
     private final DocumentReadGrants grants;
     private final Clock clock;
+    private final BriefingReplayReadPolicy replay;
 
     public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock) {
+        this(jdbc, properties, clock, BriefingReplayReadPolicy.disabled());
+    }
+
+    @Autowired
+    public DocumentBriefingContentAccess(JdbcTemplate jdbc, DocumentReadProperties properties, Clock clock,
+            BriefingReplayReadPolicy replay) {
         this.jdbc = jdbc;
         this.grants = new DocumentReadGrants(properties.grantsPath());
         this.clock = clock;
+        this.replay = replay;
     }
 
     @Override
     public boolean mayRead(BriefingRound round, String requestId) {
         if (round.publishedAt() == null || round.payload() == null || round.publicSnapshot() == null) return false;
+        if (BriefingReplayReadPolicy.marked(round) && !replay.permits(round)) return false;
         GrantRegistry current = grants.registry(requestId);
         Instant now = clock.instant();
         try {

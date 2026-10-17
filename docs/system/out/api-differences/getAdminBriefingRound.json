@@ -579,6 +579,23 @@
         "type": "string"
       }
     },
+    "response:200:application/json.published<anyOf:0>.marketVariables<anyOf:0>.indicators[].valueKind<anyOf:0>": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "close",
+          "latest",
+          "reference"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "close",
+          "latest"
+        ]
+      }
+    },
     "response:200:application/json.published<anyOf:0>.marketVariables<anyOf:0>.rateCutoffAt": {
       "target": {
         "type": "string",

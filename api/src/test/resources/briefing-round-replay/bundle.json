@@ -1,0 +1,1691 @@
+{
+  "authorization": {
+    "productionAuthorized": false,
+    "scope": "publication_clock_simulation",
+    "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+    "userInboxRef": "inbox/synthetic-round-authorization.md"
+  },
+  "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+  "mode": "publication_clock_simulation",
+  "operationalCollectionGate": false,
+  "receipts": [
+    {
+      "httpStatus": 200,
+      "inputTokens": 100,
+      "model": "gpt-6-luna",
+      "outputTokens": 20,
+      "requestDigest": "310d586cb72b886c54370bceea894787b68d90b8a82090fbd71dbacefdd5df7b",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_importance",
+      "stage": "round_simulation_importance",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 101,
+      "model": "gpt-6-luna",
+      "outputTokens": 21,
+      "requestDigest": "04dc553d1cdd704b5a601d365beeed5373f53fe7e832b60dd7ea0e23b65628e7",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_selection",
+      "stage": "round_simulation_selection",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 102,
+      "model": "gpt-6-luna",
+      "outputTokens": 22,
+      "requestDigest": "74d549d5df722b87847a762d957c4a0e65ba3994a459de0c9baf95f52f027d38",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_morning_generation",
+      "stage": "round_simulation_morning_generation",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 103,
+      "model": "gpt-6-luna",
+      "outputTokens": 23,
+      "requestDigest": "99097406c019aeccee001ff60615ed44de4e0fb257a4129cbe9d3c01180182b3",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_morning_verification",
+      "stage": "round_simulation_morning_verification",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 100,
+      "model": "gpt-6-luna",
+      "outputTokens": 20,
+      "requestDigest": "7c4e80026640e7a0c1d9bb785db5420b27b8d62f507c1d7479e83a3c235002dc",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_importance",
+      "stage": "round_simulation_importance",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 101,
+      "model": "gpt-6-luna",
+      "outputTokens": 21,
+      "requestDigest": "107e4797bc3f9315d45944ba91beb4b81f8579f50a30fada739d8156abd0e127",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_selection",
+      "stage": "round_simulation_selection",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 102,
+      "model": "gpt-6-luna",
+      "outputTokens": 22,
+      "requestDigest": "a6a62bd28d8463706e30fd8031ada2bee2549c8eb7f497f8830aa0e8905b0d1c",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_evening_generation",
+      "stage": "round_simulation_evening_generation",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 103,
+      "model": "gpt-6-luna",
+      "outputTokens": 23,
+      "requestDigest": "16500e34f336c07e870c3d41d24dec349c117e05ed860be86252ab8208c0ebae",
+      "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_evening_verification",
+      "stage": "round_simulation_evening_verification",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 100,
+      "model": "gpt-6-luna",
+      "outputTokens": 20,
+      "requestDigest": "e2e8a9e61465943969cf9727be3472f768abe764eb6354736b87962229e2a266",
+      "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_importance",
+      "stage": "round_simulation_importance",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 101,
+      "model": "gpt-6-luna",
+      "outputTokens": 21,
+      "requestDigest": "d2e68424253776d2c41635816c436b1cc0811878a940d396cba0644883706680",
+      "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_selection",
+      "stage": "round_simulation_selection",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 102,
+      "model": "gpt-6-luna",
+      "outputTokens": 22,
+      "requestDigest": "a7c5ff793168be4e55dd4793e207e242aed65f87399ddb80968668231ed4b0b0",
+      "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_morning_generation",
+      "stage": "round_simulation_morning_generation",
+      "status": "completed",
+      "usageKnown": true
+    },
+    {
+      "httpStatus": 200,
+      "inputTokens": 103,
+      "model": "gpt-6-luna",
+      "outputTokens": 23,
+      "requestDigest": "7e78acc777ab5bc023d2d8f9b89865849f8027933351d921121c863838ea2c9c",
+      "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_morning_verification",
+      "stage": "round_simulation_morning_verification",
+      "status": "completed",
+      "usageKnown": true
+    }
+  ],
+  "retrospectiveBodies": true,
+  "rounds": [
+    {
+      "clockRefs": [
+        {
+          "bodySha256": "71bae7769197bed4593774b90924750847d9448e2cdf229d3ba0ff075a9f9b5e",
+          "clockRecordSha256": "0141e2187afee92aeea3505a30015083639cfe2b332e56b74c81eb3ac9feb6ab",
+          "documentId": "doc-synthetic-round-morning",
+          "htmlSha256": "93c84c2cc275ed392978209b44be6d211f0320cd503151d135edab9a4964fa9d",
+          "publishedAt": "2026-10-02T00:20:00Z"
+        }
+      ],
+      "date": "2026-10-02",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "5d88f4ccbd182f0beb86f58242183bb550a07c25028710c9c2731f39266c39c4",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-02",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-01T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-02T00:20:00Z"
+        }
+      },
+      "identitySha256": "6e741104e101853f93e9f49b0697a77dc7c94b023332d97c5e6cf3770fb66576",
+      "inputSources": [
+        {
+          "bodySha256": "71bae7769197bed4593774b90924750847d9448e2cdf229d3ba0ff075a9f9b5e",
+          "documentId": "doc-synthetic-round-morning",
+          "documentVersion": "sha256-71bae7769197bed4593774b90924750847d9448e2cdf229d3ba0ff075a9f9b5e"
+        }
+      ],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [
+        {
+          "httpStatus": 200,
+          "inputTokens": 100,
+          "model": "gpt-6-luna",
+          "outputTokens": 20,
+          "requestDigest": "310d586cb72b886c54370bceea894787b68d90b8a82090fbd71dbacefdd5df7b",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_importance",
+          "stage": "round_simulation_importance",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 101,
+          "model": "gpt-6-luna",
+          "outputTokens": 21,
+          "requestDigest": "04dc553d1cdd704b5a601d365beeed5373f53fe7e832b60dd7ea0e23b65628e7",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_selection",
+          "stage": "round_simulation_selection",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 102,
+          "model": "gpt-6-luna",
+          "outputTokens": 22,
+          "requestDigest": "74d549d5df722b87847a762d957c4a0e65ba3994a459de0c9baf95f52f027d38",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_morning_generation",
+          "stage": "round_simulation_morning_generation",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 103,
+          "model": "gpt-6-luna",
+          "outputTokens": 23,
+          "requestDigest": "99097406c019aeccee001ff60615ed44de4e0fb257a4129cbe9d3c01180182b3",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_morning_verification",
+          "stage": "round_simulation_morning_verification",
+          "status": "completed",
+          "usageKnown": true
+        }
+      ],
+      "result": {
+        "generatedAt": "2026-10-16T01:00:00Z",
+        "generationRequestDigest": "74d549d5df722b87847a762d957c4a0e65ba3994a459de0c9baf95f52f027d38",
+        "items": [
+          {
+            "claims": [
+              {
+                "evidenceIds": [
+                  "evidence-brf-sim-2026-10-02-morning-0"
+                ],
+                "text": "[합성시험] 시험기업의 회차별 자료를 확인했다.",
+                "type": "fact"
+              },
+              {
+                "evidenceIds": [
+                  "evidence-brf-sim-2026-10-02-morning-0"
+                ],
+                "text": "[합성시험] 후속 자료 확인이 필요하다.",
+                "type": "plan"
+              }
+            ],
+            "issueId": "issue-brf-sim-2026-10-02-morning",
+            "rank": 1,
+            "title": "[합성시험] 10월 2일 morning 독립 선정",
+            "titleEvidenceIds": [
+              "evidence-brf-sim-2026-10-02-morning-0"
+            ]
+          }
+        ],
+        "usage": [
+          {
+            "httpStatus": 200,
+            "inputTokens": 102,
+            "model": "gpt-6-luna",
+            "outputTokens": 22,
+            "requestDigest": "74d549d5df722b87847a762d957c4a0e65ba3994a459de0c9baf95f52f027d38",
+            "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_morning_generation",
+            "stage": "round_simulation_morning_generation",
+            "status": "completed",
+            "usageKnown": true
+          },
+          {
+            "httpStatus": 200,
+            "inputTokens": 103,
+            "model": "gpt-6-luna",
+            "outputTokens": 23,
+            "requestDigest": "99097406c019aeccee001ff60615ed44de4e0fb257a4129cbe9d3c01180182b3",
+            "responseId": "resp_synthetic_brf-sim-2026-10-02-morning_round_simulation_morning_verification",
+            "stage": "round_simulation_morning_verification",
+            "status": "completed",
+            "usageKnown": true
+          }
+        ],
+        "verification": {
+          "checks": [
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-02-morning:title",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            },
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-02-morning:claim:0",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            },
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-02-morning:claim:1",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            }
+          ],
+          "status": "PASS"
+        },
+        "verificationRequestDigest": "99097406c019aeccee001ff60615ed44de4e0fb257a4129cbe9d3c01180182b3"
+      },
+      "resultSha256": "914e41b1079136915aa0460cbd9c9659e0b99f85d9ccccb048b625854de40732",
+      "roundId": "brf-sim-2026-10-02-morning",
+      "selected": [
+        {
+          "companyNames": [
+            "[합성시험] 시험기업"
+          ],
+          "issueId": "issue-brf-sim-2026-10-02-morning",
+          "rank": 1,
+          "reason": "[합성시험] 이 회차 창에 실제 포함된 문서만 선정했습니다.",
+          "score": 2,
+          "sources": [
+            {
+              "bodySha256": "71bae7769197bed4593774b90924750847d9448e2cdf229d3ba0ff075a9f9b5e",
+              "documentId": "doc-synthetic-round-morning",
+              "documentVersion": "sha256-71bae7769197bed4593774b90924750847d9448e2cdf229d3ba0ff075a9f9b5e",
+              "end": 27,
+              "evidenceId": "evidence-brf-sim-2026-10-02-morning-0",
+              "quote": "시험기업의 morning 자료다.",
+              "start": 9,
+              "url": "https://example.invalid/round-morning"
+            }
+          ]
+        }
+      ],
+      "selectionStatus": "SELECTED",
+      "sourceCoverage": {
+        "confirmedInWindow": 1,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 1
+      },
+      "window": {
+        "from": "2026-10-01T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-02T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [
+        {
+          "bodySha256": "e19ba3cb2abed6cd9f1cfe38cce5eb77bcffdcca592407d77b97b081835d23c5",
+          "clockRecordSha256": "35b5cbe03107ff1e324f9ef9ba3b0ca91c8aedbee722669fad7e8b531ba8cb79",
+          "documentId": "doc-synthetic-round-evening-a",
+          "htmlSha256": "4f7217654ebe1215f2f1351c368481aac14a4053c9d91f47effe50f160f91683",
+          "publishedAt": "2026-10-02T00:20:01Z"
+        },
+        {
+          "bodySha256": "96d4de6f636946f8ab28dcdd5dc3bbb13f60b5cda6575d69feccf45ba22aa03b",
+          "clockRecordSha256": "428c83d62c3e2445fc2f35fa1c462e1e681bcb79ffa345ab87f71c9a9863801d",
+          "documentId": "doc-synthetic-round-evening-b",
+          "htmlSha256": "681032d14e1a3591a21f48817734305d9d8dce38eeba33443fa2d3d7cf446c0f",
+          "publishedAt": "2026-10-02T08:30:00Z"
+        }
+      ],
+      "date": "2026-10-02",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "2f2f06ba03b1420931668ed192ecc1bbb846c2efb9dd61335cfc76fe5d8d8122",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-02",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "resultSha256": "914e41b1079136915aa0460cbd9c9659e0b99f85d9ccccb048b625854de40732",
+          "roundId": "brf-sim-2026-10-02-morning",
+          "status": "available",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-02T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-02T08:30:00Z"
+        }
+      },
+      "identitySha256": "9005a46cc862e17f1bf70ff735e127e98e57daf706fe17e0802a6fe7da70ba01",
+      "inputSources": [
+        {
+          "bodySha256": "e19ba3cb2abed6cd9f1cfe38cce5eb77bcffdcca592407d77b97b081835d23c5",
+          "documentId": "doc-synthetic-round-evening-a",
+          "documentVersion": "sha256-e19ba3cb2abed6cd9f1cfe38cce5eb77bcffdcca592407d77b97b081835d23c5"
+        },
+        {
+          "bodySha256": "96d4de6f636946f8ab28dcdd5dc3bbb13f60b5cda6575d69feccf45ba22aa03b",
+          "documentId": "doc-synthetic-round-evening-b",
+          "documentVersion": "sha256-96d4de6f636946f8ab28dcdd5dc3bbb13f60b5cda6575d69feccf45ba22aa03b"
+        }
+      ],
+      "previous": {
+        "resultSha256": "914e41b1079136915aa0460cbd9c9659e0b99f85d9ccccb048b625854de40732",
+        "roundId": "brf-sim-2026-10-02-morning",
+        "status": "available",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [
+        {
+          "httpStatus": 200,
+          "inputTokens": 100,
+          "model": "gpt-6-luna",
+          "outputTokens": 20,
+          "requestDigest": "7c4e80026640e7a0c1d9bb785db5420b27b8d62f507c1d7479e83a3c235002dc",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_importance",
+          "stage": "round_simulation_importance",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 101,
+          "model": "gpt-6-luna",
+          "outputTokens": 21,
+          "requestDigest": "107e4797bc3f9315d45944ba91beb4b81f8579f50a30fada739d8156abd0e127",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_selection",
+          "stage": "round_simulation_selection",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 102,
+          "model": "gpt-6-luna",
+          "outputTokens": 22,
+          "requestDigest": "a6a62bd28d8463706e30fd8031ada2bee2549c8eb7f497f8830aa0e8905b0d1c",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_evening_generation",
+          "stage": "round_simulation_evening_generation",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 103,
+          "model": "gpt-6-luna",
+          "outputTokens": 23,
+          "requestDigest": "16500e34f336c07e870c3d41d24dec349c117e05ed860be86252ab8208c0ebae",
+          "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_evening_verification",
+          "stage": "round_simulation_evening_verification",
+          "status": "completed",
+          "usageKnown": true
+        }
+      ],
+      "result": {
+        "generatedAt": "2026-10-16T01:01:00Z",
+        "generationRequestDigest": "a6a62bd28d8463706e30fd8031ada2bee2549c8eb7f497f8830aa0e8905b0d1c",
+        "items": [
+          {
+            "claims": [
+              {
+                "evidenceIds": [
+                  "evidence-brf-sim-2026-10-02-evening-0",
+                  "evidence-brf-sim-2026-10-02-evening-1"
+                ],
+                "text": "[합성시험] 시험기업의 회차별 자료를 확인했다.",
+                "type": "fact"
+              },
+              {
+                "evidenceIds": [
+                  "evidence-brf-sim-2026-10-02-evening-0",
+                  "evidence-brf-sim-2026-10-02-evening-1"
+                ],
+                "text": "[합성시험] 후속 자료 확인이 필요하다.",
+                "type": "plan"
+              }
+            ],
+            "issueId": "issue-brf-sim-2026-10-02-evening",
+            "rank": 1,
+            "title": "[합성시험] 10월 2일 evening 독립 선정",
+            "titleEvidenceIds": [
+              "evidence-brf-sim-2026-10-02-evening-0",
+              "evidence-brf-sim-2026-10-02-evening-1"
+            ]
+          }
+        ],
+        "usage": [
+          {
+            "httpStatus": 200,
+            "inputTokens": 102,
+            "model": "gpt-6-luna",
+            "outputTokens": 22,
+            "requestDigest": "a6a62bd28d8463706e30fd8031ada2bee2549c8eb7f497f8830aa0e8905b0d1c",
+            "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_evening_generation",
+            "stage": "round_simulation_evening_generation",
+            "status": "completed",
+            "usageKnown": true
+          },
+          {
+            "httpStatus": 200,
+            "inputTokens": 103,
+            "model": "gpt-6-luna",
+            "outputTokens": 23,
+            "requestDigest": "16500e34f336c07e870c3d41d24dec349c117e05ed860be86252ab8208c0ebae",
+            "responseId": "resp_synthetic_brf-sim-2026-10-02-evening_round_simulation_evening_verification",
+            "stage": "round_simulation_evening_verification",
+            "status": "completed",
+            "usageKnown": true
+          }
+        ],
+        "verification": {
+          "checks": [
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-02-evening:title",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            },
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-02-evening:claim:0",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            },
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-02-evening:claim:1",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            }
+          ],
+          "status": "PASS"
+        },
+        "verificationRequestDigest": "16500e34f336c07e870c3d41d24dec349c117e05ed860be86252ab8208c0ebae"
+      },
+      "resultSha256": "7b47d5523965e23c4e1f1590ce35ce389a3a0b664498b527f2fe2ae159b7f729",
+      "roundId": "brf-sim-2026-10-02-evening",
+      "selected": [
+        {
+          "companyNames": [
+            "[합성시험] 시험기업"
+          ],
+          "issueId": "issue-brf-sim-2026-10-02-evening",
+          "rank": 1,
+          "reason": "[합성시험] 이 회차 창에 실제 포함된 문서만 선정했습니다.",
+          "score": 2,
+          "sources": [
+            {
+              "bodySha256": "e19ba3cb2abed6cd9f1cfe38cce5eb77bcffdcca592407d77b97b081835d23c5",
+              "documentId": "doc-synthetic-round-evening-a",
+              "documentVersion": "sha256-e19ba3cb2abed6cd9f1cfe38cce5eb77bcffdcca592407d77b97b081835d23c5",
+              "end": 29,
+              "evidenceId": "evidence-brf-sim-2026-10-02-evening-0",
+              "quote": "시험기업의 evening-a 자료다.",
+              "start": 9,
+              "url": "https://example.invalid/round-evening-a"
+            },
+            {
+              "bodySha256": "96d4de6f636946f8ab28dcdd5dc3bbb13f60b5cda6575d69feccf45ba22aa03b",
+              "documentId": "doc-synthetic-round-evening-b",
+              "documentVersion": "sha256-96d4de6f636946f8ab28dcdd5dc3bbb13f60b5cda6575d69feccf45ba22aa03b",
+              "end": 29,
+              "evidenceId": "evidence-brf-sim-2026-10-02-evening-1",
+              "quote": "시험기업의 evening-b 자료다.",
+              "start": 9,
+              "url": "https://example.invalid/round-evening-b"
+            }
+          ]
+        }
+      ],
+      "selectionStatus": "SELECTED",
+      "sourceCoverage": {
+        "confirmedInWindow": 2,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 2
+      },
+      "window": {
+        "from": "2026-10-02T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-02T08:30:00Z"
+      }
+    },
+    {
+      "clockRefs": [
+        {
+          "bodySha256": "af6e51df24a603a2eb071d969ddcfbca04d67f73092ef79e33a03c7fce3c2bda",
+          "clockRecordSha256": "5f1781096436b166f26f4e6895db815a815cdc479a87e829f2f757f7b13b8f37",
+          "documentId": "doc-synthetic-round-next-morning",
+          "htmlSha256": "8efbf9cb6fb238b89b67e7100be97615eae7e5118d3fabf381686f21f10928d1",
+          "publishedAt": "2026-10-02T08:30:01Z"
+        }
+      ],
+      "date": "2026-10-03",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "837214450e720b3286780d879be59ebc01b6065b03fb5efa40d46e6cde3059cb",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-03",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "resultSha256": "7b47d5523965e23c4e1f1590ce35ce389a3a0b664498b527f2fe2ae159b7f729",
+          "roundId": "brf-sim-2026-10-02-evening",
+          "status": "available",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-02T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-03T00:20:00Z"
+        }
+      },
+      "identitySha256": "b9e1531b8f77d97235b29766266038b1ce60e3e68e717d36a564089f07f230e7",
+      "inputSources": [
+        {
+          "bodySha256": "af6e51df24a603a2eb071d969ddcfbca04d67f73092ef79e33a03c7fce3c2bda",
+          "documentId": "doc-synthetic-round-next-morning",
+          "documentVersion": "sha256-af6e51df24a603a2eb071d969ddcfbca04d67f73092ef79e33a03c7fce3c2bda"
+        }
+      ],
+      "previous": {
+        "resultSha256": "7b47d5523965e23c4e1f1590ce35ce389a3a0b664498b527f2fe2ae159b7f729",
+        "roundId": "brf-sim-2026-10-02-evening",
+        "status": "available",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [
+        {
+          "httpStatus": 200,
+          "inputTokens": 100,
+          "model": "gpt-6-luna",
+          "outputTokens": 20,
+          "requestDigest": "e2e8a9e61465943969cf9727be3472f768abe764eb6354736b87962229e2a266",
+          "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_importance",
+          "stage": "round_simulation_importance",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 101,
+          "model": "gpt-6-luna",
+          "outputTokens": 21,
+          "requestDigest": "d2e68424253776d2c41635816c436b1cc0811878a940d396cba0644883706680",
+          "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_selection",
+          "stage": "round_simulation_selection",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 102,
+          "model": "gpt-6-luna",
+          "outputTokens": 22,
+          "requestDigest": "a7c5ff793168be4e55dd4793e207e242aed65f87399ddb80968668231ed4b0b0",
+          "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_morning_generation",
+          "stage": "round_simulation_morning_generation",
+          "status": "completed",
+          "usageKnown": true
+        },
+        {
+          "httpStatus": 200,
+          "inputTokens": 103,
+          "model": "gpt-6-luna",
+          "outputTokens": 23,
+          "requestDigest": "7e78acc777ab5bc023d2d8f9b89865849f8027933351d921121c863838ea2c9c",
+          "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_morning_verification",
+          "stage": "round_simulation_morning_verification",
+          "status": "completed",
+          "usageKnown": true
+        }
+      ],
+      "result": {
+        "generatedAt": "2026-10-16T01:02:00Z",
+        "generationRequestDigest": "a7c5ff793168be4e55dd4793e207e242aed65f87399ddb80968668231ed4b0b0",
+        "items": [
+          {
+            "claims": [
+              {
+                "evidenceIds": [
+                  "evidence-brf-sim-2026-10-03-morning-0"
+                ],
+                "text": "[합성시험] 시험기업의 회차별 자료를 확인했다.",
+                "type": "fact"
+              },
+              {
+                "evidenceIds": [
+                  "evidence-brf-sim-2026-10-03-morning-0"
+                ],
+                "text": "[합성시험] 후속 자료 확인이 필요하다.",
+                "type": "plan"
+              }
+            ],
+            "issueId": "issue-brf-sim-2026-10-03-morning",
+            "rank": 1,
+            "title": "[합성시험] 10월 3일 morning 독립 선정",
+            "titleEvidenceIds": [
+              "evidence-brf-sim-2026-10-03-morning-0"
+            ]
+          }
+        ],
+        "usage": [
+          {
+            "httpStatus": 200,
+            "inputTokens": 102,
+            "model": "gpt-6-luna",
+            "outputTokens": 22,
+            "requestDigest": "a7c5ff793168be4e55dd4793e207e242aed65f87399ddb80968668231ed4b0b0",
+            "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_morning_generation",
+            "stage": "round_simulation_morning_generation",
+            "status": "completed",
+            "usageKnown": true
+          },
+          {
+            "httpStatus": 200,
+            "inputTokens": 103,
+            "model": "gpt-6-luna",
+            "outputTokens": 23,
+            "requestDigest": "7e78acc777ab5bc023d2d8f9b89865849f8027933351d921121c863838ea2c9c",
+            "responseId": "resp_synthetic_brf-sim-2026-10-03-morning_round_simulation_morning_verification",
+            "stage": "round_simulation_morning_verification",
+            "status": "completed",
+            "usageKnown": true
+          }
+        ],
+        "verification": {
+          "checks": [
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-03-morning:title",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            },
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-03-morning:claim:0",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            },
+            {
+              "noInvestmentAdvice": true,
+              "noUnsupportedNumbers": true,
+              "reason": "[합성시험] 직접 작성한 합성 검증 결과입니다.",
+              "targetId": "issue-brf-sim-2026-10-03-morning:claim:1",
+              "temporalAppropriate": true,
+              "typeAppropriate": true,
+              "verdict": "SUPPORTED"
+            }
+          ],
+          "status": "PASS"
+        },
+        "verificationRequestDigest": "7e78acc777ab5bc023d2d8f9b89865849f8027933351d921121c863838ea2c9c"
+      },
+      "resultSha256": "5f7287c0ac1597584a94f279bdaf08a3d6a2e1ba3e8381d833f9b78fc4d07c5b",
+      "roundId": "brf-sim-2026-10-03-morning",
+      "selected": [
+        {
+          "companyNames": [
+            "[합성시험] 시험기업"
+          ],
+          "issueId": "issue-brf-sim-2026-10-03-morning",
+          "rank": 1,
+          "reason": "[합성시험] 이 회차 창에 실제 포함된 문서만 선정했습니다.",
+          "score": 2,
+          "sources": [
+            {
+              "bodySha256": "af6e51df24a603a2eb071d969ddcfbca04d67f73092ef79e33a03c7fce3c2bda",
+              "documentId": "doc-synthetic-round-next-morning",
+              "documentVersion": "sha256-af6e51df24a603a2eb071d969ddcfbca04d67f73092ef79e33a03c7fce3c2bda",
+              "end": 32,
+              "evidenceId": "evidence-brf-sim-2026-10-03-morning-0",
+              "quote": "시험기업의 next-morning 자료다.",
+              "start": 9,
+              "url": "https://example.invalid/round-next-morning"
+            }
+          ]
+        }
+      ],
+      "selectionStatus": "SELECTED",
+      "sourceCoverage": {
+        "confirmedInWindow": 1,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 1
+      },
+      "window": {
+        "from": "2026-10-02T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-03T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-03",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-03",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "resultSha256": "5f7287c0ac1597584a94f279bdaf08a3d6a2e1ba3e8381d833f9b78fc4d07c5b",
+          "roundId": "brf-sim-2026-10-03-morning",
+          "status": "available",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-03T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-03T08:30:00Z"
+        }
+      },
+      "identitySha256": "73a9cd18a8069ff2ab7522b6e691a7e41f514610bb6cd416efb65f3a9c4718eb",
+      "inputSources": [],
+      "previous": {
+        "resultSha256": "5f7287c0ac1597584a94f279bdaf08a3d6a2e1ba3e8381d833f9b78fc4d07c5b",
+        "roundId": "brf-sim-2026-10-03-morning",
+        "status": "available",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-03-evening",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-03T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-03T08:30:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-04",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-04",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-03T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-04T00:20:00Z"
+        }
+      },
+      "identitySha256": "275600db3bb8c5c3c57e412773b781fefdc41fcf47db2255c3b9debb76c0b844",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-04-morning",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-03T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-04T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-04",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-04",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-04T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-04T08:30:00Z"
+        }
+      },
+      "identitySha256": "fbc54cfcb3385b224c4782467230f1fe74ce5d7f5a3d2e3d109199b474e3e89a",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-04-evening",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-04T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-04T08:30:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-05",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-05",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-04T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-05T00:20:00Z"
+        }
+      },
+      "identitySha256": "44da71c9413bca1064ea7deb530cdab5a1f34bc2428b786e22f4e7f28a254783",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-05-morning",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-04T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-05T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-05",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-05",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-05T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-05T08:30:00Z"
+        }
+      },
+      "identitySha256": "9cb4c92b980abad1496dbaa39a8d7f2ea8da71bce7582df3fa32393c772a2ea0",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-05-evening",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-05T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-05T08:30:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-06",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-06",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-05T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-06T00:20:00Z"
+        }
+      },
+      "identitySha256": "db0906d70c265f985d4533cd9ba6a2271e1d8ed179909b7b2122e71810006eec",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-06-morning",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-05T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-06T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-06",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-06",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-06T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-06T08:30:00Z"
+        }
+      },
+      "identitySha256": "29ecf183491b37ee29065de7040c6e7c770c8438cbdb1fcf08461d5f92d2f7b4",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-06-evening",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-06T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-06T08:30:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-07",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-07",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-06T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-07T00:20:00Z"
+        }
+      },
+      "identitySha256": "7c5c9cfb818abefeacdea55af42ae2277e2e933a516707af20da6575af3ff93c",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-07-morning",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-06T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-07T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-07",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-07",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-07T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-07T08:30:00Z"
+        }
+      },
+      "identitySha256": "a2f5ada3b077e15412a5171374ea1bf737c9c3277273c8b0b28476ec8327e31c",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-07-evening",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-07T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-07T08:30:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-08",
+      "edition": "morning",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-08",
+        "edition": "morning",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-07T08:30:00Z",
+          "openStart": false,
+          "to": "2026-10-08T00:20:00Z"
+        }
+      },
+      "identitySha256": "441e4055714695b747556324f181694b35ae5007e9d2faa53ba136293a8abab9",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-08-morning",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-07T08:30:00Z",
+        "openStart": false,
+        "to": "2026-10-08T00:20:00Z"
+      }
+    },
+    {
+      "clockRefs": [],
+      "date": "2026-10-08",
+      "edition": "evening",
+      "identity": {
+        "authorization": {
+          "productionAuthorized": false,
+          "scope": "publication_clock_simulation",
+          "sourceSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+          "userInboxRef": "inbox/synthetic-round-authorization.md"
+        },
+        "baseline": {
+          "from": "2026-10-01T17:30:00+09:00",
+          "meaning": "simulation_baseline_not_service_first_round"
+        },
+        "candidateInputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "clockFileSha256": "06e921f7cb4d1cfabd29a0f0fe857067a669b1a55ea974c3229a486e031a16cb",
+        "contextVersion": "round-simulation-v1",
+        "date": "2026-10-08",
+        "edition": "evening",
+        "mode": "publication_clock_simulation",
+        "operationalCollectionGate": false,
+        "previous": {
+          "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+          "status": "unavailable",
+          "type": "simulated_previous_output"
+        },
+        "promptArtifacts": {
+          "generation-evening.md": "a39050a1f9cc2f1e0725ecc659d92fb3e0b67cb47666bb8a44cd1e6758218417",
+          "generation-morning.md": "00fb8e770e1b12f4e8f3b05c7d9fb08f1a0cbf5e2ceca8ce23cf93d20f198707",
+          "generation.schema.json": "8a18b1071fb2e052f0a57f294d8ea340e089986e774d64b4e801f1b7105b68c0",
+          "importance.md": "8f798879798a601d5190d0e0e6eaec56ca917276a393407ba5c654765a6d09d6",
+          "importance.schema.json": "1ab0c73fa440cc7f23b7be82ae84a3ea09fb70cb23b406759ce1fbcf703c995d",
+          "selection.md": "5121bd7faf866ef18a4725a4bede94a186634818edff5c44676ad43d417d087d",
+          "selection.schema.json": "a0dc19c713a324f8dbfa6e14dede732fb20bba088ed0efc38ef64e58e62e42fb",
+          "verification.md": "3ffd3984549470ba02b024d7bf86577dbeb81655fcdae1c8cfabdd128ba5203c",
+          "verification.schema.json": "b2100d1c4e48790bf962ec569f7df8f83d2f8e5e22db46959be4d155a4559bd8"
+        },
+        "runId": "brf-round-synthetic-063",
+        "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c",
+        "window": {
+          "from": "2026-10-08T00:20:00Z",
+          "openStart": false,
+          "to": "2026-10-08T08:30:00Z"
+        }
+      },
+      "identitySha256": "b3f24aabab27a60ba04b1fa7dc25bac4b0a6a688f2cc3b4cabd4f271b0d1bef7",
+      "inputSources": [],
+      "previous": {
+        "reason": "[합성시험] 바로 직전 PASS 회차가 없습니다.",
+        "status": "unavailable",
+        "type": "simulated_previous_output"
+      },
+      "receipts": [],
+      "result": null,
+      "resultSha256": null,
+      "roundId": "brf-sim-2026-10-08-evening",
+      "selected": [],
+      "selectionStatus": "HELD_SOURCE_COVERAGE",
+      "sourceCoverage": {
+        "confirmedInWindow": 0,
+        "excludedDuplicateCount": 0,
+        "operationalCollectionGate": false,
+        "unconfirmedTotal": 1,
+        "uniqueInputCount": 0
+      },
+      "window": {
+        "from": "2026-10-08T00:20:00Z",
+        "openStart": false,
+        "to": "2026-10-08T08:30:00Z"
+      }
+    }
+  ],
+  "runId": "brf-round-synthetic-063",
+  "schemaVersion": "zoop-briefing-round-simulation-v2",
+  "sourceFileSha256": "ec40b746c7ecd325325974dc0da41d95b1f73604c1dbb68201afc98fca3d4e0c"
+}

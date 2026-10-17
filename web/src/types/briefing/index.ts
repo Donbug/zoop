@@ -22,7 +22,8 @@ export type MarketIndicator = {
   unit: 'pt' | 'KRW';
   status: 'ok' | 'delayed' | 'unavailable' | 'failed';
   value: number | null;
-  valueKind: 'close' | 'latest' | null;
+  /** reference는 은행 고시 기준환율이며 시장 종가와 구분한다. */
+  valueKind: 'close' | 'latest' | 'reference' | null;
   observedDate: string | null;
   observedAt: string | null;
   baseline: { value: number; date: string; at: string | null } | null;

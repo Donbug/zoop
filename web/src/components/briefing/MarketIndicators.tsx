@@ -13,12 +13,28 @@ const number = (value: number) =>
   value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
 const signed = (value: number) => `${value > 0 ? '+' : ''}${number(value)}`;
 
-/** 관측 시점: 종가면 날짜, 아니면 시각 */
+/** 일별 값은 관측 날짜를 쓴다. 환율의 일별 고시값은 시장 종가와 구분한다. */
 function observed(item: MarketIndicator) {
-  const at = item.observedAt
-    ? briefingTime(item.observedAt)
-    : (item.observedDate ?? '시각 미상');
-  return `${at} ${item.valueKind === 'close' ? '종가' : '기준'}`;
+  const dailyReference = item.valueKind === 'reference' && !item.observedAt;
+  const legacyBankReference =
+    item.valueKind === 'close' &&
+    item.id === 'usdkrw' &&
+    item.source?.name.includes('하나은행');
+  const at =
+    (item.valueKind === 'close' || dailyReference) && item.observedDate
+      ? item.observedDate
+      : item.observedAt
+        ? briefingTime(item.observedAt)
+        : (item.observedDate ?? '시각 미상');
+  const kind =
+    dailyReference || legacyBankReference
+      ? '일별 고시값'
+      : item.valueKind === 'reference'
+        ? '고시값'
+        : item.valueKind === 'close'
+          ? '종가'
+          : '기준';
+  return `${at} ${kind}`;
 }
 
 function baseline(item: MarketIndicator) {
