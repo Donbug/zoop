@@ -5,27 +5,18 @@ export const periods: {
   value: ChartPeriod;
   label: string;
   interval: string;
+  /** 화면에 보이는 시간 버킷 이름(FS041) */
+  bucket: string;
 }[] = [
-  { value: '1d', label: '1일', interval: '5m' },
-  { value: '1w', label: '1주', interval: '1h' },
-  { value: '1m', label: '1개월', interval: '1d' },
-  { value: '1y', label: '1년', interval: '1wk' },
+  { value: '1d', label: '1일', interval: '5m', bucket: '5분' },
+  { value: '1w', label: '1주', interval: '1h', bucket: '1시간' },
+  { value: '1m', label: '1개월', interval: '1d', bucket: '일' },
+  { value: '1y', label: '1년', interval: '1wk', bucket: '주' },
 ];
 export const exactTime = (value: string | null | undefined) =>
   !!value &&
   /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value));
-// One URL transition clears dependent selections before historical reads begin.
-export function selectTime(time: string) {
-  return {
-    asOf: time,
-    event: null,
-    bucket: null,
-    document: null,
-    evidence: null,
-    docScope: null,
-  };
-}
 export function bucketKey(
   event: Pick<Event, 'eventTime' | 'timePrecision'>,
   period: ChartPeriod,
