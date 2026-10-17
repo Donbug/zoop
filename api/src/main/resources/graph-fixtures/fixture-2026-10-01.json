@@ -60,7 +60,7 @@
         "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395",
         "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"
       ],
-      "assertionStatus": "reported",
+      "assertionStatus": "occurred",
       "mentions": [
         {
           "mentionId": "men-fixture-hbm-supply-1",
@@ -90,6 +90,7 @@
         "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c",
         "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf"
       ],
+      "assertionStatus": "announced",
       "mentions": [
         {
           "mentionId": "men-fixture-hbm-equip-1",
@@ -119,7 +120,8 @@
         "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62",
         "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e"
       ],
-      "period": "2026-09/2026-12",
+      "period": "2026Q4",
+      "assertionStatus": "announced",
       "mentions": [
         {
           "mentionId": "men-fixture-euv-export-1",
@@ -143,7 +145,7 @@
       "source": "iss-fixture-hbm-supply",
       "target": "NASDAQ:NVDA",
       "role": "구매",
-      "assertionStatus": "reported",
+      "assertionStatus": "occurred",
       "evidenceIds": [
         "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395"
       ],
@@ -155,7 +157,7 @@
       "source": "iss-fixture-hbm-supply",
       "target": "KRX:000660",
       "role": "공급",
-      "assertionStatus": "reported",
+      "assertionStatus": "occurred",
       "evidenceIds": [
         "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"
       ],
@@ -167,7 +169,7 @@
       "source": "iss-fixture-hbm-equip",
       "target": "KRX:042700",
       "role": "장비 공급",
-      "assertionStatus": "reported",
+      "assertionStatus": "announced",
       "evidenceIds": [
         "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c"
       ],
@@ -178,8 +180,8 @@
       "relationType": "STRUCTURALLY_RELATED_TO",
       "source": "iss-fixture-hbm-equip",
       "target": "KRX:000660",
-      "role": "고객",
-      "assertionStatus": "verified",
+      "role": null,
+      "assertionStatus": null,
       "evidenceIds": [
         "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf"
       ],
@@ -204,7 +206,7 @@
       "source": "iss-fixture-euv-export",
       "target": "NASDAQ:ASML",
       "role": "규제 대상",
-      "assertionStatus": "reported",
+      "assertionStatus": "announced",
       "evidenceIds": [
         "ev-63f463a0464041f09503f04f07ff1f660a0a5628a3507b4732a44ec95cbc5bd8"
       ],
@@ -215,8 +217,8 @@
       "relationType": "STRUCTURALLY_RELATED_TO",
       "source": "iss-fixture-euv-export",
       "target": "NYSE:TSM",
-      "role": "장비 고객",
-      "assertionStatus": "verified",
+      "role": null,
+      "assertionStatus": null,
       "evidenceIds": [
         "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62"
       ],
@@ -241,8 +243,8 @@
       "relationType": "STRUCTURALLY_RELATED_TO",
       "source": "iss-fixture-euv-export",
       "target": "KRX:005930",
-      "role": "장비 고객",
-      "assertionStatus": "verified",
+      "role": null,
+      "assertionStatus": null,
       "evidenceIds": [
         "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e"
       ],
