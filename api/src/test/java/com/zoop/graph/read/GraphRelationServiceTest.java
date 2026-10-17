@@ -36,7 +36,10 @@ class GraphRelationServiceTest {
         assertEquals(HYNIX, edge.target().id());
         assertEquals("company", edge.target().kind());
         assertEquals(List.of("rel-fixture-04"), edge.relationIds());
-        assertEquals(List.of("고객"), edge.roles());
+        // Structural edges carry no role or assertion status in the AI handoff (manual operator basis).
+        assertTrue(edge.roles().isEmpty());
+        assertNull(edge.role());
+        assertEquals("구조적 관계", edge.summary());
         assertEquals("ALLOW", edge.verification().status());
         assertEquals("SUPPLIES", edge.basis().get(0).relationType());
         assertEquals(GraphRelationService.EXPLANATIONS.get("STRUCTURALLY_RELATED_TO"), edge.explanation());

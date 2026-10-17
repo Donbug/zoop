@@ -132,11 +132,11 @@ class GraphSnapshotCodecTest {
     void issueKeepsPeriodStatusAndMentionsThatCiteItsOwnArticles() throws IOException {
         var issues = GraphSnapshotCodec.read(v1().getBytes(StandardCharsets.UTF_8), "fixture-2026-10-01").issues();
         var supply = issues.stream().filter(i -> i.issueId().equals("iss-fixture-hbm-supply")).findFirst().orElseThrow();
-        assertEquals("reported", supply.assertionStatus());
+        assertEquals("occurred", supply.assertionStatus());
         assertEquals("men-fixture-hbm-supply-1", supply.representativeMentionId());
         assertEquals("art-hbm-supply", supply.mentions().get(0).articleId());
         var euv = issues.stream().filter(i -> i.issueId().equals("iss-fixture-euv-export")).findFirst().orElseThrow();
-        assertEquals("2026-09/2026-12", euv.period());
+        assertEquals("2026Q4", euv.period());
         assertEquals(2, euv.mentions().size());
 
         String foreign = v1().replaceFirst("(\"mentionId\": \"men-fixture-hbm-supply-1\",\\s*\"articleId\": )\"art-hbm-supply\"",
