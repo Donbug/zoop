@@ -45,6 +45,39 @@ PRIVATE = (SUP, SUP2, COMP, INV, VALID, CO, EVT, GOOD, BAD, QB, "합성 공급 �
 WITHHELD_KEYS = {"schemaVersion", "versionId", "state", "publication", "delivery", "usage"}
 
 
+def trust_env() -> dict[str, str]:
+    """The ONE trust variable a graph CLI child receives: `SSL_CERT_FILE`, the public CA file of a private-CA `bolt+s` target, exactly as an operator
+    passes it per command. Nothing else (no SSL_CERT_DIR, no generic secret or proxy environment) is forwarded."""
+    return {"SSL_CERT_FILE": os.environ["SSL_CERT_FILE"]} if os.environ.get("SSL_CERT_FILE") else {}
+
+
+CREDENTIAL_KEYS = frozenset({"user", "username", "password", "passwd", "auth", "authorization", "credential", "credentials", "secret", "token", "uri", "graphuri", "owner"})
+
+
+def assert_no_credential_leak(text: str, database: str) -> None:
+    """No password anywhere in one command output, no credential-shaped field, and the user name only where it IS a legitimate constant of the answer.
+    On Community the only user is `neo4j`, the same word as the database name (`"database":"neo4j"`) and, case-insensitively, the server agent prefix
+    (`Neo4j/5.x`): a plain substring test would fail on those constants, so the user name is checked outside exactly those two positions."""
+    password, user = os.environ.get("ZOOP_GRAPH_PASSWORD"), os.environ.get("ZOOP_GRAPH_USER")
+    assert not password or password not in text, "password echoed"
+    if not text:
+        return
+
+    def walk(value, key: str | None = None) -> None:
+        if isinstance(value, dict):
+            for k, v in value.items():
+                assert k.lower() not in CREDENTIAL_KEYS, f"credential-shaped field {k!r}"
+                walk(v, k)
+        elif isinstance(value, list):
+            for v in value:
+                walk(v, key)
+        elif isinstance(value, str) and user:
+            legitimate = (key == "database" and value.lower() == database.lower()) or (key == "agent" and value.startswith("Neo4j/"))
+            assert legitimate or user.lower() not in value.lower(), "user name echoed outside its legitimate constants"
+
+    walk(json.loads(text))
+
+
 # ---------------------------------------------------------------- the authored world (also used by the unit tests) -----------------
 
 def mapping(world) -> dict:
@@ -274,7 +307,7 @@ class Operator:
     def graph(self, command: str, request: dict, *, state: str = "graph", expected: int = 0, hook: str | None = None, uri: str | None = None,
               extra: tuple = (), canonical: Path | None = None, raw_input: bytes | None = None):
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM,
-               **{k: v for k, v in os.environ.items() if k.startswith("ZOOP_GRAPH_") and k != "ZOOP_GRAPH_SMOKE_URI"}}
+               **{k: v for k, v in os.environ.items() if k.startswith("ZOOP_GRAPH_") and k != "ZOOP_GRAPH_SMOKE_URI"}, **trust_env()}
         program = guard_source(self.port) + (HOOKS[hook] if hook else "") + "runpy.run_module('zoop_ai_pipeline.graph_projection_cli', run_name='__main__')\n"
         argv = [sys.executable, "-c", program, command, "--state-dir", str(self.root / state)]
         if command in SOURCED:
@@ -289,8 +322,7 @@ class Operator:
         self.outputs.append(text)
         assert child.returncode == expected, (command, request, child.returncode, text, child.stderr.decode()[-2000:])
         assert expected == 9 or not child.stderr, (command, child.stderr.decode()[-2000:])
-        for secret in (os.environ.get("ZOOP_GRAPH_PASSWORD"), os.environ.get("ZOOP_GRAPH_USER")):
-            assert not secret or secret not in text, "credential echoed"
+        assert_no_credential_leak(text, self.database)
         return json.loads(text) if text else None
 
     def sel(self, name: str) -> dict:

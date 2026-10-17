@@ -21,6 +21,7 @@ database is NOT cleaned: use a throwaway one. On success the last stdout line is
 """
 from __future__ import annotations
 
+import base64
 import argparse
 import atexit
 import datetime as dt
@@ -262,8 +263,12 @@ class Jar:
         self.counter = 0
 
     def base_env(self) -> dict[str, str]:
+        # The app's CSRF key ring is required at startup (auth stays enabled). A fresh random synthetic key per process run;
+        # it is never printed or stored, and nothing in these smokes ever issues a session.
+        csrf_key = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
         return {"PATH": "/usr/bin:/bin", "HOME": str(Path.home()), "LANG": "C.UTF-8", "DB_URL": os.environ["DB_URL"],
-                "DB_USERNAME": self.db.user, "DB_PASSWORD": self.db.password}
+                "DB_USERNAME": self.db.user, "DB_PASSWORD": self.db.password,
+                "ZOOP_AUTH_CSRF_ACTIVE_KEY_ID": "smoke-v1", "ZOOP_AUTH_CSRF_KEYS": "smoke-v1=" + csrf_key}
 
     def import_env(self, request: Path, result: Path, artifact_root: Path) -> dict[str, str]:
         return {**self.base_env(), "ZOOP_DOCUMENT_IMPORT_ENABLED": "true", "ZOOP_DOCUMENT_IMPORT_REQUEST": str(request),
@@ -284,9 +289,13 @@ class Jar:
             request.write_bytes(request_body)
         else:
             request.write_bytes(json.dumps({"schemaVersion": IMPORT_SCHEMA, "items": request_body}, ensure_ascii=False).encode("utf-8"))
-        done = subprocess.run(self.argv("--spring.main.web-application-type=none"),
-                              env=self.import_env(request, result, artifact_root or self.world.artifacts),
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=240)
+        try:
+            done = subprocess.run(self.argv("--spring.main.web-application-type=none"),
+                                  env=self.import_env(request, result, artifact_root or self.world.artifacts),
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=240)
+        except subprocess.TimeoutExpired as expired:
+            OUTPUT.append((expired.stdout or b"").decode("utf-8", "replace"))
+            raise AssertionError(f"{label}: the import JVM did not exit within 240s (result file exists: {result.exists()})")
         output = done.stdout.decode("utf-8", "replace")
         OUTPUT.append(output)
         parsed = None

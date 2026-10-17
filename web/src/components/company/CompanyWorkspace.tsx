@@ -1,4 +1,5 @@
 import PriceChart from './PriceChart';
+import CompanyInfoTab from './CompanyInfoTab';
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,7 +32,6 @@ import {
   impactEdges,
   selectTime,
   number,
-  safeHref,
 } from './detail-model';
 
 const workspaceClasses =
@@ -582,34 +582,7 @@ export default function CompanyWorkspace() {
           </section>
         )}
         {tab === 'documents' && <CompanyDocumentPanel />}
-        {tab === 'info' && company.data && (
-          <section aria-label="기업 기준정보">
-            <h2>기업 기준정보</h2>
-            <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-[var(--zoop-faint)] [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
-              {[
-                ['정식 법인명', company.data.legalName],
-                ['시장', company.data.market],
-                ['업종', company.data.sector],
-                ['대표자', company.data.representative],
-                ['설립일', company.data.foundedDate],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{value ?? '미제공'}</dd>
-                </div>
-              ))}
-            </dl>
-            {safeHref(company.data.websiteUrl) && (
-              <a
-                href={safeHref(company.data.websiteUrl)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                공식 웹사이트
-              </a>
-            )}
-          </section>
-        )}
+        {tab === 'info' && <CompanyInfoTab resource={company} />}
         <section aria-label="핵심 재무">
           <h2>핵심 재무</h2>
           <Status resource={financials} label="재무" />

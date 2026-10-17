@@ -4,7 +4,7 @@
 It FAILS, never skips, without the environment below. Required:
     ZOOP_GRAPH_SMOKE_URI=bolt://127.0.0.1:<port>   an EMPTY, isolated Neo4j 5 database nothing else uses (loopback only)
     ZOOP_GRAPH_AUTH=none|basic  [ZOOP_GRAPH_USER / ZOOP_GRAPH_PASSWORD]   [ZOOP_GRAPH_SMOKE_DATABASE=neo4j]
-    make pipeline-install && make service-install                         (the private PoC credential is needed for the pipeline)
+    make pipeline-install && make service-install                         (public dependencies only; no private credential)
 Run: `make service-graph-smoke` or `ai/service/.venv/bin/python ai/service/scripts/graph_service_smoke.py`.
 
 What it does. The operator side (ai/pipeline's interpreter) builds an OWNED synthetic world with `ai/evaluation/scripts/graph_tool_bench.py prepare`: actual
@@ -318,7 +318,7 @@ def main() -> int:
         return 1
     for path in (PIPELINE_PYTHON, GRAPH_CLI, BENCH):
         if not path.is_file():
-            print(f"FAILED: {path.name} is missing: run `make pipeline-install` (private PoC credential)", file=sys.stderr)
+            print(f"FAILED: {path.name} is missing: run `make pipeline-install`", file=sys.stderr)
             return 1
     root = Path(tempfile.mkdtemp(prefix="zoop-ai-graph-service-smoke-")).resolve()
     smoke, run_id = Smoke(root), "gsm" + os.urandom(4).hex()

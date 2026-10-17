@@ -109,6 +109,7 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | `components/company/CompanyDocumentsTab.tsx`        | 관련 문서         | D-COM-02                    | 출처·발행 시각·인용을 제공한다. 문서 탭 설명과 일부 프레임이 불일치한다.                 |
 | `components/company/CompanyInfoTab.tsx`             | 기업 정보         | PDF 실제 5페이지 하단       | 정식 명칭·시장·업종·설립·홈페이지를 표시한다.                                            |
 | `components/company/CompanyRelationGraph.tsx`       | 기업 관계 그래프  | D-COM-04 내부 요소          | 기업 상세와 같은 asOf를 사용하고 전체 지도 진입을 연결한다.                              |
+| `components/briefing/PublishedBriefing.tsx`         | 발행 회차 조회    | D-BRF-01 / 02               | 날짜·회차 API 조회, 상태·재시도·정정 이력과 불변 발행 데이터를 표시한다.                 |
 | `components/briefing/MarketIndicators.tsx`          | 주요 시장 지표    | D-BRF-01 / 02               | 회차 시각과 지표 관측 시각을 구분하고 정상·지연·사용 불가·실패를 분리한다.               |
 | `components/briefing/BriefingIssueList.tsx`         | 핵심 이슈         | D-BRF-01 / 02               | 핵심 이슈·선정 이유·근거·회차 지도·피드백을 연결한다.                                    |
 | `components/briefing/BriefingComparison.tsx`        | 아침 대비 변화    | D-BRF-02                    | 동일 날짜 출근 회차 대비 신규·이어짐·빠짐을 비교한다.                                    |

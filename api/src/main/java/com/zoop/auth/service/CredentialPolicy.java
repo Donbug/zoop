@@ -14,14 +14,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public final class CredentialPolicy {
-    private static final int PASSWORD_MIN_CODE_POINTS = 15;
-    private static final int PASSWORD_MAX_CODE_POINTS = 128;
+    private static final int PASSWORD_MIN_CODE_POINTS = 8;
+    private static final int PASSWORD_MAX_CODE_POINTS = 32;
     private static final int DISPLAY_NAME_MAX_CODE_POINTS = 40;
 
     private final Set<String> commonPasswords;
 
     public CredentialPolicy() {
-        try (var input = CredentialPolicy.class.getResourceAsStream("/auth/common-passwords-v1.txt")) {
+        try (var input = CredentialPolicy.class.getResourceAsStream("/auth/common-passwords-v2.txt")) {
             if (input == null) {
                 throw new IllegalStateException("Common password list is missing");
             }

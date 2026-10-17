@@ -31,7 +31,7 @@ make bff-build
 # S1 worker 자체 locked 환경 설치·시험·schema drift (공개 의존성만)
 make worker-install worker-test worker-schema-check
 make worker-build
-# S2/S3 pipeline (private PoC 접근 필요)
+# 수집·S2-1·S2-2·S3·S4·graph·handoff 전체 pipeline (네이티브 replay 전용, 공개 의존성만, private PoC·토큰 불필요)
 make pipeline-install pipeline-test pipeline-smoke
 make pipeline-build
 # S1 내부 HTTP transport (loopback 전용, 공개 의존성만; 설치된 zoop-ai를 test 의존성으로 사용)
@@ -69,7 +69,7 @@ runner는 `ubuntu-24.04`로 명시합니다. 공식 [runner image 도구 목록]
 | `web` | `prototype/web`의 frozen pnpm 설치, typecheck, Vitest, Vite build | 없음 |
 | `app-web` | 루트 `web/`의 frozen pnpm 10.34.6 설치(`HUSKY=0`으로 git hook 설치 생략), ESLint, Prettier check, `tsc -b` + Vite build, Vitest | 없음 |
 | `bff` | App 등록 preflight, private pinned PoC 설치, worker 설치(토큰 없음), offline pytest, worker portable fixture 및 BFF→web type 생성 drift | 필요 |
-| `ai-pipeline` | 동일한 fork 거부·App 등록 preflight, private pinned PoC 설치(`private_poc_sync.py --project ai/pipeline`), offline pytest, ingestion/extraction/relation 실제 CLI smoke | 필요 |
+| `ai-pipeline` | 공개 의존성만 `make pipeline-install`(private Git 접근·App token 없음)로 설치한 환경에서 offline pytest 전체와 collection/ingestion/extraction/relation/dependents/handoff 실제 CLI smoke(`make pipeline-test pipeline-smoke`). 이 환경에는 `investmate`가 설치되지 않으며 시험은 PoC import를 막은 자식 프로세스에서도 모든 pipeline 모듈·명령이 동작함을 확인한다. 이 job의 success는 `required-ci`와 릴리스 게이트(`scripts/require_ci.py`의 `REQUIRED_JOBS`)가 요구하고, 브랜치 보호의 required status check 등록은 관리자의 수동 항목이다. 이전의 별도 `ai-pipeline-public` job과 `pipeline-public-*` target은 이 job으로 합쳐 제거했다 | 없음 |
 | `ai-worker` | worker 자신의 manifest 설치, offline pytest, S1 schema drift, stdlib portable fixture validation | 없음 |
 | `ai-service` | service 자신의 manifest 설치(worker는 test 의존성), offline pytest(실제 uvicorn+설치된 `zoop-ai`+authored replay), 실제 loopback smoke, 내부 OpenAPI drift. 로컬 준비 상태이며 배포 승인이 아니다 | 없음 |
 | `api` | 러너의 JDK 21(`JAVA_HOME_21_X64`, 없으면 실패), `make api-test api-build`(foundation + AI 클라이언트 시험, DB·Python 불필요), `make service-install`, `make api-ai-smoke`(실제 Java→uvicorn ai/service→설치된 zoop-ai replay, 합성 인메모리 토큰, 모델 호출 0). 로컬 준비 상태이며 배포 승인이 아니다 | 없음 |

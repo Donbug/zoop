@@ -10,7 +10,7 @@ LG CNS AM Inspire Camp 5기 2조 금융 도메인 프로젝트입니다. 내 종
 |---|---|---|
 | `web/` | 사용자·관리자 클라이언트 | [화면계획서](docs/screen-plan/README.md), `docs/design/`, 목표 HTTP 계약 |
 | `api/` — 실행 기반 있음 | 인증·업무 규칙·앱 저장소·공개 HTTP API | [API 실행·개발 안내](api/README.md), [목표 OpenAPI](docs/api/openapi.yaml), [계약 인계](docs/migration/contract-handoff.md) |
-| `ai/` — **현재 존재** | AI 실행·작업·산출물 저장소. 독립 세 프로젝트 `ai/worker`(S1 CLI), `ai/pipeline`(S2/S3, private PoC), `ai/service`(S1 내부 HTTP, 로컬 준비 상태·미배포). worker/service 설치에는 private PoC 토큰이 필요 없지만 HTTP 호출에는 별도 서비스 인증이 필요합니다. | [ai/README.md](ai/README.md), [AI 실행 계약](docs/design/ai-system.md), [내부 HTTP 계약](docs/api/internal-ai-openapi.yaml), [이식 가이드](docs/migration/README.md) |
+| `ai/` — **현재 존재** | AI 실행·작업·산출물 저장소. 독립 세 프로젝트 `ai/worker`(S1 CLI), `ai/pipeline`(S2/S3 네이티브 replay 전용), `ai/service`(S1 내부 HTTP, 로컬 준비 상태·미배포). 세 프로젝트 모두 설치에 private PoC 토큰이 필요 없지만(PoC는 `prototype/bff`만 사용) HTTP 호출에는 별도 서비스 인증이 필요합니다. | [ai/README.md](ai/README.md), [AI 실행 계약](docs/design/ai-system.md), [내부 HTTP 계약](docs/api/internal-ai-openapi.yaml), [이식 가이드](docs/migration/README.md) |
 | `contracts/` | 필요한 언어 중립 생성물·합성 fixture의 향후 배포 경계 | **정본은 현재 `docs/api/`**입니다. 생성·검증 명령과 실제 consumer가 생길 때 만들며 두 번째 명세 원본으로 사용하지 않습니다. |
 | `infra/` | 별도 승인된 배포·운영 설정 | [현재 구조와 목표/클라우드 초안](docs/share/system-architecture/README.md), [설정 선행조건](docs/development/github-setup.md) |
 | `docs/` — 현재 존재 | 원문 근거·설계·계약·인계 | [근거 목록](docs/evidence/README.md), [추적 체계](docs/system/README.md) |

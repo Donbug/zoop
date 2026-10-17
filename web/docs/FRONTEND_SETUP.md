@@ -123,7 +123,12 @@ VITE_API_BASE_URL=https://api.example.com
 
 4. `pnpm --dir web dev`로 띄운 `https://localhost:5173/login`을 브라우저에서 열고, 자체 서명 인증서 경고는 이 로컬 주소에 한해 진행한다.
 
-현재 `api/`에 구현된 인증 API는 가입·로그인·세션 조회·약관·소셜(Google·카카오) 시작·콜백·소셜 가입이다. 로그아웃(`POST /api/v1/auth/logout`), 비회원 세션(`POST /api/v1/auth/guest`), 로그인 후 이동을 정하는 `GET /api/v1/me/settings`·`GET /api/v1/portfolio`는 아직 없어 404다. 그래서 초기 설정을 마친 회원은 로그인 후 종목을 확인하지 못해 이동할 화면을 정하지 못하고, 로그인 화면에서 [로그인 상태 다시 확인]만 할 수 있다(FS006: 추측하지 않음). 소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다.
+현재 `api/`에 구현된 인증 API는 가입·로그인·세션 조회·약관·소셜(Google·카카오) 시작·콜백·소셜 가입이다. 로그아웃(`POST /api/v1/auth/logout`), 비회원 세션(`POST /api/v1/auth/guest`), 로그인 후 이동을 정하는 `GET /api/v1/me/settings`·`GET /api/v1/portfolio`는 아직 없어 404다. 그래서 초기 설정을 마친 회원은 로그인 후 종목을 확인하지 못해 이동할 화면을 정하지 못하고, 로그인 화면에서 [로그인 상태 다시 확인]만 할 수 있다(FS006: 추측하지 않음). 소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다. 콜백은 개발 서버 주소를 거쳐야 로그인·가입 화면으로 돌아온다.
+
+- 키는 팀이 함께 쓰는 개발용 OAuth 클라이언트 하나를 쓰고 Git에 넣지 않는다. `api/.env`를 바꾸면 API를 다시 시작해야 반영된다.
+- Google: OAuth 클라이언트의 **승인된 리디렉션 URI**에 위 주소를 그대로 등록한다. `api/.env`의 client ID가 그 클라이언트의 것이어야 한다. 동의 화면 사용자 유형이 **내부**이면 개인 Gmail은 `org_internal`로 막히므로, **외부 + 테스트** 상태로 두고 테스트 사용자를 등록한다.
+- 카카오: **Redirect URI**에 위 주소를 등록하고 OpenID Connect와 이메일 동의항목을 켠다.
+- 처음 소셜 로그인한 사용자는 `/signup?social=pending`으로 돌아와 표시 이름과 약관 동의만으로 가입을 마친다(D-AUT-02 소셜 가입).
 
 `src/apis/auth/ApiService.ts`:
 
