@@ -71,9 +71,11 @@ public final class GraphSnapshotFilter {
     }
 
     private static Issue withEvidence(Issue i, Set<String> evidenceIds) {
-        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.action(), i.target(), i.geography(),
-                i.geographyPolicyVersion(), i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(),
-                i.articleIds(), i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.latestPublishedAt());
+        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(),
+                i.action(), i.target(), i.geography(), i.geographyPolicyVersion(),
+                i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(), i.articleIds(),
+                i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.mentions(),
+                i.representativeMentionId(), i.latestPublishedAt());
     }
 
     private static String articleKey(Article a) {

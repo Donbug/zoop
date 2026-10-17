@@ -9,7 +9,7 @@ import java.util.Objects;
  */
 public record PublicGraphSnapshot(int snapshotFormat, String versionId, String sourceBundleId, List<Company> companies,
         List<Issue> issues, List<Relation> relations, List<Article> articles, List<Evidence> evidence) {
-    public static final int FORMAT = 2;
+    public static final int FORMAT = 3;
 
     public PublicGraphSnapshot {
         Objects.requireNonNull(versionId, "versionId");
@@ -27,16 +27,23 @@ public record PublicGraphSnapshot(int snapshotFormat, String versionId, String s
      * Canonical public issue (not a per-document mention or a per-job event candidate). Unresolved geography, or
      * geography without its supporting evidence, never reaches a snapshot. {@code eventTime} keeps the precision
      * given by {@code timePrecision} ("2026", "2026-09", "2026-09-22", an instant, or null for unknown).
+     * {@code period}, {@code assertionStatus} and the mention references come from the AI handoff issue as given
+     * ({@code period}, {@code assertionStatus}, {@code sourceEvents}, {@code representative}); null when not given.
      */
-    public record Issue(String issueId, String label, String eventTime, String timePrecision, String action,
-            String target, String geography, String geographyPolicyVersion, List<String> geographyEvidenceIds,
-            List<String> articleIds, List<String> evidenceIds, String latestPublishedAt) {
+    public record Issue(String issueId, String label, String eventTime, String timePrecision, String period,
+            String assertionStatus, String action, String target, String geography, String geographyPolicyVersion,
+            List<String> geographyEvidenceIds, List<String> articleIds, List<String> evidenceIds,
+            List<MentionRef> mentions, String representativeMentionId, String latestPublishedAt) {
         public Issue {
             geographyEvidenceIds = List.copyOf(geographyEvidenceIds);
             articleIds = List.copyOf(articleIds);
             evidenceIds = List.copyOf(evidenceIds);
+            mentions = List.copyOf(mentions);
         }
     }
+
+    /** One per-document mention the issue was built from, pinned to an article version of this snapshot. */
+    public record MentionRef(String mentionId, String articleId, String articleVersion) { }
 
     /** Approved source relation. Display edges group these by (relationType, source, target) at read time. */
     public record Relation(String relationId, String relationType, String source, String target, String role,
