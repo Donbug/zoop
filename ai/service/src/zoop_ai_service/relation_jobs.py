@@ -44,7 +44,7 @@ BUSY_WAIT = 10.0
 # Pipeline refusals that mean "the pipeline is busy or the server-side state is unusable", never "your request is wrong".
 BUSY_CODES = DISPATCH_BUSY | {"extraction_busy", "ingestion_busy"}
 CONFIG_CODES = frozenset({"input_or_configuration_invalid", "persistence_failed", "relation_internal_failure", "ledger_version_unknown",
-                          "poc_contract_changed", "state_ownership_unconfigured"})
+                          "analysis_contract_changed", "state_ownership_unconfigured"})
 CONFIG_PATTERN = re.compile(r"state_[a-z_]+|[a-z]+_state_(missing|invalid)|[a-z]+_recovery_required")
 
 

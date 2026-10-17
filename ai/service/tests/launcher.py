@@ -11,6 +11,7 @@ ZOOP_TEST_CRASH_AT = after_intent      after the owner reservation commits, befo
                                        transient SQLite error before touching the row; later calls are real
 ZOOP_TEST_RUN_DEADLINE = seconds       the internal run/resume deadline seam (not configuration)
 ZOOP_TEST_GRAPH_DEADLINE = seconds    the internal graph read/focus deadline seam (not configuration)
+ZOOP_TEST_HANDOFF_DEADLINE = seconds  the internal handoff export deadline seam (not configuration)
 ZOOP_TEST_RELATION_CRASH_AT = after_reserve  S3: after the owner reservation commits, before the pipeline is asked to register
                      after_registration  after the real pipeline registered the job, before the service accepts it
                      before_response   after accepted + dispatch intent commit, before any response is sent
@@ -53,7 +54,8 @@ def die() -> None:
 
 def main() -> int:
     try:
-        limits = {"long": os.environ.get("ZOOP_TEST_RUN_DEADLINE"), "read": os.environ.get("ZOOP_TEST_GRAPH_DEADLINE")}
+        limits = {"long": os.environ.get("ZOOP_TEST_RUN_DEADLINE"), "read": os.environ.get("ZOOP_TEST_GRAPH_DEADLINE"),
+                  "handoff": os.environ.get("ZOOP_TEST_HANDOFF_DEADLINE")}
         service = entry.build_service(load(os.environ), deadlines=Deadlines(**{name: float(value) for name, value in limits.items() if value}))
     except ConfigError as error:
         return entry.refuse(error)

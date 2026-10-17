@@ -12,16 +12,24 @@ public final class SessionCookie {
     }
 
     public static ResponseCookie issue(String token) {
-        return base(token).maxAge(LIFETIME).build();
+        return issue(token, true);
+    }
+
+    public static ResponseCookie issue(String token, boolean secure) {
+        return base(token, secure).maxAge(LIFETIME).build();
     }
 
     public static ResponseCookie clear() {
-        return base("").maxAge(Duration.ZERO).build();
+        return clear(true);
     }
 
-    private static ResponseCookie.ResponseCookieBuilder base(String value) {
+    public static ResponseCookie clear(boolean secure) {
+        return base("", secure).maxAge(Duration.ZERO).build();
+    }
+
+    private static ResponseCookie.ResponseCookieBuilder base(String value, boolean secure) {
         return ResponseCookie.from(NAME, value)
-                .secure(true).httpOnly(true).sameSite("Lax")
+                .secure(secure).httpOnly(true).sameSite("Lax")
                 .path("/api/v1");
     }
 }

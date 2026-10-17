@@ -101,10 +101,11 @@ public class DocumentRegistrationService {
     }
 
     private boolean registerVersion(RegistrationCommand command) {
-        String precision = command.publishedAt() == null ? "unknown" : "datetime";
-        // publisher and raw artifact are not exported by S2-1 and `day` precision is never produced, so they stay NULL.
+        // The publisher and raw artifact are not exported by S2-1, so they stay NULL. Time precision is the export's own:
+        // an instant, a calendar date (never a midnight) or nothing.
         VersionRow wanted = new VersionRow(command.articleId(), command.version(), command.title(), null, command.url(),
-                command.publishedAt(), null, precision, null, command.textArtifactId(), command.collectedAt());
+                command.publishedAt(), command.publishedDate(), command.publicationPrecision(), null, command.textArtifactId(),
+                command.collectedAt());
         boolean created = repository.insertVersionIfAbsent(wanted);
         VersionRow stored = repository.findVersion(command.articleId(), command.version())
                 .orElseThrow(() -> new DocumentImportException(DocumentImportFailure.INTERNAL_ERROR));

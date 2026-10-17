@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
 class EmailAuthPostgresTest {
-    private static final String PASSWORD = "correct horse battery staple 2026";
+    private static final String PASSWORD = "correct horse battery staple";
     private static final String ORIGIN = "https://zoop.example";
 
     @Autowired WebApplicationContext context;

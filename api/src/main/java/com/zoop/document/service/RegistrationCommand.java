@@ -1,6 +1,7 @@
 package com.zoop.document.service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * One verified document version, ready to register. Identity strings are the S2-1 export values, unmodified:
@@ -13,10 +14,22 @@ import java.time.Instant;
  * @param bytes        length of the stored UTF-8 bytes
  * @param title        version-bound title, possibly empty
  * @param url          normalized URL of the observation; kept only if this is the first registered observation
- * @param publishedAt  null when the source gave no publication time; never a guessed value
- * @param collectedAt  page receipt time of the observation; kept only if this is the first registered observation
+ * @param publishedAt  set only for the {@code datetime} precision; never a guessed value
+ * @param publishedDate set only for the {@code day} precision: a calendar date that is never widened to a midnight
+ * @param publicationPrecision the registry's precision vocabulary: {@code datetime}, {@code day} or {@code unknown}
+ * @param collectedAt  time of the observation; kept only if this is the first registered observation. For a document collected
+ *                     over HTTP this is the actual fetch time, otherwise the S2-1 page receipt time
  */
 public record RegistrationCommand(String articleId, String version, String provider, ArticleKind kind,
         String textArtifactId, String storageUri, String sha256, long bytes, String title, String url,
-        Instant publishedAt, Instant collectedAt, PointerPolicy pointer) {
+        Instant publishedAt, LocalDate publishedDate, String publicationPrecision, Instant collectedAt,
+        PointerPolicy pointer) {
+
+    /** The authored form: a publication instant or none ({@code datetime} / {@code unknown}), never a day. */
+    public RegistrationCommand(String articleId, String version, String provider, ArticleKind kind, String textArtifactId,
+            String storageUri, String sha256, long bytes, String title, String url, Instant publishedAt, Instant collectedAt,
+            PointerPolicy pointer) {
+        this(articleId, version, provider, kind, textArtifactId, storageUri, sha256, bytes, title, url, publishedAt, null,
+                publishedAt == null ? "unknown" : "datetime", collectedAt, pointer);
+    }
 }

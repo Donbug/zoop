@@ -37,11 +37,12 @@
 
 ## 화면·목표 API
 
-[D-ONB-02](screen-D-ONB-02.md) · [D-MY-01](screen-D-MY-01.md)
+[D-ONB-02](screen-D-ONB-02.md) · [D-COM-01](screen-D-COM-01.md) · [D-MY-01](screen-D-MY-01.md) · [M-COM-01](screen-M-COM-01.md)
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
 | [listVirtualAccountProfiles](../../api/out/zoop-api-spec.md#listvirtualaccountprofiles) | GET /api/v1/portfolio/mock-portfolios | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 | 회원(본인) |
 | [getVirtualAccountProfile](../../api/out/zoop-api-spec.md#getvirtualaccountprofile) | GET /api/v1/portfolio/mock-portfolios/{id} | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 | 회원(본인) |
 | [connectVirtualAccount](../../api/out/zoop-api-spec.md#connectvirtualaccount) | POST /api/v1/portfolio/connections | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 | 회원(본인) |
+| [getMyPortfolio](../../api/out/zoop-api-spec.md#getmyportfolio) | GET /api/v1/portfolio | 6.1.2, 6.11.1, 6.3.2, 6.4.1, 6.4.3, 6.4.4, 6.4.6, 6.7.8 | 회원(본인) |
 | [disconnectVirtualAccount](../../api/out/zoop-api-spec.md#disconnectvirtualaccount) | DELETE /api/v1/portfolio/connections/{id} | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 | 회원(본인) |

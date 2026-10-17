@@ -2,6 +2,7 @@ package com.zoop.document.importer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -16,6 +17,7 @@ import static com.zoop.document.importer.ExportFixtures.CONTROL_HASH;
 import static com.zoop.document.importer.ExportFixtures.CONTROL_TEXT;
 import static com.zoop.document.importer.ExportFixtures.EMOJI_HASH;
 import static com.zoop.document.importer.ExportFixtures.EMOJI_TEXT;
+import static com.zoop.document.importer.ExportFixtures.collected;
 import static com.zoop.document.importer.ExportFixtures.MIXED_HASH;
 import static com.zoop.document.importer.ExportFixtures.MIXED_TEXT;
 import static com.zoop.document.importer.ExportFixtures.NFC_HASH;
@@ -247,5 +249,120 @@ class IngestionExportParserTest {
         VerifiedDocument document = parser.parse(ExportFixtures.bytes(export), observation);
         assertEquals("", document.title());
         assertEquals("https://example.invalid/한글/\uD83D\uDE00", document.url());
+    }
+
+    private ObjectNode collectedExport(String precision, String raw) {
+        return collected(export(observation, PLAIN_TEXT, PLAIN_HASH), "news", precision, raw);
+    }
+
+    private static ObjectNode collectionOf(ObjectNode export) {
+        return (ObjectNode) observationOf(export).get("collection");
+    }
+
+    private static ObjectNode publishedOf(ObjectNode export) {
+        return (ObjectNode) collectionOf(export).get("published");
+    }
+
+    private DocumentImportFailure collectedFailure(String precision, String raw, Consumer<ObjectNode> mutation) {
+        ObjectNode export = collectedExport(precision, raw);
+        mutation.accept(export);
+        return failure(ExportFixtures.bytes(export));
+    }
+
+    @Test
+    void anAuthoredExportHasNoCollectionFactsAndKeepsItsPrecision() {
+        VerifiedDocument dated = parser.parse(ExportFixtures.bytes(export(observation, PLAIN_TEXT, PLAIN_HASH)), observation);
+        assertNull(dated.collected());
+        assertNull(dated.publishedDate());
+        assertEquals("datetime", dated.publicationPrecision());
+        ObjectNode none = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(none).putNull("publishedAt");
+        assertEquals("unknown", parser.parse(ExportFixtures.bytes(none), observation).publicationPrecision());
+    }
+
+    @Test
+    void collectedObservationsKeepEveryDeclaredTimeAtItsOwnPrecisionAndEveryAcquisitionFact() {
+        VerifiedDocument instant = parser.parse(ExportFixtures.bytes(collectedExport("instant", "2026-10-14T09:00:00+09:00")), observation);
+        assertEquals(Instant.parse("2026-10-14T00:00:00Z"), instant.publishedAt());
+        assertNull(instant.publishedDate());
+        assertEquals("datetime", instant.publicationPrecision());
+
+        // A calendar date stays a date: never an instant, never a midnight in any zone.
+        VerifiedDocument day = parser.parse(ExportFixtures.bytes(collectedExport("day", "2026-10-14")), observation);
+        assertNull(day.publishedAt());
+        assertEquals(LocalDate.of(2026, 10, 14), day.publishedDate());
+        assertEquals("day", day.publicationPrecision());
+
+        // A time without an offset is not given a timezone: the registry stores `unknown`, the declared form is kept in `collected`.
+        VerifiedDocument unresolved = parser.parse(ExportFixtures.bytes(collectedExport("unresolved", "2026-10-14T09:30:00")), observation);
+        assertNull(unresolved.publishedAt());
+        assertNull(unresolved.publishedDate());
+        assertEquals("unknown", unresolved.publicationPrecision());
+        assertEquals("unresolved", unresolved.collected().declaredPrecision());
+        assertEquals("2026-10-14T09:30:00", unresolved.collected().declaredRaw());
+
+        VerifiedDocument unknown = parser.parse(ExportFixtures.bytes(collectedExport("unknown", null)), observation);
+        assertEquals("unknown", unknown.publicationPrecision());
+        assertNull(unknown.collected().declaredRaw());
+
+        CollectedProvenance facts = day.collected();
+        assertEquals("collect-1", facts.collectionId());
+        assertEquals(Instant.parse("2026-10-13T23:59:58.123456Z"), facts.fetchedAt());
+        assertEquals(200, facts.httpStatus());
+        assertEquals("text/html; charset=utf-8", facts.contentType());
+        assertEquals("https://example.invalid/a", facts.finalUrl());
+        assertEquals("news", facts.documentKind());
+        assertEquals("synthetic_loopback", facts.network());
+        assertEquals(ExportFixtures.hex64('7'), facts.receiptSha256());
+        assertEquals(ExportFixtures.hex64('9'), facts.bodySha256());
+    }
+
+    @Test
+    void theCollectedFactsAreAClosedConsistentRecord() {
+        // The two observation keys exist together or not at all.
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("provenance", "collected_http")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putObject("collection")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> observationOf(e).remove("provenance")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> observationOf(e).remove("collection")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> observationOf(e).put("provenance", "authored_control")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("provenance", "other")));
+        // Closed objects: an unknown key anywhere is refused, not ignored.
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("extra", 1)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> publishedOf(e).put("extra", 1)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID,
+                collectedFailure("day", "2026-10-14", e -> ((ObjectNode) collectionOf(e).get("receipt")).put("extra", 1)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).remove("network")));
+        // Values: the body hash must be the export's own raw hash; status, kind, network and times are exact.
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("bodySha256", ExportFixtures.hex64('8'))));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> ((ObjectNode) collectionOf(e).get("receipt")).put("sha256", "abc")));
+        for (int status : new int[] {199, 300, 404, 500}) {
+            assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("httpStatus", status)));
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("documentKind", "blog")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("network", "internet")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("fetchedAt", "2026-10-13T23:59:58")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("fetchedAt", "2026-10-13")));
+        assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED, collectedFailure("day", "2026-10-14", e -> collectionOf(e).put("finalUrl", "")));
+    }
+
+    @Test
+    void theDeclaredPublicationFieldsMustAgreeWithTheLedgersPublishedAt() {
+        // A day is a date and nothing else: no time of day, no other spelling, a real calendar day, no instant beside it.
+        assertEquals(DocumentImportFailure.EXPORT_INVALID,
+                collectedFailure("day", "2026-10-14", e -> observationOf(e).put("publishedAt", "2026-10-14T00:00:00Z")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("day", "2026-10-14", e -> publishedOf(e).put("date", "2026-10-15")));
+        assertEquals(DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED, collectedFailure("day", "2026-02-30", e -> { }));
+        assertEquals(DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED, collectedFailure("day", "2026-10-14T00:00:00Z", e -> { }));
+        assertEquals(DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED, collectedFailure("day", "20261014", e -> { }));
+        // An instant must equal the ledger's publishedAt and keep the exact ledger form.
+        assertEquals(DocumentImportFailure.EXPORT_INVALID,
+                collectedFailure("instant", "2026-10-14T09:00:00+09:00", e -> observationOf(e).put("publishedAt", "2026-10-14T00:00:00Z")));
+        assertEquals(DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED, collectedFailure("instant", "2026-10-14", e -> { }));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("instant", null, e -> { }));
+        // An offset-less time and an undeclared time can never carry a ledger instant.
+        assertEquals(DocumentImportFailure.EXPORT_INVALID,
+                collectedFailure("unresolved", "2026-10-14T09:30:00", e -> observationOf(e).put("publishedAt", "2026-10-14T09:30:00Z")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("unknown", "2026-10-14", e -> { }));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, collectedFailure("weekly", "2026-10-14", e -> { }));
     }
 }

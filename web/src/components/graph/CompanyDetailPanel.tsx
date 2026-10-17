@@ -1,3 +1,4 @@
+import type { EventContext } from '@/types/map/event';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,6 +9,7 @@ import type { GraphNode } from '@/types/map/graph';
 type RelatedCompany = { id: string; name: string; sharedIssueCount: number };
 type Props = {
   companyId: string;
+  context?: EventContext;
   fallback: GraphNode;
   relatedCompanies: RelatedCompany[];
   token: string | null;
@@ -78,6 +80,7 @@ export default function CompanyDetailPanel(props: Props) {
     props.companyId,
     props.token,
     retry,
+    props.context,
   );
   const [watchOverride, setWatchOverride] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
@@ -229,8 +232,8 @@ export default function CompanyDetailPanel(props: Props) {
                   <span>
                     52주 범위{' '}
                     <b>
-                      {number(quote.quote.week52Low)}–
-                      {number(quote.quote.week52High)}
+                      {number(quote.quote.fiftyTwoWeekLow)}–
+                      {number(quote.quote.fiftyTwoWeekHigh)}
                     </b>
                   </span>
                 </div>

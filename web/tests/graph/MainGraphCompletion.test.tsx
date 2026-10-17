@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MapPage from '@/pages/map/MapPage';
 import { getGraph } from '@/apis/graph/graph';
+import { getBriefingGraphBasis } from '@/apis/briefing/briefing';
 import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { focusNeighborhood } from '@/components/graph/graph-model';
 import { createMockGraph } from '@/mocks/graph/response';
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import type { GraphResponse } from '@/types/map/graph';
 
 vi.mock('@/apis/graph/graph', () => ({ getGraph: vi.fn() }));
+vi.mock('@/apis/briefing/briefing', () => ({ getBriefingGraphBasis: vi.fn() }));
 vi.mock('@/apis/graph/tutorial', () => ({ setTutorialCompleted: vi.fn() }));
 vi.mock('@/components/graph/GraphCanvas', () => ({
   default: ({
@@ -83,6 +85,51 @@ function setup(url = '/?mode=all') {
   render(<RouterProvider router={router} />);
   return router;
 }
+
+it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  const roundId = 'brf-2026-09-17-evening';
+  vi.mocked(getBriefingGraphBasis).mockResolvedValue({
+    roundId,
+    date: '2026-09-17',
+    edition: 'evening',
+    status: 'available',
+    message: null,
+    reason: null,
+    publishedAt: '2026-09-17T09:11:00Z',
+    dataAsOf: '2026-09-17T09:10:00Z',
+    graphVersion: 'fixture-v1',
+    keyIssueIds: [],
+    companyIds: [],
+    correctionCount: 0,
+  });
+  const router = setup(`/?mode=all&round=${roundId}`);
+  await screen.findByTestId('graph-canvas');
+  expect(
+    vi
+      .mocked(getGraph)
+      .mock.calls.some(([request]) => request.round === roundId),
+  ).toBe(true);
+  expect(
+    await screen.findByRole('region', { name: '브리핑 회차 기준 지도' }),
+  ).toBeTruthy();
+  expect(
+    screen
+      .getByTestId('graph-canvas')
+      .closest('section')
+      ?.getAttribute('data-screen-id'),
+  ).toBe('D-BRF-04');
+  await userEvent.click(
+    screen.getByRole('button', { name: '현재 그래프로 보기' }),
+  );
+  await waitFor(() =>
+    expect(vi.mocked(getGraph).mock.calls.at(-1)?.[0].round).toBeUndefined(),
+  );
+  expect(router.state.location.search).not.toContain('round=');
+});
 
 describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
   beforeEach(() => {

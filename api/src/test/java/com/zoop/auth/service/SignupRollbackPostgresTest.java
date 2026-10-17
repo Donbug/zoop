@@ -43,7 +43,7 @@ class SignupRollbackPostgresTest {
                 .filter(term -> term.required() && term.version() != null)
                 .map(term -> new SignupRequest.Agreement(term.id(), term.version(), true)).toList();
         assertEquals(2, agreements.size());
-        var request = new SignupRequest(email, "correct horse battery staple 2026", "Rollback Member", agreements);
+        var request = new SignupRequest(email, "correct horse battery staple", "Rollback Member", agreements);
         try {
             assertThrows(IllegalStateException.class,
                     () -> signups.signup(request, EmailAddress.parse(email), null, "rollback-test"));
