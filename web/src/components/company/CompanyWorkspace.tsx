@@ -358,7 +358,16 @@ export default function CompanyWorkspace() {
               <button
                 key={p.value}
                 aria-pressed={period === p.value}
-                onClick={() => updateQuery({ period: p.value, bucket: null })}
+                onClick={() => {
+                  // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
+                  const selected = events.data?.items.find(
+                    (item) => item.id === eventId,
+                  );
+                  updateQuery({
+                    period: p.value,
+                    bucket: selected ? bucketKey(selected, p.value) : null,
+                  });
+                }}
               >
                 {p.label}
               </button>

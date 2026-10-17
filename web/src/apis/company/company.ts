@@ -76,16 +76,12 @@ export async function readCompanyResource<T>(
         '요청한 기업·기간과 다른 차트를 받았어요.',
       );
     if (prices.status === 'available') {
-      const from = requested.searchParams.get('from');
       const to = requested.searchParams.get('to');
+      // 일·주 봉은 구간 시작 시각으로 찍히므로 첫 봉이 from보다 앞설 수 있다. 기준 시점(to) 뒤의 자료만 거부한다.
       if (
         prices.points.some((point) => {
           const at = Date.parse(point.time);
-          return (
-            !Number.isFinite(at) ||
-            (from !== null && at < Date.parse(from)) ||
-            (to !== null && at > Date.parse(to))
-          );
+          return !Number.isFinite(at) || (to !== null && at > Date.parse(to));
         })
       )
         throw new ApiError(

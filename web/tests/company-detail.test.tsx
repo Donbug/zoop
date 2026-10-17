@@ -309,7 +309,7 @@ test('D-COM-03 shares the company request and restores the info tab after a map 
 test('direct URL defaults to one month and supplied timestamp/version; quote stays latest', async () => {
   open();
   await screen.findByRole('heading', { name: '합성 기업' });
-  await screen.findByRole('img', { name: '공급된 종가 차트' });
+  await screen.findByRole('group', { name: '공급된 종가 차트' });
   await waitFor(() =>
     expect(screen.getByTestId('address').textContent).toContain(
       'graphVersion=v1',
@@ -340,6 +340,26 @@ test('same bucket exposes count then individual cards and exact selected event t
         ?.query.get('asOf'),
     ).toBe(old),
   );
+});
+test('FS044: changing the period keeps the selected issue and moves it to the new bucket', async () => {
+  open(pinned);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole('button', { name: '2026-10-05 · 사건 2건' }),
+  );
+  await user.click(screen.getByRole('button', { name: '합성 사건 A' }));
+  await screen.findByRole('heading', { name: '합성 사건 A' });
+  await user.click(screen.getByRole('button', { name: '1주' }));
+  const address = new URLSearchParams(
+    screen.getByTestId('address').textContent!.split('?')[1],
+  );
+  expect(address.get('period')).toBe('1w');
+  expect(address.get('event')).toBe('issue-a');
+  expect(address.get('bucket')).toBeTruthy();
+  expect(address.get('bucket')).not.toBe('2026-10-05');
+  expect(
+    await screen.findByRole('button', { name: '합성 사건 A' }),
+  ).toBeTruthy();
 });
 test('chart selection updates historical requests; period retains snapshot and changes resolution', async () => {
   open(pinned);
@@ -372,7 +392,7 @@ test('market unavailability and provider errors remain independent with retry', 
   open(pinned);
   await screen.findByText(/시세 조회 실패/);
   expect(
-    await screen.findByRole('img', { name: '공급된 종가 차트' }),
+    await screen.findByRole('group', { name: '공급된 종가 차트' }),
   ).toBeTruthy();
   server.on('GET', '/api/v1/companies/:id/quote', () =>
     json({ status: 'unavailable', reason: '종목 미지원' }),
@@ -578,7 +598,7 @@ test('unsupported resolution is not mislabeled as requested chart', async () => 
   );
   open(pinned);
   await screen.findByText(/공급된 봉 해상도가 달라/);
-  expect(screen.queryByRole('img', { name: '공급된 종가 차트' })).toBeNull();
+  expect(screen.queryByRole('group', { name: '공급된 종가 차트' })).toBeNull();
 });
 test('buckets follow exact five-minute/hour/day/week resolutions and never invented impact', () => {
   expect(
@@ -815,7 +835,7 @@ test('D-COM-05/06: every period shares exact chart/timeline from/to and pins gra
           ?.query.get('period'),
       ).toBe(period),
     );
-    await screen.findByRole('img', { name: '공급된 종가 차트' });
+    await screen.findByRole('group', { name: '공급된 종가 차트' });
     const pricesRequest = server
       .calls('GET', '/api/v1/companies/:id/prices')
       .at(-1)!;
@@ -997,7 +1017,7 @@ test('mismatched chart company/period is rejected rather than shown as selected 
   );
   open(pinned);
   await screen.findByText(/요청한 기업·기간과 다른 차트/);
-  expect(screen.queryByRole('img', { name: '공급된 종가 차트' })).toBeNull();
+  expect(screen.queryByRole('group', { name: '공급된 종가 차트' })).toBeNull();
 });
 
 test('chart bucket marker opens event cards from the info tab without altering cutoff', async () => {

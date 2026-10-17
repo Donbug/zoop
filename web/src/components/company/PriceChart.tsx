@@ -40,7 +40,7 @@ export default function PriceChart({
     <svg
       className="h-auto w-full"
       viewBox="0 0 600 210"
-      role="img"
+      role="group"
       aria-label="공급된 종가 차트"
     >
       <polyline
@@ -90,7 +90,13 @@ export default function PriceChart({
               bucketKey(
                 { eventTime: point.time, timePrecision: 'datetime' },
                 period,
-              ) === key,
+              ) === key ||
+              // 1일·1주에서 일 정밀도 사건은 같은 한국 날짜의 첫 봉에 표시한다.
+              (key.endsWith(' · 일 정밀도') &&
+                bucketKey(
+                  { eventTime: point.time, timePrecision: 'datetime' },
+                  '1m',
+                ) === key.slice(0, 10)),
           )?.time;
         if (!at || Date.parse(at) < start || Date.parse(at) > end) return null;
         const selected =
