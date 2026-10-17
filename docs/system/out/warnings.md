@@ -4,6 +4,13 @@
 
 | 분류 | 수준 | 대상 ID | 경고 내용 | 출처 |
 | --- | --- | --- | --- | --- |
+| SOURCE_CHANGED | error | docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/evidence/spec-v1.2-gap.md | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| SOURCE_CHANGED | error | docs/screen-plan/captures/slide-index.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
+| DETAIL_AUTHORITY_INVALID | error | 03-메인-그래프.csv | 이력 시트의 출처 고정본이 선언(docs/evidence/raw/functional-spec_2026-10-12)과 다르다: ['docs\\evidence\\raw\\functional-spec_2026-10-12'] |  |
+| DETAIL_AUTHORITY_INVALID | error | 07-AI-챗봇.csv | 이력 시트의 출처 고정본이 선언(docs/evidence/raw/functional-spec_2026-10-12)과 다르다: ['docs\\evidence\\raw\\functional-spec_2026-10-12'] |  |
 | SPEC_NOT_IN_INDEX | warning | FS050-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS050-02 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS052-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row) |
@@ -70,13 +77,13 @@
 | TEAM_DECISION_REQUIRED | warning | getBriefing | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listBriefingRounds | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getBriefingGraphBasis | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | createConversation | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | getConversation | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | getCurrentConversation | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | submitQuestion | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
-| TEAM_DECISION_REQUIRED | warning | getQuestionJob | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | retryQuestionJob | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | cancelQuestionJob | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | createConversation | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |  |
+| TEAM_DECISION_REQUIRED | warning | getConversation | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | getCurrentConversation | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | submitQuestion | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |  |
+| TEAM_DECISION_REQUIRED | warning | getQuestionJob | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |  |
+| TEAM_DECISION_REQUIRED | warning | retryQuestionJob | 실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다. |  |
+| TEAM_DECISION_REQUIRED | warning | cancelQuestionJob | 취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getAdminSession | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | logInAdmin | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | logOutAdmin | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
@@ -280,17 +287,17 @@
 | BFF_PATH_DIFFERENCE | difference | createConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | createConversation | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 136 · BFF만 32 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 140 · BFF만 32 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | getCurrentConversation | 목표 /api/v1/chat/sessions/current ↔ BFF /api/chat/sessions/current |  |
-| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 136 · BFF만 32 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 140 · BFF만 32 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | submitQuestion | 목표 /api/v1/chat/sessions/{id}/jobs ↔ BFF /api/chat/sessions/{id}/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 211 · BFF만 34 · 형식/필수/권한 변경 24 |  |
+| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 219 · BFF만 34 · 형식/필수/권한 변경 38 |  |
 | BFF_PATH_DIFFERENCE | difference | getQuestionJob | 목표 /api/v1/chat/jobs/{job_id} ↔ BFF /api/chat/jobs/{job_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 153 · BFF만 23 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 157 · BFF만 23 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | retryQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/retry ↔ BFF /api/chat/jobs/{job_id}/retry |  |
-| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 207 · BFF만 34 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 215 · BFF만 34 · 형식/필수/권한 변경 35 |  |
 | BFF_PATH_DIFFERENCE | difference | cancelQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/cancel ↔ BFF /api/chat/jobs/{job_id}/cancel |  |
-| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 184 · BFF만 23 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 188 · BFF만 23 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminSession | 목표 /api/v1/admin/auth/session ↔ BFF /api/admin/auth/session |  |
 | BFF_FIELD_DIFFERENCE | difference | getAdminSession | 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | logInAdmin | 목표 /api/v1/admin/auth/login ↔ BFF /api/admin/auth/login |  |

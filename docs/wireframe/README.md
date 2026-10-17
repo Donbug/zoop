@@ -98,6 +98,8 @@
 
 [전체 보드 보기](boards/06-ai-chat.jpg)
 
+정적 화면에 없는 로딩·확인 질문·복구·오류·답변 근거 수준은 [AI 챗봇 화면 상태 계약](ai-chatbot-state-contract.md)을 함께 적용합니다.
+
 | 순서 | 화면 ID | 화면명 | 기준 라우트 | 이미지 | 상세 문서 |
 |---:|---|---|---|---|---|
 | 1 | `D-AI-01` | D-AI-01 · AI 질문·대상 연결 | `/?mode=all&select=node%3AKRX%3A005930` | [PNG](screens/D-AI-01--node-620-1593.png) | [D-AI-01](../system/out/screen-D-AI-01.md) |
