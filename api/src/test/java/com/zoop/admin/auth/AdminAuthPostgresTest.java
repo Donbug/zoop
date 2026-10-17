@@ -1,7 +1,11 @@
 package com.zoop.admin.auth;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import com.zoop.admin.auth.provision.AdminProvisioningService;
@@ -130,10 +134,51 @@ class AdminAuthPostgresTest {
         assertEquals(1, jdbc.queryForObject("""
                 SELECT count(*) FROM audit_logs
                 WHERE request_id = ? AND action = 'auth.login_failed' AND outcome = 'denied'
+                  AND reason = 'invalid_credentials'
                 """, Integer.class, "admin-failed-" + suffix));
         assertEquals(1, jdbc.queryForObject("""
-                SELECT count(*) FROM auth_rate_events WHERE scope = 'admin_login_email_failure'
-                """, Integer.class));
+                SELECT count(*) FROM auth_rate_events
+                WHERE scope = 'admin_login_email_failure' AND subject_hash = ?
+                """, Integer.class, rateSubjectHash("admin_login_email_failure",
+                "missing-" + suffix + "@example.com")));
+    }
+
+    @Test
+    void blockedAdminLoginFailuresAreCountedAndEventuallyRateLimited() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        String email = "blocked-" + suffix + "@example.com";
+        String adminId = provisioning.provision(email, "Blocked Admin", PASSWORD,
+                "provision-blocked-" + suffix);
+        jdbc.update("UPDATE admins SET status = 'blocked' WHERE id = ?", adminId);
+
+        for (int attempt = 1; attempt <= 20; attempt++) {
+            mvc.perform(post("/api/v1/admin/auth/login")
+                            .header("Origin", ORIGIN)
+                            .header("X-Request-ID", "admin-blocked-" + suffix + "-" + attempt)
+                            .contentType("application/json")
+                            .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error.code").value("MEMBER_BLOCKED"));
+        }
+
+        mvc.perform(post("/api/v1/admin/auth/login")
+                        .header("Origin", ORIGIN)
+                        .header("X-Request-ID", "admin-blocked-" + suffix + "-limited")
+                        .contentType("application/json")
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error.code").value("RATE_LIMITED"));
+
+        String rateHash = rateSubjectHash("admin_login_email_failure", email);
+        assertEquals(20, jdbc.queryForObject("""
+                SELECT count(*) FROM auth_rate_events
+                WHERE scope = 'admin_login_email_failure' AND subject_hash = ?
+                """, Integer.class, rateHash));
+        assertEquals(20, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_logs
+                WHERE request_id LIKE ? AND action = 'auth.login_failed'
+                  AND outcome = 'denied' AND reason = 'account_blocked'
+                """, Integer.class, "admin-blocked-" + suffix + "-%"));
     }
 
     @Test
@@ -158,5 +203,14 @@ class AdminAuthPostgresTest {
                         .header("Origin", ORIGIN).header("X-CSRF-Token", csrf))
                 .andExpect(status().isNoContent());
         mvc.perform(post("/api/v1/admin/auth/logout")).andExpect(status().isNoContent());
+    }
+
+    private static String rateSubjectHash(String scope, String subject) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest((scope + "\0" + subject).getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

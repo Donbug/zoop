@@ -33,15 +33,16 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
     }
 
     @Override
-    public void recordLoginFailure(String requestId, Instant occurredAt) {
+    public void recordLoginFailure(String requestId, String reason, Instant occurredAt) {
         jdbc.update("""
                 INSERT INTO audit_logs
                   (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
                    target_type, target_id, outcome, purpose, reason, request_id, detail, occurred_at)
                 VALUES ('anonymous', NULL, 'unknown', NULL, 'auth.login_failed',
-                        'admin_session', NULL, 'denied', NULL, 'invalid_credentials',
+                        'admin_session', NULL, 'denied', NULL, :reason,
                         :requestId, '{}'::jsonb, :occurredAt)
                 """, new MapSqlParameterSource("requestId", requestId)
+                .addValue("reason", reason)
                 .addValue("occurredAt", Timestamp.from(occurredAt)));
     }
 

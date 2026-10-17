@@ -43,12 +43,13 @@ public class AdminLoginService {
         boolean passwordMatches = passwords.matchesOrDummy(request.password(), hash);
         if (!passwordMatches || admin.isEmpty()) {
             rates.recordAdminLoginFailure(email.key());
-            audit.loginFailed(requestId);
+            audit.loginFailed(requestId, "invalid_credentials");
             throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
         }
         var account = admin.orElseThrow();
         if (!"active".equals(account.status()) || !"admin".equals(account.role())) {
-            audit.loginFailed(requestId);
+            rates.recordAdminLoginFailure(email.key());
+            audit.loginFailed(requestId, "account_blocked");
             throw new CustomException(ErrorCode.MEMBER_BLOCKED);
         }
         var issued = sessions.issue(account.id(), account.email(), account.displayName(),

@@ -27,9 +27,9 @@ public class AdminAuthAuditService implements AdminSessionService.AdminSessionAu
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void loginFailed(String requestId) {
+    public void loginFailed(String requestId, String reason) {
         try {
-            repository.recordLoginFailure(requestId, clock.instant());
+            repository.recordLoginFailure(requestId, reason, clock.instant());
         } catch (RuntimeException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
