@@ -1,5 +1,6 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
+import BoltIcon from './BoltIcon';
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,7 +31,6 @@ import {
   timeRange,
   bucketKey,
   impactEdges,
-  selectTime,
   number,
 } from './detail-model';
 
@@ -64,6 +64,8 @@ function Basis({ metadata }: { metadata: Meta | undefined }) {
     </p>
   ) : null;
 }
+const bucketElementId = (key: string) => `bucket-${key.replace(/[^w-]/g, '_')}`;
+
 export default function CompanyWorkspace() {
   const { id = '' } = useParams();
   const { params, updateQuery } = useRouteQuery();
@@ -171,7 +173,16 @@ export default function CompanyWorkspace() {
     ? portfolio.data.holdings.find((h) => h.companyId === id)
     : null;
   const selectedBucket = params.get('bucket');
-  const visible = selectedBucket ? (groups.get(selectedBucket) ?? []) : [];
+  // 최근 버킷부터. 시각을 알 수 없는 버킷은 맨 뒤에 둔다.
+  const sortedGroups = [...groups].sort(([a], [b]) =>
+    /^d/.test(a) === /^d/.test(b) ? b.localeCompare(a) : /^d/.test(a) ? -1 : 1,
+  );
+  useEffect(() => {
+    if (selectedBucket)
+      document
+        .getElementById(bucketElementId(selectedBucket))
+        ?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedBucket]);
   const mapQuery = new URLSearchParams({
     mode: 'all',
     select: `node:${eventId ?? id}`,
@@ -194,9 +205,7 @@ export default function CompanyWorkspace() {
       ...(targetTab
         ? { tab: targetTab, docScope: 'event', document: null, evidence: null }
         : {}),
-      ...(item.timePrecision === 'datetime' && exactTime(item.eventTime)
-        ? { asOf: item.eventTime! }
-        : {}),
+      // 사건을 골라도 기준 시점은 바꾸지 않는다(D-COM-06 시점 이동 없음).
     });
   }
   if (invalid)
@@ -420,38 +429,31 @@ export default function CompanyWorkspace() {
                       evidence: null,
                     })
                   }
-                  onSelect={(time) => updateQuery(selectTime(time))}
                 />
                 <p>
                   {prices.data.source.name} · {prices.data.currency} ·{' '}
                   {prices.data.source.delayNote ?? '지연 정보 미제공'}
                 </p>
-                <details>
-                  <summary>차트 시점 선택·가격 표</summary>
-                  <table>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-zoop-muted">
+                    표로 보기
+                  </summary>
+                  <table className="mt-2 w-full text-left tabular-nums">
                     <thead>
-                      <tr>
-                        <th>시각</th>
-                        <th>종가</th>
-                        <th>선택</th>
+                      <tr className="text-zoop-muted">
+                        <th className="py-1 font-medium">시각</th>
+                        <th className="py-1 text-right font-medium">종가</th>
                       </tr>
                     </thead>
                     <tbody>
                       {prices.data.points.map((point) => (
-                        <tr key={point.time}>
-                          <td>{point.time}</td>
-                          <td>{number(point.close)}</td>
-                          <td>
-                            <button
-                              disabled={!exactTime(point.time)}
-                              onClick={() =>
-                                updateQuery({
-                                  ...selectTime(point.time),
-                                })
-                              }
-                            >
-                              이 시점 선택
-                            </button>
+                        <tr
+                          key={point.time}
+                          className="border-t-[0.667px] border-zoop-line"
+                        >
+                          <td className="py-1">{point.time}</td>
+                          <td className="py-1 text-right">
+                            {number(point.close)}
                           </td>
                         </tr>
                       ))}
@@ -460,7 +462,7 @@ export default function CompanyWorkspace() {
                 </details>
               </>
             ))}
-          <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2">
+          <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-xs text-zoop-muted">
             차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지 않아요.
           </p>
         </section>
@@ -487,53 +489,76 @@ export default function CompanyWorkspace() {
                 {(events.data.metadata.failures ?? []).map((failure, index) => (
                   <p key={index}>{failure.message}</p>
                 ))}
-                <p>
-                  제공 사건 {events.data.items.length}건 · 시점 미상 제외{' '}
+                <p className="text-xs text-zoop-muted">
+                  {periods.find((p) => p.value === period)?.label} · 사건{' '}
+                  {events.data.items.length}건 · 시점 미상 제외{' '}
                   {events.data.metadata.excludedUnknownTime ?? 0}건
                 </p>
-                {!groups.size && <p>해당 기간에 공개·유효한 사건이 없어요.</p>}
-                <ul className="flex flex-wrap gap-2">
-                  {[...groups].map(([key, items]) => (
-                    <li key={key}>
-                      <button
-                        aria-pressed={selectedBucket === key}
-                        onClick={() =>
-                          updateQuery({
-                            bucket: key,
-                            event: null,
-                            document: null,
-                            evidence: null,
-                          })
-                        }
-                      >
-                        {key} · 사건 {items.length}건
-                      </button>
+                {!groups.size && (
+                  <p className="text-xs text-zoop-muted">
+                    해당 기간에 공개·유효한 사건이 없어요.
+                  </p>
+                )}
+                {/* FS041: 시간 버킷마다 사건 수를 보이고 사건 카드를 나열한다. 차트 ⚡ 표식이나 버킷을 고르면 그 버킷을 강조한다. */}
+                <ol className="flex flex-col">
+                  {sortedGroups.map(([key, items]) => (
+                    <li
+                      key={key}
+                      id={bucketElementId(key)}
+                      className={`grid grid-cols-[7rem_1fr] gap-4 border-b-[0.667px] border-zoop-line px-2 py-4 ${selectedBucket === key ? 'bg-zoop-wash' : ''}`}
+                    >
+                      <p className="text-xs text-zoop-muted tabular-nums">
+                        {key}
+                      </p>
+                      <div className="flex flex-col gap-3">
+                        <button
+                          aria-pressed={selectedBucket === key}
+                          aria-label={`${key} · 사건 ${items.length}건`}
+                          onClick={() =>
+                            updateQuery({
+                              bucket: key,
+                              event: null,
+                              document: null,
+                              evidence: null,
+                            })
+                          }
+                          className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! inline-flex items-center gap-1 self-start font-semibold text-zoop-ink aria-pressed:underline"
+                        >
+                          <BoltIcon />
+                          사건 {items.length}건
+                        </button>
+                        {items.map((item) => (
+                          <article
+                            key={item.id}
+                            className="flex flex-col gap-1 border-0! py-0!"
+                          >
+                            <p className="text-[11px] text-zoop-muted">
+                              문서 {item.articleCount}건 ·{' '}
+                              {item.relationTypes.join(', ') ||
+                                '직접 관계 미확인'}
+                            </p>
+                            <button
+                              aria-pressed={eventId === item.id}
+                              onClick={() => selectEvent(item)}
+                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-left text-sm! font-semibold text-zoop-ink underline-offset-4 hover:underline aria-pressed:underline"
+                            >
+                              {item.title}
+                            </button>
+                            <p className="text-[11px] text-zoop-muted tabular-nums">
+                              {item.eventTime ?? '시점 미상'}
+                            </p>
+                            <button
+                              onClick={() => selectEvent(item, 'documents')}
+                              className="border-0! bg-transparent! min-h-0! p-0! aria-pressed:bg-transparent! aria-pressed:text-zoop-ink! self-start text-[11px]! text-zoop-muted underline underline-offset-4"
+                            >
+                              근거 문서 {item.articleCount}건 보기
+                            </button>
+                          </article>
+                        ))}
+                      </div>
                     </li>
                   ))}
-                </ul>
-                {visible.map((item) => (
-                  <article key={item.id}>
-                    <button
-                      aria-pressed={eventId === item.id}
-                      onClick={() => selectEvent(item)}
-                    >
-                      {item.title}
-                    </button>
-                    <p>
-                      {item.eventTime ?? '시점 미상'} · 문서 {item.articleCount}
-                      건 · {item.relationTypes.join(', ') || '직접 관계 미확인'}
-                    </p>
-                    <button onClick={() => selectEvent(item, 'documents')}>
-                      근거 문서 {item.articleCount}건 보기
-                    </button>
-                    {item.timePrecision !== 'datetime' && (
-                      <p>
-                        정확한 사건 시각이 없어 기준 시점을 임의 변경하지
-                        않아요.
-                      </p>
-                    )}
-                  </article>
-                ))}
+                </ol>
                 {events.data.unknownTimeItems.length > 0 && (
                   <details>
                     <summary>

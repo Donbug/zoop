@@ -72,12 +72,13 @@ test('the chart positions prices by elapsed time instead of index', () => {
       groups={new Map()}
     />,
   );
-  const circles = screen
+  const line = screen
     .getByRole('group', { name: '공급된 종가 차트' })
-    .querySelectorAll('circle');
-  const positions = [...circles].map((circle) =>
-    Number(circle.getAttribute('cx')),
-  );
+    .querySelector('polyline')!;
+  const positions = line
+    .getAttribute('points')!
+    .split(' ')
+    .map((pair) => Number(pair.split(',')[0]));
   expect(positions[1] - positions[0]).toBeLessThan(
     (positions[2] - positions[1]) / 20,
   );

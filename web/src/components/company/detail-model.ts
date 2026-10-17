@@ -15,17 +15,6 @@ export const exactTime = (value: string | null | undefined) =>
   !!value &&
   /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value));
-// One URL transition clears dependent selections before historical reads begin.
-export function selectTime(time: string) {
-  return {
-    asOf: time,
-    event: null,
-    bucket: null,
-    document: null,
-    evidence: null,
-    docScope: null,
-  };
-}
 export function bucketKey(
   event: Pick<Event, 'eventTime' | 'timePrecision'>,
   period: ChartPeriod,

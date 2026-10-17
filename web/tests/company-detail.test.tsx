@@ -323,7 +323,7 @@ test('direct URL defaults to one month and supplied timestamp/version; quote sta
   ).toBe(false);
   expect(server.calls('GET', '/api/v1/portfolio')).toHaveLength(0);
 });
-test('same bucket exposes count then individual cards and exact selected event time', async () => {
+test('same bucket exposes count then individual cards; selecting an issue keeps the reference time', async () => {
   open(pinned);
   const user = userEvent.setup();
   await user.click(
@@ -332,13 +332,17 @@ test('same bucket exposes count then individual cards and exact selected event t
   await user.click(screen.getByRole('button', { name: '합성 사건 A' }));
   await screen.findByRole('heading', { name: '합성 사건 A' });
   expect(screen.getByTestId('address').textContent).toContain('event=issue-a');
+  // D-COM-06 시점 이동 없음: 사건을 골라도 기준 시점은 그대로다.
+  expect(screen.getByTestId('address').textContent).toContain(
+    `asOf=${encodeURIComponent(time)}`,
+  );
   await waitFor(() =>
     expect(
       server
         .calls('GET', '/api/v1/companies/:id/graph')
         .at(-1)
         ?.query.get('asOf'),
-    ).toBe(old),
+    ).toBe(time),
   );
 });
 test('FS044: changing the period keeps the selected issue and moves it to the new bucket', async () => {
@@ -361,17 +365,12 @@ test('FS044: changing the period keeps the selected issue and moves it to the ne
     await screen.findByRole('button', { name: '합성 사건 A' }),
   ).toBeTruthy();
 });
-test('chart selection updates historical requests; period retains snapshot and changes resolution', async () => {
+test('price bars are not selectable; period change retains snapshot and changes resolution', async () => {
   open(pinned);
   const user = userEvent.setup();
-  await user.click(
-    await screen.findByRole('button', { name: `차트 ${old} 선택` }),
-  );
-  await waitFor(() =>
-    expect(
-      server.calls('GET', '/api/v1/events').at(-1)?.query.get('asOf'),
-    ).toBe(old),
-  );
+  await screen.findByRole('group', { name: '공급된 종가 차트' });
+  // D-COM-06 시점 이동을 두지 않으므로 가격 봉 선택 버튼이 없다.
+  expect(screen.queryByRole('button', { name: `차트 ${old} 선택` })).toBeNull();
   await user.click(screen.getByRole('button', { name: '1주' }));
   await waitFor(() =>
     expect(
@@ -660,7 +659,7 @@ test('selected graph version is not silently replaced with latest', async () => 
   ).toBeNull();
 });
 
-test('FS043: event card enters its document scope with period and exact time retained', async () => {
+test('FS043: event card enters its document scope with period and reference time retained', async () => {
   server.on('GET', '/api/v1/companies/:id/documents', (r) =>
     json({
       items: [
@@ -702,7 +701,7 @@ test('FS043: event card enters its document scope with period and exact time ret
       .calls('GET', '/api/v1/companies/:id/documents')
       .at(-1)
       ?.query.get('asOf'),
-  ).toBe(old);
+  ).toBe(time);
 });
 
 test('D-COM-04 depth change retains company period/time/tab and passes exact scope to the API', async () => {
@@ -869,11 +868,9 @@ test('chart count marker expands both events without changing public cutoff; eve
       .getByRole('button', { name: '차트 사건 2026-10-05 · 사건 2건' })
       .getAttribute('aria-pressed'),
   ).toBe('true');
-  expect(
-    screen
-      .getByRole('button', { name: `차트 ${old} 선택` })
-      .getAttribute('aria-pressed'),
-  ).toBe('true');
+  expect(screen.getByTestId('address').textContent).toContain(
+    `asOf=${encodeURIComponent(time)}`,
+  );
   const region = screen.getByRole('complementary', {
     name: '시점 기반 관계 그래프',
   });
@@ -884,53 +881,28 @@ test('chart count marker expands both events without changing public cutoff; eve
   ).toBe('true');
 });
 
-test('chart time transition clears dependent event/document/evidence and keeps tab', async () => {
-  open(
-    `${pinned}&tab=info&event=issue-a&bucket=2026-10-05&document=old&evidence=old&docScope=event`,
-  );
-  await userEvent.click(
-    await screen.findByRole('button', { name: `차트 ${old} 선택` }),
-  );
-  await waitFor(() =>
-    expect(
-      server.calls('GET', '/api/v1/events').at(-1)?.query.get('asOf'),
-    ).toBe(old),
-  );
-  const address = screen.getByTestId('address').textContent!;
-  for (const key of [
-    'event=',
-    'bucket=',
-    'document=',
-    'evidence=',
-    'docScope=',
-  ])
-    expect(address).not.toContain(key);
-  expect(address).toContain('tab=info');
-  expect(address).toContain('graphVersion=v1');
-});
-
-test('late timeline response from former cutoff is discarded after chart selection', async () => {
+test('late timeline response from the former period is discarded after a period change', async () => {
   const pending = deferred<Response>();
-  server.on('GET', '/api/v1/events', (r) =>
-    r.query.get('asOf') === time
-      ? pending.promise
-      : json({
-          items: [events[0]],
-          unknownTimeItems: [],
-          nextCursor: null,
-          metadata: {
-            ...metadata,
-            asOf: old,
-            total: 1,
-            excludedUnknownTime: 0,
-          },
-        }),
-  );
+  let first = true;
+  server.on('GET', '/api/v1/events', () => {
+    if (first) {
+      first = false;
+      return pending.promise;
+    }
+    return json({
+      items: [events[0]],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        total: 1,
+        excludedUnknownTime: 0,
+      },
+    });
+  });
   open(pinned);
-  await userEvent.click(
-    await screen.findByRole('button', { name: `차트 ${old} 선택` }),
-  );
-  await screen.findByRole('button', { name: '2026-10-05 · 사건 1건' });
+  await userEvent.click(await screen.findByRole('button', { name: '1주' }));
+  await screen.findAllByRole('button', { name: /· 사건 1건$/ });
   await act(async () =>
     pending.resolve(
       json({
@@ -941,11 +913,11 @@ test('late timeline response from former cutoff is discarded after chart selecti
       }),
     ),
   );
+  expect(screen.queryAllByRole('button', { name: /· 사건 2건$/ })).toHaveLength(
+    0,
+  );
   expect(
-    screen.queryByRole('button', { name: '2026-10-05 · 사건 2건' }),
-  ).toBeNull();
-  expect(
-    screen.getByRole('button', { name: '2026-10-05 · 사건 1건' }),
+    screen.getAllByRole('button', { name: /· 사건 1건$/ })[0],
   ).toBeTruthy();
 });
 
