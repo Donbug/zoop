@@ -138,28 +138,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Require private PoC registration (forks cannot receive credentials)
-        env:
-          POC_APP_ID: ${{ vars.POC_APP_ID }}
-          POC_APP_PRIVATE_KEY: ${{ secrets.POC_APP_PRIVATE_KEY }}
-          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-        run: |
-          if [ "$IS_FORK" = "true" ]; then
-            printf '%s\n' 'Private PoC tests require a maintainer-reviewed same-repository PR; fork CI is not a full pass.' >&2
-            exit 1
-          fi
-          if [ -z "$POC_APP_ID" ] || [ -z "$POC_APP_PRIVATE_KEY" ]; then
-            printf '%s\n' 'Missing POC_APP_ID / POC_APP_PRIVATE_KEY. Register read-only App access to Donbug/investmate-poc; see docs/development/github-setup.md.' >&2
-            exit 1
-          fi
-      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        id: poc-token
-        with:
-          app-id: ${{ vars.POC_APP_ID }}
-          private-key: ${{ secrets.POC_APP_PRIVATE_KEY }}
-          owner: Donbug
-          repositories: investmate-poc
-          permission-contents: read
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
@@ -169,11 +147,9 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: false
-      - name: Install pinned dependencies with ephemeral read-only credentials
-        env:
-          POC_READ_TOKEN: ${{ steps.poc-token.outputs.token }}
-        run: python scripts/private_poc_sync.py --project ai/pipeline
-      - name: Offline pipeline tests and actual CLI smokes (replay only, no model token or real state)
+      - name: Install the pipeline runtime (public dependencies only, no private Git access or token)
+        run: make pipeline-install
+      - name: Offline pipeline tests and actual CLI smokes (native replay only, investmate is not installed; no model token, provider call or real state)
         run: make pipeline-test pipeline-smoke
   ai-worker:
     name: ai-worker
@@ -193,6 +169,8 @@ jobs:
         run: make worker-install
       - name: Offline worker tests (no model token or external data)
         run: make worker-test worker-schema-check
+      - name: Korean verification authored-control gate (actual installed CLI, loopback only, no model token)
+        run: make evaluation-verification-check
       - name: Validate portable authored contract fixture
         run: python ai/worker/scripts/validate_contracts.py
   ai-service:

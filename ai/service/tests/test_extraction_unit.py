@@ -112,7 +112,9 @@ def test_a_complete_group_loads_and_hands_the_child_only_ownership_roots(tmp_pat
 def test_no_provider_key_url_model_or_live_switch_ever_reaches_the_child(tmp_path):
     ws = Workspace(tmp_path, replay=document_replay())
     live = {"ZOOP_AI_LIVE_ENABLED": "1", "ZOOP_AI_GLOBAL_MAX_CALLS": "5", "ZOOP_AI_API_KEY": "k-secret", "ZOOP_AI_BASE_URL": "http://127.0.0.1:1",
-            "ZOOP_AI_PROVIDER": "openai", "ZOOP_AI_DOCUMENT_SUMMARY_MODEL": "m", "OPENAI_API_KEY": "k-other", "HTTPS_PROXY": "http://127.0.0.1:2"}
+            "ZOOP_AI_PROVIDER": "openai", "ZOOP_AI_DOCUMENT_SUMMARY_MODEL": "m", "OPENAI_API_KEY": "k-other", "HTTPS_PROXY": "http://127.0.0.1:2",
+            "ZOOP_AI_VERIFY_PROVIDER": "typesafe-native", "TYPESAFE_API_KEY": "k-jev-secret", "TYPESAFE_BASE_URL": "http://127.0.0.1:3/v1",
+            "TYPESAFE_VALIDATION_MODEL": "jev-1.14.0"}
     extraction = load(extraction_env(ws, tmp_path, **live)).extraction
     assert extraction is not None
     assert not set(extraction.child_env) & (set(live) | {"HOME", "OPENAI_BASE_URL"}) and "k-secret" not in json.dumps(dict(extraction.child_env))
@@ -365,6 +367,14 @@ def test_only_the_pre_effect_busy_refusals_are_retried_and_the_s3_code_is_not_on
     # A job the pipeline recorded as stopped (a busy ingestion reader INSIDE an execution) is an ordinary result: idle, explicit recover only.
     stopped = policy(Outcome("result", result={}, exit_code=0), object(), busy_count=0, busy_codes=BUSY_CODES)
     assert (stopped.state, stopped.last_outcome) == ("idle", "exited")
+
+
+def test_the_analysis_contract_refusal_is_a_server_configuration_fault_in_s2_and_s3_and_the_retired_poc_codes_are_not():
+    from zoop_ai_service import extraction_jobs, relation_jobs
+    for module in (extraction_jobs, relation_jobs):
+        assert module.is_config_code("analysis_contract_changed") and module.is_config_code("ledger_version_unknown")
+        assert not module.is_config_code("poc_contract_changed") and not module.is_config_code("pinned_poc_unavailable") and not module.is_config_code("job_input_conflict")
+    assert extraction_jobs.is_config_code("replay_fixture_invalid")
 
 
 # ---- the exit-code interpretation of the S2 pipeline -------------------------------------------------------------------------

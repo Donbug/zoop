@@ -1,0 +1,680 @@
+{
+ "schema": "zoop-verify-gold-1",
+ "corpusId": "fin-verify-ko-v1",
+ "revision": "1",
+ "inputsSha256": "cf368670e081cb022f6b1557e92d1667b52f63139014b88c75a3925fb57c0c81",
+ "provenance": {
+  "annotators": 1,
+  "adjudicated": false,
+  "synthetic": true,
+  "devOnly": true,
+  "authoredFrom": "문서 본문만 보고 한 명이 직접 작성했다. 어떤 모델의 출력에서도 가져오지 않았다.",
+  "note": "단일 작성자 초안이며 합의를 거치지 않았다. 경계 사례(제한 claim, 도출 숫자, 원인·예측 표현)의 라벨은 논쟁 여지가 있다."
+ },
+ "cases": [
+  {
+   "caseId": "VK-01",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-01-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 8% 증가"
+    },
+    {
+     "claimId": "VK-01-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 12% 감소"
+    },
+    {
+     "claimId": "VK-01-c3",
+     "decision": "supported",
+     "tags": [
+      "limitation"
+     ],
+     "note": "본문은 전망 미제시만 밝힌다"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-02",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-02-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 8% 증가"
+    },
+    {
+     "claimId": "VK-02-c2",
+     "decision": "contradicted",
+     "tags": [
+      "direction"
+     ],
+     "note": "본문은 12% 감소"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-03",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-03-c1",
+     "decision": "contradicted",
+     "tags": [
+      "numeric"
+     ],
+     "note": "본문은 8% 증가, 18%는 숫자 변조"
+    },
+    {
+     "claimId": "VK-03-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 12% 감소"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-04",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-04-c1",
+     "decision": "supported",
+     "tags": [
+      "numeric-derived"
+     ],
+     "note": "1,050/12,400=8.47% > 8%"
+    },
+    {
+     "claimId": "VK-04-c2",
+     "decision": "contradicted",
+     "tags": [
+      "numeric-derived"
+     ],
+     "note": "12%는 영업이익 감소율이고 영업이익률은 8.47%"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-05",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": true,
+   "claims": [
+    {
+     "claimId": "VK-05-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 12% 감소"
+    },
+    {
+     "claimId": "VK-05-c2",
+     "decision": "insufficient",
+     "tags": [
+      "causal"
+     ],
+     "note": "본문이 든 이유는 재고 평가손실이며 중국 수요는 언급 없음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-06",
+   "expectedGate": "reject",
+   "expectedAdvice": true,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-06-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 12% 감소"
+    },
+    {
+     "claimId": "VK-06-c2",
+     "decision": "insufficient",
+     "tags": [
+      "advice"
+     ],
+     "note": "본문은 매수 판단을 다루지 않음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-07",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-07-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 2026년 2분기 흑자 전환"
+    },
+    {
+     "claimId": "VK-07-c2",
+     "decision": "supported",
+     "tags": [
+      "time"
+     ],
+     "note": "본문: 전년 2분기 150억 원 영업손실"
+    },
+    {
+     "claimId": "VK-07-c3",
+     "decision": "supported",
+     "tags": [
+      "numeric"
+     ],
+     "note": "본문: 같은 기간 평균 가동률 87%"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-08",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-08-c1",
+     "decision": "contradicted",
+     "tags": [
+      "time"
+     ],
+     "note": "본문은 2분기, 3분기로 기간 변조"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-09",
+   "expectedGate": "hold",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-09-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 2분기 흑자 전환"
+    },
+    {
+     "claimId": "VK-09-c2",
+     "decision": "insufficient",
+     "tags": [
+      "unsupported-detail"
+     ],
+     "note": "본문에 시장 기대치 없음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-10",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-10-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 20% 인수 결정"
+    },
+    {
+     "claimId": "VK-10-c2",
+     "decision": "supported",
+     "tags": [
+      "numeric"
+     ],
+     "note": "본문: 3,000억 원"
+    },
+    {
+     "claimId": "VK-10-c3",
+     "decision": "supported",
+     "tags": [
+      "time"
+     ],
+     "note": "본문: 올해 말 완료 예정"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-11",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-11-c1",
+     "decision": "contradicted",
+     "tags": [
+      "entity"
+     ],
+     "note": "인수 주체는 대하물산이고 동성상사는 입찰 불참"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-12",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-12-c1",
+     "decision": "contradicted",
+     "tags": [
+      "negation"
+     ],
+     "note": "본문: 참여하지 않았다"
+    },
+    {
+     "claimId": "VK-12-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 인수하기로 했다"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-13",
+   "expectedGate": "hold",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-13-c1",
+     "decision": "supported",
+     "tags": [
+      "numeric"
+     ],
+     "note": "본문: 3,000억 원"
+    },
+    {
+     "claimId": "VK-13-c2",
+     "decision": "insufficient",
+     "tags": [
+      "unsupported-detail"
+     ],
+     "note": "조달 방식은 본문에 없음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-14",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-14-c1",
+     "decision": "supported",
+     "tags": [
+      "negation"
+     ],
+     "note": "본문: 충족하지 못했다"
+    },
+    {
+     "claimId": "VK-14-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 검토 후 결정하겠다"
+    },
+    {
+     "claimId": "VK-14-c3",
+     "decision": "supported",
+     "tags": [
+      "limitation"
+     ],
+     "note": "본문에 수치 없음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-15",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-15-c1",
+     "decision": "contradicted",
+     "tags": [
+      "negation"
+     ],
+     "note": "본문은 충족하지 못했다"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-16",
+   "expectedGate": "reject",
+   "expectedAdvice": true,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-16-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 충족하지 못했다"
+    },
+    {
+     "claimId": "VK-16-c2",
+     "decision": "insufficient",
+     "tags": [
+      "advice"
+     ],
+     "note": "주가 예측은 본문에 없고 금지된 예측 표현"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-17",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-17-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 충족하지 못했다"
+    },
+    {
+     "claimId": "VK-17-c2",
+     "decision": "contradicted",
+     "tags": [
+      "limitation"
+     ],
+     "note": "본문은 3상 진행 여부가 미정이라고만 하며 3상 결과를 다루지 않는다"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-18",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-18-c1",
+     "decision": "supported",
+     "tags": [
+      "numeric-derived"
+     ],
+     "note": "4,200/5,000=0.84, 16% 감소"
+    },
+    {
+     "claimId": "VK-18-c2",
+     "decision": "supported",
+     "tags": [
+      "numeric-derived"
+     ],
+     "note": "4,200/3,500=1.20, 20% 증가"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-19",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-19-c1",
+     "decision": "contradicted",
+     "tags": [
+      "numeric-derived"
+     ],
+     "note": "실제 감소율은 16%"
+    },
+    {
+     "claimId": "VK-19-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 늘었다"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-20",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": true,
+   "claims": [
+    {
+     "claimId": "VK-20-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 줄었다"
+    },
+    {
+     "claimId": "VK-20-c2",
+     "decision": "insufficient",
+     "tags": [
+      "causal"
+     ],
+     "note": "본문은 생산 라인 중단 사유만 밝히고 판매 감소와 연결하지 않음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-21",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-21-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 주당 500원"
+    },
+    {
+     "claimId": "VK-21-c2",
+     "decision": "supported",
+     "tags": [
+      "numeric-derived"
+     ],
+     "note": "500원 > 400원"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-22",
+   "expectedGate": "reject",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-22-c1",
+     "decision": "contradicted",
+     "tags": [
+      "time"
+     ],
+     "note": "본문은 12월 31일"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-23",
+   "expectedGate": "reject",
+   "expectedAdvice": true,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-23-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 주당 500원"
+    },
+    {
+     "claimId": "VK-23-c2",
+     "decision": "insufficient",
+     "tags": [
+      "advice"
+     ],
+     "note": "보유 권유는 본문에 없음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-24",
+   "expectedGate": "hold",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-24-c1",
+     "decision": "insufficient",
+     "tags": [
+      "unsupported-detail"
+     ],
+     "note": "본문은 타결 시점 미정이며 이번 달 타결은 본문으로 판단 불가"
+    },
+    {
+     "claimId": "VK-24-c2",
+     "decision": "supported",
+     "tags": [
+      "limitation"
+     ],
+     "note": "본문에 쟁점 없음"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-25",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-25-c1",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 진행 중"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-26",
+   "expectedGate": "hold",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-26-c1",
+     "decision": "insufficient",
+     "tags": [
+      "unsupported-detail"
+     ],
+     "note": "본문은 재고 평가손실만 언급하고 부문 손익은 없음"
+    },
+    {
+     "claimId": "VK-26-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 8% 증가"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-27",
+   "expectedGate": "hold",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-27-c1",
+     "decision": "insufficient",
+     "tags": [
+      "unsupported-detail"
+     ],
+     "note": "해외 비중은 본문에 없음"
+    },
+    {
+     "claimId": "VK-27-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 이틀간 중단"
+    }
+   ]
+  },
+  {
+   "caseId": "VK-28",
+   "expectedGate": "supported",
+   "expectedAdvice": false,
+   "expectedCausality": false,
+   "claims": [
+    {
+     "claimId": "VK-28-c1",
+     "decision": "supported",
+     "tags": [
+      "numeric"
+     ],
+     "note": "본문: 12개 병원"
+    },
+    {
+     "claimId": "VK-28-c2",
+     "decision": "supported",
+     "tags": [
+      "plain"
+     ],
+     "note": "본문: 하위 분석 검토 후 결정"
+    }
+   ]
+  }
+ ]
+}

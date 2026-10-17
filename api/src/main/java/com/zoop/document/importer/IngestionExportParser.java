@@ -4,6 +4,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.Set;
@@ -13,6 +14,7 @@ import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.Text;
 import com.zoop.document.DocumentImportException;
 import com.zoop.document.DocumentImportFailure;
+import com.zoop.document.service.ArticleKind;
 
 /**
  * Validates one S2-1 {@code zoop-ai-ingest export} document against the exact observation the operator asked for.
@@ -40,6 +42,14 @@ public final class IngestionExportParser {
     private static final Set<String> DOCUMENT = Set.of("documentId", "documentVersion", "sourceId", "textArtifactId",
             "inputKind", "cleanerVersion", "text", "sourceHash", "rawLocators");
     private static final Set<String> MEDIA_TYPES = Set.of("text/html", "application/pdf");
+    /** Present together, and only for an observation collected over HTTP; an authored export has neither key. */
+    private static final Set<String> COLLECTED_KEYS = Set.of("provenance", "collection");
+    private static final Set<String> COLLECTION = Set.of("provenance", "collectionId", "receipt", "fetchedAt", "finalUrl",
+            "httpStatus", "contentType", "bodySha256", "documentKind", "network", "published");
+    private static final Set<String> FILE_REF = Set.of("file", "sha256");
+    private static final Set<String> PUBLISHED = Set.of("raw", "precision", "date", "basis");
+    private static final Pattern CALENDAR_DATE = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2}");
+    private static final int MAX_COLLECTION_CODE_POINTS = 200;
 
     public VerifiedDocument parse(byte[] export, Observation expected) {
         try {
@@ -52,7 +62,8 @@ public final class IngestionExportParser {
     private static VerifiedDocument verify(StrictJson.Obj root, Observation expected) {
         root.exactly(TOP);
         require(SCHEMA_VERSION.equals(root.string("schemaVersion")));
-        StrictJson.Obj observation = root.object("observation").exactly(OBSERVATION);
+        StrictJson.Obj observation = root.object("observation").keys(OBSERVATION, COLLECTED_KEYS);
+        require(observation.has("provenance") == observation.has("collection"));
         StrictJson.Obj grant = root.object("grant").exactly(GRANT);
         StrictJson.Obj document = root.object("document").exactly(DOCUMENT);
         root.object("locatorMetadata");
@@ -102,8 +113,35 @@ public final class IngestionExportParser {
         }
 
         Instant observedAt = timestamp(observation.string("observedAt"), DocumentImportFailure.EXPORT_INVALID);
-        Instant publishedAt = observation.isNull("publishedAt") ? null
-                : timestamp(observation.string("publishedAt"), DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED);
+        CollectedProvenance collected = observation.has("provenance")
+                ? collected(observation, root.object("locatorMetadata")) : null;
+
+        Instant publishedAt = null;
+        LocalDate publishedDate = null;
+        String precision = "unknown";
+        if (collected == null) {
+            if (!observation.isNull("publishedAt")) {
+                publishedAt = timestamp(observation.string("publishedAt"), DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED);
+                precision = "datetime";
+            }
+        } else {
+            // The declared classification and the ledger's publishedAt must agree; a date is never widened to a midnight.
+            switch (collected.declaredPrecision()) {
+                case "instant" -> {
+                    require(!observation.isNull("publishedAt")
+                            && collected.declaredRaw().equals(observation.string("publishedAt")));
+                    publishedAt = timestamp(collected.declaredRaw(), DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED);
+                    precision = "datetime";
+                }
+                case "day" -> {
+                    require(observation.isNull("publishedAt"));
+                    publishedDate = calendarDate(collected.declaredRaw());
+                    precision = "day";
+                }
+                case "unresolved", "unknown" -> require(observation.isNull("publishedAt"));
+                default -> throw failure(DocumentImportFailure.EXPORT_INVALID);
+            }
+        }
 
         String title = observation.string("title");
         String url = observation.string("url");
@@ -111,8 +149,65 @@ public final class IngestionExportParser {
                 || Text.codePoints(url) > MAX_URL_CODE_POINTS || !Text.storable(title) || !Text.storable(url)) {
             throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
         }
-        return new VerifiedDocument(expected, textArtifactId, text, textUtf8, title, url, publishedAt, observedAt,
-                grantId, grantRevision, document.node());
+        return new VerifiedDocument(expected, textArtifactId, text, textUtf8, title, url, publishedAt, publishedDate, precision,
+                observedAt, grantId, grantRevision, collected, document.node());
+    }
+
+    /**
+     * The acquisition facts of a collected observation, validated in the closed form the ledger writes. The body hash must be
+     * the export's own raw hash, the declared publication fields must be mutually consistent, and every time keeps the
+     * ledger's exact form. These facts are an operator-owned, unsigned record, never proof of a fetch or a license.
+     */
+    private static CollectedProvenance collected(StrictJson.Obj observation, StrictJson.Obj metadata) {
+        require(CollectedProvenance.PROVENANCE.equals(observation.string("provenance")));
+        StrictJson.Obj collection = observation.object("collection").exactly(COLLECTION);
+        require(CollectedProvenance.PROVENANCE.equals(collection.string("provenance")));
+        StrictJson.Obj receipt = collection.object("receipt").exactly(FILE_REF);
+        bounded(receipt.string("file"), 500);
+        String receiptSha256 = receipt.string("sha256");
+        String bodySha256 = collection.string("bodySha256");
+        require(StrictJson.SHA256.matcher(receiptSha256).matches() && StrictJson.SHA256.matcher(bodySha256).matches());
+        require(bodySha256.equals(metadata.string("rawHash")));
+        int status = collection.count("httpStatus");
+        require(status >= 200 && status <= 299);
+        Instant fetchedAt = timestamp(collection.string("fetchedAt"), DocumentImportFailure.EXPORT_INVALID);
+        String finalUrl = collection.string("finalUrl");
+        String contentType = collection.string("contentType");
+        if (finalUrl.isEmpty() || Text.codePoints(finalUrl) > MAX_URL_CODE_POINTS || !Text.storable(finalUrl)
+                || Text.codePoints(contentType) > MAX_COLLECTION_CODE_POINTS || !Text.storable(contentType)) {
+            throw failure(DocumentImportFailure.METADATA_UNSUPPORTED);
+        }
+        String network = collection.string("network");
+        require(network.equals("external") || network.equals("synthetic_loopback"));
+        String kind = collection.string("documentKind");
+        require(ArticleKind.fromWire(kind).isPresent());
+        StrictJson.Obj published = collection.object("published").exactly(PUBLISHED);
+        String precision = published.string("precision");
+        String raw = published.stringOrNull("raw");
+        String date = published.stringOrNull("date");
+        boolean consistent = switch (precision) {
+            case "instant" -> raw != null && date == null;
+            case "day" -> raw != null && raw.equals(date);
+            case "unresolved" -> raw != null && date == null;
+            case "unknown" -> raw == null && date == null;
+            default -> false;
+        };
+        require(consistent);
+        return new CollectedProvenance(bounded(collection.string("collectionId"), 100), receiptSha256, bodySha256, fetchedAt,
+                finalUrl, status, contentType, network, kind, precision, raw,
+                bounded(published.string("basis"), MAX_COLLECTION_CODE_POINTS));
+    }
+
+    /** {@code YYYY-MM-DD} only: no time, no zone, no other spelling, and a real calendar day. */
+    private static LocalDate calendarDate(String value) {
+        try {
+            if (value == null || !CALENDAR_DATE.matcher(value).matches()) {
+                throw failure(DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED);
+            }
+            return LocalDate.parse(value);
+        } catch (DateTimeException error) {
+            throw failure(DocumentImportFailure.PUBLISHED_AT_UNSUPPORTED);
+        }
     }
 
     /**

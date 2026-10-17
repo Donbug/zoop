@@ -14,6 +14,11 @@ SCHEMA_GOLD = "zoop-bench-gold-1"
 SCHEMA_RUN = "zoop-bench-run-1"
 SCHEMA_SCORE = "zoop-bench-score-1"
 SCHEMA_COMPARE = "zoop-bench-compare-1"
+SCHEMA_VERIFY_CASES = "zoop-verify-cases-1"
+SCHEMA_VERIFY_GOLD = "zoop-verify-gold-1"
+SCHEMA_VERIFY_RUN = "zoop-verify-run-1"
+SCHEMA_VERIFY_SCORE = "zoop-verify-score-1"
+SCHEMA_VERIFY_LOOPBACK = "zoop-verify-loopback-script-1"
 
 SPLITS = ("dev", "test")
 TASK_KINDS = ("graph", "qa")

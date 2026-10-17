@@ -19,8 +19,9 @@ PROJECTS = (
     ("app-web", "web", "Production React/Vite frontend (pnpm 10 per its packageManager)", "HUSKY=0 pnpm install --frozen-lockfile", "pnpm lint; pnpm format:check; pnpm build; pnpm test"),
     ("bff", "prototype/bff", "FastAPI prototype (private pinned PoC)", "uv sync --frozen --group dev", "uv run --no-sync python -m pytest; uv build"),
     ("ai-worker", "ai/worker", "S1 Python CLI JSON worker (public dependencies only, not an HTTP service)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; uv build"),
+    ("ai-evaluation", "ai/evaluation", "Offline authored-control scoring; Korean verification gate uses the installed public worker runtime", "make worker-install (from repository root)", "make evaluation-verification-check (from repository root)"),
     ("ai-service", "ai/service", "S1 internal loopback HTTP transport to the installed zoop-ai CLI (public dependencies only; local preparation, not deployed)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/service_smoke.py; scripts/export_openapi.py --check; uv build"),
-    ("ai-pipeline", "ai/pipeline", "S2-1/S2-2/S3 offline CLI processes and the S4 read-only dependents report (private pinned PoC)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/*_smoke.py; uv build"),
+    ("ai-pipeline", "ai/pipeline", "Native replay-only document collection, S2-1 ingestion, S2-2 event/topic candidates, S3 relation/impact candidates, S4 dependents, private graph projection and handoff (public dependencies only; no PoC, token or live model)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/*_smoke.py; uv build"),
     ("api", "api", "Spring Boot 4.1.1 / Java 21 app backend foundation plus the internal S1 AI transport client (no auth or domain endpoints yet; needs JDK 21)", "JAVA_HOME=<JDK 21>; ./api/gradlew -p api --version", "make api-test api-build; make service-install api-ai-smoke"),
     ("contracts", "docs/api", "Language-neutral target contract", "existing PyYAML/OpenAPI validator", "make contracts-check docs-check"),
 )
@@ -31,7 +32,8 @@ Prototype web only: make web-install | web-typecheck | web-test | web-build
 Production web (root web/) only: make app-web-install | app-web-lint | app-web-format-check | app-web-build | app-web-test
 BFF only: make bff-install | bff-test | bff-build
 Worker only: make worker-install | worker-test | worker-schema-check | worker-build
-Pipeline only (private PoC): make pipeline-install | pipeline-test | pipeline-smoke | pipeline-build
+Evaluation (Korean verification, installed worker required): make evaluation-verification-check (actual loopback CLI smoke, corpus validation, targeted evaluation tests; no real provider)
+Pipeline (native replay-only, public dependencies, no private PoC or token): make pipeline-install | pipeline-test | pipeline-smoke | pipeline-build
 Service only (internal HTTP over the S1 CLI, public deps): make service-install | service-test | service-smoke | service-openapi-check | service-build
 Service + installed pipeline (S2 extraction jobs and S3 relation jobs; needs both make pipeline-install and make service-install, fails without them): make service-pipeline-test | service-pipeline-smoke
 API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate)
@@ -291,6 +293,23 @@ def worker_schema() -> None:
     print("Worker generated S1 schema: exact output and content drift passed (worktree unchanged).")
 
 
+def evaluation_verification() -> None:
+    """Run the producer before any gold-reading evaluation command; use only the installed worker and local controls."""
+    cli = ROOT / "ai/worker/.venv/bin/zoop-ai"
+    if not cli.is_file() or not os.access(cli, os.X_OK):
+        raise ValueError("Installed zoop-ai CLI required: run make worker-install, then make evaluation-verification-check.")
+    env = {key: os.environ[key] for key in ("PATH", "HOME", "LANG") if key in os.environ}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    # smoke owns temporary state and audits gold access during production; only its
+    # subsequent scoring phase opens gold. No .env loader or real provider is used.
+    run([sys.executable, "-B", "ai/worker/scripts/verification_bench.py", "smoke"], cwd=ROOT, env=env)
+    evaluation = ROOT / "ai/evaluation"
+    run([sys.executable, "-B", "-m", "zoop_eval", "verify-validate"], cwd=evaluation, env=env)
+    run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_verification.py", "-v"],
+        cwd=evaluation, env=env)
+    print("Korean verification offline gate: loopback CLI smoke, corpus validation and targeted evaluation tests passed. Authored controls only; not model-quality evidence.")
+
+
 def worker_contracts() -> None:
     """BFF-owned fixture exporter; needs the installed BFF environment (zoop_bff, pinned PoC, test-only zoop_ai)."""
     with tempfile.TemporaryDirectory(prefix="zoop-worker-contracts-") as folder:
@@ -393,7 +412,7 @@ def secrets() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["help", "projects", "available", "config", "contracts", "worker-schema", "worker-contracts", "bff-types", "docs", "tokens", "secrets", "public", "pr-title"])
+    parser.add_argument("command", choices=["help", "projects", "available", "config", "contracts", "worker-schema", "worker-contracts", "evaluation-verification", "bff-types", "docs", "tokens", "secrets", "public", "pr-title"])
     command = parser.parse_args().command
     try:
         if command == "help":
@@ -409,7 +428,7 @@ def main() -> None:
                 raise ValueError("PR title must use Conventional Commits: type(web|api|ai|contracts|docs|infra): summary")
             print("PR title convention: passed.")
         else:
-            {"available": available, "config": config, "contracts": contracts, "worker-schema": worker_schema, "worker-contracts": worker_contracts, "bff-types": bff_types, "docs": docs, "tokens": tokens, "secrets": secrets}[command]()
+            {"available": available, "config": config, "contracts": contracts, "worker-schema": worker_schema, "worker-contracts": worker_contracts, "evaluation-verification": evaluation_verification, "bff-types": bff_types, "docs": docs, "tokens": tokens, "secrets": secrets}[command]()
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         raise SystemExit(str(error)) from None
 

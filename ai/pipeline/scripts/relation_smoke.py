@@ -22,6 +22,7 @@ sys.path[:0] = [str(PIPELINE)]
 from scripts.extraction_smoke import PROMPT, Kit, page, topic_replay, topic_response  # noqa: E402
 from scripts.ingestion_smoke import json_bytes, ownership_env  # noqa: E402
 from zoop_ai_pipeline import relation_rules as rules  # noqa: E402
+from zoop_ai_pipeline.extraction_contracts import Catalogue  # noqa: E402
 from zoop_ai_pipeline.relation import document_view, next_attempt  # noqa: E402
 from zoop_ai_pipeline.relation_contracts import IMPACT_POLICY, SCHEMA, digest  # noqa: E402
 
@@ -105,10 +106,9 @@ def impact_verifier_reply(candidate: dict, effects: dict[str, str] | None = None
 class RelKit(Kit):
     """Kit with a four-company catalogue plus authored producer/verifier fixtures and relation process runners."""
 
-    def settings(self, prompt: str = PROMPT):
-        from zoop_ai_pipeline import extraction_poc as poc
-        from zoop_ai_pipeline.extraction_contracts import Catalogue
-        return poc.settings(prompt, Catalogue.model_validate(CATALOGUE))
+    @staticmethod
+    def catalogue() -> Catalogue:
+        return Catalogue.model_validate(CATALOGUE)
 
     def submit(self, job: str, incoming: dict, events: list[dict] | None = None, *, topic: bool = False, source_kind: str = "synthetic", prompt: str = PROMPT) -> dict:
         return {**super().submit(job, incoming, events, topic=topic, source_kind=source_kind, prompt=prompt), "catalogue": CATALOGUE}

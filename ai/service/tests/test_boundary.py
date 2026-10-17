@@ -13,7 +13,7 @@ import pytest
 from support import ZOOP_AI, live_job, runtime_processes, terminate_runtime, wait_for
 
 SOURCE = Path(__file__).resolve().parents[1] / "src" / "zoop_ai_service"
-FORBIDDEN_ROOTS = {"zoop_ai", "zoop_ai_pipeline", "zoop_bff", "investmate_poc", "prototype"}
+FORBIDDEN_ROOTS = {"zoop_ai", "zoop_ai_pipeline", "zoop_bff", "investmate", "investmate_poc", "prototype"}
 
 
 def imported_roots() -> dict[str, set[str]]:
@@ -107,3 +107,27 @@ def test_process_lookup_failure_is_an_error_and_not_a_clean_no_match(tmp_path, m
     monkeypatch.setattr(support, "PGREP", str(tmp_path / "absent"))
     with pytest.raises(OSError):
         runtime_processes(tmp_path / "state")
+
+
+def test_the_graph_door_opens_no_database_and_names_no_ledger_or_neo4j_driver():
+    """The graph family is a pure transport over the installed CLI: it imports no database driver or the pipeline and names no ledger file."""
+    doors = [path for path in SOURCE.glob("graph_*.py")]
+    assert {path.name for path in doors} >= {"graph_access.py", "graph_reads.py", "graph_runtime.py", "graph_wire.py", "graph_doc.py"}
+    for path in doors:
+        text = path.read_text(encoding="utf-8")
+        roots = imported_roots()[path.name]
+        assert not roots & {"sqlite3", "neo4j", "zoop_ai_pipeline"}, path.name
+        assert "graph.sqlite3" not in text and "graph.lock" not in text and "bolt://" not in text, path.name
+
+
+def test_the_handoff_door_opens_no_database_names_no_ledger_and_can_only_run_export():
+    """The handoff family is a pure transport over the installed CLI: no database, pipeline or network import, no ledger file, and no command but `export`."""
+    doors = [path for path in SOURCE.glob("handoff_*.py")]
+    assert {path.name for path in doors} >= {"handoff_access.py", "handoff_reads.py", "handoff_runtime.py", "handoff_wire.py", "handoff_doc.py"}
+    for path in doors:
+        text = path.read_text(encoding="utf-8")
+        roots = imported_roots()[path.name]
+        assert not roots & {"sqlite3", "neo4j", "zoop_ai_pipeline", "socket", "urllib", "http", "httpx", "requests"}, path.name
+        assert "handoff.sqlite3" not in text and "handoff.lock" not in text and "bolt://" not in text, path.name
+    runtime = (SOURCE / "handoff_runtime.py").read_text(encoding="utf-8")
+    assert '"export"' in runtime and not any(f'"{command}"' in runtime for command in ("freeze", "recover", "inspect"))

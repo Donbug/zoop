@@ -23,8 +23,10 @@ public class AuthRequestConfiguration implements WebMvcConfigurer {
     }
 
     @Bean
-    static AuthOriginPolicy authOriginPolicy(@Value("${ZOOP_AUTH_ALLOWED_ORIGINS:}") String origins) {
-        return new AuthOriginPolicy(origins);
+    static AuthOriginPolicy authOriginPolicy(
+            @Value("${zoop.auth.allowed-origins:${ZOOP_AUTH_ALLOWED_ORIGINS:}}") String origins,
+            @Value("${zoop.auth.allow-http-loopback-origins:false}") boolean allowHttpLoopbackOrigins) {
+        return new AuthOriginPolicy(origins, allowHttpLoopbackOrigins);
     }
 
     @Bean

@@ -1,0 +1,17 @@
+{
+  "fixtureFormat": 1,
+  "versions": [
+    {
+      "versionId": "fixture-2026-10-01",
+      "file": "fixture-2026-10-01.json",
+      "activatedAt": "2026-10-01T00:00:00Z",
+      "reason": "합성 fixture: 기본 3개 이슈"
+    },
+    {
+      "versionId": "fixture-2026-10-08",
+      "file": "fixture-2026-10-08.json",
+      "activatedAt": "2026-10-08T00:00:00Z",
+      "reason": "합성 fixture: AI 가속기 이슈 추가"
+    }
+  ]
+}

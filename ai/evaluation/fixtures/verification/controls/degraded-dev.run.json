@@ -1,0 +1,2344 @@
+{
+ "schema": "zoop-verify-run-1",
+ "runId": "control-degraded_all_supported-dev",
+ "label": "authored control: degraded_all_supported",
+ "provenance": {
+  "kind": "authored_control",
+  "executionMode": "authored",
+  "recorder": "zoop_eval.verification.build_control",
+  "recordedAt": null,
+  "controlKind": "degraded_all_supported",
+  "note": "hand-degraded: every claim supported at p=0.97 and no finding, so every case is accepted"
+ },
+ "corpus": {
+  "corpusId": "fin-verify-ko-v1",
+  "corpusRevision": "1",
+  "inputsSha256": "cf368670e081cb022f6b1557e92d1667b52f63139014b88c75a3925fb57c0c81",
+  "split": "dev"
+ },
+ "system": {
+  "name": "authored-control",
+  "adapter": "typesafe-native",
+  "endpointKind": "none",
+  "model": "jev-1.14.0",
+  "providerRevision": "authored-control",
+  "promptVersion": "authored-control",
+  "policyVersion": "authored-control",
+  "adapterIdentity": "authored-control",
+  "policy": {
+   "choiceProbability": 0.9,
+   "choiceConfidence": 0.8,
+   "noulTrue": 0.9,
+   "noulFalse": 0.1,
+   "distributionTolerance": 0.02
+  }
+ },
+ "records": [
+  {
+   "caseId": "VK-01",
+   "caseSha256": "934852728d8ac8a0b335027197dab37d96b989e063eef88a8956872d1ad0326d",
+   "claimBinding": [
+    {
+     "claimId": "VK-01-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-01-c2",
+     "key": "claim-1"
+    },
+    {
+     "claimId": "VK-01-c3",
+     "key": "claim-2"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-01-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-01-c2",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-01-c3",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-2": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 260,
+     "output_tokens": 24
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-01",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 260,
+     "outputTokens": 24
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 8
+  },
+  {
+   "caseId": "VK-02",
+   "caseSha256": "7e845c042283609872e01a2444c8c2256c3465842d0f33353a95210189356ffe",
+   "claimBinding": [
+    {
+     "claimId": "VK-02-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-02-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-02-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-02-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-02",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-03",
+   "caseSha256": "c6f8e0478ddb135b38025a416a28c3919f6d5ba037ebcb6b8cafe935c3f78c9d",
+   "claimBinding": [
+    {
+     "claimId": "VK-03-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-03-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-03-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-03-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-03",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-04",
+   "caseSha256": "d1beb7d7a7fa2c791e8146893b7a6a5c5aef4e891062cdbfa1495c814322c87f",
+   "claimBinding": [
+    {
+     "claimId": "VK-04-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-04-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-04-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-04-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-04",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-05",
+   "caseSha256": "83e23bc41f7877194d3fc65e93fff9119577ab4454cad33746155c5772ef4cef",
+   "claimBinding": [
+    {
+     "claimId": "VK-05-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-05-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-05-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-05-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-05",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-06",
+   "caseSha256": "50814cfd55e65d29edecf4770c85af0a7e7d361fbcf64a42234b638b560fecfb",
+   "claimBinding": [
+    {
+     "claimId": "VK-06-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-06-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-06-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-06-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-06",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-07",
+   "caseSha256": "1ae0455c5380cd4b2ffe4926ec0041629723877a04278deb219eb606a5271046",
+   "claimBinding": [
+    {
+     "claimId": "VK-07-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-07-c2",
+     "key": "claim-1"
+    },
+    {
+     "claimId": "VK-07-c3",
+     "key": "claim-2"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-07-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-07-c2",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-07-c3",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-2": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 260,
+     "output_tokens": 24
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-07",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 260,
+     "outputTokens": 24
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 8
+  },
+  {
+   "caseId": "VK-08",
+   "caseSha256": "09ed47021e7612daeb050e002bd16071588f3ef5911436aca48e45ba39e382ce",
+   "claimBinding": [
+    {
+     "claimId": "VK-08-c1",
+     "key": "claim-0"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-08-c1",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 220,
+     "output_tokens": 16
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-08",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 220,
+     "outputTokens": 16
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 6
+  },
+  {
+   "caseId": "VK-09",
+   "caseSha256": "1f6df46406f155b5fe5a7f7a01aa4900e4aa27176fe2f617fa6b58f1722966a2",
+   "claimBinding": [
+    {
+     "claimId": "VK-09-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-09-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-09-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-09-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-09",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-10",
+   "caseSha256": "7c1bc0312da3773400978f645d84019ab090213d7a0cf928bcb9cd5f976ed378",
+   "claimBinding": [
+    {
+     "claimId": "VK-10-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-10-c2",
+     "key": "claim-1"
+    },
+    {
+     "claimId": "VK-10-c3",
+     "key": "claim-2"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-10-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-10-c2",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-10-c3",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-2": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 260,
+     "output_tokens": 24
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-10",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 260,
+     "outputTokens": 24
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 8
+  },
+  {
+   "caseId": "VK-11",
+   "caseSha256": "867f0947490ad646b00fac93ab79a0326275658604443e334233f0981a611b4d",
+   "claimBinding": [
+    {
+     "claimId": "VK-11-c1",
+     "key": "claim-0"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-11-c1",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 220,
+     "output_tokens": 16
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-11",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 220,
+     "outputTokens": 16
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 6
+  },
+  {
+   "caseId": "VK-12",
+   "caseSha256": "09a71739ed86a9cbb706aaab396b04c97636f694d5a7bde489ed5564d08affce",
+   "claimBinding": [
+    {
+     "claimId": "VK-12-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-12-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-12-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-12-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-12",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-13",
+   "caseSha256": "09128e24924ed5518e5ae59d240c435bd24f53558e928e158f1a2fb66c621964",
+   "claimBinding": [
+    {
+     "claimId": "VK-13-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-13-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-13-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-13-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-13",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-14",
+   "caseSha256": "b87a74f74b65e1d7aaff7726a2f7c5ebe4ad4eabc81cec104e1d95520176c4c7",
+   "claimBinding": [
+    {
+     "claimId": "VK-14-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-14-c2",
+     "key": "claim-1"
+    },
+    {
+     "claimId": "VK-14-c3",
+     "key": "claim-2"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-14-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-14-c2",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-14-c3",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-2": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 260,
+     "output_tokens": 24
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-14",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 260,
+     "outputTokens": 24
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 8
+  },
+  {
+   "caseId": "VK-15",
+   "caseSha256": "95177d1a037f1027c4fa3849ddcf0b795f88eb09fbbe7ccfd2e64ad6e7c5b036",
+   "claimBinding": [
+    {
+     "claimId": "VK-15-c1",
+     "key": "claim-0"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-15-c1",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 220,
+     "output_tokens": 16
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-15",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 220,
+     "outputTokens": 16
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 6
+  },
+  {
+   "caseId": "VK-16",
+   "caseSha256": "610f6badd03f2d53fcfd5277694c80290cf908ec66c3370974d9196b2a5e9909",
+   "claimBinding": [
+    {
+     "claimId": "VK-16-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-16-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-16-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-16-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-16",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-17",
+   "caseSha256": "6fdd624c64eb2fbb59b7a11cb037f4f0b4599ee38fa5b79d2378a6005624731e",
+   "claimBinding": [
+    {
+     "claimId": "VK-17-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-17-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-17-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-17-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-17",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-18",
+   "caseSha256": "f931e04af082c810b010b99cc3a3a01aee40ef076900dfca4ad8df28d070bbaf",
+   "claimBinding": [
+    {
+     "claimId": "VK-18-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-18-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-18-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-18-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-18",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-19",
+   "caseSha256": "7cb04ad6d4ac9bb4960b34a88972a1bf6f40f3f75d705c238dc5aa8c51cb1c84",
+   "claimBinding": [
+    {
+     "claimId": "VK-19-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-19-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-19-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-19-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-19",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-20",
+   "caseSha256": "9e097fa4073e7cdfff84de4482745c254ff301827dfb8959636b27119caf8c0c",
+   "claimBinding": [
+    {
+     "claimId": "VK-20-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-20-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-20-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-20-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-20",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-21",
+   "caseSha256": "4232117921dee31407a89f1a3dfc907d053a4b315a5315cd790304c2301abf23",
+   "claimBinding": [
+    {
+     "claimId": "VK-21-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-21-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-21-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-21-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-21",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-22",
+   "caseSha256": "9b77696d27678da9df228342caeb26db395bf03f8ea14bb77091efcb52138fe9",
+   "claimBinding": [
+    {
+     "claimId": "VK-22-c1",
+     "key": "claim-0"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-22-c1",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 220,
+     "output_tokens": 16
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-22",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 220,
+     "outputTokens": 16
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 6
+  },
+  {
+   "caseId": "VK-23",
+   "caseSha256": "98b662c7034240ae24f14fec406d871b2c79258dc581e77bc6246e3276477a18",
+   "claimBinding": [
+    {
+     "claimId": "VK-23-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-23-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-23-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-23-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-23",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-24",
+   "caseSha256": "dc2c719a5a0774e45d32e698c9b98ec5a102fe4af7cdc10821c9bbf0cfe0f933",
+   "claimBinding": [
+    {
+     "claimId": "VK-24-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-24-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-24-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-24-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-24",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-25",
+   "caseSha256": "78aff21d87243bf5912f9703eb33cdbc7390009460f91983ab182a3e04acacdb",
+   "claimBinding": [
+    {
+     "claimId": "VK-25-c1",
+     "key": "claim-0"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-25-c1",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 220,
+     "output_tokens": 16
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-25",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 220,
+     "outputTokens": 16
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 6
+  },
+  {
+   "caseId": "VK-26",
+   "caseSha256": "ad3bd2f06403ab39d0813222a908db5ed49bcc53848b6d6261548757d83bee74",
+   "claimBinding": [
+    {
+     "claimId": "VK-26-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-26-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-26-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-26-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-26",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-27",
+   "caseSha256": "e0adc30decc636a3b69f4eed4783735b1feffeafcad764b3870ec78777a55242",
+   "claimBinding": [
+    {
+     "claimId": "VK-27-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-27-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-27-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-27-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-27",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  },
+  {
+   "caseId": "VK-28",
+   "caseSha256": "9fc50ee2a27693c36d2cdbcf931eed19b99214a041dfd386c12ec630ffaf4e70",
+   "claimBinding": [
+    {
+     "claimId": "VK-28-c1",
+     "key": "claim-0"
+    },
+    {
+     "claimId": "VK-28-c2",
+     "key": "claim-1"
+    }
+   ],
+   "status": "ok",
+   "result": {
+    "gate": "supported",
+    "claims": [
+     {
+      "claimId": "VK-28-c1",
+      "decision": "supported"
+     },
+     {
+      "claimId": "VK-28-c2",
+      "decision": "supported"
+     }
+    ],
+    "prohibitedAdvice": false,
+    "unsupportedCausality": false
+   },
+   "raw": {
+    "model": "jev-1.14.0",
+    "answers": {
+     "claim-0": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "claim-1": {
+      "type": "choice",
+      "choice": "supported",
+      "probabilities": {
+       "supported": 0.97,
+       "contradicted": 0.015,
+       "insufficient": 0.015
+      },
+      "confidence": 0.93
+     },
+     "prohibited-advice": {
+      "type": "noul",
+      "noul": 0.02
+     },
+     "unsupported-causality": {
+      "type": "noul",
+      "noul": 0.03
+     }
+    },
+    "usage": {
+     "input_tokens": 240,
+     "output_tokens": 20
+    }
+   },
+   "call": {
+    "attemptId": "control-VK-28",
+    "model": "jev-1.14.0",
+    "providerRevision": "authored-control",
+    "promptVersion": "authored-control",
+    "policyVersion": "authored-control",
+    "usage": {
+     "inputTokens": 240,
+     "outputTokens": 20
+    },
+    "cost": {
+     "usd": null,
+     "source": "unknown"
+    }
+   },
+   "latencyMs": 7
+  }
+ ]
+}

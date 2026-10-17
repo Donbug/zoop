@@ -1,0 +1,776 @@
+{
+  "about": "Synthetic golden vectors from the pinned investmate-poc for the native S2 analysis parity test. Not runtime data, not a fixture for any job, not evidence of model inference.",
+  "expected": {
+    "actualArticleVersionA": "ae6faf519ae80a929ed206de293c4e1f67172855c5dbe318f0b689140980a753",
+    "articles": {
+      "a": {
+        "projection": {
+          "allow_model_send": false,
+          "article_id": "doc-golden-a",
+          "body": "합성기업은 2026년 3분기 공급 계약을 발표했다.\n계약 상대는 합성상대다.",
+          "input_kind": "body",
+          "language": "ko",
+          "origin_id": null,
+          "published_at": "2026-10-01T09:00:00+09:00",
+          "publisher": "",
+          "synthetic": true,
+          "title": "합성 공급 계약 & 발표",
+          "url": "https://example.invalid/golden/a",
+          "withdrawn": false
+        },
+        "version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae"
+      },
+      "b": {
+        "projection": {
+          "allow_model_send": false,
+          "article_id": "doc-golden-b",
+          "body": "합성기업은 4분기 신규 공장 착공을 알렸다.\n\"착공\"은 11월 예정이다.\\ 끝.",
+          "input_kind": "body",
+          "language": "ko",
+          "origin_id": null,
+          "published_at": null,
+          "publisher": "",
+          "synthetic": true,
+          "title": "합성 공장 착공",
+          "url": "https://example.invalid/golden/b",
+          "withdrawn": false
+        },
+        "version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced"
+      },
+      "c": {
+        "projection": {
+          "allow_model_send": false,
+          "article_id": "doc-golden-c",
+          "body": "합성 😀 문단.\n합성기업은 합성상대와 투자 계약을 맺었다.",
+          "input_kind": "body",
+          "language": "ko",
+          "origin_id": null,
+          "published_at": "2026-10-02T00:00:00+00:00",
+          "publisher": "",
+          "synthetic": true,
+          "title": "합성 투자",
+          "url": "https://example.invalid/golden/c",
+          "withdrawn": false
+        },
+        "version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75"
+      }
+    },
+    "compare": {
+      "compare-a-vs-event-1": {
+        "input": {
+          "article": {
+            "allow_model_send": false,
+            "article_id": "doc-golden-a",
+            "body": "합성기업은 2026년 3분기 공급 계약을 발표했다.\n계약 상대는 합성상대다.",
+            "input_kind": "body",
+            "language": "ko",
+            "origin_id": null,
+            "published_at": "2026-10-01T09:00:00+09:00",
+            "publisher": "",
+            "synthetic": true,
+            "title": "합성 공급 계약 & 발표",
+            "url": "https://example.invalid/golden/a",
+            "withdrawn": false
+          },
+          "issue": {
+            "articles": [
+              {
+                "allow_model_send": false,
+                "article_id": "doc-golden-b",
+                "body": "합성기업은 4분기 신규 공장 착공을 알렸다.\n\"착공\"은 11월 예정이다.\\ 끝.",
+                "input_kind": "body",
+                "language": "ko",
+                "origin_id": null,
+                "published_at": null,
+                "publisher": "",
+                "synthetic": true,
+                "title": "합성 공장 착공",
+                "url": "https://example.invalid/golden/b",
+                "withdrawn": false
+              }
+            ],
+            "issue_id": "event-1",
+            "mentions": [
+              {
+                "action": "공장 착공 알림",
+                "article_id": "doc-golden-b",
+                "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+                "assertion_status": "planned",
+                "background": true,
+                "countries": [
+                  "KR"
+                ],
+                "event_time": "2026-11",
+                "event_type": "facility",
+                "evidence": [
+                  {
+                    "article_id": "doc-golden-b",
+                    "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+                    "end": 18,
+                    "quote": "신규 공장 착공",
+                    "start": 10
+                  },
+                  {
+                    "article_id": "doc-golden-b",
+                    "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+                    "end": 34,
+                    "quote": "\"착공\"은 11월",
+                    "start": 25
+                  }
+                ],
+                "keywords": [
+                  "공장",
+                  "착공"
+                ],
+                "mention_id": "m-b",
+                "participants": [
+                  {
+                    "company_id": "SYNTH-1",
+                    "name": "합성기업",
+                    "role": "builder"
+                  },
+                  {
+                    "company_id": null,
+                    "name": "지방자치단체",
+                    "role": "host"
+                  }
+                ],
+                "period": "2026Q4",
+                "target": "신규 공장",
+                "title": "합성 공장 착공"
+              }
+            ]
+          },
+          "mention": {
+            "action": "공급 계약 발표",
+            "article_id": "doc-golden-a",
+            "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+            "assertion_status": "announced",
+            "background": false,
+            "countries": [],
+            "event_time": null,
+            "event_type": "supply_contract",
+            "evidence": [
+              {
+                "article_id": "doc-golden-a",
+                "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+                "end": 21,
+                "quote": "공급 계약",
+                "start": 16
+              }
+            ],
+            "keywords": [],
+            "mention_id": "m-a",
+            "participants": [
+              {
+                "company_id": null,
+                "name": "합성기업",
+                "role": "issuer"
+              }
+            ],
+            "period": null,
+            "target": null,
+            "title": "합성 공급 계약"
+          }
+        },
+        "key": "00b84836de495829445e118c8b0dcf4913413f86c4a542f7ab66a4e4ec426339"
+      },
+      "compare-b-vs-event-2": {
+        "input": {
+          "article": {
+            "allow_model_send": false,
+            "article_id": "doc-golden-b",
+            "body": "합성기업은 4분기 신규 공장 착공을 알렸다.\n\"착공\"은 11월 예정이다.\\ 끝.",
+            "input_kind": "body",
+            "language": "ko",
+            "origin_id": null,
+            "published_at": null,
+            "publisher": "",
+            "synthetic": true,
+            "title": "합성 공장 착공",
+            "url": "https://example.invalid/golden/b",
+            "withdrawn": false
+          },
+          "issue": {
+            "articles": [
+              {
+                "allow_model_send": false,
+                "article_id": "doc-golden-a",
+                "body": "합성기업은 2026년 3분기 공급 계약을 발표했다.\n계약 상대는 합성상대다.",
+                "input_kind": "body",
+                "language": "ko",
+                "origin_id": null,
+                "published_at": "2026-10-01T09:00:00+09:00",
+                "publisher": "",
+                "synthetic": true,
+                "title": "합성 공급 계약 & 발표",
+                "url": "https://example.invalid/golden/a",
+                "withdrawn": false
+              },
+              {
+                "allow_model_send": false,
+                "article_id": "doc-golden-c",
+                "body": "합성 😀 문단.\n합성기업은 합성상대와 투자 계약을 맺었다.",
+                "input_kind": "body",
+                "language": "ko",
+                "origin_id": null,
+                "published_at": "2026-10-02T00:00:00+00:00",
+                "publisher": "",
+                "synthetic": true,
+                "title": "합성 투자",
+                "url": "https://example.invalid/golden/c",
+                "withdrawn": false
+              }
+            ],
+            "issue_id": "event-2",
+            "mentions": [
+              {
+                "action": "공급 계약 발표",
+                "article_id": "doc-golden-a",
+                "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+                "assertion_status": "announced",
+                "background": false,
+                "countries": [],
+                "event_time": null,
+                "event_type": "supply_contract",
+                "evidence": [
+                  {
+                    "article_id": "doc-golden-a",
+                    "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+                    "end": 21,
+                    "quote": "공급 계약",
+                    "start": 16
+                  }
+                ],
+                "keywords": [],
+                "mention_id": "m-a",
+                "participants": [
+                  {
+                    "company_id": null,
+                    "name": "합성기업",
+                    "role": "issuer"
+                  }
+                ],
+                "period": null,
+                "target": null,
+                "title": "합성 공급 계약"
+              },
+              {
+                "action": "투자 계약 체결",
+                "article_id": "doc-golden-c",
+                "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+                "assertion_status": "occurred",
+                "background": false,
+                "countries": [],
+                "event_time": null,
+                "event_type": "investment",
+                "evidence": [
+                  {
+                    "article_id": "doc-golden-c",
+                    "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+                    "end": 26,
+                    "quote": "투자 계약",
+                    "start": 21
+                  }
+                ],
+                "keywords": [],
+                "mention_id": "m-c",
+                "participants": [
+                  {
+                    "company_id": "SYNTH-1",
+                    "name": "합성기업",
+                    "role": "investor"
+                  },
+                  {
+                    "company_id": "SYNTH-2",
+                    "name": "합성상대",
+                    "role": "investee"
+                  }
+                ],
+                "period": null,
+                "target": null,
+                "title": "합성 투자 계약"
+              }
+            ]
+          },
+          "mention": {
+            "action": "공장 착공 알림",
+            "article_id": "doc-golden-b",
+            "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+            "assertion_status": "planned",
+            "background": true,
+            "countries": [
+              "KR"
+            ],
+            "event_time": "2026-11",
+            "event_type": "facility",
+            "evidence": [
+              {
+                "article_id": "doc-golden-b",
+                "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+                "end": 18,
+                "quote": "신규 공장 착공",
+                "start": 10
+              },
+              {
+                "article_id": "doc-golden-b",
+                "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+                "end": 34,
+                "quote": "\"착공\"은 11월",
+                "start": 25
+              }
+            ],
+            "keywords": [
+              "공장",
+              "착공"
+            ],
+            "mention_id": "m-b",
+            "participants": [
+              {
+                "company_id": "SYNTH-1",
+                "name": "합성기업",
+                "role": "builder"
+              },
+              {
+                "company_id": null,
+                "name": "지방자치단체",
+                "role": "host"
+              }
+            ],
+            "period": "2026Q4",
+            "target": "신규 공장",
+            "title": "합성 공장 착공"
+          }
+        },
+        "key": "cd0071fccf118edd91ae7abe3596494707d7fda429ef3c02bb6e283156dd4b85"
+      }
+    },
+    "extract": {
+      "extract-a-full": {
+        "input": {
+          "article": {
+            "allow_model_send": false,
+            "article_id": "doc-golden-a",
+            "body": "합성기업은 2026년 3분기 공급 계약을 발표했다.\n계약 상대는 합성상대다.",
+            "input_kind": "body",
+            "language": "ko",
+            "origin_id": null,
+            "published_at": "2026-10-01T09:00:00+09:00",
+            "publisher": "",
+            "synthetic": true,
+            "title": "합성 공급 계약 & 발표",
+            "url": "https://example.invalid/golden/a",
+            "withdrawn": false
+          },
+          "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+          "companies": [
+            {
+              "aliases": [],
+              "company_id": "SYNTH-1",
+              "name": "합성기업",
+              "ticker": "000001"
+            },
+            {
+              "aliases": [
+                "상대사",
+                "합성 상대"
+              ],
+              "company_id": "SYNTH-2",
+              "name": "합성상대",
+              "ticker": null
+            }
+          ],
+          "prompt_version": "zoop-extraction-authored-1"
+        },
+        "key": "ec70bd42628a89dbe4be2eeb72b4255e6e3c9abaa9b2fb75113337e2c18cac80"
+      },
+      "extract-c-empty": {
+        "input": {
+          "article": {
+            "allow_model_send": false,
+            "article_id": "doc-golden-c",
+            "body": "합성 😀 문단.\n합성기업은 합성상대와 투자 계약을 맺었다.",
+            "input_kind": "body",
+            "language": "ko",
+            "origin_id": null,
+            "published_at": "2026-10-02T00:00:00+00:00",
+            "publisher": "",
+            "synthetic": true,
+            "title": "합성 투자",
+            "url": "https://example.invalid/golden/c",
+            "withdrawn": false
+          },
+          "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+          "companies": [],
+          "prompt_version": "zoop-extraction-authored-1"
+        },
+        "key": "ddc19221b0478104b1f57a9e3dd4163fa466f3fdebc347c9802973113ef5045f"
+      }
+    },
+    "mentions": {
+      "m-a": {
+        "digest": "af2e80d0bfb57f4c46a59696f911361013b662017f12cf32c197dfd0f67643bb",
+        "dump": {
+          "action": "공급 계약 발표",
+          "article_id": "doc-golden-a",
+          "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+          "assertion_status": "announced",
+          "background": false,
+          "countries": [],
+          "event_time": null,
+          "event_type": "supply_contract",
+          "evidence": [
+            {
+              "article_id": "doc-golden-a",
+              "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+              "end": 21,
+              "quote": "공급 계약",
+              "start": 16
+            }
+          ],
+          "keywords": [],
+          "mention_id": "m-a",
+          "participants": [
+            {
+              "company_id": null,
+              "name": "합성기업",
+              "role": "issuer"
+            }
+          ],
+          "period": null,
+          "target": null,
+          "title": "합성 공급 계약"
+        }
+      },
+      "m-b": {
+        "digest": "4c801e078111a626a688243b5f81c147c72bbb8b4e49ad34ef687888702a7fce",
+        "dump": {
+          "action": "공장 착공 알림",
+          "article_id": "doc-golden-b",
+          "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+          "assertion_status": "planned",
+          "background": true,
+          "countries": [
+            "KR"
+          ],
+          "event_time": "2026-11",
+          "event_type": "facility",
+          "evidence": [
+            {
+              "article_id": "doc-golden-b",
+              "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+              "end": 18,
+              "quote": "신규 공장 착공",
+              "start": 10
+            },
+            {
+              "article_id": "doc-golden-b",
+              "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+              "end": 34,
+              "quote": "\"착공\"은 11월",
+              "start": 25
+            }
+          ],
+          "keywords": [
+            "공장",
+            "착공"
+          ],
+          "mention_id": "m-b",
+          "participants": [
+            {
+              "company_id": "SYNTH-1",
+              "name": "합성기업",
+              "role": "builder"
+            },
+            {
+              "company_id": null,
+              "name": "지방자치단체",
+              "role": "host"
+            }
+          ],
+          "period": "2026Q4",
+          "target": "신규 공장",
+          "title": "합성 공장 착공"
+        }
+      },
+      "m-c": {
+        "digest": "60936301cacbd8bc4508b33204845abc1cf30bfd31db2d32a0d8e3aa3f88b174",
+        "dump": {
+          "action": "투자 계약 체결",
+          "article_id": "doc-golden-c",
+          "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+          "assertion_status": "occurred",
+          "background": false,
+          "countries": [],
+          "event_time": null,
+          "event_type": "investment",
+          "evidence": [
+            {
+              "article_id": "doc-golden-c",
+              "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+              "end": 26,
+              "quote": "투자 계약",
+              "start": 21
+            }
+          ],
+          "keywords": [],
+          "mention_id": "m-c",
+          "participants": [
+            {
+              "company_id": "SYNTH-1",
+              "name": "합성기업",
+              "role": "investor"
+            },
+            {
+              "company_id": "SYNTH-2",
+              "name": "합성상대",
+              "role": "investee"
+            }
+          ],
+          "period": null,
+          "target": null,
+          "title": "합성 투자 계약"
+        }
+      }
+    }
+  },
+  "formulas": {
+    "articleProjection": "the 12 Article fields except collected_at, from the export subset with publisher '', language 'ko', origin_id null, withdrawn false, allow_model_send false",
+    "articleVersion": "digest(articleProjection)",
+    "companies": "catalogue companies as {company_id,name,aliases,ticker} sorted by company_id",
+    "compareInput": "{mention: dump, issue: {issue_id, mentions: [dumps], articles: [projections]}, article: incoming projection}",
+    "digest": "sha256 of json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')) encoded UTF-8",
+    "extractInput": "{article: projection, article_version, companies, prompt_version}",
+    "requestKey": "digest({stage, input, version: analysisVersion})"
+  },
+  "inputs": {
+    "actualVariant": "a",
+    "analysisVersion": "authored-analysis-1",
+    "catalogues": {
+      "empty": {
+        "companies": [],
+        "revision": "catalogue-golden-empty"
+      },
+      "full": {
+        "companies": [
+          {
+            "aliases": [
+              "상대사",
+              "합성 상대"
+            ],
+            "companyId": "SYNTH-2",
+            "name": "합성상대",
+            "ticker": null
+          },
+          {
+            "aliases": [],
+            "companyId": "SYNTH-1",
+            "name": "합성기업",
+            "ticker": "000001"
+          }
+        ],
+        "revision": "catalogue-golden-1"
+      }
+    },
+    "compareCases": [
+      {
+        "articles": [
+          "b"
+        ],
+        "eventId": "event-1",
+        "id": "compare-a-vs-event-1",
+        "incoming": "a",
+        "members": [
+          "m-b"
+        ],
+        "mention": "m-a"
+      },
+      {
+        "articles": [
+          "a",
+          "c"
+        ],
+        "eventId": "event-2",
+        "id": "compare-b-vs-event-2",
+        "incoming": "b",
+        "members": [
+          "m-a",
+          "m-c"
+        ],
+        "mention": "m-b"
+      }
+    ],
+    "exports": {
+      "a": {
+        "document": {
+          "inputKind": "body",
+          "text": "합성기업은 2026년 3분기 공급 계약을 발표했다.\n계약 상대는 합성상대다."
+        },
+        "observation": {
+          "documentId": "doc-golden-a",
+          "observedAt": "2026-10-16T00:00:00+00:00",
+          "publishedAt": "2026-10-01T09:00:00+09:00",
+          "title": "합성 공급 계약 & 발표",
+          "url": "https://example.invalid/golden/a"
+        }
+      },
+      "b": {
+        "document": {
+          "inputKind": "body",
+          "text": "합성기업은 4분기 신규 공장 착공을 알렸다.\n\"착공\"은 11월 예정이다.\\ 끝."
+        },
+        "observation": {
+          "documentId": "doc-golden-b",
+          "observedAt": "2026-10-16T00:00:01+00:00",
+          "publishedAt": null,
+          "title": "합성 공장 착공",
+          "url": "https://example.invalid/golden/b"
+        }
+      },
+      "c": {
+        "document": {
+          "inputKind": "body",
+          "text": "합성 😀 문단.\n합성기업은 합성상대와 투자 계약을 맺었다."
+        },
+        "observation": {
+          "documentId": "doc-golden-c",
+          "observedAt": "2026-10-16T00:00:02+00:00",
+          "publishedAt": "2026-10-02T00:00:00+00:00",
+          "title": "합성 투자",
+          "url": "https://example.invalid/golden/c"
+        }
+      }
+    },
+    "extractCases": [
+      {
+        "article": "a",
+        "catalogue": "full",
+        "id": "extract-a-full"
+      },
+      {
+        "article": "c",
+        "catalogue": "empty",
+        "id": "extract-c-empty"
+      }
+    ],
+    "mentionArticles": {
+      "m-a": "a",
+      "m-b": "b",
+      "m-c": "c"
+    },
+    "mentions": {
+      "m-a": {
+        "action": "공급 계약 발표",
+        "article_id": "doc-golden-a",
+        "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+        "assertion_status": "announced",
+        "event_type": "supply_contract",
+        "evidence": [
+          {
+            "article_id": "doc-golden-a",
+            "article_version": "0f036720dbf4f2278bae563cad6fcfb02c464e9e8cf3f24ca81464761653dfae",
+            "end": 21,
+            "quote": "공급 계약",
+            "start": 16
+          }
+        ],
+        "mention_id": "m-a",
+        "participants": [
+          {
+            "name": "합성기업",
+            "role": "issuer"
+          }
+        ],
+        "title": "합성 공급 계약"
+      },
+      "m-b": {
+        "action": "공장 착공 알림",
+        "article_id": "doc-golden-b",
+        "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+        "assertion_status": "planned",
+        "background": true,
+        "countries": [
+          "KR"
+        ],
+        "event_time": "2026-11",
+        "event_type": "facility",
+        "evidence": [
+          {
+            "article_id": "doc-golden-b",
+            "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+            "end": 18,
+            "quote": "신규 공장 착공",
+            "start": 10
+          },
+          {
+            "article_id": "doc-golden-b",
+            "article_version": "6358684b507feb9dfabd7558bf4a3be22c418a0ddea22c31667ab8fa65150ced",
+            "end": 34,
+            "quote": "\"착공\"은 11월",
+            "start": 25
+          }
+        ],
+        "keywords": [
+          "공장",
+          "착공"
+        ],
+        "mention_id": "m-b",
+        "participants": [
+          {
+            "company_id": "SYNTH-1",
+            "name": "합성기업",
+            "role": "builder"
+          },
+          {
+            "company_id": null,
+            "name": "지방자치단체",
+            "role": "host"
+          }
+        ],
+        "period": "2026Q4",
+        "target": "신규 공장",
+        "title": "합성 공장 착공"
+      },
+      "m-c": {
+        "action": "투자 계약 체결",
+        "article_id": "doc-golden-c",
+        "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+        "assertion_status": "occurred",
+        "countries": [],
+        "event_type": "investment",
+        "evidence": [
+          {
+            "article_id": "doc-golden-c",
+            "article_version": "da509b1e33878390443983dc59754161380cf19460feee2ee4f587dc533b8a75",
+            "end": 26,
+            "quote": "투자 계약",
+            "start": 21
+          }
+        ],
+        "mention_id": "m-c",
+        "participants": [
+          {
+            "company_id": "SYNTH-1",
+            "name": "합성기업",
+            "role": "investor"
+          },
+          {
+            "company_id": "SYNTH-2",
+            "name": "합성상대",
+            "role": "investee"
+          }
+        ],
+        "title": "합성 투자 계약"
+      }
+    },
+    "promptVersion": "zoop-extraction-authored-1",
+    "synthetic": true
+  },
+  "source": {
+    "analysisFingerprint": "da15369acc6aad52ebf877d341bb08041195ad9f6e0874bda1ed18b7e95eabb4",
+    "commitReadByThisScript": false,
+    "contextRevision": "role-context-3",
+    "expectedCommit": "fa446e7c72edfa06ec1a0e8e999199a21d31c695",
+    "package": "investmate-poc"
+  }
+}

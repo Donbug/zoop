@@ -244,15 +244,11 @@ final class ResultAssessor {
         // G3: identities the app recomputes instead of trusting.
         for (AiPayload.Artifact artifact : both) {
             AnalysisResult.Receipt call = artifact == main ? mainCall : verifierCall;
-            ObjectNode identity = StrictJson.newObject();
-            identity.put("jobId", artifact.jobId());
-            identity.put("kind", artifact.kind().wire());
-            identity.put("inputDigest", artifact.inputDigest());
             ObjectNode version = StrictJson.newObject();
             version.put("inputDigest", artifact.inputDigest());
             version.put("kind", artifact.kind().wire());
             version.set("result", artifact.resultNode());
-            if (!artifact.artifactId().equals("artifact-" + Canonical.digest(identity))
+            if (!artifact.artifactId().equals(artifactId(artifact.jobId(), artifact.kind().wire(), artifact.inputDigest()))
                     || !artifact.resultVersion().equals("result-" + Canonical.digest(version))
                     || !artifact.modelConfigRevision().equals(Canonical.digest(ReceiptRecords.configNode(call)))) {
                 return "artifact_digest_mismatch";
@@ -490,6 +486,18 @@ final class ResultAssessor {
         key.put("analysisId", analysisId);
         key.put("evidenceId", modelEvidenceId);
         return "ev-" + Canonical.digest(key);
+    }
+
+    /**
+     * The content-addressed id of an artifact: the job that created it, its kind and the input digest. The one rule behind the
+     * settlement gate (G3) and the read-side proof of a cache-served result ({@link ExactReceiptProof}).
+     */
+    static String artifactId(String jobId, String kindWire, String inputDigest) {
+        ObjectNode identity = StrictJson.newObject();
+        identity.put("jobId", jobId);
+        identity.put("kind", kindWire);
+        identity.put("inputDigest", inputDigest);
+        return "artifact-" + Canonical.digest(identity);
     }
 
     /** Every string that is stored in a jsonb or text column must be storable (no U+0000, a UTF-8 form). */

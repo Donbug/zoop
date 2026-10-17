@@ -1,6 +1,7 @@
+import type { EventContext } from '@/types/map/event';
+import { snapshotUrl, assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
 import { getCsrfToken } from '@/apis/auth/auth';
-import type { ApiResponse } from '@/apis/commonType';
 import type {
   CompanyDetail,
   CompanyDocumentsResponse,
@@ -19,17 +20,31 @@ async function fixture<T>(loader: () => T): Promise<T> {
   return loader();
 }
 
-async function read<T>(url: string): Promise<T> {
-  const response = await call<ApiResponse<T>>(url, 'GET', undefined, {
-    skipAuth: true,
-  });
-  return response.data;
+// 목표 계약(docs/api/openapi.yaml)의 응답은 ApiResponse로 감싸지 않은 본문 그대로다.
+function read<T>(url: string): Promise<T> {
+  return call<T>(url, 'GET', undefined, { skipAuth: true });
 }
 
 export const companyUrl = (id: string) =>
   `/api/v1/companies/${encodeURIComponent(id)}`;
 
-export async function getCompany(id: string): Promise<CompanyDetail> {
+export async function getCompany(
+  id: string,
+  context: EventContext = {},
+): Promise<CompanyDetail> {
+  if (context.round) {
+    const company = await call<
+      CompanyDetail & {
+        metadata: { graphVersion: string | null; asOf: string };
+      }
+    >(snapshotUrl(companyUrl(id), context), 'GET', undefined, {
+      skipAuth: true,
+    });
+    if (company.id !== id)
+      throw new Error('요청한 기업과 응답이 일치하지 않습니다.');
+    assertSnapshot(company.metadata, context);
+    return company;
+  }
   if (usesCompanyMock)
     return fixture(async () =>
       (await import('@/mocks/company/fixture')).mockCompany(id),
@@ -76,11 +91,7 @@ export async function getPortfolio(): Promise<PortfolioResponse> {
     return fixture(async () =>
       (await import('@/mocks/company/fixture')).mockPortfolio(),
     );
-  const response = await call<ApiResponse<PortfolioResponse>>(
-    '/api/v1/portfolio',
-    'GET',
-  );
-  return response.data;
+  return call<PortfolioResponse>('/api/v1/portfolio', 'GET');
 }
 
 export async function setWatchlistCompany(
@@ -94,11 +105,10 @@ export async function setWatchlistCompany(
   const csrfToken = getCsrfToken();
   if (!csrfToken)
     throw new Error('인증 세션의 CSRF 토큰이 없습니다. 다시 로그인해 주세요.');
-  const response = await call<ApiResponse<SettingsResponse>>(
+  return call<SettingsResponse>(
     `/api/v1/me/watchlist/${encodeURIComponent(id)}`,
     'PUT',
     { watched },
     { headers: { 'X-CSRF-Token': csrfToken } },
   );
-  return response.data;
 }

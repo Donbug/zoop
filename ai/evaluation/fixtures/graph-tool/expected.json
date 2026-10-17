@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "zoop-graph-tool-expected-1",
+  "queriesId": "zoop-graph-tool-dev-1",
+  "authoring": "Hand-written from the authored world facts (the S3 proposals and the operator canonical mapping), never from any tool output. Read ONLY by `graph_tool_bench.py score`; `prepare` and `measure` never open it. Focus semantics under test: an UNDIRECTED breadth-first ego neighborhood over all node kinds and edge types of the frozen version; an edge is returned iff one endpoint is at distance <= depth-1. Edge orientation (subject/object, direction) is an attribute checked separately from reachability.",
+  "nodeKinds": {
+    "kr-000050": "company", "kr-000100": "company", "kr-000300": "company", "kr-000400": "company",
+    "event:main-event": "event", "topic:ev-supply-chain": "topic"
+  },
+  "edgeDefs": {
+    "ab": {"type": "COMPETES_WITH", "subject": "kr-000050", "object": "kr-000100", "direction": "symmetric", "connection": "direct", "validFrom": null, "validUntil": null, "pathCompanyIds": []},
+    "cb": {"type": "SUPPLIES", "subject": "kr-000300", "object": "kr-000100", "direction": "directed", "connection": "direct", "validFrom": null, "validUntil": null, "pathCompanyIds": []},
+    "ca": {"type": "SUPPLIES", "subject": "kr-000300", "object": "kr-000050", "direction": "directed", "connection": "indirect", "validFrom": null, "validUntil": null, "pathCompanyIds": ["kr-000300", "kr-000100", "kr-000050"]},
+    "dc": {"type": "INVESTS_IN", "subject": "kr-000400", "object": "kr-000300", "direction": "directed", "connection": "direct", "validFrom": "2026-01-01", "validUntil": "2026-12-31", "pathCompanyIds": []},
+    "be": {"type": "PARTICIPATES_IN", "subject": "kr-000100", "object": "event:main-event", "direction": "directed", "connection": "direct", "validFrom": null, "validUntil": null, "pathCompanyIds": []},
+    "bt": {"type": "RELATES_TO_TOPIC", "subject": "kr-000100", "object": "topic:ev-supply-chain", "direction": "directed", "connection": "direct", "validFrom": null, "validUntil": null, "pathCompanyIds": []},
+    "sab": {"type": "COMPETES_WITH", "subject": "kr-000050", "object": "kr-000100", "direction": "symmetric", "connection": "direct", "validFrom": null, "validUntil": null, "pathCompanyIds": []},
+    "sdc": {"type": "INVESTS_IN", "subject": "kr-000400", "object": "kr-000300", "direction": "directed", "connection": "direct", "validFrom": null, "validUntil": null, "pathCompanyIds": []}
+  },
+  "cases": {
+    "GT01": {"kind": "neighborhood", "found": true, "nodes": {"kr-000400": 0, "kr-000300": 1}, "edges": ["dc"]},
+    "GT02": {"kind": "neighborhood", "found": true, "nodes": {"kr-000400": 0, "kr-000300": 1, "kr-000100": 2, "kr-000050": 2}, "edges": ["dc", "cb", "ca"]},
+    "GT03": {"kind": "neighborhood", "found": true, "nodes": {"kr-000400": 0, "kr-000300": 1, "kr-000100": 2, "kr-000050": 2, "event:main-event": 3, "topic:ev-supply-chain": 3}, "edges": ["dc", "cb", "ca", "ab", "be", "bt"]},
+    "GT04": {"kind": "neighborhood", "found": true, "nodes": {"kr-000100": 0, "kr-000050": 1, "kr-000300": 1, "event:main-event": 1, "topic:ev-supply-chain": 1}, "edges": ["ab", "cb", "be", "bt"]},
+    "GT05": {"kind": "neighborhood", "found": true, "nodes": {"kr-000100": 0, "kr-000050": 1, "kr-000300": 1, "event:main-event": 1, "topic:ev-supply-chain": 1, "kr-000400": 2}, "edges": ["ab", "cb", "ca", "dc", "be", "bt"]},
+    "GT06": {"kind": "neighborhood", "found": true, "nodes": {"kr-000100": 0, "kr-000050": 1, "kr-000300": 1, "event:main-event": 1, "topic:ev-supply-chain": 1, "kr-000400": 2}, "edges": ["ab", "cb", "ca", "dc", "be", "bt"]},
+    "GT07": {"kind": "neighborhood", "found": true, "nodes": {"kr-000050": 0, "kr-000100": 1, "kr-000300": 1}, "edges": ["ab", "ca"]},
+    "GT08": {"kind": "neighborhood", "found": true, "nodes": {"kr-000050": 0, "kr-000100": 1, "kr-000300": 1, "event:main-event": 2, "topic:ev-supply-chain": 2, "kr-000400": 2}, "edges": ["ab", "ca", "cb", "dc", "be", "bt"]},
+    "GT09": {"kind": "neighborhood", "found": true, "nodes": {"kr-000300": 0, "kr-000100": 1, "kr-000050": 1, "kr-000400": 1}, "edges": ["cb", "ca", "dc"]},
+    "GT10": {"kind": "neighborhood", "found": false, "nodes": {}, "edges": []},
+    "GT11": {"kind": "neighborhood", "found": true, "nodes": {"kr-000400": 0, "kr-000300": 1}, "edges": ["sdc"]},
+    "GT12": {"kind": "neighborhood", "found": true, "nodes": {"kr-000050": 0, "kr-000100": 1}, "edges": ["sab"]},
+    "GT13": {"kind": "neighborhood", "found": true, "nodes": {"kr-000100": 0, "kr-000050": 1}, "edges": ["sab"]},
+    "GC01": {"kind": "neighborhood", "found": true, "nodes": {"kr-000050": null, "kr-000100": null, "kr-000300": null, "kr-000400": null, "event:main-event": null, "topic:ev-supply-chain": null}, "edges": ["ab", "cb", "ca", "dc", "be", "bt"]},
+    "GC02": {"kind": "neighborhood", "found": true, "nodes": {"kr-000050": null, "kr-000100": null, "kr-000300": null, "kr-000400": null}, "edges": ["sab", "sdc"]},
+    "GC03": {"kind": "ledger", "state": "ready", "nodeCount": 6, "edgeCount": 6},
+    "GC04": {"kind": "ledger", "state": "ready", "nodeCount": 4, "edgeCount": 2}
+  },
+  "checks": {
+    "CK01": {"outcome": "withheld", "code": "source_unauthorized", "recheck": "current"},
+    "CK02": {"outcome": "withheld", "code": "grant_revision_changed", "recheck": "current"},
+    "CK03": {"outcome": "withheld", "code": "canonical_mapping_changed", "recheck": "current"},
+    "CK04": {"outcome": "error", "code": "input_or_configuration_invalid", "recheck": null},
+    "CK05": {"outcome": "error", "code": "version_not_found", "recheck": null}
+  }
+}

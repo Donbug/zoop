@@ -1,3 +1,4 @@
+import type { EventContext } from '@/types/map/event';
 import { useEffect, useState } from 'react';
 import { getCompanyIssueImpact } from '@/apis/graph/impact';
 import type { Impact } from '@/types/company/detail';
@@ -5,8 +6,12 @@ import type { Impact } from '@/types/company/detail';
 export function useImpactPath(
   companyId: string | null,
   issueId: string | null,
+  context: EventContext = {},
 ) {
-  const key = companyId && issueId ? `${companyId}|${issueId}` : '';
+  const { round, asOf, graphVersion } = context;
+  const snapshotKey = JSON.stringify([round, asOf, graphVersion]);
+  const key =
+    companyId && issueId ? `${companyId}|${issueId}|${snapshotKey}` : '';
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{
     key: string;
@@ -22,7 +27,11 @@ export function useImpactPath(
       if (!active) return;
       setState({ key, data: null, loading: true, error: null });
       try {
-        const data = await getCompanyIssueImpact(companyId, issueId);
+        const data = await getCompanyIssueImpact(companyId, issueId, {
+          round,
+          asOf,
+          graphVersion,
+        });
         if (active) setState({ key, data, loading: false, error: null });
       } catch (error) {
         if (active)
@@ -40,7 +49,7 @@ export function useImpactPath(
     return () => {
       active = false;
     };
-  }, [attempt, companyId, issueId, key]);
+  }, [attempt, companyId, issueId, key, round, asOf, graphVersion]);
 
   const current =
     state.key === key

@@ -15,13 +15,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from investmate.domain import Mention
-
-from . import extraction_poc as poc
+from . import extraction_replay as analysis
 from . import extraction_topic as topics
 from .dependency_contracts import array, cites, invalid
-from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS,
-    SCHEMA, CitationFailure, ExtractionFailure, ObservationRef, ReplyInvalid, Submit, canonical, digest)
+from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS, SCHEMA, Article, CitationFailure,
+    ExtractionFailure, Mention, ObservationRef, ReplyInvalid, Submit, canonical, digest)
 from .ingestion import Ingestor
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import Authority, Export, IngestionFailure, Inspect, byte_hash, now, reserved_state_roots
@@ -201,7 +199,7 @@ class Fixtures:
         self.replay_hash = byte_hash(replay) if replay is not None else None
         self.topic_raw = topic
         self.doc = None
-        self._model = None
+        self._index = None
         if replay is not None:
             try:
                 self.doc = json.loads(replay)
@@ -213,10 +211,11 @@ class Fixtures:
             raise ExtractionFailure("replay_fixture_required")
         return self.doc
 
-    def model(self, config):
-        if self._model is None:
-            self._model = poc.replay_model(self.require(), config)
-        return self._model
+    def index(self) -> dict:
+        """The whole fixture validated once (duplicates included) as {(stage, requestDigest): authored response}."""
+        if self._index is None:
+            self._index = analysis.index(self.require())
+        return self._index
 
     def producer(self, synthetic: bool):
         if self.topic_raw is None:
@@ -229,7 +228,7 @@ class Doc:
     key: str
     ref: ObservationRef
     export: dict
-    article: object
+    article: Article
     binding: dict
 
 
@@ -238,7 +237,7 @@ class Group:
     event_id: str
     revision: str
     members: list  # [(docKey, Mention)]
-    issue: object
+    articles: list  # [Article] of the unique documents of this whole event, in documents order
     digest: str
     documents: list  # unique docKeys
 
@@ -247,12 +246,10 @@ class Group:
 class Context:
     request: Submit
     synthetic: bool
-    config: object
     docs: dict
     incoming: str
     groups: list
     snapshot_digest: str
-    pin: dict
 
     def by_version(self, version: str) -> Doc:
         # Same documentVersion observed twice resolves identically; deterministic key order, never "newest".
@@ -267,13 +264,44 @@ def doc_key(ref: ObservationRef) -> str:
     return digest(ref.wire())
 
 
+def current(binding: dict) -> bool:
+    """A job is native only when its frozen adapter is this build's. Anything else (ledger rows written before the native
+    cutover) stays readable as history but is never resumed, delivered or re-analysed: its analysis contract cannot be reproduced."""
+    adapter = binding.get("adapter")
+    return isinstance(adapter, dict) and adapter.get("version") == ADAPTER_VERSION
+
+
+def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
+    """Ledger-only, read-only preflight. Returns an open read-only Store when the ledger holds `job_id` under a non-current adapter, else None.
+
+    It never reads fixtures or source authority and never opens the writer (no chmod/DDL/WAL write). Anything it cannot answer (no ledger, busy,
+    recovery needed, foreign namespace, unknown job, unreadable row) is None, so the ordinary path reports that exactly as before."""
+    try:
+        store = Store(root, ingestion_root, existing=True)
+    except (ExtractionFailure, OSError):
+        return None
+    try:
+        row = store.one("SELECT binding FROM jobs WHERE job_id=?", (job_id,))
+        if row is not None and not current(json.loads(row["binding"])):
+            return store
+    except (sqlite3.Error, ValueError, TypeError):
+        pass
+    store.close()
+    return None
+
+
+def locators_containing(document: dict, start: int, end: int) -> list[str]:
+    """Whole interval must lie inside one mapped run (same rule as S1 exact), never across removed/generated text."""
+    return [r["locatorId"] for r in document["rawLocators"] if r["start"] <= start < end <= r["end"]]
+
+
 def cite_exact(sources: "Sources", ref: ObservationRef, export: dict, start: int, end: int, quote: str) -> dict:
     """Exact quote -> whole mapped locator run -> ingestion source resolver. Shared by every consumer of exact citations."""
     document = export["document"]
     text = document["text"]
     if not 0 <= start < end <= len(text) or text[start:end] != quote:
         raise CitationFailure("quote_mismatch")
-    locators = poc.locators_containing(document, start, end)
+    locators = locators_containing(document, start, end)
     if not locators:
         raise CitationFailure("raw_locator_mismatch")
     resolved = sources.resolve(ref, locators[0], start, end)
@@ -293,9 +321,7 @@ class Extractor:
     # ------------------------------------------------------------------ freeze / verify ---------------------------------
 
     def _context(self, request: Submit) -> Context:
-        pin = poc.pin()
         synthetic = request.provenance.source_kind == "synthetic"
-        config = poc.settings(request.prompt_version, request.catalogue)
         refs: dict[str, ObservationRef] = {doc_key(request.incoming): request.incoming}
         for event in request.snapshot.events:
             for member in event.members:
@@ -305,8 +331,8 @@ class Extractor:
         docs = {}
         for key, ref in refs.items():
             export = self.sources.export(ref)
-            projected = poc.article(export, synthetic)
-            docs[key] = Doc(key, ref, export, projected, poc.bind(export, projected))
+            projected = analysis.article(export, synthetic)
+            docs[key] = Doc(key, ref, export, projected, analysis.bind(export, projected))
         incoming = doc_key(request.incoming)
         groups, seen = [], set()
         for event in request.snapshot.events:
@@ -314,7 +340,7 @@ class Extractor:
             for member in event.members:
                 key = doc_key(member.observation)
                 doc = docs[key]
-                mention = poc.member_mention(member.mention, doc.article)
+                mention = analysis.member_mention(member.mention, doc.article)
                 identity = (doc.ref.document_version, mention.mention_id)
                 if doc.ref.document_version == docs[incoming].ref.document_version or identity in seen:
                     raise ExtractionFailure("snapshot_member_invalid")
@@ -322,19 +348,18 @@ class Extractor:
                 members.append((key, mention))
                 if key not in keys:
                     keys.append(key)
-            issue = poc.issue_snapshot(event.event_id, [m for _, m in members], [docs[k].article for k in keys])
+            articles = [docs[k].article for k in keys]
             group_digest = digest({"eventId": event.event_id, "revision": event.revision,
                                    "members": [{"binding": digest(docs[k].binding), "mention": m.model_dump(mode="json")} for k, m in members]})
-            groups.append(Group(event.event_id, event.revision, members, issue, group_digest, keys))
+            groups.append(Group(event.event_id, event.revision, members, articles, group_digest, keys))
         snapshot_digest = digest({"revision": request.snapshot.revision, "events": sorted([g.event_id, g.revision, g.digest] for g in groups)})
-        return Context(request, synthetic, config, docs, incoming, groups, snapshot_digest, pin)
+        return Context(request, synthetic, docs, incoming, groups, snapshot_digest)
 
     def _binding(self, ctx: Context, replay: dict) -> dict:
-        identity = {k: replay[k] for k in ("format", "synthetic", "promptVersion", "modelVersion", "analysisVersion", "embeddingVersion")}
+        identity = {k: replay[k] for k in ("format", "synthetic", "recordingKind", "promptVersion", "analysisVersion")}
         request = ctx.request
-        return {"adapter": {"version": ADAPTER_VERSION, "candidate": CANDIDATE_VERSION, **ctx.pin,
-                            "fingerprint": poc.extraction_fingerprint(identity, ctx.config, request.catalogue.revision)},
-                "replay": replay, "settingsDigest": digest(ctx.config.model_dump(mode="json")),
+        return {"adapter": {"version": ADAPTER_VERSION, "candidate": CANDIDATE_VERSION, "fingerprint": analysis.fingerprint(identity, request.catalogue)},
+                "replay": replay,
                 "catalogue": {"revision": request.catalogue.revision, "digest": digest(request.catalogue.wire())},
                 "incoming": ctx.incoming, "documents": {k: ctx.docs[k].binding for k in sorted(ctx.docs)},
                 "snapshot": {"revision": request.snapshot.revision, "digest": ctx.snapshot_digest,
@@ -345,14 +370,14 @@ class Extractor:
         """Current read/store/quote authority and exact immutable binding for every document, now."""
         for doc in ctx.docs.values():
             export = self.sources.export(doc.ref)
-            bound = poc.bind(export, poc.article(export, ctx.synthetic))
+            bound = analysis.bind(export, analysis.article(export, ctx.synthetic))
             if bound["grant"] != doc.binding["grant"]:
                 raise ExtractionFailure("grant_revision_changed")
             if bound != doc.binding:
                 raise ExtractionFailure("document_binding_changed")
 
     def _ground_members(self, ctx: Context) -> None:
-        """Snapshot member evidence must be exact whole mapped runs resolved by ingestion, not merely PoC Evidence.matches."""
+        """Snapshot member evidence must be exact whole mapped runs resolved by ingestion, not merely Evidence.matches."""
         for group in ctx.groups:
             for key, mention in group.members:
                 for evidence in mention.evidence:
@@ -363,6 +388,8 @@ class Extractor:
 
     def _check_binding(self, ctx: Context, row) -> None:
         stored = json.loads(row["binding"])
+        if not current(stored):
+            raise ExtractionFailure("analysis_contract_changed")
         fresh = self._binding(ctx, stored["replay"])
         if fresh == stored:
             return
@@ -370,7 +397,7 @@ class Extractor:
             if fresh["documents"].get(key) != binding:
                 raise ExtractionFailure("grant_revision_changed" if fresh["documents"].get(key, {}).get("grant") != binding["grant"] else "document_binding_changed")
         if fresh["adapter"] != stored["adapter"]:
-            raise ExtractionFailure("poc_contract_changed")
+            raise ExtractionFailure("analysis_contract_changed")
         raise ExtractionFailure("job_binding_changed")
 
     # ------------------------------------------------------------------ commands -----------------------------------------
@@ -381,13 +408,22 @@ class Extractor:
             raise ExtractionFailure("job_not_found")
         return row
 
-    def freeze(self, request: Submit, fixtures: Fixtures) -> None:
-        """The only registration path: durably freeze the exact bound input as `queued`, with no replay model, call or candidate effect.
+    def require_legacy(self, job_id: str) -> None:
+        """Under the writer lock already held by this Store: the job must still be a stored legacy one (jobs are immutable, so this only fails if the ledger changed)."""
+        if current(json.loads(self._job(job_id)["binding"])):
+            raise ExtractionFailure("job_binding_changed")
 
-        The replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here but never
-        parsed into a model. A job that already exists is not touched at all: same input returns without re-freezing, resuming, resetting a
-        stopped job or reading authority; another input is `job_input_conflict` with nothing written. Execution is `resume`'s business."""
-        identity = poc.fixture_identity(fixtures.require(), request.provenance, request.prompt_version)
+    def freeze(self, request: Submit, fixtures: Fixtures) -> None:
+        """The only registration path: durably freeze the exact bound input as `queued`, with no replay lookup, call or candidate effect.
+
+        The replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here, but only its header is
+        read; its records are validated by the first lookup. A job that already exists is not touched at all: same input returns without re-freezing,
+        resuming, resetting a stopped job or reading authority; another input is `job_input_conflict` with nothing written. Execution is `resume`'s business."""
+        existing = self.store.one("SELECT binding FROM jobs WHERE job_id=?", (request.job_id,))
+        if existing is not None and not current(json.loads(existing["binding"])):
+            # A stored legacy job is history: say so before its fixture bytes (old format or none) are looked at.
+            raise ExtractionFailure("analysis_contract_changed")
+        identity = analysis.identity(fixtures.require(), request.provenance, request.prompt_version)
         input_digest = digest({"request": request.wire(), "replayFixtureHash": fixtures.replay_hash})
         row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
         if row is not None:
@@ -409,6 +445,9 @@ class Extractor:
 
     def resume(self, job_id: str, fixtures: Fixtures) -> dict:
         row = self._job(job_id)
+        if not current(json.loads(row["binding"])):
+            # A job frozen under another analysis contract is history: refuse before any fixture, source, authority or state access.
+            raise ExtractionFailure("analysis_contract_changed")
         if fixtures.replay_hash is not None and fixtures.replay_hash != row["replay_hash"]:
             raise ExtractionFailure("replay_fixture_changed")
         self._execute(row, fixtures)
@@ -544,34 +583,32 @@ class Extractor:
     # ------------------------------------------------------------------ stages -----------------------------------------
 
     def _cite(self, ctx: Context, doc: Doc, start: int, end: int, quote: str) -> dict:
-        """Exact quote -> whole mapped locator run -> ingestion source resolver. PoC Evidence.matches alone is insufficient."""
+        """Exact quote -> whole mapped locator run -> ingestion source resolver. Evidence.matches alone is insufficient."""
         return cite_exact(self.sources, doc.ref, doc.export, start, end, quote)
 
     def _extract(self, row, ctx: Context, fixtures: Fixtures, fence: int) -> None:
         stored = json.loads(row["binding"])
         identity, incoming = stored["replay"], ctx.docs[ctx.incoming]
-        request_input = poc.extract_input(incoming.article, ctx.config)
-        key = poc.request_key("extract", request_input, identity["analysisVersion"])
+        request_input = analysis.extract_input(incoming.article, ctx.request.prompt_version, ctx.request.catalogue)
+        key = analysis.request_digest("extract", request_input, identity["analysisVersion"])
 
         def lookup():
-            fixtures.model(ctx.config)  # whole fixture (duplicates/key mismatch) is valid before any call is reserved
-            found = poc.recorded(fixtures.require(), identity["analysisVersion"]).get(key)
+            found = fixtures.index().get(("extract", key))  # the whole fixture (duplicates, shape) is valid before any call is reserved
             if found is None:
                 raise ExtractionFailure("replay_response_missing")
             return found
 
         extraction = self._receipted(row, ctx, fence, "extract", "incoming", key, lambda: fixtures.replay_hash, lookup,
-            lambda raw: poc.parse_extraction(fixtures.model(ctx.config), incoming.article, ctx.config),
-            lambda raw: poc.parse_extraction(poc.replay_model(poc.single_record(identity, "extract", request_input, raw), ctx.config), incoming.article, ctx.config))
+            lambda raw: analysis.parse_extraction(raw, incoming.article), lambda raw: analysis.parse_extraction(raw, incoming.article))
         rows = []
         for mention in extraction.mentions:
-            mention_candidate = poc.mention_candidate_id(incoming.binding, key, stored["adapter"]["fingerprint"], mention.mention_id)
+            mention_candidate = analysis.mention_candidate_id(incoming.binding, key, stored["adapter"]["fingerprint"], mention.mention_id)
             state, reason, citations = "candidate", None, []
             try:
                 citations = [self._cite(ctx, incoming, e.start, e.end, e.quote) for e in mention.evidence]
             except CitationFailure as exc:
                 state, reason = "rejected", exc.code
-            rows.append((poc.event_candidate_id(mention_candidate), mention_candidate, mention.mention_id, state, reason,
+            rows.append((analysis.event_candidate_id(mention_candidate), mention_candidate, mention.mention_id, state, reason,
                          canonical({"mention": mention.model_dump(mode="json"), "citations": citations})))
 
         def write():
@@ -595,23 +632,22 @@ class Extractor:
             mention = Mention.model_validate(json.loads(candidate["payload"])["mention"])
             decided = []
             for group in ctx.groups:
-                request_input = poc.compare_input(mention, group.issue, incoming.article)
-                key = poc.request_key("compare", request_input, identity["analysisVersion"])
+                request_input = analysis.compare_input(mention, group.event_id, [m for _, m in group.members], group.articles, incoming.article)
+                key = analysis.request_digest("compare", request_input, identity["analysisVersion"])
 
                 def lookup(key=key):
-                    fixtures.model(ctx.config)  # whole fixture (duplicates/key mismatch) is valid before any call is reserved
-                    found = poc.recorded(fixtures.require(), identity["analysisVersion"]).get(key)
+                    found = fixtures.index().get(("compare", key))  # the whole fixture (duplicates, shape) is valid before any call is reserved
                     if found is None:
                         raise ExtractionFailure("replay_response_missing")
                     return found
 
+                def parse(raw, m=mention, g=group):
+                    return analysis.parse_comparison(raw, m, incoming.article, g.articles)
+
                 decision = self._receipted(row, ctx, fence, "compare", f"{candidate['event_candidate_id']}|{group.event_id}|{group.revision}", key,
-                    lambda: fixtures.replay_hash, lookup,
-                    lambda raw, m=mention, g=group: poc.parse_comparison(fixtures.model(ctx.config), m, g.issue, incoming.article),
-                    lambda raw, m=mention, g=group, i=request_input: poc.parse_comparison(
-                        poc.replay_model(poc.single_record(identity, "compare", i, raw), ctx.config), m, g.issue, incoming.article))
+                    lambda: fixtures.replay_hash, lookup, parse, parse)
                 sources = [(incoming.ref.document_version, incoming.article), *((ctx.docs[k].ref.document_version, ctx.docs[k].article) for k in group.documents)]
-                effective = poc.effective(mention, group.issue, incoming.article, decision, sources)
+                effective = analysis.effective(mention, [m for _, m in group.members], incoming.article, decision, sources)
                 citations = []
                 for evidence, version in zip(decision.evidence, effective["evidenceDocuments"]):
                     if version is None:
@@ -629,7 +665,7 @@ class Extractor:
                            "effective": {k: effective[k] for k in ("relation", "reason", "rule")}, "citations": citations}
                 comparisons.append((candidate["event_candidate_id"], group.event_id, canonical(payload)))
                 decided.append(payload)
-            dispositions.append((candidate["event_candidate_id"], canonical({**poc.disposition(decided), "comparedEvents": len(ctx.groups), "snapshotDigest": ctx.snapshot_digest})))
+            dispositions.append((candidate["event_candidate_id"], canonical({**analysis.disposition(decided), "comparedEvents": len(ctx.groups), "snapshotDigest": ctx.snapshot_digest})))
 
         def write():
             for event, target, payload in comparisons:
@@ -722,6 +758,10 @@ class Extractor:
                        "responseDigest": c["response_digest"], "verdict": c["verdict"]} for c in calls]}
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
+            return result
+        if not current(binding):
+            # Stored history stays inspectable verbatim, but a job frozen under another analysis contract delivers nothing and reads no source.
+            result["delivery"] = {"status": "withheld", "code": "analysis_contract_changed"}
             return result
         try:
             ctx = self._context(request)

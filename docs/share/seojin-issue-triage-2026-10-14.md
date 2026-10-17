@@ -63,3 +63,26 @@
 이 증거는 합성 replay와 로컬 PostgreSQL에 대한 것이며 외부 모델 호출은 0건이다. 검증용 DB 컨테이너는 정리했다. 현재 작업은 미커밋이며 GitHub 이슈·공유 WBS·원격 CI는 이번에 변경하지 않았다. **전체 이슈를 닫을 수 있다고 새로 판정한 항목은 0개**다. 대신 위 완료 하위 작업은 인계·리뷰 대상으로 준비됐다.
 
 다음 구현은 공개 읽기 권한·회사 문맥을 갖춘 결과 조회 또는 S2/S3 후보의 앱 작업 저장이며, GraphDB 담당과 참조/공개 버전 경계를 맞춰 선정한다. 운영자용 저장이 사용자 공개를 자동 허가하지 않는다. 오늘 당장 실수집·실모델·GraphDB·화면 전체를 완료시키는 일정으로 확대하지 않는다.
+
+## 2026-10-15 추가 — 공개 `getEvidence` 부분 구현
+
+| 관련 이슈 | 이번에 완료한 하위 작업 | 아직 남은 수용 기준 |
+|---|---|---|
+| #52 | 저장된 S1 요약 인용 한 건을 읽는 실제 `GET /api/v1/evidence/{id}`(Spring·PostgreSQL). 현재 문서 상태와 현재 grant registry를 요청마다 다시 판정, 캐시로 돌려준 요약은 exact receipt 한 건 읽기 전용 증명 | GraphDB 사건 연결(`eventIds`는 실패 구역), 고정 `round`·`graphVersion`·`asOf` 읽기(409) |
+| #53 | 위 읽기가 등록된 문서·불변 버전·`access_status`·현재 버전 규칙을 응답 때마다 적용 | `listCompanyDocuments`, 사건·기업 연결, 실자료 정책 |
+| #56 | 수입된 근거·요약 결과를 공개 경로로 읽는 첫 한 건(`documentSummary`는 최신 요청이 available일 때만, 옛 요약 대체 없음) | GraphDB upsert·공개 버전·승인·전체 철회, 기업 판정(`sentiment`는 항상 `null`) |
+| #146 | 목표 OpenAPI의 `getEvidence`를 Java로 구현(필드 추가 없음, `EVIDENCE_UNAVAILABLE`·`VERSION_UNAVAILABLE` 오류 코드) | 나머지 모든 목표 API |
+| #149 | 실제 Spring HTTP→PostgreSQL 17 읽기 smoke: 저장된 evidence 10건 전부(캐시 적중 포함), GET 294건, grant·registry·옛 버전·최신 pending·캐시 증명 불량·hash·권한·운영자 잠금 | 실제 GraphDB·운영 자료·실모델·화면 E2E |
+
+실행 근거(로컬 작업 트리·미커밋, Main 실행): Java **341개** 통과(실패·건너뜀 0)와 `assemble`, 실제 Spring jar→PostgreSQL 17의 smoke **41단계**. GET은 DB·파일·AI·모델에 쓰지 않았고 provider·모델 호출은 0이다. 규칙·한계는 [문서 분석 § 근거 읽기](../../api/docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현). 이 날 **전체 이슈를 닫을 수 있다고 판정한 항목은 0개**이며 GitHub 이슈·공유 WBS·원격 CI·커밋·푸시는 변경하지 않았다. `listCompanyDocuments`·공개 읽기용 GraphDB 연결·기업 판정 문맥은 여전히 없다(S3의 비공개 Neo4j stage는 아래 추가 절).
+
+## 2026-10-15 추가 — 비공개 Neo4j version projection (#78·#79 일부, 이슈는 닫지 않음)
+
+| 관련 이슈 | 이번에 완료한 하위 작업 | 아직 남은 수용 기준 |
+|---|---|---|
+| #78 / 6.6.19 | 완료된 S3 job 하나를 서버 소유 canonical 결정으로 **비공개** 불변 Neo4j 5 version 하나로 stage하는 `zoop-ai-graph`(`init/freeze/project/recover/inspect/read/focus`). 다섯 관계 유형, version마다 별도 노드·간선(version 사이 공유·삭제 없음), explicit 단일 transaction, unknown commit의 전체 그래프 복구, 매 read의 현재 gate와 전체 그래프 digest 검증, 읽기 전용 깊이 1–3 focus. 상세는 [AI 실행 계약](../design/ai-system.md#s3--비공개-neo4j-버전-projection-fs080-일부게시fs081-철회-아님) | 공개 version 전환과 두 조회 경로 readiness(FS059), 앱 `graph_versions`/`graph_db_state` 등록, Spring 연동, 영향 라벨 projection, 운영 Neo4j 위상·인증·TLS. **활성 공개 상태는 없고** 출력 `publication`은 항상 `not-published`다 |
+| #79 / 6.6.20 | 기존 S4 영향 대상 조회는 그대로이고, 저장된 Neo4j version은 현재 gate가 닫히면 `read`/`focus`가 내용 없이 withheld한다 | 실제 철회·비활성화·purge(물리 삭제 없음), graph 원장의 `zoop-ai-dependents` 스캔 포함, 공개 차단은 전부 남음. FS081은 부분 상태 그대로다 |
+
+실행 근거(로컬 작업 트리·미커밋, Main 실행. 원격 CI·커밋·푸시 없음): `ai/pipeline` 시험 전체 **265개** 통과. 실제 Neo4j 5.26 Community(격리된 `--rm` tmpfs 임시 컨테이너, 종료·정리 완료)에서 독립 검토 R1–R4 회귀 **11개**는 수정 전 모두 RED로 재현됐고 수정 뒤 모두 통과했다. 새 빈 database의 정상 smoke는 다섯 관계 유형 전부, 노드 6·간선 6의 `v1`, 노드를 공유하지 않는 `v2`와 `v1` 원본 바이트 불변, 깊이 1·2·3 focus, 반복 `init` 멱등, 권한 철회 withheld, unknown commit·SIGKILL 뒤 rollback·변조 fail-closed를 모두 통과했다. provider·모델 호출은 0이고 원천 원장은 읽기 전용이었다. 직접 의존성 `neo4j==6.3.1`은 lock 검사와 실제 sync를 통과했고 `make pipeline-graph-smoke`를 추가했다. 공개 계약 생성물 275개 차이 없음·하드 오류 0·문서 시스템 시험 21개 통과, 병합된 인증 작업 트리의 Java는 시험 374개 실행에 실패 0·건너뜀 9, build 성공이다(건너뜀 9를 포함하므로 374개 통과로 세지 않는다).
+
+이 검증은 기능에 한정된다. **성능·지연·부하는 측정하지 않았고** 실제 provider·모델·운영 Neo4j는 쓰지 않았다. 이 날 **전체 이슈를 닫을 수 있다고 판정한 항목은 0개**이며 GitHub 이슈·공유 WBS·원격 CI·커밋·푸시는 변경하지 않았다.
