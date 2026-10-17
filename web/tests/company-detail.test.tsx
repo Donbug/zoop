@@ -678,3 +678,116 @@ test('FS043: event card enters its document scope with period and exact time ret
       ?.query.get('asOf'),
   ).toBe(old);
 });
+
+test('D-COM-04 depth change retains company period/time/tab and passes exact scope to the API', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', (request) =>
+    json({
+      ...graph,
+      metadata: {
+        ...graph.metadata,
+        depth: Number(request.query.get('depth')),
+        asOf: request.query.get('asOf'),
+      },
+    }),
+  );
+  open(`${pinned}&period=1m&tab=info`);
+  const preview = await screen.findByRole('img', {
+    name: '기준 시점 기업 관계 그래프',
+  });
+  const original = preview.getAttribute('viewBox');
+  await userEvent.click(
+    screen.getByRole('button', { name: '기업 관계 그래프 확대' }),
+  );
+  expect(preview.getAttribute('viewBox')).not.toBe(original);
+  await userEvent.click(screen.getByRole('button', { name: '2단계' }));
+  await waitFor(() =>
+    expect(
+      server
+        .calls('GET', '/api/v1/companies/:id/graph')
+        .at(-1)
+        ?.query.get('depth'),
+    ).toBe('2'),
+  );
+  const address = screen.getByTestId('address').textContent;
+  expect(address).toContain('tab=info');
+  expect(address).toContain('period=1m');
+  expect(address).toContain('graphVersion=v1');
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole('img', { name: '기준 시점 기업 관계 그래프' })
+        .getAttribute('viewBox'),
+    ).toBe(original),
+  );
+});
+
+test('graph issue selection clears previous document/evidence while retaining tab and reference time', async () => {
+  open(
+    `${pinned}&period=1w&tab=documents&event=issue-b&document=old-document&evidence=old-evidence&bucket=old-bucket`,
+  );
+  const region = screen.getByRole('complementary', {
+    name: '시점 기반 관계 그래프',
+  });
+  await within(region).findByRole('button', { name: '사건 · 합성 사건 A' });
+  await userEvent.click(
+    within(region).getByRole('button', { name: '기업 관계 그래프 확대' }),
+  );
+  const view = within(region).getByRole('img').getAttribute('viewBox');
+  await userEvent.click(
+    await within(region).findByRole('button', { name: '사건 · 합성 사건 A' }),
+  );
+  const address = screen.getByTestId('address').textContent;
+  expect(address).toContain('event=issue-a');
+  expect(address).toContain('tab=documents');
+  expect(address).toContain('period=1w');
+  expect(address).not.toContain('document=');
+  expect(address).not.toContain('evidence=');
+  expect(address).not.toContain('bucket=');
+  expect(within(region).getByRole('img').getAttribute('viewBox')).toBe(view);
+});
+
+test('D-COM-04 permission failure stays separate from retryable graph outages', async () => {
+  server.on('GET', '/api/v1/companies/:id/graph', () =>
+    apiError(403, 'ACCESS_DENIED'),
+  );
+  open(pinned);
+  const region = screen.getByRole('complementary', {
+    name: '시점 기반 관계 그래프',
+  });
+  await within(region).findByText(
+    '이 시점의 기업 관계를 조회할 권한이 없어요.',
+  );
+  expect(
+    within(region).queryByRole('button', { name: '관계 그래프 다시 조회' }),
+  ).toBeNull();
+  expect(within(region).queryByRole('img')).toBeNull();
+});
+
+test('unconfirmed business assertions are excluded from actual impact paths', () => {
+  const impact: Impact = {
+    companyId: id,
+    issueId: 'issue-a',
+    steps: [
+      {
+        id: 'issue-a',
+        kind: 'issue',
+        reason: '합성 근거',
+        evidenceIds: ['ev-a'],
+      },
+      { id, kind: 'company', reason: '합성 근거', evidenceIds: ['ev-a'] },
+    ],
+    metadata,
+  };
+  expect(
+    impactEdges(
+      {
+        ...graph,
+        edges: graph.edges.map((edge) => ({
+          ...edge,
+          assertionStatus: 'unconfirmed',
+        })),
+      },
+      impact,
+    ),
+  ).toEqual([]);
+});

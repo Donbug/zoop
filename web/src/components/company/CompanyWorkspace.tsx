@@ -22,6 +22,7 @@ import type { GraphResponse } from '@/types/map/graph';
 import CompanyCatalog from './CompanyCatalog';
 import CompanyDocumentPanel from './CompanyDocumentPanel';
 import CompanyGraphPreview from './CompanyGraphPreview';
+import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import {
   periods,
   exactTime,
@@ -580,29 +581,56 @@ export default function CompanyWorkspace() {
       <aside
         className="min-w-0 border-l border-[var(--zoop-line)] p-4 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-[var(--zoop-line)] max-[1000px]:col-start-2 max-[1000px]:border-l-0 max-[1000px]:border-t max-md:w-full"
         aria-label="시점 기반 관계 그래프"
+        data-screen-id="D-COM-04"
       >
         <h2>관계 그래프</h2>
-        <Link to={`/?${mapQuery}`}>지도에서 보기</Link>
+        <Link className={ui.button} to={`/?${mapQuery}`}>
+          지도에서 보기
+        </Link>
         <nav aria-label="관계 깊이">
           {[1, 2].map((d) => (
             <button
               key={d}
               aria-pressed={depth === d}
+              className={ui.button}
               onClick={() => updateQuery({ depth: String(d), bucket: null })}
             >
               {d}단계
             </button>
           ))}
         </nav>
-        <Status resource={graph} label="관계 그래프" />
+        {graph.error && [401, 403].includes(graph.errorStatus ?? 0) ? (
+          <p role="alert">이 시점의 기업 관계를 조회할 권한이 없어요.</p>
+        ) : (
+          <Status resource={graph} label="관계 그래프" />
+        )}
+        {!ready && (
+          <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
+        )}
         {graph.data && (
           <>
             <Basis metadata={graph.data.metadata} />
+            {graph.data.metadata.partial && (
+              <button type="button" className={ui.button} onClick={graph.retry}>
+                관계 그래프 다시 조회
+              </button>
+            )}
+            {(graph.data.metadata.failures ?? []).map((failure, i) => (
+              <p key={`${failure.section}:${i}`}>{failure.message}</p>
+            ))}
             <CompanyGraphPreview
+              key={`${id}:${asOf}:${version}:${depth}`}
+              selectedId={eventId ?? id}
               data={graph.data}
               highlighted={highlighted}
               onSelect={(node, kind) => {
-                if (kind === 'issue') updateQuery({ event: node });
+                if (kind === 'issue')
+                  updateQuery({
+                    event: node,
+                    document: null,
+                    evidence: null,
+                    bucket: null,
+                  });
                 else {
                   const next = new URLSearchParams(params);
                   next.delete('event');
