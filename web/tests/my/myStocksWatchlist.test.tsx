@@ -86,6 +86,32 @@ describe('D-MY-01 / 01b 내 종목: 관심 종목', () => {
     expect(screen.queryByText(MARKET_INFO)).toBeNull();
   });
 
+  test('서버가 사건 섹션을 제공하지 못하면 사건 수를 0건이 아니라 미제공으로 보인다', async () => {
+    const server = createFakeServer();
+    myMember(server, { watchlistIds: ['cmp-nvidia'] });
+    server.on('GET', '/api/v1/companies/:id', () =>
+      json({
+        id: 'cmp-nvidia',
+        name: 'NVIDIA',
+        ticker: 'NVDA',
+        directIssues: [],
+        structuralIssues: [],
+        metadata: {
+          partial: true,
+          failures: [
+            { section: 'directIssues', code: 'VERSION_UNAVAILABLE' },
+            { section: 'structuralIssues', code: 'VERSION_UNAVAILABLE' },
+          ],
+        },
+      }),
+    );
+    openMy();
+
+    const list = await screen.findByRole('list', { name: '관심 종목 목록' });
+    expect(await within(list).findByText('NVDA · 사건 수 미제공')).toBeTruthy();
+    expect(within(list).queryByText(/승인된 사건 0건/)).toBeNull();
+  });
+
   test("가상 계좌에도 있는 종목은 관심 행과 검색 결과 행에 '보유' 배지를 붙인다", async () => {
     const server = createFakeServer();
     myMember(server, { connected: true, watchlistIds: ['cmp-samsung'] });
