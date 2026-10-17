@@ -830,11 +830,11 @@ test('unconfirmed business assertions are excluded from actual impact paths', ()
 
 test('D-COM-05/06: every period shares exact chart/timeline from/to and pins graph context', async () => {
   open(pinned);
-  for (const [period, label, interval] of [
-    ['1m', '1개월', '1d'],
-    ['1d', '1일', '5m'],
-    ['1w', '1주', '1h'],
-    ['1y', '1년', '1wk'],
+  for (const [period, label, bucket] of [
+    ['1m', '1개월', '일'],
+    ['1d', '1일', '5분'],
+    ['1w', '1주', '1시간'],
+    ['1y', '1년', '주'],
   ]) {
     await userEvent.click(screen.getByRole('button', { name: label }));
     await waitFor(() =>
@@ -856,7 +856,7 @@ test('D-COM-05/06: every period shares exact chart/timeline from/to and pins gra
     expect(pricesRequest.query.get('to')).toBe(eventsRequest.query.get('to'));
     expect(eventsRequest.query.get('asOf')).toBe(time);
     expect(eventsRequest.query.get('graphVersion')).toBe('v1');
-    expect(screen.getByText(new RegExp(`${interval} 해상도`))).toBeTruthy();
+    expect(screen.getByText(new RegExp(`· ${bucket} 버킷`))).toBeTruthy();
   }
 });
 

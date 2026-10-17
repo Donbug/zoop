@@ -1,5 +1,6 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
+import { formatKst, formatMoney } from '@/util/format';
 import BoltIcon from './BoltIcon';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -79,6 +80,37 @@ function Basis({ metadata }: { metadata: Meta | undefined }) {
     </p>
   ) : null;
 }
+/** 사건·문서·기업 정보 탭(밑줄형) */
+const TAB =
+  'flex-1 rounded-none! border-0! border-b-2! border-transparent! bg-transparent! py-2.5! text-sm! text-zoop-muted aria-pressed:border-zoop-ink! aria-pressed:bg-transparent! aria-pressed:font-semibold aria-pressed:text-zoop-ink!';
+
+/** 차트 기간의 처음 시세 대비 변화(D-COM-05). 상승은 빨강, 하락은 파랑으로 보인다. */
+function PriceChange({
+  label,
+  first,
+  last,
+  currency,
+}: {
+  label: string;
+  first: number;
+  last: number;
+  currency: string;
+}) {
+  const diff = last - first;
+  const rate = first ? diff / first : 0;
+  const tone =
+    diff > 0 ? 'text-zoop-up' : diff < 0 ? 'text-zoop-down' : 'text-zoop-muted';
+  return (
+    <p>
+      {label} · 처음 시세 대비{' '}
+      <span className={`font-semibold tabular-nums ${tone}`}>
+        {diff > 0 ? '▲ +' : diff < 0 ? '▼ ' : ''}
+        {formatMoney(diff, currency)} ({(rate * 100).toFixed(2)}%)
+      </span>
+    </p>
+  );
+}
+
 /** 타임라인에 한 번에 보이는 시간 버킷 수 */
 const BUCKET_PAGE = 10;
 const bucketElementId = (key: string) => `bucket-${key.replace(/[^w-]/g, '_')}`;
@@ -402,7 +434,10 @@ export default function CompanyWorkspace() {
             </>
           )}
         </section>
-        <nav aria-label="기업 상세 보기">
+        <nav
+          aria-label="기업 상세 보기"
+          className="my-0! gap-0! border-b border-zoop-line"
+        >
           {[
             ['events', '사건'],
             ['documents', '문서'],
@@ -412,33 +447,38 @@ export default function CompanyWorkspace() {
               key={value}
               aria-pressed={tab === value}
               onClick={() => updateQuery({ tab: value })}
+              className={TAB}
             >
               {label}
             </button>
           ))}
         </nav>
         <section aria-label="시세 차트" data-screen-id="D-COM-06">
-          <h2>시세 차트·기준 시점</h2>
-          <nav aria-label="차트 기간">
-            {periods.map((p) => (
-              <button
-                key={p.value}
-                aria-pressed={period === p.value}
-                onClick={() => {
-                  // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
-                  const selected = events.data?.items.find(
-                    (item) => item.id === eventId,
-                  );
-                  updateQuery({
-                    period: p.value,
-                    bucket: selected ? bucketKey(selected, p.value) : null,
-                  });
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
+          <h2 className="sr-only">시세 차트·기준 시점</h2>
+          <nav aria-label="차트 기간" className="items-center gap-3!">
+            <div className="inline-flex overflow-hidden rounded-[3px] border border-zoop-line">
+              {periods.map((p) => (
+                <button
+                  key={p.value}
+                  aria-pressed={period === p.value}
+                  className="min-w-14 rounded-none! border-0! border-r! border-zoop-line! last:border-r-0!"
+                  onClick={() => {
+                    // 선택한 사건은 유지하고, 새 기간의 버킷으로 다시 맞춘다(FS044).
+                    const selected = events.data?.items.find(
+                      (item) => item.id === eventId,
+                    );
+                    updateQuery({
+                      period: p.value,
+                      bucket: selected ? bucketKey(selected, p.value) : null,
+                    });
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
             <button
+              className="font-semibold"
               onClick={() =>
                 updateQuery({
                   asOf: null,
@@ -455,9 +495,18 @@ export default function CompanyWorkspace() {
             </button>
           </nav>
           <p>
-            기준 {asOf ?? '최신 제공 시점 확인 중'} ·{' '}
-            {periods.find((p) => p.value === period)?.interval} 해상도
+            기준 {asOf ? formatKst(asOf) : '최신 제공 시점 확인 중'} ·{' '}
+            {periods.find((p) => p.value === period)?.bucket} 버킷
           </p>
+          {prices.data?.status === 'available' &&
+            prices.data.points.length > 1 && (
+              <PriceChange
+                label={periods.find((p) => p.value === period)?.label ?? ''}
+                first={prices.data.points[0].close}
+                last={prices.data.points.at(-1)!.close}
+                currency={prices.data.currency}
+              />
+            )}
           <Status resource={prices} label="차트" />
           {prices.data?.status === 'unavailable' && (
             <p>차트 미제공 · {prices.data.reason}</p>
@@ -488,7 +537,10 @@ export default function CompanyWorkspace() {
                   }
                 />
                 <p>
-                  {prices.data.source.name} · {prices.data.currency} ·{' '}
+                  {prices.data.source.name} ·{' '}
+                  {periods.find((p) => p.value === period)?.bucket}별 종가 ·
+                  마지막 시세{' '}
+                  {formatKst(prices.data.points.at(-1)?.time ?? null)} ·{' '}
                   {prices.data.source.delayNote ?? '지연 정보 미제공'}
                 </p>
                 <details className="text-xs">
@@ -725,16 +777,18 @@ export default function CompanyWorkspace() {
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
-        <h2>관계 그래프</h2>
-        <Link className={ui.button} to={`/?${mapQuery}`}>
-          지도에서 보기
-        </Link>
-        <nav aria-label="관계 깊이">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="mb-0!">관계 그래프</h2>
+          <Link className={ui.button} to={`/?${mapQuery}`}>
+            지도에서 보기
+          </Link>
+        </div>
+        <nav aria-label="관계 깊이" className="grid! grid-cols-2 gap-0!">
           {[1, 2].map((d) => (
             <button
               key={d}
               aria-pressed={depth === d}
-              className={ui.button}
+              className="rounded-none! first:rounded-l-[3px]! last:rounded-r-[3px]!"
               onClick={() => updateQuery({ depth: String(d), bucket: null })}
             >
               {d}단계
