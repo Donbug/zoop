@@ -21,6 +21,9 @@
       ],
       "format": "date-time"
     },
+    "response:200:header:Set-Cookie": {
+      "type": "string"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
