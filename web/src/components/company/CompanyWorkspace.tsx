@@ -1,7 +1,7 @@
 import CompanyInfoTab from './CompanyInfoTab';
 import PriceChart from './PriceChart';
 import BoltIcon from './BoltIcon';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -64,7 +64,25 @@ function Basis({ metadata }: { metadata: Meta | undefined }) {
     </p>
   ) : null;
 }
+/** 타임라인에 한 번에 보이는 시간 버킷 수 */
+const BUCKET_PAGE = 10;
 const bucketElementId = (key: string) => `bucket-${key.replace(/[^w-]/g, '_')}`;
+
+/** 사건 시점 지도의 기준 시각. 현재 기준 시점보다 늦을 수 없다. */
+function eventReferenceTime(
+  event: { eventTime: string | null; timePrecision: string } | null | undefined,
+  current: string | null,
+) {
+  if (!event?.eventTime) return current;
+  const time =
+    event.timePrecision === 'datetime' && exactTime(event.eventTime)
+      ? event.eventTime
+      : event.timePrecision === 'day'
+        ? `${event.eventTime.slice(0, 10)}T23:59:59+09:00`
+        : null;
+  if (!time) return current;
+  return current && Date.parse(time) > Date.parse(current) ? current : time;
+}
 
 export default function CompanyWorkspace() {
   const { id = '' } = useParams();
@@ -177,6 +195,21 @@ export default function CompanyWorkspace() {
   const sortedGroups = [...groups].sort(([a], [b]) =>
     /^d/.test(a) === /^d/.test(b) ? b.localeCompare(a) : /^d/.test(a) ? -1 : 1,
   );
+  // 사건이 많은 기간(예: 1년)에는 최근 버킷부터 나눠 보여 준다. 선택한 버킷은 항상 보인다.
+  const bucketScope = `${period}|${asOf ?? ''}`;
+  const [bucketPage, setBucketPage] = useState({
+    scope: bucketScope,
+    limit: BUCKET_PAGE,
+  });
+  const bucketLimit =
+    bucketPage.scope === bucketScope ? bucketPage.limit : BUCKET_PAGE;
+  const shownGroups = sortedGroups.slice(
+    0,
+    Math.max(
+      bucketLimit,
+      sortedGroups.findIndex(([key]) => key === selectedBucket) + 1,
+    ),
+  );
   useEffect(() => {
     if (selectedBucket)
       document
@@ -195,6 +228,15 @@ export default function CompanyWorkspace() {
   if (asOf) mapQuery.set('asOf', asOf);
   if (version) mapQuery.set('graphVersion', version);
   if (eventId) mapQuery.set('event', eventId);
+  // 사건의 관계는 그 사건 시각 기준 지도로 연다. 기업 상세의 기준 시점은 그대로 둔다.
+  // 시각이 없으면 현재 기준 시점을 쓰고, 일 정밀도는 그날 한국 시간 끝까지로 본다.
+  const eventMapQuery = new URLSearchParams(mapQuery);
+  const eventAsOf = eventReferenceTime(event.data, asOf);
+  if (eventAsOf && eventAsOf !== asOf) {
+    eventMapQuery.set('asOf', eventAsOf);
+    // 다른 시점이면 그 시점의 공개 버전을 서버가 고르게 한다.
+    eventMapQuery.delete('graphVersion');
+  }
   const highlighted = graph.data ? impactEdges(graph.data, impact.data) : [];
   function selectEvent(item: Events['items'][number], targetTab?: string) {
     updateQuery({
@@ -501,7 +543,7 @@ export default function CompanyWorkspace() {
                 )}
                 {/* FS041: 시간 버킷마다 사건 수를 보이고 사건 카드를 나열한다. 차트 ⚡ 표식이나 버킷을 고르면 그 버킷을 강조한다. */}
                 <ol className="flex flex-col">
-                  {sortedGroups.map(([key, items]) => (
+                  {shownGroups.map(([key, items]) => (
                     <li
                       key={key}
                       id={bucketElementId(key)}
@@ -559,6 +601,20 @@ export default function CompanyWorkspace() {
                     </li>
                   ))}
                 </ol>
+                {shownGroups.length < sortedGroups.length && (
+                  <button
+                    onClick={() =>
+                      setBucketPage({
+                        scope: bucketScope,
+                        limit: shownGroups.length + BUCKET_PAGE,
+                      })
+                    }
+                    className="self-start"
+                  >
+                    이전 사건 더 보기 (
+                    {sortedGroups.length - shownGroups.length}개 날짜)
+                  </button>
+                )}
                 {events.data.unknownTimeItems.length > 0 && (
                   <details>
                     <summary>
@@ -606,8 +662,8 @@ export default function CompanyWorkspace() {
                         근거 {evidenceId} 보기
                       </button>
                     ))}
-                    <Link to={`/?${mapQuery}`}>
-                      이 사건의 관계를 지도에서 보기
+                    <Link to={`/?${eventMapQuery}`}>
+                      이 사건 시점의 관계를 지도에서 보기
                     </Link>
                   </article>
                 )}

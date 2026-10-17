@@ -487,22 +487,20 @@ test('switching member hides previous holdings while next response is pending', 
   );
   await screen.findByText('연결된 가상 계좌가 없어요.');
 });
-test('map round trip restores period, time, tab, event and bucket exactly; only real path highlighted', async () => {
+test('event map link opens the event-time map; round trip restores period, time, tab, event and bucket exactly', async () => {
   const query = `${pinned}&period=1m&tab=events&event=issue-a&bucket=2026-10-05`;
   open(query);
   await screen.findByRole('heading', { name: '합성 사건 A' });
   await userEvent.click(
-    screen.getByRole('link', { name: '이 사건의 관계를 지도에서 보기' }),
+    screen.getByRole('link', { name: '이 사건 시점의 관계를 지도에서 보기' }),
   );
   await waitFor(() =>
     expect(screen.getByTestId('map-highlight').textContent).toBe('edge-a'),
   );
-  expect(
-    server
-      .calls('GET', '/api/v1/companies/:id/graph')
-      .at(-1)
-      ?.query.get('graphVersion'),
-  ).toBe('v1');
+  // 지도는 사건 시각 기준으로 열고, 그 시점의 공개 버전은 서버가 고른다.
+  const mapGraph = server.calls('GET', '/api/v1/companies/:id/graph').at(-1);
+  expect(mapGraph?.query.get('asOf')).toBe(old);
+  expect(mapGraph?.query.get('graphVersion')).toBeNull();
   await userEvent.click(
     screen.getByRole('link', { name: '기업 상세로 돌아가기' }),
   );
@@ -1030,4 +1028,41 @@ test('FS040 calendar ranges clamp month and leap year at the Korean midnight bou
   expect(timeRange('2026-03-30T15:00:00Z', '1m')).toEqual(
     timeRange('2026-03-31T00:00:00+09:00', '1m'),
   );
+});
+
+test('timeline shows the latest ten day buckets first and loads older ones on demand', async () => {
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    ...events[0],
+    id: `issue-day-${i}`,
+    title: `합성 날짜 사건 ${i}`,
+    eventTime: new Date(Date.parse(time) - (i + 1) * 86400000).toISOString(),
+  }));
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items: many,
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        asOf: r.query.get('asOf') ?? time,
+        total: many.length,
+        excludedUnknownTime: 0,
+      },
+    }),
+  );
+  open(`${pinned}&period=1m&tab=events`);
+  const timeline = await screen.findByRole('region', { name: '사건 타임라인' });
+  await within(timeline).findByRole('button', { name: '합성 날짜 사건 0' });
+  expect(
+    within(timeline).queryByRole('button', { name: '합성 날짜 사건 11' }),
+  ).toBeNull();
+  await userEvent.click(
+    within(timeline).getByRole('button', { name: /이전 사건 더 보기/ }),
+  );
+  expect(
+    within(timeline).getByRole('button', { name: '합성 날짜 사건 11' }),
+  ).toBeTruthy();
+  expect(
+    within(timeline).queryByRole('button', { name: /이전 사건 더 보기/ }),
+  ).toBeNull();
 });

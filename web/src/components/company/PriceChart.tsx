@@ -154,6 +154,8 @@ export default function PriceChart({
               }
             }}
           >
+            {/* 마우스를 올리면 그때의 사건 제목을 보여 준다. */}
+            <title>{items.map((item) => item.title).join(' / ')}</title>
             <rect
               x={position - 9}
               y="181"

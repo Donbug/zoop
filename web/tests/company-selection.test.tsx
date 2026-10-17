@@ -160,3 +160,26 @@ test('a day-precision event gets a marker on the same KST day in the 1w chart', 
     }),
   ).toBeTruthy();
 });
+
+test('an event marker previews the event titles on hover', () => {
+  render(
+    <PriceChart
+      {...props}
+      points={[{ time: props.asOf, close: 120 }]}
+      groups={
+        new Map([
+          [
+            '2026-10-05',
+            [event, { ...event, id: 'fixture-other', title: '합성 사건 2' }],
+          ],
+        ])
+      }
+    />,
+  );
+  const marker = screen.getByRole('button', {
+    name: '차트 사건 2026-10-05 · 사건 2건',
+  });
+  expect(marker.querySelector('title')?.textContent).toBe(
+    '합성 사건 / 합성 사건 2',
+  );
+});
