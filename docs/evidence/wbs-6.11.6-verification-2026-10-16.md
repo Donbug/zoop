@@ -118,8 +118,8 @@ DB_PASSWORD=<local test value>
 | NF-API-008 | timeout 및 실제 재시도 | retryable 응답 계약만 확인, 실제 재시도는 미검증 | PARTIAL |
 | NF-API-009 | DB 장애 응답 계약 | `INTERNAL_ERROR`, HTTP 500, `retryable=false`, 약 30초 응답 확인 | OBSERVED |
 | NF-API-010 | 게스트의 회원 전용 API 접근 | 게스트 세션 생성 후 `GET /api/v1/me/settings` 호출 시 HTTP 403, `MEMBER_REQUIRED` 확인 | PASS |
-| NF-PERF-001 | 응답시간 p50/p95/max | 측정 harness 필요 | PENDING |
-| NF-PERF-002 | 동시 요청 C=1/5/10 | 실행 가능한 API 확정 필요 | PENDING |
+| NF-PERF-001 | 응답시간 p50/p95/max | 로컬 k6 측정 결과 전체 회차 p95 27.14ms 이하, HTTP 실패 0건 | PASS |
+| NF-PERF-002 | 동시 요청 C=1/5/10 | C=1·5·10에서 각각 300초씩 2회 측정 완료 | PASS |
 | NF-WEB-001 | 로딩·빈 데이터·실패 화면 | 프론트 연동 완료 후 검증 | BLOCKED |
 | NF-E2E-001 | 실패 후 재시도 및 복구 | 프론트·백엔드 연동 완료 후 검증 | BLOCKED |
 
@@ -296,43 +296,68 @@ HTTP 403 `ACCESS_DENIED`로 거부됐다. 로컬 검증용 Origin을 명시적�
 - `TermControllerTest`
   - 잘못된 cursor와 범위를 벗어난 timestamp가 500이 아닌 422 오류로 처리되는지 확인한다.
 
-## 6. 성능 측정 준비 기준
+## 6. 로컬 성능 측정 결과
 
-운영 성능 기준은 아직 승인되지 않았다. 아래 값은 로컬 측정 준비를 위한 제안값이며 운영 SLO로 사용하지 않는다.
+### 검증 정보
 
-| 항목 | 로컬 준비값 |
+| 항목 | 값 |
 |---|---|
-| 동시 요청 | C=1, 5, 10 |
-| 사용자별 in-flight | 1개 |
-| warmup | 단계별 60초 |
-| 측정 시간 | 단계별 300초 |
-| 반복 | 동일 조건 2회 |
-| 일반 HTTP timeout | 10초 |
-| 결과값 | p50, p95, max |
-| 추가 집계 | 성공, 실패, timeout, 누락 |
-| 비AI 일반 읽기 제안 p95 | 1초 이하 |
-| graph/timeline 제안 p95 | 2초 이하 |
-| 비동기 작업 접수 제안 p95 | 1초 이하 |
+| 실행 브랜치 | `test/151-performance-retry-verification` |
+| 실행 커밋 | `2df9e31740c8c954268aa0b8add379dfc7385f82` |
+| 측정일 | 2026-10-17 |
+| 대상 API | `GET /api/v1/auth/terms` |
+| 부하 도구 | k6 2.2.0 |
+| 실행 환경 | Windows 네이티브 k6 |
+| API 주소 | `http://localhost:8080` |
+| 데이터베이스 | 로컬 Docker PostgreSQL |
+| 스크립트 | `api/scripts/performance/terms-paced-baseline.js` |
+| 응답 본문 보관 | 하지 않음 |
+| 외부 유료 API 호출 | 없음 |
+| 실제 사용자 데이터 사용 | 없음 |
 
-실제 측정 전 다음 항목을 확정해야 한다.
+### 측정 조건
 
-- 측정 대상 API
-- 합성 데이터 규모
-- 캐시 cold/warm 조건
-- 서버 worker 수
-- CPU 및 RAM
-- DB 상태와 인덱스
-- 성공 응답의 정의
-- 예상 실패 응답의 정의
+| 항목 | 조건 |
+|---|---|
+| 동시 사용자 | C=1, 5, 10 |
+| 사용자별 동작 | 요청 완료 후 1초 대기 |
+| 사용자별 in-flight 요청 | 최대 1개 |
+| 사전 워밍업 | 단계별 60초 |
+| 정식 측정 시간 | 단계별 300초 |
+| 반복 횟수 | 각 동시 사용자 조건에서 2회 |
+| 요청 timeout | 15초 |
+| 성공 조건 | HTTP 200 |
+| 오류 허용 기준 | HTTP 실패율 0% |
+| 로컬 응답시간 기준 | p95 1초 이하 |
+
+각 가상 사용자는 약관 조회 요청이 완료된 후 1초를 대기한다. 따라서 이 측정은 최대 처리량 시험이 아니라 일정한 사용자 요청 간격을 적용한 로컬 동시 사용자 기준선이다.
+
+### 실행 명령
+
+```powershell
+$env:BASE_URL = "http://localhost:8080"
+$env:VUS = "5"
+$env:DURATION = "300s"
+
+& "C:\Program Files\k6\k6.exe" run `
+  api/scripts/performance/terms-paced-baseline.js
+```
+
+`VUS` 값을 `1`, `5`, `10`으로 변경하여 각 조건을 2회 측정했다.
 
 ## 7. 현재 결론
 
 - 기준 커밋 `f28ff16bcb941657004fb646a9cedb87a3e40dee`의 API 전체 테스트는 정상 통과했다.
-- 네이티브 Windows 실패는 Linux 재검증 결과 환경 차이로 판정했다.
-- 현재 코드 회귀 결함은 발견되지 않았다.
-- 실제 성능 측정 도구는 아직 저장소에 존재하지 않는다.
-- 프론트엔드 및 백엔드 연동과 배포가 완료되지 않아 E2E 및 운영 성능 판정은 보류한다.
+- 네이티브 Windows에서 발생한 테스트 실패는 Linux 컨테이너 재검증 결과 실행 환경 차이로 판정했다.
+- 현재까지 애플리케이션 코드의 회귀 결함은 발견되지 않았다.
 - PostgreSQL 중단 시 약관 조회 API는 약 30초 후 HTTP 500과 `retryable=false`를 반환했다.
-- PostgreSQL 재시작 후 API를 재시작하지 않아도 동일 요청이 HTTP 200으로 자동 복구됐다.
+- PostgreSQL 재시작 후에는 API를 재시작하지 않아도 동일 요청이 HTTP 200으로 자동 복구됐다.
+- 인증되지 않은 사용자의 회원 전용 API 접근은 HTTP 401과 `AUTH_REQUIRED`로 차단됐다.
+- 게스트 사용자의 회원 전용 API 접근은 HTTP 403과 `MEMBER_REQUIRED`로 차단됐다.
+- 재현 가능한 k6 로컬 성능 측정 스크립트를 `api/scripts/performance/terms-paced-baseline.js`에 추가했다.
+- `GET /api/v1/auth/terms`를 C=1·5·10에서 각각 300초씩 2회 측정했으며 전체 9,500건의 요청이 성공했다.
+- 정식 성능 측정의 HTTP 실패율은 0%였으며 가장 높은 p95는 27.14ms였다.
+- NF-PERF-001과 NF-PERF-002는 로컬 검증 범위에서 PASS로 판정한다.
+- 프론트엔드와 백엔드 연동 및 실제 배포가 완료되지 않아 E2E와 AWS 운영 성능 판정은 보류한다.
 - DB 장애 응답을 HTTP 503과 재시도 가능한 오류로 처리할지 팀 검토가 필요하다.
-- 다음 작업은 DB 장애 응답 계약과 timeout 정책을 검토하고, 보호 API 및 실제 재시도 동작을 추가 검증하는 것이다.
+- 다음 작업은 DB 장애 응답 계약과 timeout 정책을 검토하고 실제 재시도 동작을 검증하는 것이다.
