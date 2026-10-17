@@ -7,6 +7,8 @@ export type Resource<T> = {
   error: string | null;
   errorCode: string | null;
   errorStatus: number | null;
+  /** 서버가 알려 준 재시도 가능 여부(F05). 모르면 null */
+  errorRetryable: boolean | null;
   retry: () => void;
 };
 export function useCompanyResource<T>(
@@ -23,6 +25,7 @@ export function useCompanyResource<T>(
     error: null as string | null,
     errorCode: null as string | null,
     errorStatus: null as number | null,
+    errorRetryable: null as boolean | null,
   });
   useEffect(() => {
     let active = true;
@@ -35,6 +38,7 @@ export function useCompanyResource<T>(
         error: null,
         errorCode: null,
         errorStatus: null,
+        errorRetryable: null,
       });
       try {
         const data = await readCompanyResource<T>(url, paged);
@@ -46,6 +50,7 @@ export function useCompanyResource<T>(
             error: null,
             errorCode: null,
             errorStatus: null,
+            errorRetryable: null,
           });
       } catch (error) {
         if (active)
@@ -59,6 +64,7 @@ export function useCompanyResource<T>(
                 : '자료를 불러오지 못했어요.',
             errorCode: error instanceof ApiError ? error.code : null,
             errorStatus: error instanceof ApiError ? error.status : null,
+            errorRetryable: error instanceof ApiError ? error.retryable : null,
           });
       }
     });
@@ -75,6 +81,7 @@ export function useCompanyResource<T>(
           error: null,
           errorCode: null,
           errorStatus: null,
+          errorRetryable: null,
         };
   return {
     ...current,

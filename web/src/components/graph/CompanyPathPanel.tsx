@@ -56,7 +56,13 @@ export default function CompanyPathPanel({
           </button>
         </div>
         {to && (
-          <button className={`${ui.button} mt-3`} onClick={() => onPick('')}>
+          <button
+            className={`${ui.button} mt-3`}
+            onClick={() => {
+              setQuery('');
+              onPick('');
+            }}
+          >
             다른 기업 고르기
           </button>
         )}

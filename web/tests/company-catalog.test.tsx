@@ -93,6 +93,7 @@ it('D-COM-01 does not present a failed or pending relation lookup as no linked c
     error: null,
     errorCode: null,
     errorStatus: null,
+    errorRetryable: null,
     retry() {},
   });
   const linked = within(screen.getByRole('region', { name: '연결된 기업' }));
@@ -105,6 +106,7 @@ it('D-COM-01 does not present a failed or pending relation lookup as no linked c
     error: 'temporary failure',
     errorCode: 'SOURCE_UNAVAILABLE',
     errorStatus: 503,
+    errorRetryable: true,
     retry() {},
   });
   expect(

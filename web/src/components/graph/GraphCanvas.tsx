@@ -31,6 +31,8 @@ export default function GraphCanvas({
   const [zoom, setZoom] = useState(1);
   const drawing = useRef(Promise.resolve());
   const lastFocused = useRef<string | null>(null);
+  const hovered = useRef<string | null>(null);
+  const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const selectNode = useEffectEvent((id: string | null) => onSelect?.(id));
   const selectEdge = useEffectEvent((id: string) => {
     if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
@@ -45,6 +47,81 @@ export default function GraphCanvas({
     data.nodes.find((n) => n.id === selected && n.kind === 'company') ??
     data.nodes.find((n) => n.isFocus);
   const selectedNode = data.nodes.find((n) => n.id === selected);
+  // D-GRP-01: hover changes presentation only, never selection, layout or viewport.
+  const syncVisualStates = useEffectEvent(
+    async (graph: Graph, rendered: ReturnType<typeof toG6Data>) => {
+      const visibleIds = new Set(
+        rendered.nodes?.map((node) => String(node.id)),
+      );
+      const active =
+        hovered.current &&
+        visibleIds.has(hovered.current) &&
+        (!focusId || focusedNodes.has(hovered.current))
+          ? hovered.current
+          : null;
+      const relatedNodes = new Set(active ? [active] : []);
+      const relatedEdges = new Set<string>();
+      if (active) {
+        for (const edge of rendered.edges ?? []) {
+          const source = String(edge.source);
+          const target = String(edge.target);
+          if (
+            (source === active || target === active) &&
+            (!focusId || (focusedNodes.has(source) && focusedNodes.has(target)))
+          ) {
+            relatedNodes.add(source);
+            relatedNodes.add(target);
+            relatedEdges.add(String(edge.id));
+          }
+        }
+      }
+      const states: Record<string, string[]> = {};
+      for (const node of rendered.nodes ?? []) {
+        const id = String(node.id);
+        states[id] = active
+          ? [
+              id === active
+                ? 'hovered'
+                : relatedNodes.has(id)
+                  ? 'related'
+                  : 'inactive',
+            ]
+          : [];
+        if (id === selected) states[id].push('selected');
+      }
+      for (const edge of rendered.edges ?? []) {
+        const id = String(edge.id);
+        states[id] = active
+          ? [relatedEdges.has(id) ? 'related' : 'inactive']
+          : [];
+        if (id === selectedEdgeId) states[id].push('selected');
+      }
+      await graph.setElementState(states);
+    },
+  );
+  const hoverNode = useEffectEvent((id: string | null) => {
+    if (hovered.current === id) return;
+    hovered.current = id;
+    const graph = instance.current;
+    if (!graph) return;
+    drawing.current = drawing.current
+      .then(async () => {
+        if (
+          graph.destroyed ||
+          instance.current !== graph ||
+          !renderedData.current
+        )
+          return;
+        await syncVisualStates(graph, renderedData.current);
+      })
+      .catch(() => {
+        if (!graph.destroyed) setRenderError(true);
+      });
+  });
+  const leaveNode = useEffectEvent((id: string) => {
+    // A late leave from the previous node must not clear the new node's hover.
+    if (hovered.current === id) hoverNode(null);
+  });
   const syncSelection = useEffectEvent(() => {
     const graph = instance.current;
     const host = container.current;
@@ -85,18 +162,8 @@ export default function GraphCanvas({
         graph.setData(rendered);
         await graph.draw();
         if (graph.destroyed) return;
-        await graph.setElementState(
-          Object.fromEntries(
-            [...(rendered.nodes ?? []), ...(rendered.edges ?? [])].map(
-              (node) => [
-                node.id,
-                node.id === selected || node.id === selectedEdgeId
-                  ? ['selected']
-                  : [],
-              ],
-            ),
-          ),
-        );
+        renderedData.current = rendered;
+        await syncVisualStates(graph, rendered);
         if (
           focusId &&
           focusId !== lastFocused.current &&
@@ -125,6 +192,10 @@ export default function GraphCanvas({
     let disposed = false;
     let graph: Graph | null = null;
     let observer: ResizeObserver | null = null;
+    const clearHover = () => hoverNode(null);
+    host.addEventListener('pointerleave', clearHover);
+    hovered.current = null;
+    renderedData.current = null;
     async function mount() {
       await document.fonts.ready;
       if (disposed || !host) return;
@@ -141,11 +212,23 @@ export default function GraphCanvas({
         zoomRange: [0.25, 4],
         edge: {
           state: {
+            related: { lineWidth: 2, stroke: '#1a1a1a', strokeOpacity: 1 },
+            inactive: { strokeOpacity: 0.2 },
             selected: { lineWidth: 2, stroke: '#1a1a1a', strokeOpacity: 1 },
           },
         },
         node: {
           state: {
+            related: { opacity: 1, lineWidth: 1.4, labelFill: '#1a1a1a' },
+            inactive: { opacity: 0.35 },
+            hovered: {
+              opacity: 1,
+              lineWidth: 2,
+              halo: true,
+              haloStroke: '#1a1a1a',
+              haloFill: 'transparent',
+              labelFill: '#1a1a1a',
+            },
             selected: {
               lineWidth: 2,
               halo: true,
@@ -158,6 +241,13 @@ export default function GraphCanvas({
       graph.on('node:click', (event: IElementEvent) =>
         selectNode(event.target.id),
       );
+      graph.on('node:pointerenter', (event: IElementEvent) =>
+        hoverNode(event.target.id),
+      );
+      graph.on('node:pointerleave', (event: IElementEvent) =>
+        leaveNode(event.target.id),
+      );
+      graph.on('canvas:pointerleave', () => hoverNode(null));
       graph.on('canvas:click', () => selectNode(null));
       graph.on('edge:click', (event: IElementEvent) =>
         selectEdge(event.target.id),
@@ -189,6 +279,7 @@ export default function GraphCanvas({
     });
     return () => {
       disposed = true;
+      host.removeEventListener('pointerleave', clearHover);
       observer?.disconnect();
       graph?.destroy();
       instance.current = null;

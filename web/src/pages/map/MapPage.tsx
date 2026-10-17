@@ -142,6 +142,24 @@ export default function MapPage() {
     if (tutorialOpen && tutorialStep === null) setTutorialStep(1);
     if (!tutorialOpen && tutorialStep !== null) setTutorialStep(null);
   }, [setTutorialStep, tutorialOpen, tutorialStep]);
+  // FS015: 튜토리얼을 마치거나 건너뛰지 않은 회원은 지도에 들어오면 한 번 자동으로 연다.
+  // 완료·건너뛰기는 PUT /api/v1/auth/tutorial로 계정에 저장되어 다음부터는 열지 않는다.
+  const tutorialPending = useAuthStore(
+    (state) =>
+      state.session?.kind === 'member' &&
+      state.session.setup?.tutorialCompleted === false,
+  );
+  const tutorialMemberId = useAuthStore(selectMemberId);
+  const autoTutorial = useRef({ memberId: tutorialMemberId, opened: false });
+  useEffect(() => {
+    if (autoTutorial.current.memberId !== tutorialMemberId)
+      autoTutorial.current = { memberId: tutorialMemberId, opened: false };
+    // 이번 방문에 이미 열렸던 튜토리얼(주소의 tour=1 포함)은 닫은 뒤 다시 자동으로 열지 않는다.
+    if (tutorialOpen) autoTutorial.current.opened = true;
+    if (!tutorialPending || autoTutorial.current.opened) return;
+    autoTutorial.current.opened = true;
+    updateQuery({ tour: '1' }, { replace: true });
+  }, [tutorialMemberId, tutorialPending, tutorialOpen, updateQuery]);
   useEffect(() => {
     if (previousEvent.current && !selectedPanel) {
       (opener.current?.isConnected
@@ -353,7 +371,7 @@ export default function MapPage() {
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
       )}
       {historical && (
-        <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2 text-xs">
+        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-xs">
           기업 상세에서 선택한 시점 · {asOf} · {graphVersion ?? '버전 미제공'}
         </p>
       )}
