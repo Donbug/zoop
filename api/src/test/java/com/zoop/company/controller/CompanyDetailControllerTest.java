@@ -60,6 +60,16 @@ class CompanyDetailControllerTest {
     }
 
     @Test
+    void aMembersHoldingsReadFailureIsAnErrorNotAnUnpersonalisedPage() throws Exception {
+        var member = new MemberPrincipal("m-1", "s-1");
+        when(sessions.requireMember("member-token")).thenReturn(member);
+        when(personal.of(member)).thenThrow(new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+        mvc.perform(get("/api/v1/companies/" + HYNIX).cookie(new Cookie(SessionCookie.NAME, "member-token")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"));
+    }
+
+    @Test
     void aGuestSessionStillReadsThePublicPage() throws Exception {
         when(sessions.requireMember("guest-token")).thenThrow(new CustomException(ErrorCode.MEMBER_REQUIRED));
         mvc.perform(get("/api/v1/companies/" + HYNIX).cookie(new Cookie(SessionCookie.NAME, "guest-token")))
