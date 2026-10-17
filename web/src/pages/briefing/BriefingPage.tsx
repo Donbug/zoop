@@ -1,18 +1,25 @@
+import { useAuth } from '@/hooks/useAuth';
 import PublishedBriefing from '@/components/briefing/PublishedBriefing';
 import BriefingRoundPicker from '@/components/briefing/BriefingRoundPicker';
 import { FOCUS_RING } from '@/components/briefing/briefingStyles';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import type { BriefingEdition } from '@/types/briefing';
+import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
-const EDITION_BUTTON = `min-w-[76px] rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
+const EDITION_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
 
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
   const { params, updateQuery } = useRouteQuery();
+  const auth = useAuth();
+  const memberId = useAuthStore(selectMemberId);
+  const revision = useAuthStore((s) => s.sessionRevision);
   const edition: BriefingEdition =
     params.get('edition') === 'evening' ? 'evening' : 'morning';
   const date = params.get('date') ?? '';
+  // FS036: 공통 / 내 종목 기준. 주소(?view=personal)에 남는다.
+  const personal = params.get('view') === 'personal';
   return (
     <section
       className="mx-auto w-full max-w-[800px] text-zoop-ink"
@@ -26,6 +33,14 @@ export default function BriefingPage() {
         시장의 주요 변화와 내 종목 주변 사건을 한눈에 확인하세요.
       </p>
 
+      {auth.failed && (
+        <p role="alert" className="mt-3 text-xs text-zoop-muted">
+          로그인 상태를 확인하지 못해 공통 브리핑을 표시합니다.{' '}
+          <button type="button" className={FOCUS_RING} onClick={auth.retry}>
+            로그인 상태 다시 확인
+          </button>
+        </p>
+      )}
       <div
         className="mt-5 flex items-center gap-2.5 max-sm:flex-col max-sm:items-stretch"
         aria-label="브리핑 회차 선택"
@@ -54,7 +69,35 @@ export default function BriefingPage() {
         </div>
       </div>
 
-      <PublishedBriefing key={date + edition} date={date} edition={edition} />
+      <div
+        role="group"
+        aria-label="브리핑 기준"
+        className="mt-3 inline-flex h-8 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px]"
+      >
+        <button
+          type="button"
+          aria-pressed={!personal}
+          onClick={() => updateQuery({ view: null })}
+          className={`px-3 ${EDITION_BUTTON}`}
+        >
+          공통
+        </button>
+        <button
+          type="button"
+          aria-pressed={personal}
+          onClick={() => updateQuery({ view: 'personal' })}
+          className={`px-3 ${EDITION_BUTTON}`}
+        >
+          내 종목 기준
+        </button>
+      </div>
+
+      <PublishedBriefing
+        key={`${date}:${edition}:${memberId ?? 'public'}:${revision}`}
+        date={date}
+        edition={edition}
+        personal={personal}
+      />
     </section>
   );
 }

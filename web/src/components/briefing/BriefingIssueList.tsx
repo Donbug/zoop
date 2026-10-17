@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { BriefingItem } from '@/types/briefing';
 import {
@@ -13,10 +14,13 @@ import {
 export default function BriefingIssueList({
   items,
   graphHref,
+  renderExtra,
 }: {
   items?: BriefingItem[];
   /** D-BRF-04 이 회차 기준 지도 주소. 발행 회차에만 준다. */
   graphHref?: string;
+  /** 이슈마다 덧붙일 영역(회차 지도 링크·평가). 발행 회차에만 준다. */
+  renderExtra?: (item: BriefingItem) => ReactNode;
 }) {
   return (
     <section className={SECTION} aria-labelledby="briefing-issues-title">
@@ -54,6 +58,17 @@ export default function BriefingIssueList({
               <h4 className="text-sm font-bold">
                 {item.rank}. {item.title}
               </h4>
+              {(item.matchedCompanyIds ?? []).length > 0 && (
+                <p className="self-start rounded-full border-[0.667px] border-zoop-ink px-2 py-[2px] text-[10px] font-semibold">
+                  내 종목:{' '}
+                  {item.companies
+                    .filter((company) =>
+                      (item.matchedCompanyIds ?? []).includes(company.id),
+                    )
+                    .map((company) => company.name)
+                    .join(', ') || (item.matchedCompanyIds ?? []).join(', ')}
+                </p>
+              )}
               <p className="text-[11px] text-zoop-muted">
                 {item.companies.length
                   ? item.companies.map((company) => company.name).join(', ')
@@ -67,6 +82,7 @@ export default function BriefingIssueList({
               <p className={NOTE}>
                 선정 이유: {item.reason} · 근거 {item.evidenceCount}건
               </p>
+              {renderExtra?.(item)}
             </li>
           ))}
         </ol>
