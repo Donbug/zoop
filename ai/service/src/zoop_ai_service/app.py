@@ -1,4 +1,4 @@
-"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes, the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes) and the two read-only `/internal/v1/graph-versions` routes. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
+"""The five S1 `/internal/v1/analysis-jobs` routes, the five S2 `/internal/v1/extraction-jobs` routes, the eight S3 `/internal/v1/relation-jobs` routes (five job routes, three review-operation routes) the two read-only `/internal/v1/graph-versions` routes and the two read-only `/internal/v1/graph-handoffs` routes. HTTP framing only: auth, headers, bounded strict body parsing, error envelope, request id.
 
 Order is fixed: authentication and scope, then headers, then body. Documentation, CORS, proxy headers and the server header are
 off. An unexpected exception becomes a bare `internal_error` envelope; its text is never sent or logged.
@@ -28,6 +28,8 @@ from .extraction_jobs import ExtractionError, ExtractionJobs
 from .extraction_wire import ExtractionErrorEnvelope, ExtractionJobStatus, ExtractionResultEnvelope, ExtractionSubmit
 from .graph_reads import GraphError, GraphReads
 from .graph_wire import COMPANY_ID_PATTERN, VERSION_ID_PATTERN, GraphErrorEnvelope, GraphFocusResult, GraphVersionStatus
+from .handoff_reads import HandoffError, HandoffReads
+from .handoff_wire import HANDOFF_ID_PATTERN, HdBundle, HdErrorEnvelope, HdStatus
 from .relation_jobs import RelationError, RelationJobs
 from .relation_wire import RelationErrorEnvelope, RelationJobStatus, RelationOperationStatus, RelationResultEnvelope, RelationReview, RelationSubmit
 from .wire import KINDS, ErrorBody, ErrorEnvelope, JobStatus, ResultEnvelope
@@ -44,10 +46,13 @@ PATH_JOB_ID = Path(alias="jobId", description="Runtime job id; equals the Idempo
 PATH_OPERATION_ID = Path(alias="operationId", description="The review operation's id: the Idempotency-Key of the POST that created it.",
                          json_schema_extra={"pattern": "^" + JOB_ID_PATTERN + "$"})
 PATH_VERSION_ID = Path(alias="versionId", description="An allowlisted graph version id.", json_schema_extra={"pattern": VERSION_ID_PATTERN})
+PATH_HANDOFF_ID = Path(alias="handoffId", description="An allowlisted handoff id.", json_schema_extra={"pattern": HANDOFF_ID_PATTERN})
 RELATION_PREFIX = "/internal/v1/relation-jobs"
 EXTRACTION_PREFIX = "/internal/v1/extraction-jobs"
 GRAPH_PREFIX = "/internal/v1/graph-versions"
+HANDOFF_PREFIX = "/internal/v1/graph-handoffs"
 VERSION_ID = re.compile(VERSION_ID_PATTERN)
+HANDOFF_ID = re.compile(HANDOFF_ID_PATTERN)
 
 
 def invalid(field: str) -> ApiError:
@@ -225,6 +230,8 @@ class Gateway:
                     envelope = ExtractionErrorEnvelope(error=body)
                 elif str(scope.get("path", "")).startswith(GRAPH_PREFIX):
                     envelope = GraphErrorEnvelope(error=body)
+                elif str(scope.get("path", "")).startswith(HANDOFF_PREFIX):
+                    envelope = HdErrorEnvelope(error=body)
                 else:
                     envelope = ErrorEnvelope(error=body)
                 await JSONResponse(envelope.wire(), status_code=500)(scope, watch, relay)
@@ -240,7 +247,8 @@ class Gateway:
                 "runtime": seen.runtime if seen else [], "problem": seen.problem if seen else None,
                 "durationMs": round((time.monotonic() - began) * 1000, 1),
                 **({"operationId": context["operationId"]} if "operationId" in context else {}),
-                **({"versionId": context["versionId"]} if "versionId" in context else {})})
+                **({"versionId": context["versionId"]} if "versionId" in context else {}),
+                **({"handoffId": context["handoffId"]} if "handoffId" in context else {})})
 
 
 def _error_response(error: ApiError, request: Request) -> JSONResponse:
@@ -253,6 +261,8 @@ def _error_response(error: ApiError, request: Request) -> JSONResponse:
         error = ExtractionError(error.status, error.code, runtime_code=error.runtime_code, field=error.field, headers=error.headers)
     elif request.url.path.startswith(GRAPH_PREFIX) and not isinstance(error, GraphError):
         error = GraphError(error.status, error.code, runtime_code=error.runtime_code, field=error.field, headers=error.headers)
+    elif request.url.path.startswith(HANDOFF_PREFIX) and not isinstance(error, HandoffError):
+        error = HandoffError(error.status, error.code, runtime_code=error.runtime_code, field=error.field, headers=error.headers)
     return JSONResponse(error.envelope(context["requestId"]).wire(), status_code=error.status, headers=error.headers)
 
 
@@ -295,15 +305,25 @@ GRAPH_ERRORS = {
     503: {"model": GraphErrorEnvelope, "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty graph."},
 }
 
+HANDOFF_ERRORS = {
+    401: {"model": HdErrorEnvelope, "description": "authentication_required: missing, malformed or unknown bearer token."},
+    403: {"model": HdErrorEnvelope, "description": "scope_denied: the principal lacks `handoff.read`; or handoff_not_allowed: the handoff is not listed for this principal (unknown, unlisted and another principal's answer alike)."},
+    404: {"model": HdErrorEnvelope, "description": "handoff_not_found: the operator listed the handoff but the handoff ledger has none (an operator configuration gap), or route_not_found."},
+    409: {"model": HdErrorEnvelope, "description": "execution_unavailable: the handoff configuration group is not enabled."},
+    422: {"model": HdErrorEnvelope, "description": "invalid_request: path, query parameter (any is refused) or header validation."},
+    500: {"model": HdErrorEnvelope, "description": "runtime_contract_mismatch, runtime_binding_mismatch or internal_error (not retryable)."},
+    503: {"model": HdErrorEnvelope, "description": "runtime_unavailable, runtime_busy, service_configuration_invalid or service_busy (retryable); never an empty bundle."},
+}
+
 
 def create_app(service: JobService | None = None, relation: RelationJobs | None = None, extraction: ExtractionJobs | None = None,
-               graph: GraphReads | None = None) -> FastAPI:
+               graph: GraphReads | None = None, handoff: HandoffReads | None = None) -> FastAPI:
     """With no service this builds the route skeleton only (OpenAPI export); a service makes it serve requests. `relation` is the
-    S3 relation-job family, `extraction` the S2 extraction-job family and `graph` the read-only graph-version family; without one, every
+    S3 relation-job family, `extraction` the S2 extraction-job family, `graph` the read-only graph-version family and `handoff` the read-only handoff family; without one, every
     route of that family answers 409 `execution_unavailable` after authentication."""
     app = FastAPI(title="Zoop internal AI analysis transport", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None,
                   redirect_slashes=False)
-    app.state.service, app.state.relation, app.state.extraction, app.state.graph, app.state.log = service, relation, extraction, graph, emit
+    app.state.service, app.state.relation, app.state.extraction, app.state.graph, app.state.handoff, app.state.log = service, relation, extraction, graph, handoff, emit
     app.add_middleware(Gateway)
 
     @app.exception_handler(ApiError)
@@ -612,5 +632,34 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
         context["versionId"] = version_id
         seen = context["seen"] = Observation()
         return respond(await run_in_threadpool(graph_reads.focus, principal.name, version_id, company_id, int(depth), seen))
+
+    def handoff_service(request: Request) -> HandoffReads:
+        handoff_reads = request.app.state.handoff
+        if handoff_reads is None:
+            raise HandoffError(409, "execution_unavailable")  # the all-or-nothing handoff configuration group is not enabled
+        return handoff_reads
+
+    async def handoff_call(request: Request, operation: str, principal: Principal, handoff_id: str) -> JSONResponse:
+        handoff_reads = handoff_service(request)
+        graph_query(request, ())
+        if not HANDOFF_ID.fullmatch(handoff_id):
+            raise invalid("handoffId")
+        context = _context(request)
+        context["handoffId"] = handoff_id
+        seen = context["seen"] = Observation()
+        return respond(await run_in_threadpool(getattr(handoff_reads, operation), principal.name, handoff_id, seen))
+
+    @app.get("/internal/v1/graph-handoffs/{handoffId}", operation_id="getGraphHandoffStatus", tags=["graph-handoffs"],
+             response_model=HdStatus, summary="Verified, content-free status of one allowlisted AI handoff", responses=HANDOFF_ERRORS)
+    async def handoff_status(request: Request, principal: Annotated[Principal, Depends(require("handoff.read"))],
+                             handoff_id: Annotated[str, PATH_HANDOFF_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await handoff_call(request, "status", principal, handoff_id)
+
+    @app.get("/internal/v1/graph-handoffs/{handoffId}/bundle", operation_id="getGraphHandoffBundle", tags=["graph-handoffs"],
+             response_model=HdBundle, summary="The whole bundle of an allowlisted AI handoff, only while it verifies now and matches the operator's pins",
+             responses=HANDOFF_ERRORS)
+    async def handoff_bundle(request: Request, principal: Annotated[Principal, Depends(require("handoff.read"))],
+                             handoff_id: Annotated[str, PATH_HANDOFF_ID], x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
+        return await handoff_call(request, "bundle", principal, handoff_id)
 
     return app

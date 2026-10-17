@@ -20,10 +20,9 @@ export function isMember() {
 }
 export async function logout() {
   const revision = useAuthStore.getState().sessionRevision;
-  try {
-    await logOut();
-  } finally {
-    if (revision === useAuthStore.getState().sessionRevision)
-      clearAuthentication();
-  }
+  // A failed request does not prove that the HttpOnly cookie was revoked.
+  // Preserve the confirmed session so the caller can show an error and retry.
+  await logOut();
+  if (revision === useAuthStore.getState().sessionRevision)
+    clearAuthentication();
 }

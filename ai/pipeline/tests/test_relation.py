@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from scripts import relation_smoke as rs
 from scripts.relation_smoke import (BAD, COMP, CO, EVT, GOOD, INV, QB, SUP, SUP2, VALID, build_world, co, converge, ev, find, forged_span, impact_item,
     impact_reply, impact_verifier_reply, proposal, relation_reply, step, tp, verifier_reply, world_cite)
+from tests.legacy_ledger import copy_as_legacy
 from zoop_ai_pipeline import relation_rules as rules
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
 from zoop_ai_pipeline.relation import Engine, Store, next_attempt
@@ -580,6 +581,15 @@ def test_forged_or_unusable_upstream_is_refused_before_any_job_exists(world):
     assert ready["state"] == "ready"
 
 
+def test_a_legacy_s2_upstream_is_refused_by_its_owner_before_any_s3_job_exists(world):
+    w = world
+    legacy = copy_as_legacy(w.kit.root, "s2-job", "s2-legacy")
+    with pytest.raises(ExtractionFailure, match="analysis_contract_changed"):
+        w.kit.rel_job("run", w.kit.rsubmit("from-legacy", {"jobId": "s2-legacy", "inputDigest": legacy["input_digest"]}))
+    assert database(w).execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
+    assert w.kit.job("inspect", w.kit.job_selector("s2-job"))["delivery"]["status"] == "current"
+
+
 def test_revoked_or_changed_rights_withhold_delivery_and_stop_resume_without_calls_then_recover(world):
     w = world
     props = [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="p")]
@@ -922,10 +932,10 @@ def test_dedicated_ledger_rejects_overlapping_mixed_and_app_roots(world, tmp_pat
 
 
 def test_no_database_pipeline_graph_or_network_modules_are_loaded(world):
-    code = ("import sys\nfrom zoop_ai_pipeline import relation, relation_cli\nprint([m for m in sys.modules if m.startswith(('investmate.storage', 'investmate.pipeline', 'investmate.graph', "
+    code = ("import sys\nfrom zoop_ai_pipeline import relation, relation_cli\nprint([m for m in sys.modules if m.startswith(('investmate', "
             "'psycopg', 'neo4j', 'zoop_bff', 'zoop_ai.', 'socket', 'httpx', 'requests'))] + (['zoop_ai'] if 'zoop_ai' in sys.modules else []))")
     child = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True, cwd=world.kit.root, env={"PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"), "PATH": "/usr/bin:/bin"})
-    assert child.returncode == 0 and "investmate.pipeline" not in child.stdout and "zoop_bff" not in child.stdout and "neo4j" not in child.stdout, child.stderr + child.stdout
+    assert child.returncode == 0 and "investmate" not in child.stdout and "zoop_bff" not in child.stdout and "neo4j" not in child.stdout, child.stderr + child.stdout
 
 
 def test_wire_is_closed_versioned_and_review_cannot_name_a_publication_decision(world):

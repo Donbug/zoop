@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .ingestion_contracts import SCHEMA as INGESTION_SCHEMA
 from .ingestion_contracts import Wire, canonical, digest
@@ -16,13 +16,10 @@ __all__ = ["canonical", "digest"]
 
 SCHEMA = "zoop-extraction-s2-2"
 LEDGER_VERSION = "zoop-extraction-ledger-1"
-ADAPTER_VERSION = "zoop-extraction-poc-adapter-1"
+ADAPTER_VERSION = "zoop-extraction-native-replay-1"  # article projection, request preimages, quote resolution, strict parse/grounding and effective/disposition rules: any change MUST bump it
+REPLAY_FORMAT = "zoop-analysis-replay-1"
 ARTICLE_PROJECTION = "zoop-article-projection-1"
 CANDIDATE_VERSION = "zoop-event-candidate-1"
-POC_COMMIT = "fa446e7c72edfa06ec1a0e8e999199a21d31c695"
-# Pinned prompt/schema fingerprint of installed extraction+compare contracts (investmate.prompts).
-ANALYSIS_FINGERPRINT = "da15369acc6aad52ebf877d341bb08041195ad9f6e0874bda1ed18b7e95eabb4"
-CONTEXT_REVISION = "role-context-3"
 
 TOPIC_PRODUCER = "zoop-topic-replay-producer-1"
 TOPIC_REQUEST = "zoop-topic-request-1"
@@ -36,7 +33,7 @@ MAX_COMPANIES = 500
 MAX_EVENTS = 50
 MAX_MEMBERS = 20
 MAX_DOCUMENTS = 200
-MAX_COMPARISONS = 499  # plus one extraction call stays within the installed per-run replay budget (500)
+MAX_COMPARISONS = 499  # one extraction plus 499 comparisons per job
 # Candidate ID namespaces. A client-owned snapshot eventId may never collide with a produced identity.
 RESERVED_PREFIXES = ("mc-", "evc-", "tp-")
 
@@ -96,7 +93,7 @@ class Catalogue(Wire):
 
 class SnapshotMember(Wire):
     observation: ObservationRef
-    # Original investmate Mention JSON. It is strictly parsed and grounded against the exact document by the adapter.
+    # Mention JSON of this module's native `Mention` (snake_case). It is strictly parsed and grounded against the exact document by extraction_replay.
     mention: dict[str, Any]
 
 
@@ -188,4 +185,100 @@ class TopicReplay(Wire):
     def unique(self):
         if len({r.request_digest for r in self.records}) != len(self.records):
             raise ValueError("duplicate topic replay request")
+        return self
+
+
+# ---- Native strict analysis domain (snake_case JSON, the shape authored mentions/decisions are written in) ----
+
+class Record(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class Article(Record):
+    """The exact analysed text. `version` is the digest of every field; it never includes collection time."""
+    article_id: str
+    url: str
+    title: str
+    body: str
+    publisher: str
+    published_at: str | None = None
+    language: str = "ko"
+    input_kind: Literal["body", "summary"] = "body"
+    origin_id: str | None = None
+    withdrawn: bool = False
+    allow_model_send: bool = False
+    synthetic: bool = False
+
+    @property
+    def version(self) -> str:
+        return digest(self.model_dump(mode="json"))
+
+
+class Evidence(Record):
+    article_id: str
+    article_version: str
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+    quote: str = Field(min_length=1)
+
+    def matches(self, article: Article) -> bool:
+        return (self.article_id == article.article_id and self.article_version == article.version and self.end > self.start
+                and article.body[self.start:self.end] == self.quote)
+
+
+class Participant(Record):
+    company_id: str | None = None
+    name: str
+    role: str
+
+
+class Mention(Record):
+    mention_id: str
+    article_id: str
+    article_version: str
+    title: str
+    event_type: str
+    action: str
+    target: str | None = None
+    event_time: str | None = None
+    period: str | None = None
+    assertion_status: Literal["occurred", "announced", "planned", "forecast", "cancelled", "unknown"]
+    participants: list[Participant]
+    evidence: list[Evidence]
+    keywords: list[str] = Field(default_factory=list)
+    background: bool = False
+    countries: list[str] = Field(default_factory=list)
+
+
+class Extraction(Record):
+    mentions: list[Mention]
+
+
+class PairDecision(Record):
+    relation: Literal["SAME", "DIFFERENT", "FOLLOWS", "CONFLICT", "HOLD"]
+    reason: str
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
+# ---- Native authored replay: responses keyed by the exact request digest (no input text is copied into the fixture). ----
+
+class AnalysisReplayRecord(Wire):
+    stage: Literal["extract", "compare"]
+    request_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    response: dict[str, Any]
+
+
+class AnalysisReplay(Wire):
+    format: Literal["zoop-analysis-replay-1"]
+    synthetic: bool
+    recording_kind: Literal["authored-test"]
+    prompt_version: str = Field(min_length=1, max_length=200)
+    analysis_version: str = Field(min_length=1, max_length=200)
+    records: list[AnalysisReplayRecord] = Field(max_length=2000)
+
+    @model_validator(mode="after")
+    def unique(self):
+        keys = [(r.stage, r.request_digest) for r in self.records]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate replay request")
         return self

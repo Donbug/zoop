@@ -369,6 +369,14 @@ def test_only_the_pre_effect_busy_refusals_are_retried_and_the_s3_code_is_not_on
     assert (stopped.state, stopped.last_outcome) == ("idle", "exited")
 
 
+def test_the_analysis_contract_refusal_is_a_server_configuration_fault_in_s2_and_s3_and_the_retired_poc_codes_are_not():
+    from zoop_ai_service import extraction_jobs, relation_jobs
+    for module in (extraction_jobs, relation_jobs):
+        assert module.is_config_code("analysis_contract_changed") and module.is_config_code("ledger_version_unknown")
+        assert not module.is_config_code("poc_contract_changed") and not module.is_config_code("pinned_poc_unavailable") and not module.is_config_code("job_input_conflict")
+    assert extraction_jobs.is_config_code("replay_fixture_invalid")
+
+
 # ---- the exit-code interpretation of the S2 pipeline -------------------------------------------------------------------------
 
 def payload(state: str = "ready", **overrides: Any) -> dict[str, Any]:

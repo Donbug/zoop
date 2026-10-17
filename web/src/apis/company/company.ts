@@ -20,6 +20,18 @@ export async function readCompanyResource<T>(
     skipAuth: !url.startsWith('/api/v1/portfolio'),
   });
   const requested = new URL(url, 'http://localhost');
+  const companyId = /^\/api\/v1\/companies\/([^/]+)$/.exec(
+    requested.pathname,
+  )?.[1];
+  if (
+    companyId &&
+    (first as { id?: unknown }).id !== decodeURIComponent(companyId)
+  )
+    throw new ApiError(
+      502,
+      'INVALID_RESPONSE',
+      '요청한 기업과 다른 자료를 받았어요.',
+    );
   const eventId = /^\/api\/v1\/events\/([^/]+)$/.exec(requested.pathname)?.[1];
   const impactIds =
     /^\/api\/v1\/companies\/([^/]+)\/issues\/([^/]+)\/impact$/.exec(
@@ -119,8 +131,7 @@ export async function readCompanyResource<T>(
       !Number.isFinite(expectedTime) ||
       actualTime !== expectedTime ||
       graph.metadata?.depth !== expectedDepth ||
-      ((graph.nodes.length > 0 || focus.length > 0) &&
-        !focus.includes(decodeURIComponent(graphCompanyId)))
+      !focus.includes(decodeURIComponent(graphCompanyId))
     )
       throw new ApiError(
         502,

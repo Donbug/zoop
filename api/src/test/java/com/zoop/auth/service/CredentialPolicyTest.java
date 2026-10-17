@@ -40,11 +40,14 @@ class CredentialPolicyTest {
     }
 
     @Test
-    void acceptsLongUnicodePasswordsWithoutTrimmingAndRejectsKnownCommonValues() {
-        policy.newPassword("   Correct Horse Battery Staple   ");
-        policy.newPassword("가".repeat(15));
-        assertInvalid(() -> policy.newPassword("short"));
-        assertInvalid(() -> policy.newPassword("x".repeat(129)));
+    void acceptsEightToThirtyTwoCodePointPasswordsWithoutTrimmingAndRejectsKnownCommonValues() {
+        policy.newPassword("  Correct Horse Battery Staple");
+        policy.newPassword("x".repeat(8));
+        policy.newPassword("x".repeat(32));
+        policy.newPassword("가".repeat(8));
+        assertInvalid(() -> policy.newPassword("x".repeat(7)));
+        assertInvalid(() -> policy.newPassword("x".repeat(33)));
+        assertInvalid(() -> policy.newPassword("password"));
         assertInvalid(() -> policy.newPassword("password1234567"));
         assertInvalid(() -> policy.newPassword("valid password\nmore"));
         assertInvalid(() -> policy.newPassword("valid password \uD800"));

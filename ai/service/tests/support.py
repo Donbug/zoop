@@ -65,16 +65,17 @@ class Credentials:
     """Synthetic principals with tokens built in memory; only SHA-256 digests reach the service environment."""
 
     def __init__(self) -> None:
-        self.tokens = {name: "t" + secrets.token_urlsafe(36) for name in ("alpha", "beta", "reader", "submitter", "viewer", "grapher")}
+        self.tokens = {name: "t" + secrets.token_urlsafe(36) for name in ("alpha", "beta", "reader", "submitter", "viewer", "grapher", "handoffer")}
         relation = ["relation.submit", "relation.read", "relation.cancel", "relation.recover", "relation.review"]
         extraction = ["extraction.submit", "extraction.read", "extraction.cancel", "extraction.recover"]
         self.scopes = {
-            "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read"],
-            "beta": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read"],
+            "alpha": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read"],
+            "beta": ["analysis.submit", "analysis.read", "analysis.cancel", "analysis.recover", *relation, *extraction, "graph.read", "handoff.read"],
             "reader": ["analysis.read"],
             "submitter": ["analysis.submit"],
             "viewer": ["relation.read", "extraction.read"],  # may look jobs and operations up, but never write a review or an extraction
             "grapher": ["graph.read"],                       # reads graph versions and nothing else
+            "handoffer": ["handoff.read"],                   # reads AI handoff bundles and nothing else
         }
 
     def digest(self, name: str) -> str:

@@ -20,7 +20,7 @@
 
 ### signupPolicy
 
-2026-10-14 사용자 확정: 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 15~128 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md.
+2026-10-14 사용자 확정(비밀번호 길이는 2026-10-16 변경): 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 8~32 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md.
 
 ### socialAuthPolicy
 
@@ -666,7 +666,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listVirtualAccountProfiles · 가상 계좌 프로필 목록
 
-가상 계좌 프로필 목록.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필 목록. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -694,7 +694,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getVirtualAccountProfile · 가상 계좌 프로필 조회
 
-가상 계좌 프로필 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필을 조회한다. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -721,7 +721,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## connectVirtualAccount · 가상 계좌 연결
 
-가상 계좌 연결.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원에게 서비스 시연용 고정 Mock 프로필을 연결한다. 실제 증권계좌·자격 증명을 사용하지 않는다. 같은 Idempotency-Key와 같은 프로필의 재요청은 기존 결과를 반환하고, 같은 키에 다른 프로필을 지정하면 409다. 키 결과는 회원 계정이 존재하는 동안 보존한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -751,7 +751,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getMyPortfolio · 모의 보유 정보 조회
 
-모의 보유 정보 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+연결된 서비스 시연용 Mock 프로필과 고정 보유정보를 조회한다. Mock 보유수량·평균 매입가는 변경하지 않으며 가격을 제공하지 않는 경우 평가 금액과 비중은 unavailable로 반환한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -760,9 +760,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 요청 본문 | 없음 |
 | 응답 | 200: [PortfolioResponse](#schema-portfolioresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
-| FS/NFS | [FS039](../../system/out/feature-FS039.md) · [FS054](../../system/out/feature-FS054.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
-| 화면 | [D-COM-01](../../system/out/screen-D-COM-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
-| WBS | 6.1.2, 6.11.1, 6.4.1, 6.4.3, 6.4.6, 6.7.8 |
+| FS/NFS | [FS009](../../system/out/feature-FS009.md) · [FS062](../../system/out/feature-FS062.md) · [FS010](../../system/out/feature-FS010.md) · [FS039](../../system/out/feature-FS039.md) · [FS054](../../system/out/feature-FS054.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-ONB-02](../../system/out/screen-D-ONB-02.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.3.2, 6.4.1, 6.4.3, 6.4.4, 6.4.6, 6.7.8 |
 | 프로토타입 대응 | /api/portfolio |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -777,7 +777,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## disconnectVirtualAccount · 가상 계좌 연결 해제
 
-가상 계좌 연결 해제.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+현재 회원 본인의 서비스 시연용 Mock 프로필 연결을 해제한다. 다른 초기 설정과 관심종목은 유지한다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -956,7 +956,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCompanyMetrics · 기업 주요 지표 조회
 
-기업 주요 지표 조회. 공급자가 제공한 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 주요 지표 조회. 최신 공급자 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. graphVersion 또는 asOf를 지정한 요청은 422 INVALID_REQUEST로 거절하며, 해당 시점의 과거 지표처럼 최신값을 반환하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -5783,8 +5783,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 
 ### SettingsUpdate
 
-Unset fields keep their stored value; ``version`` must equal the stored version unless the request
-changes nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null.
+Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. completed cannot be true unless investor has been answered and mode has been selected. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5792,7 +5791,7 @@ changes nothing (a resent request is answered with the stored settings). The mod
 | mode | 선택 | string {assets, watchlist} / null | assets/watchlist를 지정하면 방식을 선택한다. null 또는 생략은 현재 값을 변경하지 않는다. |
 | watchlistIds | 선택 | string[] / null |  |
 | tutorialCompleted | 선택 | boolean / null |  |
-| completed | 선택 | boolean / null |  |
+| completed | 선택 | boolean / null | Cannot be true unless investor has been answered and mode has been selected. Set false to clear completion. |
 | investor | 선택 | boolean / null | Answer to 'do you invest in stocks now?' |
 
 <a id="schema-setupstate"></a>

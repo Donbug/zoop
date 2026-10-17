@@ -8,7 +8,7 @@
 
 | 기능 | 목표 API | 경로 | 우선순위 |
 | --- | --- | --- | --- |
-| [FS039](feature-FS039.md) · [FS054](feature-FS054.md) | [getMyPortfolio](../../api/out/zoop-api-spec.md#getmyportfolio) | GET /api/v1/portfolio | P1 |
+| [FS009](feature-FS009.md) · [FS062](feature-FS062.md) · [FS010](feature-FS010.md) · [FS039](feature-FS039.md) · [FS054](feature-FS054.md) | [getMyPortfolio](../../api/out/zoop-api-spec.md#getmyportfolio) | GET /api/v1/portfolio | P1 |
 | [FS011-01](feature-FS011-01.md) · [FS026](feature-FS026.md) · [FS037](feature-FS037.md) | [searchCompanies](../../api/out/zoop-api-spec.md#searchcompanies) | GET /api/v1/companies | P1 |
 | [FS020](feature-FS020.md) · [FS038](feature-FS038.md) · [FS044](feature-FS044.md) | [getCompany](../../api/out/zoop-api-spec.md#getcompany) | GET /api/v1/companies/{id} | P1 |
 | [FS020](feature-FS020.md) · [FS038](feature-FS038.md) · [FS063](feature-FS063.md) | [getCompanyQuote](../../api/out/zoop-api-spec.md#getcompanyquote) | GET /api/v1/companies/{id}/quote | P1 |

@@ -11,6 +11,8 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "요청이 허용되지 않습니다.", false),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "이미 등록된 이메일입니다.", false),
     SOCIAL_LINK_REQUIRED(HttpStatus.CONFLICT, "기존 계정으로 로그인한 후 소셜 계정을 연결해 주세요.", false),
+    REVISION_CONFLICT(HttpStatus.CONFLICT, "설정이 변경되었습니다. 최신 상태를 확인해 주세요.", false),
+    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 요청 키에 다른 내용이 사용되었습니다.", false),
     TERMS_REQUIRED(HttpStatus.UNPROCESSABLE_CONTENT, "필수 약관 동의를 확인해 주세요.", false),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", true),
     INVALID_CURSOR(HttpStatus.UNPROCESSABLE_CONTENT, "유효하지 않은 커서입니다.", false),

@@ -4,12 +4,14 @@ import java.time.Clock;
 import java.time.Duration;
 
 import com.zoop.auth.repository.AuthRateEventStore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@ConditionalOnWebApplication
 @EnableScheduling
 public class AuthRateCleanup {
     private final AuthRateEventStore store;
