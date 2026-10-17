@@ -1147,7 +1147,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getBriefing · 공개 브리핑 회차 조회
 
-발행 당시 자료와 그래프 버전·시장 지표·outlook·문서별 기업 판정을 읽는다. 발행 후 재판정하거나 최신 값으로 대체하지 않는다. 출근 07:40/퇴근 18:10 KST, 핵심 이슈 최대 3개는 기존 요구사항 확정값이며 부족하면 채우지 않는다. 시장 요약은 근거와 검증을 갖춘 실제 생성 결과만 제공한다.
+발행 당시 자료와 그래프 버전·시장 지표·outlook·문서별 기업 판정을 읽는다. 발행 후 재판정하거나 최신 값으로 대체하지 않는다. 생성 시작 출근 09:20/퇴근 17:30 KST, 핵심 이슈 최대 3개는 기존 요구사항 확정값이며 부족하면 채우지 않는다. 시장 요약은 근거와 검증을 갖춘 실제 생성 결과만 제공한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4929,7 +4929,7 @@ The three market indicators stored with a published round; never changed after p
 | --- | --- | --- | --- |
 | status | 필수 | string |  |
 | referenceAt | 필수 | string (date-time) | The round's scheduled time (KST) |
-| rateCutoffAt | 필수 | string (date-time) | Latest time an observation could have (morning 07:40, evening 18:05, KST) |
+| rateCutoffAt | 필수 | string (date-time) | Latest time an observation could have: at or before the stored round data-window end (KST). Generation starts at 09:20/17:30; this is not a market closing timestamp. |
 | collectedAt | 필수 | string (date-time) |  |
 | indicators | 필수 | [MarketIndicator](#schema-marketindicator)[] |  |
 
