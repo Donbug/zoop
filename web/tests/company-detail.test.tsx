@@ -1084,3 +1084,69 @@ test('timeline shows the latest ten day buckets first and loads older ones on de
     within(timeline).queryByRole('button', { name: /이전 사건 더 보기/ }),
   ).toBeNull();
 });
+
+test('A02: timeline shows relation types in Korean and empty relations as unconfirmed', async () => {
+  server.on('GET', '/api/v1/events', (r) =>
+    json({
+      items: [
+        ...events,
+        {
+          ...events[0],
+          id: 'issue-c',
+          title: '합성 사건 C',
+          relationTypes: [],
+        },
+      ],
+      unknownTimeItems: [],
+      nextCursor: null,
+      metadata: {
+        ...metadata,
+        asOf: r.query.get('asOf') ?? time,
+        total: 3,
+        excludedUnknownTime: 0,
+      },
+    }),
+  );
+  open(`${pinned}&period=1m&tab=events`);
+  const timeline = await screen.findByRole('region', { name: '사건 타임라인' });
+  await within(timeline).findByRole('button', { name: '합성 사건 C' });
+  expect(within(timeline).getByText(/문서 1건 · 직접 관련$/)).toBeTruthy();
+  expect(within(timeline).getByText(/문서 2건 · 구조적 관련$/)).toBeTruthy();
+  expect(within(timeline).getByText(/직접 관계 미확인$/)).toBeTruthy();
+  expect(
+    within(timeline).queryByText(/INVOLVES|STRUCTURALLY_RELATED_TO/),
+  ).toBeNull();
+});
+
+test('F05: quote outages offer retry only when the server says it may help', async () => {
+  let retryable = false;
+  server.on('GET', '/api/v1/companies/:id/quote', () =>
+    json(
+      {
+        error: {
+          code: 'SOURCE_UNAVAILABLE',
+          message: '시세 공급자 장애',
+          retryable,
+        },
+      },
+      503,
+    ),
+  );
+  const view = open(pinned);
+  const quoteRegion = () => screen.getByRole('region', { name: '최신 시세' });
+  await within(quoteRegion()).findByText(
+    /자료 공급원의 설정이나 응답 형식 문제/,
+  );
+  expect(
+    within(quoteRegion()).queryByRole('button', { name: '시세 다시 조회' }),
+  ).toBeNull();
+  view.unmount();
+
+  retryable = true;
+  open(pinned);
+  expect(
+    await within(quoteRegion()).findByRole('button', {
+      name: '시세 다시 조회',
+    }),
+  ).toBeTruthy();
+});

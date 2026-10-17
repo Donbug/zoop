@@ -36,6 +36,12 @@ export default function CompanyInfoTab({
   const permission =
     [401, 403].includes(resource.errorStatus ?? 0) ||
     ['ACCESS_DENIED', 'MEMBER_REQUIRED'].includes(resource.errorCode ?? '');
+  // F04·F05: 없음(404)·버전 없음(409)·재시도 불가 장애는 다시 보내도 같으므로 다시 조회를 두지 않는다.
+  const canRetry =
+    !permission &&
+    resource.errorStatus !== 404 &&
+    resource.errorCode !== 'VERSION_UNAVAILABLE' &&
+    resource.errorRetryable !== false;
   return (
     <section
       aria-label="기업 기준정보"
@@ -54,10 +60,12 @@ export default function CompanyInfoTab({
               : resource.errorStatus === 404
                 ? '기업 기준정보를 찾을 수 없어요.'
                 : resource.errorCode === 'VERSION_UNAVAILABLE'
-                  ? '선택한 공개 버전의 기업 기준정보를 확인할 수 없어요.'
-                  : '기업 기준정보를 불러오지 못했어요.'}
+                  ? '선택한 공개 버전의 기업 기준정보를 확인할 수 없어요. [최신 시점]으로 돌아가 확인해 주세요.'
+                  : resource.errorRetryable === false
+                    ? '자료 공급원의 설정이나 응답 형식 문제로 기업 기준정보를 확인할 수 없어요.'
+                    : '기업 기준정보를 불러오지 못했어요.'}
           </p>
-          {!permission && (
+          {canRetry && (
             <button
               type="button"
               className={ui.button}
