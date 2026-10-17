@@ -33,7 +33,7 @@ import {
 } from './detail-model';
 
 const workspaceClasses =
-  'company-workspace grid grid-cols-[180px_minmax(0,1fr)_280px] gap-0 m-0 overflow-hidden rounded-[5px] border border-[var(--zoop-line)] bg-[var(--zoop-soft)] text-[var(--zoop-ink)] max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-[var(--zoop-line)] [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-[var(--zoop-muted)] [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-[3px] [&_button]:border [&_button]:border-[var(--zoop-line)] [&_button]:bg-white [&_button]:min-h-[34px] [&_button]:px-[9px] [&_button]:py-1.5 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-[var(--zoop-ink)] [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-[var(--zoop-ink)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-[var(--zoop-ink)] [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1 [&_article]:border-b [&_article]:border-[var(--zoop-line)] [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-[#a12828] [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-[3px] [&_input]:border [&_input]:border-[var(--zoop-line)] [&_input]:bg-white [&_input]:px-2 [&_input]:py-1.5 [&_input]:min-h-[34px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-[var(--zoop-ink)] [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-[var(--zoop-ink)] max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
+  'company-workspace grid grid-cols-[180px_minmax(0,1fr)_280px] gap-0 m-0 overflow-hidden rounded-[5px] border border-zoop-line bg-zoop-soft text-zoop-ink max-[1000px]:grid-cols-[160px_minmax(0,1fr)] max-md:flex max-md:flex-col [&_section]:border-b [&_section]:border-zoop-line [&_section]:py-4 [&_h1]:text-[26px] [&_h1]:font-bold [&_h1]:tracking-[-0.035em] [&_h2]:mb-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:tracking-[-0.025em] [&_h3]:font-semibold [&_p]:text-xs [&_p]:text-zoop-muted [&_p]:leading-[1.7] [&_button]:cursor-pointer [&_button]:rounded-[3px] [&_button]:border [&_button]:border-zoop-line [&_button]:bg-white [&_button]:min-h-[34px] [&_button]:px-[9px] [&_button]:py-1.5 [&_button]:text-xs! [&_button[aria-pressed=true]]:bg-zoop-ink [&_button[aria-pressed=true]]:text-white [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-default [&_a]:cursor-pointer [&_a]:px-[9px] [&_a]:py-1.5 [&_a]:text-xs [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-zoop-ink [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline-zoop-ink [&_nav]:my-3 [&_nav]:flex [&_nav]:flex-wrap [&_nav]:gap-1 [&_article]:border-b [&_article]:border-zoop-line [&_article]:py-3 [&_table]:w-full [&_table]:text-xs [&_table]:wrap-anywhere [&_[role=alert]]:text-[#a12828] [&_details]:my-3 [&_input]:max-w-full [&_input]:rounded-[3px] [&_input]:border [&_input]:border-zoop-line [&_input]:bg-white [&_input]:px-2 [&_input]:py-1.5 [&_input]:min-h-[34px] [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-zoop-ink [&_summary:focus-visible]:outline-2 [&_summary:focus-visible]:outline-offset-2 [&_summary:focus-visible]:outline-zoop-ink max-md:[&_table]:block max-md:[&_table]:overflow-auto max-md:[&_section]:min-w-0 max-md:[&_section]:wrap-anywhere';
 
 function Status<T>({
   resource,
@@ -42,16 +42,31 @@ function Status<T>({
   resource: Resource<T>;
   label: string;
 }) {
-  return resource.loading ? (
-    <p role="status">{label} 불러오는 중…</p>
-  ) : resource.error ? (
+  if (resource.loading) return <p role="status">{label} 불러오는 중…</p>;
+  if (!resource.error) return null;
+  // 계약의 오류 코드별 안내. 다시 보내도 같은 결과인 오류(없음·버전 없음·조건 오류)에는 다시 시도를 두지 않는다.
+  const fixed = fixedFailure(resource.errorStatus, resource.errorCode);
+  return (
     <div role="alert">
       <p>
         {label} 조회 실패 · {resource.error}
       </p>
-      <button onClick={resource.retry}>{label} 다시 조회</button>
+      {fixed ? (
+        <p>{fixed}</p>
+      ) : (
+        <button onClick={resource.retry}>{label} 다시 조회</button>
+      )}
     </div>
-  ) : null;
+  );
+}
+function fixedFailure(status: number | null, code: string | null) {
+  if (status === 404 || code === 'RESOURCE_NOT_FOUND')
+    return '해당 자료가 없어요.';
+  if (status === 409 || code === 'VERSION_UNAVAILABLE')
+    return '이 기준 시점의 공개 자료가 없어요. [최신 시점]으로 돌아가 확인해 주세요.';
+  if (status === 422 || code === 'INVALID_REQUEST')
+    return '조회 조건을 확인해 주세요.';
+  return null;
 }
 function Basis({ metadata }: { metadata: Meta | undefined }) {
   return metadata ? (
@@ -260,7 +275,7 @@ export default function CompanyWorkspace() {
                 {quote.data.source.name} ·{' '}
                 {quote.data.source.delayNote ?? '지연 정보 미제공'}
               </p>
-              <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-[var(--zoop-faint)] [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+              <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
                 <dt>거래량</dt>
                 <dd>{number(quote.data.quote.volume)}</dd>
                 <dt>당일 저가~고가</dt>
@@ -296,7 +311,7 @@ export default function CompanyWorkspace() {
               )}
               {holding && (
                 <>
-                  <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-[var(--zoop-faint)] [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
+                  <dl className="my-3 flex flex-wrap gap-x-3 gap-y-2 text-xs [&_dt]:text-zoop-faint [&_dd]:font-semibold max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)]">
                     <dt>보유 수량</dt>
                     <dd>{number(holding.quantity)}주</dd>
                     <dt>평균 매입가</dt>
@@ -433,7 +448,7 @@ export default function CompanyWorkspace() {
                 </details>
               </>
             ))}
-          <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2">
+          <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2">
             차트와 사건의 시점이 겹쳐도 인과관계를 뜻하지 않아요.
           </p>
         </section>
@@ -579,7 +594,7 @@ export default function CompanyWorkspace() {
         </section>
       </main>
       <aside
-        className="min-w-0 border-l border-[var(--zoop-line)] p-4 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-[var(--zoop-line)] max-[1000px]:col-start-2 max-[1000px]:border-l-0 max-[1000px]:border-t max-md:w-full"
+        className="min-w-0 border-l border-zoop-line p-4 [&_li]:text-xs [&_li]:wrap-anywhere [&_svg]:h-auto [&_svg]:w-full [&_svg]:bg-zoop-line max-[1000px]:col-start-2 max-[1000px]:border-l-0 max-[1000px]:border-t max-md:w-full"
         aria-label="시점 기반 관계 그래프"
         data-screen-id="D-COM-04"
       >
@@ -599,11 +614,7 @@ export default function CompanyWorkspace() {
             </button>
           ))}
         </nav>
-        {graph.error && [401, 403].includes(graph.errorStatus ?? 0) ? (
-          <p role="alert">이 시점의 기업 관계를 조회할 권한이 없어요.</p>
-        ) : (
-          <Status resource={graph} label="관계 그래프" />
-        )}
+        <Status resource={graph} label="관계 그래프" />
         {!ready && (
           <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
         )}

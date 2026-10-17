@@ -332,7 +332,7 @@ export default function MapPage() {
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
       )}
       {historical && (
-        <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2 text-xs">
+        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-xs">
           기업 상세에서 선택한 시점 · {asOf} · {graphVersion ?? '버전 미제공'}
         </p>
       )}
