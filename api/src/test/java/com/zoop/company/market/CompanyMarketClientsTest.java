@@ -19,6 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CompanyMarketClientsTest {
+    private static final java.time.Clock CLOCK =
+            java.time.Clock.fixed(java.time.Instant.parse("2026-10-16T03:00:00Z"), java.time.ZoneOffset.UTC);
     private HttpServer server;
     private java.util.concurrent.ExecutorService executor;
     private final AtomicInteger tokenRequests = new AtomicInteger();
@@ -153,6 +155,56 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void monthOfDailyBarsOldestFirstWithTheExchangeOffset() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null);
+
+        assertEquals("available", result.status());
+        assertEquals("1m", result.period());
+        assertEquals("1d", result.interval());
+        assertEquals("KRW", result.currency());
+        assertEquals("toss", result.source().provider());
+        // Default range starts one month before today (KST 2026-10-16), so the 2025 bars are left out.
+        assertEquals(List.of("2026-10-14T09:00+09:00", "2026-10-15T09:00+09:00"),
+                result.points().stream().map(p -> p.time()).toList());
+        var last = result.points().get(1);
+        assertEquals(695.0, last.open());
+        assertEquals(700.0, last.close());
+        assertEquals(1234.0, last.volume());
+    }
+
+    @Test
+    void fromAndToAreKstDays() {
+        var day = java.time.LocalDate.parse("2026-10-15");
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", day, day);
+        assertEquals(1, result.points().size());
+
+        var empty = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
+                java.time.LocalDate.parse("2026-01-01"), java.time.LocalDate.parse("2026-01-31"));
+        assertEquals("unavailable", empty.status());
+        assertEquals("no_data", empty.reasonCode());
+    }
+
+    @Test
+    void resolutionsTossCannotServeAreNoDataWithoutCallingTheProvider() {
+        for (String period : List.of("1d", "1w", "1y")) {
+            var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", period, null, null);
+            assertEquals("unavailable", result.status(), period);
+            assertEquals("no_data", result.reasonCode(), period);
+            assertEquals(period, result.period());
+        }
+        assertEquals(0, tokenRequests.get());
+        assertEquals("not_connected", tossClient("", "").prices("KRX:005930", "KRX", "005930", "1m", null, null).reasonCode());
+    }
+
+    @Test
+    void pricesProviderOutageIsARetryableSourceFailure() {
+        providerStatus = 503;
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null));
+        assertTrue(error.retryable());
+    }
+
+    @Test
     void naverMapsDomesticMetricsAndKeepsProviderReferenceTime() {
         var result = naverClient().metrics("KRX:005930", "KRX", "005930");
 
@@ -188,7 +240,7 @@ class CompanyMarketClientsTest {
     private TossMarketClient tossClient(String clientId, String clientSecret) {
         var settings = new CompanyMarketSettings("toss", clientId, clientSecret, baseUrl(), "naver",
                 baseUrl(), baseUrl(), baseUrl(), Duration.ofSeconds(2));
-        return new TossMarketClient(settings, JsonMapper.builder().build());
+        return new TossMarketClient(settings, JsonMapper.builder().build(), CLOCK);
     }
 
     private NaverMetricsClient naverClient() {
@@ -210,16 +262,16 @@ class CompanyMarketClientsTest {
                 """;
         if (path.equals("/api/v1/candles") && paginateCandles) return """
                 {"result":{"candles":[
-                  {"timestamp":"2026-10-15T00:00:00+09:00","highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
+                  {"timestamp":"2026-10-15T00:00:00+09:00","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
                 ],"nextBefore":"2026-10-15T00:00:00+09:00"}}
                 """;
         if (path.equals("/api/v1/stocks")) return """
-                {"result":[{"symbol":"005930","sharesOutstanding":1000}]}
+                {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"}]}
                 """;
         if (path.equals("/api/v1/candles")) return """
                 {"result":{"candles":[
-                  {"timestamp":"2026-10-15T00:00:00Z","highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
-                  {"timestamp":"2026-10-14T00:00:00Z","highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400},
+                  {"timestamp":"2026-10-15T00:00:00Z","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
+                  {"timestamp":"2026-10-14T00:00:00Z","openPrice":645,"highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400},
                   {"timestamp":"2025-10-15T00:00:00Z","highPrice":750,"lowPrice":500,"closePrice":550,"volume":1000},
                   {"timestamp":"2025-10-14T00:00:00Z","highPrice":999,"lowPrice":1,"closePrice":600,"volume":900}
                 ]}}

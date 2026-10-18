@@ -1,12 +1,16 @@
 package com.zoop.company.market;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.zoop.company.market.dto.CompanyPriceResponse;
 import com.zoop.company.market.dto.CompanyQuoteResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -25,13 +29,15 @@ public class TossMarketClient {
     private final CompanyMarketSettings settings;
     private final RestClient client;
     private final ObjectMapper mapper;
+    private final Clock clock;
     private final ReentrantLock tokenLock = new ReentrantLock();
     private volatile String token;
     private volatile Instant tokenExpires = Instant.EPOCH;
 
-    public TossMarketClient(CompanyMarketSettings settings, ObjectMapper mapper) {
+    public TossMarketClient(CompanyMarketSettings settings, ObjectMapper mapper, Clock clock) {
         this.settings = settings;
         this.mapper = mapper;
+        this.clock = clock;
         var httpClient = java.net.http.HttpClient.newBuilder().connectTimeout(settings.timeout()).build();
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(settings.timeout());
@@ -63,19 +69,7 @@ public class TossMarketClient {
             JsonNode stocks = get("/api/v1/stocks", Map.of("symbols", code));
             JsonNode stock = matching(stocks.path("result"), code);
             Double shares = stock == null ? null : number(stock.get("sharesOutstanding"));
-            List<JsonNode> daily = new java.util.ArrayList<>();
-            String before = null;
-            for (int page = 0; page < 3; page++) {
-                var candleParams = new java.util.HashMap<String, Object>();
-                candleParams.put("symbol", code); candleParams.put("interval", "1d"); candleParams.put("count", "200");
-                if (before != null) candleParams.put("before", before);
-                JsonNode candlePage = get("/api/v1/candles", candleParams).path("result");
-                JsonNode candles = candlePage.path("candles");
-                if (!candles.isArray()) throw formatFailure();
-                candles.forEach(daily::add);
-                if (candles.isEmpty() || !candlePage.hasNonNull("nextBefore")) break;
-                before = text(candlePage.get("nextBefore"));
-            }
+            List<JsonNode> daily = dailyCandles(code, 3, null);
             // Daily candles are dated in the market's own calendar, so the quote's session day uses the same zone.
             String sessionDate = asOf == null ? null : asOf.atZone(marketZone(exchange)).toLocalDate().toString();
             // The 52-week range only uses candles from the year ending on the quote's session date.
@@ -124,6 +118,86 @@ public class TossMarketClient {
         } catch (Exception exception) {
             throw new MarketDataException(false);
         }
+    }
+
+    /** Bar resolution the contract fixes per period: 1d=5m, 1w=1h, 1m=1d, 1y=1wk. */
+    public static final Map<String, String> PERIOD_INTERVAL = Map.of("1d", "5m", "1w", "1h", "1m", "1d", "1y", "1wk");
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    /**
+     * getCompanyPrices. Toss serves only 1-minute and daily candles, so only 1m (daily bars) can be answered; the other
+     * periods are a normal no_data rather than bars re-labelled, aggregated or interpolated from another resolution
+     * (contract). The range is in KST calendar days: fromDay defaults to one month back from today (prototype
+     * {@code period_start}), toDay to no upper bound.
+     */
+    public CompanyPriceResponse prices(String companyId, String exchange, String code, String period,
+            LocalDate fromDay, LocalDate toDay) {
+        if (!"toss".equalsIgnoreCase(settings.quoteProvider())
+                || blank(settings.tossClientId()) || blank(settings.tossClientSecret())) {
+            return CompanyPriceResponse.unavailable(companyId, period, "not_connected", "토스증권 시세 키가 설정되지 않았어요.");
+        }
+        if (!("KRX".equals(exchange) || "NASDAQ".equals(exchange) || "NYSE".equals(exchange) || "AMEX".equals(exchange))) {
+            return CompanyPriceResponse.unavailable(companyId, period, "unsupported_symbol", "이 종목은 토스증권 시세 조회를 지원하지 않아요.");
+        }
+        String interval = PERIOD_INTERVAL.get(period);
+        if (!"1d".equals(interval)) {
+            return CompanyPriceResponse.unavailable(companyId, period, "no_data",
+                    "연결한 시세 출처(토스증권)는 " + interval + " 간격 가격 자료를 제공하지 않아요.");
+        }
+        LocalDate cutoff = fromDay != null ? fromDay : LocalDate.now(clock.withZone(KST)).minusMonths(1);
+        try {
+            List<CompanyPriceResponse.Point> points = new java.util.ArrayList<>();
+            for (JsonNode candle : dailyCandles(code, 10, cutoff)) {
+                Instant at = instant(text(candle.get("timestamp")));
+                if (at == null) continue;
+                LocalDate day = at.atZone(KST).toLocalDate();
+                if (day.isBefore(cutoff) || (toDay != null && day.isAfter(toDay))) continue;
+                Double open = number(candle.get("openPrice")), high = number(candle.get("highPrice"));
+                Double low = number(candle.get("lowPrice")), close = number(candle.get("closePrice"));
+                if (open == null || high == null || low == null || close == null) continue;
+                String time = at.atZone(marketZone(exchange)).toOffsetDateTime().toString();
+                points.add(new CompanyPriceResponse.Point(time, open, high, low, close, number(candle.get("volume"))));
+            }
+            if (points.isEmpty()) {
+                return CompanyPriceResponse.unavailable(companyId, period, "no_data", "이 기간에는 거래된 시세가 없어요(휴장일 등).");
+            }
+            points.sort(java.util.Comparator.comparing(point -> java.time.OffsetDateTime.parse(point.time())));
+            JsonNode stock = matching(get("/api/v1/stocks", Map.of("symbols", code)).path("result"), code);
+            String currency = stock == null ? null : strictText(stock.get("currency"));
+            if (currency == null) {
+                return CompanyPriceResponse.unavailable(companyId, period, "no_data", "토스증권 응답에 통화가 없어요.");
+            }
+            return CompanyPriceResponse.available(companyId, period,
+                    new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, points);
+        } catch (MarketDataException exception) {
+            throw exception;
+        } catch (TossUnsupportedSymbolException exception) {
+            return CompanyPriceResponse.unavailable(companyId, period, "unsupported_symbol", "토스증권에서 이 종목을 찾지 못했어요.");
+        } catch (RestClientException exception) {
+            throw new MarketDataException(true);
+        } catch (Exception exception) {
+            throw new MarketDataException(false);
+        }
+    }
+
+    /** Daily candles newest first, following nextBefore for up to maxPages pages or until a page ends before stopBefore (KST day). */
+    private List<JsonNode> dailyCandles(String code, int maxPages, LocalDate stopBefore) {
+        List<JsonNode> daily = new java.util.ArrayList<>();
+        String before = null;
+        for (int page = 0; page < maxPages; page++) {
+            var candleParams = new java.util.HashMap<String, Object>();
+            candleParams.put("symbol", code); candleParams.put("interval", "1d"); candleParams.put("count", "200");
+            if (before != null) candleParams.put("before", before);
+            JsonNode candlePage = get("/api/v1/candles", candleParams).path("result");
+            JsonNode candles = candlePage.path("candles");
+            if (!candles.isArray()) throw formatFailure();
+            candles.forEach(daily::add);
+            if (candles.isEmpty() || !candlePage.hasNonNull("nextBefore")) break;
+            Instant oldest = instant(text(candles.get(candles.size() - 1).get("timestamp")));
+            if (stopBefore != null && oldest != null && oldest.atZone(KST).toLocalDate().isBefore(stopBefore)) break;
+            before = text(candlePage.get("nextBefore"));
+        }
+        return daily;
     }
 
     private JsonNode get(String path, Map<String, ?> params) {
