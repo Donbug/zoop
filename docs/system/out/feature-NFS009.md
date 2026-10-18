@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:96 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:96 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 중단 작업 복구: 작업이 중단되면 기존 작업 상태를 확인한 뒤 허용된 복구만 수행해야 한다. 복구로 AI 답변이나 브리핑이 중복 생성·발행되어서는 안 된다. 복구할 수 없으면 실패 사유와 가능한 다음 조치를 안내하며, 재실행이 금지된 작업에 재실행을 안내하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv) — 중단 작업 복구: 작업이 중단되면 기존 작업 상태를 확인한 뒤 허용된 복구만 수행해야 한다. 복구로 AI 답변이나 브리핑이 중복 생성·발행되어서는 안 된다. 복구할 수 없으면 실패 사유와 가능한 다음 조치를 안내하며, 재실행이 금지된 작업에 재실행을 안내하지 않는다.
 
 ## 상세 권한과 의미 이행
 

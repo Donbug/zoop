@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:67 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:67 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv) — 대화와 질문 기록: 회원의 대화별로 질문 작업과 실행을 구분하고, 최초 질문 시각·맥락·대상·기간·근거 버전, 처리 상태와 저장 결과를 기록한다. 동일 작업 재시도는 최초 조건을 유지하며 현재 권한과 실행의 유효성을 확인한다. 새 질문과 기존 상태·결과 회수를 구분한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv) — 대화와 질문 기록: 회원의 대화별로 질문 작업과 실행을 구분하고, 최초 질문 시각·맥락·대상·기간·근거 버전, 처리 상태와 저장 결과를 기록한다. 동일 작업 재시도는 최초 조건을 유지하며 현재 권한과 실행의 유효성을 확인한다. 새 질문과 기존 상태·결과 회수를 구분한다.
 
 ## 상세 권한과 의미 이행
 

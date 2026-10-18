@@ -1,0 +1,1404 @@
+[
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 7,
+    "fs_nfs_ids_in_row": [
+      "FS017"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS017  개인화 관계 그래프"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 7,
+        "column": 1,
+        "cell": "A7",
+        "before": "FS017  개인화 관계 그래프",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 9,
+    "fs_nfs_ids_in_row": [
+      "FS017"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS017"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 9,
+        "column": 1,
+        "cell": "A9",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 9,
+        "column": 2,
+        "cell": "B9",
+        "before": "FS017",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 21,
+    "fs_nfs_ids_in_row": [
+      "FS018"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS018  전체 관계 그래프"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 21,
+        "column": 1,
+        "cell": "A21",
+        "before": "FS018  전체 관계 그래프",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 23,
+    "fs_nfs_ids_in_row": [
+      "FS018"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS018"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 23,
+        "column": 1,
+        "cell": "A23",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 23,
+        "column": 2,
+        "cell": "B23",
+        "before": "FS018",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 35,
+    "fs_nfs_ids_in_row": [
+      "FS019"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS019  그래프 모드 전환"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 35,
+        "column": 1,
+        "cell": "A35",
+        "before": "FS019  그래프 모드 전환",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 37,
+    "fs_nfs_ids_in_row": [
+      "FS019"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS019"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 37,
+        "column": 1,
+        "cell": "A37",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 37,
+        "column": 2,
+        "cell": "B37",
+        "before": "FS019",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 49,
+    "fs_nfs_ids_in_row": [
+      "FS020"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS020  기업 노드 정보"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 49,
+        "column": 1,
+        "cell": "A49",
+        "before": "FS020  기업 노드 정보",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 51,
+    "fs_nfs_ids_in_row": [
+      "FS020"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS020"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 51,
+        "column": 1,
+        "cell": "A51",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 51,
+        "column": 2,
+        "cell": "B51",
+        "before": "FS020",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 63,
+    "fs_nfs_ids_in_row": [
+      "FS021"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS021  이슈 노드 정보"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 63,
+        "column": 1,
+        "cell": "A63",
+        "before": "FS021  이슈 노드 정보",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 65,
+    "fs_nfs_ids_in_row": [
+      "FS021"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS021"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 65,
+        "column": 1,
+        "cell": "A65",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 65,
+        "column": 2,
+        "cell": "B65",
+        "before": "FS021",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 77,
+    "fs_nfs_ids_in_row": [
+      "FS022"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS022  기업 패널에서 이슈 영향 경로 확인"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 77,
+        "column": 1,
+        "cell": "A77",
+        "before": "FS022  기업 패널에서 이슈 영향 경로 확인",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 79,
+    "fs_nfs_ids_in_row": [
+      "FS022"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS022"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 79,
+        "column": 1,
+        "cell": "A79",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 79,
+        "column": 2,
+        "cell": "B79",
+        "before": "FS022",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 91,
+    "fs_nfs_ids_in_row": [
+      "FS023"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS023  기업 간 관계 확인(기업 간 간선 클릭)"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 91,
+        "column": 1,
+        "cell": "A91",
+        "before": "FS023  기업 간 관계 확인(기업 간 간선 클릭)",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 93,
+    "fs_nfs_ids_in_row": [
+      "FS023"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS023"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 93,
+        "column": 1,
+        "cell": "A93",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 93,
+        "column": 2,
+        "cell": "B93",
+        "before": "FS023",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 105,
+    "fs_nfs_ids_in_row": [
+      "FS024"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS024  관계 근거 확인"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 105,
+        "column": 1,
+        "cell": "A105",
+        "before": "FS024  관계 근거 확인",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 107,
+    "fs_nfs_ids_in_row": [
+      "FS024"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS024"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 107,
+        "column": 1,
+        "cell": "A107",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 107,
+        "column": 2,
+        "cell": "B107",
+        "before": "FS024",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 119,
+    "fs_nfs_ids_in_row": [
+      "FS025"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS025  선택한 노드로 AI 질문"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 119,
+        "column": 1,
+        "cell": "A119",
+        "before": "FS025  선택한 노드로 AI 질문",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 121,
+    "fs_nfs_ids_in_row": [
+      "FS025"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS025"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 121,
+        "column": 1,
+        "cell": "A121",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 121,
+        "column": 2,
+        "cell": "B121",
+        "before": "FS025",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 133,
+    "fs_nfs_ids_in_row": [
+      "FS026"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS026  사이드바 기업 선택"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 133,
+        "column": 1,
+        "cell": "A133",
+        "before": "FS026  사이드바 기업 선택",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 135,
+    "fs_nfs_ids_in_row": [
+      "FS026"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS026"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 135,
+        "column": 1,
+        "cell": "A135",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 135,
+        "column": 2,
+        "cell": "B135",
+        "before": "FS026",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 147,
+    "fs_nfs_ids_in_row": [
+      "FS027"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS027  관심 종목 수정"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 147,
+        "column": 1,
+        "cell": "A147",
+        "before": "FS027  관심 종목 수정",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "메인 그래프",
+    "row": 149,
+    "fs_nfs_ids_in_row": [
+      "FS027"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS027"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 149,
+        "column": 1,
+        "cell": "A149",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "메인 그래프",
+        "row": 149,
+        "column": 2,
+        "cell": "B149",
+        "before": "FS027",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 7,
+    "fs_nfs_ids_in_row": [
+      "FS045"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS045  AI 질문 진입과 전송"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 7,
+        "column": 1,
+        "cell": "A7",
+        "before": "FS045  AI 질문 진입과 전송",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 9,
+    "fs_nfs_ids_in_row": [
+      "FS045"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS045"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 9,
+        "column": 1,
+        "cell": "A9",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 9,
+        "column": 2,
+        "cell": "B9",
+        "before": "FS045",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 21,
+    "fs_nfs_ids_in_row": [
+      "FS046"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS046  AI 권한과 중복 작업 통제"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 21,
+        "column": 1,
+        "cell": "A21",
+        "before": "FS046  AI 권한과 중복 작업 통제",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 23,
+    "fs_nfs_ids_in_row": [
+      "FS046"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS046"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 23,
+        "column": 1,
+        "cell": "A23",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 23,
+        "column": 2,
+        "cell": "B23",
+        "before": "FS046",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 35,
+    "fs_nfs_ids_in_row": [
+      "FS047"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS047  질문 해석과 되묻기"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 35,
+        "column": 1,
+        "cell": "A35",
+        "before": "FS047  질문 해석과 되묻기",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 37,
+    "fs_nfs_ids_in_row": [
+      "FS047"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS047"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 37,
+        "column": 1,
+        "cell": "A37",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 37,
+        "column": 2,
+        "cell": "B37",
+        "before": "FS047",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 49,
+    "fs_nfs_ids_in_row": [
+      "FS048"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS048  개인화 조건과 근거 확보"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 49,
+        "column": 1,
+        "cell": "A49",
+        "before": "FS048  개인화 조건과 근거 확보",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 51,
+    "fs_nfs_ids_in_row": [
+      "FS048"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS048"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 51,
+        "column": 1,
+        "cell": "A51",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 51,
+        "column": 2,
+        "cell": "B51",
+        "before": "FS048",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 63,
+    "fs_nfs_ids_in_row": [
+      "FS049"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS049  답변 검증과 제공"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 63,
+        "column": 1,
+        "cell": "A63",
+        "before": "FS049  답변 검증과 제공",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 65,
+    "fs_nfs_ids_in_row": [
+      "FS049"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS049"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 65,
+        "column": 1,
+        "cell": "A65",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 65,
+        "column": 2,
+        "cell": "B65",
+        "before": "FS049",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 77,
+    "fs_nfs_ids_in_row": [
+      "FS050-01"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS050-01  AI 답변 근거·원문 확인"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 77,
+        "column": 1,
+        "cell": "A77",
+        "before": "FS050-01  AI 답변 근거·원문 확인",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 79,
+    "fs_nfs_ids_in_row": [
+      "FS050-01"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS050-01"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 79,
+        "column": 1,
+        "cell": "A79",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 79,
+        "column": 2,
+        "cell": "B79",
+        "before": "FS050-01",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 91,
+    "fs_nfs_ids_in_row": [
+      "FS050-02"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS050-02  AI 답변 관련 그래프 탐색"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 91,
+        "column": 1,
+        "cell": "A91",
+        "before": "FS050-02  AI 답변 관련 그래프 탐색",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 93,
+    "fs_nfs_ids_in_row": [
+      "FS050-02"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS050-02"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 93,
+        "column": 1,
+        "cell": "A93",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 93,
+        "column": 2,
+        "cell": "B93",
+        "before": "FS050-02",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 105,
+    "fs_nfs_ids_in_row": [
+      "FS051"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS051  새 대화 시작"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 105,
+        "column": 1,
+        "cell": "A105",
+        "before": "FS051  새 대화 시작",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 107,
+    "fs_nfs_ids_in_row": [
+      "FS051"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS051"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 107,
+        "column": 1,
+        "cell": "A107",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 107,
+        "column": 2,
+        "cell": "B107",
+        "before": "FS051",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 119,
+    "fs_nfs_ids_in_row": [
+      "FS052-01"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS052-01  같은 대화에서 후속 질문 전송"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 119,
+        "column": 1,
+        "cell": "A119",
+        "before": "FS052-01  같은 대화에서 후속 질문 전송",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 121,
+    "fs_nfs_ids_in_row": [
+      "FS052-01"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS052-01"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 121,
+        "column": 1,
+        "cell": "A121",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 121,
+        "column": 2,
+        "cell": "B121",
+        "before": "FS052-01",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 133,
+    "fs_nfs_ids_in_row": [
+      "FS052-02"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS052-02  AI 내부 패널 닫기·재열기와 대화 유지"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 133,
+        "column": 1,
+        "cell": "A133",
+        "before": "FS052-02  AI 내부 패널 닫기·재열기와 대화 유지",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 135,
+    "fs_nfs_ids_in_row": [
+      "FS052-02"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS052-02"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 135,
+        "column": 1,
+        "cell": "A135",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 135,
+        "column": 2,
+        "cell": "B135",
+        "before": "FS052-02",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 147,
+    "fs_nfs_ids_in_row": [
+      "FS053"
+    ],
+    "before_nonempty_cells": {
+      "A": "FS053  AI 결과 회수와 재시도"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 147,
+        "column": 1,
+        "cell": "A147",
+        "before": "FS053  AI 결과 회수와 재시도",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "AI 챗봇",
+    "row": 149,
+    "fs_nfs_ids_in_row": [
+      "FS053"
+    ],
+    "before_nonempty_cells": {
+      "A": "기능 ID",
+      "B": "FS053"
+    },
+    "after_nonempty_cells": {},
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 149,
+        "column": 1,
+        "cell": "A149",
+        "before": "기능 ID",
+        "after": ""
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "AI 챗봇",
+        "row": 149,
+        "column": 2,
+        "cell": "B149",
+        "before": "FS053",
+        "after": ""
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 67,
+    "fs_nfs_ids_in_row": [
+      "FS028",
+      "FS029",
+      "FS031",
+      "FS058",
+      "FS059",
+      "FS070",
+      "FS074",
+      "NFS009",
+      "NFS012"
+    ],
+    "before_nonempty_cells": {},
+    "after_nonempty_cells": {
+      "A": "2026-10-13 운영 일정 변경",
+      "B": "FS028·FS029·FS031·FS058·FS059·FS070·FS074·NFS009·NFS012",
+      "C": "사용자 확정 + Muse 검토 통합",
+      "D": "브리핑 09:20·17:30 KST / AWS 09~18",
+      "E": "기존07:40·18:10 이력 보존. 시각 분리·야간 커서/멱등성 복구·운영 중 SLA·안전 종료 검증 반영. FX cutoff·접수 마감·복구 기한은 미정. 새 suspended enum 없음. 원문 문서만 수정, GitHub 코드/실제 AWS 미변경.",
+      "F": "BRF-DOC-016 / 2026-10-13"
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 67,
+        "column": 1,
+        "cell": "A67",
+        "before": "",
+        "after": "2026-10-13 운영 일정 변경"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 67,
+        "column": 2,
+        "cell": "B67",
+        "before": "",
+        "after": "FS028·FS029·FS031·FS058·FS059·FS070·FS074·NFS009·NFS012"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 67,
+        "column": 3,
+        "cell": "C67",
+        "before": "",
+        "after": "사용자 확정 + Muse 검토 통합"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 67,
+        "column": 4,
+        "cell": "D67",
+        "before": "",
+        "after": "브리핑 09:20·17:30 KST / AWS 09~18"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 67,
+        "column": 5,
+        "cell": "E67",
+        "before": "",
+        "after": "기존07:40·18:10 이력 보존. 시각 분리·야간 커서/멱등성 복구·운영 중 SLA·안전 종료 검증 반영. FX cutoff·접수 마감·복구 기한은 미정. 새 suspended enum 없음. 원문 문서만 수정, GitHub 코드/실제 AWS 미변경."
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 67,
+        "column": 6,
+        "cell": "F67",
+        "before": "",
+        "after": "BRF-DOC-016 / 2026-10-13"
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "변경 내역",
+    "row": 68,
+    "fs_nfs_ids_in_row": [
+      "FS042"
+    ],
+    "before_nonempty_cells": {},
+    "after_nonempty_cells": {
+      "A": "2026-10-18 00:00:00",
+      "C": "FS042",
+      "D": "시점 기반 관계 그래프 조회",
+      "E": "유효기간으로 표시 여부를 정하지 않고 예정·유효·종료·기간 미상 상태로 표시. validUntil 종료일 포함, Asia/Seoul 날짜 비교. 기간 종료만으로 과거 이슈 연결을 제거하지 않음. 공개 제외 관계는 과거 조회에서도 비노출. AI 판정(PR Donbug/zoop#229)·백엔드·OpenAPI 후속 반영"
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 68,
+        "column": 1,
+        "cell": "A68",
+        "before": "",
+        "after": "2026-10-18 00:00:00"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 68,
+        "column": 3,
+        "cell": "C68",
+        "before": "",
+        "after": "FS042"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 68,
+        "column": 4,
+        "cell": "D68",
+        "before": "",
+        "after": "시점 기반 관계 그래프 조회"
+      },
+      {
+        "workbook": "functional-spec",
+        "sheet": "변경 내역",
+        "row": 68,
+        "column": 5,
+        "cell": "E68",
+        "before": "",
+        "after": "유효기간으로 표시 여부를 정하지 않고 예정·유효·종료·기간 미상 상태로 표시. validUntil 종료일 포함, Asia/Seoul 날짜 비교. 기간 종료만으로 과거 이슈 연결을 제거하지 않음. 공개 제외 관계는 과거 조회에서도 비노출. AI 판정(PR Donbug/zoop#229)·백엔드·OpenAPI 후속 반영"
+      }
+    ]
+  },
+  {
+    "workbook": "functional-spec",
+    "sheet": "제안·확인 사항",
+    "row": 17,
+    "fs_nfs_ids_in_row": [
+      "FS058",
+      "FS059",
+      "FS067-02",
+      "NFS012"
+    ],
+    "before_nonempty_cells": {
+      "A": "D11",
+      "B": "FS058, FS059, FS067-02, NFS012",
+      "C": "수집·검증·공개",
+      "D": "수집 0건 성공과 수집 실패를 구분한다. 관리자 허용도 자동 검증을 우회하지 않는다. 공개 버전을 두 화면의 조회에서 확인한 후 반영 완료로 판정한다.",
+      "E": "기존 05분·35분 수집 시작, 10분·40분 조회 반영 기한 유지. 측정 간격은 운영 설정 필요."
+    },
+    "after_nonempty_cells": {
+      "A": "D11",
+      "B": "FS058, FS059, FS067-02, NFS012",
+      "C": "수집·검증·공개",
+      "D": "수집 0건 성공과 수집 실패를 구분한다. 관리자 허용도 자동 검증을 우회하지 않는다. 공개 버전을 두 화면의 조회에서 확인한 후 반영 완료로 판정한다.",
+      "E": "기존 05분·35분 수집 시작, 10분·40분 조회 반영 기한 유지. 측정 간격은 운영 설정 필요.\n2026-10-13 운영 보완: 정기 회차 예정 시작이09:00 이상18:00 미만인 경우 적용. 비운영/기동 후 backlog는 별도 복구 기록. 기동·시작 지연은 정상 SLA로 간주하지 않음."
+    },
+    "cell_deltas": [
+      {
+        "workbook": "functional-spec",
+        "sheet": "제안·확인 사항",
+        "row": 17,
+        "column": 5,
+        "cell": "E17",
+        "before": "기존 05분·35분 수집 시작, 10분·40분 조회 반영 기한 유지. 측정 간격은 운영 설정 필요.",
+        "after": "기존 05분·35분 수집 시작, 10분·40분 조회 반영 기한 유지. 측정 간격은 운영 설정 필요.\n2026-10-13 운영 보완: 정기 회차 예정 시작이09:00 이상18:00 미만인 경우 적용. 비운영/기동 후 backlog는 별도 복구 기록. 기동·시작 지연은 정상 SLA로 간주하지 않음."
+      }
+    ]
+  }
+]

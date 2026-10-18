@@ -7,7 +7,7 @@
       "target": "FS011-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 20,
           "rowUnit": "xlsx-row"
         },
@@ -30,7 +30,7 @@
       "target": "FS011-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 21,
           "rowUnit": "xlsx-row"
         },
@@ -62,7 +62,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 9,
           "rowUnit": "xlsx-row"
         },
@@ -87,7 +87,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -112,7 +112,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 39,
           "rowUnit": "xlsx-row"
         },
@@ -137,7 +137,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 53,
           "rowUnit": "xlsx-row"
         },
@@ -162,7 +162,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 67,
           "rowUnit": "xlsx-row"
         },
@@ -178,7 +178,7 @@
       "target": "FS022",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 32,
           "rowUnit": "xlsx-row"
         },
@@ -210,7 +210,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 80,
           "rowUnit": "xlsx-row"
         },
@@ -226,7 +226,7 @@
       "target": "FS023",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 33,
           "rowUnit": "xlsx-row"
         },
@@ -258,7 +258,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -283,7 +283,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 112,
           "rowUnit": "xlsx-row"
         },
@@ -308,7 +308,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 125,
           "rowUnit": "xlsx-row"
         },
@@ -333,7 +333,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 139,
           "rowUnit": "xlsx-row"
         },
@@ -358,7 +358,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv",
           "row": 154,
           "rowUnit": "xlsx-row"
         },
@@ -374,7 +374,7 @@
       "target": "FS031",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 41,
           "rowUnit": "xlsx-row"
         },
@@ -397,7 +397,7 @@
       "target": "FS032",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 42,
           "rowUnit": "xlsx-row"
         },
@@ -420,7 +420,7 @@
       "target": "FS035",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         },
@@ -443,7 +443,7 @@
       "target": "FS035",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         },
@@ -466,7 +466,7 @@
       "target": "FS041",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -489,7 +489,7 @@
       "target": "FS042",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 52,
           "rowUnit": "xlsx-row"
         },
@@ -512,7 +512,7 @@
       "target": "FS044",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 54,
           "rowUnit": "xlsx-row"
         },
@@ -535,7 +535,7 @@
       "target": "FS045",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 55,
           "rowUnit": "xlsx-row"
         },
@@ -567,7 +567,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv",
           "row": 9,
           "rowUnit": "xlsx-row"
         },
@@ -583,7 +583,7 @@
       "target": "FS046",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 56,
           "rowUnit": "xlsx-row"
         },
@@ -615,7 +615,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -631,7 +631,7 @@
       "target": "FS047",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 57,
           "rowUnit": "xlsx-row"
         },
@@ -663,7 +663,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv",
           "row": 37,
           "rowUnit": "xlsx-row"
         },
@@ -679,7 +679,7 @@
       "target": "FS048",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 58,
           "rowUnit": "xlsx-row"
         },
@@ -711,7 +711,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv",
           "row": 51,
           "rowUnit": "xlsx-row"
         },
@@ -727,7 +727,7 @@
       "target": "FS049",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         },
@@ -759,7 +759,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv",
           "row": 65,
           "rowUnit": "xlsx-row"
         },
@@ -775,7 +775,7 @@
       "target": "FS050",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         },
@@ -798,7 +798,7 @@
       "target": "FS051",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         },
@@ -830,7 +830,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv",
           "row": 94,
           "rowUnit": "xlsx-row"
         },
@@ -846,7 +846,7 @@
       "target": "FS065",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 72,
           "rowUnit": "xlsx-row"
         },
@@ -869,7 +869,7 @@
       "target": "FS066-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 73,
           "rowUnit": "xlsx-row"
         },
@@ -892,7 +892,7 @@
       "target": "FS066-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 73,
           "rowUnit": "xlsx-row"
         },
@@ -915,7 +915,7 @@
       "target": "FS066-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv",
           "row": 134,
           "rowUnit": "xlsx-row"
         },
@@ -924,7 +924,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv",
           "row": 23,
           "rowUnit": "xlsx-row"
         },
@@ -940,7 +940,7 @@
       "target": "FS066-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 74,
           "rowUnit": "xlsx-row"
         },
@@ -963,7 +963,7 @@
       "target": "FS066-03",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 75,
           "rowUnit": "xlsx-row"
         },
@@ -986,7 +986,7 @@
       "target": "FS067-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 76,
           "rowUnit": "xlsx-row"
         },
@@ -1009,7 +1009,7 @@
       "target": "FS067-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 77,
           "rowUnit": "xlsx-row"
         },
@@ -1032,7 +1032,7 @@
       "target": "FS067-03",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 78,
           "rowUnit": "xlsx-row"
         },
@@ -1055,7 +1055,7 @@
       "target": "FS069-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 80,
           "rowUnit": "xlsx-row"
         },
@@ -1078,7 +1078,7 @@
       "target": "FS069-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 81,
           "rowUnit": "xlsx-row"
         },
@@ -1101,7 +1101,7 @@
       "target": "FS070-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 82,
           "rowUnit": "xlsx-row"
         },
@@ -1124,7 +1124,7 @@
       "target": "FS070-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 83,
           "rowUnit": "xlsx-row"
         },
@@ -1147,7 +1147,7 @@
       "target": "FS071-01",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 84,
           "rowUnit": "xlsx-row"
         },
@@ -1170,7 +1170,7 @@
       "target": "FS071-02",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 85,
           "rowUnit": "xlsx-row"
         },
@@ -1193,7 +1193,7 @@
       "target": "FS073",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 87,
           "rowUnit": "xlsx-row"
         },
@@ -1216,7 +1216,7 @@
       "target": "FS074",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1239,7 +1239,7 @@
       "target": "FS074",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1262,7 +1262,7 @@
       "target": "FS074",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 100,
           "rowUnit": "xlsx-row"
         },
@@ -1285,7 +1285,7 @@
       "target": "FS075",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         },
@@ -1308,7 +1308,7 @@
       "target": "FS075",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         },
@@ -1331,7 +1331,7 @@
       "target": "FS075",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 101,
           "rowUnit": "xlsx-row"
         },
@@ -1354,7 +1354,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1377,7 +1377,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1400,7 +1400,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1423,7 +1423,7 @@
       "target": "FS076",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 102,
           "rowUnit": "xlsx-row"
         },
@@ -1446,7 +1446,7 @@
       "target": "FS077",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         },
@@ -1469,7 +1469,7 @@
       "target": "FS077",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         },
@@ -1492,7 +1492,7 @@
       "target": "FS077",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 103,
           "rowUnit": "xlsx-row"
         },
@@ -1515,7 +1515,7 @@
       "target": "FS078",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         },
@@ -1538,7 +1538,7 @@
       "target": "FS078",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         },
@@ -1561,7 +1561,7 @@
       "target": "FS078",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 104,
           "rowUnit": "xlsx-row"
         },
@@ -1584,7 +1584,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1607,7 +1607,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1630,7 +1630,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1653,7 +1653,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1676,7 +1676,7 @@
       "target": "FS079",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 105,
           "rowUnit": "xlsx-row"
         },
@@ -1699,7 +1699,7 @@
       "target": "FS080",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         },
@@ -1722,7 +1722,7 @@
       "target": "FS080",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         },
@@ -1745,7 +1745,7 @@
       "target": "FS080",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 106,
           "rowUnit": "xlsx-row"
         },
@@ -1768,7 +1768,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1791,7 +1791,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1814,7 +1814,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1837,7 +1837,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1860,7 +1860,7 @@
       "target": "FS081",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 107,
           "rowUnit": "xlsx-row"
         },
@@ -1883,7 +1883,7 @@
       "target": "요구42 / FS042",
       "originalA": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 52,
           "rowUnit": "xlsx-row"
         },
@@ -1915,7 +1915,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 55,
           "rowUnit": "xlsx-row"
         },
@@ -1939,7 +1939,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 56,
           "rowUnit": "xlsx-row"
         },
@@ -1963,7 +1963,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 57,
           "rowUnit": "xlsx-row"
         },
@@ -1987,7 +1987,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 58,
           "rowUnit": "xlsx-row"
         },
@@ -2011,7 +2011,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         },
@@ -2035,7 +2035,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 59,
           "rowUnit": "xlsx-row"
         },
@@ -2059,7 +2059,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         },
@@ -2083,7 +2083,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 60,
           "rowUnit": "xlsx-row"
         },
@@ -2107,7 +2107,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         },
@@ -2131,7 +2131,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 61,
           "rowUnit": "xlsx-row"
         },
@@ -2200,7 +2200,7 @@
       },
       "originalB": {
         "source": {
-          "path": "docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv",
+          "path": "docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv",
           "row": 45,
           "rowUnit": "xlsx-row"
         },

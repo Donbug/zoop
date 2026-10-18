@@ -1,0 +1,122 @@
+{
+  "result": "passed",
+  "method": {
+    "python": "3.12.15 (main, Oct  6 2026, 02:02:22) [GCC 14.2.0]",
+    "openpyxl": "3.1.5",
+    "data_only": true,
+    "csv_encoding": "utf-8-sig",
+    "empty_cell": "",
+    "other_values": "str(value)",
+    "all_worksheets": true,
+    "comparison": "exact string cell values, sheet names/order, rectangular ranges and sheet visibility; formula and hyperlink target deltas recorded",
+    "network": "one unauthenticated public XLSX GET request (functional-spec); wbs and requirements-sheet not re-fetched; no external writes; no package installs"
+  },
+  "workbooks": [
+    {
+      "source_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs",
+      "export_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs/export?format=xlsx",
+      "request_started_at_utc": "2026-10-18T13:04:22.968168+00:00",
+      "collected_at_utc": "2026-10-18T13:04:24.236161+00:00",
+      "collected_at_kst": "2026-10-18T22:04:24.236161+09:00",
+      "auth": "none",
+      "http_status": 200,
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "response_bytes": 205906,
+      "response_sha256": "a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273",
+      "workbook": "functional-spec",
+      "baseline": "docs/evidence/raw/functional-spec_2026-10-12",
+      "capture": "docs/evidence/raw/functional-spec_2026-10-18",
+      "recommended_importer_input": "docs/evidence/raw/functional-spec_2026-10-18",
+      "xlsx_sha256": "a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273",
+      "baseline_xlsx_sha256": "49fc383bce873367036c449bd02bde23b08ab3893e21b9bf340096845b82267c",
+      "sheet_count": 13,
+      "sheet_state_deltas": [
+        {
+          "sheet": "메인 그래프",
+          "before": "hidden",
+          "after": null
+        },
+        {
+          "sheet": "AI 챗봇",
+          "before": "hidden",
+          "after": null
+        }
+      ],
+      "cell_delta_count": 603,
+      "formula_delta_count": 0,
+      "structural_deltas": [
+        {
+          "sheet": "메인 그래프",
+          "before": [
+            160,
+            2
+          ],
+          "after": null
+        },
+        {
+          "sheet": "AI 챗봇",
+          "before": [
+            160,
+            2
+          ],
+          "after": null
+        },
+        {
+          "sheet": "변경 내역",
+          "before": [
+            66,
+            6
+          ],
+          "after": [
+            68,
+            6
+          ]
+        }
+      ],
+      "mapping_relevant_row_count": 47,
+      "hyperlink_delta_count": 0,
+      "current_hyperlink_count": 4,
+      "cells_checked": 32732,
+      "current_csv_readback": "passed",
+      "logged_cell_deltas_matched": 0,
+      "logged_cell_deltas_mismatched": 0,
+      "logged_cells_absent_from_delta": 0,
+      "unlogged_cell_deltas": 603,
+      "logged_hyperlink_deltas": 0,
+      "unlogged_hyperlink_deltas": 0,
+      "unexplained_structural_deltas": 3
+    }
+  ],
+  "carried_unchanged": {
+    "wbs": "docs/evidence/raw/wbs_2026-10-12",
+    "requirements-sheet": "docs/evidence/raw/requirements-sheet_2026-10-06"
+  },
+  "counts": {
+    "workbooks": 1,
+    "sheets": 13,
+    "current_cells_checked": 32732,
+    "cell_deltas": 603,
+    "formula_deltas": 0,
+    "mapping_relevant_rows": 47,
+    "logged_cells_expected": 0,
+    "logged_cell_deltas_matched": 0,
+    "logged_cell_deltas_mismatched": 0,
+    "logged_cells_absent_from_delta": 0,
+    "unlogged_cell_deltas": 603,
+    "logged_hyperlink_deltas": 0,
+    "unlogged_hyperlink_deltas": 0,
+    "unexplained_structural_deltas": 3,
+    "total_cell_deltas": 603
+  },
+  "invariants": {
+    "all_tabs_captured": true,
+    "full_workbook_to_csv_readback": "passed",
+    "original_frozen_files_unchanged": true,
+    "original_files_hash_checked": 722
+  },
+  "recommended_importer_inputs": {
+    "functional-spec": "docs/evidence/raw/functional-spec_2026-10-18",
+    "wbs": "docs/evidence/raw/wbs_2026-10-12",
+    "requirements-sheet": "docs/evidence/raw/requirements-sheet_2026-10-06"
+  }
+}

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:97 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:97 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 지원 환경: 시스템은 팀이 지정한 데스크톱 브라우저와 최소 화면 크기에서 주요 기능을 정상적으로 제공해야 한다. 지원 대상 브라우저, 최소 버전, 해상도 및 모바일 지원 여부를 문서에 명시해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv:135 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv) — 지원 환경: 시스템은 팀이 지정한 데스크톱 브라우저와 최소 화면 크기에서 주요 기능을 정상적으로 제공해야 한다. 지원 대상 브라우저, 최소 버전, 해상도 및 모바일 지원 여부를 문서에 명시해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:304 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
