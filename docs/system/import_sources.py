@@ -47,8 +47,11 @@ def header(rows: list[list[str]], expected: list[str], path: Path) -> tuple[int,
     return n, {name: index for index, name in enumerate(row[:len(expected)])}
 
 
-def import_specs(folder: Path, warnings: list[dict]) -> list[dict]:
+def import_specs(folder: Path, warnings: list[dict], historical: list[Path] = ()) -> list[dict]:
+    # 원본에서 삭제된 이력 탭은 그 탭이 남아 있던 이전 고정본의 CSV를 그대로 읽는다(출처 경로가 이전 고정본을 가리킨다).
     files = sorted(folder.glob("*.csv"))
+    current_names = {p.name for p in files}
+    files += [p for p in historical if p.name not in current_names]
     indexes = [p for p in files if any(r and r[0] == "명세 ID" for r in csv_rows(p))]
     if len(indexes) != 1:
         raise ValueError(f"명세 목차 CSV는 하나여야 한다: {folder} ({len(indexes)})")
@@ -216,23 +219,29 @@ def import_implementation(path: Path) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-12")
+    parser.add_argument("--spec-dir", type=Path, default=ROOT / "docs/evidence/raw/functional-spec_2026-10-18")
+    parser.add_argument("--historical-spec-file", type=Path, action="append", dest="historical_spec_files",
+                        help="현재 원본에서 삭제된 이력 탭의 이전 고정본 CSV. 반복 지정한다.")
     parser.add_argument("--wbs-dir", type=Path, default=ROOT / "docs/evidence/raw/wbs_2026-10-12")
     parser.add_argument("--requirements-dir", type=Path, default=ROOT / "docs/evidence/raw/requirements-sheet_2026-10-06")
     parser.add_argument("--screens", type=Path, default=ROOT / "docs/screen-plan/captures/slide-index.json")
     parser.add_argument("--gap", type=Path, default=ROOT / "docs/evidence/spec-v1.2-gap.md")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = parser.parse_args()
+    if args.historical_spec_files is None:
+        args.historical_spec_files = [ROOT / "docs/evidence/raw/functional-spec_2026-10-12" / name
+                                      for name in ("03-메인-그래프.csv", "07-AI-챗봇.csv")]
     warnings: list[dict] = []
-    specs = import_specs(args.spec_dir, warnings)
+    specs = import_specs(args.spec_dir, warnings, args.historical_spec_files)
     requirements = import_requirements(args.requirements_dir, warnings)
     tasks, wbs_sources = import_wbs(args.wbs_dir, warnings)
     screens = json.loads(args.screens.read_text())
     inputs = sorted({p for folder in (args.spec_dir, args.wbs_dir, args.requirements_dir)
                      for p in folder.iterdir() if p.suffix in (".csv", ".xlsx") or p.name == "_collection-manifest.json"}
-                    | {args.screens, args.gap})
+                    | {args.screens, args.gap} | set(args.historical_spec_files))
     catalog = {"schemaVersion": 1, "sources": {"specDir": relative(args.spec_dir), "wbsDir": relative(args.wbs_dir),
-               "requirementsDir": relative(args.requirements_dir), "screens": relative(args.screens), "gap": relative(args.gap)},
+               "requirementsDir": relative(args.requirements_dir), "screens": relative(args.screens), "gap": relative(args.gap),
+               "historicalSpecFiles": [relative(p) for p in args.historical_spec_files]},
                "fingerprints": {relative(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},
                "specs": specs, "requirements": requirements, "wbs": tasks, "wbsSources": wbs_sources,
                "screens": [{**s, "source": {"path": relative(args.screens), "row": s["page"], "rowUnit": "slide-page"}}

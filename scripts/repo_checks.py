@@ -232,7 +232,8 @@ def docs() -> None:
         sources = catalog["sources"]
         run([sys.executable, "docs/system/import_sources.py", "--spec-dir", sources["specDir"],
              "--wbs-dir", sources["wbsDir"], "--requirements-dir", sources["requirementsDir"],
-             "--screens", sources["screens"], "--gap", sources["gap"]], cwd=target)
+             "--screens", sources["screens"], "--gap", sources["gap"],
+             *[arg for path in sources.get("historicalSpecFiles", []) for arg in ("--historical-spec-file", path)]], cwd=target)
         generated = yaml.safe_load((target / "docs/system/catalog.yaml").read_text())
         if generated != catalog:
             raise ValueError("Generated catalog drift: run documented import_sources.py command.")
