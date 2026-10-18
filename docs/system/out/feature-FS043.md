@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:53 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:53 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 뉴스와 공시 조회: 시스템은 각 이슈에 연결된 근거 문서의 개수를 표시해야 한다. 사용자가 근거를 선택하면 문서 제목, 출처, 발행 시각, 관련 설명 및 원문 링크를 제공해야 한다. 원문 링크가 없는 경우 ‘원문을 제공하지 않는 자료입니다’라는 안내를 표시해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv) — 뉴스와 공시 조회: 시스템은 각 이슈에 연결된 근거 문서의 개수를 표시해야 한다. 사용자가 근거를 선택하면 문서 제목, 출처, 발행 시각, 관련 설명 및 원문 링크를 제공해야 한다. 원문 링크가 없는 경우 ‘원문을 제공하지 않는 자료입니다’라는 안내를 표시해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:100 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

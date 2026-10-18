@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:56 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:56 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — 질문 대상·기간 해석 및 되묻기: 시스템은 질문과 전달된 맥락에서 분석 대상·기간을 해석한다. 대상 또는 기간을 하나로 정할 수 없으면 임의로 분석하지 않고 확인 질문을 제공한다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — AI 권한과 중복 작업 통제: 서버는 로그인·접근 권한, 대화 소유자, 근거 문서 접근 권한과 같은 작업의 질문 내용 일치 여부를 확인해야 한다. 처리 중인 질문 작업을 중복 실행하지 않고, 완료한 작업은 현재 권한을 확인해 저장된 결과를 반환해야 한다. 동시에 요청되어도 유효한 실행 하나만 처리해야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — 질문 대상·기간 해석 및 되묻기: 시스템은 질문과 전달된 맥락에서 분석 대상·기간을 해석한다. 대상 또는 기간을 하나로 정할 수 없으면 임의로 분석하지 않고 확인 질문을 제공한다.
 
 ## 상세 권한과 의미 이행
 

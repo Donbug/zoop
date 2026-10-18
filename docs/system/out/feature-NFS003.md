@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:90 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:90 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 작업 일관성과 복구: 관심 종목 등록, 계좌 연결, AI 답변 생성, 브리핑 생성 등 상태를 변경하거나 결과를 생성하는 요청에는 중복 실행 방지 기준을 적용해야 한다. 동일한 작업 식별자로 요청을 재전송한 경우 결과를 중복 생성하거나 상태를 중복 변경해서는 안 된다. 네트워크 또는 서버 오류 이후 재시도할 때 기존 작업의 처리 상태를 먼저 확인해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv) — 작업 일관성과 복구: 관심 종목 등록, 계좌 연결, AI 답변 생성, 브리핑 생성 등 상태를 변경하거나 결과를 생성하는 요청에는 중복 실행 방지 기준을 적용해야 한다. 동일한 작업 식별자로 요청을 재전송한 경우 결과를 중복 생성하거나 상태를 중복 변경해서는 안 된다. 네트워크 또는 서버 오류 이후 재시도할 때 기존 작업의 처리 상태를 먼저 확인해야 한다.
 
 ## 상세 권한과 의미 이행
 
