@@ -38,16 +38,24 @@ class GraphSnapshotFilterTest {
     }
 
     @Test
-    void structuralBasisMustBeVerifiedAndWithinItsValidityDatesAtAsOf() {
+    void structuralBasisIsVisibleOnceVerifiedWhateverItsValidityDates() {
         Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
-        assertTrue(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", "2026-09-01", null), asOf));
-        assertFalse(GraphSnapshotFilter.validAt(basis("2026-10-06T00:00:00Z", "2026-09-01", null), asOf));
-        // Not yet valid: validFrom has not begun everywhere (UTC-12 is still 2026-10-04).
-        assertFalse(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", "2026-10-05", null), asOf));
-        assertTrue(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", "2026-10-04", null), asOf));
-        // Expired: validUntil (exclusive) has already begun somewhere (UTC+14 is 2026-10-05).
-        assertFalse(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", null, "2026-10-05"), asOf));
-        assertTrue(GraphSnapshotFilter.validAt(basis("2026-09-29T00:00:00Z", null, "2026-10-06"), asOf));
+        assertTrue(GraphSnapshotFilter.verifiedBy(basis("2026-09-29T00:00:00Z", "2026-09-01", null), asOf));
+        assertFalse(GraphSnapshotFilter.verifiedBy(basis("2026-10-06T00:00:00Z", "2026-09-01", null), asOf));
+
+        // FS042: a business relation not started yet (validFrom later) or already ended (validUntil earlier) is still
+        // shown at asOf; its status, not its visibility, tells them apart.
+        for (var dates : List.of(List.of("2026-11-01", ""), List.of("2026-01-01", "2026-03-31"))) {
+            var shifted = new PublicGraphSnapshot(v2.snapshotFormat(), v2.versionId(), v2.sourceBundleId(), v2.companies(),
+                    v2.issues(), v2.relations().stream().map(r -> r.basis().isEmpty() ? r : new Relation(r.relationId(),
+                            r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(),
+                            r.basis().stream().map(x -> new PublicGraphSnapshot.Basis(x.basisId(), x.relationType(),
+                                    x.verifiedAt(), dates.get(0), dates.get(1).isEmpty() ? null : dates.get(1),
+                                    x.countries(), x.articleId(), x.articleVersion())).toList())).toList(),
+                    v2.articles(), v2.evidence());
+            var visible = GraphSnapshotFilter.apply(shifted, Instant.parse("2026-10-12T00:00:00Z"), DisclosureExclusions.NONE);
+            assertTrue(visible.relations().stream().anyMatch(r -> r.relationId().equals("rel-fixture-04")), dates.toString());
+        }
     }
 
     private static PublicGraphSnapshot.Basis basis(String verifiedAt, String validFrom, String validUntil) {
