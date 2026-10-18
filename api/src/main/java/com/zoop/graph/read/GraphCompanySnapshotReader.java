@@ -51,29 +51,32 @@ public class GraphCompanySnapshotReader implements CompanyGraphSnapshotReader {
                 .collect(Collectors.toMap(a -> a.articleId() + "@" + a.version(), Function.identity()));
         return Optional.of(new CompanyGraphSnapshot(pinned.selected().version().id(), pinned.selected().asOf(),
                 graph.companies.containsKey(companyId),
-                issues(graph, companyId, "INVOLVES", relations, articles),
-                issues(graph, companyId, "STRUCTURALLY_RELATED_TO", relations, articles), null));
+                issues(graph, companyId, "INVOLVES", relations, articles, pinned.selected().asOf()),
+                issues(graph, companyId, "STRUCTURALLY_RELATED_TO", relations, articles, pinned.selected().asOf()), null));
     }
 
     private static List<CompanyIssueRef> issues(DisplayGraph graph, String companyId, String relationType,
-            Map<String, Relation> relations, Map<String, Article> articles) {
+            Map<String, Relation> relations, Map<String, Article> articles, Instant at) {
         return graph.edges.values().stream()
                 .filter(e -> !e.derived() && e.target().equals(companyId) && e.relationType().equals(relationType))
                 .sorted(Comparator.comparing(e -> graph.issues.get(e.source()), DisplayGraph.RECENT))
                 .map(e -> {
                     var issue = graph.issues.get(e.source());
                     List<BasisOut> basis = e.relationIds().stream().map(relations::get)
-                            .flatMap(r -> r.basis().stream()).map(b -> basisOut(b, articles)).toList();
+                            .flatMap(r -> r.basis().stream()).map(b -> basisOut(b, articles, at)).toList();
                     return new CompanyIssueRef(issue.label(), issue.issueId(), issue.eventTime(), issue.timePrecision(),
                             e.role(), e.assertionStatus(), e.evidenceIds().size(), basis);
                 })
                 .toList();
     }
 
-    /** sourceUrl only when the cited article version is still visible in this read (asOf, current exclusions). */
-    static BasisOut basisOut(Basis b, Map<String, Article> visibleArticles) {
+    /**
+     * sourceUrl only when the cited article version is still visible in this read (asOf, current exclusions);
+     * validity is the business relation status at {@code at}, the read's asOf.
+     */
+    static BasisOut basisOut(Basis b, Map<String, Article> visibleArticles, Instant at) {
         Article article = b.articleId() == null ? null : visibleArticles.get(b.articleId() + "@" + b.articleVersion());
         return new BasisOut(b.basisId(), b.relationType(), article == null ? null : article.url(),
-                Instant.parse(b.verifiedAt()), b.validFrom(), b.validUntil(), b.countries());
+                Instant.parse(b.verifiedAt()), b.validFrom(), b.validUntil(), b.countries(), RelationValidity.of(b, at));
     }
 }

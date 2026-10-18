@@ -55,13 +55,13 @@ public class GraphRelationService {
                 sources.stream().map(Relation::role).filter(Objects::nonNull).map(RoleLabels::display).distinct().toList(),
                 edge.assertionStatus(), edge.evidenceIds(),
                 sources.stream().flatMap(r -> r.basis().stream())
-                        .map(b -> GraphCompanySnapshotReader.basisOut(b, articles)).toList(),
+                        .map(b -> GraphCompanySnapshotReader.basisOut(b, articles, pinned.selected().asOf())).toList(),
                 edge.relationIds(),
                 edge.derived() ? new Verification("not_applicable", "파생 연결은 검증 대상이 아닙니다.")
                         : new Verification("ALLOW", null),
                 edge.derived() ? via(graph, edge) : List.of(),
                 edge.derived() ? DERIVED_EXPLANATION : EXPLANATIONS.get(edge.relationType()),
-                metadata);
+                RelationValidity.of(graph.basesOf(edge), pinned.selected().asOf()), metadata);
     }
 
     /** For a derived edge: each shared issue with the evidence on its links to the two companies. */

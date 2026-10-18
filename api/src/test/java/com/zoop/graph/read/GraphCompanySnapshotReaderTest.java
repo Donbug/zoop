@@ -45,6 +45,7 @@ class GraphCompanySnapshotReaderTest {
         assertEquals("SUPPLIES", basis.relationType());
         assertEquals("https://example.invalid/zoop-fixture/art-hbm-equip", basis.sourceUrl());
         assertEquals(List.of("KR"), basis.countries());
+        assertEquals("active", basis.validity());
         assertNull(hynix.summary());
     }
 
@@ -72,6 +73,6 @@ class GraphCompanySnapshotReaderTest {
     @Test
     void basisOfAnArticleNoLongerVisibleHasNoSourceUrl() {
         var basis = new Basis("b", "SUPPLIES", "2026-09-29T00:00:00Z", null, null, List.of(), "art-x", "v1");
-        assertNull(GraphCompanySnapshotReader.basisOut(basis, Map.of()).sourceUrl());
+        assertNull(GraphCompanySnapshotReader.basisOut(basis, Map.of(), NOW).sourceUrl());
     }
 }

@@ -107,6 +107,13 @@ public final class DisplayGraph {
         };
     }
 
+    /** The structural bases of the source relations behind a display edge; empty for other edge types. */
+    List<PublicGraphSnapshot.Basis> basesOf(Edge e) {
+        Set<String> ids = Set.copyOf(e.relationIds());
+        return snapshot.relations().stream().filter(r -> ids.contains(r.relationId()))
+                .flatMap(r -> r.basis().stream()).toList();
+    }
+
     List<Issue> issuesOf(String companyId) {
         return companyIssues.getOrDefault(companyId, Set.of()).stream().map(issues::get).sorted(RECENT).toList();
     }

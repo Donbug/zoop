@@ -42,6 +42,9 @@ class GraphRelationServiceTest {
         assertEquals("구조적 관계", edge.summary());
         assertEquals("ALLOW", edge.verification().status());
         assertEquals("SUPPLIES", edge.basis().get(0).relationType());
+        // Fixture basis valid from 2026-09-01 with no end: active at the request time.
+        assertEquals("active", edge.basis().get(0).validity());
+        assertEquals("active", edge.validity());
         assertEquals(GraphRelationService.EXPLANATIONS.get("STRUCTURALLY_RELATED_TO"), edge.explanation());
         assertTrue(edge.via().isEmpty());
         assertEquals("fixture-2026-10-08", edge.metadata().graphVersion());
@@ -59,6 +62,7 @@ class GraphRelationServiceTest {
         // The shared issue's evidence on its links to the two companies.
         assertEquals(2, edge.via().get(0).evidenceIds().size());
         assertNull(edge.role());
+        assertNull(edge.validity());
     }
 
     @Test

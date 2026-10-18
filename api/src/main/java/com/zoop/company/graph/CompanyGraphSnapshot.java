@@ -20,8 +20,9 @@ public record CompanyGraphSnapshot(String graphVersion, Instant asOf, boolean co
         public CompanyIssueRef { basis = List.copyOf(basis); }
     }
 
+    /** validity: the business relation status at the response's asOf (scheduled·active·ended·unknown, FS042). */
     public record BasisOut(String edgeId, String relationType, String sourceUrl, Instant verifiedAt,
-            String validFrom, String validUntil, List<String> countries) {
+            String validFrom, String validUntil, List<String> countries, String validity) {
         public BasisOut { countries = List.copyOf(countries); }
     }
 

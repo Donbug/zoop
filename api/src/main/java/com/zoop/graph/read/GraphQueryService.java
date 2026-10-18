@@ -105,7 +105,8 @@ public class GraphQueryService {
                 .filter(e -> picked.containsKey(e.source()) && picked.containsKey(e.target()))
                 .filter(e -> !e.derived() || e.via().stream().anyMatch(picked::containsKey))
                 .map(e -> new GraphResponse.Edge(e.id(), e.source(), e.target(), e.relationType(), e.role(), e.summary(),
-                        e.assertionStatus(), e.derived(), e.via(), e.evidenceIds()))
+                        e.assertionStatus(), e.derived(), e.via(), e.evidenceIds(),
+                        RelationValidity.of(graph.basesOf(e), selected.asOf())))
                 .toList();
         String emptyReason = edges.isEmpty() ? (focus.isEmpty() ? "no_approved_issues" : "no_related_issues") : null;
         return new GraphResponse(nodes, edges, new GraphResponse.Metadata("public_graph_snapshot",
