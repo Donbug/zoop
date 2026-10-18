@@ -250,13 +250,13 @@
 | BFF_PATH_DIFFERENCE | difference | disconnectVirtualAccount | 목표 /api/v1/portfolio/connections/{id} ↔ BFF /api/portfolio/connections/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | disconnectVirtualAccount | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getGraph | 목표 /api/v1/graph ↔ BFF /api/graph |  |
-| BFF_FIELD_DIFFERENCE | difference | getGraph | 목표만 158 · BFF만 27 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | getGraph | 목표만 161 · BFF만 27 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyRelation | 목표 /api/v1/graph/edges/{id} ↔ BFF /api/graph/edges/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 118 · BFF만 43 · 형식/필수/권한 변경 6 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 123 · BFF만 43 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | searchCompanies | 목표 /api/v1/companies ↔ BFF /api/companies |  |
 | BFF_FIELD_DIFFERENCE | difference | searchCompanies | 목표만 108 · BFF만 50 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompany | 목표 /api/v1/companies/{id} ↔ BFF /api/companies/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompany | 목표만 143 · BFF만 48 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompany | 목표만 147 · BFF만 48 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyQuote | 목표 /api/v1/companies/{id}/quote ↔ BFF /api/companies/{id}/quote |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyQuote | 목표만 80 · BFF만 39 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyMetrics | 목표 /api/v1/companies/{id}/metrics ↔ BFF /api/companies/{id}/metrics |  |
@@ -375,7 +375,7 @@
 | TARGET_ONLY_API | difference | getCompanyIssueImpact | GET /api/v1/companies/{id}/issues/{issueId}/impact: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getPersonalizedBriefing | GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyGraphAsOf | 목표 /api/v1/companies/{id}/graph ↔ BFF /api/companies/{id}/graph |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyGraphAsOf | 목표만 121 · BFF만 41 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyGraphAsOf | 목표만 124 · BFF만 41 · 형식/필수/권한 변경 7 |  |
 | PROTOTYPE_ONLY_API | difference | health_api_health_get | GET /api/health: 프로토타입 상태 점검 경로다. 정식 readiness/liveness 계약은 배포 설계에서 별도 확정한다. |  |
 | PROTOTYPE_ONLY_API | difference | mock_idp_consent_api_auth_social_mock_idp_consent_post | POST /api/auth/social/mock/idp/consent: 개발용 모의 IdP 동의 흐름은 정식 인증 계약에서 제외한다. |  |
 | PROTOTYPE_ONLY_API | difference | get_evaluations_api_briefings__id__evaluations_get | GET /api/briefings/{id}/evaluations: 프로토타입에서도 미제공인 가격/예측 평가 자리다. 투자 예측을 목표 계약에 넣지 않는다. |  |

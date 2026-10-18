@@ -1726,7 +1726,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getGraph",
       "severity": "difference",
-      "message": "목표만 158 · BFF만 27 · 형식/필수/권한 변경 9",
+      "message": "목표만 161 · BFF만 27 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -1740,7 +1740,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyRelation",
       "severity": "difference",
-      "message": "목표만 118 · BFF만 43 · 형식/필수/권한 변경 6",
+      "message": "목표만 123 · BFF만 43 · 형식/필수/권한 변경 6",
       "source": ""
     },
     {
@@ -1768,7 +1768,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompany",
       "severity": "difference",
-      "message": "목표만 143 · BFF만 48 · 형식/필수/권한 변경 7",
+      "message": "목표만 147 · BFF만 48 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2601,7 +2601,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyGraphAsOf",
       "severity": "difference",
-      "message": "목표만 121 · BFF만 41 · 형식/필수/권한 변경 7",
+      "message": "목표만 124 · BFF만 41 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
