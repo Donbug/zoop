@@ -58,6 +58,25 @@ class GraphSnapshotFilterTest {
         }
     }
 
+    @Test
+    void asOfDropsStructuralBasesVerifiedLaterButKeepsTheRelation() {
+        var early = basis("2026-09-01T00:00:00Z", "2026-01-01", "2026-03-31");
+        var late = new PublicGraphSnapshot.Basis("b-late", "INVESTS", "2026-10-20T00:00:00Z", "2026-09-01", null,
+                List.of(), null, null);
+        var s = new PublicGraphSnapshot(v2.snapshotFormat(), v2.versionId(), v2.sourceBundleId(), v2.companies(),
+                v2.issues(), v2.relations().stream().map(r -> r.basis().isEmpty() ? r : new Relation(r.relationId(),
+                        r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(),
+                        List.of(early, late))).toList(), v2.articles(), v2.evidence());
+
+        var past = GraphSnapshotFilter.apply(s, Instant.parse("2026-10-12T00:00:00Z"), DisclosureExclusions.NONE);
+        var rel = past.relations().stream().filter(r -> r.relationId().equals("rel-fixture-04")).findFirst().orElseThrow();
+        assertEquals(List.of(early), rel.basis());
+
+        var now = GraphSnapshotFilter.apply(s, null, DisclosureExclusions.NONE);
+        assertEquals(2, now.relations().stream().filter(r -> r.relationId().equals("rel-fixture-04")).findFirst()
+                .orElseThrow().basis().size());
+    }
+
     private static PublicGraphSnapshot.Basis basis(String verifiedAt, String validFrom, String validUntil) {
         return new PublicGraphSnapshot.Basis("b", "SUPPLIES", verifiedAt, validFrom, validUntil, List.of(), null, null);
     }
