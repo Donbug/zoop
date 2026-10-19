@@ -125,13 +125,13 @@ public class TossMarketClient {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     /**
-     * getCompanyPrices. Toss serves only 1-minute and daily candles, so only 1m (daily bars) can be answered; the other
-     * periods are a normal no_data rather than bars re-labelled, aggregated or interpolated from another resolution
-     * (contract). The range is in KST calendar days: fromDay defaults to one month back from today (prototype
-     * {@code period_start}), toDay to no upper bound.
+     * getCompanyPrices over [from, to). Toss serves only 1-minute and daily candles, so 1d/1w are 1-minute bars and
+     * 1y daily bars aggregated into the contract's fixed resolution (x-zoop.chartResolution); 1m is the daily bars as
+     * they are. Daily bars are kept by their KST day, intraday bars by their start time. A missing to is now and a
+     * missing from one period before it.
      */
     public CompanyPriceResponse prices(String companyId, String exchange, String code, String period,
-            LocalDate fromDay, LocalDate toDay) {
+            Instant from, Instant to) {
         if (!"toss".equalsIgnoreCase(settings.quoteProvider())
                 || blank(settings.tossClientId()) || blank(settings.tossClientSecret())) {
             return CompanyPriceResponse.unavailable(companyId, period, "not_connected", "토스증권 시세 키가 설정되지 않았어요.");
@@ -140,28 +140,28 @@ public class TossMarketClient {
             return CompanyPriceResponse.unavailable(companyId, period, "unsupported_symbol", "이 종목은 토스증권 시세 조회를 지원하지 않아요.");
         }
         String interval = PERIOD_INTERVAL.get(period);
-        if (!"1d".equals(interval)) {
-            return CompanyPriceResponse.unavailable(companyId, period, "no_data",
-                    "연결한 시세 출처(토스증권)는 " + interval + " 간격 가격 자료를 제공하지 않아요.");
-        }
-        LocalDate cutoff = fromDay != null ? fromDay : LocalDate.now(clock.withZone(KST)).minusMonths(1);
+        ZoneId zone = marketZone(exchange);
+        Instant end = to != null ? to : clock.instant();
+        Instant start = from != null ? from : periodStart(period, end);
         try {
-            List<CompanyPriceResponse.Point> points = new java.util.ArrayList<>();
-            for (JsonNode candle : dailyCandles(code, 10, cutoff)) {
-                Instant at = instant(text(candle.get("timestamp")));
-                if (at == null) continue;
-                LocalDate day = at.atZone(KST).toLocalDate();
-                if (day.isBefore(cutoff) || (toDay != null && day.isAfter(toDay))) continue;
-                Double open = number(candle.get("openPrice")), high = number(candle.get("highPrice"));
-                Double low = number(candle.get("lowPrice")), close = number(candle.get("closePrice"));
-                if (open == null || high == null || low == null || close == null) continue;
-                String time = at.atZone(marketZone(exchange)).toOffsetDateTime().toString();
-                points.add(new CompanyPriceResponse.Point(time, open, high, low, close, number(candle.get("volume"))));
+            List<CompanyPriceResponse.Point> points;
+            if ("5m".equals(interval) || "1h".equals(interval)) {
+                long size = "5m".equals(interval) ? 300 : 3600;
+                points = PriceBars.byInterval(minuteBars(code, zone, start, end), size, zone);
+            } else {
+                LocalDate fromDay = start.atZone(KST).toLocalDate(), toDay = end.minusNanos(1).atZone(KST).toLocalDate();
+                List<PriceBars.Bar> daily = new java.util.ArrayList<>();
+                for (JsonNode candle : dailyCandles(code, 10, fromDay)) {
+                    PriceBars.Bar bar = bar(candle, at -> at);
+                    if (bar == null) continue;
+                    LocalDate day = bar.start().atZone(KST).toLocalDate();
+                    if (!day.isBefore(fromDay) && !day.isAfter(toDay)) daily.add(bar);
+                }
+                points = "1wk".equals(interval) ? PriceBars.byWeek(daily, zone) : PriceBars.asIs(daily, zone);
             }
             if (points.isEmpty()) {
                 return CompanyPriceResponse.unavailable(companyId, period, "no_data", "이 기간에는 거래된 시세가 없어요(휴장일 등).");
             }
-            points.sort(java.util.Comparator.comparing(point -> java.time.OffsetDateTime.parse(point.time())));
             JsonNode stock = matching(get("/api/v1/stocks", Map.of("symbols", code)).path("result"), code);
             String currency = stock == null ? null : strictText(stock.get("currency"));
             if (currency == null) {
@@ -178,6 +178,76 @@ public class TossMarketClient {
         } catch (Exception exception) {
             throw new MarketDataException(false);
         }
+    }
+
+    /** Default range: one day, 7 days, one calendar month or one calendar year (KST) before the end. */
+    static Instant periodStart(String period, Instant end) {
+        var at = end.atZone(KST);
+        var start = switch (period) {
+            case "1d" -> at.minusDays(1);
+            case "1w" -> at.minusDays(7);
+            case "1y" -> at.minusYears(1);
+            default -> at.minusMonths(1);
+        };
+        return start.toInstant();
+    }
+
+    /**
+     * 1-minute bars starting in [from, to), read per exchange-local day. A finished day's bars are kept: Toss does not
+     * revise Korean candles, and US late trades only land in the first hour after the day.
+     * shortcut: per-process LRU of 512 symbol-days, move to a shared store once several API instances run.
+     */
+    private List<PriceBars.Bar> minuteBars(String code, ZoneId zone, Instant from, Instant to) {
+        List<PriceBars.Bar> bars = new java.util.ArrayList<>();
+        Instant settled = clock.instant().minus(java.time.Duration.ofHours(1));
+        for (LocalDate day = from.atZone(zone).toLocalDate(); !day.atStartOfDay(zone).toInstant().isAfter(to.minusNanos(1));
+                day = day.plusDays(1)) {
+            Instant dayStart = day.atStartOfDay(zone).toInstant(), dayEnd = day.plusDays(1).atStartOfDay(zone).toInstant();
+            String key = code + "|" + day;
+            List<PriceBars.Bar> dayBars = minuteCache.get(key);
+            if (dayBars == null) {
+                dayBars = minuteDay(code, dayStart, dayEnd);
+                if (!dayEnd.isAfter(settled)) minuteCache.put(key, dayBars);
+            }
+            for (PriceBars.Bar bar : dayBars) if (!bar.start().isBefore(from) && bar.start().isBefore(to)) bars.add(bar);
+        }
+        return bars;
+    }
+
+    private final Map<String, List<PriceBars.Bar>> minuteCache = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, List<PriceBars.Bar>> eldest) { return size() > 512; }
+            });
+
+    /** One day's 1-minute bars, walking back from the day's end; Toss stamps a 1-minute bar with its end time. */
+    private List<PriceBars.Bar> minuteDay(String code, Instant dayStart, Instant dayEnd) {
+        List<PriceBars.Bar> bars = new java.util.ArrayList<>();
+        String before = dayEnd.toString();
+        for (int page = 0; page < 20; page++) {
+            JsonNode candlePage = get("/api/v1/candles", Map.of("symbol", code, "interval", "1m", "count", "200",
+                    "before", before)).path("result");
+            JsonNode candles = candlePage.path("candles");
+            if (!candles.isArray()) throw formatFailure();
+            Instant oldest = null;
+            for (JsonNode candle : candles) {
+                PriceBars.Bar bar = bar(candle, end -> end.minusSeconds(60));
+                if (bar == null) continue;
+                oldest = bar.start();
+                if (!bar.start().isBefore(dayStart) && bar.start().isBefore(dayEnd)) bars.add(bar);
+            }
+            if (oldest == null || oldest.isBefore(dayStart) || !candlePage.hasNonNull("nextBefore")) break;
+            before = text(candlePage.get("nextBefore"));
+        }
+        return bars;
+    }
+
+    /** A candle as a bar starting at start(timestamp); null when its time or prices are missing. */
+    private static PriceBars.Bar bar(JsonNode candle, java.util.function.UnaryOperator<Instant> start) {
+        Instant at = instant(text(candle.get("timestamp")));
+        Double open = number(candle.get("openPrice")), high = number(candle.get("highPrice"));
+        Double low = number(candle.get("lowPrice")), close = number(candle.get("closePrice"));
+        if (at == null || open == null || high == null || low == null || close == null) return null;
+        return new PriceBars.Bar(start.apply(at), open, high, low, close, number(candle.get("volume")));
     }
 
     /** Daily candles newest first, following nextBefore for up to maxPages pages or until a page ends before stopBefore (KST day). */

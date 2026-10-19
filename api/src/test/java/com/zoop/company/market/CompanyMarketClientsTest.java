@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpServer;
+import com.zoop.company.market.dto.CompanyPriceResponse;
 import com.zoop.company.market.dto.CompanyMetricsResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -173,27 +174,54 @@ class CompanyMarketClientsTest {
     }
 
     @Test
-    void fromAndToAreKstDays() {
-        var day = java.time.LocalDate.parse("2026-10-15");
-        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", day, day);
+    void dailyBarsAreKeptByTheirKstDay() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
+                kst("2026-10-15T00:00"), kst("2026-10-16T00:00"));
         assertEquals(1, result.points().size());
 
         var empty = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
-                java.time.LocalDate.parse("2026-01-01"), java.time.LocalDate.parse("2026-01-31"));
+                kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
         assertEquals("unavailable", empty.status());
         assertEquals("no_data", empty.reasonCode());
     }
 
     @Test
-    void resolutionsTossCannotServeAreNoDataWithoutCallingTheProvider() {
-        for (String period : List.of("1d", "1w", "1y")) {
-            var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", period, null, null);
-            assertEquals("unavailable", result.status(), period);
-            assertEquals("no_data", result.reasonCode(), period);
-            assertEquals(period, result.period());
-        }
-        assertEquals(0, tokenRequests.get());
+    void yearAggregatesDailyBarsIntoMondayWeeks() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1y", null, null);
+
+        assertEquals("1wk", result.interval());
+        // 10-14 and 10-15 fall in the week of Monday 10-12; the 2025 bars have no open and are left out.
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-12T00:00+09:00", 645, 720, 640, 700, 2634.0)),
+                result.points());
+    }
+
+    @Test
+    void dayAggregatesMinuteBarsByTheirStartIntoFiveMinuteBuckets() {
+        var client = tossClient("test-client", "test-secret");
+        var result = client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
+
+        assertEquals("5m", result.interval());
+        // Toss stamps a minute bar with its end: 12:01 and 12:02 start in the 12:00 bucket, 12:06 in 12:05.
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
+                new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
+
+        // A finished day is read once; today (KST 10-16) is read again.
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
+        assertEquals(1, candleQueries.stream().filter(q -> q.contains("before=2026-10-15T15")).count());
+        assertEquals(2, candleQueries.stream().filter(q -> q.contains("before=2026-10-16T15")).count());
+    }
+
+    @Test
+    void weekUsesHourBuckets() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1w", null, null);
+        assertEquals("1h", result.interval());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 103, 16.0)),
+                result.points());
         assertEquals("not_connected", tossClient("", "").prices("KRX:005930", "KRX", "005930", "1m", null, null).reasonCode());
+    }
+
+    private static java.time.Instant kst(String local) {
+        return java.time.LocalDateTime.parse(local).atZone(java.time.ZoneId.of("Asia/Seoul")).toInstant();
     }
 
     @Test
@@ -264,6 +292,15 @@ class CompanyMarketClientsTest {
                 {"result":{"candles":[
                   {"timestamp":"2026-10-15T00:00:00+09:00","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
                 ],"nextBefore":"2026-10-15T00:00:00+09:00"}}
+                """;
+        if (path.equals("/api/v1/candles") && rawQuery.contains("interval=1m")) return rawQuery.contains("before=2026-10-15T15") ? """
+                {"result":{"candles":[
+                  {"timestamp":"2026-10-15T12:06:00+09:00","openPrice":104,"highPrice":104,"lowPrice":103,"closePrice":103,"volume":1},
+                  {"timestamp":"2026-10-15T12:02:00+09:00","openPrice":100,"highPrice":105,"lowPrice":100,"closePrice":104,"volume":5},
+                  {"timestamp":"2026-10-15T12:01:00+09:00","openPrice":100,"highPrice":101,"lowPrice":99,"closePrice":100,"volume":10}
+                ],"nextBefore":null}}
+                """ : """
+                {"result":{"candles":[],"nextBefore":null}}
                 """;
         if (path.equals("/api/v1/stocks")) return """
                 {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"}]}
