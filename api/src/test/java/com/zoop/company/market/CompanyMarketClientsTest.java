@@ -31,6 +31,7 @@ class CompanyMarketClientsTest {
     private volatile String priceTimestamp = "2026-10-15T06:30:00Z";
     private volatile String lastPriceJson = "700";
     private volatile boolean paginateCandles;
+    private volatile boolean rateLimitOnce;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -43,6 +44,7 @@ class CompanyMarketClientsTest {
             // Count before replying: once the client has the response the test may assert immediately.
             if (path.equals("/oauth2/token")) tokenRequests.incrementAndGet();
             int status = path.equals("/oauth2/token") ? tokenStatus : providerStatus;
+            if (path.equals("/api/v1/candles") && rateLimitOnce) { rateLimitOnce = false; status = 429; }
             String rawQuery = exchange.getRequestURI().getRawQuery();
             if (path.equals("/api/v1/candles")) candleQueries.add(rawQuery);
             String body = response(path, rawQuery);
@@ -205,10 +207,18 @@ class CompanyMarketClientsTest {
         assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
                 new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
 
-        // A finished day is read once; today (KST 10-16) is read again.
+        // Each day is read from its own end; the finished KST 10-15 is then kept and only today (10-16) is read again.
         client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
         assertEquals(1, candleQueries.stream().filter(q -> q.contains("before=2026-10-15T15")).count());
         assertEquals(2, candleQueries.stream().filter(q -> q.contains("before=2026-10-16T15")).count());
+    }
+
+    @Test
+    void aRateLimitedPageIsRetriedAfterTheBucketRefills() {
+        rateLimitOnce = true;
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null);
+        assertEquals("available", result.status());
+        assertEquals(false, rateLimitOnce);
     }
 
     @Test

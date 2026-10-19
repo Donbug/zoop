@@ -193,24 +193,43 @@ public class TossMarketClient {
     }
 
     /**
-     * 1-minute bars starting in [from, to), read per exchange-local day. A finished day's bars are kept: Toss does not
-     * revise Korean candles, and US late trades only land in the first hour after the day.
+     * 1-minute bars starting in [from, to), kept per exchange-local day. Days missing from the cache are read at the
+     * same time, at most four at once across all requests, which keeps a cold 1w read under Toss's 20 requests a
+     * second. A finished day is kept: Toss does not revise Korean candles, and US late trades only land in the first
+     * hour after the day.
      * shortcut: per-process LRU of 512 symbol-days, move to a shared store once several API instances run.
      */
     private List<PriceBars.Bar> minuteBars(String code, ZoneId zone, Instant from, Instant to) {
-        List<PriceBars.Bar> bars = new java.util.ArrayList<>();
         Instant settled = clock.instant().minus(java.time.Duration.ofHours(1));
-        for (LocalDate day = from.atZone(zone).toLocalDate(); !day.atStartOfDay(zone).toInstant().isAfter(to.minusNanos(1));
+        Map<LocalDate, java.util.concurrent.Future<List<PriceBars.Bar>>> reads = new java.util.LinkedHashMap<>();
+        Map<LocalDate, List<PriceBars.Bar>> days = new java.util.HashMap<>();
+        for (LocalDate day = from.atZone(zone).toLocalDate(); !day.isAfter(to.minusNanos(1).atZone(zone).toLocalDate());
                 day = day.plusDays(1)) {
+            List<PriceBars.Bar> cached = minuteCache.get(code + "|" + day);
+            if (cached != null) { days.put(day, cached); continue; }
             Instant dayStart = day.atStartOfDay(zone).toInstant(), dayEnd = day.plusDays(1).atStartOfDay(zone).toInstant();
-            String key = code + "|" + day;
-            List<PriceBars.Bar> dayBars = minuteCache.get(key);
-            if (dayBars == null) {
-                dayBars = minuteDay(code, dayStart, dayEnd);
-                if (!dayEnd.isAfter(settled)) minuteCache.put(key, dayBars);
-            }
-            for (PriceBars.Bar bar : dayBars) if (!bar.start().isBefore(from) && bar.start().isBefore(to)) bars.add(bar);
+            reads.put(day, minuteReads.submit(() -> minuteDay(code, dayStart, dayEnd)));
         }
+        try {
+            for (var read : reads.entrySet()) {
+                List<PriceBars.Bar> bars = read.getValue().get();
+                days.put(read.getKey(), bars);
+                if (!read.getKey().plusDays(1).atStartOfDay(zone).toInstant().isAfter(settled)) {
+                    minuteCache.put(code + "|" + read.getKey(), bars);
+                }
+            }
+        } catch (java.util.concurrent.ExecutionException exception) {
+            reads.values().forEach(read -> read.cancel(true));
+            if (exception.getCause() instanceof RuntimeException cause) throw cause;
+            throw new MarketDataException(false);
+        } catch (InterruptedException exception) {
+            reads.values().forEach(read -> read.cancel(true));
+            Thread.currentThread().interrupt();
+            throw new MarketDataException(true);
+        }
+        List<PriceBars.Bar> bars = new java.util.ArrayList<>();
+        days.values().forEach(dayBars -> dayBars.stream()
+                .filter(bar -> !bar.start().isBefore(from) && bar.start().isBefore(to)).forEach(bars::add));
         return bars;
     }
 
@@ -218,6 +237,8 @@ public class TossMarketClient {
             new java.util.LinkedHashMap<>(64, 0.75f, true) {
                 @Override protected boolean removeEldestEntry(Map.Entry<String, List<PriceBars.Bar>> eldest) { return size() > 512; }
             });
+    private final java.util.concurrent.ExecutorService minuteReads =
+            java.util.concurrent.Executors.newFixedThreadPool(4, Thread.ofPlatform().daemon().name("toss-minute-", 0).factory());
 
     /** One day's 1-minute bars, walking back from the day's end; Toss stamps a 1-minute bar with its end time. */
     private List<PriceBars.Bar> minuteDay(String code, Instant dayStart, Instant dayEnd) {
@@ -230,7 +251,7 @@ public class TossMarketClient {
             if (!candles.isArray()) throw formatFailure();
             Instant oldest = null;
             for (JsonNode candle : candles) {
-                PriceBars.Bar bar = bar(candle, end -> end.minusSeconds(60));
+                PriceBars.Bar bar = bar(candle, at -> at.minusSeconds(60));
                 if (bar == null) continue;
                 oldest = bar.start();
                 if (!bar.start().isBefore(dayStart) && bar.start().isBefore(dayEnd)) bars.add(bar);
@@ -270,7 +291,25 @@ public class TossMarketClient {
         return daily;
     }
 
+    /** Provider requests made and their total time, for the live check only. */
+    final java.util.concurrent.atomic.AtomicLong requests = new java.util.concurrent.atomic.AtomicLong(), requestNanos = new java.util.concurrent.atomic.AtomicLong();
+
     private JsonNode get(String path, Map<String, ?> params) {
+        long started = System.nanoTime();
+        try {
+            // A 429 means the 20-a-second bucket is empty; it refills within a second, so wait once and retry.
+            for (int attempt = 0; ; attempt++) {
+                try { return send(path, params); }
+                catch (TossRateLimitedException exception) {
+                    if (attempt == 2) throw new MarketDataException(true);
+                    try { Thread.sleep(1000); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new MarketDataException(true); }
+                }
+            }
+        } finally { requests.incrementAndGet(); requestNanos.addAndGet(System.nanoTime() - started); }
+    }
+
+    private JsonNode send(String path, Map<String, ?> params) {
         String accessToken = token();
         for (int attempt = 0; attempt < 2; attempt++) {
             final String usedToken = accessToken;
@@ -288,7 +327,8 @@ public class TossMarketClient {
                         if (code == 401 && firstAttempt) return new HttpResult(code, body);
                         if (code == 401 || code == 403) throw new MarketDataException(false);
                         if (code == 400 || code == 404) throw new TossUnsupportedSymbolException();
-                        if (code == 429 || code >= 500) throw new MarketDataException(true);
+                        if (code == 429) throw new TossRateLimitedException();
+                        if (code >= 500) throw new MarketDataException(true);
                         if (code < 200 || code >= 300) throw new MarketDataException(false);
                         return new HttpResult(code, body);
                     });
@@ -375,4 +415,5 @@ public class TossMarketClient {
     private record HttpResult(int status, byte[] body) { }
     private static class TossAuthException extends RuntimeException { }
     private static class TossUnsupportedSymbolException extends RuntimeException { }
+    private static class TossRateLimitedException extends RuntimeException { }
 }
