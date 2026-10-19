@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.company.graph.CompanyGraphReadRequest;
+import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Basis;
 import java.time.Instant;
 import java.util.List;
@@ -72,7 +73,18 @@ class GraphCompanySnapshotReaderTest {
 
     @Test
     void basisOfAnArticleNoLongerVisibleHasNoSourceUrl() {
-        var basis = new Basis("b", "SUPPLIES", "2026-09-29T00:00:00Z", null, null, List.of(), "art-x", "v1");
+        var basis = new Basis("b", "SUPPLIES", "2026-09-29T00:00:00Z", null, null, List.of(),
+                List.of(new PublicGraphSnapshot.ArticleRef("art-x", "v1")));
         assertNull(GraphCompanySnapshotReader.basisOut(basis, Map.of(), NOW).sourceUrl());
+    }
+
+    @Test
+    void sourceUrlIsTheFirstCitedArticleStillVisible() {
+        // The handoff's sourceArticles may name several; one published after asOf is skipped, not a reason for no link.
+        var visible = new PublicGraphSnapshot.Article("art-y", "v1", "Y", "https://example.test/y", "2026-09-01");
+        var basis = new Basis("b", "SUPPLIES", "2026-09-29T00:00:00Z", null, null, List.of(),
+                List.of(new PublicGraphSnapshot.ArticleRef("art-x", "v1"), new PublicGraphSnapshot.ArticleRef("art-y", "v1")));
+        assertEquals("https://example.test/y",
+                GraphCompanySnapshotReader.basisOut(basis, Map.of("art-y@v1", visible), NOW).sourceUrl());
     }
 }

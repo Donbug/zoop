@@ -13,7 +13,7 @@ class RelationValidityTest {
     private static final Instant SEOUL_NOV_1 = Instant.parse("2026-10-31T15:30:00Z");
 
     private static Basis basis(String validFrom, String validUntil) {
-        return new Basis("b", "SUPPLIES", "2026-10-18T00:00:00Z", validFrom, validUntil, List.of(), null, null);
+        return new Basis("b", "SUPPLIES", "2026-10-18T00:00:00Z", validFrom, validUntil, List.of(), List.of());
     }
 
     @Test

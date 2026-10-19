@@ -57,14 +57,18 @@ public record PublicGraphSnapshot(int snapshotFormat, String versionId, String s
     /**
      * The structural path behind a STRUCTURALLY_RELATED_TO relation (AI handoff basis): its own id, the business
      * relation type it rests on (e.g. SUPPLIES), when it was verified and valid, the countries it applies to, and the
-     * article version it was read from when the handoff names one.
+     * article versions it was read from (the handoff's sourceArticles, possibly several or none).
      */
     public record Basis(String basisId, String relationType, String verifiedAt, String validFrom, String validUntil,
-            List<String> countries, String articleId, String articleVersion) {
+            List<String> countries, List<ArticleRef> articles) {
         public Basis {
             countries = List.copyOf(countries);
+            articles = List.copyOf(articles);
         }
     }
+
+    /** One article version pinned to this snapshot. */
+    public record ArticleRef(String articleId, String articleVersion) { }
 
     /**
      * Article version pinned to this snapshot; publishedAt keeps the provider precision ("2026-10-01" or an instant),

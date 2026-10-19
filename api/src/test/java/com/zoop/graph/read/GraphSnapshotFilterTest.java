@@ -51,7 +51,7 @@ class GraphSnapshotFilterTest {
                             r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(),
                             r.basis().stream().map(x -> new PublicGraphSnapshot.Basis(x.basisId(), x.relationType(),
                                     x.verifiedAt(), dates.get(0), dates.get(1).isEmpty() ? null : dates.get(1),
-                                    x.countries(), x.articleId(), x.articleVersion())).toList())).toList(),
+                                    x.countries(), x.articles())).toList())).toList(),
                     v2.articles(), v2.evidence());
             var visible = GraphSnapshotFilter.apply(shifted, Instant.parse("2026-10-12T00:00:00Z"), DisclosureExclusions.NONE);
             assertTrue(visible.relations().stream().anyMatch(r -> r.relationId().equals("rel-fixture-04")), dates.toString());
@@ -62,7 +62,7 @@ class GraphSnapshotFilterTest {
     void asOfDropsStructuralBasesVerifiedLaterButKeepsTheRelation() {
         var early = basis("2026-09-01T00:00:00Z", "2026-01-01", "2026-03-31");
         var late = new PublicGraphSnapshot.Basis("b-late", "INVESTS", "2026-10-20T00:00:00Z", "2026-09-01", null,
-                List.of(), null, null);
+                List.of(), List.of());
         var s = new PublicGraphSnapshot(v2.snapshotFormat(), v2.versionId(), v2.sourceBundleId(), v2.companies(),
                 v2.issues(), v2.relations().stream().map(r -> r.basis().isEmpty() ? r : new Relation(r.relationId(),
                         r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(),
@@ -78,7 +78,7 @@ class GraphSnapshotFilterTest {
     }
 
     private static PublicGraphSnapshot.Basis basis(String verifiedAt, String validFrom, String validUntil) {
-        return new PublicGraphSnapshot.Basis("b", "SUPPLIES", verifiedAt, validFrom, validUntil, List.of(), null, null);
+        return new PublicGraphSnapshot.Basis("b", "SUPPLIES", verifiedAt, validFrom, validUntil, List.of(), List.of());
     }
 
     @Test

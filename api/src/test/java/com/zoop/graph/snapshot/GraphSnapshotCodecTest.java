@@ -120,12 +120,15 @@ class GraphSnapshotCodecTest {
         assertEquals("basis-fixture-04", basis.basisId());
         assertEquals("SUPPLIES", basis.relationType());
         assertEquals(java.util.List.of("KR"), basis.countries());
-        assertEquals("art-hbm-equip", basis.articleId());
+        assertEquals(java.util.List.of(new PublicGraphSnapshot.ArticleRef("art-hbm-equip", "v1")), basis.articles());
 
         String unpinned = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?\"articleVersion\": )\"v1\"", "$1\"v9\"");
         assertEquals("snapshot_invalid:relation_basis_article", reason(unpinned, "fixture-2026-10-01"));
+        // A reference needs both its id and version, and the list itself is required (empty when none is named).
         String half = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?\"articleVersion\": )\"v1\"", "$1null");
-        assertEquals("snapshot_invalid:relation_basis_article", reason(half, "fixture-2026-10-01"));
+        assertEquals("snapshot_malformed", reason(half, "fixture-2026-10-01"));
+        String noList = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?)\"articles\": \\[[\\s\\S]*?\\]", "$1\"other\": []");
+        assertEquals("snapshot_malformed", reason(noList, "fixture-2026-10-01"));
     }
 
     @Test

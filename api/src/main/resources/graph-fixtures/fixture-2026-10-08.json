@@ -230,8 +230,12 @@
           "countries": [
             "KR"
           ],
-          "articleId": "art-hbm-equip",
-          "articleVersion": "v1"
+          "articles": [
+            {
+              "articleId": "art-hbm-equip",
+              "articleVersion": "v1"
+            }
+          ]
         }
       ]
     },
@@ -268,8 +272,12 @@
             "TW",
             "NL"
           ],
-          "articleId": "art-euv-export",
-          "articleVersion": "v1"
+          "articles": [
+            {
+              "articleId": "art-euv-export",
+              "articleVersion": "v1"
+            }
+          ]
         }
       ]
     },
@@ -294,8 +302,12 @@
             "KR",
             "NL"
           ],
-          "articleId": "art-euv-export",
-          "articleVersion": "v1"
+          "articles": [
+            {
+              "articleId": "art-euv-export",
+              "articleVersion": "v1"
+            }
+          ]
         }
       ]
     },
@@ -342,8 +354,12 @@
             "TW",
             "US"
           ],
-          "articleId": "art-ai-accel",
-          "articleVersion": "v1"
+          "articles": [
+            {
+              "articleId": "art-ai-accel",
+              "articleVersion": "v1"
+            }
+          ]
         }
       ]
     }

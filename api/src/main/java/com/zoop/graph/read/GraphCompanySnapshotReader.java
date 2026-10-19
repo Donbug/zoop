@@ -71,11 +71,12 @@ public class GraphCompanySnapshotReader implements CompanyGraphSnapshotReader {
     }
 
     /**
-     * sourceUrl only when the cited article version is still visible in this read (asOf, current exclusions);
+     * sourceUrl is the first cited article version still visible in this read (asOf, current exclusions), null if none;
      * validity is the business relation status at {@code at}, the read's asOf.
      */
     static BasisOut basisOut(Basis b, Map<String, Article> visibleArticles, Instant at) {
-        Article article = b.articleId() == null ? null : visibleArticles.get(b.articleId() + "@" + b.articleVersion());
+        Article article = b.articles().stream().map(a -> visibleArticles.get(a.articleId() + "@" + a.articleVersion()))
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
         return new BasisOut(b.basisId(), b.relationType(), article == null ? null : article.url(),
                 Instant.parse(b.verifiedAt()), b.validFrom(), b.validUntil(), b.countries(), RelationValidity.of(b, at));
     }
