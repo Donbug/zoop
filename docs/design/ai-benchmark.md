@@ -207,7 +207,7 @@ S3 관계 생산 계약(`relation_contracts.MAX_PATH=2`)은 **관계 후보로 �
 3. **불일치 합의**: 불일치 항목을 목록화하고 제3자 또는 합의 회의에서 결정한다. 합의가 안 되면 모호한 항목은 `UNDECIDABLE`/`null`/abstain으로 남기고 정확 일치 채점 대상에서 제외한다. 모호함은 지우지 않고 기록한다.
 4. **동결**: `goldRevision`을 올리고 `validate`의 `goldSha256`을 기록한다. 이후 gold 수정은 새 revision이며 이전 revision 결과와 비교하지 않는다.
 5. **기록**: 작성자 수, 합의 여부(`adjudicated`), 불일치율을 `gold.json`의 `provenance`에 적는다. 지금은 `annotators=1, adjudicated=false`다.
-6. **규모**: 거버넌스 문서 [`ZOOP_AI_거버넌스_정책_v0.1.md`](../ZOOP_AI_거버넌스_정책_v0.1.md) 11절은 일반 유형 20건 이상, 복잡·예외 40건 이상을 **제안**한다. 현재 split당 질문 9·그래프 task 5는 이에 한참 못 미친다. 사람 gold를 먼저 만들자는 팀 내 제안은 결정이 아니라 제안이다(`docs/evidence/raw/notion_2026-10-03` 0916 스크럼 기록).
+6. **규모**: 거버넌스 문서 [`ZOOP_AI_거버넌스_정책.md`](../ZOOP_AI_거버넌스_정책.md) 11절은 일반 유형 20건 이상, 복잡·예외 40건 이상을 **제안**한다. 현재 split당 질문 9·그래프 task 5는 이에 한참 못 미친다. 사람 gold를 먼저 만들자는 팀 내 제안은 결정이 아니라 제안이다(`docs/evidence/raw/notion_2026-10-03` 0916 스크럼 기록).
 
 ## 공정한 baseline과 경쟁 서비스의 분리
 
