@@ -163,10 +163,9 @@ public class TossMarketClient {
                 return CompanyPriceResponse.unavailable(companyId, period, "no_data", "이 기간에는 거래된 시세가 없어요(휴장일 등).");
             }
             JsonNode stock = matching(get("/api/v1/stocks", Map.of("symbols", code)).path("result"), code);
+            // Bars came back, so a missing stock row or currency is a provider format failure, not an absence of data.
             String currency = stock == null ? null : strictText(stock.get("currency"));
-            if (currency == null) {
-                return CompanyPriceResponse.unavailable(companyId, period, "no_data", "토스증권 응답에 통화가 없어요.");
-            }
+            if (currency == null) throw formatFailure();
             return CompanyPriceResponse.available(companyId, period,
                     new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, points);
         } catch (MarketDataException exception) {

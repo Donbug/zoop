@@ -32,6 +32,7 @@ class CompanyMarketClientsTest {
     private volatile String lastPriceJson = "700";
     private volatile boolean paginateCandles;
     private volatile boolean rateLimitOnce;
+    private volatile boolean omitStockCurrency;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -235,6 +236,14 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void barsWithoutACurrencyAreAProviderFormatFailureNotNoData() {
+        omitStockCurrency = true;
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null));
+        assertFalse(error.retryable());
+    }
+
+    @Test
     void pricesProviderOutageIsARetryableSourceFailure() {
         providerStatus = 503;
         var error = assertThrows(MarketDataException.class,
@@ -314,7 +323,7 @@ class CompanyMarketClientsTest {
                 """;
         if (path.equals("/api/v1/stocks")) return """
                 {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"}]}
-                """;
+                """.replace(omitStockCurrency ? ",\"currency\":\"KRW\"" : "never-in-body", "");
         if (path.equals("/api/v1/candles")) return """
                 {"result":{"candles":[
                   {"timestamp":"2026-10-15T00:00:00Z","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
