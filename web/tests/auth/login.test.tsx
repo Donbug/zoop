@@ -154,7 +154,7 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     expect(useAuthStore.getState().member?.id).toBe('mem-1');
   });
 
-  test('초기 설정을 마친 회원은 내 종목 지도로 간다', async () => {
+  test('초기 설정을 마친 회원은 시장 전체 지도로 간다', async () => {
     server.on('POST', '/api/v1/auth/login', () =>
       json({ ...memberSession(true), metadata }),
     );
@@ -163,7 +163,7 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     await fillAndSubmit('member@zoop.test', 'secret-pass');
 
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all',
     );
   });
 
@@ -212,7 +212,7 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     );
     await user.click(screen.getByRole('button', { name: '로그인' }));
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all',
     );
   });
 
@@ -267,7 +267,7 @@ describe('D-AUT-01 이메일 로그인 (FS002·FS006)', () => {
     );
     renderApp();
     expect((await screen.findByTestId('destination')).textContent).toBe(
-      '/?mode=personal',
+      '/?mode=all',
     );
   });
 });

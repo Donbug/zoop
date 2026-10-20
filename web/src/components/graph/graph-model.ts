@@ -2,6 +2,7 @@ import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
+import { companyLogo } from '@/util/company-logo';
 
 export function graphSummary(data: GraphResponse) {
   const companyNodes = data.nodes.filter((n) => n.kind === 'company');
@@ -79,7 +80,7 @@ export function companyNodeSize(issueCount: number, scale = 1) {
           : issueCount <= 4
             ? 3
             : 4;
-  return [18, 22, 26, 34, 44][level] * scale;
+  return [36, 44, 52, 68, 88][level] * scale;
 }
 
 export function focusNeighborhood(
@@ -226,6 +227,7 @@ export function toG6Data(
           : []),
       ];
       const dimmed = emphasizedNodes.size > 0 && !emphasizedNodes.has(n.id);
+      const logo = company ? companyLogo(n.id, n.logoUrl) : null;
       return {
         id: n.id,
         type: company ? 'circle' : 'diamond',
@@ -243,10 +245,11 @@ export function toG6Data(
           haloFill: 'transparent',
           haloStrokeOpacity: 1,
           icon: company,
-          iconSrc: n.logoUrl ?? undefined,
-          iconText: n.logoUrl ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
-          iconWidth: size * (n.label === '삼성전자' ? 0.8 : 0.52),
-          iconHeight: size * 0.52,
+          iconSrc: logo ?? undefined,
+          iconText: logo ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
+          iconWidth: size,
+          iconHeight: size,
+          iconRadius: size / 2,
           iconFontSize: size * 0.34,
           iconFontFamily: 'Inter Variable',
           iconFontWeight: 700,
@@ -254,10 +257,10 @@ export function toG6Data(
           labelText: company ? n.label : planned ? n.label : '',
           labelPlacement: company ? 'bottom' : 'top',
           labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
-          labelFontSize: (company ? 8.6 : 9.57) * scale,
-          labelFontWeight: company ? 400 : 700,
-          labelFill: company ? '#8a8a86' : '#1a1a1a',
-          labelOffsetY: company ? 6 : -5,
+          labelFontSize: (company ? 17.2 : 9.57) * scale,
+          labelFontWeight: company ? 500 : 700,
+          labelFill: company ? '#55554f' : '#1a1a1a',
+          labelOffsetY: company ? 10 : -5,
           labelBackground: !company,
           labelBackgroundFill: '#ffffff',
           labelBackgroundStroke: '#1a1a1a',
