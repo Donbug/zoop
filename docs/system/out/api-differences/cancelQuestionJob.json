@@ -31,6 +31,26 @@
       ]
     },
     "response:200:application/json.context.graphVersion:required": true,
+    "response:200:application/json.resolves:required": true,
+    "response:200:application/json.resolves<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.resolves<anyOf:0>.choiceId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "response:200:application/json.resolves<anyOf:0>.choiceId:required": true,
+    "response:200:application/json.resolves<anyOf:0>.jobId": {
+      "type": "string"
+    },
+    "response:200:application/json.resolves<anyOf:0>.jobId:required": true,
+    "response:200:application/json.resolves<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.result<anyOf:0>.answerBasis": {
       "type": "string",
       "enum": [

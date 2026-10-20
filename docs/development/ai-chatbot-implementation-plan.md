@@ -58,7 +58,7 @@ flowchart LR
 
 ### 단계 0 — 계약 고정과 fixture
 
-1. `ChatResult.answerBasis`, `ChatChoice.kind`, 입력·조회 상한과 `budget_exceeded`를 Java DTO·웹 타입·프로토타입 호환 fixture에 반영한다.
+1. `ChatResult.answerBasis`, `ChatChoice.kind`, 확인 질문 답 `resolves`(`ChatClarificationReply`), 입력·조회 상한과 `budget_exceeded`를 Java DTO·웹 타입·프로토타입 호환 fixture에 반영한다.
 2. 내부 `ChatRouteSummary v1`, `ChatToolRequest v1`, `ChatToolResult v1` JSON Schema를 만든다.
 3. Q01~Q08, 논리 capability, MCP registry group을 코드 enum/registry로 한 곳에서 버전 관리한다.
 4. 실제 모델 없이도 전체 상태 머신을 시험할 deterministic fake router·coverage·tool·generator를 만든다.
@@ -68,7 +68,7 @@ flowchart LR
 ### 단계 1 — 저장과 공개 job 수명주기
 
 1. 새 Flyway migration으로 `chat_sessions`, `chat_jobs`, `chat_tool_calls` 및 부분 UNIQUE·CHECK·인덱스를 만든다.
-2. Java에 chat controller/service/repository와 멱등성·소유권·대화당 활성 job 하나 제약을 구현한다.
+2. Java에 chat controller/service/repository와 멱등성·소유권·대화당 활성 job 하나 제약을 구현한다. `resolves`가 있으면 원 작업의 같은 대화·clarification·choice 존재를 같은 트랜잭션에서 검사하고 원 고정 문맥을 복사한다.
 3. `queued → running → completed|failed|cancelled`, lease/owner token, 늦은 완료 차단, recovery artifact와 `save_only`를 구현한다.
 4. `getCurrentConversation`은 최신 저장 대화만 복원하고 모델을 호출하지 않게 한다.
 
@@ -175,6 +175,7 @@ flowchart LR
 | 계획 | 미등록 도구, 중복 제거, 의존·병렬 순서, 12회·4동시·1추가 라운드 한도 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
 | 결과 | answerBasis 일치, Q02 빈 인용, clarification 새 job, no PARTIAL |
+| 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |
 | 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |

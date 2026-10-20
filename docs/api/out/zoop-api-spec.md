@@ -1311,7 +1311,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3373,7 +3373,18 @@ What the answer was actually built on.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | label | 필수 | string |  |
-| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. |
+| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. 회원이 고른 선택지는 새 질문의 resolves.choiceId로 그대로 돌려보낸다. |
+
+<a id="schema-chatclarificationreply"></a>
+
+### ChatClarificationReply
+
+확인 질문(clarification)에 대한 답. 서버는 원 작업의 질문·고정 문맥과 이 선택을 합쳐 새 작업을 실행하며 원 작업은 바꾸지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| jobId | 필수 | string | 답하는 원 작업. 같은 대화에 속하고 completed·outcome=clarification이어야 한다. |
+| choiceId | 필수 | string, null | 원 작업 result.choices[].id 중 하나. null이면 선택지 대신 question에 쓴 자유 입력이 답이다. |
 
 <a id="schema-chatcontextitem"></a>
 
@@ -3465,6 +3476,7 @@ The selection frozen when the question was first received.
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} / null |  |
 | askedAt | 필수 | string (date-time) | UTC time the question was first received; relative dates are read against its KST day |
 | context | 필수 | [ChatFrozenContext](#schema-chatfrozencontext) |  |
+| resolves | 필수 | [ChatClarificationReply](#schema-chatclarificationreply) / null | 이 작업이 답한 확인 질문. 최초 접수 때 고정되며 확인 질문 답이 아니면 null이다. |
 | failure | 필수 | [ChatFailure](#schema-chatfailure) / null |  |
 | result | 필수 | [ChatResult](#schema-chatresult) / null | Only a saved result; null until the job is completed |
 | runs | 필수 | integer | Executions started so far (a retry starts another) |
@@ -3476,13 +3488,14 @@ The selection frozen when the question was first received.
 
 ### ChatJobRequest
 
-
+새 질문 또는 확인 질문에 대한 답. resolves가 있으면 context를 보내지 않으며 서버가 원 작업의 고정 문맥을 이어받는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | jobId | 필수 | string | Client-made idempotency key of this question (not a request-trace id). Resending it never asks twice. |
-| question | 필수 | string |  |
+| question | 필수 | string | 질문 원문. resolves가 있으면 회원에게 보일 답(선택지 label 또는 자유 입력)이다. |
 | context | 선택 | [ChatContextRequest](#schema-chatcontextrequest) |  |
+| resolves | 선택 | [ChatClarificationReply](#schema-chatclarificationreply) |  |
 
 <a id="schema-chatperiod"></a>
 
@@ -3512,7 +3525,7 @@ The selection frozen when the question was first received.
 | citations | 필수 | [Citation](#schema-citation)[] |  |
 | graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
-| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
+| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 resolves.choiceId를 담은 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 

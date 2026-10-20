@@ -4,6 +4,12 @@
 
 기준: v5와 사용자 제공 v5 검증 결과. API 필드는 저장소 docs/api/out/zoop-api-spec.md 및 openapi.yaml과 대조했다. 이전 다운로드 API 파일과 바이트 단위 동일성을 검증한 것은 아니다.
 
+## 2026-10-20 추가 변경 — 확인 질문 답 연결
+
+- `chat_jobs`에 `resolves_job_id text? FK chat_jobs`, `resolves_choice_id text?`와 CHECK(choice가 있으면 job 필수)를 추가했다. 기존 계약에는 clarification 선택지(`ChatChoice.id`)를 새 질문에 돌려보낼 필드가 없어 원 질문과 선택을 서버가 결합할 근거가 없었다.
+- API `ChatJobRequest.resolves`·`ChatJob.resolves`(`ChatClarificationReply`)와 대응한다. 원 작업의 같은 대화·completed·clarification 여부와 choice 존재는 접수 트랜잭션에서 검사하며, 새 작업은 원 작업의 고정 문맥을 복사한다.
+- 테이블 수는 그대로 36개다. 챗봇 첫 migration에 함께 포함한다.
+
 ## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
 
 - PostgreSQL 테이블 수를 35개에서 36개로 변경하고 `chat_tool_calls`를 추가했다. 질문 결과와 함께 읽는 분류·계획 요약은 `chat_jobs.route_summary` JSONB에 유지하되, 실제 MCP/서버 읽기 호출은 요청당 상한·지연·오류·중복 제거를 독립 집계할 수 있도록 행으로 분리했다.
