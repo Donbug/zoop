@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:58 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:58 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — 근거 기반 답변 생성 및 안전 검증: 시스템은 조회된 근거·관계·시장 데이터만 바탕으로 답변을 생성한다. 답변에는 적용 대상·기간, 핵심 설명, 연결 근거, 한계 또는 추가 확인 사항을 포함한다. 매수·매도 권유나 수익·가격 예측은 제공하지 않는다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — 개인화 조건과 근거 확보: 현재 접근 권한으로 사용할 수 있는 개인화 정보와 질문 작업에 고정된 근거 문서를 조회해야 한다. 로그인·종목 설정 등 조건 부족, 근거 부족, 기술 오류를 구분해야 한다. 선택한 문서나 버전을 사용할 수 없다고 최신 자료로 몰래 바꿔서는 안 된다.
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — 근거 기반 답변 생성 및 안전 검증: 시스템은 조회된 근거·관계·시장 데이터만 바탕으로 답변을 생성한다. 답변에는 적용 대상·기간, 핵심 설명, 연결 근거, 한계 또는 추가 확인 사항을 포함한다. 매수·매도 권유나 수익·가격 예측은 제공하지 않는다.
 
 ## 상세 권한과 의미 이행
 

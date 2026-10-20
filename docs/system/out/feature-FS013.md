@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv) — 초기 설정 저장: 시스템은 회원의 투자 여부, 가상계좌 연결 상태, 관심종목 등 초기 설정 정보를 해당 회원 계정에 저장한다. 저장 실패 시 초기 설정 완료로 처리하지 않고 현재 선택 내용을 유지한 상태에서 다시 시도할 수 있도록 한다. 비회원의 개인 설정은 저장하지 않으며, 개인 설정 기능을 이용하려는 경우 로그인 및 회원 초기 설정 절차로 안내한다. 튜토리얼 완료·건너뛰기 여부는 초기 설정 완료 판정과 별도로 관리한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv) — 초기 설정 저장: 시스템은 회원의 투자 여부, 가상계좌 연결 상태, 관심종목 등 초기 설정 정보를 해당 회원 계정에 저장한다. 저장 실패 시 초기 설정 완료로 처리하지 않고 현재 선택 내용을 유지한 상태에서 다시 시도할 수 있도록 한다. 비회원의 개인 설정은 저장하지 않으며, 개인 설정 기능을 이용하려는 경우 로그인 및 회원 초기 설정 절차로 안내한다. 튜토리얼 완료 여부(`tutorialCompleted`)는 초기 설정 완료 판정과 별도로 관리한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:187 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

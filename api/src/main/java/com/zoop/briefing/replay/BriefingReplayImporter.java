@@ -239,11 +239,29 @@ public final class BriefingReplayImporter {
                 held.add(new Held(id, date, edition, from, cutoff, "HELD_VALIDATION".equals(state) ? "failed" : "missing", snapshot));
                 priorId = null; priorSha = null;
             } else {
-                require(!inputs.isEmpty() && (("SELECTED".equals(state) && !selected.isEmpty())
-                        || ("EMPTY_CONFIRMED".equals(state) && selected.isEmpty())), "simulation_selection_state");
-                StrictJson.Obj result = definition.object("result"); validateGeneration(result, selected);
-                require(Canonical.digest(result.node()).equals(definition.string("resultSha256")), "simulation_result_hash");
-                validateSimulationSuccessReceipts(edition, result, receipts, qualityV2);
+                boolean emptyConfirmed = "EMPTY_CONFIRMED".equals(state);
+                StrictJson.Obj result;
+                if (emptyConfirmed) {
+                    require(selected.isEmpty() && definition.isNull("result") && definition.isNull("resultSha256")
+                            && coverage.count("unconfirmedTotal") == 0 && clocks.verified.size() == pool.size(), "simulation_empty_confirmation");
+                    for (JsonNode value : receipts.values()) {
+                        String stage = StrictJson.Obj.of(value).string("stage");
+                        require(!stage.endsWith("_generation") && !stage.endsWith("_verification"), "simulation_empty_has_no_generated_result");
+                    }
+                    validateSimulationSuccessRecordings(definition, receipts);
+                    // Coverage has no selected text or model verification. Keep the full audited source scope as authority.
+                    Map<String, Source> coverageSources = new LinkedHashMap<>(pool);
+                    documents.putAll(coverageSources); inputs = coverageSources;
+                    Instant determined = created.isAfter(cutoff) ? created : cutoff;
+                    ObjectNode empty = StrictJson.newObject().put("generatedAt", determined.toString()); empty.putArray("items");
+                    result = StrictJson.Obj.of(empty); marker.put("emptyConfirmation", "source_coverage_no_selected_issue");
+                } else {
+                    require("SELECTED".equals(state) && !inputs.isEmpty() && !selected.isEmpty(), "simulation_selection_state");
+                    result = definition.object("result"); validateGeneration(result, selected);
+                    require(Canonical.digest(result.node()).equals(definition.string("resultSha256")), "simulation_result_hash");
+                    validateSimulationSuccessReceipts(edition, result, receipts, qualityV2);
+                    validateSimulationSuccessRecordings(definition, receipts);
+                }
                 Instant generated = Instant.parse(result.string("generatedAt")); if (generated.isAfter(created)) created = generated;
                 Round base = round(namespace, edition, date, date.minusDays(1), sourceSha, bundleSha, run,
                         definition.object("identity"), selected, result, inputs, generated);
@@ -255,7 +273,7 @@ public final class BriefingReplayImporter {
                     ((ObjectNode) item).put("reportedAt", newest.toString()); // Document publication, not an invented event time.
                 }
                 payload.set("dataWindow", StrictJson.newObject().put("start", from.toString()).put("end", cutoff.toString()).put("openStart", false));
-                payload.put("selectedFrom", inputs.size()); if (selected.isEmpty()) payload.put("emptyReason", "no_issues_in_window");
+                payload.put("selectedFrom", coverage.count("uniqueInputCount")); if (selected.isEmpty()) payload.put("emptyReason", "no_issues_in_window");
                 ObjectNode metadata = (ObjectNode) payload.get("metadata"); metadata.put("source", "zoop-briefing-publication-clock-simulation");
                 ((ObjectNode) metadata.get("selection")).put("reason", "확인된 원 발행시각을 회차 창에 나눈 과거 시뮬레이션입니다. 당시 수집·동일 본문 버전·완전한 시장 모집단을 입증하지 않습니다.");
                 ArrayNode limitations = metadata.putArray("failures");
@@ -264,13 +282,17 @@ public final class BriefingReplayImporter {
                 failure(limitations, "graphVersion", "SOURCE_UNAVAILABLE", "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.");
                 failure(limitations, "marketVariables", "SOURCE_UNAVAILABLE", "당시 KOSPI·KOSDAQ·환율 및 실제 전망 성과를 제공하지 않습니다.");
                 ObjectNode snapshot = base.snapshot(); snapshot.set("replay", marker);
-                marker.put("resultSha256", definition.string("resultSha256")).put("inputArtifactId", namespace + "-input-" + index)
-                        .put("resultArtifactId", namespace + "-result-" + index).put("verificationArtifactId", namespace + "-verification-" + index);
-                blobs.put(namespace + "-result-" + index, blob("analysis_result", StrictJson.write(result.node())));
-                blobs.put(namespace + "-verification-" + index, blob("verification_receipt", StrictJson.write(result.object("verification").node())));
+                marker.put("inputArtifactId", namespace + "-input-" + index);
+                if (!emptyConfirmed) {
+                    marker.put("resultSha256", definition.string("resultSha256")).put("resultArtifactId", namespace + "-result-" + index)
+                            .put("verificationArtifactId", namespace + "-verification-" + index);
+                    blobs.put(namespace + "-result-" + index, blob("analysis_result", StrictJson.write(result.node())));
+                    blobs.put(namespace + "-verification-" + index, blob("verification_receipt", StrictJson.write(result.object("verification").node())));
+                }
                 ObjectNode comparison = "morning".equals(edition) ? null : StrictJson.newObject().put("status", "unavailable")
                         .put("reason", "직전 모의 결과는 입력 문맥으로만 연결했습니다. 실제 출근 대비 장중 변화·전망 성과 평가는 없습니다.");
-                Instant published = generated;
+                Instant published = emptyConfirmed ? generated : simulationPublicationTime(generated, result, receipts);
+                if (published.isAfter(created)) created = published;
                 if (marketRounds.containsKey(id)) {
                     StrictJson.Obj enrichment = marketRounds.get(id);
                     if (enrichment.has("marketContext")) {
@@ -292,7 +314,8 @@ public final class BriefingReplayImporter {
                     applyMarketEnrichment(payload, snapshot, enrichment);
                     registerMarketBlobs(namespace + "-market-" + index, enrichment, blobs);
                     MarketPublicationTimes times = marketPublicationTimes(generated, enrichment);
-                    generated = times.generatedAt(); published = times.publishedAt();
+                    generated = times.generatedAt();
+                    if (times.publishedAt().isAfter(published)) published = times.publishedAt();
                     payload.put("generatedAt", generated.toString());
                     if (times.artifactCreatedAt().isAfter(created)) created = times.artifactCreatedAt();
                 }
@@ -678,7 +701,10 @@ public final class BriefingReplayImporter {
         String status = summary.object("verification").string("status");
         require(Set.of("PASS", "WITHHELD").contains(status), "market_summary_verification_status");
         if (claims.isEmpty() && "WITHHELD".equals(status)) {
-            require(summary.isNull("text") && summary.isNull("summary") && summary.isNull("resultVersion"), "market_summary_withheld_content"); return;
+            require(summary.isNull("text") && summary.isNull("summary") && summary.isNull("resultVersion"), "market_summary_withheld_content");
+            require(summary.object("verification").objects("checks").isEmpty()
+                    && (!summary.has("verificationRequestDigest") || summary.isNull("verificationRequestDigest")), "market_summary_withheld_final_binding");
+            return;
         }
         require(claims.size() >= 2 && claims.size() <= (contextual ? 8 : 4), "market_summary_claim_count");
         for (int index = 0; index < claims.size(); index++) {
@@ -1059,7 +1085,10 @@ public final class BriefingReplayImporter {
     private void paidResponseBlobs(String namespace, Map<String, JsonNode> receipts, Map<String, Blob> blobs) {
         for (var entry : receipts.entrySet()) {
             StrictJson.Obj receipt = StrictJson.Obj.of(entry.getValue());
-            if (!receipt.has("responseSha256") || receipt.isNull("responseSha256")) continue;
+            if (!receipt.has("responseSha256") || receipt.isNull("responseSha256")) {
+                require(!success(receipt), "simulation_success_recording_required");
+                continue;
+            }
             String responseSha = receipt.string("responseSha256"), digest = entry.getKey();
             require(responseSha.matches("[0-9a-f]{64}"), "simulation_provider_response_digest");
             Path calls = settings.bundle().getParent().resolve("calls");
@@ -1076,6 +1105,86 @@ public final class BriefingReplayImporter {
             String kind = receipt.string("stage").endsWith("_verification") ? "verification_receipt" : "analysis_result";
             blobs.put(namespace + "-response-" + digest, new Blob(kind, response, "application/octet-stream"));
         }
+    }
+
+    private static Instant simulationPublicationTime(Instant generated, StrictJson.Obj result, Map<String, JsonNode> receipts) {
+        Instant published = generated;
+        for (String field : List.of("generationRequestDigest", "verificationRequestDigest")) {
+            Instant finished = Instant.parse(StrictJson.Obj.of(receipts.get(result.string(field))).string("finishedAt"));
+            if (finished.isAfter(published)) published = finished;
+        }
+        return published;
+    }
+
+    /** Bind the final published draft to the immutable provider recordings, not just self-declared receipt IDs. */
+    private void validateSimulationSuccessRecordings(StrictJson.Obj round, Map<String, JsonNode> receipts) {
+        Map<String, StrictJson.Obj> requests = new LinkedHashMap<>(), outputs = new LinkedHashMap<>();
+        for (var entry : receipts.entrySet()) {
+            StrictJson.Obj receipt = StrictJson.Obj.of(entry.getValue());
+            if (!success(receipt)) continue; // Failed/unknown paid attempts remain accounting, never publication evidence.
+            require(receipt.bool("usageKnown") && receipt.count("httpStatus") == 200
+                    && receipt.has("responseSha256") && !receipt.isNull("responseSha256"), "simulation_success_recording_required");
+            String digest = entry.getKey();
+            Path calls = settings.bundle().getParent().resolve("calls");
+            byte[] requestBytes = read(calls.resolve(digest + ".request.json"));
+            byte[] responseBytes = read(calls.resolve(digest + ".response.json"));
+            require(digest.equals(Canonical.sha256(requestBytes))
+                    && receipt.string("responseSha256").equals(Canonical.sha256(responseBytes)), "simulation_success_recording_hash");
+            StrictJson.Obj request = StrictJson.parseObject(requestBytes), data = StrictJson.parseObject(request.string("input"));
+            require(receipt.string("stage").equals(request.object("text").object("format").string("name"))
+                    && receipt.string("model").equals(request.string("model"))
+                    && round.string("identitySha256").equals(data.string("contextSha256"))
+                    && round.object("identity").node().equals(data.object("context").node()), "simulation_success_request_context");
+            StrictJson.Obj previous = round.object("previous");
+            if ("available".equals(previous.string("status")))
+                require(previous.string("resultSha256").equals(Canonical.digest(data.object("simulatedPreviousOutput").node())), "simulation_success_previous_binding");
+            else require(data.isNull("simulatedPreviousOutput"), "simulation_success_previous_binding");
+            StrictJson.Obj response = StrictJson.parseObject(responseBytes);
+            require(receipt.string("status").equals(response.string("status")) && receipt.string("responseId").equals(response.string("id"))
+                    && receipt.count("inputTokens") == response.object("usage").count("input_tokens")
+                    && receipt.count("outputTokens") == response.object("usage").count("output_tokens"), "simulation_success_response_usage");
+            Instant.parse(receipt.string("finishedAt"));
+            List<String> texts = new ArrayList<>();
+            for (StrictJson.Obj message : response.objects("output")) if ("message".equals(message.string("type")))
+                for (StrictJson.Obj content : message.objects("content")) {
+                    require(!"refusal".equals(content.string("type")), "simulation_success_refusal");
+                    if ("output_text".equals(content.string("type"))) texts.add(content.string("text"));
+                }
+            require(texts.size() == 1, "simulation_success_one_output");
+            requests.put(digest, data); outputs.put(digest, StrictJson.parseObject(texts.getFirst()));
+        }
+        if (round.isNull("result")) {
+            for (var entry : outputs.entrySet()) {
+                String stage = StrictJson.Obj.of(receipts.get(entry.getKey())).string("stage");
+                if ("round_simulation_selection".equals(stage))
+                    require(entry.getValue().array("selected").isEmpty(), "simulation_empty_selection_recording");
+            }
+            return;
+        }
+        StrictJson.Obj result = round.object("result");
+        String generation = result.string("generationRequestDigest"), verification = result.string("verificationRequestDigest");
+        StrictJson.Obj generated = outputs.get(generation), verified = outputs.get(verification);
+        require(generated != null && verified != null, "simulation_final_recording_required");
+        for (String digest : List.of(generation, verification))
+            require(requests.get(digest).array("selected").equals(round.array("selected"))
+                    && round.string("edition").equals(requests.get(digest).string("edition")), "simulation_final_selected_binding");
+        ArrayNode items = StrictJson.newArray();
+        if (generated.raw("items").isArray()) generated.array("items").forEach(items::add);
+        else {
+            Set<String> ids = new HashSet<>();
+            for (StrictJson.Obj item : result.objects("items")) { ids.add(item.string("issueId")); items.add(generated.object("items").raw(item.string("issueId"))); }
+            generated.object("items").exactly(ids);
+        }
+        require(items.equals(result.array("items")), "simulation_generated_content_binding");
+        require(requests.get(verification).object("draft").array("items").equals(result.array("items")), "simulation_verified_draft_binding");
+        ArrayNode checks = StrictJson.newArray();
+        if (verified.raw("checks").isArray()) verified.array("checks").forEach(checks::add);
+        else {
+            Set<String> ids = new HashSet<>();
+            for (StrictJson.Obj check : result.object("verification").objects("checks")) { ids.add(check.string("targetId")); checks.add(verified.object("checks").raw(check.string("targetId"))); }
+            verified.object("checks").exactly(ids);
+        }
+        require(checks.equals(result.object("verification").array("checks")), "simulation_verifier_checks_binding");
     }
 
     private static void validateSimulationSuccessReceipts(String edition, StrictJson.Obj result, Map<String, JsonNode> receipts, boolean qualityV2) {

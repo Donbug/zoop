@@ -1,0 +1,174 @@
+{
+  "source_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs",
+  "export_url": "https://docs.google.com/spreadsheets/d/1irLUY-NCkDRfF8fO3WkZWU2MpaStu2RPmQ-wG0F9Xcs/export?format=xlsx",
+  "request_started_at_utc": "2026-10-18T13:04:22.968168+00:00",
+  "collected_at_utc": "2026-10-18T13:04:24.236161+00:00",
+  "collected_at_kst": "2026-10-18T22:04:24.236161+09:00",
+  "auth": "none",
+  "http_status": 200,
+  "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "response_bytes": 205906,
+  "response_sha256": "a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273",
+  "baseline": "functional-spec_2026-10-12",
+  "baseline_xlsx_sha256": "49fc383bce873367036c449bd02bde23b08ab3893e21b9bf340096845b82267c",
+  "content_identical": false,
+  "meaningful_cell_content_changed": true,
+  "data_only": true,
+  "csv_encoding": "utf-8-sig",
+  "xlsx": "zoop-functional-spec_2026-10-18.xlsx",
+  "sha256": "a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273",
+  "sheets": {
+    "명세 목차": "00-명세-목차.csv",
+    "회원가입·로그인": "01-회원가입-로그인.csv",
+    "온보딩·튜토리얼": "02-온보딩-튜토리얼.csv",
+    "메인그래프 v2": "04-메인그래프-v2.csv",
+    "출퇴근 브리핑": "05-출퇴근-브리핑.csv",
+    "기업 상세·타임라인": "06-기업-상세-타임라인.csv",
+    "AI 챗봇 v2": "08-AI-챗봇-v2.csv",
+    "데이터 관리": "09-데이터-관리.csv",
+    "외부 연동": "10-외부-연동.csv",
+    "AI 평가·관리자": "11-AI-평가-관리자.csv",
+    "비기능 상세": "12-비기능-상세.csv",
+    "변경 내역": "13-변경-내역.csv",
+    "제안·확인 사항": "14-제안-확인-사항.csv"
+  },
+  "sheet_ranges": {
+    "명세 목차": {
+      "rows": 107,
+      "columns": 8
+    },
+    "회원가입·로그인": {
+      "rows": 104,
+      "columns": 2
+    },
+    "온보딩·튜토리얼": {
+      "rows": 146,
+      "columns": 2
+    },
+    "메인그래프 v2": {
+      "rows": 995,
+      "columns": 26
+    },
+    "출퇴근 브리핑": {
+      "rows": 144,
+      "columns": 2
+    },
+    "기업 상세·타임라인": {
+      "rows": 118,
+      "columns": 26
+    },
+    "AI 챗봇 v2": {
+      "rows": 105,
+      "columns": 2
+    },
+    "데이터 관리": {
+      "rows": 90,
+      "columns": 5
+    },
+    "외부 연동": {
+      "rows": 62,
+      "columns": 2
+    },
+    "AI 평가·관리자": {
+      "rows": 230,
+      "columns": 2
+    },
+    "비기능 상세": {
+      "rows": 174,
+      "columns": 2
+    },
+    "변경 내역": {
+      "rows": 68,
+      "columns": 6
+    },
+    "제안·확인 사항": {
+      "rows": 30,
+      "columns": 5
+    }
+  },
+  "sheet_states": {
+    "명세 목차": "visible",
+    "회원가입·로그인": "visible",
+    "온보딩·튜토리얼": "visible",
+    "메인그래프 v2": "visible",
+    "출퇴근 브리핑": "visible",
+    "기업 상세·타임라인": "visible",
+    "AI 챗봇 v2": "visible",
+    "데이터 관리": "visible",
+    "외부 연동": "visible",
+    "AI 평가·관리자": "visible",
+    "비기능 상세": "visible",
+    "변경 내역": "visible",
+    "제안·확인 사항": "visible"
+  },
+  "sheet_state_deltas": [
+    {
+      "sheet": "메인 그래프",
+      "before": "hidden",
+      "after": null
+    },
+    {
+      "sheet": "AI 챗봇",
+      "before": "hidden",
+      "after": null
+    }
+  ],
+  "files": {
+    "00-명세-목차.csv": "4d5505aad267724a958436db9304e4fb62ccaf49bedfcce0aa2c4dd80ab045a2",
+    "01-회원가입-로그인.csv": "c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74",
+    "02-온보딩-튜토리얼.csv": "c07b0ddcf3a055b9c087c295bb03ac637da872f630e7360ccbaa3bd8313e5541",
+    "04-메인그래프-v2.csv": "dd707d3eb708f6426c3a5f4328d0f4742ac58495362b6d74091ee6f2df516a05",
+    "05-출퇴근-브리핑.csv": "647627f382ee1eb63fd1e67157fe2834b46be2f09d4e237587fec71530bf0647",
+    "06-기업-상세-타임라인.csv": "437b6826c5e374b095885a2d2076df638f21dccda95fbe7a644b03af3e2eca20",
+    "08-AI-챗봇-v2.csv": "5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90",
+    "09-데이터-관리.csv": "ac09b5a762d039d23e826997faf19a36a5d21f788719136db0f70ed10a23d4d5",
+    "10-외부-연동.csv": "8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6",
+    "11-AI-평가-관리자.csv": "97679445a88a3714b5a7a11665b89c60482f2cccf9edbc1912179956904206c2",
+    "12-비기능-상세.csv": "41995ded3b10043dc379c8afab1e3e9f341c26941cc59b67b550ddccb5f552e4",
+    "13-변경-내역.csv": "52b0d0606bea399de6d6b71e38dd6be4e8c5fc9b506e26600702d3e0d986d61f",
+    "14-제안-확인-사항.csv": "4c588d550b2146c8ae5c90144442392c7bdff20e42cc648eaa0dec9f2fd7d131",
+    "zoop-functional-spec_2026-10-18.xlsx": "a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273"
+  },
+  "baseline_sheet_order": [
+    "명세 목차",
+    "회원가입·로그인",
+    "온보딩·튜토리얼",
+    "메인 그래프",
+    "메인그래프 v2",
+    "출퇴근 브리핑",
+    "기업 상세·타임라인",
+    "AI 챗봇",
+    "AI 챗봇 v2",
+    "데이터 관리",
+    "외부 연동",
+    "AI 평가·관리자",
+    "비기능 상세",
+    "변경 내역",
+    "제안·확인 사항"
+  ],
+  "current_sheet_order": [
+    "명세 목차",
+    "회원가입·로그인",
+    "온보딩·튜토리얼",
+    "메인그래프 v2",
+    "출퇴근 브리핑",
+    "기업 상세·타임라인",
+    "AI 챗봇 v2",
+    "데이터 관리",
+    "외부 연동",
+    "AI 평가·관리자",
+    "비기능 상세",
+    "변경 내역",
+    "제안·확인 사항"
+  ],
+  "cell_delta_count": 603,
+  "formula_delta_count": 0,
+  "structural_delta_count": 3,
+  "logged_cell_deltas_matched": 0,
+  "logged_cell_deltas_mismatched": 0,
+  "logged_cells_absent_from_delta": 0,
+  "unlogged_cell_deltas": 603,
+  "logged_hyperlink_deltas": 0,
+  "unlogged_hyperlink_deltas": 0,
+  "unexplained_structural_deltas": 3
+}

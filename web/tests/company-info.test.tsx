@@ -82,7 +82,7 @@ function Harness() {
   );
 }
 function open() {
-  render(
+  return render(
     <MemoryRouter
       initialEntries={[
         `/companies/fixture-a?tab=info&period=1w&event=fixture-event&asOf=${encodeURIComponent(asOf)}&graphVersion=fixture-v1`,
@@ -163,23 +163,49 @@ test('permission denial is distinct from a retryable network outage', async () =
     screen.queryByRole('button', { name: '기업 기준정보 다시 조회' }),
   ).toBeNull();
 });
-test('missing company and unavailable public version are explicit', async () => {
+test('missing company and unavailable public version are explicit and offer no retry', async () => {
   server.on('GET', '/api/v1/companies/:id', () => apiError(404, 'NOT_FOUND'));
-  open();
+  const missing = open();
   await screen.findByText('기업 기준정보를 찾을 수 없어요.');
+  expect(
+    screen.queryByRole('button', { name: '기업 기준정보 다시 조회' }),
+  ).toBeNull();
+  missing.unmount();
+
   server.on('GET', '/api/v1/companies/:id', () =>
     json({
       ...company,
       metadata: { ...company.metadata, graphVersion: 'other' },
     }),
   );
-  await userEvent
-    .setup()
-    .click(screen.getByRole('button', { name: '기업 기준정보 다시 조회' }));
+  open();
   await screen.findByText(
-    '선택한 공개 버전의 기업 기준정보를 확인할 수 없어요.',
+    /선택한 공개 버전의 기업 기준정보를 확인할 수 없어요/,
   );
+  expect(
+    screen.queryByRole('button', { name: '기업 기준정보 다시 조회' }),
+  ).toBeNull();
   expect(screen.queryByText(company.legalName!)).toBeNull();
+});
+
+test('F05: a non-retryable provider failure explains itself without retry', async () => {
+  server.on('GET', '/api/v1/companies/:id', () =>
+    json(
+      {
+        error: {
+          code: 'SOURCE_UNAVAILABLE',
+          message: '공급자 인증 실패',
+          retryable: false,
+        },
+      },
+      503,
+    ),
+  );
+  open();
+  await screen.findByText(/자료 공급원의 설정이나 응답 형식 문제/);
+  expect(
+    screen.queryByRole('button', { name: '기업 기준정보 다시 조회' }),
+  ).toBeNull();
 });
 test('partial information retains available fields and permits retry', async () => {
   server.on('GET', '/api/v1/companies/:id', () =>

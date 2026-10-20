@@ -95,11 +95,6 @@ class BriefingRoundReplayPostgresTest {
         restoreInput();
         Files.deleteIfExists(grants);
         Files.deleteIfExists(manifest);
-        if (Files.exists(directory.resolve("calls"))) {
-            try (var files = Files.walk(directory.resolve("calls"))) {
-                for (Path path : files.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
-            }
-        }
         try (var files = Files.walk(artifacts)) {
             for (Path path : files.filter(path -> !path.equals(artifacts)).sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
         }
@@ -302,6 +297,102 @@ class BriefingRoundReplayPostgresTest {
     }
 
     @Test
+    void actualOfflineProducerEmptyWindowsImportWithoutFabricatedResultsAndKeepPublicReads() throws Exception {
+        var process = new ProcessBuilder("python3", "scripts/briefing_review_fixture.py", directory.toString()).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.waitFor(), output);
+        jdbc.update("INSERT INTO companies(id,name) VALUES ('company-authored-review','시험 기업') ON CONFLICT DO NOTHING");
+        var actualImporter = new BriefingReplayImporter(jdbc, transactionManager,
+                new BriefingReplaySettings(source, bundle, artifacts, grants, manifest, Canonical.sha256(Files.readAllBytes(source)), INBOX, clocks));
+        assertEquals(14, actualImporter.importBundle().roundIds().size());
+        assertEquals(14, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
+        assertEquals(12, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE public_snapshot->'replay'->>'selectionStatus'='EMPTY_CONFIRMED'", Integer.class));
+        var empty = get(localPort, "/api/v1/briefings?date=2026-10-03&edition=morning");
+        assertEquals(200, empty.status(), empty.body());
+        assertEquals("published", empty.json().path("status").asText());
+        assertEquals("no_issues_in_window", empty.json().path("emptyReason").asText());
+        assertEquals(0, empty.json().path("items").size());
+        assertEquals(8, receiptCount());
+        assertTrue(actualImporter.importBundle().alreadyImported());
+    }
+
+    @Test
+    void actualOfflineProducerNoSelectionAlsoImportsWithoutInventingGenerationOrVerification() throws Exception {
+        var process = new ProcessBuilder("python3", "scripts/briefing_review_fixture.py", directory.toString(), "select-none").redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.waitFor(), output);
+        var actualImporter = new BriefingReplayImporter(jdbc, transactionManager,
+                new BriefingReplaySettings(source, bundle, artifacts, grants, manifest, Canonical.sha256(Files.readAllBytes(source)), INBOX, clocks));
+        actualImporter.importBundle();
+        assertEquals(14, count("briefing_rounds")); assertEquals(4, receiptCount());
+        assertEquals(14, jdbc.queryForObject("SELECT count(*) FROM briefing_rounds WHERE jsonb_array_length(published_payload->'items')=0", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE id ~ '-result-[0-9]+$'", Integer.class));
+        for (var round : bundleNode().path("rounds")) { assertTrue(round.path("result").isNull()); assertTrue(round.path("resultSha256").isNull()); }
+    }
+
+    @Test
+    void actualProducerStructurallyRejectedMarketRepairImportsAsWithheldAndPreservesAllAttempts() throws Exception {
+        var process = new ProcessBuilder("python3", "scripts/briefing_review_fixture.py", directory.toString(), "market-repair").redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.waitFor(), output);
+        jdbc.update("INSERT INTO companies(id,name) VALUES ('company-authored-review','시험 기업') ON CONFLICT DO NOTHING");
+        var actualImporter = new BriefingReplayImporter(jdbc, transactionManager,
+                new BriefingReplaySettings(source, bundle, artifacts, grants, manifest, Canonical.sha256(Files.readAllBytes(source)), INBOX, clocks));
+        actualImporter.importBundle();
+        assertEquals(14, count("briefing_rounds")); assertEquals(14, receiptCount());
+        for (var record : bundleNode().at("/marketEnrichment/rounds")) {
+            assertEquals(0, record.at("/summaryResult/claims").size());
+            assertTrue(record.at("/summaryResult/verificationRequestDigest").isNull());
+            assertEquals(2, record.at("/summaryResult/attempts").size());
+            assertEquals(3, record.path("receipts").size());
+        }
+        var response = get(localPort, QUERY + "morning");
+        assertEquals(200, response.status(), response.body());
+        assertEquals("unavailable", response.json().at("/marketSummary/status").asText());
+        assertEquals(1, response.json().path("items").size());
+        assertTrue(actualImporter.importBundle().alreadyImported());
+    }
+
+    @Test
+    void recomputingBundleHashesCannotPublishContentNeverGeneratedOrVerified() throws Exception {
+        for (String mutation : List.of("title", "claim", "check", "missing_response_hash", "usage")) {
+            restoreInput(); var candidate = bundleNode(); var first = (ObjectNode) candidate.path("rounds").get(0);
+            if (mutation.equals("title")) ((ObjectNode) first.at("/result/items/0")).put("title", "[합성시험] 생성되지 않은 제목");
+            if (mutation.equals("claim")) ((ObjectNode) first.at("/result/items/0/claims/0")).put("text", "[합성시험] 생성되지 않은 문장");
+            if (mutation.equals("check")) ((ObjectNode) first.at("/result/verification/checks/0")).put("reason", "[합성시험] 바뀐 검증");
+            if (mutation.equals("missing_response_hash") || mutation.equals("usage")) {
+                String digest = first.path("receipts").get(2).path("requestDigest").asText();
+                for (JsonNode list : List.of(candidate.path("receipts"), first.path("receipts"), first.at("/result/usage")))
+                    for (var receipt : list) if (digest.equals(receipt.path("requestDigest").asText())) {
+                        if (mutation.equals("usage")) ((ObjectNode) receipt).put("inputTokens", 99999);
+                        else ((ObjectNode) receipt).remove("responseSha256");
+                    }
+            }
+            rebindResultsAndPrevious(candidate); writeBundle(candidate);
+            var error = assertThrows(RuntimeException.class, () -> importer().importBundle(), mutation);
+            String expected = switch (mutation) {
+                case "title", "claim" -> "simulation_generated_content_binding";
+                case "check" -> "simulation_verifier_checks_binding";
+                case "missing_response_hash" -> "simulation_success_recording_required";
+                case "usage" -> "simulation_success_response_usage";
+                default -> throw new IllegalStateException(mutation);
+            };
+            assertTrue(error.getMessage().contains(expected), error.getMessage());
+            assertEquals(0, count("briefing_rounds"), mutation); assertEquals(0, count("artifacts"), mutation);
+        }
+    }
+
+    @Test
+    void newsOnlyPublicationIsNotEarlierThanVerificationAndReimportPreservesItsTime() throws Exception {
+        importer().importBundle();
+        String id = bundleNode().path("rounds").get(0).path("roundId").asText();
+        var before = jdbc.queryForMap("SELECT generated_at,published_at FROM briefing_rounds WHERE id=?", id);
+        assertTrue(((java.sql.Timestamp) before.get("published_at")).toInstant().isAfter(((java.sql.Timestamp) before.get("generated_at")).toInstant()));
+        assertTrue(importer().importBundle().alreadyImported());
+        assertEquals(before, jdbc.queryForMap("SELECT generated_at,published_at FROM briefing_rounds WHERE id=?", id));
+    }
+
+    @Test
     void earlierFailedIncompleteAndUnknownPaidAttemptsStayInAccountingWithoutReplacingSuccess() throws Exception {
         var candidate = withPriorAttempts();
         writeBundle(candidate);
@@ -406,10 +497,10 @@ class BriefingRoundReplayPostgresTest {
         var receipt = (ObjectNode) third.path("receipts").get(3);
         String oldDigest = receipt.path("requestDigest").asText();
         String digest = Canonical.sha256(syntheticRequest());
-        receipt.put("requestDigest", digest).put("responseSha256", Canonical.sha256(syntheticResponse()));
+        receipt.put("requestDigest", digest).put("responseSha256", Canonical.sha256(syntheticResponse())).put("status", "failed").put("httpStatus", 500);
         for (var value : candidate.path("receipts")) {
             if (value.path("requestDigest").asText().equals(oldDigest)) {
-                ((ObjectNode) value).put("requestDigest", digest).put("responseSha256", Canonical.sha256(syntheticResponse()));
+                ((ObjectNode) value).put("requestDigest", digest).put("responseSha256", Canonical.sha256(syntheticResponse())).put("status", "failed").put("httpStatus", 500);
             }
         }
         Files.createDirectories(directory.resolve("calls"));
@@ -424,6 +515,7 @@ class BriefingRoundReplayPostgresTest {
         var first = (ObjectNode) candidate.path("rounds").get(0);
         for (String status : List.of("failed", "incomplete", "unknown")) {
             var prior = ((ObjectNode) first.path("receipts").get(0)).deepCopy();
+            prior.remove("responseSha256");
             prior.put("requestDigest", Canonical.sha256("synthetic-previous-" + status)).put("responseId", "resp_synthetic_prior_" + status)
                     .put("status", status).put("stage", status.equals("incomplete") ? "round_simulation_importance" : "round_simulation_morning_generation");
             if (status.equals("unknown")) prior.put("usageKnown", false).putNull("inputTokens").putNull("outputTokens").putNull("httpStatus").putNull("responseId");
@@ -480,7 +572,57 @@ class BriefingRoundReplayPostgresTest {
             }
             ((ObjectNode) round).put("identitySha256", Canonical.digest(identity));
         }
+        recordSyntheticProviderCalls(candidate);
         Files.writeString(bundle, Canonical.write(candidate));
+    }
+
+    /** Authored provider recordings, never live requests. Stable bytes exercise the actual request/result binding. */
+    private static void recordSyntheticProviderCalls(ObjectNode candidate) throws Exception {
+        Files.createDirectories(directory.resolve("calls"));
+        var ledger = candidate.putArray("receipts");
+        JsonNode prior = null;
+        for (var value : candidate.path("rounds")) {
+            var round = (ObjectNode) value;
+            var previous = JSON.createObjectNode().put("type", "simulated_previous_output");
+            if (prior == null) previous.put("status", "unavailable").put("reason", "[합성시험] 바로 직전 PASS 회차가 없습니다.");
+            else previous.put("status", "available").put("roundId", prior.path("roundId").asText()).put("resultSha256", prior.path("resultSha256").asText());
+            round.set("previous", previous); ((ObjectNode) round.path("identity")).set("previous", previous.deepCopy());
+            round.put("identitySha256", Canonical.digest(round.path("identity")));
+            if (round.path("result").isNull()) { prior = null; continue; }
+            var result = (ObjectNode) round.path("result");
+            var finalUsage = result.putArray("usage");
+            for (var node : round.path("receipts")) {
+                var receipt = (ObjectNode) node; String stage = receipt.path("stage").asText();
+                var data = JSON.createObjectNode().put("contextSha256", round.path("identitySha256").asText()).put("edition", round.path("edition").asText());
+                data.set("context", round.path("identity").deepCopy()); data.set("selected", round.path("selected").deepCopy());
+                data.set("simulatedPreviousOutput", prior == null ? JSON.nullNode() : prior.path("result").deepCopy());
+                var answer = JSON.createObjectNode();
+                if (stage.endsWith("_generation")) {
+                    var items = answer.putObject("items");
+                    for (var item : result.path("items")) items.set(item.path("issueId").asText(), item.deepCopy());
+                } else if (stage.endsWith("_verification")) {
+                    data.putObject("draft").set("items", result.path("items").deepCopy());
+                    var checks = answer.putObject("checks");
+                    for (var check : result.at("/verification/checks")) checks.set(check.path("targetId").asText(), check.deepCopy());
+                } else answer.put("synthetic", true);
+                var request = JSON.createObjectNode().put("model", receipt.path("model").asText()).put("store", false).put("input", Canonical.write(data));
+                request.putObject("text").putObject("format").put("name", stage);
+                byte[] requestBytes = Canonical.write(request).getBytes(StandardCharsets.UTF_8); String digest = Canonical.sha256(requestBytes);
+                var response = JSON.createObjectNode().put("id", receipt.path("responseId").asText()).put("status", "completed");
+                response.putObject("usage").put("input_tokens", receipt.path("inputTokens").asInt()).put("output_tokens", receipt.path("outputTokens").asInt());
+                response.putArray("output").addObject().put("type", "message").putArray("content").addObject().put("type", "output_text").put("text", Canonical.write(answer));
+                byte[] responseBytes = Canonical.write(response).getBytes(StandardCharsets.UTF_8);
+                receipt.put("requestDigest", digest).put("responseSha256", Canonical.sha256(responseBytes));
+                receipt.put("finishedAt", java.time.Instant.parse(result.path("generatedAt").asText()).plusSeconds(stage.endsWith("_verification") ? 10 : 0).toString());
+                Files.write(directory.resolve("calls").resolve(digest + ".request.json"), requestBytes);
+                Files.write(directory.resolve("calls").resolve(digest + ".response.json"), responseBytes);
+                ledger.add(receipt.deepCopy());
+                if (stage.endsWith("_generation") || stage.endsWith("_verification")) {
+                    finalUsage.add(receipt.deepCopy()); result.put(stage.endsWith("_generation") ? "generationRequestDigest" : "verificationRequestDigest", digest);
+                }
+            }
+            round.put("resultSha256", Canonical.digest(result)); prior = round;
+        }
     }
     private static ObjectNode bundleNode() throws Exception { return (ObjectNode) JSON.readTree(Files.readAllBytes(bundle)); }
     private static void writeBundle(JsonNode candidate) throws Exception { Files.writeString(bundle, JSON.writeValueAsString(candidate)); }

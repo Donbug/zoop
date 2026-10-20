@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import AppLayout from '@/components/common/AppLayout';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
+import MapEntryRoute from '@/components/auth/MapEntryRoute';
 import AdminLayout from '@/components/admin/common/AdminLayout';
 import AdminProtectedRoute from '@/components/admin/common/AdminProtectedRoute';
 import OnboardingLayout from '@/components/onboarding/OnboardingLayout';
@@ -38,9 +39,15 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
-    lazy: async () => ({
-      Component: (await import('@/pages/map/MapPage')).default,
-    }),
+    element: <MapEntryRoute />,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({
+          Component: (await import('@/pages/map/MapPage')).default,
+        }),
+      },
+    ],
   },
   {
     element: <AppLayout />,

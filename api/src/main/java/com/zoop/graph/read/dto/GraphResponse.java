@@ -15,7 +15,7 @@ public record GraphResponse(List<Node> nodes, List<Edge> edges, Metadata metadat
             Integer evidenceCount, String geography) { }
 
     public record Edge(String id, String source, String target, String relationType, String role, String summary,
-            String assertionStatus, boolean derived, List<String> via, List<String> evidenceIds) { }
+            String assertionStatus, boolean derived, List<String> via, List<String> evidenceIds, String validity) { }
 
     public record Metadata(String source, String asOf, String graphVersion, String mode, boolean truncated,
             String emptyReason, List<String> focusCompanyIds, Integer depth, int limit, String requestId,

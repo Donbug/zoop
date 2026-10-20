@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:55 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:55 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — AI 질문 진입과 맥락 전달: 시스템은 전역 AI 패널과 기업·이슈·관계 패널의 AI에게 질문하기에서 질문을 시작할 수 있게 한다. 선택한 기업, 이슈, 관계, 기준 시점, 근거 문서는 질문 맥락으로 함께 전달한다. 전역 질문은 선택 맥락 없이도 시작할 수 있다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — AI 질문 진입과 전송: 전역 AI 질문창 또는 그래프·기업 상세에서 전달받은 기업·이슈·관계·문서를 기준으로 질문할 수 있어야 한다. 전달받은 선택 대상·기간·근거를 질문에 포함하고 대화 및 질문 작업과 연결해야 한다. 빈 입력과 같은 대화에서 작업 처리 중인 추가 전송은 제한해야 한다. 비회원은 질문 자체를 제한한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — AI 질문 진입과 맥락 전달: 시스템은 전역 AI 패널과 기업·이슈·관계 패널의 AI에게 질문하기에서 질문을 시작할 수 있게 한다. 선택한 기업, 이슈, 관계, 기준 시점, 근거 문서는 질문 맥락으로 함께 전달한다. 전역 질문은 선택 맥락 없이도 시작할 수 있다.
 
 ## 상세 권한과 의미 이행
 

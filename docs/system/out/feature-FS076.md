@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:102 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:102 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:196 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — AI 사건·이슈 추출 및 이슈 후보 생성: 정제된 뉴스·공시에서 개별 사건과 이슈 후보를 AI로 추출한다. 사건은 발생 사실 단위, 이슈는 관련 사건을 묶는 분석 주제로 구분한다. AI가 추출 모델·프롬프트·결과 검증을, 백엔드 B가 결과 계약·작업 상태 연계를 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:196 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — AI 사건·이슈 추출 및 이슈 후보 생성: 정제된 뉴스·공시에서 개별 사건과 이슈 후보를 AI로 추출한다. 사건은 발생 사실 단위, 이슈는 관련 사건을 묶는 분석 주제로 구분한다. AI가 추출 모델·프롬프트·결과 검증을, 백엔드 B가 결과 계약·작업 상태 연계를 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS056](feature-FS056.md) · [FS058](feature-FS058.md) · [FS064](feature-FS064.md)
 

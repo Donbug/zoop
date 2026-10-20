@@ -1,6 +1,13 @@
 import type { Meta } from '@/types/company/detail';
 import type { GraphResponse } from '@/types/map/graph';
 import { ApiError, call } from '@/apis/auth/ApiService';
+
+const PRICE_PERIOD_INTERVAL_MS: Record<string, number> = {
+  '1d': 5 * 60 * 1000,
+  '1w': 60 * 60 * 1000,
+  '1m': 24 * 60 * 60 * 1000,
+  '1y': 7 * 24 * 60 * 60 * 1000,
+};
 export function companyUrl(
   id: string,
   suffix = '',
@@ -78,13 +85,21 @@ export async function readCompanyResource<T>(
     if (prices.status === 'available') {
       const from = requested.searchParams.get('from');
       const to = requested.searchParams.get('to');
+      const period = requested.searchParams.get('period') ?? '';
+      const fromTime = from === null ? null : Date.parse(from);
+      const toTime = to === null ? null : Date.parse(to);
+      const intervalMs = PRICE_PERIOD_INTERVAL_MS[period] ?? 0;
+      // 봉은 구간 시작 시각으로 찍힐 수 있으므로 from 직전의 한 구간만 허용한다.
+      // 하한 검증 자체를 없애면 임의의 오래된 자료가 현재 차트에 섞일 수 있다.
       if (
         prices.points.some((point) => {
           const at = Date.parse(point.time);
           return (
             !Number.isFinite(at) ||
-            (from !== null && at < Date.parse(from)) ||
-            (to !== null && at > Date.parse(to))
+            (fromTime !== null &&
+              Number.isFinite(fromTime) &&
+              at < fromTime - intervalMs) ||
+            (toTime !== null && Number.isFinite(toTime) && at > toTime)
           );
         })
       )

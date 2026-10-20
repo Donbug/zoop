@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:266 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구: 신규·수정·철회 문서나 잘못된 연결이 확인되면 영향을 받는 이슈·관계를 선별 갱신한다. 백엔드 B는 의존 추적·비활성화·저장/공개 복구를, AI는 영향 대상의 재추출·재연결·재검증을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:266 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — 그래프 증분 갱신·관계 비활성화 및 실패 단계 복구: 신규·수정·철회 문서나 잘못된 연결이 확인되면 영향을 받는 이슈·관계를 선별 갱신한다. 백엔드 B는 의존 추적·비활성화·저장/공개 복구를, AI는 영향 대상의 재추출·재연결·재검증을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS055](feature-FS055.md) · [FS058](feature-FS058.md) · [FS059](feature-FS059.md) · [FS067-03](feature-FS067-03.md)
 

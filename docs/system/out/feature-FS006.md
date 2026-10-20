@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:15 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:15 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv) — 로그인 후 화면 이동: 시스템은 로그인 성공 후 초기 설정 완료 여부를 확인해야 한다. 미완료 사용자는 초기 설정 화면으로, 완료 사용자는 기존 보유종목과 관심종목을 기준으로 메인 화면에 진입시켜야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv) — 로그인 후 화면 이동: 시스템은 로그인 성공 후 초기 설정 완료 여부를 확인해야 한다. 미완료 사용자는 초기 설정 화면으로, 완료 사용자는 기존 보유종목과 관심종목을 기준으로 메인 화면에 진입시켜야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:174 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

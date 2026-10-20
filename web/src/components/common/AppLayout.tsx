@@ -5,9 +5,7 @@ import ServiceHeader from './ServiceHeader';
 export default function AppLayout() {
   return (
     <div className="service-surface">
-      <div className="hidden md:block">
-        <ServiceHeader navLabel="데스크톱 주 메뉴" />
-      </div>
+      <ServiceHeader navLabel="데스크톱 주 메뉴" />
 
       <main className="service-page-main has-[>.company-workspace]:w-full! has-[>.company-workspace]:max-w-[1320px] has-[>.company-workspace]:pt-6!">
         <Outlet />

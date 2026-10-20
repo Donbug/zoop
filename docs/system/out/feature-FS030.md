@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:40 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:40 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv) — 핵심 이슈 선정 및 제공: 시스템은 각 브리핑에 핵심 이슈를 최대 3개 제공한다. 정해진 선정 기준에 따라 이슈 제목, 요약, 중요하게 선정한 이유와 관련 기업을 표시해야 한다. 선정 기준을 충족하는 이슈가 부족하면 개수를 억지로 채우지 않아야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv) — 핵심 이슈 선정 및 제공: 시스템은 각 브리핑에 핵심 이슈를 최대 3개 제공한다. 정해진 선정 기준에 따라 이슈 제목, 요약, 중요하게 선정한 이유와 관련 기업을 표시해야 한다. 선정 기준을 충족하는 이슈가 부족하면 개수를 억지로 채우지 않아야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:214 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

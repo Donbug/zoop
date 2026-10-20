@@ -1,5 +1,9 @@
 # Shared detail panel styles
 
+## Auth and onboarding header
+
+Use `SlimHeader` from `@/components/common/SlimHeader` for D-AUT-01/02, D-ONB-01/02 and D-WAT-01/01b. It matches Figma 619:1087 using Tailwind zoop tokens and local icons. Keep `ServiceHeader` for the normal service navigation. Tutorial cards (D-GRP-T~T5) occupy their own left column rather than covering the map legend. D-GRP-07 reuses `panelStyles` for the two-company path rail; see `WIREFRAME_ALIGNMENT_20261017.md` for its snapshot-bound semantics.
+
 Read before editing frontend UI. Baseline: D-GRP-03 company side panel, Figma 619:6729. Applies to D-GRP-02 event, D-GRP-04 relation, D-GRP-05 evidence. Wireframes remain the navigation reference; this guide unifies the visual primitives, not the data semantics.
 
 ## Import and reuse
@@ -53,3 +57,9 @@ These values come from the D-GRP-03/D-GRP-05 Figma frames (619:6729, 619:8225), 
 Import `FeedbackButtons` from `@/components/common/FeedbackButtons` for member-only result feedback. Supply the feature, stable target ID, immutable target version and the confirmed saved value. Pass `undefined` until the saved vote has been read successfully; never turn a failed read into `none`. Provide a retry action alongside a read error. Keep this component keyed by the current member/session and result identity so pending responses and optional dislike reasons cannot cross accounts.
 
 The component uses existing Tailwind tokens, focus rings and native buttons with `aria-pressed`. It confirms the returned target/version/value before displaying a saved vote, preserves the last confirmed value on failure and retries the desired final state. A 409 (result version changed) asks for a refresh instead of offering retry, because resending the same version is rejected again. Results without a version (`graphVersion: null`) show a note instead of the buttons. Guest/checking sessions receive login/status guidance. See `PublishedBriefing` for paginated saved-vote reads and round/issue usage.
+
+## Account menu
+
+Use `AccountMenu` from `@/components/common/AccountMenu` through `ServiceHeader` for D-GRP-01/D-MY-01 and other service screens, including mobile. It replaces the member link to `/my` with a popup containing confirmed name/email and logout only; nonmembers retain the login link. This is the user's approved account-navigation refinement, rather than a new profile/settings page. Keep styles in Tailwind tokens.
+
+Click/tap, Enter/Space and arrow keys open the menu, with `aria-expanded` reflecting its state. Focus the logout item when opening; Escape closes and returns focus to the trigger, and outside pointer/Tab/focus departure close it. Disabling a focused action can cause a native browser blur, so keep pending/error UI visible and restore retry focus. Logout reuses cookie/CSRF transport, preserves the session on failure, prevents duplicate requests and ignores old responses after a member change. D-MY-01's page body no longer owns logout. Cover these behaviors with `tests/auth/account-menu.test.tsx` and `tests/auth/authJourney.test.tsx`.

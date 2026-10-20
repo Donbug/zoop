@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:94 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:94 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 성능 측정 기준: 시스템은 동일한 네트워크 및 테스트 환경에서 화면 초기 표시, 일반 영역 조회, AI 질문 및 브리핑 생성 시간을 측정할 수 있어야 한다. 백분위 응답시간을 기준으로 측정하며, 측정 환경과 표본 수를 함께 기록해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv) — 성능 측정 기준: 시스템은 동일한 네트워크 및 테스트 환경에서 화면 초기 표시, 일반 영역 조회, AI 질문 및 브리핑 생성 시간을 측정할 수 있어야 한다. 백분위 응답시간을 기준으로 측정하며, 측정 환경과 표본 수를 함께 기록해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:301 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

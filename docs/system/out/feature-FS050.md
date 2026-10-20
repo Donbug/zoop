@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:60 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:60 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — 새 대화와 후속 질문: 사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에 새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — 새 대화와 후속 질문: 사용자는 기존 답변에 이어 후속 질문을 하거나, 이전 맥락을 이어받지 않는 새 대화를 시작할 수 있다. 후속 질문은 동일 대화에 새 질문으로 저장되며, 새 대화는 별도 대화 ID로 생성된다.
 
 ## 상세 권한과 의미 이행
 
