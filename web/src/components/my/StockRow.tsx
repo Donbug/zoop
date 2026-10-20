@@ -6,6 +6,7 @@ import type { StockRowProps } from '@/types/my';
 export default function StockRow({
   id,
   name,
+  logoUrl,
   description,
   trailing,
   action,
@@ -18,7 +19,7 @@ export default function StockRow({
         aria-label={`${name}, 지도에서 보기`}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-lg hover:bg-gray-50"
       >
-        <CompanyMark name={name} />
+        <CompanyMark name={name} logoUrl={logoUrl} />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium text-gray-950">
             {name}

@@ -140,6 +140,8 @@ export default function MapPage() {
   const focusId = params.get('focus');
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
+  const logoOf = (companyId: string) =>
+    data?.nodes.find((node) => node.id === companyId)?.logoUrl;
   const tutorialOpen = params.get('tour') === '1';
   useEffect(() => {
     if (tutorialOpen && tutorialStep === null) setTutorialStep(1);
@@ -681,6 +683,7 @@ export default function MapPage() {
                 id={eventId}
                 context={eventContext}
                 geography={selectedNode?.geography ?? null}
+                logoOf={logoOf}
                 onClose={() => selectNode(null)}
                 onAction={eventAction}
               />
@@ -690,6 +693,7 @@ export default function MapPage() {
                 key={edgeId}
                 id={edgeId}
                 context={eventContext}
+                logoOf={logoOf}
                 onClose={() => selectNode(null)}
                 onSelectNode={selectNode}
                 onAction={relationAction}

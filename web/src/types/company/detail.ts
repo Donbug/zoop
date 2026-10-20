@@ -18,6 +18,7 @@ export type Company = {
   id: string;
   name: string;
   ticker: string | null;
+  logoUrl?: string | null;
   legalName: string | null;
   market: string | null;
   sector: string | null;

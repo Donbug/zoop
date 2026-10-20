@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
 import StockQuote from '@/components/stocks/StockQuote';
 import type { Company } from '@/types/company/detail';
@@ -33,13 +34,11 @@ export default function CompanyCatalogRow({
       aria-current={selected ? 'page' : undefined}
       className={`flex! min-w-0 items-center gap-2 rounded-[3px] border p-2! no-underline ${selected ? 'border-zoop-ink bg-white' : 'border-transparent hover:bg-white'}`}
     >
-      <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full border border-zoop-muted bg-white text-[10px] font-bold">
-        {company?.logoUrl ? (
-          <img src={company.logoUrl} alt="" className="size-5 object-contain" />
-        ) : (
-          (row?.name ?? id).slice(0, 1)
-        )}
-      </span>
+      <CompanyLogo
+        name={row?.name ?? id}
+        logoUrl={row?.logoUrl}
+        className="size-7 rounded-full border border-zoop-muted bg-white text-[10px] font-bold"
+      />
       <span className="min-w-0 flex-1">
         <strong className="block truncate text-[11px] font-semibold text-zoop-ink">
           {row?.name ?? id}
