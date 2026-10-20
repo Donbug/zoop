@@ -5,6 +5,7 @@
       "name": "OpenAI",
       "ticker": null,
       "aliases": [],
+      "brand_color": "#000000",
       "logo": "openai.svg",
       "brand_source": null
     },
@@ -13,6 +14,7 @@
       "name": "Anthropic",
       "ticker": null,
       "aliases": [],
+      "brand_color": "#181818",
       "logo": "anthropic.svg",
       "brand_source": null
     },
@@ -23,6 +25,7 @@
       "aliases": [
         "ASML Holding"
       ],
+      "brand_color": "#0F238C",
       "logo": "asml.svg",
       "brand_source": null
     },
@@ -34,6 +37,7 @@
         "Taiwan Semiconductor Manufacturing",
         "Taiwan Semiconductor"
       ],
+      "brand_color": "#E60012",
       "logo": "tsmc.svg",
       "brand_source": null
     },
@@ -91,6 +95,7 @@
         "SK hynix",
         "SK Hynix"
       ],
+      "brand_color": "#E1002A",
       "logo": "sk-hynix.svg",
       "brand_source": null
     },
@@ -101,6 +106,7 @@
       "aliases": [
         "Micron Technology"
       ],
+      "brand_color": "#000000",
       "logo": "micron.svg",
       "brand_source": null
     },
@@ -111,6 +117,7 @@
       "aliases": [
         "Microsoft Corporation"
       ],
+      "brand_color": "#F35325",
       "logo": "microsoft.svg",
       "brand_source": null
     },
@@ -133,6 +140,7 @@
       "aliases": [
         "Kakao"
       ],
+      "brand_color": "#FFCD00",
       "logo": "kakao.svg",
       "brand_source": null
     },
@@ -168,6 +176,7 @@
         "LG씨엔에스",
         "엘지씨엔에스"
       ],
+      "brand_color": "#A50034",
       "logo": "lg.svg",
       "brand_source": null
     },
@@ -179,6 +188,7 @@
         "삼성에스디에스",
         "Samsung SDS"
       ],
+      "brand_color": "#1428A0",
       "logo": "samsung-sds.svg",
       "brand_source": null
     },
@@ -189,6 +199,7 @@
       "aliases": [
         "Hanmi Semiconductor"
       ],
+      "brand_color": "#E60021",
       "logo": "hanmi-semiconductor.svg",
       "brand_source": null
     },
@@ -200,6 +211,7 @@
         "DB HiTek",
         "DB Hitek"
       ],
+      "brand_color": "#F27720",
       "logo": "db-hitek.svg",
       "brand_source": null
     },
@@ -211,6 +223,7 @@
         "SK Telecom",
         "SKT"
       ],
+      "brand_color": "#E1002A",
       "logo": "sk-telecom.svg",
       "brand_source": null
     },

@@ -1,12 +1,16 @@
 package com.zoop.company.market;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.zoop.company.market.dto.CompanyPriceResponse;
 import com.zoop.company.market.dto.CompanyQuoteResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -25,13 +29,15 @@ public class TossMarketClient {
     private final CompanyMarketSettings settings;
     private final RestClient client;
     private final ObjectMapper mapper;
+    private final Clock clock;
     private final ReentrantLock tokenLock = new ReentrantLock();
     private volatile String token;
     private volatile Instant tokenExpires = Instant.EPOCH;
 
-    public TossMarketClient(CompanyMarketSettings settings, ObjectMapper mapper) {
+    public TossMarketClient(CompanyMarketSettings settings, ObjectMapper mapper, Clock clock) {
         this.settings = settings;
         this.mapper = mapper;
+        this.clock = clock;
         var httpClient = java.net.http.HttpClient.newBuilder().connectTimeout(settings.timeout()).build();
         var requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(settings.timeout());
@@ -63,19 +69,7 @@ public class TossMarketClient {
             JsonNode stocks = get("/api/v1/stocks", Map.of("symbols", code));
             JsonNode stock = matching(stocks.path("result"), code);
             Double shares = stock == null ? null : number(stock.get("sharesOutstanding"));
-            List<JsonNode> daily = new java.util.ArrayList<>();
-            String before = null;
-            for (int page = 0; page < 3; page++) {
-                var candleParams = new java.util.HashMap<String, Object>();
-                candleParams.put("symbol", code); candleParams.put("interval", "1d"); candleParams.put("count", "200");
-                if (before != null) candleParams.put("before", before);
-                JsonNode candlePage = get("/api/v1/candles", candleParams).path("result");
-                JsonNode candles = candlePage.path("candles");
-                if (!candles.isArray()) throw formatFailure();
-                candles.forEach(daily::add);
-                if (candles.isEmpty() || !candlePage.hasNonNull("nextBefore")) break;
-                before = text(candlePage.get("nextBefore"));
-            }
+            List<JsonNode> daily = dailyCandles(code, 3, null, null);
             // Daily candles are dated in the market's own calendar, so the quote's session day uses the same zone.
             String sessionDate = asOf == null ? null : asOf.atZone(marketZone(exchange)).toLocalDate().toString();
             // The 52-week range only uses candles from the year ending on the quote's session date.
@@ -126,7 +120,209 @@ public class TossMarketClient {
         }
     }
 
+    /** Bar resolution the contract fixes per period: 1d=5m, 1w=1h, 1m=1d, 1y=1wk. */
+    public static final Map<String, String> PERIOD_INTERVAL = Map.of("1d", "5m", "1w", "1h", "1m", "1d", "1y", "1wk");
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    /**
+     * getCompanyPrices over [from, to). Toss serves only 1-minute and daily candles, so 1d/1w are 1-minute bars and
+     * 1y daily bars aggregated into the contract's fixed resolution (x-zoop.chartResolution); 1m is the daily bars as
+     * they are. A point is a whole bucket (5 minutes, an hour, an exchange day or a Monday week) that overlaps
+     * [from, to): the chart sends a point's own start back as to, and that point must come back with the same values.
+     * A missing to is now and a missing from one period before it.
+     */
+    public CompanyPriceResponse prices(String companyId, String exchange, String code, String period,
+            Instant from, Instant to) {
+        if (!"toss".equalsIgnoreCase(settings.quoteProvider())
+                || blank(settings.tossClientId()) || blank(settings.tossClientSecret())) {
+            return CompanyPriceResponse.unavailable(companyId, period, "not_connected", "토스증권 시세 키가 설정되지 않았어요.");
+        }
+        if (!("KRX".equals(exchange) || "NASDAQ".equals(exchange) || "NYSE".equals(exchange) || "AMEX".equals(exchange))) {
+            return CompanyPriceResponse.unavailable(companyId, period, "unsupported_symbol", "이 종목은 토스증권 시세 조회를 지원하지 않아요.");
+        }
+        String interval = PERIOD_INTERVAL.get(period);
+        ZoneId zone = marketZone(exchange);
+        Instant end = to != null ? to : clock.instant();
+        Instant start = from != null ? from : periodStart(period, end);
+        try {
+            List<CompanyPriceResponse.Point> points;
+            if ("5m".equals(interval) || "1h".equals(interval)) {
+                long size = "5m".equals(interval) ? 300 : 3600;
+                // Every minute of the first and last bucket, so the edge buckets are whole.
+                Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(), size) * size);
+                Instant last = Instant.ofEpochSecond(Math.floorDiv(end.minusNanos(1).getEpochSecond(), size) * size + size);
+                points = PriceBars.byInterval(minuteBars(code, zone, first, last), size, zone);
+            } else {
+                boolean weekly = "1wk".equals(interval);
+                // A daily bar starts at its exchange-local midnight; a week bucket at that week's Monday.
+                Instant first = weekly ? PriceBars.weekStart(start, zone)
+                        : start.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant();
+                // The next local Monday, not +168 hours: a DST week is 167 or 169 hours long.
+                Instant last = weekly ? PriceBars.weekStart(end.minusNanos(1).atZone(zone).plusWeeks(1).toInstant(), zone) : end;
+                List<PriceBars.Bar> daily = new java.util.ArrayList<>();
+                for (JsonNode candle : dailyCandles(code, 10, last, first)) {
+                    PriceBars.Bar bar = bar(candle, at -> at);
+                    if (bar != null && !bar.start().isBefore(first) && bar.start().isBefore(last)) daily.add(bar);
+                }
+                points = weekly ? PriceBars.byWeek(daily, zone) : PriceBars.asIs(daily, zone);
+            }
+            if (points.isEmpty()) {
+                return CompanyPriceResponse.unavailable(companyId, period, "no_data", "이 기간에는 거래된 시세가 없어요(휴장일 등).");
+            }
+            JsonNode stock = matching(get("/api/v1/stocks", Map.of("symbols", code)).path("result"), code);
+            // Bars came back, so a missing stock row or currency is a provider format failure, not an absence of data.
+            String currency = stock == null ? null : strictText(stock.get("currency"));
+            if (currency == null) throw formatFailure();
+            return CompanyPriceResponse.available(companyId, period,
+                    new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, points);
+        } catch (MarketDataException exception) {
+            throw exception;
+        } catch (TossUnsupportedSymbolException exception) {
+            return CompanyPriceResponse.unavailable(companyId, period, "unsupported_symbol", "토스증권에서 이 종목을 찾지 못했어요.");
+        } catch (RestClientException exception) {
+            throw new MarketDataException(true);
+        } catch (Exception exception) {
+            throw new MarketDataException(false);
+        }
+    }
+
+    /** Default range: one day, 7 days, one calendar month or one calendar year (KST) before the end. */
+    public static Instant periodStart(String period, Instant end) {
+        var at = end.atZone(KST);
+        var start = switch (period) {
+            case "1d" -> at.minusDays(1);
+            case "1w" -> at.minusDays(7);
+            case "1y" -> at.minusYears(1);
+            default -> at.minusMonths(1);
+        };
+        return start.toInstant();
+    }
+
+    /**
+     * 1-minute bars starting in [from, to), kept per exchange-local day. Days missing from the cache are read at the
+     * same time, at most four at once across all requests, which keeps a cold 1w read under Toss's 20 requests a
+     * second. A finished day is kept: Toss does not revise Korean candles, and US late trades only land in the first
+     * hour after the day.
+     * shortcut: per-process LRU of 512 symbol-days, move to a shared store once several API instances run.
+     */
+    private List<PriceBars.Bar> minuteBars(String code, ZoneId zone, Instant from, Instant to) {
+        Instant settled = clock.instant().minus(java.time.Duration.ofHours(1));
+        Map<LocalDate, java.util.concurrent.Future<List<PriceBars.Bar>>> reads = new java.util.LinkedHashMap<>();
+        Map<LocalDate, List<PriceBars.Bar>> days = new java.util.HashMap<>();
+        for (LocalDate day = from.atZone(zone).toLocalDate(); !day.isAfter(to.minusNanos(1).atZone(zone).toLocalDate());
+                day = day.plusDays(1)) {
+            List<PriceBars.Bar> cached = minuteCache.get(code + "|" + day);
+            if (cached != null) { days.put(day, cached); continue; }
+            Instant dayStart = day.atStartOfDay(zone).toInstant(), dayEnd = day.plusDays(1).atStartOfDay(zone).toInstant();
+            reads.put(day, minuteReads.submit(() -> minuteDay(code, dayStart, dayEnd)));
+        }
+        try {
+            for (var read : reads.entrySet()) {
+                List<PriceBars.Bar> bars = read.getValue().get();
+                days.put(read.getKey(), bars);
+                if (!read.getKey().plusDays(1).atStartOfDay(zone).toInstant().isAfter(settled)) {
+                    minuteCache.put(code + "|" + read.getKey(), bars);
+                }
+            }
+        } catch (java.util.concurrent.ExecutionException exception) {
+            reads.values().forEach(read -> read.cancel(true));
+            if (exception.getCause() instanceof RuntimeException cause) throw cause;
+            throw new MarketDataException(false);
+        } catch (InterruptedException exception) {
+            reads.values().forEach(read -> read.cancel(true));
+            Thread.currentThread().interrupt();
+            throw new MarketDataException(true);
+        }
+        List<PriceBars.Bar> bars = new java.util.ArrayList<>();
+        days.values().forEach(dayBars -> dayBars.stream()
+                .filter(bar -> !bar.start().isBefore(from) && bar.start().isBefore(to)).forEach(bars::add));
+        return bars;
+    }
+
+    private final Map<String, List<PriceBars.Bar>> minuteCache = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, List<PriceBars.Bar>> eldest) { return size() > 512; }
+            });
+    private final java.util.concurrent.ExecutorService minuteReads =
+            java.util.concurrent.Executors.newFixedThreadPool(4, Thread.ofPlatform().daemon().name("toss-minute-", 0).factory());
+
+    /** One day's 1-minute bars, walking back from the day's end; Toss stamps a 1-minute bar with its end time. */
+    private List<PriceBars.Bar> minuteDay(String code, Instant dayStart, Instant dayEnd) {
+        List<PriceBars.Bar> bars = new java.util.ArrayList<>();
+        String before = dayEnd.toString();
+        for (int page = 0; page < 20; page++) {
+            JsonNode candlePage = get("/api/v1/candles", Map.of("symbol", code, "interval", "1m", "count", "200",
+                    "before", before)).path("result");
+            JsonNode candles = candlePage.path("candles");
+            if (!candles.isArray()) throw formatFailure();
+            Instant oldest = null;
+            for (JsonNode candle : candles) {
+                PriceBars.Bar bar = bar(candle, at -> at.minusSeconds(60));
+                if (bar == null) continue;
+                oldest = bar.start();
+                if (!bar.start().isBefore(dayStart) && bar.start().isBefore(dayEnd)) bars.add(bar);
+            }
+            if (oldest == null || oldest.isBefore(dayStart) || !candlePage.hasNonNull("nextBefore")) break;
+            before = text(candlePage.get("nextBefore"));
+        }
+        return bars;
+    }
+
+    /**
+     * A candle as a bar starting at start(timestamp). Absent prices are no bar; a candle without a readable time or
+     * with a present value of the wrong shape is a provider format failure (503), never skipped as missing data.
+     */
+    private static PriceBars.Bar bar(JsonNode candle, java.util.function.UnaryOperator<Instant> start) {
+        String timestamp = strictText(candle.get("timestamp"));
+        Instant at = timestamp == null ? null : instant(timestamp);
+        if (at == null) throw formatFailure();
+        Double open = strictNumber(candle.get("openPrice")), high = strictNumber(candle.get("highPrice"));
+        Double low = strictNumber(candle.get("lowPrice")), close = strictNumber(candle.get("closePrice"));
+        Double volume = strictNumber(candle.get("volume"));
+        if (open == null || high == null || low == null || close == null) return null;
+        return new PriceBars.Bar(start.apply(at), open, high, low, close, volume);
+    }
+
+    /** Daily candles newest first, following nextBefore for up to maxPages pages or until a page ends before stopBefore (KST day). */
+    private List<JsonNode> dailyCandles(String code, int maxPages, Instant startBefore, Instant stopBefore) {
+        List<JsonNode> daily = new java.util.ArrayList<>();
+        // Starting at the requested end keeps an old range from falling off the page limit.
+        String before = startBefore == null ? null : startBefore.toString();
+        for (int page = 0; page < maxPages; page++) {
+            var candleParams = new java.util.HashMap<String, Object>();
+            candleParams.put("symbol", code); candleParams.put("interval", "1d"); candleParams.put("count", "200");
+            if (before != null) candleParams.put("before", before);
+            JsonNode candlePage = get("/api/v1/candles", candleParams).path("result");
+            JsonNode candles = candlePage.path("candles");
+            if (!candles.isArray()) throw formatFailure();
+            candles.forEach(daily::add);
+            if (candles.isEmpty() || !candlePage.hasNonNull("nextBefore")) break;
+            Instant oldest = instant(text(candles.get(candles.size() - 1).get("timestamp")));
+            if (stopBefore != null && oldest != null && oldest.isBefore(stopBefore)) break;
+            before = text(candlePage.get("nextBefore"));
+        }
+        return daily;
+    }
+
+    /** Provider requests made and their total time, for the live check only. */
+    final java.util.concurrent.atomic.AtomicLong requests = new java.util.concurrent.atomic.AtomicLong(), requestNanos = new java.util.concurrent.atomic.AtomicLong();
+
     private JsonNode get(String path, Map<String, ?> params) {
+        long started = System.nanoTime();
+        try {
+            // A 429 means the 20-a-second bucket is empty; it refills within a second, so wait once and retry.
+            for (int attempt = 0; ; attempt++) {
+                try { return send(path, params); }
+                catch (TossRateLimitedException exception) {
+                    if (attempt == 2) throw new MarketDataException(true);
+                    try { Thread.sleep(1000); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new MarketDataException(true); }
+                }
+            }
+        } finally { requests.incrementAndGet(); requestNanos.addAndGet(System.nanoTime() - started); }
+    }
+
+    private JsonNode send(String path, Map<String, ?> params) {
         String accessToken = token();
         for (int attempt = 0; attempt < 2; attempt++) {
             final String usedToken = accessToken;
@@ -144,7 +340,8 @@ public class TossMarketClient {
                         if (code == 401 && firstAttempt) return new HttpResult(code, body);
                         if (code == 401 || code == 403) throw new MarketDataException(false);
                         if (code == 400 || code == 404) throw new TossUnsupportedSymbolException();
-                        if (code == 429 || code >= 500) throw new MarketDataException(true);
+                        if (code == 429) throw new TossRateLimitedException();
+                        if (code >= 500) throw new MarketDataException(true);
                         if (code < 200 || code >= 300) throw new MarketDataException(false);
                         return new HttpResult(code, body);
                     });
@@ -231,4 +428,5 @@ public class TossMarketClient {
     private record HttpResult(int status, byte[] body) { }
     private static class TossAuthException extends RuntimeException { }
     private static class TossUnsupportedSymbolException extends RuntimeException { }
+    private static class TossRateLimitedException extends RuntimeException { }
 }

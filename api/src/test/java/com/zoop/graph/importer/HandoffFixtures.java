@@ -227,6 +227,29 @@ final class HandoffFixtures {
             issueEvidence.add(id);
         }
         issue.putArray("sourceEvents").add(sourceEvent);
+        ObjectNode mention = issue.putArray("mentions").addObject();
+        mention.put("documentId", ARTICLE_ID);
+        mention.put("documentVersion", ARTICLE_VERSION);
+        mention.put("mentionId", "m-1");
+        mention.put("articleId", ARTICLE_ID);
+        mention.put("articleVersion", ARTICLE_VERSION);
+        mention.put("verification", "none");
+        mention.put("title", "합성 공급 계약");
+        mention.put("action", "공급 계약");
+        mention.put("target", "배터리");
+        mention.put("eventTime", spec.eventTime());
+        mention.put("timePrecision", spec.eventPrecision());
+        mention.put("period", "2026Q3");
+        mention.put("assertionStatus", "announced");
+        mention.put("background", false);
+        ArrayNode participants = mention.putArray("participants");
+        participants.addObject().put("sourceCompanyId", "s2-co-a").put("companyId", COMPANY_A).put("name", "합성기업")
+                .put("role", "공급자");
+        participants.addObject().put("sourceCompanyId", "s2-co-unlisted").putNull("companyId").put("name", "미등록 협력사")
+                .put("role", "수요자");
+        participants.addObject().putNull("sourceCompanyId").putNull("companyId").put("name", "이름만 있는 참가자")
+                .put("role", "언급");
+        mention.putArray("evidenceIds").add(eventId);
         issue.put("decisionRef", "issue-1");
         issue.putNull("representative");
 
