@@ -5,6 +5,9 @@ import { readCompanyResource } from '@/apis/company/company';
 import { isMember } from '@/apis/auth/auth';
 import type { GraphRequest, GraphResponse } from '@/types/map/graph';
 import type { MockScenario } from '@/mocks/graph/response';
+import { getSettings } from '@/apis/settings/settings';
+import { getPortfolio } from '@/apis/portfolio/portfolio';
+import { withCatalogCompanies, withMemberCompanies } from './catalog-companies';
 
 // Local mock is development-only; production always uses the real read endpoint.
 export const usesGraphMock =
@@ -65,9 +68,43 @@ export async function getGraph(request: GraphRequest): Promise<GraphResponse> {
     await new Promise((resolve) => setTimeout(resolve, 220));
     if (scenario === 'error')
       throw new Error('Mock 조회 실패 · 다시 시도해 주세요.');
-    return createMockGraph(request, scenario);
+    if (request.mode === 'personal') {
+      // 개발 목데이터에서도 내 종목 지도는 실제 로그인 회원의 보유·관심 종목을 기준으로 그린다.
+      const member = await loadMemberCompanies();
+      if (member)
+        return withMemberCompanies(
+          createMockGraph(request, scenario, member),
+          member,
+        );
+      return createMockGraph(request, scenario);
+    }
+    return marketMap(request, createMockGraph(request, scenario));
   }
-  return call<GraphResponse>(graphUrl(request), 'GET', undefined, {
+  const graph = await call<GraphResponse>(graphUrl(request), 'GET', undefined, {
     skipAuth: request.mode === 'all',
   });
+  return marketMap(request, graph);
+}
+
+/** 시장 전체 지도(기업 중심 보기 제외)에는 사건 없는 기업도 연결 없는 기업으로 보인다. */
+function marketMap(request: GraphRequest, graph: GraphResponse) {
+  return request.mode === 'all' && !request.companyId
+    ? withCatalogCompanies(graph)
+    : graph;
+}
+
+async function loadMemberCompanies() {
+  if (!isMember()) return null;
+  try {
+    const [settings, portfolio] = await Promise.all([
+      getSettings(),
+      getPortfolio(),
+    ]);
+    return {
+      holdings: portfolio.holdings.map((holding) => holding.companyId),
+      watchlist: settings.watchlistIds,
+    };
+  } catch {
+    return null;
+  }
 }

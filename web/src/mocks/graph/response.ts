@@ -5,17 +5,15 @@ export type MockScenario = 'success' | 'empty' | 'no-relations' | 'error';
 export function createMockGraph(
   request: GraphRequest,
   scenario: MockScenario = 'success',
+  /** 내 종목 기준 회원. 개발 화면은 실제 로그인 회원의 보유·관심 종목을 넘긴다. */
+  member: { holdings: string[]; watchlist: string[] } = mockMember,
 ): GraphResponse {
   const personal = request.mode === 'personal';
   const seeds = personal
     ? [
         ...new Set([
-          ...(request.personalFilter !== 'watchlist'
-            ? mockMember.holdings
-            : []),
-          ...(request.personalFilter !== 'holdings'
-            ? mockMember.watchlist
-            : []),
+          ...(request.personalFilter !== 'watchlist' ? member.holdings : []),
+          ...(request.personalFilter !== 'holdings' ? member.watchlist : []),
         ]),
       ]
     : [];
@@ -32,8 +30,8 @@ export function createMockGraph(
   ].map((n) => ({
     ...n,
     isFocus: personal ? seeds.includes(n.id) : n.id === 'NASDAQ:NVDA',
-    holding: personal && mockMember.holdings.includes(n.id),
-    watch: personal && mockMember.watchlist.includes(n.id),
+    holding: personal && member.holdings.includes(n.id),
+    watch: personal && member.watchlist.includes(n.id),
   }));
   let visibleEdges: GraphEdge[] = [
     ...edges,
