@@ -1,0 +1,28 @@
+# 저장 이슈 재사용 · 회차별 브리핑 (개발 시뮬레이션)
+
+운영 공개 그래프/ERD를 바꾸지 않는 명시적 opt-in 경로다. 늦게 수집한 10월2~8일 자료와 현재 관측한 발행시각으로 시험하며 당시 본문·수집 가용성을 입증하지 않는다. 기존 회차·PR·DB를 덮어쓰지 않는다.
+
+## 처리 순서
+
+1. `briefing_issue_pipeline.py`가 원문/발행시각 등록부 SHA를 검증한다. 통합 원본881건을 유지하고, 회차에 배정할 수 있는489건을 분석한다. 시각 미해소334건은 이슈 DB에 원문을 보존하고 보류 이유를 기록한다. 창밖/중복 자료를 임의 시각으로 넣지 않는다.
+2. 외부 팀 의존성 investmate-poc의 고정 fa446e7 계약과 실제 추출/비교 프롬프트를 사용한다. `briefing_issue_rules.py`는 감사한 원본5파일 SHA를 검사하며 domain의 Article/Mention/Evidence, search.incompatible, pipeline의 비교 가드/사건ID·SAME할당 표현식을 원본 AST에서 실행한다. 전체 PoC 파이프라인·B4 임베딩 검색·Neo4j 승인 실행과는 구분한다. private 소스는 복사·배포하지 않는다. `--poc-root`가 별도로 필요하다.
+3. 추출 응답의 버전·인용을 검사하고 독립 의미 검증에서 사건/모든 참여기업 역할을 확인한다. 배경·미지원·모호한 사건은 보류한다.
+4. 시간순으로 기존95개 이슈와 이미 저장한 새 사건을 검색·비교한다. 현재 구현의 후보 검색은 공통 기업/어휘 기반 상위4개로 제한되며 완전한 recall이나 팀 B4 검색과 같다고 주장하지 않는다. 기술·회사 이름이 같다는 이유만으로 SAME이 되지 않는다. 기간·상태·사건일 충돌/다중SAME/HOLD는 보류한다. 비교 후 전체 대상이 바뀌었으면 새 판단 없이 전이 병합하지 않고 보류한다.
+5. `issues.sqlite3`에881문서·기존/새이슈·mention·직접 기업 연결·인용·판정·호출 영수증을 불변 저장한다. `grouped-issues.json`은 브리핑 입력용 불변 아카이브다. PoC Article.version(메타데이터 포함)과 브리핑 body SHA version을 별도 보존한다.
+6. `briefing_grouped_run.py`는14회차 `(from,to]`의 새 언급과 cutoff 이전 배경만 읽는다. AI가 저장된 사건 단위로 중요도/근거/영향범위/신규성을 평가해 최대3개를 고른다. 재선정은 MATERIAL_UPDATE와 이번 회차의 새 변화 인용이 필수다.
+7. 선정된 안정적 issueId·기업 역할·exact 인용을 기존 출근/퇴근 생성·독립 검증에 전달한다. 검증된 결과만 공개 후보가 되고 부족하면 보류하며 원 응답/사용량은 남긴다. 기술 주제는 원문과 역할 연결이 확인된 기업만 설명하며 수혜·공급계약·가격 인과로 확대하지 않는다.
+8. Spring importer의 `zoop-briefing-grouped-simulation-v1` 분기가 아카이브·회차·기업/근거·실제 AI 요청응답/프롬프트/사용량 결속을 다시 확인하고 별도 PostgreSQL 발행 저장소에 등록한다. 기존 공개 브리핑 API/React 조회를 재사용한다. 기존 v2 importer는 보존한다.
+
+## 원천 경계
+
+95개 seed의 승인 뷰/수동 제외 관계11개를 사용하고 후보407개 감사 원장의 HOLD/REJECT/제외된 ALLOW 관계를 다시 살리지 않는다. 확인된 seed95개는 각각 기사1개에 연결돼 있다. 따라서 이 seed 자체로 여러 기사 묶음 품질을 입증하지 않는다. 새 서로다른 기사 SAME 병합은 회귀 시험과 실제 실행 결과로 별도 확인한다.
+
+원 수집 allowModelSend/rightsStatus는 수정하지 않는다. 사용자 개발 AI 실행 승인과 운영 저장/재배포 권한을 구분한다. 호출은 OpenAI gpt-6-luna/Responses/store=false, 동시최대3, 전체공유400회 정지 상한이다. 같은 요청의 완료 기록은 재사용하며 응답 불명은 자동 재전송하지 않는다. API 키는 별도0600파일의 Authorization 헤더로만 사용한다. 정확 비용은 응답에 없으면 확정하지 않는다.
+
+## 실행
+
+기본은 OFFLINE이다. 두 스크립트의 --help에서 입력/출력과 명시 실행 옵션을 확인한다. 동일 output은 같은 identity/원문/SHA에서만 재사용하며 기존 화면용DB가 아닌 별도DB에 import한다. 공개 운영 scheduler에 연결하지 않는다.
+
+## 검증
+
+실제 외부 PoC checkout이 있는 환경은 `ZOOP_TEST_POC_ROOT`로 지정한다. 미설정으로 skip된 시험을 통과로 세지 않는다. tests/test_briefing_issue_rules.py, test_briefing_issue_pipeline.py, test_briefing_grouped_rounds.py, test_briefing_grouped_run.py와 Spring BriefingGroupedReplayPostgresTest를 사용한다. 합성 provider 기록은 실제 유료 호출/모델 품질 증거와 구분한다.

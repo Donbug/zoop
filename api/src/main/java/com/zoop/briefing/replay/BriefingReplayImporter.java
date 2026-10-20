@@ -62,7 +62,8 @@ public final class BriefingReplayImporter {
         String bundleSha = Canonical.sha256(bundleBytes);
         StrictJson.Obj bundle = StrictJson.parseObject(bundleBytes);
         rejectCredentialFields(bundle.node());
-        if ("zoop-briefing-round-simulation-v2".equals(bundle.string("schemaVersion"))) {
+        if ("zoop-briefing-round-simulation-v2".equals(bundle.string("schemaVersion"))
+                || BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"))) {
             return importSimulation(sourceBytes, bundleBytes, bundle);
         }
         require("zoop-briefing-replay-v1".equals(bundle.string("schemaVersion")), "bundle_schema");
@@ -166,6 +167,7 @@ public final class BriefingReplayImporter {
     /** Per-round simulation reuses the same document/evidence/round registries; no migration or operational writer. */
     private ImportResult importSimulation(byte[] sourceBytes, byte[] bundleBytes, StrictJson.Obj bundle) {
         String scope = "publication_clock_simulation", sourceSha = Canonical.sha256(sourceBytes), bundleSha = Canonical.sha256(bundleBytes);
+        boolean grouped = BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"));
         String run = text(bundle, "runId"), clockSha = text(bundle, "clockFileSha256");
         require(run.matches("[A-Za-z0-9_-]{1,96}") && clockSha.matches("[0-9a-f]{64}"), "simulation_identity");
         require(scope.equals(bundle.string("mode")) && sourceSha.equals(bundle.string("sourceFileSha256"))
@@ -178,6 +180,8 @@ public final class BriefingReplayImporter {
         Map<String, Source> pool = sources(sourceBytes);
         Map<String, JsonNode> sourceNodes = new LinkedHashMap<>(); pool.forEach((key, value) -> sourceNodes.put(key, value.row().node()));
         PublicationClockRegistry clocks = new PublicationClockRegistry(settings.clocks(), sourceSha, clockSha, sourceNodes);
+        BriefingGroupedSimulationRules.Archive groupedArchive = grouped
+                ? BriefingGroupedSimulationRules.archive(bundle, settings.bundle().getParent(), sourceNodes, clocks) : null;
         List<StrictJson.Obj> definitions = bundle.objects("rounds"); require(definitions.size() == 14, "simulation_fourteen_rounds");
         boolean qualityV2 = simulationQualityV2(definitions.getFirst().object("identity"));
         ArrayNode noveltyHistory = StrictJson.newArray();
@@ -217,6 +221,7 @@ public final class BriefingReplayImporter {
             for (var receipt : receipts.entrySet()) require(receipt.getValue().equals(allReceipts.get(receipt.getKey()))
                     && accounted.add(receipt.getKey()), "simulation_round_receipt_owner");
             Map<String, Issue> selected = selections(definition, inputs, true);
+            if (grouped) BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent());
             if (qualityV2) {
                 validateSimulationNovelty(definition, noveltyHistory, receipts);
                 if (definition.has("noveltyAudit") && definition.object("noveltyAudit").bool("modelCalled"))
@@ -243,7 +248,7 @@ public final class BriefingReplayImporter {
                         || ("EMPTY_CONFIRMED".equals(state) && selected.isEmpty())), "simulation_selection_state");
                 StrictJson.Obj result = definition.object("result"); validateGeneration(result, selected);
                 require(Canonical.digest(result.node()).equals(definition.string("resultSha256")), "simulation_result_hash");
-                validateSimulationSuccessReceipts(edition, result, receipts, qualityV2);
+                if (!grouped) validateSimulationSuccessReceipts(edition, result, receipts, qualityV2);
                 Instant generated = Instant.parse(result.string("generatedAt")); if (generated.isAfter(created)) created = generated;
                 Round base = round(namespace, edition, date, date.minusDays(1), sourceSha, bundleSha, run,
                         definition.object("identity"), selected, result, inputs, generated);
@@ -306,6 +311,11 @@ public final class BriefingReplayImporter {
             ids.add(id);
         }
         require(accounted.equals(allReceipts.keySet()), "simulation_unowned_paid_receipt");
+        if (grouped) {
+            blobs.put(namespace + "-grouped-issues", blob("briefing_input", groupedArchive.bytes()));
+            for (var receipt : simulationReceiptLedger(bundle.objects("groupingReceipts")).entrySet())
+                require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "grouped_receipt_ownership");
+        }
         if (bundle.has("marketEnrichment")) for (var receipt : simulationReceiptLedger(bundle.object("marketEnrichment").objects("receipts")).entrySet())
             require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "market_enrichment_receipt_reuses_news_request");
         if (bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("comparisonBaselineSha256")) {
@@ -847,9 +857,13 @@ public final class BriefingReplayImporter {
                 "importance.schema.json", "selection.schema.json", "generation.schema.json", "verification.schema.json"));
         if (simulationQualityV2(identity)) names.addAll(List.of("selection-v2.md", "selection-v2.schema.json",
                 "generation-v2-morning.md", "generation-v2-evening.md", "novelty.md", "novelty.schema.json", "novelty-verification.md"));
+        boolean grouped = BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"));
+        if (grouped) names.addAll(List.of("grouped-selection.md", "grouped-selection.schema.json"));
         StrictJson.Obj prompts = identity.object("promptArtifacts"); prompts.exactly(Set.copyOf(names));
         for (String name : names) {
-            try (var stream = BriefingReplayImporter.class.getResourceAsStream("/briefing/prompts/round-simulation/" + name)) {
+            String resource = name.startsWith("grouped-") ? "/briefing/prompts/grouped-issues/" + name.substring("grouped-".length())
+                    : "/briefing/prompts/round-simulation/" + name;
+            try (var stream = BriefingReplayImporter.class.getResourceAsStream(resource)) {
                 require(stream != null && Canonical.sha256(stream.readAllBytes()).equals(prompts.string(name)), "simulation_prompt_hash");
             } catch (IOException unavailable) { throw new IllegalArgumentException("Simulation prompt is unavailable", unavailable); }
         }

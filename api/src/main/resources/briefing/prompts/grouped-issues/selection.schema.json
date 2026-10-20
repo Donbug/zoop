@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "properties": {
+    "assessments": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "importance": {"type": "integer", "minimum": 0, "maximum": 3},
+          "priority": {"type": "integer", "minimum": 0, "maximum": 100},
+          "status": {"type": "string", "enum": ["SELECTABLE", "HOLD", "REPEAT"]},
+          "reason": {"type": "string", "minLength": 1, "maxLength": 300},
+          "scope": {"type": "string", "enum": ["COMMON_POLICY", "BROAD_MARKET", "COMPANY", "INSUFFICIENT"]},
+          "affectedSectors": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
+          "transmission": {"type": "string", "maxLength": 300}
+        },
+        "required": ["importance", "priority", "status", "reason", "scope", "affectedSectors", "transmission"],
+        "additionalProperties": false
+      }
+    },
+    "selected": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "issueId": {"type": "string", "minLength": 1, "maxLength": 500},
+          "title": {"type": "string", "minLength": 1, "maxLength": 80},
+          "evidenceIds": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "maxItems": 12},
+          "companyIds": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 0, "maxItems": 20},
+          "novelty": {"type": "string", "enum": ["NEW_EVENT", "MATERIAL_UPDATE"]},
+          "deltaEvidenceIds": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 0, "maxItems": 12},
+          "limitations": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 240}, "minItems": 1, "maxItems": 6}
+        },
+        "required": ["issueId", "title", "evidenceIds", "companyIds", "novelty", "deltaEvidenceIds", "limitations"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["assessments", "selected"],
+  "additionalProperties": false
+}
