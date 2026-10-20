@@ -72,6 +72,40 @@ class EventListServiceTest {
     }
 
     @Test
+    void assertionStatusIsTheHandoffIssueStatusAsGiven() {
+        var r = list(null, null, null, null, null, null);
+        assertEquals(List.of("occurred", "announced", "occurred", "announced"),
+                r.items().stream().map(EventListResponse.EventSummary::assertionStatus).toList());
+    }
+
+    @Test
+    void anEarlierAsOfHidesEventsPublishedAfterIt() {
+        // FS040-3 / FS041-4: ai-accel's only article is published 2026-10-05T09:00Z, after this asOf.
+        var r = service.list(null, null, null, null, null, null, null, "2026-10-05T00:00:00Z");
+        assertFalse(ids(r.items()).contains(AI_ACCEL));
+        assertEquals("2026-10-05T00:00:00Z", r.metadata().asOf());
+        assertEquals("fixture-2026-10-01", r.metadata().graphVersion());
+    }
+
+    @Test
+    void aCompanyScopeIsNotCutByTheGraphNodeCap() {
+        // 600 issues on one company: the map's 500-node cap would drop the oldest, the timeline keeps every one.
+        List<Issue> issues = new java.util.ArrayList<>();
+        List<com.zoop.graph.snapshot.PublicGraphSnapshot.Relation> relations = new java.util.ArrayList<>();
+        for (int n = 0; n < 600; n++) {
+            String id = "iss-" + n;
+            issues.add(new Issue(id, "label", null, "unknown", null, null, null, null, "KR", "p", List.of(), List.of(),
+                    List.of(), List.of(), null, null));
+            relations.add(new com.zoop.graph.snapshot.PublicGraphSnapshot.Relation("rel-" + n, "INVOLVES", id, HYNIX,
+                    null, null, List.of(), List.of()));
+        }
+        var graph = DisplayGraph.of(new com.zoop.graph.snapshot.PublicGraphSnapshot(3, "v", "b",
+                List.of(new com.zoop.graph.snapshot.PublicGraphSnapshot.Company(HYNIX, "SK하이닉스", null, null)),
+                issues, relations, List.of(), List.of()));
+        assertEquals(600, EventListService.companyIssues(graph, HYNIX, 1).size());
+    }
+
+    @Test
     void reportedAtIsNeverMadeUpFromADateOnlyPublication() {
         var r = list(null, null, null, null, null, null);
         assertNull(r.items().get(1).reportedAt()); // hbm-equip was published on 2026-09-25 with no time
@@ -124,6 +158,7 @@ class EventListServiceTest {
     void invalidInputsAreRejectedNotEmptied() {
         for (Runnable bad : List.<Runnable>of(
                 () -> list(HYNIX, 3, null, null, null, null),
+                () -> list(null, 3, null, null, null, null), // the enum holds even where depth is ignored
                 () -> list(null, null, null, null, null, 0),
                 () -> list(null, null, "2026-10-02", "2026-10-01", null, null),
                 () -> list(null, null, "2026-10-01T00:00:00", null, null, null))) {

@@ -26,6 +26,7 @@ public class EventController {
                     + "최신순으로 들어갑니다. from/to가 없으면 모든 사건이 items입니다. items는 최신 사건순이며 limit·cursor로 나눠 받고, "
                     + "unknownTimeItems는 첫 페이지에만 담습니다. relationTypes는 요청 기업과 사건 사이의 직접 간선 유형만입니다. "
                     + "reportedAt은 기사 공개 시각이 날짜만 있으면 null입니다(시각을 지어내지 않음). "
+                    + "assertionStatus는 AI 인계 이슈의 사건 상태(occurred·announced·planned·forecast·cancelled·unknown)를 그대로 담고, 없으면 null입니다. "
                     + "없는 기업 404, 잘못된 입력 422, 잘못된 커서 422 INVALID_CURSOR, 고정 버전 없음 409, 스냅샷 읽기 실패 503입니다.")
     public EventListResponse listEvents(@RequestParam(required = false) String companyId,
             @RequestParam(required = false) Integer depth,

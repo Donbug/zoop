@@ -53,9 +53,9 @@ public class EventListService {
     public EventListResponse list(String companyId, Integer depth, String from, String to, String cursor, Integer limit,
             String graphVersion, String asOf) {
         if (limit != null && limit < 1) throw invalid();
-        // depth applies to a company scope only (contract); the whole-graph list ignores it.
+        // depth is 1 or 2 (contract enum) and applies to a company scope only; the whole-graph list ignores it.
+        if (depth != null && depth != 1 && depth != 2) throw invalid();
         Integer hops = companyId == null ? null : depth == null ? 1 : depth;
-        if (hops != null && hops != 1 && hops != 2) throw invalid();
         Instant start = from == null ? null : bound(from, false);
         Instant end = to == null ? null : bound(to, true);
         if (start != null && end != null && !start.isBefore(end)) throw invalid();
@@ -90,7 +90,8 @@ public class EventListService {
         int offset = after == null ? 0 : after.offset();
         if (offset > timed.size()) throw new CustomException(ErrorCode.INVALID_CURSOR);
         int pageLimit = limit != null ? limit : after != null ? after.limit() : timed.size() - offset;
-        List<Issue> page = timed.subList(offset, Math.min(timed.size(), offset + pageLimit));
+        // long: a forged cursor's offset + limit must not overflow into a negative end.
+        List<Issue> page = timed.subList(offset, (int) Math.min(timed.size(), (long) offset + pageLimit));
         String next = offset + page.size() < timed.size()
                 ? encode(new Cursor(companyId, hops, from, to, pageLimit, pinned.selected().version().id(), asOf,
                         offset + page.size()))
@@ -105,9 +106,12 @@ public class EventListService {
                 metadata, next);
     }
 
-    /** The company's events within the same literal hops as getCompanyGraphAsOf (2 also reaches FOLLOWS neighbours). */
-    private static List<Issue> companyIssues(DisplayGraph graph, String companyId, int hops) {
-        GraphSelection.Result ego = GraphSelection.select(graph, List.of(companyId), 2, GraphQueryService.NODE_LIMIT);
+    /**
+     * The company's events within the same literal hops as getCompanyGraphAsOf (2 also reaches FOLLOWS neighbours). No node
+     * cap: the graph's cap trims newest-first over all time, so it would silently drop the events of an older range.
+     */
+    static List<Issue> companyIssues(DisplayGraph graph, String companyId, int hops) {
+        GraphSelection.Result ego = GraphSelection.select(graph, List.of(companyId), 2, Integer.MAX_VALUE);
         GraphSelection.Result near = GraphSelection.neighbourhood(graph, ego, companyId, hops);
         return near.nodes().entrySet().stream().filter(e -> e.getValue() == GraphSelection.Kind.ISSUE)
                 .map(e -> graph.issues.get(e.getKey())).toList();
@@ -119,7 +123,7 @@ public class EventListService {
                 .filter(e -> e.source().equals(issue.issueId()) && e.target().equals(companyId))
                 .map(DisplayGraph.Edge::relationType).distinct().sorted().toList();
         return new EventSummary(issue.label(), issue.issueId(), issue.action(), issue.target(), issue.eventTime(),
-                issue.timePrecision(), issue.period(),
+                issue.timePrecision(), issue.period(), issue.assertionStatus(),
                 List.copyOf(new TreeSet<>(graph.issueCompanies.getOrDefault(issue.issueId(), Set.of()))), relationTypes,
                 issue.articleIds().size(), instantOrNull(issue.latestPublishedAt()));
     }
