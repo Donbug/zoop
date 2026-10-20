@@ -11279,11 +11279,27 @@ components:
             - "issue"
         label:
           type: "string"
+        logoUrl:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "기업 끝점의 로고 경로(GraphNode.logoUrl과 같은 값). 기업 카탈로그에 없으면 null이고 사건 끝점은 항상 null이다."
+        brandColor:
+          anyOf:
+            -
+              type: "string"
+            -
+              type: "null"
+          description: "기업 끝점의 브랜드 색(GraphNode.brandColor와 같은 값). 없으면 null이고 사건 끝점은 항상 null이다."
       type: "object"
       required:
         - "id"
         - "kind"
         - "label"
+        - "logoUrl"
+        - "brandColor"
     ErrorBody:
       type: "object"
       properties:
