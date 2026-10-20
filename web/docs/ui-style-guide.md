@@ -66,4 +66,4 @@ Click/tap, Enter/Space and arrow keys open the menu, with `aria-expanded` reflec
 
 ## Graph feature port
 
-D-GRP-01/01b uses `graph-view` for member/mode-scoped state and legend keys. G6 supplies flow layout and the conditional desktop minimap. `MapDetailSheet` owns M-GRP-01 modal snaps and focus return; `IsolatedIssuesPanel` reuses the detail panel tokens. Keep the source-to-implementation map in `PROTOTYPE_GRAPH_PORT_20261020.md` when changing these interactions.
+D-GRP-01/01b uses `graph-view` for member/mode-scoped state and legend keys. G6 supplies the conditional desktop minimap. Saved zoom/pan is reused only when the map size is unchanged; otherwise the default layout opens. `MapDetailSheet` owns M-GRP-01 modal snaps and focus return; `IsolatedIssuesPanel` reuses the detail panel tokens.

@@ -10,6 +10,7 @@ import {
   saveModeEntry,
   type GraphView,
   type LegendKey,
+  sameViewport,
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 
@@ -48,8 +49,6 @@ export default function GraphCanvas({
     view = readModeEntry(memoryOwner, data.metadata.mode)?.view ?? emptyView();
     setViewState({ key: viewKey, view });
   }
-  const flowPositions = useRef(new Map<string, { x: number; y: number }>());
-  const layoutSignature = useRef('');
   function changeView(next: GraphView) {
     setViewState({ key: viewKey, view: next });
     const saved = readModeEntry(memoryOwner, data.metadata.mode);
@@ -245,7 +244,6 @@ export default function GraphCanvas({
           ...node,
           style: {
             ...node.style,
-            ...(view.flow ? flowPositions.current.get(String(node.id)) : {}),
             visibility: hiddenNodes.has(String(node.id)) ? 'hidden' : 'visible',
           },
         }));
@@ -264,31 +262,8 @@ export default function GraphCanvas({
                 : 'visible',
           },
         }));
-        const signature = `${view.flow}:${rendered.nodes?.map((node) => node.id).join(',')}`;
         graph.setData(rendered);
         await graph.draw();
-        if (signature !== layoutSignature.current) {
-          graph.setLayout(
-            view.flow
-              ? { type: 'dagre', rankdir: 'LR', nodesep: 90, ranksep: 150 }
-              : [],
-          );
-          if (view.flow) {
-            await graph.layout();
-            // 흐름 배치는 좌표 범위가 기존 배치와 달라 화면 밖으로 넘친다. 전체가 보이게 맞춘다.
-            await graph.fitView({ when: 'always' }, false);
-            flowPositions.current = new Map(
-              graph.getNodeData().map((node) => [
-                String(node.id),
-                {
-                  x: Number(node.style?.x ?? 0),
-                  y: Number(node.style?.y ?? 0),
-                },
-              ]),
-            );
-          } else flowPositions.current.clear();
-          layoutSignature.current = signature;
-        }
         const visibleCount =
           rendered.nodes?.filter((node) => node.style?.visibility !== 'hidden')
             .length ?? 0;
@@ -339,7 +314,6 @@ export default function GraphCanvas({
     highlightedEdgeIds,
     connectionPath,
     view.hidden,
-    view.flow,
   ]);
   useEffect(() => {
     const host = container.current;
@@ -352,8 +326,6 @@ export default function GraphCanvas({
     host.addEventListener('pointerleave', clearHover);
     hovered.current = null;
     renderedData.current = null;
-    layoutSignature.current = '';
-    flowPositions.current.clear();
     const graphMode = data.metadata.mode;
     const rememberCamera = () => {
       if (!graph || disposed || graph.destroyed || instance.current !== graph)
@@ -367,6 +339,7 @@ export default function GraphCanvas({
           camera: {
             zoom: graph.getZoom(),
             position: [position[0], position[1]],
+            size: [host.clientWidth, host.clientHeight],
           },
         },
       });
@@ -443,7 +416,11 @@ export default function GraphCanvas({
       }
       if (disposed) return;
       const camera = readModeEntry(memoryOwner, graphMode)?.view.camera;
-      if (camera) {
+      // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 기본 배치로 연다.
+      if (
+        camera &&
+        sameViewport(camera.size, host.clientWidth, host.clientHeight)
+      ) {
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
         await graph.translateTo(camera.position, false);
@@ -555,14 +532,6 @@ export default function GraphCanvas({
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              className="pointer-events-auto mt-2 w-full rounded border border-zoop-line px-2 py-1 text-left text-[11px] aria-pressed:bg-white focus-visible:outline-2"
-              aria-pressed={view.flow}
-              onClick={() => changeView({ ...view, flow: !view.flow })}
-            >
-              흐름 순으로 정렬
-            </button>
             <p className="mt-2 text-[10px]">○ 기업 · ◆ 사건 · 크기=활동</p>
           </div>
         </aside>

@@ -5,11 +5,11 @@ export type LegendKey =
   'company' | 'issue' | GraphResponse['edges'][number]['relationType'];
 export type GraphView = {
   hidden: LegendKey[];
-  flow: boolean;
-  camera?: { zoom: number; position: [number, number] };
+  /** size: 저장할 때의 지도 크기. 크기가 달라지면 위치를 복원하지 않고 기본 배치로 연다. */
+  camera?: { zoom: number; position: [number, number]; size: [number, number] };
 };
 export type ModeEntry = { url: string; view: GraphView };
-export const emptyView = (): GraphView => ({ hidden: [], flow: false });
+export const emptyView = (): GraphView => ({ hidden: [] });
 const keys: LegendKey[] = [
   'company',
   'issue',
@@ -38,14 +38,16 @@ export function readModeEntry(owner: string, mode: MapMode): ModeEntry | null {
         hidden: entry.view.hidden.filter((key: LegendKey) =>
           keys.includes(key),
         ),
-        flow: entry.view.flow === true,
         ...(camera &&
         Number.isFinite(camera.zoom) &&
         camera.zoom >= 0.25 &&
         camera.zoom <= 4 &&
         Array.isArray(camera.position) &&
         camera.position.length === 2 &&
-        camera.position.every(Number.isFinite)
+        camera.position.every(Number.isFinite) &&
+        Array.isArray(camera.size) &&
+        camera.size.length === 2 &&
+        camera.size.every(Number.isFinite)
           ? { camera }
           : {}),
       },
@@ -53,6 +55,14 @@ export function readModeEntry(owner: string, mode: MapMode): ModeEntry | null {
   } catch {
     return null;
   }
+}
+/** 저장한 화면 위치를 지금 지도 크기에 그대로 쓸 수 있는지(1px 오차 허용) */
+export function sameViewport(
+  saved: [number, number],
+  width: number,
+  height: number,
+) {
+  return Math.abs(saved[0] - width) <= 1 && Math.abs(saved[1] - height) <= 1;
 }
 export function saveModeEntry(owner: string, mode: MapMode, entry: ModeEntry) {
   try {

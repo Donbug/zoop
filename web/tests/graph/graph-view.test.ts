@@ -13,8 +13,11 @@ it('keeps mode and member viewport memories separate and rejects malformed camer
     url: '/?mode=all&select=node%3ANASDAQ%3ANVDA',
     view: {
       hidden: ['FOLLOWS' as const],
-      flow: true,
-      camera: { zoom: 1.5, position: [30, 40] as [number, number] },
+      camera: {
+        zoom: 1.5,
+        position: [30, 40] as [number, number],
+        size: [1200, 700] as [number, number],
+      },
     },
   };
   saveModeEntry('member-a', 'all', entry);

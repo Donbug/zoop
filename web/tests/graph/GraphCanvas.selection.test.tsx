@@ -103,18 +103,9 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       (node) => node.id === 'NASDAQ:NVDA',
     )?.style;
     expect([after?.x, after?.y]).toEqual([before?.x, before?.y]);
-    await userEvent.click(screen.getByRole('button', { name: /□ 기업/ }));
-    await userEvent.click(
-      screen.getByRole('button', { name: '흐름 순으로 정렬' }),
-    );
-    await waitFor(() => expect(canvas.layout).toHaveBeenCalled());
-    expect(canvas.setLayout).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: 'dagre' }),
-    );
-    // The flow layout spans a different area, so it is fitted into view.
-    await waitFor(() =>
-      expect(canvas.fitView).toHaveBeenCalledWith({ when: 'always' }, false),
-    );
+    expect(
+      screen.queryByRole('button', { name: '흐름 순으로 정렬' }),
+    ).toBeNull();
   });
   it('restores zoom and pan separately for each mode', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -138,6 +129,23 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     rerender(<GraphCanvas data={all} memoryOwner="member-a" />);
     await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalledWith(1.8, false));
     expect(canvas.translateTo).toHaveBeenCalledWith([40, 60], false);
+  });
+  it('opens the default layout instead of a saved camera taken at another map size', async () => {
+    const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    sessionStorage.setItem(
+      'zoop.graph.view:member-a:all',
+      JSON.stringify({
+        url: '/?mode=all',
+        view: {
+          hidden: [],
+          camera: { zoom: 1.8, position: [40, 60], size: [1600, 900] },
+        },
+      }),
+    );
+    render(<GraphCanvas data={all} memoryOwner="member-a" />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(canvas.translateTo).not.toHaveBeenCalled();
   });
   it('enables the desktop minimap only above sixty visible nodes', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
