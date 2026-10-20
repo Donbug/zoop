@@ -33,13 +33,16 @@ def run(args, transport=None):
                      "productionAuthorized": False, "groupArchiveSha256": archive_sha}
     run_identity = {"source":source,"archiveSha256":archive_sha,"promptArtifacts":prompts,"authorization":authorization}
     run_id = "grouped-round-simulation-"+base.digest(base.canonical(run_identity))[:20]
-    prepared = []
+    prepared, identity_holds_by_round = [], {}
     for spec in sim.windows():
         pool, inputs, clocks, duplicates, coverage = sim.pool_for_round(rows,spec,len(unknown))
-        candidates = grouped.build_grouped_candidates(archive,spec)
+        identity_holds = []
+        candidates = grouped.build_grouped_candidates(archive,spec,identity_holds)
+        identity_holds_by_round[(spec['date'],spec['edition'])] = identity_holds
         prepared.append((spec,inputs,clocks,duplicates,coverage,candidates))
     plan = {"runId":run_id,"groupArchiveSha256":archive_sha,"maximumPaidCalls":args.max_calls,
             "rounds":[{**spec,"candidateIssues":len(candidates),
+                       "companyIdentityHeldIssues":identity_holds_by_round[(spec['date'],spec['edition'])],
                        "selectionOutputPlan":grouped.selection_output_plan(candidates)}
                       for spec,_,_,_,_,candidates in prepared]}
     if not args.execute_authorized:
@@ -77,6 +80,7 @@ def run(args, transport=None):
         context["priorSelectedIssues"]=[{"issueId":item["issueId"],"title":item["title"],"sources":item["sources"]}
                                         for item in published_history]
         record={"roundId":round_id,**spec,"identity":identity,"identitySha256":identity_sha,
+                "companyIdentityHeldIssues":identity_holds_by_round[(spec['date'],spec['edition'])],
                 "inputSources":inputs,"clockRefs":clocks,"sourceCoverage":coverage,"discardedDuplicateBodies":duplicates,
                 "previous":previous,"selected":[],"result":None,"resultSha256":None,"receipts":[],
                 "groupedSelectionRequestDigest":None}

@@ -119,6 +119,37 @@ class CorrectionTransport(AuthoredTransport):
 
 
 class GroupedRoundTests(unittest.TestCase):
+    def test_unverified_company_group_is_held_only_after_its_member_becomes_available(self):
+        first = document("identity-first", "2026-10-07T08:00:00+09:00")
+        later = document("identity-later", "2026-10-07T12:00:00+09:00")
+        old, bad = mention(first, "identity-old"), mention(later, "identity-bad")
+        for value, eligible in [(old, True), (bad, False)]:
+            value["companyProjection"] = {"policy": "canonical-evidence-v1", "briefingEligible": eligible,
+                                          "audit": []}
+        value = archive(("issue-identity", [(first, old), (later, bad)]))
+        value["identity"] = {"companyProjectionVersion": "canonical-evidence-v1"}
+        holds = []
+        self.assertEqual(1, len(grouped.build_grouped_candidates(value, round_spec(), holds)))
+        self.assertEqual([], holds)
+        evening = {"date": "2026-10-07", "edition": "evening", "window": {
+            "from": "2026-10-07T09:20:00+09:00", "to": "2026-10-07T17:30:00+09:00", "openStart": False}}
+        self.assertEqual([], grouped.build_grouped_candidates(value, evening, holds))
+        self.assertEqual([{"issueId": "issue-identity", "mentionIds": ["identity-bad"],
+            "reason": "unverified_company_link_in_asof_group"}], holds)
+
+    def test_projection_policy_cannot_be_removed_or_its_required_marker_omitted(self):
+        doc = document("identity-policy", "2026-10-07T08:00:00+09:00")
+        m = mention(doc, "identity-policy")
+        value = archive(("issue-identity", [(doc, m)]))
+        value["identity"] = {"companyProjectionVersion": "canonical-evidence-v1"}
+        with self.assertRaisesRegex(grouped.ReplayError, "grouped_company_projection_missing_or_invalid"):
+            grouped.build_grouped_candidates(value, round_spec())
+        m["companyProjection"] = {"policy": "canonical-evidence-v1", "briefingEligible": True, "audit": []}
+        self.assertEqual(1, len(grouped.build_grouped_candidates(value, round_spec())))
+        del value["identity"]
+        with self.assertRaisesRegex(grouped.ReplayError, "grouped_company_projection_policy_missing"):
+            grouped.build_grouped_candidates(value, round_spec())
+
     def setUp(self):
         self.doc = document("doc-current", "2026-10-07T08:00:00+09:00")
         self.mention = mention(self.doc, "mention-current")

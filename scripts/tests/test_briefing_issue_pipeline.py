@@ -95,6 +95,16 @@ class SameEventTransport(AuthoredIssueTransport):
 
 
 class IssuePipelineTest(unittest.TestCase):
+    def test_cache_only_miss_cannot_create_a_reservation_or_contact_provider(self):
+        def forbidden(_):
+            raise AssertionError("cache-only must never contact provider")
+        client = pipeline.IssueClient(self.root / "cache-only", forbidden, {"issue_extraction": "Authored prompt"}, 400,
+                                      cache_only=True)
+        with self.assertRaisesRegex(pipeline.Error, "cache_only_request_not_recorded"):
+            client.ask("issue_extraction", {"authored": True}, pipeline.obj({}), 100)
+        self.assertEqual([], list(client.calls.glob("*.pending.json")))
+        self.assertEqual(set(), client.new_calls)
+
     @classmethod
     def setUpClass(cls):
         cls.poc_root = os.environ.get("ZOOP_TEST_POC_ROOT")
@@ -536,6 +546,161 @@ class IssuePipelineTest(unittest.TestCase):
         self.assertEqual(0, catalog["newPaidCalls"])
         self.assertEqual([], transport.calls)
         self.assertFalse((self.root / "output").exists())
+
+    def projection_value(self, name, company_id, body, quote=None):
+        article = self.rules.article({"article_id": "projection-source", "url": "https://example.invalid/projection",
+            "title": "Authored projection fixture", "body": body, "publisher": "authored",
+            "published_at": "2026-10-02T09:00:00+09:00", "collected_at": "2026-10-20T00:00:00Z"})
+        quote = body if quote is None else quote
+        start = body.index(quote)
+        mention = self.rules.domain.Mention.model_validate({"mention_id": "authored-projection", "article_id": article.article_id,
+            "article_version": article.version, "title": "Authored event", "event_type": "announcement", "action": "announced",
+            "assertion_status": "announced", "participants": [{"company_id": company_id, "name": name, "role": "reported actor"}],
+            "evidence": [{"article_id": article.article_id, "article_version": article.version,
+                "start": start, "end": start + len(quote), "quote": quote}]})
+        sha = pipeline.digest(body.encode())
+        return {"key": "mention-projection", "mention": mention, "article": article,
+                "row": {"documentId": article.article_id, "documentVersion": "sha256-" + sha, "bodySha256": sha,
+                        "clockRecord": {"publishedAt": article.published_at}},
+                "grounding": {"verdict": "SUPPORTED", "reason": "authored earlier role review"}}
+
+    def test_projection_rejects_clickhouse_as_cadence_and_preserves_raw_identity(self):
+        catalogue = [{"company_id": "NASDAQ:CDNS", "name": "Cadence", "aliases": ["Cadence Design Systems"]}]
+        value = self.projection_value("ClickHouse", "NASDAQ:CDNS", "ClickHouse announced a database upgrade in this authored test.")
+        before = value["mention"].model_dump(mode="json")
+        legacy = pipeline.public_mention(value, catalogue)
+        self.assertEqual("Cadence", legacy["companies"][0]["name"])
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual([], projected["companies"])
+        self.assertEqual(pipeline.COMPANY_PROJECTION, projected["companyProjection"]["policy"])
+        self.assertFalse(projected["companyProjection"]["briefingEligible"])
+        self.assertEqual("quarantined", projected["companyProjection"]["status"])
+        audit = projected["companyProjection"]["audit"][0]
+        self.assertEqual("excluded_company_identity_unconfirmed", audit["status"])
+        self.assertEqual("NASDAQ:CDNS", audit["suppliedCompanyId"])
+        self.assertEqual("ClickHouse", audit["suppliedName"])
+        self.assertEqual("reported actor", audit["suppliedRole"])
+        self.assertEqual("Cadence", audit["canonicalName"])
+        self.assertEqual(before["participants"][0], audit["rawParticipant"])
+        self.assertEqual(before, value["mention"].model_dump(mode="json"))
+
+    def test_projection_does_not_reassign_unknown_microsoft_identifier(self):
+        catalogue = [{"company_id": "NASDAQ:MSFT", "name": "Microsoft", "aliases": ["마이크로소프트"]}]
+        value = self.projection_value("Microsoft", "NYSE:MSFT", "Microsoft announced an authored test contract.")
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual([], projected["companies"])
+        audit = projected["companyProjection"]["audit"][0]
+        self.assertEqual("excluded_unknown_company_id", audit["status"])
+        self.assertEqual("NYSE:MSFT", audit["suppliedCompanyId"])
+        self.assertIsNone(audit["canonicalName"])
+        self.assertEqual("Microsoft", audit["suppliedName"])
+
+    def test_ceo_name_requires_company_in_this_mentions_exact_quote(self):
+        catalogue = [{"company_id": "NASDAQ:AMD", "name": "AMD", "aliases": ["Advanced Micro Devices"]}]
+        value = self.projection_value("Lisa Su", "NASDAQ:AMD", "Lisa Su said AMD announced an authored chip update.")
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual(["AMD"], [c["name"] for c in projected["companies"]])
+        audit = projected["companyProjection"]["audit"][0]
+        self.assertEqual("linked_exact_evidence_match", audit["status"])
+        self.assertEqual("Lisa Su", audit["suppliedName"])
+        self.assertEqual("company_reference_in_exact_evidence_only", audit["linkMeaning"])
+        self.assertTrue(projected["companyProjection"]["briefingEligible"])
+        body = "AMD appeared in another paragraph. Lisa Su announced an authored chip update."
+        value = self.projection_value("Lisa Su", "NASDAQ:AMD", body, "Lisa Su announced an authored chip update.")
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual([], projected["companies"])
+        self.assertEqual("excluded_company_identity_unconfirmed", projected["companyProjection"]["audit"][0]["status"])
+
+    def test_projection_uses_exact_normalized_names_and_not_amd_substrings(self):
+        catalogue = [{"company_id": "NASDAQ:AMD", "name": "AMD", "aliases": ["Advanced Micro Devices"]}]
+        for body in ["Lisa Su described AMDocs in this authored test.", "Lisa Su described XAMD and AMDextra in this authored test."]:
+            value = self.projection_value("Lisa Su", "NASDAQ:AMD", body)
+            self.assertEqual([], pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)["companies"])
+        value = self.projection_value("  advanced   MICRO devices  ", "NASDAQ:AMD", "An authored actor described a chip update.")
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual(["AMD"], [c["name"] for c in projected["companies"]])
+        self.assertEqual("linked_name_match", projected["companyProjection"]["audit"][0]["status"])
+
+    def test_projection_without_exact_mention_evidence_never_links(self):
+        catalogue = [{"company_id": "NASDAQ:AMD", "name": "AMD", "aliases": []}]
+        value = self.projection_value("AMD", "NASDAQ:AMD", "AMD announced an authored test event.")
+        value["mention"] = value["mention"].model_copy(update={"evidence": []})
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual([], projected["companies"])
+        self.assertEqual("excluded_no_exact_mention_evidence", projected["companyProjection"]["audit"][0]["status"])
+
+    def test_projection_quarantines_any_unresolved_participant_but_zero_participants_is_eligible(self):
+        catalogue = [{"company_id": "NASDAQ:AMD", "name": "AMD", "aliases": []}]
+        value = self.projection_value("AMD", "NASDAQ:AMD", "AMD announced an authored test event.")
+        unresolved = self.rules.domain.Participant(company_id="UNKNOWN:ID", name="Unresolved", role="mentioned actor")
+        value["mention"] = value["mention"].model_copy(update={"participants": [*value["mention"].participants, unresolved]})
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertEqual(1, len(projected["companies"]))
+        self.assertFalse(projected["companyProjection"]["briefingEligible"])
+        self.assertEqual(2, len(projected["companyProjection"]["audit"]))
+        summary = pipeline.company_projection_summary({"issue": {"mentions": [projected]}})
+        self.assertEqual((1, 0, 1), (summary["mentions"], summary["eligibleMentions"], summary["quarantinedMentions"]))
+        value["mention"] = value["mention"].model_copy(update={"participants": []})
+        projected = pipeline.public_mention(value, catalogue, pipeline.COMPANY_PROJECTION)
+        self.assertTrue(projected["companyProjection"]["briefingEligible"])
+        self.assertEqual([], projected["companyProjection"]["audit"])
+        self.assertEqual("eligible", projected["companyProjection"]["status"])
+
+    def test_unindexed_person_or_institution_is_audited_without_quarantining_event(self):
+        value = self.projection_value("Unlisted Institution", None, "An institution announced an authored public event.")
+        projected = pipeline.public_mention(value, [], pipeline.COMPANY_PROJECTION)
+        self.assertEqual([], projected["companies"])
+        self.assertTrue(projected["companyProjection"]["briefingEligible"])
+        audit = projected["companyProjection"]["audit"][0]
+        self.assertEqual("not_indexed", audit["status"])
+        self.assertIsNone(audit["suppliedCompanyId"])
+        self.assertEqual("Unlisted Institution", audit["suppliedName"])
+        summary = pipeline.company_projection_summary({"issue": {"mentions": [projected]}})
+        self.assertEqual((1, 0, 0, 1), (summary["participants"], summary["linked"], summary["excluded"], summary["notIndexed"]))
+        self.assertEqual((1, 0), (summary["eligibleMentions"], summary["quarantinedMentions"]))
+
+    def test_projection_reuses_native_paid_recordings_with_zero_calls_and_unchanged_decisions(self):
+        self.prepared(self.same_event_rows(2))
+        args = self.args(True)
+        args.comparison_batch_size = 2
+        transport = SameEventTransport()
+        with contextlib.redirect_stdout(io.StringIO()):
+            pipeline.run(args, transport)
+        native_output = self.root / "output"
+        native_archive = pipeline.base.strict_load((native_output / "grouped-issues.json").read_bytes())
+        native_identity = pipeline.base.strict_load((native_output / "identity.json").read_bytes())
+        self.assertNotIn("companyProjectionVersion", native_identity)
+        projected_output = self.root / "projected-output"
+        projected_output.mkdir(mode=0o700)
+        shutil.copytree(native_output / "calls", projected_output / "calls")
+        original_calls = {p.name: p.read_bytes() for p in (native_output / "calls").glob("*")}
+        args.output = str(projected_output)
+        args.company_projection = pipeline.COMPANY_PROJECTION
+        args.cache_only = True
+        def deny(_):
+            raise AssertionError("company projection must reuse original model inputs and receipts")
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = pipeline.run(args, deny)
+        projected_archive = pipeline.base.strict_load((projected_output / "grouped-issues.json").read_bytes())
+        projected_identity = pipeline.base.strict_load((projected_output / "identity.json").read_bytes())
+        self.assertEqual(0, result["newPaidCalls"])
+        self.assertEqual(pipeline.COMPANY_PROJECTION, projected_identity.pop("companyProjectionVersion"))
+        self.assertEqual(native_identity, projected_identity)
+        self.assertEqual(native_archive["decisions"], projected_archive["decisions"])
+        self.assertEqual(native_archive["receipts"], projected_archive["receipts"])
+        self.assertEqual(native_archive["issues"][0]["issueId"], projected_archive["issues"][0]["issueId"])
+        self.assertEqual(original_calls, {p.name: p.read_bytes() for p in (projected_output / "calls").glob("*")})
+        self.assertEqual(2, result["companyProjection"]["participants"])
+        self.assertEqual(2, result["companyProjection"]["linked"])
+        self.assertEqual(0, result["companyProjection"]["excluded"])
+        self.assertEqual(2, result["companyProjection"]["eligibleMentions"])
+        self.assertEqual(0, result["companyProjection"]["quarantinedMentions"])
+        self.assertEqual(result["companyProjection"], projected_archive["companyProjection"])
+        with sqlite3.connect(projected_output / "issues.sqlite3") as db:
+            snapshots = [pipeline.base.strict_load(row[0])["teamSnapshot"] for row in db.execute("SELECT payload FROM issues")]
+        with sqlite3.connect(native_output / "issues.sqlite3") as db:
+            original_snapshots = [pipeline.base.strict_load(row[0])["teamSnapshot"] for row in db.execute("SELECT payload FROM issues")]
+        self.assertEqual(original_snapshots, snapshots)
 
     def test_offline_plan_never_calls_provider_or_creates_output(self):
         self.prepared()

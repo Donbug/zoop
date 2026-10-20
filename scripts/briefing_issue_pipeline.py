@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import sqlite3
 import sys
+import unicodedata
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -28,6 +29,7 @@ base = sim.base
 canonical, digest, Error = base.canonical, base.digest, base.ReplayError
 VERSION = "zoop-grouped-issues-v1"
 COMPARISON_WIRE = "article-catalog-v1"
+COMPANY_PROJECTION = "canonical-evidence-v1"
 COMPARISON_CATALOG_INSTRUCTIONS = (
     "\nLossless input adapter: each {article_ref: SHA256} in a pair's input.article or input.issue.articles "
     "references the COMPLETE unchanged article in articleCatalog. Resolve every reference before applying the original "
@@ -111,12 +113,13 @@ class HeldPaidRequest(Error):
 
 
 class IssueClient(base.ResponsesClient):
-    def __init__(self, output, transport, prompts, max_calls, hold_unresolved_requests=False, comparison_wire="legacy"):
+    def __init__(self, output, transport, prompts, max_calls, hold_unresolved_requests=False, comparison_wire="legacy", cache_only=False):
         super().__init__(output, transport, max_calls)
         self.prompts = prompts
         if comparison_wire not in {"legacy", COMPARISON_WIRE}:
             raise Error("comparison_wire_unknown")
         self.comparison_wire = comparison_wire
+        self.cache_only = cache_only
         # Only reservations unresolved before this process started can be held.
         # A new transport failure still stops every queued sibling normally.
         self.held_at_start = {p.name.removesuffix(".pending.json") for p in self.calls.glob("*.pending.json")
@@ -135,6 +138,8 @@ class IssueClient(base.ResponsesClient):
                 # Deliberately outside ResponsesClient.call: this disposition is
                 # neither a successful receipt nor a new global transport failure.
                 raise HeldPaidRequest(key, stage)
+        if self.cache_only and not self.has_recorded(key):
+            raise Error("cache_only_request_not_recorded")
         return super().call(stage, data, prompt_name, schema_name, max_output, schema_override)
 
     def request(self, stage, data, prompt_name, schema_name, max_output=12000, schema_override=None):
@@ -332,17 +337,88 @@ def evidence_record(evidence, row):
             "bodySha256": row["bodySha256"], "quote": evidence.quote, "start": evidence.start, "end": evidence.end}
 
 
-def public_mention(value, catalogue):
+def _company_name(value):
+    return " ".join(unicodedata.normalize("NFKC", value).casefold().split()) if isinstance(value, str) else ""
+
+
+def _company_projection(value, catalogue, evidence):
+    """Identity evidence guard only; not a new event-quality or role verifier.
+
+    Do not repair a supplied identifier from a name, ticker or world knowledge.
+    Native participants remain unchanged in snapshots/provider recordings.
+    """
+    mention, article = value["mention"], value["article"]
+    known = {c["company_id"]: c for c in catalogue}
+    exact = [(record, e.quote) for e, record in zip(mention.evidence, evidence) if e.matches(article)]
+    companies, audit = [], []
+    for participant in mention.participants:
+        canonical_company = known.get(participant.company_id)
+        entry = {"suppliedCompanyId": participant.company_id, "suppliedName": participant.name,
+                 "suppliedRole": participant.role, "canonicalName": canonical_company["name"] if canonical_company else None,
+                 "rawParticipant": participant.model_dump(mode="json"), "matchedEvidenceIds": []}
+        if participant.company_id is None:
+            entry["status"] = "not_indexed"
+        elif canonical_company is None:
+            entry["status"] = "excluded_unknown_company_id"
+        elif not exact:
+            entry["status"] = "excluded_no_exact_mention_evidence"
+        else:
+            aliases = {_company_name(name) for name in [canonical_company["name"], *canonical_company.get("aliases", [])]}
+            aliases.discard("")
+            name_match = _company_name(participant.name) in aliases
+            matching_evidence = [record["evidenceId"] for record, quote in exact if any(
+                re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", _company_name(quote)) for alias in aliases)]
+            if name_match or matching_evidence:
+                entry["status"] = "linked_name_match" if name_match else "linked_exact_evidence_match"
+                entry["matchedEvidenceIds"] = sorted(set(matching_evidence))
+                entry["linkMeaning"] = "catalogue_label_match" if name_match else "company_reference_in_exact_evidence_only"
+                companies.append({"companyId": participant.company_id, "name": canonical_company["name"],
+                                  "role": participant.role, "evidence": evidence})
+            else:
+                entry["status"] = "excluded_company_identity_unconfirmed"
+        audit.append(entry)
+    eligible = all(entry["status"].startswith("linked_") or entry["status"] == "not_indexed" for entry in audit)
+    return companies, {"version": COMPANY_PROJECTION, "policy": COMPANY_PROJECTION,
+        "briefingEligible": eligible, "status": "eligible" if eligible else "quarantined",
+        "meaning": "Company identity evidence guard; not a same-event quality guarantee or new role verification.",
+        "audit": audit}
+
+
+def public_mention(value, catalogue, company_projection="legacy"):
     mention, row = value["mention"], value["row"]
     evidence = [evidence_record(e, row) for e in mention.evidence]
     known = {c["company_id"]: c for c in catalogue}
     companies = [{"companyId": p.company_id, "name": known[p.company_id]["name"], "role": p.role, "evidence": evidence}
                  for p in mention.participants if p.company_id in known]
-    return {"mentionId": value["key"], "articleId": row["documentId"], "articleVersion": row["documentVersion"],
+    result = {"mentionId": value["key"], "articleId": row["documentId"], "articleVersion": row["documentVersion"],
             "pocArticleVersion": value["article"].version, "publishedAt": row["clockRecord"]["publishedAt"], "bodySha256": row["bodySha256"],
             "title": mention.title, "action": mention.action, "target": mention.target, "eventTime": mention.event_time,
             "assertionStatus": mention.assertion_status, "keywords": list(mention.keywords), "companies": companies,
             "evidence": evidence, "grounding": value["grounding"]}
+    if company_projection == COMPANY_PROJECTION:
+        result["companies"], result["companyProjection"] = _company_projection(value, catalogue, evidence)
+    elif company_projection != "legacy":
+        raise Error("company_projection_unknown")
+    return result
+
+
+def company_projection_summary(issues):
+    statuses = {}; mentions = 0; eligible = 0
+    for issue in issues.values():
+        for mention in issue["mentions"]:
+            projection = mention.get("companyProjection", {})
+            mentions += 1
+            eligible += projection.get("briefingEligible") is True
+            for entry in projection.get("audit", []):
+                statuses[entry["status"]] = statuses.get(entry["status"], 0) + 1
+    linked = sum(count for status, count in statuses.items() if status.startswith("linked_"))
+    not_indexed = statuses.get("not_indexed", 0)
+    total = sum(statuses.values())
+    return {"version": COMPANY_PROJECTION, "policy": COMPANY_PROJECTION,
+            "mentions": mentions, "eligibleMentions": eligible, "quarantinedMentions": mentions - eligible,
+            "participants": total, "linked": linked, "excluded": total - linked - not_indexed, "notIndexed": not_indexed,
+            "statuses": statuses,
+            "meaning": "Projected participant identities only; native event decisions and model receipts are unchanged."}
 
 
 def database(path, identity, all_rows, issues, decisions, held, receipts):
@@ -428,11 +504,17 @@ def run(args, transport=None):
             "nativePromptSha256": digest(instructions["issue_comparison"].encode()),
             "catalogPromptSha256": digest((instructions["issue_comparison"] + COMPARISON_CATALOG_INSTRUCTIONS).encode()),
             "nativeProjection": "lossless-full-native-articles", "reuseNativeRecordedRequests": True}
+    company_projection = getattr(args, "company_projection", "legacy")
+    if company_projection != "legacy":
+        if company_projection != COMPANY_PROJECTION:
+            raise Error("company_projection_unknown")
+        identity["companyProjectionVersion"] = company_projection
     plan = {"identitySha256": digest(canonical(identity)), "sourceRecords": len(all_rows), "eligibleDocuments": len(rows),
             "timeUnresolvedDocuments": len(unknown), "seedIssues": len(issues), "model": base.MODEL, "maximumPaidCalls": args.max_calls}
     if not args.execute_authorized:
         return {**plan, "status": "OFFLINE", "newPaidCalls": 0}
-    if not args.user_inbox_ref or not (args.key_file or transport):
+    cache_only = getattr(args, "cache_only", False)
+    if not args.user_inbox_ref or not (args.key_file or transport or cache_only):
         raise Error("issue_execution_authorization_required")
     output = Path(args.output); base.private_dir(output)
     base.save_json(output / "identity.json", identity)
@@ -441,9 +523,13 @@ def run(args, transport=None):
         saved = base.strict_load(base.regular(archive))
         if saved["identitySha256"] != plan["identitySha256"]:
             raise Error("issue_archive_identity_changed")
-        return {**plan, "status": "REUSED", "newPaidCalls": 0, "counts": saved["counts"], "archiveSha256": digest(base.regular(archive))}
-    client = IssueClient(output, transport or base.authenticated_transport(Path(args.key_file), timeout=600), instructions, args.max_calls,
-                         hold_unresolved_requests=getattr(args, "hold_unresolved_requests", False), comparison_wire=comparison_wire)
+        return {**plan, "status": "REUSED", "newPaidCalls": 0, "counts": saved["counts"], "archiveSha256": digest(base.regular(archive)),
+                **({"companyProjection": saved["companyProjection"]} if "companyProjection" in saved else {})}
+    def no_network(_):
+        raise Error("cache_only_network_forbidden")
+    client = IssueClient(output, no_network if cache_only else (transport or base.authenticated_transport(Path(args.key_file), timeout=600)), instructions, args.max_calls,
+                         hold_unresolved_requests=getattr(args, "hold_unresolved_requests", False), comparison_wire=comparison_wire,
+                         cache_only=cache_only)
     lock = output / ".issue-run.lock"
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
     try:
@@ -505,7 +591,7 @@ def run(args, transport=None):
                     issues[issue_id]["snapshot"] = rules.issue_snapshot({"issue_id": issue_id, "mentions": members, "articles": list(articles.values())})
                 else:
                     issues[issue_id] = {"snapshot": rules.issue_snapshot({"issue_id": issue_id, "mentions": [mention], "articles": [article]}), "mentions": [], "seed": False}
-                issues[issue_id]["mentions"].append(public_mention(value, catalogue))
+                issues[issue_id]["mentions"].append(public_mention(value, catalogue, company_projection))
             print(json.dumps({"stage": "grouping", "processedMentions": min(index+len(batch),len(extracted)), "issues": len(issues)}), flush=True)
         for record in unknown:
             held.append({"articleId": record["documentId"], "reason": "unresolved_round_clock", "detail": record["reason"]})
@@ -518,9 +604,12 @@ def run(args, transport=None):
                  "documents": [{k:v for k,v in r.items() if k != "clockTime"} for r in rows],
                  "decisions": decisions, "held": held, "counts": counts, "receipts": receipts,
                  "retrospectiveBodies": True, "operationalCollectionGate": False, "productionAuthorized": False}
+        if company_projection == COMPANY_PROJECTION:
+            value["companyProjection"] = company_projection_summary(issues)
         base.save_json(archive, value)
         return {**plan, "status": "COMPLETE", "counts": counts, "newPaidCalls": len(client.new_calls),
-                "archiveSha256": digest(base.regular(archive)), "assignmentCounts": {s:sum(d["status"]==s for d in decisions) for s in ["NEW","MERGE","HOLD"]}}
+                "archiveSha256": digest(base.regular(archive)), "assignmentCounts": {s:sum(d["status"]==s for d in decisions) for s in ["NEW","MERGE","HOLD"]},
+                **({"companyProjection": value["companyProjection"]} if "companyProjection" in value else {})}
     finally:
         receipts = canonical(client.receipts())
         base.write_once(output / ("accounting-" + digest(receipts) + ".json"), receipts)
@@ -535,8 +624,11 @@ def parser():
     p.add_argument("--execute-authorized", action="store_true")
     p.add_argument("--hold-unresolved-requests", action="store_true",
         help="Explicitly HOLD batches with paid reservations unresolved before this process; never resend them or invent usage.")
+    p.add_argument("--cache-only", action="store_true", help="reuse only recorded responses/explicit holds; no key, network or new reservation")
     p.add_argument("--comparison-wire", choices=("legacy", COMPARISON_WIRE), default="legacy",
         help="Losslessly share full articles across new comparison pairs; existing native recordings are reused unchanged.")
+    p.add_argument("--company-projection", choices=("legacy", COMPANY_PROJECTION), default="legacy",
+        help="Guard public company identity links without changing native snapshots, model inputs or event decisions.")
     p.add_argument("--batch-size", type=int, choices=range(1,17), default=6)
     p.add_argument("--comparison-batch-size", type=int, choices=range(1,13), default=6)
     p.add_argument("--workers", type=int, choices=range(1,4), default=3)

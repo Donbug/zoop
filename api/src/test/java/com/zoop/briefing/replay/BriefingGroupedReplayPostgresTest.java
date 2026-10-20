@@ -202,6 +202,82 @@ class BriefingGroupedReplayPostgresTest {
         }
     }
 
+    @Test void aFutureQuarantinedMemberCannotRemoveAnEarlierPublishedIssueAndMalformedProjectionIsRejected() throws Exception {
+        Path directory = Files.createTempDirectory(root, "projection-asof-").toRealPath();
+        String authored = """
+                import importlib.util, sys
+                from pathlib import Path
+                path = Path('..').resolve() / 'scripts/tests/test_briefing_grouped_run.py'
+                spec = importlib.util.spec_from_file_location('projection_fixture_case', path)
+                m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+                f = m.GroupedRunTest(); f.setUp()
+                try:
+                    directory = Path(sys.argv[1]).resolve(); m.base.private_dir(directory)
+                    f.root = directory; f.archive_path = directory / 'archive.json'; f.output = directory / 'output'
+                    f.clock.root = directory; f.clock.sources = directory / 'sources.jsonl'
+                    f.clock.clocks = directory / 'clocks.json'; f.clock.html = directory / 'html'; f.clock.html.mkdir()
+                    archive = f.prepare()
+                    archive['identity'] = {'companyProjectionVersion':'canonical-evidence-v1'}
+                    for issue in archive['issues']:
+                        for mention in issue['mentions']:
+                            audit = []
+                            for company in mention['companies']:
+                                raw = {'company_id':company['companyId'], 'name':company['name'], 'role':company['role']}
+                                audit.append({'suppliedCompanyId':raw['company_id'], 'suppliedName':raw['name'],
+                                    'suppliedRole':raw['role'], 'canonicalName':raw['name'], 'rawParticipant':raw,
+                                    'matchedEvidenceIds':[e['evidenceId'] for e in company['evidence']], 'status':'linked_name_match'})
+                            mention['companyProjection'] = {'policy':'canonical-evidence-v1', 'version':'canonical-evidence-v1',
+                                'briefingEligible':True, 'status':'eligible', 'audit':audit}
+                    future = archive['issues'].pop(1)['mentions'][0]
+                    future['companies'] = []
+                    raw = {'company_id':'UNKNOWN:BAD', 'name':'합성 기업', 'role':'contract party'}
+                    future['companyProjection'] = {'policy':'canonical-evidence-v1', 'version':'canonical-evidence-v1',
+                        'briefingEligible':False, 'status':'quarantined', 'audit':[{'suppliedCompanyId':raw['company_id'],
+                        'suppliedName':raw['name'], 'suppliedRole':raw['role'], 'canonicalName':None,
+                        'rawParticipant':raw, 'matchedEvidenceIds':[], 'status':'excluded_unknown_company_id'}]}
+                    archive['issues'][0]['mentions'].append(future)
+                    f.archive_path.write_bytes(m.base.canonical(archive))
+                    result = f.execute(m.fixtures.AuthoredTransport())
+                    assert result['selectedRounds'] == 13, result
+                finally:
+                    f.tearDown()
+                """;
+        ProcessBuilder command = new ProcessBuilder("python3", "-c", authored, directory.toString());
+        command.environment().put("PYTHONDONTWRITEBYTECODE", "1");
+        Process process = command.redirectErrorStream(true).redirectOutput(directory.resolve("fixture.log").toFile()).start();
+        int code = process.waitFor(); assertEquals(0, code, Files.readString(directory.resolve("fixture.log")));
+        String schema = "projection_case_" + UUID.randomUUID().toString().replace("-", "");
+        String baseUrl = System.getenv("DB_URL"), url = baseUrl + (baseUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema + ",public";
+        var datasource = new DriverManagerDataSource(url, username(), password()); var database = new JdbcTemplate(datasource);
+        try {
+            Flyway.configure().dataSource(datasource).schemas(schema).defaultSchema(schema).load().migrate();
+            database.update("INSERT INTO companies(id,name) VALUES ('company-authored','합성 기업')");
+            Path source = directory.resolve("sources.jsonl"), output = directory.resolve("output"), bundleFile = output.resolve("bundle-v2.json"), archiveFile = output.resolve("grouped-issues.json");
+            var settings = new BriefingReplaySettings(source, bundleFile, Files.createDirectory(directory.resolve("artifacts")),
+                    directory.resolve("grants.json"), directory.resolve("manifest.json"), ArtifactFileStore.sha256(Files.readAllBytes(source)),
+                    "inbox/authored-grouped-run.md", directory.resolve("clocks.json"));
+            var projectedImporter = new BriefingReplayImporter(database, new DataSourceTransactionManager(datasource), settings);
+            projectedImporter.importBundle();
+            assertEquals(13, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
+            assertEquals(1, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE round_date='2026-10-02' AND edition='morning' AND published_payload->'items'->0->>'eventId'='stable-authored-issue-0'", Integer.class));
+            assertEquals(1, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE round_date='2026-10-02' AND edition='evening' AND published_payload IS NULL", Integer.class));
+            assertEquals(39, database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
+            assertTrue(projectedImporter.importBundle().alreadyImported());
+            byte[] originalArchive = Files.readAllBytes(archiveFile), originalBundle = Files.readAllBytes(bundleFile);
+            String before = database.queryForObject("SELECT md5(string_agg(row_to_json(r)::text, '' ORDER BY id)) FROM briefing_rounds r", String.class);
+            for (String mutation : new String[]{"missing_policy", "false_claimed_eligible"}) {
+                var changedArchive = (tools.jackson.databind.node.ObjectNode) StrictJson.parseObject(originalArchive).node().deepCopy();
+                var projection = (tools.jackson.databind.node.ObjectNode) changedArchive.path("issues").get(0).path("mentions").get(1).path("companyProjection");
+                if ("missing_policy".equals(mutation)) projection.remove("policy"); else projection.put("briefingEligible", true);
+                byte[] changedBytes = StrictJson.write(changedArchive); Files.write(archiveFile, changedBytes);
+                var changedBundle = (tools.jackson.databind.node.ObjectNode) StrictJson.parseObject(originalBundle).node().deepCopy();
+                changedBundle.put("groupArchiveSha256", ArtifactFileStore.sha256(changedBytes)); Files.write(bundleFile, StrictJson.write(changedBundle));
+                assertThrows(RuntimeException.class, projectedImporter::importBundle);
+                assertEquals(before, database.queryForObject("SELECT md5(string_agg(row_to_json(r)::text, '' ORDER BY id)) FROM briefing_rounds r", String.class));
+            }
+        } finally { database.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
+    }
+
     private static String url() { String base = System.getenv("DB_URL"); return base + (base.contains("?") ? "&" : "?") + "currentSchema=" + SCHEMA + ",public"; }
     private static String username() { return System.getenv().getOrDefault("DB_USERNAME", "company_test"); }
     private static String password() { return System.getenv().getOrDefault("DB_PASSWORD", ""); }

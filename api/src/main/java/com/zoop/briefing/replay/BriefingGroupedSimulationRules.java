@@ -34,11 +34,16 @@ final class BriefingGroupedSimulationRules {
         StrictJson.Obj archive = StrictJson.parseObject(bytes);
         require("zoop-grouped-issues-v1".equals(archive.string("schemaVersion"))
                 && bundle.string("sourceFileSha256").equals(archive.string("sourceFileSha256")), "archive_source");
+        String companyPolicy = archive.has("identity") && archive.object("identity").has("companyProjectionVersion")
+                ? archive.object("identity").stringOrNull("companyProjectionVersion") : null;
+        require(companyPolicy == null || "canonical-evidence-v1".equals(companyPolicy), "archive_company_projection_policy");
         Map<String, StrictJson.Obj> issues = new LinkedHashMap<>(); Set<String> mentions = new HashSet<>();
         for (StrictJson.Obj issue : archive.objects("issues")) {
             require(issues.putIfAbsent(issue.string("issueId"), issue) == null, "duplicate_issue");
             for (StrictJson.Obj mention : issue.objects("mentions")) {
                 require(mentions.add(mention.string("mentionId")), "duplicate_mention");
+                require((companyPolicy != null) == mention.has("companyProjection"), "archive_company_projection_declaration");
+                companyEligible(mention);
                 String key = mention.string("articleId") + "\u0000" + mention.string("bodySha256");
                 JsonNode source = sources.get(key); PublicationClockRegistry.Clock clock = clocks.verified.get(key);
                 require(source != null && clock != null && ("sha256-" + mention.string("bodySha256")).equals(mention.string("articleVersion"))
@@ -99,6 +104,45 @@ final class BriefingGroupedSimulationRules {
         return new UnknownCall(digest, requestBytes, reservationBytes);
     }
 
+    /** Optional legacy-compatible identity projection; it is never an event or same-legal-entity approval. */
+    static boolean companyEligible(StrictJson.Obj mention) {
+        if (!mention.has("companyProjection")) return true;
+        StrictJson.Obj projection = mention.object("companyProjection");
+        require("canonical-evidence-v1".equals(projection.string("policy"))
+                && (!projection.has("version") || "canonical-evidence-v1".equals(projection.string("version"))), "company_projection_policy");
+        List<StrictJson.Obj> linked = new ArrayList<>(); boolean eligible = true;
+        Set<String> evidenceIds = new HashSet<>(); mention.objects("evidence").forEach(e -> evidenceIds.add(e.string("evidenceId")));
+        for (StrictJson.Obj audit : projection.objects("audit")) {
+            String status = audit.string("status"), supplied = audit.stringOrNull("suppliedCompanyId");
+            require(Set.of("linked_name_match", "linked_exact_evidence_match", "not_indexed", "excluded_unknown_company_id",
+                    "excluded_no_exact_mention_evidence", "excluded_company_identity_unconfirmed").contains(status), "company_projection_status");
+            require(!audit.string("suppliedName").isBlank() && evidenceIds.containsAll(audit.strings("matchedEvidenceIds")), "company_projection_evidence");
+            StrictJson.Obj raw = audit.object("rawParticipant");
+            require(java.util.Objects.equals(supplied, raw.stringOrNull("company_id")) && audit.string("suppliedName").equals(raw.string("name"))
+                    && audit.string("suppliedRole").equals(raw.string("role")), "company_projection_reported_identity");
+            if (status.startsWith("linked_")) {
+                require(supplied != null && !supplied.isBlank() && audit.stringOrNull("canonicalName") != null
+                        && (!audit.has("sameLegalEntityEstablished") || !audit.bool("sameLegalEntityEstablished")), "company_projection_link");
+                if ("linked_exact_evidence_match".equals(status)) require(!audit.strings("matchedEvidenceIds").isEmpty(), "company_projection_link_evidence");
+                linked.add(audit);
+            } else if ("not_indexed".equals(status)) require(supplied == null && audit.isNull("canonicalName")
+                    && audit.strings("matchedEvidenceIds").isEmpty(), "company_projection_unindexed");
+            else {
+                eligible = false;
+                if ("excluded_unknown_company_id".equals(status)) require(supplied != null && audit.isNull("canonicalName"), "company_projection_unknown_identity");
+            }
+        }
+        require(projection.bool("briefingEligible") == eligible, "company_projection_eligibility");
+        if (projection.has("status")) require((eligible ? "eligible" : "quarantined").equals(projection.string("status")), "company_projection_overall_status");
+        List<StrictJson.Obj> companies = mention.objects("companies"); require(companies.size() == linked.size(), "company_projection_link_population");
+        for (int index = 0; index < companies.size(); index++) {
+            StrictJson.Obj company = companies.get(index), audit = linked.get(index);
+            require(company.string("companyId").equals(audit.string("suppliedCompanyId")) && company.string("name").equals(audit.string("canonicalName"))
+                    && company.string("role").equals(audit.string("suppliedRole")), "company_projection_canonical_link");
+        }
+        return eligible;
+    }
+
     private static void exact(StrictJson.Obj evidence, StrictJson.Obj mention, JsonNode source) {
         String body = source.path("body").stringValue(); int start = evidence.count("start"), end = evidence.count("end");
         require(!evidence.string("evidenceId").isBlank() && evidence.string("articleId").equals(mention.string("articleId"))
@@ -115,9 +159,14 @@ final class BriefingGroupedSimulationRules {
         for (JsonNode value : receipts.values()) require(stages.contains(StrictJson.Obj.of(value).string("stage")), "round_receipt_scope");
         Instant from = Instant.parse(round.object("window").string("from")), to = Instant.parse(round.object("window").string("to"));
         Map<String, StrictJson.Obj> expected = new LinkedHashMap<>();
-        for (var entry : archive.issues().entrySet()) if (entry.getValue().objects("mentions").stream()
-                .anyMatch(m -> Instant.parse(m.string("publishedAt")).isAfter(from) && !Instant.parse(m.string("publishedAt")).isAfter(to)))
-            expected.put(entry.getKey(), entry.getValue());
+        for (var entry : archive.issues().entrySet()) {
+            List<StrictJson.Obj> available = entry.getValue().objects("mentions").stream()
+                    .filter(m -> !Instant.parse(m.string("publishedAt")).isAfter(to)).toList();
+            // A later quarantined member cannot remove an otherwise eligible earlier round's issue.
+            if (available.stream().allMatch(BriefingGroupedSimulationRules::companyEligible)
+                    && available.stream().anyMatch(m -> Instant.parse(m.string("publishedAt")).isAfter(from)))
+                expected.put(entry.getKey(), entry.getValue());
+        }
         if (!round.has("groupedSelectionRequestDigest") || round.isNull("groupedSelectionRequestDigest")) {
             require(expected.isEmpty() && round.objects("selected").isEmpty(), "selection_recording_required"); return;
         }

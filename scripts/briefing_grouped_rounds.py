@@ -86,7 +86,7 @@ def _evidence(value, document):
             "clockRecordSha256": document["clockRecordSha256"]}
 
 
-def build_grouped_candidates(archive, spec):
+def build_grouped_candidates(archive, spec, identity_holds=None):
     """Return issues with a new (from,to] mention and only cutoff-available facts.
 
     A group's eventual title is deliberately ignored: a later article may have
@@ -95,6 +95,8 @@ def build_grouped_candidates(archive, spec):
     never evidence that its future contents were available in the old round.
     """
     require(archive.get("schemaVersion") == "zoop-grouped-issues-v1", "grouped_archive_schema_invalid")
+    company_policy = archive.get("identity", {}).get("companyProjectionVersion")
+    require(company_policy in (None, "canonical-evidence-v1"), "grouped_company_projection_policy_unknown")
     documents = _indexed(archive.get("documents"), "documentId", "grouped_duplicate_or_invalid_document")
     issues = _indexed(archive.get("issues"), "issueId", "grouped_duplicate_or_invalid_issue")
     start, end = sim.aware(spec["window"]["from"]), sim.aware(spec["window"]["to"])
@@ -102,11 +104,21 @@ def build_grouped_candidates(archive, spec):
     result, seen_mentions, evidence_bindings = [], set(), {}
     for issue_id, issue in sorted(issues.items()):
         mentions = _indexed(issue.get("mentions"), "mentionId", "grouped_duplicate_or_invalid_mention")
-        available = []
+        available, identity_held_mentions = [], []
         for mention_id, mention in sorted(mentions.items()):
             published = sim.aware(mention.get("publishedAt"))
             if published > end:
                 continue
+            projection = mention.get("companyProjection")
+            if company_policy is not None:
+                require(type(projection) is dict and projection.get("policy") == company_policy
+                        and type(projection.get("briefingEligible")) is bool
+                        and type(projection.get("audit")) is list,
+                        "grouped_company_projection_missing_or_invalid")
+                if not projection["briefingEligible"]:
+                    identity_held_mentions.append(mention_id)
+            else:
+                require(projection is None, "grouped_company_projection_policy_missing")
             require(mention_id not in seen_mentions, "grouped_mention_in_multiple_issues")
             seen_mentions.add(mention_id)
             document = documents.get(mention.get("articleId"))
@@ -145,6 +157,14 @@ def build_grouped_candidates(archive, spec):
         available.sort(key=lambda value: (sim.aware(value["publishedAt"]), value["mentionId"]))
         new = [value for value in available if value["newInRound"]]
         if not new:
+            continue
+        if identity_held_mentions:
+            # The original model grouping may have used an unverified entity ID.
+            # Retain that proposal in the archive but do not publish its whole
+            # as-of group. A future uncertain member cannot suppress an old round.
+            if identity_holds is not None:
+                identity_holds.append({"issueId": issue_id, "mentionIds": identity_held_mentions,
+                                       "reason": "unverified_company_link_in_asof_group"})
             continue
         value = {"issueId": issue_id, "title": available[0]["title"],
                  "newMentions": new, "backgroundMentions": [m for m in available if not m["newInRound"]],
