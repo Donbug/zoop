@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-1` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-2` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -29,7 +29,7 @@ from .wire import ErrorBody, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-1"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2"
 POLICY = "zoop-public-projection-policy-1"
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
@@ -62,6 +62,9 @@ Id = Annotated[str, StringConstraints(pattern=HANDOFF_ID_PATTERN)]
 Hash = Annotated[str, StringConstraints(pattern=HASH_PATTERN)]
 Name = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 Text = Annotated[str, StringConstraints(max_length=MAX_TEXT)]
+# Original S2 mention strings (title, action, target, period, participant source id, name, role) carry no length or emptiness rule in S2 (`extraction_contracts`
+# `Mention`/`Participant`) and the producer adds none: they are relayed verbatim, empty included. Only the producer's 6 MiB bundle cap bounds them.
+MentionText = Annotated[str, StringConstraints(max_length=6 * 1024 * 1024)]
 Stamp = Annotated[str, StringConstraints(max_length=100)]
 Countries = Annotated[list[Annotated[str, StringConstraints(max_length=100)]], Field(max_length=10)]
 EvidenceIds = Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(max_length=MAX_EVIDENCE)]
@@ -183,6 +186,36 @@ class BGeography(Bx):
     basis: Annotated[list[BGeographyBasis], Field(max_length=1000)]
 
 
+class BParticipant(Bx):
+    """A participant exactly as the S2 mention states it. `role` is the S2 text, never a confirmed role; `company_id` is the public company id only where every
+    carrying upstream mapped `source_company_id` to the same company of this bundle, otherwise null."""
+    source_company_id: MentionText | None
+    company_id: Id | None
+    name: MentionText
+    role: MentionText
+
+
+class BMention(Bx):
+    """One original S2 mention of the issue, identified by its source document version and S2 local id (a local id is unique only within one document version).
+    `verification` is always `none`: these are S2 candidate or snapshot values, never verified, decided or approved fields."""
+    document_id: Id
+    document_version: Hash
+    mention_id: Name
+    article_id: Annotated[str, StringConstraints(pattern=ARTICLE_ID_PATTERN)]
+    article_version: Hash
+    verification: Literal["none"]
+    title: MentionText
+    action: MentionText
+    target: MentionText | None
+    event_time: Stamp | None
+    time_precision: Literal["year", "month", "day", "datetime", "unknown"]
+    period: MentionText | None
+    assertion_status: Literal["occurred", "announced", "planned", "forecast", "cancelled", "unknown"]
+    background: bool
+    participants: Annotated[list[BParticipant], Field(max_length=1000)]
+    evidence_ids: Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(min_length=1, max_length=MAX_EVIDENCE)]
+
+
 class BIssue(Bx):
     id: Id
     canonical_id: Id
@@ -196,6 +229,7 @@ class BIssue(Bx):
     geography: BGeography
     evidence_ids: EvidenceIds
     source_events: Annotated[list[BSourceEvent], Field(max_length=1000)]
+    mentions: Annotated[list[BMention], Field(max_length=1000)]
     decision_ref: Id
     representative: BSourceEvent | None
 
@@ -377,7 +411,7 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-1"]
+    schema_version: Literal["zoop-graph-handoff-bundle-2"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
@@ -482,7 +516,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-1"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-2"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)

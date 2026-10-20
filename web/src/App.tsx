@@ -148,10 +148,26 @@ export const router = createBrowserRouter([
             }),
           },
           {
+            path: 'stats/companies/:companyId',
+            lazy: async () => ({
+              Component: (
+                await import('@/pages/admin/stats/AdminCompanyStatsPage')
+              ).default,
+            }),
+          },
+          {
             path: 'feedback',
             lazy: async () => ({
               Component: (
                 await import('@/pages/admin/feedback/AdminFeedbackPage')
+              ).default,
+            }),
+          },
+          {
+            path: 'feedback/transcripts/:sessionId',
+            lazy: async () => ({
+              Component: (
+                await import('@/pages/admin/feedback/AdminTranscriptPage')
               ).default,
             }),
           },
