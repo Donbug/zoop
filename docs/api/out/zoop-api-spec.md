@@ -1007,7 +1007,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | period | query | 선택 | string {1d, 1w, 1m, 1y} |  |
-| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. |
+| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. 범위는 period 하나(1d=하루, 1w=7일, 1m=한 달, 1y=1년, KST 달력 기준)까지이며, from이 to(생략 시 요청 시각)에서 그만큼 전보다 앞서면 422 INVALID_REQUEST다. |
 | to | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
