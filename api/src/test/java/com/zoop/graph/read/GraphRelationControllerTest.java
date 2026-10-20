@@ -13,7 +13,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class GraphRelationControllerTest {
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new GraphRelationController(new GraphRelationService(
-                    GraphReadFixtures.reader(Instant.parse("2026-10-16T12:00:00Z"), () -> DisclosureExclusions.NONE))))
+                    GraphReadFixtures.reader(Instant.parse("2026-10-16T12:00:00Z"), () -> DisclosureExclusions.NONE),
+                    org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class))))
             .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter()).build();
 
     @Test
@@ -22,6 +23,8 @@ class GraphRelationControllerTest {
         mvc.perform(get("/api/v1/graph/edges/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.source.kind").value("issue"))
+                .andExpect(jsonPath("$.source.logoUrl").hasJsonPath())
+                .andExpect(jsonPath("$.target.brandColor").hasJsonPath())
                 .andExpect(jsonPath("$.verification.status").value("ALLOW"))
                 .andExpect(jsonPath("$.verification.note").hasJsonPath())
                 .andExpect(jsonPath("$.basis[0].edgeId").value("basis-fixture-04"))
