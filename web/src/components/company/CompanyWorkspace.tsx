@@ -30,6 +30,7 @@ import {
   periods,
   exactTime,
   timeRange,
+  legacyTimeRange,
   bucketKey,
   impactEdges,
   number,
@@ -218,7 +219,13 @@ export default function CompanyWorkspace() {
   ]);
   const depth = params.get('depth') === '2' ? 2 : 1;
   const eventsQuery = new URLSearchParams({
-    ...range,
+    ...(ready
+      ? period === '1d' &&
+        prices.data?.status === 'available' &&
+        prices.data.range
+        ? { from: prices.data.range.from, to: prices.data.range.to }
+        : legacyTimeRange(asOf!, period)
+      : {}),
     companyId: id,
     depth: String(depth),
     ...(asOf ? { asOf } : {}),
@@ -556,6 +563,7 @@ export default function CompanyWorkspace() {
               <>
                 <PriceChart
                   points={prices.data.points}
+                  range={prices.data.range}
                   asOf={asOf}
                   period={period}
                   groups={groups}
