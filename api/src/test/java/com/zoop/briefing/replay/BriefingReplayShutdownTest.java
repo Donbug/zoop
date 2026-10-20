@@ -22,7 +22,7 @@ class BriefingReplayShutdownTest {
         return new ApplicationContextRunner().withUserConfiguration(BriefingReplayConfiguration.class)
                 .withBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class))
                 .withBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class))
-                .withBean(DocumentReadProperties.class, () -> new DocumentReadProperties(null, null));
+                .withBean(DocumentReadProperties.class, () -> new DocumentReadProperties(null, null, null));
     }
 
     @Test
