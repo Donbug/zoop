@@ -333,6 +333,11 @@ class BriefingHttpPostgresTest {
         assertTrue(analysis.path("anyOf").values().stream().anyMatch(value -> "null".equals(value.path("type").asText())));
         assertFalse(doc.json().at("/components/schemas/AnalysisSummary/required").values().stream()
                 .anyMatch(value -> "analysis".equals(value.asText())));
+        for (String field : java.util.List.of("direction", "updateAction")) {
+            JsonNode nullableEnum = doc.json().at("/components/schemas/MarketOutlookClaim/properties/" + field);
+            assertTrue(nullableEnum.path("anyOf").values().stream().anyMatch(value -> value.path("enum").isArray()));
+            assertTrue(nullableEnum.path("anyOf").values().stream().anyMatch(value -> "null".equals(value.path("type").asText())));
+        }
         for (JsonNode reference : doc.json().findValues("$ref")) {
             String path = reference.asText();
             if (path.startsWith("#/components/schemas/")) assertFalse(doc.json().at(path.substring(1)).isMissingNode(), path);
