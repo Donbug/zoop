@@ -70,6 +70,34 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.source.brandColor:required": true,
+    "response:200:application/json.source.brandColor<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.source.brandColor<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.source.logoUrl:required": true,
+    "response:200:application/json.source.logoUrl<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.source.logoUrl<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.target.brandColor:required": true,
+    "response:200:application/json.target.brandColor<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.target.brandColor<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.target.logoUrl:required": true,
+    "response:200:application/json.target.logoUrl<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.target.logoUrl<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.validity:required": true,
     "response:200:application/json.validity<anyOf:0>": {
       "type": "string",
