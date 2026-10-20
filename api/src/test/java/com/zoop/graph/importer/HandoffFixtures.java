@@ -1,0 +1,605 @@
+package com.zoop.graph.importer;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+import com.zoop.artifact.storage.ArtifactFileStore;
+import com.zoop.common.json.Canonical;
+import com.zoop.common.json.StrictJson;
+import com.zoop.common.json.Text;
+import com.zoop.document.DocumentImportException;
+import com.zoop.document.importer.IngestionExporter;
+import com.zoop.document.importer.Observation;
+import com.zoop.document.repository.ArtifactRow;
+import com.zoop.document.repository.VersionRow;
+import com.zoop.document.service.InMemoryDocumentRegistry;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
+
+/**
+ * A complete, synthetic and VALID handoff in the exact shape of {@code zoop-ai-handoff export}: one article whose text holds a
+ * non-BMP emoji before the cited sentences (so UTF-16 and code point offsets differ), one issue, two companies, one INVOLVES
+ * and one STRUCTURALLY_RELATED_TO relation with a validity basis. Every digest, id formula, count and reference is computed
+ * the way the producer does, so the strict verifier accepts it; tests mutate copies to break exactly one rule. A real producer
+ * export is covered separately by the resource fixtures under {@code graph-handoff/}.
+ */
+final class HandoffFixtures {
+    static final JsonMapper JSON = JsonMapper.builder().build();
+    static final String SOURCE = "synthetic-source";
+    static final String HANDOFF_ID = "handoff-unit-1";
+    static final String EVENT = "계약을 발표했다.";
+    static final String GEO = "국내 시장이다.";
+    static final String BASIS = "구조 근거 문장이다.";
+    /** The emoji (two UTF-16 units, one code point) sits before every cited sentence. */
+    static final String TEXT = "합성기업은 \uD83D\uDE00 " + EVENT + " " + GEO + " " + BASIS;
+    static final String ARTICLE_ID = "doc-" + "a".repeat(64);
+    static final String ARTICLE_VERSION = "b".repeat(64);
+    static final String RAW_VERSION = "c".repeat(64);
+    static final String OBSERVED_AT = "2026-10-14T01:02:03.456789+00:00";
+    static final String PUBLISHED_AT = "2026-10-08T09:00:00+09:00";
+    static final String COMPANY_A = "SYNTH:000001";
+    static final String COMPANY_B = "SYNTH:000002";
+    static final String ISSUE = "issue:supply-2026q3";
+    static final Observation SELECTOR = new Observation("round-1", SOURCE, 0, 0, ARTICLE_ID, RAW_VERSION, ARTICLE_VERSION);
+
+    private HandoffFixtures() {
+    }
+
+    /** Knobs that change the content of the handoff (and therefore its digests). */
+    record Spec(String handoffId, String canonicalPin, String publishedAt, String precision, String eventTime,
+            String eventPrecision, String validFrom, String validUntil, boolean utf16Offsets) {
+        static Spec standard() {
+            return new Spec(HANDOFF_ID, "4".repeat(64), PUBLISHED_AT, "datetime", "2026-09-30", "day", "2026-01-01",
+                    "2026-12-31", false);
+        }
+
+        Spec withHandoffId(String value) {
+            return new Spec(value, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets);
+        }
+
+        Spec withCanonicalPin(String value) {
+            return new Spec(handoffId, value, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets);
+        }
+
+        Spec withPublication(String value, String valuePrecision) {
+            return new Spec(handoffId, canonicalPin, value, valuePrecision, eventTime, eventPrecision, validFrom, validUntil,
+                    utf16Offsets);
+        }
+
+        Spec withEvent(String value, String valuePrecision) {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, value, valuePrecision, validFrom, validUntil,
+                    utf16Offsets);
+        }
+
+        Spec withValidity(String from, String until) {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, from, until,
+                    utf16Offsets);
+        }
+
+        Spec withUtf16Offsets() {
+            return new Spec(handoffId, canonicalPin, publishedAt, precision, eventTime, eventPrecision, validFrom, validUntil,
+                    true);
+        }
+    }
+
+    /** One built handoff: the nodes, the bytes the CLI would print and the request that pins them. */
+    record Built(Spec spec, ObjectNode manifest, ObjectNode bundle, ObjectNode envelope, byte[] envelopeBytes,
+            String manifestDigest, String bundleDigest, List<String> evidenceIds) {
+        GraphHandoffRequest request() {
+            return new GraphHandoffRequest(spec.handoffId(), manifestDigest, bundleDigest, "operator-a");
+        }
+
+        String versionId() {
+            return HandoffSnapshotWriter.versionId(spec.handoffId());
+        }
+    }
+
+    static Built build() {
+        return build(Spec.standard());
+    }
+
+    static Built build(Spec spec) {
+        String relationJob = "rel-1";
+        String upstreamJob = "s2-1";
+        String candidate = "rc-" + "2".repeat(64);
+        String eventCandidate = "evc-" + "3".repeat(64);
+
+        ObjectNode event = span(spec, EVENT);
+        ObjectNode geo = span(spec, GEO);
+        ObjectNode basis = span(spec, BASIS);
+        List<ObjectNode> evidence = new ArrayList<>(List.of(event, geo, basis));
+        evidence.sort((a, b) -> a.get("id").stringValue().compareTo(b.get("id").stringValue()));
+        String eventId = event.get("id").stringValue();
+        String geoId = geo.get("id").stringValue();
+        String basisId = basis.get("id").stringValue();
+
+        ObjectNode bundle = StrictJson.newObject();
+        bundle.put("schemaVersion", HandoffBundleVerifier.BUNDLE_SCHEMA);
+        bundle.put("handoffId", spec.handoffId());
+        // manifestDigest is filled in below, once the manifest exists.
+        ObjectNode provenance = bundle.putObject("provenance");
+        provenance.put("declaredSourceKind", "synthetic");
+        provenance.put("observedSourceKind", "synthetic");
+        provenance.put("executionMode", "replay");
+        provenance.put("recordingKind", "authored-test");
+        ObjectNode policy = bundle.putObject("policy");
+        policy.put("version", HandoffBundleVerifier.POLICY);
+        ObjectNode files = policy.putObject("files");
+        files.put("bindings", "6".repeat(64));
+        files.put("canonical", spec.canonicalPin());
+        files.put("decisions", "5".repeat(64));
+        policy.put("evidenceIdKind", HandoffBundleVerifier.EVIDENCE_KIND);
+        policy.put("offsetUnit", HandoffBundleVerifier.OFFSET_UNIT);
+        policy.put("geography", "operator-field-verdict");
+        policy.put("structural", "manual-operator-review");
+        policy.put("sequence", "s2-comparison-with-operator-decision");
+
+        ObjectNode pin = StrictJson.newObject();
+        pin.putObject("relation").put("jobId", relationJob).put("inputDigest", "f".repeat(64));
+        ObjectNode upstreamPin = pin.putObject("upstream");
+        upstreamPin.put("jobId", upstreamJob);
+        upstreamPin.put("inputDigest", "d".repeat(64));
+        upstreamPin.put("digest", "e".repeat(64));
+        pin.put("reviewDigest", "1".repeat(64));
+
+        ObjectNode source = bundle.putArray("sources").addObject();
+        source.set("relation", pin.get("relation"));
+        source.set("upstream", pin.get("upstream"));
+        source.put("reviewDigest", "1".repeat(64));
+        ObjectNode policies = source.putObject("policies");
+        for (String name : List.of("producer", "verifier", "impactProducer", "impactVerifier", "policy", "revalidationPolicy",
+                "impactPolicy")) {
+            policies.put(name, name + "-1");
+        }
+        ArrayNode used = source.putArray("reviewUsed");
+        ArrayNode usedEntry = used.addArray();
+        usedEntry.add(candidate);
+        usedEntry.add(1);
+        ObjectNode audit = source.putObject("audit");
+        audit.put("s3Relations", 2);
+        ObjectNode eligibility = audit.putObject("eligibility");
+        eligibility.put("eligible", 2);
+        eligibility.put("hold", 0);
+        eligibility.put("reject", 0);
+        eligibility.put("pending", 0);
+        audit.put("reviewPending", 0);
+        audit.put("impactCandidates", 0);
+        audit.putObject("eligibleNotPublicByType");
+
+        ArrayNode companies = bundle.putArray("companies");
+        for (String[] company : new String[][] {{COMPANY_B, "co:b", "합성부품"}, {COMPANY_A, "co:a", "합성기업"}}) {
+            ObjectNode node = companies.addObject();
+            node.put("id", company[0]);
+            node.put("canonicalId", company[1]);
+            node.put("label", company[2]);
+            node.put("decisionRef", "catalog-1");
+        }
+
+        ObjectNode sourceEvent = StrictJson.newObject();
+        sourceEvent.set("upstream", StrictJson.newObject().put("jobId", upstreamJob).put("inputDigest", "d".repeat(64)));
+        sourceEvent.put("kind", "event-candidate");
+        sourceEvent.put("ref", eventCandidate);
+        sourceEvent.put("mentionId", "m-1");
+        sourceEvent.put("documentId", ARTICLE_ID);
+        sourceEvent.put("documentVersion", ARTICLE_VERSION);
+        ObjectNode observation = sourceEvent.putObject("observation");
+        observation.put("roundId", SELECTOR.roundId());
+        observation.put("sourceId", SELECTOR.sourceId());
+        observation.put("page", SELECTOR.page());
+        observation.put("ordinal", SELECTOR.ordinal());
+        observation.put("documentId", ARTICLE_ID);
+        observation.put("rawVersion", RAW_VERSION);
+        observation.put("documentVersion", ARTICLE_VERSION);
+
+        ObjectNode issue = bundle.putArray("issues").addObject();
+        issue.put("id", ISSUE);
+        issue.put("canonicalId", "issue:supply");
+        issue.put("title", "합성 공급 계약");
+        issue.put("action", "공급 계약");
+        issue.put("target", "배터리");
+        issue.put("eventTime", spec.eventTime());
+        issue.put("timePrecision", spec.eventPrecision());
+        issue.put("period", "2026Q3");
+        issue.put("assertionStatus", "announced");
+        ObjectNode geography = issue.putObject("geography");
+        geography.put("value", "domestic");
+        geography.put("decisionRef", "geo-1");
+        geography.put("decisionVersion", "g1");
+        geography.put("policyVersion", HandoffBundleVerifier.POLICY);
+        geography.putArray("countries").add("KR");
+        geography.put("verification", "operator-field-verdict");
+        geography.putArray("evidenceIds").add(geoId);
+        ObjectNode geographyBasis = sourceEvent.deepCopy();
+        geographyBasis.putArray("countries").add("KR");
+        geography.putArray("basis").add(geographyBasis);
+        ArrayNode issueEvidence = issue.putArray("evidenceIds");
+        for (String id : sorted(eventId, geoId)) {
+            issueEvidence.add(id);
+        }
+        issue.putArray("sourceEvents").add(sourceEvent);
+        issue.put("decisionRef", "issue-1");
+        issue.putNull("representative");
+
+        ArrayNode relations = bundle.putArray("relations");
+        List<ObjectNode> relationNodes = new ArrayList<>();
+        ObjectNode involves = StrictJson.newObject();
+        involves.put("id", edge(Map.of("type", "INVOLVES", "source", ISSUE, "target", COMPANY_A)));
+        involves.put("type", "INVOLVES");
+        involves.put("source", ISSUE);
+        involves.put("target", COMPANY_A);
+        involves.putNull("role");
+        involves.put("assertionStatus", "announced");
+        involves.putArray("evidenceIds").add(eventId);
+        involves.putArray("basis");
+        ObjectNode involvesProvenance = involves.putObject("provenance");
+        involvesProvenance.put("origin", "s3-relation");
+        involvesProvenance.put("s3SemanticValidation", "independent-verifier-supported-all-claims");
+        involves.putNull("decisionRef");
+        involves.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
+        relationNodes.add(involves);
+
+        String relationKey = "7".repeat(64);
+        ObjectNode structuralPreimage = StrictJson.newObject();
+        structuralPreimage.put("type", "STRUCTURALLY_RELATED_TO");
+        structuralPreimage.put("source", ISSUE);
+        structuralPreimage.put("target", COMPANY_B);
+        structuralPreimage.putArray("basis").add(relationKey);
+        ObjectNode structural = StrictJson.newObject();
+        structural.put("id", "edge-" + Canonical.digest(structuralPreimage));
+        structural.put("type", "STRUCTURALLY_RELATED_TO");
+        structural.put("source", ISSUE);
+        structural.put("target", COMPANY_B);
+        structural.putNull("role");
+        structural.put("assertionStatus", "announced");
+        structural.putArray("evidenceIds").add(eventId);
+        ObjectNode basisNode = structural.putArray("basis").addObject();
+        basisNode.putObject("sourceRelation").put("jobId", relationJob).put("relationCandidateId", candidate);
+        basisNode.put("relationKey", relationKey);
+        basisNode.put("relationType", "SUPPLIES");
+        basisNode.put("validFrom", spec.validFrom());
+        basisNode.put("validUntil", spec.validUntil());
+        basisNode.putArray("countries").add("KR");
+        basisNode.put("verifiedAt", "2026-10-16T12:00:00.123456+00:00");
+        basisNode.putArray("sourceArticles").addObject().put("articleId", ARTICLE_ID).put("articleVersion", ARTICLE_VERSION);
+        basisNode.putArray("evidenceIds").add(basisId);
+        ObjectNode structuralProvenance = structural.putObject("provenance");
+        structuralProvenance.put("origin", "manual-operator-review");
+        structuralProvenance.put("s3SemanticValidation", "none");
+        structuralProvenance.put("status", "operator-asserted");
+        structuralProvenance.put("reviewer", "reviewer-a");
+        structuralProvenance.put("decisionRef", "applic-1");
+        structuralProvenance.put("decisionVersion", "v1");
+        structuralProvenance.put("bindingDigest", "8".repeat(64));
+        structuralProvenance.put("basisEligibility", "s3-independent-verifier-supported-all-claims");
+        structural.put("decisionRef", "applic-1");
+        structural.putArray("sourceRefs").add(ref("s3-relation", relationJob, candidate));
+        relationNodes.add(structural);
+        relationNodes.sort((a, b) -> {
+            int type = a.get("type").stringValue().compareTo(b.get("type").stringValue());
+            return type != 0 ? type : a.get("id").stringValue().compareTo(b.get("id").stringValue());
+        });
+        relationNodes.forEach(relations::add);
+
+        ArrayNode evidenceNodes = bundle.putArray("evidence");
+        evidence.forEach(evidenceNodes::add);
+
+        ObjectNode article = bundle.putArray("articles").addObject();
+        article.put("articleId", ARTICLE_ID);
+        article.put("articleVersion", ARTICLE_VERSION);
+        article.put("documentId", ARTICLE_ID);
+        article.put("documentVersion", ARTICLE_VERSION);
+        article.put("rawVersion", RAW_VERSION);
+        article.put("title", "합성 제목");
+        article.put("url", "https://example.invalid/a");
+        article.put("publishedAt", spec.publishedAt());
+        article.put("publicationPrecision", spec.precision());
+        ObjectNode observed = article.putArray("observations").addObject();
+        observed.put("roundId", SELECTOR.roundId());
+        observed.put("sourceId", SELECTOR.sourceId());
+        observed.put("page", SELECTOR.page());
+        observed.put("ordinal", SELECTOR.ordinal());
+        observed.put("observedAt", OBSERVED_AT);
+        observed.putObject("grant").put("grantId", "operator-grant").put("revision", "rights-1");
+
+        ObjectNode exclusions = bundle.putObject("exclusions");
+        exclusions.putObject("counts");
+        exclusions.putArray("items");
+        ObjectNode counts = bundle.putObject("counts");
+        counts.put("companies", 2);
+        counts.put("issues", 1);
+        ObjectNode relationCounts = counts.putObject("relations");
+        relationCounts.put("INVOLVES", 1);
+        relationCounts.put("STRUCTURALLY_RELATED_TO", 1);
+        relationCounts.put("FOLLOWS", 0);
+        counts.put("evidence", 3);
+        counts.put("articles", 1);
+        counts.put("exclusions", 0);
+        ObjectNode checks = bundle.putObject("checks");
+        HandoffBundleVerifier.PRODUCER_CHECKS.forEach(checks.putArray("producerConfirmed")::add);
+        HandoffBundleVerifier.APP_IMPORT_PENDING.forEach(checks.putArray("appImportPending")::add);
+        ObjectNode readiness = bundle.putObject("readiness");
+        readiness.put("app", "import-pending");
+        readiness.put("evidenceRegistration", "not-registered");
+        readiness.put("publicActivation", "none");
+        readiness.put("graphDb", "none");
+
+        ObjectNode manifest = StrictJson.newObject();
+        manifest.put("schemaVersion", HandoffBundleVerifier.MANIFEST_SCHEMA);
+        manifest.put("handoffId", spec.handoffId());
+        manifest.put("sourceKind", "synthetic");
+        manifest.put("policyVersion", HandoffBundleVerifier.POLICY);
+        ObjectNode manifestSource = manifest.putArray("sources").addObject();
+        manifestSource.set("relation", pin.get("relation"));
+        manifestSource.set("upstream", pin.get("upstream"));
+        manifestSource.put("reviewDigest", "1".repeat(64));
+        manifest.set("files", files.deepCopy());
+        String manifestDigest = Canonical.digest(manifest);
+        bundle.put("manifestDigest", manifestDigest);
+        ObjectNode digests = bundle.putObject("digests");
+        digests.put("content", HandoffBundleVerifier.contentDigest(bundle));
+
+        byte[] bundleBytes = Canonical.bytes(bundle);
+        String bundleDigest = Canonical.sha256(bundleBytes);
+        ObjectNode receipt = StrictJson.newObject();
+        receipt.put("handoffId", spec.handoffId());
+        receipt.put("manifestDigest", manifestDigest);
+        receipt.put("bundleSchema", HandoffBundleVerifier.BUNDLE_SCHEMA);
+        receipt.put("bundleDigest", bundleDigest);
+        receipt.put("contentDigest", digests.get("content").stringValue());
+        receipt.put("bundleBytes", bundleBytes.length);
+        receipt.set("provenance", provenance.deepCopy());
+        ArrayNode receiptSources = receipt.putArray("sources");
+        ObjectNode receiptSource = receiptSources.addObject();
+        receiptSource.set("relation", pin.get("relation"));
+        receiptSource.set("upstream", pin.get("upstream"));
+        receiptSource.put("reviewDigest", "1".repeat(64));
+        receipt.set("files", files.deepCopy());
+        receipt.set("counts", counts.deepCopy());
+        receipt.putObject("exclusionCodes");
+        receipt.set("checks", checks.deepCopy());
+        receipt.put("frozenAt", "2026-10-14T00:00:00+00:00");
+
+        ObjectNode envelope = StrictJson.newObject();
+        envelope.put("schemaVersion", ProcessHandoffExporter.SCHEMA_VERSION);
+        envelope.put("handoffId", spec.handoffId());
+        envelope.put("state", "ready");
+        envelope.put("publication", "not-published");
+        envelope.put("next", "export");
+        envelope.putNull("failure");
+        envelope.set("receipt", receipt);
+        ObjectNode attempt = envelope.putArray("attempts").addObject();
+        attempt.put("n", 1);
+        attempt.put("kind", "freeze");
+        attempt.put("outcome", "written");
+        attempt.putNull("code");
+        envelope.putObject("usage").put("providerCalls", 0).put("modelCalls", 0);
+        ObjectNode delivery = envelope.putObject("delivery");
+        delivery.put("status", "current");
+        delivery.put("checkedAt", "2026-10-17T00:00:00+00:00");
+        delivery.put("reviewDigestMatches", true);
+        ArrayNode deliveryChecks = delivery.putArray("checks");
+        for (String check : List.of("operator_files_equal_manifest_pins", "s3_authority_and_s2_upstream_pin_current",
+                "used_review_revisions_unchanged", "content_digest_rebuilt_equal")) {
+            deliveryChecks.add(check);
+        }
+        envelope.set("manifest", manifest);
+        envelope.set("bundle", bundle);
+        return new Built(spec, manifest, bundle, envelope, Canonical.bytes(envelope), manifestDigest, bundleDigest,
+                evidence.stream().map(node -> node.get("id").stringValue()).toList());
+    }
+
+    /** The envelope bytes after {@code change} was applied to a copy; pins are NOT recomputed. */
+    static byte[] envelopeAfter(Built built, java.util.function.Consumer<ObjectNode> change) {
+        ObjectNode copy = built.envelope().deepCopy();
+        change.accept(copy);
+        return Canonical.bytes(copy);
+    }
+
+    // ---------------------------------------------------------------------------------------------- evidence -----------
+
+    /** An evidence node for one cited sentence: offsets in code points (or, for a negative test, in UTF-16 units). */
+    private static ObjectNode span(Spec spec, String quote) {
+        int index = TEXT.indexOf(quote);
+        int start = spec.utf16Offsets() ? index : TEXT.codePointCount(0, index);
+        int end = spec.utf16Offsets() ? index + quote.length() : start + quote.codePointCount(0, quote.length());
+        ObjectNode node = StrictJson.newObject();
+        node.put("id", HandoffBundleVerifier.appEvidenceId(ARTICLE_ID, ARTICLE_VERSION, start, end));
+        node.put("kind", HandoffBundleVerifier.EVIDENCE_KIND);
+        node.put("articleId", ARTICLE_ID);
+        node.put("articleVersion", ARTICLE_VERSION);
+        node.put("start", start);
+        node.put("end", end);
+        node.put("offsetUnit", HandoffBundleVerifier.OFFSET_UNIT);
+        node.put("quoteSha256", Canonical.sha256(quote));
+        node.putArray("rawLocatorIds").add("loc-1");
+        ObjectNode source = node.putObject("source");
+        source.put("documentId", ARTICLE_ID);
+        source.put("documentVersion", ARTICLE_VERSION);
+        source.put("rawVersion", RAW_VERSION);
+        source.put("textArtifactId", "text-" + ARTICLE_VERSION);
+        ArrayNode preimage = StrictJson.newArray();
+        preimage.add(ARTICLE_VERSION);
+        preimage.add(start);
+        preimage.add(end);
+        source.put("sourceEvidenceId", "ev-" + Canonical.digest(preimage).substring(0, 32));
+        source.put("inputKind", "body");
+        return node;
+    }
+
+    private static List<String> sorted(String... ids) {
+        return java.util.Arrays.stream(ids).sorted().toList();
+    }
+
+    private static String edge(Map<String, String> preimage) {
+        ObjectNode node = StrictJson.newObject();
+        preimage.forEach(node::put);
+        return "edge-" + Canonical.digest(node);
+    }
+
+    private static ObjectNode ref(String kind, String jobId, String id) {
+        ObjectNode node = StrictJson.newObject();
+        node.put("kind", kind);
+        node.put("jobId", jobId);
+        node.put("id", id);
+        return node;
+    }
+
+    // ---------------------------------------------------------------------------------------------- the app side --------
+
+    /** The app's registered article, version, text artifact and text file for {@link #TEXT}. */
+    static void seedApp(ArtifactFileStore store, InMemoryDocumentRegistry registry, String text) throws IOException {
+        seedApp(store, registry, text, "합성 제목", "available");
+    }
+
+    /** The same with an explicit stored text, version title and article access status (to build app-side mismatches). */
+    static void seedApp(ArtifactFileStore store, InMemoryDocumentRegistry registry, String text, String title, String access)
+            throws IOException {
+        seedApp(store, registry, text, title, access, Instant.parse("2026-10-08T00:00:00Z"), "datetime");
+    }
+
+    /** The same with the version's stored publication time and precision ({@code null} and {@code unknown} for no time). */
+    static void seedApp(ArtifactFileStore store, InMemoryDocumentRegistry registry, String text, String title, String access,
+            Instant publishedAt, String precision) throws IOException {
+        byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
+        String artifactId = "text-" + ARTICLE_VERSION;
+        try (ArtifactFileStore.Session session = store.open()) {
+            ArtifactFileStore.StoredFile file = session.put("extracted_text", artifactId + ".txt", utf8);
+            registry.insertArtifactIfAbsent(new ArtifactRow(artifactId, "extracted_text", file.uri(), file.sha256(),
+                    file.bytes(), "text/plain; charset=utf-8", Instant.parse("2026-10-14T01:00:00Z")));
+        }
+        registry.seedArticle(ARTICLE_ID, "news", SOURCE, ARTICLE_VERSION, access);
+        registry.insertVersionIfAbsent(new VersionRow(ARTICLE_ID, ARTICLE_VERSION, title, null,
+                "https://example.invalid/a", publishedAt, null, precision, null, artifactId,
+                Instant.parse("2026-10-14T01:02:03.456789Z")));
+    }
+
+    // ---------------------------------------------------------------------------------------------- the CLIs ------------
+
+    /** The S2-1 export of {@link #SELECTOR} for {@code text}, in the shape {@code zoop-ai-ingest export} prints. */
+    static byte[] ingestionExport(Observation selector, String text, String title, String url, String publishedAt,
+            String grantId, String grantRevision) {
+        ObjectNode root = JSON.createObjectNode();
+        root.put("schemaVersion", "zoop-ingestion-s2-1");
+        ObjectNode observation = root.putObject("observation");
+        observation.put("roundId", selector.roundId());
+        observation.put("sourceId", selector.sourceId());
+        observation.put("page", selector.page());
+        observation.put("ordinal", selector.ordinal());
+        observation.put("pageId", "page-0");
+        observation.put("observedAt", OBSERVED_AT);
+        observation.put("documentId", selector.documentId());
+        observation.put("rawVersion", selector.rawVersion());
+        observation.put("documentVersion", selector.documentVersion());
+        observation.put("url", url);
+        observation.put("title", title);
+        observation.put("publishedAt", publishedAt);
+        observation.putNull("modifiedAt");
+        observation.putNull("sourceRevision");
+        observation.put("mediaType", "text/html");
+        ObjectNode grant = root.putObject("grant");
+        grant.put("grantId", grantId);
+        grant.put("revision", grantRevision);
+        ObjectNode document = root.putObject("document");
+        document.put("documentId", selector.documentId());
+        document.put("documentVersion", selector.documentVersion());
+        document.put("sourceId", selector.sourceId());
+        document.put("textArtifactId", "text-" + selector.documentVersion());
+        document.put("inputKind", "body");
+        document.put("cleanerVersion", "exact-copy-1");
+        document.put("text", text);
+        document.put("sourceHash", Canonical.sha256(Text.pythonJsonString(text)));
+        ObjectNode locator = document.putArray("rawLocators").addObject();
+        locator.put("locatorId", "loc-1");
+        locator.put("start", 0);
+        locator.put("end", Text.codePoints(text));
+        root.putObject("locatorMetadata").put("rawHash", "9".repeat(64));
+        return Canonical.bytes(root);
+    }
+
+    /** The standard export of the standard article. */
+    static byte[] standardIngestionExport() {
+        return ingestionExport(SELECTOR, TEXT, "합성 제목", "https://example.invalid/a", PUBLISHED_AT, "operator-grant",
+                "rights-1");
+    }
+
+    /**
+     * The installed S2-1 CLI's stand-in: serves the standard export of the standard article, can refuse it, can start refusing
+     * from the n-th call on (rights revoked while an import runs), and counts every call.
+     */
+    static final class FakeIngestion implements IngestionExporter {
+        final AtomicInteger calls = new AtomicInteger();
+        Function<Observation, byte[]> serve = observation -> standardIngestionExport();
+        private int refuseFromCall = Integer.MAX_VALUE;
+        private String refusalCode = "source_unauthorized";
+        private int hookCall = Integer.MAX_VALUE;
+        private Runnable hook = () -> { };
+
+        /** Runs {@code action} when the n-th call arrives (before it is served): something changes while an import is running. */
+        FakeIngestion before(int call, Runnable action) {
+            this.hookCall = call;
+            this.hook = action;
+            return this;
+        }
+
+        FakeIngestion refuseAlways(String code) {
+            return refuseFrom(1, code);
+        }
+
+        FakeIngestion refuseFrom(int call, String code) {
+            this.refuseFromCall = call;
+            this.refusalCode = code;
+            return this;
+        }
+
+        @Override
+        public byte[] export(Observation observation) {
+            int call = calls.incrementAndGet();
+            if (call == hookCall) {
+                hook.run();
+            }
+            if (call >= refuseFromCall) {
+                throw DocumentImportException.ingestionRefused(refusalCode);
+            }
+            return serve.apply(observation);
+        }
+    }
+
+    /** The installed handoff CLI's stand-in: serves one envelope, or withholds it from the n-th call on. */
+    static final class FakeHandoff implements HandoffExporter {
+        final AtomicInteger calls = new AtomicInteger();
+        byte[] envelope;
+        private int withholdFromCall = Integer.MAX_VALUE;
+
+        FakeHandoff(byte[] envelope) {
+            this.envelope = envelope;
+        }
+
+        FakeHandoff withholdFrom(int call) {
+            this.withholdFromCall = call;
+            return this;
+        }
+
+        @Override
+        public byte[] export(String handoffId) {
+            int call = calls.incrementAndGet();
+            if (call >= withholdFromCall) {
+                throw GraphHandoffException.handoffWithheld("source_unauthorized");
+            }
+            return envelope;
+        }
+    }
+
+    static JsonNode parse(byte[] bytes) {
+        return JSON.readTree(bytes);
+    }
+}

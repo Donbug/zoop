@@ -19,6 +19,7 @@ import com.zoop.portfolio.dto.MockPortfolioOption;
 import com.zoop.portfolio.dto.MockProfileResponse;
 import com.zoop.portfolio.dto.PortfolioResponse;
 import com.zoop.portfolio.dto.PortfolioValuation;
+import com.zoop.portfolio.model.MockHolding;
 import com.zoop.portfolio.model.MockPortfolio;
 import com.zoop.portfolio.repository.PortfolioConnectionRepository;
 import com.zoop.portfolio.repository.PortfolioConnectionRow;
@@ -105,6 +106,20 @@ public class PortfolioService {
             }
         } catch (CustomException exception) {
             throw exception;
+        } catch (DataAccessException exception) {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
+        }
+    }
+
+    /** Company ids of the member's connected mock portfolio, without pricing; empty when not connected. */
+    @Transactional(readOnly = true)
+    public List<String> heldCompanyIds(MemberPrincipal member) {
+        try {
+            var connection = repository.findConnection(member.memberId());
+            if (connection.isEmpty()) return List.of();
+            MockPortfolio profile = catalog.find(connection.get().mockPortfolioId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.SOURCE_UNAVAILABLE));
+            return profile.holdings().stream().map(MockHolding::companyId).distinct().toList();
         } catch (DataAccessException exception) {
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, exception);
         }
