@@ -54,6 +54,20 @@ class GraphQueryServiceTest {
         service = new GraphQueryService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void companyNodesFillAMissingLogoOrColourFromTheCatalogAndKeepTheSnapshotValue() {
+        when(jdbc.query(anyString(), any(SqlParameterSource.class), any(RowMapper.class))).thenAnswer(call -> {
+            List<String> ids = (List<String>) ((SqlParameterSource) call.getArgument(1)).getValue("ids");
+            return ids.stream().map(id -> new Company(id, "catalog " + id, "#000000", "/graph-assets/" + id + ".svg")).toList();
+        });
+        var samsung = all().nodes().stream().filter(n -> n.id().equals("KRX:005930")).findFirst().orElseThrow();
+        assertEquals("/graph-assets/KRX:005930.svg", samsung.logoUrl());
+        // The fixture snapshot carries Samsung's colour; the snapshot value wins over the catalog.
+        assertEquals("#1428A0", samsung.brandColor());
+        assertEquals("삼성전자", samsung.label());
+    }
+
     private GraphResponse all() {
         return service.getGraph(null, null, null, null, null, null, null, null, "req-1");
     }

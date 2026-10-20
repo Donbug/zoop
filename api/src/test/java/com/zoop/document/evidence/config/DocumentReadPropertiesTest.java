@@ -24,8 +24,9 @@ class DocumentReadPropertiesTest {
     @Test
     void unsetOrBlankValuesAreAllowed() {
         for (String blank : new String[] {null, "", "  "}) {
-            DocumentReadProperties properties = new DocumentReadProperties(blank, blank);
+            DocumentReadProperties properties = new DocumentReadProperties(blank, blank, blank);
             assertNull(properties.grantsPath());
+            assertNull(properties.ingestionSourcesPath());
             assertNull(properties.artifactRootPath());
         }
     }
@@ -35,34 +36,43 @@ class DocumentReadPropertiesTest {
         Path file = Files.writeString(temp.resolve("grants.json"), "{}");
         Path directory = Files.createDirectory(temp.resolve("artifacts"));
 
-        DocumentReadProperties valid = new DocumentReadProperties(file.toString(), directory.toString());
+        DocumentReadProperties valid = new DocumentReadProperties(file.toString(), null, directory.toString());
         assertEquals(file, valid.grantsPath());
         assertEquals(directory, valid.artifactRootPath());
 
         assertEquals("zoop.document-read.grants must be a normalized absolute path",
-                message(() -> new DocumentReadProperties("grants.json", null).grantsPath()));
+                message(() -> new DocumentReadProperties("grants.json", null, null).grantsPath()));
         assertEquals("zoop.document-read.grants must be a normalized absolute path",
-                message(() -> new DocumentReadProperties(temp + "/../" + temp.getFileName() + "/grants.json", null).grantsPath()));
+                message(() -> new DocumentReadProperties(temp + "/../" + temp.getFileName() + "/grants.json", null, null).grantsPath()));
         assertEquals("zoop.document-read.grants must be an existing file",
-                message(() -> new DocumentReadProperties(temp.resolve("missing.json").toString(), null).grantsPath()));
+                message(() -> new DocumentReadProperties(temp.resolve("missing.json").toString(), null, null).grantsPath()));
         assertEquals("zoop.document-read.grants must be an existing file",
-                message(() -> new DocumentReadProperties(directory.toString(), null).grantsPath()));
+                message(() -> new DocumentReadProperties(directory.toString(), null, null).grantsPath()));
+        assertEquals("zoop.document-read.ingestion-sources must be a normalized absolute path",
+                message(() -> new DocumentReadProperties(null, "sources.json", null).ingestionSourcesPath()));
+        assertEquals("zoop.document-read.ingestion-sources must be an existing file",
+                message(() -> new DocumentReadProperties(null, directory.toString(), null).ingestionSourcesPath()));
+        assertEquals("zoop.document-read.ingestion-sources must be an existing file",
+                message(() -> new DocumentReadProperties(null, temp.resolve("missing.json").toString(), null).ingestionSourcesPath()));
+        assertEquals(file, new DocumentReadProperties(null, file.toString(), null).ingestionSourcesPath());
         assertEquals("zoop.document-read.artifact-root must be a normalized absolute path",
-                message(() -> new DocumentReadProperties(null, "relative/root").artifactRootPath()));
+                message(() -> new DocumentReadProperties(null, null, "relative/root").artifactRootPath()));
         assertEquals("zoop.document-read.artifact-root must be an existing directory",
-                message(() -> new DocumentReadProperties(null, file.toString()).artifactRootPath()));
+                message(() -> new DocumentReadProperties(null, null, file.toString()).artifactRootPath()));
         assertEquals("zoop.document-read.artifact-root must be an existing directory",
-                message(() -> new DocumentReadProperties(null, temp.resolve("missing").toString()).artifactRootPath()));
+                message(() -> new DocumentReadProperties(null, null, temp.resolve("missing").toString()).artifactRootPath()));
     }
 
     @Test
     void theFailureAndToStringNeverCarryThePathValue() {
         String secret = temp.resolve("secret-location.json").toString();
-        DocumentReadProperties properties = new DocumentReadProperties(secret, secret);
+        DocumentReadProperties properties = new DocumentReadProperties(secret, secret, secret);
 
         assertFalse(message(properties::grantsPath).contains("secret-location"));
+        assertFalse(message(properties::ingestionSourcesPath).contains("secret-location"));
         assertFalse(message(properties::artifactRootPath).contains("secret-location"));
         assertFalse(properties.toString().contains("secret-location"));
         assertTrue(properties.toString().contains("grants=set"));
+        assertTrue(properties.toString().contains("ingestionSources=set"));
     }
 }

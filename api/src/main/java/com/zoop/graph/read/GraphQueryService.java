@@ -65,6 +65,7 @@ public class GraphQueryService {
         GraphSelection.Result selection = isPersonal && focus.isEmpty()
                 ? new GraphSelection.Result(Map.of(), false)
                 : GraphSelection.select(pinned.graph(), focus, depth, NODE_LIMIT);
+        withAppearance(catalog, selection);
         GraphResponse response = response(pinned, selection, catalog, focus, resolvedMode, depth, requestId,
                 isPersonal ? personal : null, isPersonal ? filter : null);
         if (isPersonal && focus.isEmpty()) {
@@ -82,13 +83,21 @@ public class GraphQueryService {
         if (hops < 1 || hops > 2) throw invalid();
         Instant at = parseInstant(asOf);
         List<String> focus = List.of(companyId);
-        Map<String, Company> catalog = catalogCompanies(focus);
+        Map<String, Company> catalog = new HashMap<>(catalogCompanies(focus));
 
         PublicGraphReader.Pinned pinned = reader.read(null, graphVersion, at);
         // Two company hops always cover two literal edges; the literal walk then trims to the requested depth.
         GraphSelection.Result ego = GraphSelection.select(pinned.graph(), focus, 2, NODE_LIMIT);
         GraphSelection.Result selection = GraphSelection.neighbourhood(pinned.graph(), ego, companyId, hops);
+        withAppearance(catalog, selection);
         return response(pinned, selection, catalog, focus, "all", hops, requestId, null, null);
+    }
+
+    /** Catalog rows for every picked company, read once, so a node's missing logo or colour can be filled. */
+    private void withAppearance(Map<String, Company> catalog, GraphSelection.Result selection) {
+        List<String> ids = selection.nodes().entrySet().stream().filter(e -> e.getValue() == Kind.COMPANY)
+                .map(Map.Entry::getKey).filter(id -> !catalog.containsKey(id)).toList();
+        CompanyAppearance.of(jdbc, ids).forEach(catalog::putIfAbsent);
     }
 
     private static GraphResponse response(PublicGraphReader.Pinned pinned, GraphSelection.Result selection,
@@ -99,7 +108,8 @@ public class GraphQueryService {
         Map<String, Kind> picked = selection.nodes();
         List<GraphResponse.Node> nodes = picked.entrySet().stream()
                 .map(e -> e.getValue() == Kind.ISSUE ? issueNode(graph.issues.get(e.getKey()))
-                        : companyNode(graph.companies.getOrDefault(e.getKey(), catalog.get(e.getKey())), focus.contains(e.getKey()), personal))
+                        : companyNode(CompanyAppearance.fill(graph.companies.get(e.getKey()), catalog.get(e.getKey())),
+                                focus.contains(e.getKey()), personal))
                 .toList();
         List<GraphResponse.Edge> edges = graph.edges.values().stream()
                 .filter(e -> picked.containsKey(e.source()) && picked.containsKey(e.target()))

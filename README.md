@@ -4,18 +4,28 @@ LG CNS AM Inspire Camp 5기 2조 금융 도메인 프로젝트입니다. 내 종
 
 ## 본개발 시작하기
 
-**본개발 코드는 저장소 루트의 `web/`, `api/`, `ai/`, `contracts/`, `infra/`에 책임별로 구현합니다. `api/`에는 Spring Boot 실행 기반, 공통 오류 처리, 내부 AI 분석 transport 클라이언트가 있으며 업무 API·인증은 아직 없습니다. 현재 기능을 실행할 수 있는 앱은 `prototype/`에 있고 운영 배포는 없습니다.** 앱 백엔드는 Java 21/Spring Boot를 선택했으며 프론트엔드와 AI 런타임은 독립적으로 선택합니다.
+**본개발 코드는 저장소 루트의 `web/`, `api/`, `ai/`에 있습니다. Spring 인증·기업·그래프 조회와 AI 수집·정제·인계 경로는 로컬에서 실행할 수 있으며, AWS 배포는 로컬 개발의 선행 조건이 아닙니다.** 앱 백엔드는 Java 21/Spring Boot이며, 공개 그래프 조회는 Neo4j 직접 연결이 아니라 앱 스냅샷을 사용합니다. 운영 배포·실제 데이터 공개와 합성 데이터 개발·검증은 구분합니다.
 
-| 본개발 예정 경로 | 책임 | 현재 참고 자료 |
+| 본개발 경로 | 책임 | 실행·참고 자료 |
 |---|---|---|
 | `web/` | 사용자·관리자 클라이언트 | [화면계획서](docs/screen-plan/README.md), `docs/design/`, 목표 HTTP 계약 |
-| `api/` — 실행 기반 있음 | 인증·업무 규칙·앱 저장소·공개 HTTP API | [API 실행·개발 안내](api/README.md), [목표 OpenAPI](docs/api/openapi.yaml), [계약 인계](docs/migration/contract-handoff.md) |
+| `api/` | 인증·기업·그래프 조회·앱 저장소·공개 HTTP API | **[로컬 실행 안내](api/README.md#로컬-실행)**, [목표 OpenAPI](docs/api/openapi.yaml), [계약 인계](docs/migration/contract-handoff.md) |
 | `ai/` — **현재 존재** | AI 실행·작업·산출물 저장소. 독립 세 프로젝트 `ai/worker`(S1 CLI), `ai/pipeline`(S2/S3 네이티브 replay 전용), `ai/service`(S1 내부 HTTP, 로컬 준비 상태·미배포). 세 프로젝트 모두 설치에 private PoC 토큰이 필요 없지만(PoC는 `prototype/bff`만 사용) HTTP 호출에는 별도 서비스 인증이 필요합니다. | [ai/README.md](ai/README.md), [AI 실행 계약](docs/design/ai-system.md), [내부 HTTP 계약](docs/api/internal-ai-openapi.yaml), [이식 가이드](docs/migration/README.md) |
 | `contracts/` | 필요한 언어 중립 생성물·합성 fixture의 향후 배포 경계 | **정본은 현재 `docs/api/`**입니다. 생성·검증 명령과 실제 consumer가 생길 때 만들며 두 번째 명세 원본으로 사용하지 않습니다. |
 | `infra/` | 별도 승인된 배포·운영 설정 | [현재 구조와 목표/클라우드 초안](docs/share/system-architecture/README.md), [설정 선행조건](docs/development/github-setup.md) |
 | `docs/` — 현재 존재 | 원문 근거·설계·계약·인계 | [근거 목록](docs/evidence/README.md), [추적 체계](docs/system/README.md) |
 
-`api/`는 팀의 병렬 개발을 위한 최소 기반 PR로 먼저 생성했습니다. Java 21·Gradle Wrapper·PostgreSQL/JPA/Flyway와 공통 오류 처리를 로컬에서 검증했으며 업무 API는 각 담당자의 기능 PR에서 추가합니다. 다른 예정 경로는 실제 기능이 생길 때 생성합니다. API 실행기는 루트 명령(`make api-test api-build api-ai-smoke`)과 CI job `api`에 연결돼 있습니다. 팀원이 지금 할 일은 [본개발 시작 안내](docs/share/production-start-2026-10-12.md), 자세한 생성 조건과 이름 규칙은 [개발 참여 규약](CONTRIBUTING.md)에 있습니다.
+백엔드 그래프 조회 개발은 **Spring + 로컬 PostgreSQL + 합성 스냅샷(`ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`)**으로 진행할 수 있으며, Neo4j·AWS·AI API 키가 필요하지 않습니다. AI 원문 수집·정제·handoff 실행과 Neo4j writer 실행은 별도 경로입니다. 명령과 필수 설정은 [API 실행 안내](api/README.md), [AI 실행 안내](ai/README.md)에 있습니다. 이름 규칙과 리뷰 책임은 [개발 참여 규약](CONTRIBUTING.md)을 따릅니다.
+
+### 담당자별 바로 실행
+
+| 하려는 작업 | 저장소 루트 명령 | 필요한 것·결과 |
+|---|---|---|
+| 백엔드 그래프 조회 개발 | `make api-build api-graph-dev` | Java 21·Python·Docker·로컬에 받은 PostgreSQL 이미지. 일회용 DB와 API를 띄우고 실제 조회가 준비되면 URL을 표시합니다. 종료하면 합성 데이터도 삭제됩니다. [실행 설정](api/README.md#그래프-읽기-로컬-빠른-시작-합성-fixture-일회용) |
+| 브리핑 문서 입력 형식 확인 | `make pipeline-install pipeline-collection-demo` | 합성 HTTP 수집→정제→문서 export 파일을 남깁니다. 실제 뉴스가 아니며, 실제 URL은 별도 권리 확인이 필요합니다. [수집·export 안내](ai/pipeline/README.md#수령자용-최단-레시피-명시한-url--준비된-문서-export-모델pocdb-서버클라우드-없음) |
+| AI 인계 묶음 재현 | `make pipeline-install pipeline-handoff-package HANDOFF_PACKAGE_DIR=/절대경로/새폴더` | 합성 원장·운영자 설정·manifest·bundle·수입 요청을 남깁니다. 같은 경로에서 `pipeline-handoff-package-verify`로 다시 검증합니다. [패키지 안내](api/docs/GRAPH_READ_HANDOFF.md#재현-가능한-operator-handoff-package---write-package---verify-package) |
+
+세 경로 모두 AWS·Neo4j·유료 AI 키 없이 사용할 수 있습니다. 합성 인계 패키지는 생성 위치에 결속되므로 다른 컴퓨터에서는 그 컴퓨터의 새 경로에서 다시 생성하세요. 실제 데이터 적재·공개 활성화와는 별개입니다.
 
 1. [최신 원문 갱신 기록](docs/evidence/doc-delta-2026-10-12.md)과 [현재 작업 결정](docs/share/day-work-2026-10-10.md)을 읽고, 최신 명세·WBS의 **ID·업무명·출처**로 작업 범위를 정합니다.
 2. 중복 이슈를 확인한 뒤 정상·실패·복구 조건의 완료 기준을 작성하고, [branch·commit·PR 규약](CONTRIBUTING.md#작업-범위와-이슈부터-pr까지)에 따라 브랜치를 만듭니다.
@@ -41,7 +51,7 @@ make help projects available-checks
 | [추적 체계](docs/system/README.md) · [팀용 추적표](docs/system/out/zoop-trace.xlsx) · [내용 기반 WBS 이행](docs/system/out/wbs-migration.md) · [경고/차이](docs/system/out/warnings.md) | 화면→명세 정의→현재 WBS 역할→목표 API의 연결과 남은 충돌 |
 | [마이그레이션 가이드](docs/migration/README.md) · [계약 인계](docs/migration/contract-handoff.md) | FE·앱 백엔드·AI의 독립 선택, HTTP/JSON·근거·작업 상태·저장소 경계와 전환 기준 |
 | [화면계획서](docs/screen-plan/README.md) · [Figma 비교 근거](docs/evidence/wireframe-delta-2026-10-08.md) | Figma는 폰트 제외 최종 목표 디자인이며 SUIT를 유지합니다. `docs/design/`에는 토큰·그래프 UX 결정, `docs/research/`에는 조사 자료가 있습니다. |
-| [검증·배포 증거 절차](docs/development/release-verification.md) · [10/12 주 작업 계획](docs/share/seojin-work-plan-2026-10-12.md) | 실행한 검증과 배포 승인을 구분합니다. 작업 계획은 원본 WBS를 대체하지 않습니다. |
+| [검증·배포 증거 절차](docs/development/release-verification.md) · [윤서진 실행·인계 기준선](docs/share/seojin-execution-plan-2026-10-20.md) | 인계·기능 수용·운영 검증을 구분하고, 담당 이슈·소비자 의존성·증거·다음 작업을 관리합니다. 팀 WBS의 일정·담당을 대체하지 않습니다. |
 | [GitHub 설정 안내](docs/development/github-setup.md) | 기존 CI, private PoC credential trust 승인, 보호 규칙의 수동 등록과 아티팩트 준비 범위 |
 
 일정은 **WBS**를 따릅니다. 옛 Notion 일정은 비권위이고 갱신된 회의·API 결정은 사례별 증거입니다. FS074~FS081을 포함한 모든 명세/WBS 내용은 설계·구현 계획의 대상이며 오래된 `검토 전` 표기와 완료·실행 승인을 구분합니다. 추천 종목·산업·테마는 활성 기능에서 제외하되 `listRecommendations` 계약은 유보하고, 재무·실적 요구는 폐기하지 않았습니다.

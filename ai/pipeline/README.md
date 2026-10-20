@@ -8,11 +8,19 @@
 | `zoop-ai-relation {run,submit,inspect,resume,review,revalidate,cancel}` | `zoop_ai_pipeline.relation_cli` | `zoop-relation-s3` | `relation.sqlite3` |
 | `zoop-ai-dependents` (하위 명령 없음, stdin 변경 1건) | `zoop_ai_pipeline.dependency_cli` | `zoop-dependency-s4` | 위 세 원장을 읽기 전용으로만 연다(쓰는 상태 파일 없음) |
 | `zoop-ai-graph {init,freeze,project,recover,inspect,read,focus}` | `zoop_ai_pipeline.graph_projection_cli` | `zoop-graph-projection-1` | `graph.sqlite3` + 이 원장 하나에 묶인 별도 Neo4j 5 database의 **비공개** version(공개 아님) |
-| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `zoop-graph-handoff-bundle-1`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 위 세 원장을 읽기 전용으로만 열고 Neo4j는 쓰지 않음 |
+| `zoop-ai-handoff {freeze,recover,inspect,export}` | `zoop_ai_pipeline.handoff_cli` | `zoop-ai-handoff-1` (bundle `zoop-graph-handoff-bundle-2`) | `handoff.sqlite3` + `bundles/<sha256>.json`; 위 세 원장을 읽기 전용으로만 열고 Neo4j는 쓰지 않음 |
 
 세 원장(ingestion/extraction/relation)은 서로의 디렉터리를 `--ingestion-state-dir`/`--extraction-state-dir` 경로로 읽기 전용으로 엽니다(그래서 한 프로젝트입니다). 이 세 프로세스는 authored replay 전용이며 live/네트워크 경로가 없습니다. 공개 route, 앱 문서 등록·게시, S1 DB 쓰기는 하지 않습니다. `zoop-ai-dependents`는 세 원장을 읽기만 하는 S4의 일부(영향 대상 조회)이며 철회·재생성은 하지 않습니다. `zoop-ai-graph`는 이들 위에서 **완료된 S3 job 하나**를 읽기 전용으로만 소비해 `graph.sqlite3`와 원장에 묶인 Neo4j 한 곳에만 쓰며(아래 절), 그 밖의 네트워크·모델·provider 호출은 없습니다. `zoop-ai-ingest export`는 기본으로 `read`·`quote-display`만 요구하며, 앱 문서 import처럼 내보낸 텍스트를 **저장**하는 소비자는 `--require-store`(export 전용)로 현재 grant의 `store`까지 요구합니다. 이 확인도 호출마다 현재 registry로 CLI 안에서 하며 소비자가 registry를 읽지 않습니다.
 
 `zoop-ai-handoff`는 여러 S3 job과 S2 upstream을 운영자 manifest로 고정해 **공개 이슈 중심 handoff bundle**을 만듭니다. 앱 버전·활성화·공개 준비 완료가 아니며, export 직전에 모든 원천과 운영자 파일의 현재 권한·고정 hash를 다시 검사합니다. member 식별은 문서 ID·버전·정확한 관측까지 포함하고, 구조 basis의 유효기간 근거와 동일 문서의 모든 관측도 보존·대조합니다. 원장 소유권은 변경 전에 읽기 전용으로 검사합니다. 현재 CLI와 `ai/service`의 인증된 전체 bundle HTTP는 **frozen manifest 본문과 bundle을 함께** 반환하여 두 digest를 독립 검증할 수 있습니다. 계약·소유·앱 import·공개 수용의 잔여 조건은 [그래프 인수 문서](../../api/docs/GRAPH_READ_HANDOFF.md)를 따릅니다.
+
+**원본 mention(bundle `-2`).** 각 이슈의 `mentions[]`는 그 이슈의 source event가 가리키는 S2 mention을 있는 그대로 담습니다. 신원은 (문서 ID, 문서 버전, 로컬 mention ID)이며(로컬 ID는 문서 버전 안에서만 유일), 앱 article·version은 운영자 binding에서 옵니다. 한 mention을 두 upstream(event candidate와 snapshot member)이 싣더라도 기록은 하나입니다. `title`·`action`·`target`·`eventTime`·`period`·`assertionStatus`·`background`와 참여자의 `sourceCompanyId`·`name`·`role`은 S2 후보/snapshot 값 그대로(순서 포함)이고 `verification`은 항상 `"none"`입니다. `timePrecision`은 형식으로만 계산하며 넓히지 않습니다. 참여자의 `companyId`는 이 mention을 싣는 **모든** upstream이 같은 공개 회사로 매핑하고 그 회사를 bundle이 `companies`로 게시할 때만 채우며, 아니면 null입니다(참여자 자체는 항상 보존; 역할은 확인된 역할도 `INVOLVES`도 아닙니다). mention의 `evidenceIds`는 그 mention 자신의 정확한 인용 근거이고 이슈의 `evidenceIds`는 mention 근거와 geography 근거의 합집합입니다. 같은 신원을 싣는 member들이 값을 다르게 말하면 `mention_values_conflict`, mention 시각을 추측 없이 분류할 수 없으면 `mention_event_time_unsupported`로 **이슈 전체**를 보이게 제외합니다(병합·마지막 값 우선 없음; `-1`이면 공개됐을 수 있는 이슈입니다). field decision·support·approval·publisher·impact 값은 만들지 않으며, source event·counts·digest 공식·`policy`는 `-1`과 같아 운영자 attestation digest가 그대로 유효합니다.
+
+**이전 bundle의 이력.** 저장된 receipt의 `bundleSchema`가 현재 스키마가 아닌 행(`-1`)은 이력입니다. 운영자 파일·원천 원장·grant·artifact·쓰기 가능한 ledger에 손대기 **전에** 원장만 읽어 판별하고(각 `Handoff` 메서드가 잠금 아래에서 다시 확인), `inspect`는 저장된 상태·receipt·attempt와 `next: null`·`delivery: withheld/handoff_contract_changed`(artifact는 읽지 않음), `export`는 내용 없는 withheld, `recover`와 같은 ID의 `freeze`는 `handoff_contract_changed` 오류입니다. 행·attempt·artifact의 바이트와 권한은 바뀌지 않고 `recover`가 이 행을 `failed`로 만들지도 않으므로, 다시 만들려면 새 `handoffId`로 freeze합니다. 새 ID는 같은 원장에서 정상 동작합니다. 이전 빌드를 이 원장에 실행하지 마십시오(옛 `recover`가 `-2` 행을 invalid로 판정합니다). 손으로 쓴 기대값과 설치된 CLI 확인은 `ai/pipeline/scripts/graph_handoff_smoke.py`가 맡으며, `--write-fixture`는 mention 기대값(`expected-mentions.json`)과 이전 schema의 withheld 봉투(`export-withheld-legacy.json`)도 새 디렉터리에 씁니다.
+
+판별은 세 갈래입니다. **증명된 없음/현재**(디렉터리·원장 파일이 없거나 행이 없거나 현재 스키마)일 때만 기존 쓰기 경로로 넘어가고, **이력**이면 읽기 전용 보기를 쓰며, **판단 불가**(writer 사용 중 `handoff_busy`, 낯선·손상된 namespace/원장, receipt에 schema 없음 `handoff_state_invalid`, 과대 파일)는 그 오류를 그대로 내고 쓰기 가능한 open으로 넘어가지 않습니다(쓰기 open은 권한 재설정·WAL checkpoint·DDL을 하므로 이력 원장을 바꿀 수 있습니다). writer가 죽어 비어 있지 않은 WAL에만 커밋된 행은 읽기 전용 immutable open에 보이지 않으므로, 소유를 먼저 증명한 뒤 shared lock 아래에서 원장 파일과 WAL을 128 MiB 한도로 임시 0700 디렉터리에 **복사**해 그 복사본만 SQLite로 엽니다(원본 파일·`-shm`·WAL·권한·mtime 불변, 임시 디렉터리는 닫을 때 삭제). 현재 스키마 행의 hot WAL 복구(`recover`)는 그대로 쓰기 경로이고 읽기 명령은 `handoff_recovery_required`를 냅니다.
+
+복사 한도는 파일마다 **128 MiB**이며 원본이 일반 파일이 아니거나(심볼릭 링크 포함) 한도를 넘으면 잘라 읽지 않고 `handoff_state_invalid` 오류로 닫힙니다. 임시 디렉터리는 `mkdtemp`로 만든 0700 비공개 위치이고, 정상·오류 어느 경로에서도 보기를 닫을 때 삭제하며 원장 디렉터리 안에는 아무것도 만들지 않습니다.
 
 **의존성.** 전체 패키지(`zoop-ai-pipeline`)는 공개 패키지(pydantic 2.13.5·httpx 0.28.1·lxml 6.1.3·pypdf 6.19.0·neo4j 6.3.1)만 쓰며 collect·ingest·extract·relation·dependents·graph·handoff 일곱 명령 모두 **private PoC·git 인증·토큰 없이** 설치·실행됩니다. 원본 PoC(`investmate`)는 이 프로젝트의 어떤 소스·스크립트·시험에서도 import하지 않고 manifest·lock에도 없습니다(옛 `poc` extra, `poc_guard`, `pinned_poc_unavailable` 코드 제거). `prototype/bff`만 별도로 private PoC를 고정해 쓰며, CI에서 그 token을 쓰는 job은 `bff` 하나뿐입니다.
 
@@ -60,6 +68,102 @@ zoop-ai-ingest run --state-dir STATE --sources registry.json --fixture-manifest 
 - **디렉터리 안전**: `inputRoot`와 `collections/`는 심볼릭 링크를 따르지 않고(디렉터리 fd, `O_NOFOLLOW`) 열며, `.lock`으로 배타 잠금하고, 낯선 파일(예: 외부 SQLite)이나 같은 id의 낯선 디렉터리는 채택하지 않고(`collection_namespace_conflict`) 앱/S1/PoC 상태 루트와 겹치면 거부합니다. 기존 `collection.json`도 descriptor-relative `O_NONBLOCK|O_NOFOLLOW`로 열고 regular file/크기 한도를 확인한 뒤 제한된 길이만 읽습니다(FIFO 등은 즉시 거부·미수정). 자신이 만든 `.tmp-<id>-…`에만 쓰고 한 번의 rename으로 공개하며, 실패 시 자신이 만든 이름만 지웁니다(이전 프로세스가 남긴 임시 디렉터리는 채택도 삭제도 하지 않음).
 - **지원/미지원**: 지원은 명시된 `text/html`·`application/pdf` URL의 단발 수집뿐입니다(`text/plain` 등은 없음). 검색·RSS·DART/OpenDART 같은 API·인증·스케줄링·주기 갱신·시간 창 coverage 주장은 구현하지 않았으며 수집은 `coverageThrough`를 비웁니다. 실제 사이트에 대한 수집은 이 변경에서 실행하지 않았습니다.
 - **HTTPS 인증서 검증**은 끌 수 없고, 연결 IP가 아니라 원래 요청 호스트를 Host·SNI·인증서 이름으로 사용합니다. 공개 회귀 시험의 HTTP 루프백만으로 TLS의 신뢰 체인과 이름 검증까지 증명할 수 없으므로, TLS 변경 시 별도 신뢰된 로컬 테스트 CA/잘못된 이름/신뢰되지 않은 CA 검증이 필요합니다.
+
+### 수령자용 최단 레시피: 명시한 URL → 준비된 문서 export (모델·PoC·DB 서버·클라우드 없음)
+
+필요한 것은 `make pipeline-install`로 만든 `ai/pipeline/.venv`뿐이다. Neo4j·PostgreSQL·OpenAI/TypeSafe 키·네트워크 계정은 필요 없다(네트워크는 `zoop-ai-collect`가 **요청에 적은 URL**에만 연다). 저장소 checkout 안의 `.venv`를 쓰면 앱/S1 상태 루트가 자동 파악된다. checkout 밖에 설치한 패키지는 `ZOOP_STATE_DIR`·`ZOOP_AI_WORKER_STATE_DIR`(절대 경로)를 지정해야 하고 없으면 거부한다. 두 모드는 **같은 명령, 다른 입력**이다. 합성 시연이 외부 문서가 아님은 export의 `observation.collection.network`가 `synthetic_loopback`인지로 구분하며, 실제 모드의 값은 `external`이다.
+
+**A. 합성 시연(외부 접속 없음, 바로 실행).** 임시 `127.0.0.1` 서버가 합성 HTML 1건·PDF 1건을 내주고 실제 CLI 세 개(collect → ingest run → ingest export)를 subprocess로 돌린 뒤 파일을 **남긴다**(기본 smoke는 모두 지운다). 출력 디렉터리는 없거나 비어 있어야 한다.
+
+```sh
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/collection_smoke.py --output-dir /tmp/zoop-collection-demo
+# 남는 파일: sources.json, policy.json, collect-request.json, ingest-run-request.json (이 시연의 전체 유효 설정/요청),
+#            inputs/collections/demo-collect-1/ (원본 bytes·receipt·manifest), state/ingestion.sqlite3, exports/n1.json, exports/d1.json
+```
+
+서버는 종료됐으므로 남은 URL·포트는 재실행용이 아니라 형식 참고용이다. 이 파일들은 합성 문서이며 근거 자료나 실제 수집물이 아니다. 아래 B의 JSON은 같은 스키마의 실제 모드 버전이다.
+
+**B. 실제 모드: 사용자가 권리를 확인한 URL만.** 아래 `news.example.com`, `evidence`, `userAgent`, `targets`는 반드시 자기 값으로 바꾼다. `evidence`에는 이 URL들의 수집·저장·인용 표시를 허락한다는 **실제 근거**(계약·약관·서면 허락)를 적는다. 공개 URL이라는 사실이나 robots 허용은 근거가 아니다. 근거 없이 임의의 사이트를 넣지 않는다. 한 번에 최대 50건이며 모든 값이 필수라 기본값이 없다.
+
+```sh
+BIN="$PWD/ai/pipeline/.venv/bin"
+WORK="$HOME/zoop-collection-work"      # 새 디렉터리. 저장소 안이나 앱/S1/worker 상태 디렉터리 안에 두지 않는다
+mkdir -p "$WORK/inputs"
+
+cat > "$WORK/sources.json" <<EOF
+{"schemaVersion":"zoop-ingestion-s2-1","revision":"operator-1","sources":[{
+  "sourceId":"my-source","adapter":"collected-http","inputRoot":"$WORK/inputs","allowedHosts":["news.example.com"],
+  "scopes":[{"scopeId":"body","selection":"operator-listed URLs, one-off","initialCursor":null,"articleXPath":null,
+             "timestampLimitations":["one-off explicit URL list; no discovery or time-window coverage"]}],
+  "grant":{"grantId":"my-grant","revision":"rights-1","sourceId":"my-source","enabled":true,"rights":"known",
+           "allowedOperations":["read","store","quote-display"],"recipients":[],"purposes":[],
+           "evidence":["<수집·저장·인용 표시를 허락한 계약/약관/서면 근거를 여기에 적는다>"],"expiresAt":null}}]}
+EOF
+
+cat > "$WORK/policy.json" <<'EOF'
+{"schemaVersion":"zoop-collection-policy-1","userAgent":"ZoopCollector/1.0 (+mailto:operator@example.com)","timeoutSeconds":20,
+ "maxTotalSeconds":300,"maxRedirects":3,"maxRequests":20,"maxResponseBytes":5000000,"maxTotalBytes":50000000,"minIntervalSeconds":1,
+ "allowedMediaTypes":["text/html","application/pdf"],"syntheticLoopback":false}
+EOF
+
+cat > "$WORK/collect-request.json" <<'EOF'
+{"schemaVersion":"zoop-collection-1","collectionId":"my-collect-1","sourceId":"my-source","scopeId":"body","targets":[
+  {"candidateId":"n1","url":"https://news.example.com/articles/1","title":"기사 제목(운영자가 선언)","documentKind":"news",
+   "publishedAt":"2026-10-14","supplierDocumentId":null,"modifiedAt":null,"sourceRevision":null},
+  {"candidateId":"d1","url":"https://news.example.com/filings/2.pdf","title":"공시 제목","documentKind":"disclosure",
+   "publishedAt":"2026-10-14T09:00:00+09:00","supplierDocumentId":"filing-2","modifiedAt":null,"sourceRevision":null}]}
+EOF
+
+# 1) 수집. 종료 0은 모든 URL 수집 완료일 때만이다. 2면 collect-result.json의 targets[].code와 error.code를 읽는다.
+"$BIN/zoop-ai-collect" run --sources "$WORK/sources.json" --policy "$WORK/policy.json" < "$WORK/collect-request.json" > "$WORK/collect-result.json"
+
+# 2) 수집 manifest를 ingestion 요청으로 연결한다(fixtureManifestHash = collect-result.json의 manifest.sha256).
+"$BIN/python" - "$WORK" <<'PY'
+import json, sys
+work = sys.argv[1]
+result = json.load(open(f"{work}/collect-result.json"))
+json.dump({"schemaVersion": "zoop-ingestion-s2-1", "roundId": "my-round-1", "sourceId": result["sourceId"], "scopeId": result["scopeId"], "window": None,
+           "checkpointRevision": 0, "fixtureManifestHash": result["manifest"]["sha256"], "cleanerVersion": "exact-copy-1"}, open(f"{work}/ingest-run.json", "w"))
+open(f"{work}/manifest-path.txt", "w").write(result["manifestPath"])
+PY
+"$BIN/zoop-ai-ingest" run --state-dir "$WORK/state" --sources "$WORK/sources.json" --fixture-manifest "$(cat "$WORK/manifest-path.txt")" < "$WORK/ingest-run.json" > "$WORK/ingest-result.json"
+
+# 3) 준비된 문서 하나당 export 하나. state는 읽기 전용으로 열리며 --require-store는 export 순간 grant에 `store`까지 있어야 통과시킨다.
+mkdir -p "$WORK/selectors" "$WORK/exports"
+"$BIN/python" - "$WORK" <<'PY'
+import json, sys
+work = sys.argv[1]
+result = json.load(open(f"{work}/ingest-result.json"))
+assert result["state"] == "complete", result   # incomplete는 부분·실패 수집이다. 성공한 0건으로 취급하지 않는다
+for ref in result["documentRefs"]:
+    if ref["documentVersion"] is None:         # hold/error 문서는 export 대상이 아니다(ingest-result.json의 hold/error를 읽는다)
+        continue
+    selector = {"schemaVersion": "zoop-ingestion-s2-1", "roundId": result["roundId"], "sourceId": result["sourceId"],
+                **{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")}}
+    json.dump(selector, open(f"{work}/selectors/{ref['page']}-{ref['ordinal']}.json", "w"))
+PY
+for selector in "$WORK"/selectors/*.json; do
+  "$BIN/zoop-ai-ingest" export --state-dir "$WORK/state" --sources "$WORK/sources.json" --require-store < "$selector" > "$WORK/exports/$(basename "$selector")"
+done
+```
+
+`collectionId`·`roundId`는 불변이다. 같은 id로 입력이 다르면 `collection_input_conflict`/`round_input_conflict`이므로 다시 돌릴 때는 새 id를 쓴다. `$WORK/exports/*.json`이 수령자가 읽는 산출물이다.
+
+**export가 담는 것과 담지 않는 것(인수 시 읽을 출처·한계).**
+
+| 수령자가 보존할 값 | 위치 | 비고 |
+| --- | --- | --- |
+| 문서·버전 식별 | `observation.documentId`·`rawVersion`·`documentVersion` | source-local ID다. 같은 URL의 본문이 바뀌면 `documentVersion`이 새로 생기고 문서 ID는 유지된다 |
+| 실제 수집 시각 | `observation.collection.fetchedAt`(UTC offset 포함 instant), 원본은 `receipts/<sha256>.json` | 페이지 `Date`·발행 시각이 아니라 이 프로세스가 받은 시각이다 |
+| 게시 시각과 정밀도 | `observation.collection.published{raw,precision,date,basis}` | 운영자가 요청에 선언한 값뿐이다(페이지에서 긁지 않음). `day`는 날짜만 남고 자정으로 바뀌지 않으며, 오프셋 없는 시각은 `unresolved`, 미선언은 `unknown`. `observation.publishedAt`은 `instant`일 때만 채워진다 |
+| 수집 경로·분류 | `observation.provenance`(`collected_http`), `collection.network`, `collection.documentKind`, `finalUrl`, `httpStatus`, `contentType`, `bodySha256` | `network`가 `synthetic_loopback`이면 시험 서버 bytes이지 외부 문서가 아니다 |
+| 권리 | `grant.grantId`·`grant.revision` | export에는 권리 **내용**(rights·evidence·operations)이 없다. 내용은 `sources.json`의 grant가 정본이며 수령자는 grant id/revision과 함께 보관해야 한다 |
+| 본문 | `document.text`(준비된 텍스트), `document.rawLocators`, `locatorMetadata.rawHash` | 텍스트는 정리된 사본이고 원본 bytes가 아니다. HTML은 DOM text 좌표, PDF는 page 추출 텍스트 좌표다 |
+
+- **원본 bytes는 export에 들어 있지 않다.** 원본은 `inputRoot/collections/<collectionId>/bodies/<sha256>.bin`과 `ingestion.sqlite3`의 raw BLOB에 있다. 수령자에게 원본이 필요하면 `locatorMetadata.rawHash`·`collection.bodySha256`과 일치하는 파일을 별도로 전달하고, 그 전달도 `read`·`store` 권리가 있는 경우에만 한다.
+- **export는 그 순간의 권한 확인 결과**다. 이후 grant가 철회·만료되면 같은 export 명령은 본문 없이 `source_unauthorized`만 낸다. 이미 파일로 복사된 export는 이 CLI가 회수하지 못한다.
+- title·kind·게시/수정 시각은 운영자 선언이며 검증된 사실이 아니다. 공개·게시 승인, 요약·감성·기업 연결, 앱 Dataset 등록, 완전성·커버리지 주장은 이 출력에 없다.
+- 합성 시연(A)과 실제 모드(B)는 같은 형식이지만 A의 파일을 실제 수집 결과로 인용하면 안 된다. 이 절의 B 명령은 외부 사이트를 대상으로 실행되지 않았다.
 
 
 `zoop_ai_pipeline.ingestion_cli`의 `run/resume/inspect`는 BFF의 admin `ingest-run`과 **다른 내부 실행 경계**다. 네이티브 URL/HTML/PDF 준비(`ingestion_url`·`ingestion_parsers`·`ingestion_pdf`, lxml·pypdf, 같은 공개 의존성)만 쓰며 private PoC를 import하지 않고 네트워크·모델·PoC 원장·앱/S1 DB에는 연결하지 않는다(네트워크는 위 `zoop-ai-collect`만 연다). 이전 pinned-PoC parser 프로필(`pocCommit`)로 만든 round는 새 프로필(`parser: zoop-native-parsers-1`)과 달라 `resume`이 `parser_profile_changed`로 거부하며, 그 round의 저장된 version과 export는 그대로 읽힌다(재해석하지 않음). 새 프로필의 version은 같은 raw bytes여도 새 preparation key/version id를 가진다. 명시한 전용 `--state-dir`의 private `ingestion.sqlite3`에 원래 response/raw BLOB, source-local 문서 ID, raw/text version, HTML node/PDF page span과 연속 checkpoint를 저장한다. 현재 operator `--sources`는 매번 완전한 snapshot으로 읽고, fixture manifest는 hash-pinned 파일 입력일 뿐 권한을 발급하지 않는다. 수집한 관찰의 `export`는 `observation`에 `provenance: "collected_http"`와 `collection`(실제 수집 시각, 최종 URL, HTTP 상태, 본문 sha256, 문서 종류, `network`, 선언된 게시 시각의 원문·정밀도)을 **추가로** 돌려주며 license를 주장하지 않는다. authored 관찰의 export는 이전과 같은 닫힌 키 집합 그대로다(Java `IngestionExportParser`가 두 형태의 정확한 키 집합을 고정하며, 같은 집합을 `tests/test_collection.py`가 고정한다). run/inspect 결과의 최상위 `provenance`는 두 경우 모두 있다.

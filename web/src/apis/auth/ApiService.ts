@@ -11,6 +11,8 @@ type CallOptions = {
   skipMemberCsrf?: boolean;
   /** 요청별 추가 헤더(예: 목표 계약의 Idempotency-Key) */
   headers?: Record<string, string>;
+  /** 페이지를 닫는 중에도 요청을 끝까지 보낸다(예: 사용 이벤트 전송) */
+  keepalive?: boolean;
 };
 
 type ErrorBody = {
@@ -101,15 +103,15 @@ export async function call<TResponse = unknown>(
   const revision = useAuthStore.getState().sessionRevision;
   let response: Response;
   try {
-    response = await fetch(
-      `${API_BASE_URL}${api}`,
-      createRequestOptions(
+    response = await fetch(`${API_BASE_URL}${api}`, {
+      ...createRequestOptions(
         method,
         request,
         option?.headers,
         option?.skipMemberCsrf,
       ),
-    );
+      ...(option?.keepalive ? { keepalive: true } : {}),
+    });
   } catch {
     throw new ApiError(0, 'NETWORK_ERROR', '요청을 보내지 못했어요.', true);
   }

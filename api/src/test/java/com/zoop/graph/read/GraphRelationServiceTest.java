@@ -21,10 +21,26 @@ import org.junit.jupiter.api.Test;
 class GraphRelationServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-16T12:00:00Z");
     private DisclosureExclusions exclusions = DisclosureExclusions.NONE;
-    private final GraphRelationService service = new GraphRelationService(GraphReadFixtures.reader(NOW, () -> exclusions));
+    private final org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate jdbc =
+            org.mockito.Mockito.mock(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class);
+    private final GraphRelationService service = new GraphRelationService(GraphReadFixtures.reader(NOW, () -> exclusions), jdbc);
 
     private static final String STRUCTURAL = DisplayGraph.edgeId("STRUCTURALLY_RELATED_TO", HBM_EQUIP, HYNIX);
     private static final String SHARED = DisplayGraph.edgeId("SHARES_ISSUE", HYNIX, NVDA);
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aCompanyEndCarriesTheCatalogLogoAndAnIssueEndNone() {
+        org.mockito.Mockito.when(jdbc.query(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(org.springframework.jdbc.core.namedparam.SqlParameterSource.class),
+                org.mockito.ArgumentMatchers.any(org.springframework.jdbc.core.RowMapper.class)))
+                .thenReturn(List.of(new com.zoop.graph.snapshot.PublicGraphSnapshot.Company(HYNIX, "SK하이닉스", "#EA002C",
+                        "/graph-assets/sk-hynix.svg")));
+        var edge = service.getRelation(STRUCTURAL, null, null, null, "r");
+        assertEquals("/graph-assets/sk-hynix.svg", edge.target().logoUrl());
+        assertEquals("#EA002C", edge.target().brandColor());
+        assertEquals(null, edge.source().logoUrl());
+    }
 
     @Test
     void approvedRelationCarriesItsSourceRelationsBasisAndVerification() {

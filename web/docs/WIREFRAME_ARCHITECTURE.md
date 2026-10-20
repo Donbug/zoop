@@ -68,7 +68,9 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | 관리자 로그인       | /admin/login                                    | admin/login/AdminLoginPage.tsx                 | 공개 진입                               | A-ADM-05c                    |
 | 운영 대시보드       | /admin                                          | admin/dashboard/AdminDashboardPage.tsx         | 관리자                                  | A-ADM-01                     |
 | 이용 통계           | /admin/stats                                    | admin/stats/AdminStatsPage.tsx                 | 관리자                                  | A-ADM-02                     |
+| 기업별 통계         | /admin/stats/companies/:companyId               | admin/stats/AdminCompanyStatsPage.tsx          | 관리자                                  | A-ADM-02                     |
 | 선호도·대화록       | /admin/feedback                                 | admin/feedback/AdminFeedbackPage.tsx           | 관리자                                  | A-ADM-02b                    |
+| AI 대화록 상세      | /admin/feedback/transcripts/:sessionId          | admin/feedback/AdminTranscriptPage.tsx         | 관리자(대화록 열람 권한·목적)           | A-ADM-02b                    |
 | 그래프 관제·검수    | /admin/pipeline                                 | admin/pipeline/AdminPipelinePage.tsx           | 관리자                                  | A-ADM-03                     |
 | 브리핑 운영         | /admin/briefings                                | admin/briefings/AdminBriefingsPage.tsx         | 관리자                                  | A-ADM-04                     |
 | AI 운영             | /admin/ai                                       | admin/ai/AdminAiPage.tsx                       | 관리자                                  | A-ADM-04b                    |
@@ -83,46 +85,46 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 
 아래 경로는 `src/` 기준이다. 대부분 준비 상태를 반환하는 TSX 골조이며 실제 렌더러/API 구현은 후속 작업이다.
 
-| 파일                                                | 담당 영역         | 화면 근거                   | 후속 책임                                                                                |
-| --------------------------------------------------- | ----------------- | --------------------------- | ---------------------------------------------------------------------------------------- |
-| `components/auth/SignupForm.tsx`                    | 회원가입          | D-AUT-02                    | 이메일·비밀번호·표시 이름·필수 약관 입력과 가입 API를 연결한다.                          |
-| `components/auth/SocialLoginButtons.tsx`            | 간편 로그인       | D-AUT-01                    | Google·카카오 인증 공급자 연동이 확정되면 활성화한다.                                    |
-| `components/onboarding/InvestmentChoice.tsx`        | 투자 여부         | D-ONB-01                    | 투자 중/미투자 선택을 온보딩 초안에 반영한다.                                            |
-| `components/portfolio/PortfolioConnect.tsx`         | 가상 계좌 연결    | D-ONB-02 / D-MY-01b         | 초기 설정·내 종목이 함께 쓰는 연결 기능. 진입 출처로 연결 후 이동을 구분한다.            |
-| `components/onboarding/WatchlistSelector.tsx`       | 관심 종목 선택    | D-WAT-01                    | 종목 검색·추가·제거와 저장을 연결한다. 0개 선택을 허용한다.                              |
-| `components/stocks/StockSearchForm.tsx`             | 종목 검색         | PDF 실제 4페이지            | 기업명·영문명·티커 검색을 연결한다.                                                      |
-| `components/stocks/StockList.tsx`                   | 종목 목록         | PDF 실제 4페이지            | 목록 결과와 기업 상세·지도 이동을 연결한다.                                              |
-| `components/my/HoldingsSection.tsx`                 | 보유 종목         | D-MY-01 / 01b               | 연결 상태·모의 보유 표시, 확인 창을 거친 연결 끊기와 실패 시 다시 시도                   |
-| `components/my/WatchlistSection.tsx`                | 관심 종목         | D-MY-01 / 01b               | 서버 관심 목록, 추가·빼기 즉시 저장, 실패 시 되돌림과 다시 시도                          |
-| `components/graph/GraphCanvas.tsx`                  | 관계 지도         | D-GRP-01 / 01b              | 시장·개인·회차 지도와 확대 상태를 하나의 캔버스로 처리한다. 그래프 엔진은 추후 연결한다. |
-| `components/graph/EventDetailPanel.tsx`             | 사건 상세         | D-GRP-02                    | 사건·직접 관련 기업·근거와 AI 진입 동작을 연결한다.                                      |
-| `components/graph/CompanyDetailPanel.tsx`           | 기업 요약         | D-GRP-03                    | 시세·1개월 추이·모의 보유·직접 이슈·기업 상세 이동을 연결한다.                           |
-| `components/graph/RelationDetailPanel.tsx`          | 연결선 상세       | D-GRP-04                    | 관계 유형·방향 유무·공유 사건·근거를 표시한다.                                           |
-| `components/graph/ImpactPathPanel.tsx`              | 영향 경로         | D-GRP-06                    | 기업-사건 경로와 단계별 근거를 연결한다.                                                 |
-| `components/graph/CompanyPathPanel.tsx`             | 두 기업 사이 경로 | D-GRP-07                    | 두 번째 기업 선택·최단 무방향 경로·경로 없음을 구분한다.                                 |
-| `components/graph/GraphFocusControls.tsx`           | 기업 포커스       | D-GRP-07b                   | focus/hops URL을 사용한다. 패널 닫기와 포커스 해제를 구분한다.                           |
-| `components/graph/GraphTutorial.tsx`                | 지도 사용 안내    | D-GRP-T / T2 / T3 / T4 / T5 | 5개 안내 단계를 데이터로 구성하고 이전·다음·건너뛰기·완료를 연결한다.                    |
-| `components/graph/BriefingSnapshotBanner.tsx`       | 회차 기준 지도    | D-BRF-04                    | round 식별자로 고정 스냅샷을 조회하고 원래 브리핑으로 돌아간다.                          |
-| `components/company/CompanySidebar.tsx`             | 기업 선택         | D-COM-03 내부 요소          | 기업 전환 시 period/asOf/tab은 유지하고 사건·버킷 선택만 초기화한다.                     |
-| `components/company/CompanyOverview.tsx`            | 기업 시세·보유    | D-COM-01                    | 시세·지표·모의 보유를 독립적으로 조회하고 실패를 분리한다.                               |
-| `components/company/CompanyEventsTab.tsx`           | 사건·시점 탐색    | D-COM-01b / 05 / 06         | 기간·차트·시간 버킷·asOf를 연동한다. 가격과 사건의 시간 겹침을 인과로 표시하지 않는다.   |
-| `components/company/CompanyDocumentsTab.tsx`        | 관련 문서         | D-COM-02                    | 출처·발행 시각·인용을 제공한다. 문서 탭 설명과 일부 프레임이 불일치한다.                 |
-| `components/company/CompanyInfoTab.tsx`             | 기업 정보         | PDF 실제 5페이지 하단       | 정식 명칭·시장·업종·설립·홈페이지를 표시한다.                                            |
-| `components/company/CompanyRelationGraph.tsx`       | 기업 관계 그래프  | D-COM-04 내부 요소          | 기업 상세와 같은 asOf를 사용하고 전체 지도 진입을 연결한다.                              |
-| `components/briefing/PublishedBriefing.tsx`         | 발행 회차 조회    | D-BRF-01 / 02               | 날짜·회차 API 조회, 상태·재시도·정정 이력과 불변 발행 데이터를 표시한다.                 |
-| `components/briefing/MarketIndicators.tsx`          | 주요 시장 지표    | D-BRF-01 / 02               | 회차 시각과 지표 관측 시각을 구분하고 정상·지연·사용 불가·실패를 분리한다.               |
-| `components/briefing/BriefingIssueList.tsx`         | 핵심 이슈         | D-BRF-01 / 02               | 핵심 이슈·선정 이유·근거·회차 지도·피드백을 연결한다.                                    |
-| `components/briefing/BriefingComparison.tsx`        | 아침 대비 변화    | D-BRF-02                    | 동일 날짜 출근 회차 대비 신규·이어짐·빠짐을 비교한다.                                    |
-| `components/admin/dashboard/DashboardSummary.tsx`   | 운영 현황         | A-ADM-01                    | 공개 그래프 버전·작업·회차·회원 운영 요약을 연결한다.                                    |
-| `components/admin/stats/UsageStatistics.tsx`        | 이용·AI 품질 통계 | A-ADM-02                    | 기간별 통계와 표본 부족을 구분한다.                                                      |
-| `components/admin/feedback/FeedbackReview.tsx`      | 선호도·대화록     | A-ADM-02b                   | 유효 평가·사유·마스킹된 대화록을 연결한다.                                               |
-| `components/admin/pipeline/PipelineReview.tsx`      | 그래프 관제·검수  | A-ADM-03                    | 후보·공개 버전·작업 상태를 연결한다. 검수 권한과 R1 정책은 확정 필요하다.                |
-| `components/admin/briefings/BriefingOperations.tsx` | 브리핑 회차·이력  | A-ADM-04                    | 회차 원본과 정정 이력을 구분한다. 스케줄러 실행은 별도 백엔드 작업이다.                  |
-| `components/admin/ai/AiUsageOverview.tsx`           | AI 사용량·오류    | A-ADM-04b                   | 실제 모델 호출·재생을 구분하고 비용 미제공은 0원과 구분한다.                             |
-| `components/admin/members/MemberManagement.tsx`     | 회원·접근 관리    | A-ADM-05                    | 가명 ID·마스킹 이메일·정상/차단 필터와 접근 권한을 연결한다.                             |
-| `components/admin/audit/AuditLogTable.tsx`          | 관리자 감사 로그  | A-ADM-05b                   | 기존 감사 기록의 동작·대상·사유·행위자를 조회한다.                                       |
-| `components/evidence/EvidenceDrawer.tsx`            | 근거 창           | D-GRP-05                    | 대상별 출처·인용·발행/검증 시각, 성공 근거 유지 및 실패 부분 재시도                      |
-| `components/ai/AiChatDrawer.tsx`                    | AI 서랍           | D-AI-01/01b/02/02b          | 연결 대상·초안·대화 회수·새 요청, 닫기 후 맥락 유지                                      |
+| 파일                                                | 담당 영역         | 화면 근거                   | 후속 책임                                                                                                         |
+| --------------------------------------------------- | ----------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `components/auth/SignupForm.tsx`                    | 회원가입          | D-AUT-02                    | 이메일·비밀번호·표시 이름·필수 약관 입력과 가입 API를 연결한다.                                                   |
+| `components/auth/SocialLoginButtons.tsx`            | 간편 로그인       | D-AUT-01                    | Google·카카오 인증 공급자 연동이 확정되면 활성화한다.                                                             |
+| `components/onboarding/InvestmentChoice.tsx`        | 투자 여부         | D-ONB-01                    | 투자 중/미투자 선택을 온보딩 초안에 반영한다.                                                                     |
+| `components/portfolio/PortfolioConnect.tsx`         | 가상 계좌 연결    | D-ONB-02 / D-MY-01b         | 초기 설정·내 종목이 함께 쓰는 연결 기능. 진입 출처로 연결 후 이동을 구분한다.                                     |
+| `components/onboarding/WatchlistSelector.tsx`       | 관심 종목 선택    | D-WAT-01                    | 종목 검색·추가·제거와 저장을 연결한다. 0개 선택을 허용한다.                                                       |
+| `components/stocks/StockSearchForm.tsx`             | 종목 검색         | PDF 실제 4페이지            | 기업명·영문명·티커 검색을 연결한다.                                                                               |
+| `components/stocks/StockList.tsx`                   | 종목 목록         | PDF 실제 4페이지            | 목록 결과와 기업 상세·지도 이동을 연결한다.                                                                       |
+| `components/my/HoldingsSection.tsx`                 | 보유 종목         | D-MY-01 / 01b               | 연결 상태·모의 보유 표시, 확인 창을 거친 연결 끊기와 실패 시 다시 시도                                            |
+| `components/my/WatchlistSection.tsx`                | 관심 종목         | D-MY-01 / 01b               | 서버 관심 목록, 추가·빼기 즉시 저장, 실패 시 되돌림과 다시 시도                                                   |
+| `components/graph/GraphCanvas.tsx`                  | 관계 지도         | D-GRP-01 / 01b              | 시장·개인·회차 지도와 확대 상태를 하나의 캔버스로 처리한다. 그래프 엔진은 추후 연결한다.                          |
+| `components/graph/EventDetailPanel.tsx`             | 사건 상세         | D-GRP-02                    | 사건·직접 관련 기업·근거와 AI 진입 동작을 연결한다.                                                               |
+| `components/graph/CompanyDetailPanel.tsx`           | 기업 요약         | D-GRP-03                    | 시세·1개월 추이·모의 보유·직접 이슈·기업 상세 이동을 연결한다.                                                    |
+| `components/graph/RelationDetailPanel.tsx`          | 연결선 상세       | D-GRP-04                    | 관계 유형·방향 유무·공유 사건·근거를 표시한다.                                                                    |
+| `components/graph/ImpactPathPanel.tsx`              | 영향 경로         | D-GRP-06                    | 기업-사건 경로와 단계별 근거를 연결한다.                                                                          |
+| `components/graph/CompanyPathPanel.tsx`             | 두 기업 사이 경로 | D-GRP-07                    | 두 번째 기업 선택·최단 무방향 경로·경로 없음을 구분한다.                                                          |
+| `components/graph/GraphFocusControls.tsx`           | 기업 포커스       | D-GRP-07b                   | focus/hops URL을 사용한다. 패널 닫기와 포커스 해제를 구분한다.                                                    |
+| `components/graph/GraphTutorial.tsx`                | 지도 사용 안내    | D-GRP-T / T2 / T3 / T4 / T5 | 5개 안내 단계를 데이터로 구성하고 이전·다음·건너뛰기·완료를 연결한다.                                             |
+| `components/graph/BriefingSnapshotBanner.tsx`       | 회차 기준 지도    | D-BRF-04                    | round 식별자로 고정 스냅샷을 조회하고 원래 브리핑으로 돌아간다.                                                   |
+| `components/company/CompanySidebar.tsx`             | 기업 선택         | D-COM-03 내부 요소          | 기업 전환 시 period/asOf/tab은 유지하고 사건·버킷 선택만 초기화한다.                                              |
+| `components/company/CompanyOverview.tsx`            | 기업 시세·보유    | D-COM-01                    | 시세·지표·모의 보유를 독립적으로 조회하고 실패를 분리한다.                                                        |
+| `components/company/CompanyEventsTab.tsx`           | 사건·시점 탐색    | D-COM-01b / 05 / 06         | 기간·차트·시간 버킷·asOf를 연동한다. 가격과 사건의 시간 겹침을 인과로 표시하지 않는다.                            |
+| `components/company/CompanyDocumentsTab.tsx`        | 관련 문서         | D-COM-02                    | 출처·발행 시각·인용을 제공한다. 문서 탭 설명과 일부 프레임이 불일치한다.                                          |
+| `components/company/CompanyInfoTab.tsx`             | 기업 정보         | PDF 실제 5페이지 하단       | 정식 명칭·시장·업종·설립·홈페이지를 표시한다.                                                                     |
+| `components/company/CompanyRelationGraph.tsx`       | 기업 관계 그래프  | D-COM-04 내부 요소          | 기업 상세와 같은 asOf를 사용하고 전체 지도 진입을 연결한다.                                                       |
+| `components/briefing/PublishedBriefing.tsx`         | 발행 회차 조회    | D-BRF-01 / 02               | 날짜·회차 API 조회, 상태·재시도·정정 이력과 불변 발행 데이터를 표시한다.                                          |
+| `components/briefing/MarketIndicators.tsx`          | 주요 시장 지표    | D-BRF-01 / 02               | 회차 시각과 지표 관측 시각을 구분하고 정상·지연·사용 불가·실패를 분리한다.                                        |
+| `components/briefing/BriefingIssueList.tsx`         | 핵심 이슈         | D-BRF-01 / 02               | 핵심 이슈·선정 이유·근거·회차 지도·피드백을 연결한다.                                                             |
+| `components/briefing/BriefingComparison.tsx`        | 아침 대비 변화    | D-BRF-02                    | 동일 날짜 출근 회차 대비 신규·이어짐·빠짐을 비교한다.                                                             |
+| `components/admin/dashboard/DashboardSummary.tsx`   | 운영 현황         | A-ADM-01                    | getAdminDashboard로 검수·그래프·GraphDB·작업·AI·브리핑·이용 현황을 요약하고 각 관리 화면으로 연결한다.            |
+| `components/admin/stats/UsageStatistics.tsx`        | 이용·AI 품질 통계 | A-ADM-02                    | 기간(7일·30일·전체)별 지표·산식·일별 추이·회차별 조회와 종목 순위(커서)를 보여 주고, 표본이 작으면 비율을 숨긴다. |
+| `components/admin/feedback/FeedbackReview.tsx`      | 선호도·대화록     | A-ADM-02b                   | 유효 평가 집계·싫어요 사유(커서)·가린 대화록을 보여 준다. 대화록은 열람 목적을 받은 뒤에만 요청한다.              |
+| `components/admin/pipeline/PipelineReview.tsx`      | 그래프 관제·검수  | A-ADM-03                    | 후보·공개 버전·작업 상태를 연결한다. 검수 권한과 R1 정책은 확정 필요하다.                                         |
+| `components/admin/briefings/BriefingOperations.tsx` | 브리핑 회차·이력  | A-ADM-04                    | 회차 원본과 정정 이력을 구분한다. 스케줄러 실행은 별도 백엔드 작업이다.                                           |
+| `components/admin/ai/AiUsageOverview.tsx`           | AI 사용량·오류    | A-ADM-04b                   | 실제 모델 호출·재생을 구분하고 비용 미제공은 0원과 구분한다.                                                      |
+| `components/admin/members/MemberManagement.tsx`     | 회원·접근 관리    | A-ADM-05                    | 가명 ID·마스킹 이메일·정상/차단 필터와 접근 권한을 연결한다.                                                      |
+| `components/admin/audit/AuditLogTable.tsx`          | 관리자 감사 로그  | A-ADM-05b                   | 기존 감사 기록의 동작·대상·사유·행위자를 조회한다.                                                                |
+| `components/evidence/EvidenceDrawer.tsx`            | 근거 창           | D-GRP-05                    | 대상별 출처·인용·발행/검증 시각, 성공 근거 유지 및 실패 부분 재시도                                               |
+| `components/ai/AiChatDrawer.tsx`                    | AI 서랍           | D-AI-01/01b/02/02b          | 연결 대상·초안·대화 회수·새 요청, 닫기 후 맥락 유지                                                               |
 
 `OnboardingLayout`, `AdminLayout`, `AdminProtectedRoute`도 생성했다. `SocialLoginButtons`는 파일만 준비했으며 인증 공급자 미확정 상태에서 동작하는 로그인 버튼으로 노출하지 않았다.
 

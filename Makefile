@@ -91,6 +91,20 @@ pipeline-smoke:
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/relation_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/dependency_smoke.py
 	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py
+.PHONY: pipeline-collection-demo
+# Keeps synthetic loopback collection, prepared documents and exports; never collects external news.
+COLLECTION_DEMO_DIR ?= /tmp/zoop-collection-demo
+pipeline-collection-demo:
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/collection_smoke.py --output-dir "$(COLLECTION_DEMO_DIR)"
+HANDOFF_PACKAGE_DIR ?=
+.PHONY: pipeline-handoff-package pipeline-handoff-package-verify
+# Retained synthetic handoff, created in a new location; no Neo4j, cloud or model calls.
+pipeline-handoff-package:
+	@test -n "$(HANDOFF_PACKAGE_DIR)" || { echo "set HANDOFF_PACKAGE_DIR=/abs/real/new-dir"; exit 2; }
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py --write-package "$(HANDOFF_PACKAGE_DIR)"
+pipeline-handoff-package-verify:
+	@test -n "$(HANDOFF_PACKAGE_DIR)" || { echo "set HANDOFF_PACKAGE_DIR=/abs/real/package-dir"; exit 2; }
+	$(PIPELINE_PYTHON) ai/pipeline/scripts/graph_handoff_smoke.py --verify-package "$(HANDOFF_PACKAGE_DIR)"
 .PHONY: pipeline-graph-smoke
 # Requires an explicitly configured, isolated empty Neo4j test database.
 pipeline-graph-smoke:
@@ -133,7 +147,29 @@ api-ai-smoke:
 .PHONY: api-ai-pipeline-smoke
 api-ai-pipeline-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_pipeline_gate.py
+# Real installed zoop-ai-handoff/-ingest -> built jar -> PostgreSQL and evidence HTTP reads; no provider/model calls. Only the isolated smoke harness activates a synthetic version. Needs `make pipeline-install api-build` first (not run
+# automatically; fails, never skips) and DB_URL/DB_USERNAME/DB_PASSWORD for a dedicated EMPTY loopback database (no default; the script refuses a non-empty one and never cleans it).
+# Optional: GRAPH_IMPORT_PSQL_CONTAINER (docker exec psql instead of host psql), GRAPH_IMPORT_DB_USER, GRAPH_IMPORT_DB_NAME (default to DB_USERNAME and the DB_URL database).
+API_JAR ?= api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar
+.PHONY: api-graph-handoff-import-smoke
+api-graph-handoff-import-smoke:
+	$(PIPELINE_PYTHON) api/scripts/graph_handoff_import_smoke.py --jar $(API_JAR) --handoff-cli "$(CURDIR)/ai/pipeline/.venv/bin/zoop-ai-handoff" --ingest-cli "$(CURDIR)/ai/pipeline/.venv/bin/zoop-ai-ingest" $(if $(GRAPH_IMPORT_PSQL_CONTAINER),--psql-container $(GRAPH_IMPORT_PSQL_CONTAINER)) $(if $(GRAPH_IMPORT_DB_USER),--db-user $(GRAPH_IMPORT_DB_USER)) $(if $(GRAPH_IMPORT_DB_NAME),--db-name $(GRAPH_IMPORT_DB_NAME))
+# Temporary local graph API with bundled fixtures. Requires a built jar and a locally cached PostgreSQL image; never pulls.
+.PHONY: api-graph-dev
+api-graph-dev:
+	$(PYTHON) api/scripts/local_graph_dev.py --jar "$(API_JAR)" $(if $(LOCAL_GRAPH_DEV_PORT),--server-port $(LOCAL_GRAPH_DEV_PORT)) $(if $(LOCAL_GRAPH_DEV_IMAGE),--image $(LOCAL_GRAPH_DEV_IMAGE))
 api-build:
 	$(API_GRADLE) assemble
 package-artifacts:
 	$(PYTHON) scripts/package_artifacts.py --root . --output "$(ARTIFACT_DIR)" --commit "$(COMMIT)"
+
+# Local read-only PR discovery; state and acknowledgements stay outside the repository.
+PR_WATCH_STATE ?= $(HOME)/.local/state/zoop-pr-watchdog
+PR_WATCH_INTERVAL ?= 300
+.PHONY: pr-watch-once pr-watch-status pr-watch
+pr-watch-once:
+	$(PYTHON) scripts/pr_watchdog.py --state-dir "$(PR_WATCH_STATE)" --once
+pr-watch-status:
+	$(PYTHON) scripts/pr_watchdog.py --state-dir "$(PR_WATCH_STATE)" --status
+pr-watch:
+	$(PYTHON) scripts/pr_watchdog.py --state-dir "$(PR_WATCH_STATE)" --interval "$(PR_WATCH_INTERVAL)" --watch

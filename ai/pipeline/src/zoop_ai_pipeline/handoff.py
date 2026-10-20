@@ -6,6 +6,11 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1` row) is HISTORY: `inspect` shows its stored state, receipt and
+attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
+any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
+as a current bundle, resumed, settled or rewritten.
+
 What this module does NOT do: write the app, register evidence, activate a version, decide asOf policy, call a model/provider/network, touch Neo4j, or
 write any source ledger. The producer confirms only SOURCE-side facts; app-side verification stays `appImportPending` in the bundle.
 """
@@ -14,7 +19,10 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import sqlite3
+import stat
+import tempfile
 import uuid
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -29,8 +37,8 @@ from .graph_projection import Paths as SourcePaths
 from .graph_projection import Registry, Source, gate, load_registry, review_state
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
 from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE, MAX_EVIDENCE, MAX_EXCLUSIONS,
-    MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, OFFSET_UNIT, POLICY, PRODUCER_CHECKS, SCHEMA, STRUCTURAL_BASIS_TYPES, Bindings, Decisions, Manifest, Selector,
-    app_evidence_id, content_digest, countries_class, text_sha256, time_precision, validate_bundle)
+    MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_VERIFICATION, OFFSET_UNIT, POLICY, PRODUCER_CHECKS, SCHEMA, STRUCTURAL_BASIS_TYPES, Bindings, Decisions,
+    Manifest, Selector, app_evidence_id, content_digest, countries_class, mention_key, mention_time_precision, text_sha256, time_precision, validate_bundle)
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, digest, now, read_file, reserved_state_roots
 
 _SQL = """
@@ -68,13 +76,7 @@ class Store:
     and read-only, creates nothing and refuses a hot WAL (a writer command must settle it first). A writer holding the lock is `handoff_busy`."""
 
     def __init__(self, root: Path, *upstream_roots: Path, mode: str = "write"):
-        self.root = root = Path(os.path.abspath(root))
-        forbidden = [*reserved_state_roots(), *(Path(os.path.abspath(p)) for p in upstream_roots)]
-        if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
-            raise ExtractionFailure("state_namespace_conflict")
-        for parent in [*reversed(root.parents), root]:
-            if parent.exists() and parent.is_symlink():
-                raise ExtractionFailure("state_namespace_invalid")
+        self.root = root = self.guard(root, upstream_roots)
         if mode == "read":
             self._open_existing(root)
             return
@@ -130,6 +132,18 @@ class Store:
         except BaseException:
             self.close()
             raise
+
+    @staticmethod
+    def guard(root: Path, upstream_roots: tuple) -> Path:
+        """The absolute state root, proven disjoint from every reserved and upstream root and free of symlink components. Pure path checks: nothing is opened."""
+        root = Path(os.path.abspath(root))
+        forbidden = [*reserved_state_roots(), *(Path(os.path.abspath(p)) for p in upstream_roots)]
+        if any(root == p or root.is_relative_to(p) or p.is_relative_to(root) for p in forbidden):
+            raise ExtractionFailure("state_namespace_conflict")
+        for parent in [*reversed(root.parents), root]:
+            if parent.exists() and parent.is_symlink():
+                raise ExtractionFailure("state_namespace_invalid")
+        return root
 
     @staticmethod
     def _check_names(root: Path) -> None:
@@ -217,6 +231,132 @@ class Store:
                 raise ExtractionFailure("attempt_limit_exceeded")
             self.db.execute("INSERT INTO attempts VALUES(?,?,?,?,?,?)", (handoff_id, n, kind, outcome, code, now()))
             self.db.execute("UPDATE handoffs SET state=?,failure=?,updated_at=? WHERE handoff_id=?", (state, code if state == "failed" else None, now(), handoff_id))
+
+
+def contract_current(row) -> bool:
+    """Whether a ledger row was frozen under THIS build's bundle contract: read from its stored, immutable receipt alone, never from the artifact. A receipt
+    that cannot name a schema is damaged state, not history."""
+    try:
+        schema = json.loads(row["receipt"])["bundleSchema"]
+    except (ValueError, KeyError, TypeError):
+        raise ExtractionFailure("handoff_state_invalid") from None
+    if not isinstance(schema, str):
+        raise ExtractionFailure("handoff_state_invalid")
+    return schema == BUNDLE_SCHEMA
+
+
+MAX_LEDGER_COPY = 128 * 1024 * 1024         # the ledger holds receipts and manifests only (artifacts are files): a main file or WAL beyond this is not ours to copy
+
+
+def copy_bounded(source: Path, target: Path) -> None:
+    """A bounded private copy of one regular, non-symlink ledger file. The source is only read."""
+    try:
+        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        raise ExtractionFailure("handoff_state_invalid") from None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_LEDGER_COPY:
+            raise ExtractionFailure("handoff_state_invalid")
+        out = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            copied = 0
+            while chunk := os.read(fd, 1 << 20):
+                copied += len(chunk)
+                if copied > MAX_LEDGER_COPY:
+                    raise ExtractionFailure("handoff_state_invalid")
+                view, written = memoryview(chunk), 0
+                while written < len(view):
+                    written += os.write(out, view[written:])
+        finally:
+            os.close(out)
+    except OSError:
+        raise ExtractionFailure("handoff_state_invalid") from None
+    finally:
+        os.close(fd)
+
+
+class WalHistory:
+    """A read-only view of a ledger whose committed rows still sit in a HOT write-ahead log (a writer died before checkpointing).
+
+    An immutable open ignores the WAL and any other open of the real files may create `-shm`, replay or checkpoint it, so the view never opens the real files
+    with SQLite: under a held SHARED ledger lock (no writer can exist, `handoff_busy` otherwise) the main file and the WAL are copied, bounded, into a private
+    0700 scratch directory and SQLite opens THAT copy. The real ledger directory, its modes, its WAL and its `-shm` are never written; the scratch directory
+    is removed on `close`. It offers exactly the reads `Handoff` needs of a legacy row."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.lock = os.open(root / "handoff.lock", os.O_RDONLY | os.O_NOFOLLOW)
+        self.scratch: Path | None = None
+        try:
+            try:
+                fcntl.flock(self.lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise ExtractionFailure("handoff_busy") from exc
+            self.scratch = Path(tempfile.mkdtemp(prefix="zoop-handoff-history-"))
+            for name in ("handoff.sqlite3", "handoff.sqlite3-wal"):
+                copy_bounded(root / name, self.scratch / name)
+            self.db = sqlite3.connect(self.scratch / "handoff.sqlite3", isolation_level=None)
+            self.db.row_factory = sqlite3.Row
+            ledger = self.db.execute("SELECT value FROM meta WHERE key='ledger'").fetchone()
+            if ledger is None or ledger["value"] != LEDGER_VERSION:
+                raise ExtractionFailure("ledger_version_unknown")
+        except sqlite3.DatabaseError as exc:
+            self.close()
+            raise ExtractionFailure("handoff_state_invalid") from exc
+        except BaseException:
+            self.close()
+            raise
+
+    def handoff(self, handoff_id: str):
+        return self.db.execute("SELECT * FROM handoffs WHERE handoff_id=?", (handoff_id,)).fetchone()
+
+    def attempts(self, handoff_id: str) -> list:
+        return self.db.execute("SELECT n,kind,outcome,code FROM attempts WHERE handoff_id=? ORDER BY n", (handoff_id,)).fetchall()
+
+    def close(self) -> None:
+        if hasattr(self, "db"):
+            self.db.close()
+            del self.db
+        if self.scratch is not None:
+            shutil.rmtree(self.scratch, ignore_errors=True)
+            self.scratch = None
+        if hasattr(self, "lock"):
+            os.close(self.lock)
+            del self.lock
+
+
+def open_legacy_history(root: Path, *upstream_roots: Path, handoff_id: str) -> Store | WalHistory | None:
+    """Ledger-only, read-only preflight (the extraction precedent `open_legacy_history`, but TRI-STATE).
+
+    Returns the read-only view when the ledger already holds `handoff_id` under another bundle contract. Returns None ONLY when that is PROVEN not to be the
+    case: no state directory, no ledger file, or the row is absent or current. Everything inconclusive (busy writer, foreign or invalid namespace/ledger, damaged
+    receipt, unreadable or oversize state) is raised exactly as the ordinary open would, never turned into a fall-through to a writable open that could re-permission,
+    checkpoint or migrate a legacy ledger before the refusal.
+
+    It reads no operator file, source ledger, grant or artifact and writes nothing. A ledger with a non-empty WAL (rows committed by a writer that died) is read
+    through a private copy (`WalHistory`), because an immutable open cannot see those rows. Ownership is proven first (`_check_names`, `_preflight_existing`), so a
+    foreign database is never copied. Every `Handoff` method repeats the decision under its own lock."""
+    root = Store.guard(root, upstream_roots)
+    if not os.path.lexists(root):
+        return None
+    if not root.is_dir():
+        raise ExtractionFailure("state_namespace_conflict")
+    Store._check_names(root)
+    if not os.path.lexists(root / "handoff.sqlite3"):
+        return None
+    Store._preflight_existing(root)
+    wal = root / "handoff.sqlite3-wal"
+    view = WalHistory(root) if wal.exists() and wal.stat().st_size > 0 else Store(root, *upstream_roots, mode="read")
+    try:
+        row = view.handoff(handoff_id)
+        if row is not None and not contract_current(row):
+            return view
+    except BaseException:
+        view.close()
+        raise
+    view.close()
+    return None
 
 
 # ---------------------------------------------------------------------------------------------- artifact file -----------------------
@@ -537,6 +677,14 @@ ISSUE_FIELDS = (("title", "title"), ("action", "action"), ("target", "target"), 
                 ("assertion_status", "assertionStatus"))
 
 
+def outside_validity(when: str, validity: dict) -> bool:
+    """FS042: a relation is valid for `validFrom <= time <= validUntil` (start and END INCLUSIVE: `validUntil` is the last valid day), compared by the written
+    calendar date of the source (`when` has at least day precision; its text is not shifted by any time zone). A null bound is unknown, never infinite or a
+    default, and never excludes. S3 `validUntil` is the last valid day the source states and is exported verbatim: no +1 day, no midnight."""
+    day = when[:10]
+    return bool((validity["from"] and day < validity["from"][:10]) or (validity["until"] and day > validity["until"][:10]))
+
+
 class Planner:
     """The pure (given loaded sources and operator files) projection. Every S3/S2 item the operator intended to publish is either emitted or excluded
     with a visible code; nothing is guessed, merged by last-wins or inferred from company/ticker/exchange/language."""
@@ -657,14 +805,79 @@ class Planner:
         except ValueError:
             raise Skip("event_time_unsupported") from None
         geography = self.geography(decision, members)
-        event_evidence = sorted({self.cite(m.loaded, c) for m in members for c in m.evidence})
-        if not event_evidence:
-            raise Skip("issue_evidence_missing")
+        mentions, carrying = self.mentions(members)
+        event_evidence = sorted({i for mention in mentions for i in mention["evidenceIds"]})
         issue = {"id": decision.public_id, "canonicalId": decision.canonical_id, **fields, "timePrecision": precision, "geography": geography,
                  "evidenceIds": sorted(set(event_evidence) | set(geography["evidenceIds"])),
                  "sourceEvents": sorted({canonical(m.source_event()): m.source_event() for m in members}.values(), key=canonical),
-                 "decisionRef": decision.decision_ref, "representative": decision.representative.wire() if decision.representative else None}
-        return issue, {"decision": decision, "members": members, "eventEvidence": event_evidence}
+                 "decisionRef": decision.decision_ref, "representative": decision.representative.wire() if decision.representative else None, "mentions": mentions}
+        return issue, {"decision": decision, "members": members, "eventEvidence": event_evidence, "mentionUpstreams": carrying}
+
+    def mention_values(self, m: Member) -> dict:
+        """What ONE source member says about its mention: the carried S2 fields exactly as the source holds them and the app ids of its own exact citations.
+        Two members of one mention identity must agree on every one of these values."""
+        s2 = m.mention
+        return {"title": s2["title"], "action": s2["action"], "target": s2["target"], "eventTime": s2["event_time"], "period": s2["period"],
+                "assertionStatus": s2["assertion_status"], "background": s2["background"],
+                "participants": [{"sourceCompanyId": p["company_id"], "name": p["name"], "role": p["role"]} for p in s2["participants"]],
+                "evidenceIds": sorted({self.cite(m.loaded, c) for c in m.evidence})}
+
+    def mentions(self, members: list[Member]) -> tuple[list[dict], dict]:
+        """One record per mention IDENTITY of the issue: (document, document version, local mention id). A local id is unique only within one document
+        version, and one identity may be carried by several source members (an event candidate and a snapshot member, or two upstreams). Carriers that do not
+        say exactly the same thing exclude the issue; nothing is merged or overwritten, and no time is widened. Every value is a source candidate/snapshot
+        value (`verification: none`): no field decision, support level or approval exists here. The participants' `companyId` is resolved later, once the
+        bundle's companies are final (`resolve_participants`); the second result maps each identity to the upstreams that carry it."""
+        found: dict = {}
+        for m in members:
+            found.setdefault((m.doc[0], m.doc[1], m.mention_id), []).append((m, self.mention_values(m)))
+        for carriers in found.values():
+            if any(canonical(values) != canonical(carriers[0][1]) for _, values in carriers):
+                raise Skip("mention_values_conflict")
+        mentions, upstreams = [], {}
+        for identity in sorted(found):
+            carriers = found[identity]
+            values = carriers[0][1]
+            try:
+                precision = mention_time_precision(values["eventTime"])
+            except ValueError:
+                raise Skip("mention_event_time_unsupported") from None
+            if not values["evidenceIds"]:
+                raise Skip("issue_evidence_missing")
+            binding = self.resolver.bindings.get(identity[:2])
+            if binding is None:
+                raise Skip("app_binding_missing")
+            mentions.append({"documentId": identity[0], "documentVersion": identity[1], "mentionId": identity[2],
+                             "articleId": binding.article_id, "articleVersion": binding.article_version, "verification": MENTION_VERIFICATION,
+                             "title": values["title"], "action": values["action"], "target": values["target"], "eventTime": values["eventTime"],
+                             "timePrecision": precision, "period": values["period"], "assertionStatus": values["assertionStatus"],
+                             "background": values["background"], "participants": [{**p, "companyId": None} for p in values["participants"]],
+                             "evidenceIds": values["evidenceIds"]})
+            upstreams[identity] = sorted({m.loaded.upstream_key for m, _ in carriers})
+        return sorted(mentions, key=lambda x: mention_key(x["documentId"], x["documentVersion"], x["mentionId"])), upstreams
+
+    def public_company(self, upstreams: list, source_company_id: str | None, bundle_companies: set) -> str | None:
+        """The public company of an S2 participant company id, set ONLY when EVERY upstream carrying the mention maps that id (its namespace is its upstream's
+        own) to one and the same public company and this bundle publishes it. No source id, an unmapped or disagreeing id, or a company outside this version is
+        null; the participant itself is always kept as the source gave it."""
+        if source_company_id is None:
+            return None
+        public = set()
+        for job_id, input_digest in upstreams:
+            entry = self.op.registry.entries.get(entry_key(job_id, input_digest, "company", source_company_id))
+            company = self.companies.get(entry.canonical_id) if entry is not None else None
+            if company is None:
+                return None
+            public.add(company.public_id)
+        return next(iter(public)) if len(public) == 1 and public <= bundle_companies else None
+
+    def resolve_participants(self, bundle_companies: set) -> None:
+        for issue_id, issue in self.issues.items():
+            carrying = self.info[issue_id]["mentionUpstreams"]
+            for mention in issue["mentions"]:
+                upstreams = carrying[(mention["documentId"], mention["documentVersion"], mention["mentionId"])]
+                for participant in mention["participants"]:
+                    participant["companyId"] = self.public_company(upstreams, participant["sourceCompanyId"], bundle_companies)
 
     def build_issues(self) -> None:
         groups = self.groups()
@@ -767,7 +980,7 @@ class Planner:
             if validity["from"] or validity["until"]:
                 if not when or len(when) < 10:
                     raise Skip("basis_validity_unprovable")
-                if (validity["from"] and when[:10] < validity["from"][:10]) or (validity["until"] and when[:10] > validity["until"][:10]):
+                if outside_validity(when, validity):
                     raise Skip("basis_validity_outside_event_time")
             if r["countries"] and not countries <= set(r["countries"]):
                 raise Skip("basis_countries_mismatch")
@@ -894,6 +1107,7 @@ class Planner:
         articles = sorted({(e["articleId"], e["articleVersion"]): self.resolver.article(e) for e in evidence}.values(), key=lambda a: (a["articleId"], a["articleVersion"]))
         companies = sorted(({"id": c.public_id, "canonicalId": c.canonical_id, "label": c.label, "decisionRef": c.decision_ref} for c in self.companies.values()
                             if any(r["target"] == c.public_id for r in relations if r["type"] != "FOLLOWS")), key=lambda c: c["id"])
+        self.resolve_participants({c["id"] for c in companies})
         issues = [self.issues[i] for i in sorted(self.issues)]
         tally: dict[str, int] = {}
         for item in self.exclusions:
@@ -968,10 +1182,17 @@ class Handoff:
                 "attempts": [{"n": a["n"], "kind": a["kind"], "outcome": a["outcome"], "code": a["code"]} for a in self.store.attempts(row["handoff_id"])],
                 "usage": USAGE}
 
+    def history(self, row) -> dict:
+        """A row frozen under another bundle contract, as it is stored: state, receipt and attempts verbatim, nothing deliverable and no next step."""
+        return {**self.result(row), "next": None, "delivery": {"status": "withheld", "code": "handoff_contract_changed"}}
+
     def freeze(self, manifest: Manifest) -> dict:
         """Pin, build, validate, reserve, write the artifact, settle. A handoff that already exists is never changed: the same request is echoed ONLY while
         every pinned source and file is still current, a different request is `handoff_input_conflict` with nothing written."""
         paths, input_digest = self.paths, digest(manifest.wire())
+        stored = self.store.handoff(manifest.handoff_id)
+        if stored is not None and not contract_current(stored):
+            raise ExtractionFailure("handoff_contract_changed")            # history: nothing is read or written, the operator freezes a new handoff ID
         op = load_operator(paths)
         with Source(paths.source()) as source:
             row = self.store.handoff(manifest.handoff_id)
@@ -1007,6 +1228,8 @@ class Handoff:
 
     def inspect(self, request: Selector) -> dict:
         row = self._existing(request.handoff_id)
+        if not contract_current(row):
+            return self.history(row)
         if row["state"] == "ready":
             read_manifest(row, read_bundle(self.store.root, row))
         return self.result(row)
@@ -1015,6 +1238,8 @@ class Handoff:
         """Settle a `reserved` handoff from the stored artifact ONLY: no source is read, nothing is regenerated and no new ID or bundle is minted. A missing
         or altered artifact makes this handoff `failed` (terminal); the operator freezes a NEW handoff ID."""
         row = self._existing(request.handoff_id)
+        if not contract_current(row):
+            raise ExtractionFailure("handoff_contract_changed")            # never settled, resumed or marked failed: an old build's artifact is not this build's to judge
         if row["state"] != "reserved":
             raise ExtractionFailure("recovery_not_required", {"state": row["state"]})
         try:
@@ -1032,6 +1257,9 @@ class Handoff:
         content digest equal. Any drift is a `withheld` result with no content; a busy writer is an error, never an empty bundle."""
         paths = self.paths
         row = self._existing(request.handoff_id)
+        if not contract_current(row):
+            out = withheld_result(row, "handoff_contract_changed")        # the artifact is never read
+            return (out, canonical(out)) if serialized else out
         if row["state"] != "ready":
             raise ExtractionFailure("handoff_not_ready", {"state": row["state"]})
         bundle = read_bundle(self.store.root, row)

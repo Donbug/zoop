@@ -80,6 +80,9 @@ def test_the_http_bundle_is_the_real_cli_export_of_a_two_job_world_and_the_produ
     assert sorted([r["type"], r["source"], r["target"], r["evidenceIds"]] for r in bundle["relations"]) == handoff_world.relation_edges
     assert bundle["exclusions"]["counts"] == handoff_world.exclusions and sorted(a["articleId"] for a in bundle["articles"]) == handoff_world.article_ids
     assert {r["type"] for r in bundle["relations"]} == {"INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS"}   # every provenance variant of the closed model, from the real producer
+    for issue in bundle["issues"]:     # the contract's partition rule, stated here independently of the producer's validator: every source event is one original mention and no other exists
+        identity = lambda item: canonical({k: item[k] for k in ("documentId", "documentVersion", "mentionId")})  # noqa: E731
+        assert [identity(m) for m in issue["mentions"]] == sorted({identity(e) for e in issue["sourceEvents"]}) and all(m["verification"] == "none" for m in issue["mentions"])
     assert (bundle["readiness"], wire["verification"]["provenance"]) == ({"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none",
                                                                           "graphDb": "none"}, bundle["provenance"])
     assert producer_accepts(response.content)

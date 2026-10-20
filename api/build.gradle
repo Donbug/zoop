@@ -37,6 +37,7 @@ tasks.named('test') {
 		excludeTags 'ai-contract'
 		excludeTags 'ai-pipeline-contract'
 		excludeTags 'company-postgres'
+		excludeTags 'briefing-postgres'
 		excludeTags 'graph-postgres'
 	}
 }
@@ -75,6 +76,22 @@ tasks.register('authIntegrationTest', Test) {
 		events 'passed', 'failed'
 		exceptionFormat 'full'
 	}
+}
+
+// Explicit real-HTTP briefing gate: disposable PostgreSQL and a random-port Spring server, no external calls.
+tasks.register('briefingIntegrationTest', Test) {
+	group = 'verification'
+	description = 'Verifies briefing migrations and DB-backed public HTTP reads against disposable PostgreSQL.'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform { includeTags 'briefing-postgres' }
+	outputs.upToDateWhen { false }
+	doFirst {
+		if (!System.getenv('DB_URL')?.startsWith('jdbc:postgresql:')) {
+			throw new GradleException('Set DB_URL to a disposable PostgreSQL database for briefingIntegrationTest')
+		}
+	}
+	testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
 }
 
 // Real cross-language gate: this JVM talks to a running ai/service and the installed zoop-ai CLI (replay only).
