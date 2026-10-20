@@ -1050,7 +1050,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listEvents · 기업·기간별 사건 타임라인 조회
 
-기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다.
+기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각이며 오프셋이 있는 to는 그 시각을 포함한다(getCompanyPrices와 같음). 승인된 사건 시각이 있는 사건은 그 기간(연·월·일은 KST 그 기간 전체, 시각은 그 시각)이 범위와 겹치면 items에 든다.
 
 | 항목 | 계약 |
 | --- | --- |
