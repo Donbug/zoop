@@ -24,9 +24,8 @@ class TossPricesLiveTest {
     @Test
     void aggregatedPeriodsLandOnTheirBucketBoundaries() {
         for (String[] stock : List.of(new String[] {"KRX:005930", "KRX", "005930"}, new String[] {"NASDAQ:NVDA", "NASDAQ", "NVDA"})) {
-            // Three days back always reaches a trading day, even on a weekend.
-            Instant now = Instant.now();
-            check(stock, "1d", "5m", now.minus(Duration.ofDays(3)), now, t -> t.getMinute() % 5 == 0);
+            // 1d is the last regular session, even on a weekend; its 5-minute buckets never leave it.
+            check(stock, "1d", "5m", null, null, t -> t.getMinute() % 5 == 0);
             check(stock, "1w", "1h", null, null, t -> t.getMinute() == 0);
             check(stock, "1y", "1wk", null, null, t -> t.getDayOfWeek() == DayOfWeek.MONDAY && t.getHour() == 0);
         }
@@ -54,6 +53,8 @@ class TossPricesLiveTest {
             assertTrue(onBoundary.test(t) && t.getSecond() == 0, stock[0] + " " + period + " off boundary: " + p.time());
             assertTrue(previous == null || t.isAfter(previous), "points oldest first");
             assertTrue(p.high() >= Math.max(p.open(), p.close()) && p.low() <= Math.min(p.open(), p.close()), p.toString());
+            assertTrue(!"1d".equals(period) || (!t.isBefore(OffsetDateTime.parse(r.range().from()))
+                    && t.isBefore(OffsetDateTime.parse(r.range().to()))), "1d point outside its session: " + p.time());
             previous = t;
         }
         System.out.printf("%s %s: %d points, %s .. %s%n", stock[0], period, r.points().size(),

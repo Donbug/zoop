@@ -252,6 +252,9 @@ class CompanyMarketClientsTest {
         // Toss stamps a minute bar with its end: 12:01 and 12:02 start in the 12:00 bucket, 12:06 in 12:05.
         assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
                 new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
+        // Today (10-16) has no bars yet in the stub, so the session is the last one that traded: all of 10-15.
+        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00+09:00", "2026-10-15T15:30+09:00", "2026-10-15"),
+                result.range());
 
         // Each day is read from its own end; the finished KST 10-15 is then kept and only today (10-16) is read again.
         client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
@@ -267,6 +270,29 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-03-06T21:00:00Z").plusNanos(1));
         assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00-05:00", 110, 115, 109, 114, 5.0)),
                 result.points());
+    }
+
+    @Test
+    void dayIsTheExchangeSessionCutAtToAndSkipsDaysWithoutTrading() {
+        var client = tossClient("test-client", "test-secret");
+        // During the session: from the open up to to; the bucket holding to stays whole.
+        var open = client.prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1));
+        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00+09:00", "2026-10-15T12:00+09:00", "2026-10-15"),
+                open.range());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0)), open.points());
+
+        // Sunday before the open: Saturday and Sunday are skipped, Friday 10-16 has no bars (a holiday here), so 10-15.
+        var weekend = client.prices("KRX:005930", "KRX", "005930", "1d", null, java.time.Instant.parse("2026-10-18T00:00:00Z"));
+        assertEquals("2026-10-15", weekend.range().sessionDate());
+        assertEquals(2, weekend.points().size());
+        assertFalse(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-17T15") || q.contains("before=2026-10-18T15")));
+    }
+
+    @Test
+    void otherPeriodsReportTheirRangeWithoutASessionDate() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1w", null, null);
+        assertEquals(new CompanyPriceResponse.Range("2026-10-09T12:00+09:00", "2026-10-16T12:00+09:00", null), result.range());
     }
 
     @Test

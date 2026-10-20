@@ -64,7 +64,8 @@ public class CompanyMarketController {
             description = "period(1d·1w·1m·1y, 기본 1m)별로 봉 해상도가 고정됩니다(1d=5분, 1w=1시간, 1m=일봉, 1y=주봉). "
                     + "토스증권은 1분·일봉만 제공해 1d·1w는 1분봉, 1y는 일봉을 거래소 현지 시각 구간으로 집계합니다(점의 time은 구간 시작). "
                     + "from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각(to는 그 시각 포함)이며, 각 점은 [from, to]와 겹치는 구간(5분·1시간·거래소 하루·월요일 시작 주) 하나입니다. "
-                    + "to 생략 시 지금까지, from 생략 시 to에서 기간(하루·7일·한 달·1년)만큼 전부터입니다. "
+                    + "1d는 상장 거래소 정규 거래 시간(KRX 09:00–15:30, 미국 09:30–16:00 ET) 중 to가 속한 세션이고, 장 시작 전·휴장일이면 직전 거래일 세션입니다. 1d는 from을 받지 않습니다(422). "
+                    + "to 생략 시 지금까지, from 생략 시 to에서 기간(7일·한 달·1년)만큼 전부터입니다. 응답 range에 실제 구간을 담습니다. "
                     + "범위는 기간 하나까지이며, from이 to에서 기간만큼 전보다 앞서면 422입니다. "
                     + "키 미설정은 not_connected, 비상장은 unsupported_symbol, 기간 내 거래 없음은 no_data(모두 200)이고 "
                     + "공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE입니다. asOf·graphVersion은 받지 않습니다(422).")
@@ -78,6 +79,8 @@ public class CompanyMarketController {
         if (asOf != null || graphVersion != null) throw new CustomException(ErrorCode.INVALID_REQUEST);
         String resolved = period == null ? "1m" : period;
         if (!TossMarketClient.PERIOD_INTERVAL.containsKey(resolved)) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        // 1d is the exchange session the server picks for to, so a client from has nothing to mean.
+        if ("1d".equals(resolved) && from != null) throw new CustomException(ErrorCode.INVALID_REQUEST);
         Instant start = from == null ? null : bound(from, false), end = to == null ? null : bound(to, true);
         if (start != null && end != null && !start.isBefore(end)) throw new CustomException(ErrorCode.INVALID_REQUEST);
         // One period at most: a longer range would let one public request read days of minute bars from the provider.

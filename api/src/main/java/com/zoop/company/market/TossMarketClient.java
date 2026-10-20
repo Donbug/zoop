@@ -129,7 +129,8 @@ public class TossMarketClient {
      * 1y daily bars aggregated into the contract's fixed resolution (x-zoop.chartResolution); 1m is the daily bars as
      * they are. A point is a whole bucket (5 minutes, an hour, an exchange day or a Monday week) that overlaps
      * [from, to): the chart sends a point's own start back as to, and that point must come back with the same values.
-     * A missing to is now and a missing from one period before it.
+     * A missing to is now and a missing from one period before it. 1d takes no from: it is the listing exchange's
+     * regular session that is open at to, or the last one before it (FS040).
      */
     public CompanyPriceResponse prices(String companyId, String exchange, String code, String period,
             Instant from, Instant to) {
@@ -144,14 +145,28 @@ public class TossMarketClient {
         ZoneId zone = marketZone(exchange);
         Instant end = to != null ? to : clock.instant();
         Instant start = from != null ? from : periodStart(period, end);
+        String sessionDate = null;
         try {
-            List<CompanyPriceResponse.Point> points;
-            if ("5m".equals(interval) || "1h".equals(interval)) {
-                long size = "5m".equals(interval) ? 300 : 3600;
-                // Every minute of the first and last bucket, so the edge buckets are whole.
-                Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(), size) * size);
-                Instant last = Instant.ofEpochSecond(Math.floorDiv(end.minusNanos(1).getEpochSecond(), size) * size + size);
-                points = PriceBars.byInterval(minuteBars(code, zone, first, last), size, zone);
+            List<CompanyPriceResponse.Point> points = List.of();
+            if ("1d".equals(period)) {
+                boolean krx = "KRX".equals(exchange);
+                java.time.LocalTime open = krx ? java.time.LocalTime.of(9, 0) : java.time.LocalTime.of(9, 30);
+                java.time.LocalTime close = krx ? java.time.LocalTime.of(15, 30) : java.time.LocalTime.of(16, 0);
+                var local = end.minusNanos(1).atZone(zone);
+                LocalDate day = local.toLocalTime().isBefore(open) ? local.toLocalDate().minusDays(1) : local.toLocalDate();
+                Instant until = end;
+                // An exchange holiday has no minute bars, so walk back to the last day that traded.
+                // shortcut: no exchange holiday calendar, 10 days covers the longest KRX/US closures.
+                for (int back = 0; back < 10 && points.isEmpty(); back++, day = day.minusDays(1)) {
+                    if (day.getDayOfWeek().getValue() >= 6) continue;
+                    start = day.atTime(open).atZone(zone).toInstant();
+                    Instant sessionClose = day.atTime(close).atZone(zone).toInstant();
+                    end = until.isBefore(sessionClose) ? until : sessionClose;
+                    sessionDate = day.toString();
+                    points = minuteBuckets(code, zone, start, end, 300);
+                }
+            } else if ("1h".equals(interval)) {
+                points = minuteBuckets(code, zone, start, end, 3600);
             } else {
                 boolean weekly = "1wk".equals(interval);
                 // A daily bar starts at its exchange-local midnight; a week bucket at that week's Monday.
@@ -173,8 +188,11 @@ public class TossMarketClient {
             // Bars came back, so a missing stock row or currency is a provider format failure, not an absence of data.
             String currency = stock == null ? null : strictText(stock.get("currency"));
             if (currency == null) throw formatFailure();
+            // An exact to arrives as to + 1ns (inclusive); millis drop that nanosecond again.
+            var range = new CompanyPriceResponse.Range(start.atZone(zone).toOffsetDateTime().toString(),
+                    end.truncatedTo(java.time.temporal.ChronoUnit.MILLIS).atZone(zone).toOffsetDateTime().toString(), sessionDate);
             return CompanyPriceResponse.available(companyId, period,
-                    new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, points);
+                    new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, range, points);
         } catch (MarketDataException exception) {
             throw exception;
         } catch (TossUnsupportedSymbolException exception) {
@@ -184,6 +202,13 @@ public class TossMarketClient {
         } catch (Exception exception) {
             throw new MarketDataException(false);
         }
+    }
+
+    /** Minute bars over [start, end) in size-second buckets; every minute of the first and last bucket, so edge buckets are whole. */
+    private List<CompanyPriceResponse.Point> minuteBuckets(String code, ZoneId zone, Instant start, Instant end, long size) {
+        Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(), size) * size);
+        Instant last = Instant.ofEpochSecond(Math.floorDiv(end.minusNanos(1).getEpochSecond(), size) * size + size);
+        return PriceBars.byInterval(minuteBars(code, zone, first, last), size, zone);
     }
 
     /** Default range: one day, 7 days, one calendar month or one calendar year (KST) before the end. */
