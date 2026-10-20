@@ -19,7 +19,7 @@ from .ingestion_contracts import Wire, canonical, digest, timestamp
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-1"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2"
 DECISIONS_SCHEMA = "zoop-public-decisions-1"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
@@ -29,6 +29,11 @@ OFFSET_UNIT = "unicode_code_point"
 STRUCTURAL_BASIS_TYPES = ("SUPPLIES",)       # the only S3 type inside the PoC structural basis set (PRODUCES/SUPPLIES/USES/...); others are rejected
 PUBLIC_TYPES = ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")
 TIME_PRECISIONS = ("year", "month", "day", "datetime", "unknown")
+ASSERTION_STATUSES = ("occurred", "announced", "planned", "forecast", "cancelled", "unknown")     # S2 `Mention.assertion_status`, copied as is
+MENTION_VERIFICATION = "none"             # S2 candidate or operator-frozen snapshot values: no field of a mention is verified, decided or approved here
+MENTION_KEYS = ("documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification", "title", "action", "target", "eventTime",
+                "timePrecision", "period", "assertionStatus", "background", "participants", "evidenceIds")
+PARTICIPANT_KEYS = ("sourceCompanyId", "companyId", "name", "role")
 
 MAX_COMMAND = 65_536
 MAX_OPERATOR_FILE = 4_000_000
@@ -39,6 +44,8 @@ MAX_RELATIONS = 10_000
 MAX_EVIDENCE = 20_000
 MAX_ARTICLES = 1_000
 MAX_EXCLUSIONS = 20_000
+MAX_MENTIONS = 1_000                        # per issue; also the bound of an issue's source events
+MAX_PARTICIPANTS = 1_000                    # per mention
 MAX_BUNDLE = 6 * 1024 * 1024               # the whole export envelope must stay below the 8 MiB subprocess output bound the backend clients use
 MAX_ATTEMPTS = 5
 
@@ -271,6 +278,54 @@ def time_precision(value: str | None) -> str:
     raise ValueError("unsupported time form")
 
 
+# The ORIGINAL-mention `eventTime` grammar: what BOTH the producer's classifier (`time_precision`) and the app (`HandoffTime`) already accept, written out by hand
+# so that no library extension decides (the shared vectors `api/src/test/resources/graph-handoff/mention-time-vectors.json` prove both sides). The raw string is
+# always kept verbatim; only the classification is decided here. It is NOT a new tightening of the public contract, except where the two sides already
+# disagreed and the app refuses the whole bundle:
+#   * ISO week (`2026-W40-3`), ordinal and compact forms, a comma fraction, an offset without a colon or with seconds, a 24-hour offset: Python's `fromisoformat`
+#     takes some of them, the app (java.time ISO) never does -> unsupported, so the issue is excluded instead of the bundle being refused whole;
+#   * year `0000` as a month/day/datetime: Python's `date` has no year 0 (the old classifier refused it too); a bare year `0000` is kept;
+#   * offset hours above 18: the app's `ZoneOffset` range;
+#   * lowercase `t`/`z`: the old classifier already required an uppercase `T` and `fromisoformat` only knows an uppercase `Z`.
+# Seconds are optional and a fraction is 1-9 digits (both sides accept them); `-00:00` is not refused (the public contract never refused it).
+_MENTION_TIME = re.compile(r"([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2})(?:T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.[0-9]{1,9})?)?(Z|[+-][0-9]{2}:[0-9]{2}))?)?)?")
+
+
+def mention_time_precision(value: str | None) -> str:
+    """Precision of an original mention's event time by FORMAT only (`unknown` for a missing time, never midnight). Anything outside the grammar is a
+    ValueError: the issue is excluded (`mention_event_time_unsupported`), the string is never rewritten, widened or guessed."""
+    if value is None:
+        return "unknown"
+    if not isinstance(value, str):
+        raise ValueError("unsupported time form")
+    found = _MENTION_TIME.fullmatch(value)
+    if found is None:
+        raise ValueError("unsupported time form")
+    year, month, day, hour, minute, second, offset = found.groups()
+    if month is None:
+        return "year"
+    if year == "0000" or not 1 <= int(month) <= 12:
+        raise ValueError("unsupported time form")
+    if day is None:
+        return "month"
+    date(int(year), int(month), int(day))             # ValueError for a day that does not exist in that month
+    if hour is None:
+        return "day"
+    if int(hour) > 23 or int(minute) > 59 or (second is not None and int(second) > 59):
+        raise ValueError("unsupported time form")
+    if offset != "Z":
+        hours, minutes = int(offset[1:3]), int(offset[4:6])
+        if minutes > 59 or hours * 60 + minutes > 18 * 60:
+            raise ValueError("unsupported time form")
+    return "datetime"
+
+
+def mention_key(document_id: str, document_version: str, mention_id: str) -> str:
+    """The total order of an issue's mentions: the canonical JSON of the mention identity. An S2 local mention id is unique only within one document
+    version, so the document is part of the identity."""
+    return canonical({"documentId": document_id, "documentVersion": document_version, "mentionId": mention_id})
+
+
 def countries_class(countries: list[str]) -> str:
     """`invalid` | `unknown` (empty) | `domestic` (exactly KR) | `international` (any non-KR country, KR+other included). Pure; never a heuristic."""
     if not countries:
@@ -485,10 +540,48 @@ def validate_bundle(bundle: dict) -> None:
         _need(c["id"] not in companies, "companies.unique")
         companies[c["id"]] = c
 
+    by_document: dict = {}
+    for article in articles.values():
+        by_document.setdefault((article["documentId"], article["documentVersion"]), []).append((article["articleId"], article["articleVersion"]))
+
+    def mention(m, at: str) -> list:
+        """One original S2 mention. Every value is a candidate/snapshot value (`verification` is always `none`); the only closure checked here is identity,
+        the article of the mention's own document, its time precision and the evidence on that article."""
+        _keys(m, MENTION_KEYS, at)
+        _text(m["documentId"], f"{at}.documentId", ID)
+        _text(m["documentVersion"], f"{at}.documentVersion", HASH)
+        _text(m["mentionId"], f"{at}.mentionId")
+        _need(bool(m["mentionId"]), f"{at}.mentionId")
+        _text(m["articleId"], f"{at}.articleId", ARTICLE_ID)
+        _text(m["articleVersion"], f"{at}.articleVersion", HASH)
+        _need(m["verification"] == MENTION_VERIFICATION, f"{at}.verification")
+        _text(m["title"], f"{at}.title")
+        _text(m["action"], f"{at}.action")
+        for name in ("target", "eventTime", "period"):
+            _text(m[name], f"{at}.{name}", nullable=True)
+        try:
+            precision = mention_time_precision(m["eventTime"])
+        except ValueError:
+            precision = None
+        _need(precision is not None and m["timePrecision"] == precision, f"{at}.timePrecision")
+        _need(m["assertionStatus"] in ASSERTION_STATUSES, f"{at}.assertionStatus")
+        _need(type(m["background"]) is bool, f"{at}.background")
+        for p in _list(m["participants"], f"{at}.participants", MAX_PARTICIPANTS):
+            _keys(p, PARTICIPANT_KEYS, f"{at}.participant")
+            _text(p["sourceCompanyId"], f"{at}.participant.sourceCompanyId", nullable=True)
+            _text(p["companyId"], f"{at}.participant.companyId", nullable=True)
+            _text(p["name"], f"{at}.participant.name")
+            _text(p["role"], f"{at}.participant.role")
+            _need(p["companyId"] is None or (p["companyId"] in companies and p["sourceCompanyId"] is not None), f"{at}.participant.companyId")
+        ids = evidence_ids(m["evidenceIds"], f"{at}.evidenceIds")
+        _need(by_document.get((m["documentId"], m["documentVersion"])) == [(m["articleId"], m["articleVersion"])], f"{at}.articleClosure")
+        _need(all((evidence[x]["articleId"], evidence[x]["articleVersion"]) == (m["articleId"], m["articleVersion"]) for x in ids), f"{at}.evidenceClosure")
+        return ids
+
     issues = {}
     for i in _list(bundle["issues"], "issues", MAX_ISSUES):
         _keys(i, ("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
-                  "sourceEvents", "decisionRef", "representative"), "issue")
+                  "sourceEvents", "decisionRef", "representative", "mentions"), "issue")
         _text(i["id"], "issue.id", ID)
         _text(i["canonicalId"], "issue", ID)
         _text(i["decisionRef"], "issue", ID)
@@ -529,6 +622,15 @@ def validate_bundle(bundle: dict) -> None:
                         "issue.representative")
             _source_event(rep, "issue.representative", upstreams)
             _need(rep in source_events, "issue.representativeClosure")
+        mentions = _list(i["mentions"], "issue.mentions", MAX_MENTIONS)
+        mentioned = set(geo["evidenceIds"])
+        for m in mentions:
+            mentioned.update(mention(m, "issue.mention"))
+        keys = [mention_key(m["documentId"], m["documentVersion"], m["mentionId"]) for m in mentions]
+        _need(keys == sorted(set(keys)), "issue.mentions.order")
+        _need({(m["documentId"], m["documentVersion"], m["mentionId"]) for m in mentions} ==
+              {(s["documentId"], s["documentVersion"], s["mentionId"]) for s in source_events}, "issue.mentions.sourceClosure")
+        _need(set(i["evidenceIds"]) == mentioned, "issue.evidenceClosure")
         _need(i["id"] not in issues and i["id"] not in companies, "issues.unique")
         issues[i["id"]] = i
 
