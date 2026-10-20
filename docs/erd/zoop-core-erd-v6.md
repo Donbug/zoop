@@ -6,7 +6,7 @@
 
 ## 1. 결정 요약
 
-**PostgreSQL 35개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다.
+**PostgreSQL 36개 테이블.** 함께 저장하고 읽는 결과는 JSON으로 통합하고 독립 조회·집계·무결성에 필요한 관계는 테이블로 유지한다. v0.7 챗봇 오케스트레이션의 실제 MCP 호출은 독립 관측·예산 집계를 위해 `chat_tool_calls`로 분리한다.
 
 기존 설계는 회원과 1:1인 비밀번호·설정, 분석 결과 내부의 주장·인용, 발행본 내부 항목·판정, 응답과 함께 읽는 채팅 인용까지 분리했다. API가 독립 수정·검색을 요구하지 않는 구성 요소에도 별도 테이블을 배정한 것이 개수 증가의 큰 원인이다. 재시도·정정·감사 등 명세가 실제로 요구하는 기능도 개수에 영향을 준다.
 
@@ -24,12 +24,12 @@
 | 기업·관심·모의 계좌 | 5 | 별칭은 배열, 보유내역은 기업 FK가 있는 별도 테이블 |
 | 문서·근거·분석 | 5 | 분석 내부 주장·인용·긍부정을 한 결과에 저장 |
 | 브리핑 | 3 | 회차에 발행 원문 보관, 정정·중단은 한 이력 테이블 |
-| 채팅 | 2 | 작업에 결과·인용·시도 기록 포함 |
+| 채팅 | 3 | 작업에 결과·인용·라우팅 요약을 포함하고 실제 도구 호출은 독립 기록 |
 | 그래프·검수·공개 규칙 | 6 | 실제 조회 이력 유지, 버전 상태·활성 포인터 통합 |
 | 평가·작업·통계·감사 | 6 | 독립 집계·조회가 필요한 기록 유지 |
-| **합계** | **35** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
+| **합계** | **36** | Neo4j 노드·관계 및 파일 저장소는 이 개수에 포함하지 않음 |
 
-35개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
+36개는 이 설계안의 선택이지 API가 강제하는 최소 개수가 아니다. 개발 일정과 인력 배분은 이 ERD의 범위에서 제외한다.
 
 ## 2. 저장소와 공통 규칙
 
@@ -355,6 +355,7 @@ id text PK; session_id text FK chat_sessions; seq integer
 question text; request_hash text; asked_at timestamptz; frozen_context jsonb; context_company_ids text[]
 graph_version_id text? FK graph_versions; status text; outcome text?
 message_id text? UNIQUE; result jsonb?; result_schema_version text?; failure jsonb?
+route_schema_version text?; route_summary jsonb?
 runs integer; attempts jsonb; owner_token text?; lease_until timestamptz?
 recovery_artifact_id text? FK artifacts; recovery_key text? UNIQUE; cancel_requested boolean
 created_at timestamptz; updated_at timestamptz; finished_at timestamptz?
@@ -363,6 +364,8 @@ UNIQUE(session_id) WHERE status IN ('queued', 'running')
 ```
 
 `chat_results`, `chat_citations`, `chat_attempts`를 합친다. result는 `ChatResult` 전체로 citations/sources/applied/choices/action/metadata를 포함한다. SQL message_id는 result.messageId와 일치해야 한다. frozen_context는 최초 `ChatFrozenContext`로 불변이다. 같은 jobId로 다른 질문/요청이 오면 409. 세션 잠금으로 seq를 부여한다.
+
+`route_summary`는 사용자에게 노출하지 않는 버전 고정 내부 계약이다. 명시적 `requirementId`, Q01~Q08 multi-label 결과, 논리 기능, 커버리지 판정, 선택·제외 이유, 계획 revision, 예약·사용 예산, `answerBasis`, 최종 계획·출력 검증 상태를 저장한다. 자유 형식 추론 원문은 저장하지 않는다. `route_schema_version` 없이 값을 저장하지 않으며 완료 뒤에는 불변이다. 실패 작업은 마지막으로 확정된 단계까지만 저장하고 완료한 것처럼 채우지 않는다.
 
 attempts는 내부 스키마의 `{n, mode, ownerToken, recoveryKey, recoveryArtifactId, sourceAttemptNo, startedAt, finishedAt, status, failure}` 배열이다. n은 작업 안에서 유일하고 잠금 아래 증가시킨다. 새 생성 시도의 recoveryKey는 `chat/{jobId}/attempt/{n}/verified-result`처럼 작업+시도 번호로 결정하며 URI 경로 값은 안전하게 인코딩한다. 각 생성 시도의 키는 전역 유일하고 파일 덮어쓰기를 금지한다. DB 저장 전에 시도와 키를 먼저 커밋해 장애 뒤에도 찾을 수 있게 한다. job의 recovery_key/artifact는 현재 복구 대상 포인터이며 최초 실행 전 NULL이다.
 
@@ -569,6 +572,24 @@ outcome text; purpose text?; reason text?; request_id text; detail jsonb; occurr
 
 성공·거절·실패와 당시 행위자 정보를 기록한다. 중요한 상태 변경과 성공 감사는 같은 트랜잭션에 저장한다. 롤백된 실패 감사는 별도 기록 경로가 필요하다. 대화록은 권한+목적 확인→마스킹→감사 저장 성공 후 반환한다. 감사/마스킹 실패 시 원문을 반환하지 않는다. 인덱스: `(occurred_at DESC, id)`, `(target_type, target_id, occurred_at)`.
 
+### 36. chat_tool_calls — 챗봇 읽기 도구 호출·예산 관측
+
+```text
+id text PK; chat_job_id text FK chat_jobs; attempt_no integer; plan_revision integer; call_index integer
+tool_call_id text; registry_version text; registry_group text; capability_id text; tool_id text; schema_version text
+input_digest text; request_meta jsonb; request_artifact_id text? FK artifacts; response_artifact_id text? FK artifacts
+data_version text?; evidence_ids text[]; truncated boolean?; next_allowed boolean?
+status text; error_code text?; started_at timestamptz; finished_at timestamptz?
+UNIQUE(chat_job_id, attempt_no, tool_call_id)
+UNIQUE(chat_job_id, attempt_no, call_index)
+```
+
+읽기 전용 MCP 또는 같은 논리 계약의 서버 내부 어댑터 호출을 한 행씩 기록한다. `call_index`는 계획의 안정된 순서이며 실제 병렬 완료 순서를 뜻하지 않는다. `registry_group`, `capability_id`, `tool_id`, `schema_version`은 호출 시점 레지스트리의 값을 고정한다. 모델이 만든 자유 문자열 도구명은 저장·실행하지 않는다. `request_meta`는 대상 ID·기간·asOf·graphVersion·limit처럼 허용된 구조만 포함하고 회원 ID·질문 원문·인증 토큰·개인 포트폴리오 전문을 넣지 않는다. 전체 요청·응답을 보존해야 할 때만 접근 통제와 보존 정책을 충족한 불변 artifact를 연결한다.
+
+상태는 `reserved`, `running`, `succeeded`, `failed`, `cancelled`, `unknown`이다. 계획 확정 시 호출 예산을 `reserved`로 먼저 기록하고 소유 토큰을 확인한 실행만 전이한다. timeout 등으로 외부 완료 여부를 모르면 `unknown`을 실패나 호출 0회로 바꾸지 않는다. 같은 논리 조회를 재사용한 경우 새 성공 호출을 만들지 않고 원 호출 ID를 `route_summary`에 참조한다. 추가 조회 라운드는 `plan_revision`을 증가시키며 최대 횟수는 정책 버전과 함께 검증한다.
+
+`evidence_ids`는 성공 응답에서 답변 후보에 전달한 근거 ID이며 저장 시 현재 공개 문서 버전과 일치하는지 검사한다. 응답의 `data_version`, `truncated`, `next_allowed`와 artifact가 있으면 그 내용이 일치해야 한다. 기본 인덱스는 `(chat_job_id, attempt_no, call_index)`, `(tool_id, started_at)`, `(status, started_at)`이다. 요청당 호출 수·지연·오류·중복 제거율은 이 테이블에서 집계하고 모델 호출·토큰·비용은 `ai_executions`에서 별도로 집계한다.
+
 ## 4. 핵심 관계도
 
 선은 실제 SQL FK의 주요 관계만 표시한다. JSON 내부 참조와 Neo4j 외부 ID는 FK 선으로 표시하지 않는다. 아래 그림은 전체 컬럼 도면이 아니며 제3절이 저장 구조의 기준이다.
@@ -589,6 +610,7 @@ erDiagram
     companies ||--o{ mock_holdings : company
     members ||--o{ chat_sessions : owns
     chat_sessions ||--o{ chat_jobs : questions
+    chat_jobs ||--o{ chat_tool_calls : invokes
     members ||--o{ feedback : votes
     chat_jobs o|--o{ feedback : answer
     briefing_rounds o|--o{ feedback : round
@@ -634,7 +656,7 @@ erDiagram
 | briefing_corrections, briefing_suspensions | briefing_changes | 2→1, 종류별 이력 |
 | feedback | feedback | 유효 평가·취소·집계 유지 |
 | chat_sessions | chat_sessions | 대화 소유권 유지 |
-| chat_jobs, chat_attempts, chat_results, chat_citations | chat_jobs | 4→1, 질문 단위 저장 |
+| chat_jobs, chat_attempts, chat_results, chat_citations | chat_jobs + chat_tool_calls | 질문·결과·계획 요약은 작업에 통합하고 실제 읽기 도구 호출은 독립 관측 |
 | graph_versions, graph_version_db_state, graph_active_version | graph_versions | 3→1, 활성 버전 유일성 유지 |
 | graph_activations | graph_activations | 버전 활성화 이력 유지 |
 | review_targets, review_decisions | 동일 2개 | 대상과 결정 이력 유지 |
@@ -654,7 +676,9 @@ erDiagram
 | briefing_rounds.published_payload | BriefingPayload 전체 | 최초 발행만 쓰기 |
 | briefing_rounds.public_snapshot/comparison_snapshot | 공개 요약·시장 정보 및 아침 비교 결과 | 최초 발행만 쓰기 |
 | chat_jobs.frozen_context/result | ChatFrozenContext / ChatResult 전체 | 최초 문맥과 completed 결과 불변 |
+| chat_jobs.route_summary | ChatRouteSummary v1: 요구·Q 유형·기능·커버리지·계획·예산·검증 요약 | 실행 중 소유 토큰으로 단계별 갱신, completed 뒤 불변 |
 | chat_jobs.attempts, analysis_jobs.attempts | 내부 시도 이력 | 완료 원소 불변, 활성 원소만 토큰 검사 후 종료 |
+| chat_tool_calls.request_meta | 허용된 대상·기간·버전·limit만 포함한 호출 메타데이터 | 예약 후 허용 필드만 기록, 원문·비밀·개인 전문 금지 |
 | review_targets 목록 투영 | 상세 JSON 없음, 원천 상세를 version/revision으로 조회 | 필터용 컬럼만 revision 단위 동기화 |
 | graph_versions.graph_db_state | GraphDbVersionState 및 투영 상태 | 투영 worker가 상태 갱신 |
 
@@ -682,7 +706,7 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | `getBriefing`, `listBriefingRounds`, `getBriefingGraphBasis` | briefing_rounds, briefing_changes, graph_versions | 불변 발행 원문+정정/중단 상태 조합 |
 | `getPersonalizedBriefing` | briefing_rounds, watchlist, portfolio_connections, mock_portfolios, mock_holdings | 기존 회차의 항목 필터와 matchedCompanyIds |
 | `createConversation`, `getConversation`, `getCurrentConversation` | chat_sessions, chat_jobs | 대화 ID 멱등성 및 소유권 |
-| `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob` | chat_jobs, artifacts, idempotency_records, ai_executions | frozen context, 대화당 동시 작업 하나, 저장만 복구 |
+| `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob` | chat_jobs, chat_tool_calls, artifacts, idempotency_records, ai_executions | frozen context, 동적 읽기 계획·예산, 대화당 동시 작업 하나, 저장만 복구 |
 | `getAdminSession`, `logInAdmin`, `logOutAdmin` | admins, admin_sessions, 코드 권한 매핑 | 별도 쿠키와 유휴/절대 만료 |
 | `getAdminDashboard`, `getPipelineOverview` | 회원·후보·작업·브리핑·그래프·AI·감사 원천의 집계, Neo4j 상태 | 별도 dashboard 테이블 없음. 외부 상태 조회 실패를 실제로 표현 |
 | `listAuditRecords` | audit_logs | 필터·커서로 조회 |
@@ -716,6 +740,8 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 - 기존 분석의 주장·인용 순서·evidence 연결·결과 버전이 JSON 변환 후 보존되는지 확인한다.
 - 브리핑 발행 원문과 정정/중단 이력이 분리되고, 발행 후 immutable 컬럼 UPDATE/DELETE가 차단되는지 확인한다.
 - 같은 대화 동시 접수는 한 건만 성공하고, save_only가 모델을 호출하지 않는지 확인한다.
+- route_summary가 모든 명시적 requirementId를 보존하고 `answerBasis`·검증 상태가 공개 ChatResult와 일치하는지 확인한다.
+- 요청당 `chat_tool_calls`가 최대 12개, 동시 실행 최대 4개, 추가 plan revision 최대 1회인지 확인하고 timeout을 근거 없음으로 바꾸지 않는다.
 - 그래프 활성화/규칙 변경/발행 snapshot의 revision과 커밋 순서가 맞는지 확인한다.
 - 기존 평가에 회차 근거가 없으면 임의 이행하지 않는다. 원본을 보존하고 대상 식별을 해결한다.
 - 영속 캐시를 없애도 시세·재무·브리핑 응답의 기준 시각과 실패 구분이 유지되는지 확인한다.
@@ -744,8 +770,9 @@ API DTO를 그대로 노출하는 DB 엔티티로 만들지는 않는다. 저장
 | briefing_attempts.trigger / status | scheduler, admin / queued, running, verifying, completed, failed, cancelled |
 | briefing_changes.kind | correction, suspension; suspended boolean의 NULL 조건은 테이블 정의 참조 |
 | chat_jobs.status / outcome | queued, running, completed, failed, cancelled / answered, clarification, guidance, insufficient_evidence 또는 NULL |
-| chat_jobs.failure | ChatFailure: kind=validation_failed, save_failed, result_lost, transient, permission_denied, internal; retry=rerun, save_only 또는 NULL |
+| chat_jobs.failure | ChatFailure: kind=validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal; retry=rerun, save_only 또는 NULL |
 | chat_jobs.attempts | 내부 mode=initial,rerun,save_only; status=running,completed,failed,cancelled; n>=1, 단일 활성 원소 |
+| chat_tool_calls.status | reserved, running, succeeded, failed, cancelled, unknown; unknown은 전송·완료 불명이며 실패나 미호출로 단정하지 않음 |
 | graph_versions.kind / graph_db_state.status | seed, ledger / reflected, pending, unknown; 실제 조회 장애는 API 오류로 별도 표현 |
 | graph_activations.action / actor_kind | publish, activate, seed / admin, system |
 | review_targets.target_type / status | candidate, relation / ALLOW, HOLD, REJECT; status는 원천의 목록 투영값 |

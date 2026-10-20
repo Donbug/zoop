@@ -1244,7 +1244,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |
 
 ### 요청 필드
 
@@ -1272,7 +1272,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |
 
 ### 요청 필드
 
@@ -1299,7 +1299,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/current |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |
 
 ### 요청 필드
 
@@ -1311,7 +1311,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1325,7 +1325,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -1356,7 +1356,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.4, 6.9.5, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |
 
 ### 요청 필드
 
@@ -1383,7 +1383,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/retry |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다. |
 
 ### 요청 필드
 
@@ -1412,7 +1412,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/cancel |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다. |
 
 ### 요청 필드
 
@@ -3373,6 +3373,7 @@ What the answer was actually built on.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | label | 필수 | string |  |
+| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. |
 
 <a id="schema-chatcontextitem"></a>
 
@@ -3394,8 +3395,8 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| contextIds | 선택 | string[] | Company, issue, edge or evidence ids |
-| evidenceIds | 선택 | string[] | Narrows the evidence to these references |
+| contextIds | 선택 | string[] (uniqueItems) | Company, issue, edge or evidence ids |
+| evidenceIds | 선택 | string[] (uniqueItems) | Narrows the evidence to these references |
 | period | 선택 | [ChatPeriod](#schema-chatperiod) / null | Explicit period of the selection; the question's own period wins |
 | asOf | 선택 | string, null (date-time) |  |
 | graphVersion | 선택 | string, null |  |
@@ -3429,7 +3430,7 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, permission_denied, internal} |  |
+| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} |  |
 | reason | 필수 | string / null |  |
 | message | 필수 | string |  |
 | retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. |
@@ -3505,12 +3506,13 @@ The selection frozen when the question was first received.
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
 | answer | 필수 | string |  |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다. |
 | reason | 필수 | string / null |  |
-| sources | 필수 | string[] |  |
+| sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
 | graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
-| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: companies the member can pick (each becomes a new question) |
+| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 

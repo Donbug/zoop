@@ -4,6 +4,14 @@
 
 기준: v5와 사용자 제공 v5 검증 결과. API 필드는 저장소 docs/api/out/zoop-api-spec.md 및 openapi.yaml과 대조했다. 이전 다운로드 API 파일과 바이트 단위 동일성을 검증한 것은 아니다.
 
+## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
+
+- PostgreSQL 테이블 수를 35개에서 36개로 변경하고 `chat_tool_calls`를 추가했다. 질문 결과와 함께 읽는 분류·계획 요약은 `chat_jobs.route_summary` JSONB에 유지하되, 실제 MCP/서버 읽기 호출은 요청당 상한·지연·오류·중복 제거를 독립 집계할 수 있도록 행으로 분리했다.
+- `chat_jobs`에 `route_schema_version`, `route_summary`를 추가했다. 요구 ID, Q01~Q08 multi-label, 논리 기능, Luna 커버리지, 계획 revision, 예약·사용 예산, 답변 근거 수준과 검증 결과만 저장하며 자유 형식 내부 추론은 저장하지 않는다.
+- `chat_tool_calls`는 레지스트리·논리 기능·실제 도구·스키마 버전과 입력 digest, 허용된 요청 메타데이터, 결과 artifact·근거·dataVersion, timeout을 포함한 실제 상태를 고정한다. 모델 출력의 도구명을 직접 실행하지 않으며 회원 ID·인증값·질문 원문·개인 포트폴리오 전문은 기본 메타데이터에서 제외한다.
+- 모델 호출은 기존 `ai_executions(feature=chatbot)`에 router, coverage-verifier, answer-generator, semantic-verification stage로 기록하고 도구 호출과 중복 집계하지 않는다.
+- 이 변경은 목표 ERD와 계약 결정이다. 기존 migration을 수정하지 않고 챗봇 구현 PR에서 `chat_sessions`, `chat_jobs`, `chat_tool_calls`를 만드는 새 Flyway migration과 저장소·동시성 시험을 추가해야 한다.
+
 ## 2026-10-15 추가 변경 — 기업 브랜드 출처
 
 - `companies.brand_source text?`를 추가했다. 색상·로고의 출처 URL을 보관하는 내부 필드이며, 기업 상세 API의 공식 홈페이지 주소 `websiteUrl`과 구분한다.
@@ -44,7 +52,7 @@
 | 낮음: 공개 회차 상태 | scheduled/missing→not_ready, verifying→generating 등 매핑 | briefing_rounds |
 | 본문 작업 메타 | 소스 경로·실행 검증 한계·과거 반영표를 이 변경 이력으로 이동 | ERD 본문 및 본 문서 |
 
-테이블은 35개로 유지했다. 검증 문서가 제시한 전역 revision 문구 중 BriefingPayload를 현재 MAX로 해석할 수 있는 부분은 발행 당시 고정값으로 구체화했다. 오래된 분석 결과에 현재 revision만 붙이지 않도록 커밋 시 입력 revision 일치 검사도 추가했다.
+v6 최초 반영 당시 테이블은 35개로 유지했다. 이후 2026-10-17 챗봇 호출 관측 테이블 추가로 현재는 36개다. 검증 문서가 제시한 전역 revision 문구 중 BriefingPayload를 현재 MAX로 해석할 수 있는 부분은 발행 당시 고정값으로 구체화했다. 오래된 분석 결과에 현재 revision만 붙이지 않도록 커밋 시 입력 revision 일치 검사도 추가했다.
 
 내부 보조 쿠키를 선택했으므로 OAuth API 문서의 Set-Cookie 설명 동기화는 구현 시 필요하다. 이번 변경은 ERD 문서에 그 계약을 정의했으며 OpenAPI 자체를 수정하지 않았다. 최초 관리자 큐 설계는 하나의 queued/running 슬롯이었으나, 상단 추가 변경에서 복수 queued·단일 running 정책으로 대체했다.
 
@@ -52,7 +60,7 @@
 
 ## 문서 점검 범위
 
-테이블 35개와 번호 01~35, v3.5 테이블 60개의 이동 대응, 저장소 API operationId 84개의 대응을 정적으로 점검한다. 이름 대응 확인은 모든 DTO 필드와 실행 동작의 완전 검증을 의미하지 않는다. SQL 마이그레이션·서버 코드는 변경하지 않았으며 PostgreSQL 제약·동시성 실행 검증은 수행하지 않았다.
+현재 테이블 36개와 번호 01~36, v3.5 테이블 60개의 이동 대응, 저장소 API operationId 86개의 대응을 정적으로 점검한다. 이름 대응 확인은 모든 DTO 필드와 실행 동작의 완전 검증을 의미하지 않는다. SQL 마이그레이션·서버 코드는 변경하지 않았으며 PostgreSQL 제약·동시성 실행 검증은 수행하지 않았다.
 
 ## 이전 v5 반영 이력 (보관)
 
