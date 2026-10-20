@@ -275,6 +275,8 @@ export default function GraphCanvas({
           );
           if (view.flow) {
             await graph.layout();
+            // 흐름 배치는 좌표 범위가 기존 배치와 달라 화면 밖으로 넘친다. 전체가 보이게 맞춘다.
+            await graph.fitView({ when: 'always' }, false);
             flowPositions.current = new Map(
               graph.getNodeData().map((node) => [
                 String(node.id),

@@ -14,6 +14,7 @@ const canvas = vi.hoisted(() => ({
   focusElement: vi.fn(),
   setLayout: vi.fn(),
   layout: vi.fn(),
+  fitView: vi.fn(),
   setPlugins: vi.fn(),
   zoomTo: vi.fn(),
   translateTo: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock('@antv/g6', () => ({
     async render() {}
     setLayout = canvas.setLayout;
     layout = canvas.layout;
+    fitView = canvas.fitView;
     setPlugins = canvas.setPlugins;
     getZoom = canvas.getZoom;
     getPosition = canvas.getPosition;
@@ -108,6 +110,10 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     await waitFor(() => expect(canvas.layout).toHaveBeenCalled());
     expect(canvas.setLayout).toHaveBeenLastCalledWith(
       expect.objectContaining({ type: 'dagre' }),
+    );
+    // The flow layout spans a different area, so it is fitted into view.
+    await waitFor(() =>
+      expect(canvas.fitView).toHaveBeenCalledWith({ when: 'always' }, false),
     );
   });
   it('restores zoom and pan separately for each mode', async () => {
