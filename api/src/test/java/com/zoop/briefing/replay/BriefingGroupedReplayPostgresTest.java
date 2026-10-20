@@ -105,6 +105,30 @@ class BriefingGroupedReplayPostgresTest {
         assertArrayEquals(originalBundle, Files.readAllBytes(bundle));
     }
 
+    @Test void anExistingCompanyNameCannotResolveToAnIdentifierDifferentFromTheFrozenCompanyLink() throws Exception {
+        Path directory = Files.createTempDirectory(root, "wrong-catalog-id-").toRealPath();
+        String schema = "wrong_company_id_" + UUID.randomUUID().toString().replace("-", "");
+        String baseUrl = System.getenv("DB_URL"), url = baseUrl + (baseUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema + ",public";
+        var datasource = new DriverManagerDataSource(url, username(), password()); var database = new JdbcTemplate(datasource);
+        try {
+            Flyway.configure().dataSource(datasource).schemas(schema).defaultSchema(schema).load().migrate();
+            // The name lookup is unique and succeeds, but its identifier contradicts the frozen source company.
+            database.update("INSERT INTO companies(id,name) VALUES ('different-authored-company-id','합성 기업')");
+            String catalogBefore = database.queryForObject("SELECT md5(string_agg(row_to_json(c)::text, '' ORDER BY id)) FROM companies c", String.class);
+            Path source = root.resolve("sources.jsonl");
+            var settings = new BriefingReplaySettings(source, bundle, Files.createDirectory(directory.resolve("artifacts")),
+                    directory.resolve("grants.json"), directory.resolve("manifest.json"), ArtifactFileStore.sha256(Files.readAllBytes(source)),
+                    "inbox/authored-grouped-run.md", root.resolve("clocks.json"));
+            var wrongCatalogImporter = new BriefingReplayImporter(database, new DataSourceTransactionManager(datasource), settings);
+            RuntimeException rejected = assertThrows(RuntimeException.class, wrongCatalogImporter::importBundle);
+            assertTrue(rejected.getMessage().contains("grouped_company_catalog_identity"), rejected.getMessage());
+            for (String table : new String[]{"briefing_rounds", "articles", "evidence", "artifacts"})
+                assertEquals(0, database.queryForObject("SELECT count(*) FROM " + table, Integer.class), table);
+            assertEquals(catalogBefore, database.queryForObject("SELECT md5(string_agg(row_to_json(c)::text, '' ORDER BY id)) FROM companies c", String.class));
+            assertFalse(Files.exists(directory.resolve("manifest.json"))); assertFalse(Files.exists(directory.resolve("grants.json")));
+        } finally { database.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
+    }
+
     @Test void unansweredGroupingReservationIsAuditedWithoutUsageOrAcceptedIssueEvidence() throws Exception {
         Path directory = Files.createTempDirectory(root, "unknown-case-").toRealPath();
         ProcessBuilder command = new ProcessBuilder("python3", Path.of("scripts/briefing_grouped_fixture.py").toAbsolutePath().toString(), directory.toString(), "--unknown");

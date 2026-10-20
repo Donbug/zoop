@@ -221,7 +221,15 @@ public final class BriefingReplayImporter {
             for (var receipt : receipts.entrySet()) require(receipt.getValue().equals(allReceipts.get(receipt.getKey()))
                     && accounted.add(receipt.getKey()), "simulation_round_receipt_owner");
             Map<String, Issue> selected = selections(definition, inputs, true);
-            if (grouped) BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
+            if (grouped) {
+                for (StrictJson.Obj item : definition.objects("selected")) {
+                    Set<String> suppliedIds = new HashSet<>();
+                    for (StrictJson.Obj link : item.objects("companyLinks")) require(suppliedIds.add(text(link, "companyId")), "grouped_duplicate_company_link");
+                    Set<String> resolvedIds = new HashSet<>(); selected.get(item.string("issueId")).companies().forEach(company -> resolvedIds.add(company.id()));
+                    require(suppliedIds.equals(resolvedIds), "grouped_company_catalog_identity");
+                }
+                BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
+            }
             if (qualityV2) {
                 validateSimulationNovelty(definition, noveltyHistory, receipts);
                 if (definition.has("noveltyAudit") && definition.object("noveltyAudit").bool("modelCalled"))
