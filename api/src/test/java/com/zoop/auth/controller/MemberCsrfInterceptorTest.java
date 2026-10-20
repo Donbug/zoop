@@ -55,6 +55,35 @@ class MemberCsrfInterceptorTest {
         assertDenied(request);
     }
 
+    @Test
+    void logoutSkipsOriginAndCsrfOnlyWhenSessionIsNotActive() {
+        var noCookie = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
+        assertTrue(interceptor.preHandle(noCookie, new MockHttpServletResponse(), new Object()));
+
+        var expired = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
+        expired.setCookies(new Cookie("zoop_session", "expired"));
+        when(sessions.isActiveSession("expired")).thenReturn(false);
+        assertTrue(interceptor.preHandle(expired, new MockHttpServletResponse(), new Object()));
+        verify(sessions, never()).verifyCsrf(anyString(), anyString());
+    }
+
+    @Test
+    void activeLogoutSessionStillRequiresAllowedOriginAndCsrf() {
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
+        request.setCookies(new Cookie("zoop_session", "token"));
+        when(sessions.isActiveSession("token")).thenReturn(true);
+        request.addHeader("Origin", "https://zoop.example");
+        request.addHeader("X-CSRF-Token", "csrf");
+
+        assertTrue(interceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+        verify(sessions).verifyCsrf("token", "csrf");
+
+        var missingCsrf = new MockHttpServletRequest("POST", "/api/v1/auth/logout");
+        missingCsrf.setCookies(new Cookie("zoop_session", "token"));
+        missingCsrf.addHeader("Origin", "https://zoop.example");
+        assertDenied(missingCsrf);
+    }
+
     private MockHttpServletRequest request(String method, boolean cookie) {
         var request = new MockHttpServletRequest(method, "/api/v1/member/example");
         if (cookie) {

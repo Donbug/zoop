@@ -22,6 +22,7 @@ from typing import Any
 from .config import ServiceConfig
 
 RUNTIME_SCHEMA = "zoop-ai-s1-1"
+# Covers the largest handoff export envelope: the producer's bundle limit is 6 MiB (MAX_BUNDLE, canonical bytes) plus a receipt and attempts well under 1 MiB.
 MAX_STDOUT = 16 * 1024 * 1024
 CODE = re.compile(r"[a-z][a-z0-9_]{0,79}")
 
@@ -30,6 +31,8 @@ CODE = re.compile(r"[a-z][a-z0-9_]{0,79}")
 class Deadlines:
     quick: float = 30.0   # submit/get/cancel; matches the worker's SQLite busy timeout
     long: float = 300.0   # run/resume
+    read: float = 45.0    # graph read/focus: the pipeline's Neo4j connect (5 s) and read transaction (30 s) limits, plus the ledgers
+    handoff: float = 45.0  # handoff export: rebuilds the whole bundle from the S2/S3 ledgers (no Neo4j); the same fixed bound as a graph read
     grace: float = 5.0    # SIGTERM to SIGKILL
 
 

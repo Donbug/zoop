@@ -46,10 +46,11 @@ class CompanyPostgresIntegrationTest {
         if (url == null || !url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/zoop_company_test_19")) {
             throw new IllegalStateException("Set ZOOP_COMPANY_TEST_DB_URL to the dedicated localhost zoop_company_test_19 database");
         }
+        String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
         context = new SpringApplicationBuilder(ZoopApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--spring.datasource.url=" + url,
-                        "--spring.datasource.username=company_test", "--spring.datasource.password=",
+                        "--spring.datasource.username=company_test", "--spring.datasource.password=" + password,
                         "--spring.jpa.hibernate.ddl-auto=validate", "--zoop.ai.client.enabled=false",
                         "--ZOOP_AUTH_CSRF_ACTIVE_KEY_ID=test",
                         "--ZOOP_AUTH_CSRF_KEYS=test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
@@ -218,18 +219,19 @@ class CompanyPostgresIntegrationTest {
     void existingAuthSchemaCanUpgradeWithoutReapplyingOldMigrations() {
         String schema = "company_upgrade_" + java.util.UUID.randomUUID().toString().replace("-", "");
         String upgradeUrl = url + "?currentSchema=" + schema + ",public";
-        Flyway baseline = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+        String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+        Flyway baseline = Flyway.configure().dataSource(upgradeUrl, "company_test", password)
                 .schemas(schema).defaultSchema(schema)
                 .target("20261013000000").load();
         baseline.migrate();
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables "
                 + "WHERE table_schema=? AND table_name='companies'", Integer.class, schema));
-        Flyway catalog = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+        Flyway catalog = Flyway.configure().dataSource(upgradeUrl, "company_test", password)
                 .schemas(schema).defaultSchema(schema).target("20261013153313").load();
         catalog.migrate();
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".flyway_schema_history "
                 + "WHERE success AND version IN ('20261013153313', '20261014102810')", Integer.class));
-        Flyway upgrade = Flyway.configure().dataSource(upgradeUrl, "company_test", "")
+        Flyway upgrade = Flyway.configure().dataSource(upgradeUrl, "company_test", password)
                 .schemas(schema).defaultSchema(schema).load();
         upgrade.migrate();
         upgrade.validate();
@@ -320,9 +322,12 @@ class CompanyPostgresIntegrationTest {
     void maximumLimitAndInvalidCursorsWorkWithRealRepository() {
         assertEquals(ids(search(null)), ids(service.search(null, null, Integer.MAX_VALUE, null, null)));
         String cursor = service.search("acme", null, 1, null, null).nextCursor();
-        assertThrows(IllegalArgumentException.class, () -> service.search("other", cursor, 1, null, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("acme", "!bad!", 1, null, null));
-        assertThrows(IllegalArgumentException.class, () -> service.search("acme", "", 1, null, null));
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.search("other", cursor, 1, null, null));
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.search("acme", "!bad!", 1, null, null));
+        assertThrows(com.zoop.common.exception.CustomException.class,
+                () -> service.search("acme", "", 1, null, null));
     }
 
     @Test
@@ -349,9 +354,10 @@ class CompanyPostgresIntegrationTest {
                 "UPDATE companies SET aliases=ARRAY['acme'] WHERE id='boundary'",
                 "UPDATE companies SET ticker='ACME' WHERE id='short'",
                 // PostgreSQL rejects TRUNCATE of a table referenced by a foreign key unless every referencing table is
-                // truncated in the same statement. document_analyses references companies; evidence and ai_executions
-                // reference document_analyses. Listed explicitly (no CASCADE) so a new dependent fails loudly here.
-                "TRUNCATE companies, document_analyses, evidence, ai_executions")) {
+                // truncated in the same statement. member_watchlist references companies; document_analyses
+                // references companies; evidence and ai_executions reference document_analyses. Listed explicitly
+                // (no CASCADE) so a new dependent fails loudly here.
+                "TRUNCATE member_watchlist, companies, document_analyses, evidence, ai_executions")) {
             String cursor = service.search("acme", null, 1, null, null).nextCursor();
             assertNotNull(cursor);
             jdbc.execute(mutation);
@@ -382,7 +388,8 @@ class CompanyPostgresIntegrationTest {
             long revision = repository.catalogRevision();
             List<CompanySearchRow> before = repository.search("", null, null);
             // A separate connection commits between the revision read and the row read.
-            try (var connection = java.sql.DriverManager.getConnection(url, "company_test", "");
+            String password = System.getenv().getOrDefault("ZOOP_COMPANY_TEST_DB_PASSWORD", "");
+            try (var connection = java.sql.DriverManager.getConnection(url, "company_test", password);
                  var statement = connection.createStatement()) {
                 statement.executeUpdate("UPDATE companies SET name='Concurrent rename' WHERE id='special'");
             } catch (java.sql.SQLException exception) {
@@ -396,9 +403,9 @@ class CompanyPostgresIntegrationTest {
     }
 
     private static void assertStaleCursor(String query, String cursor) {
-        var exception = assertThrows(IllegalArgumentException.class,
+        var exception = assertThrows(com.zoop.common.exception.CustomException.class,
                 () -> service.search(query, cursor, 1, null, null));
-        assertTrue(exception.getMessage().contains("restart search without a cursor"));
+        assertEquals(com.zoop.common.exception.ErrorCode.INVALID_CURSOR, exception.getErrorCode());
     }
 
     private static List<String> collectPages(String query) {

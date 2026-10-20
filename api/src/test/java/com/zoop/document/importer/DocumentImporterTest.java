@@ -9,6 +9,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -543,6 +544,84 @@ class DocumentImporterTest {
         assertEquals("current_version_conflict", failure.get("code").stringValue());
         assertTrue(failure.has("currentVersion"));
         assertTrue(failure.get("currentVersion").isNull());
+    }
+
+    private void serveCollected(Observation observation, String precision, String raw, String kind) {
+        ObjectNode export = ExportFixtures.collected(ExportFixtures.export(observation, PLAIN_TEXT, PLAIN_HASH), kind, precision, raw);
+        ExportFixtures.observationOf(export).put("observedAt", LATER_OBSERVED);
+        exporter.responses.put(observation, ExportFixtures.bytes(export));
+    }
+
+    @Test
+    void aCollectedDayIsRegisteredAsADayAndTheFetchTimeIsTheCollectionTime() {
+        Observation collected = obs("r5", SOURCE, 0, 0, 'c', '5');
+        serveCollected(collected, "day", "2026-10-14", "news");
+
+        DocumentImportResult result = run(item(collected, PointerPolicy.keep()));
+
+        assertTrue(result.succeeded());
+        ItemResult.Imported item = imported(result, 0);
+        Instant fetched = Instant.parse("2026-10-13T23:59:58.123456Z");
+        assertEquals(fetched, item.collectedAt());
+        assertEquals("day", item.publicationPrecision());
+        var version = registry.state().versions().values().iterator().next();
+        assertNull(version.publishedAt());
+        assertEquals(LocalDate.of(2026, 10, 14), version.publishedDate());
+        assertEquals("day", version.publicationPrecision());
+        assertEquals(fetched, version.collectedAt());
+
+        JsonNode written = json(result).get("items").get(0);
+        assertEquals(Set.of("index", "status", "documentId", "documentVersion", "textArtifactId", "article", "artifact",
+                "artifactFile", "version", "currentVersion", "collectedAt", "grant", "publicationPrecision", "collection"),
+                Set.copyOf(written.propertyNames()));
+        assertEquals("day", written.get("publicationPrecision").stringValue());
+        JsonNode collection = written.get("collection");
+        assertEquals("collected_http", collection.get("provenance").stringValue());
+        assertEquals("synthetic_loopback", collection.get("network").stringValue());
+        assertEquals("news", collection.get("documentKind").stringValue());
+        assertEquals("2026-10-13T23:59:58.123456Z", collection.get("fetchedAt").stringValue());
+        assertEquals(200, collection.get("httpStatus").intValue());
+        assertEquals("day", collection.get("declaredPublication").get("precision").stringValue());
+        assertEquals("2026-10-14", collection.get("declaredPublication").get("raw").stringValue());
+        assertEquals(hex64('9'), collection.get("bodySha256").stringValue());
+    }
+
+    @Test
+    void anOffsetLessDeclaredTimeIsStoredAsUnknownButItsDeclaredFormIsReported() {
+        Observation collected = obs("r5", SOURCE, 0, 0, 'c', '5');
+        serveCollected(collected, "unresolved", "2026-10-14T09:30:00", "news");
+
+        DocumentImportResult result = run(item(collected, PointerPolicy.keep()));
+
+        var version = registry.state().versions().values().iterator().next();
+        assertNull(version.publishedAt());
+        assertNull(version.publishedDate());
+        assertEquals("unknown", version.publicationPrecision());
+        JsonNode declared = json(result).get("items").get(0).get("collection").get("declaredPublication");
+        assertEquals("unresolved", declared.get("precision").stringValue());
+        assertEquals("2026-10-14T09:30:00", declared.get("raw").stringValue());
+    }
+
+    @Test
+    void aKindThatDiffersFromTheOneDeclaredWhenCollectingIsRefusedAndRegistersNothing() {
+        Observation collected = obs("r5", SOURCE, 0, 0, 'c', '5');
+        serveCollected(collected, "day", "2026-10-14", "disclosure");
+
+        DocumentImportResult result = run(item(collected, PointerPolicy.keep()));
+
+        assertEquals(DocumentImportFailure.ARTICLE_KIND_CONFLICT, failed(result, 0).failure());
+        assertTrue(registry.state().versions().isEmpty());
+        assertFalse(Files.exists(textFile(collected)));
+    }
+
+    @Test
+    void anAuthoredImportKeepsItsResultKeysAndItsReceiptTime() {
+        DocumentImportResult result = run(item(A1, PointerPolicy.keep()));
+
+        assertNull(imported(result, 0).collected());
+        assertFalse(json(result).get("items").get(0).has("collection"));
+        assertFalse(json(result).get("items").get(0).has("publicationPrecision"));
+        assertEquals(Instant.parse("2026-10-14T01:02:03.456789Z"), imported(result, 0).collectedAt());
     }
 
     /** Stand-in for {@code zoop-ai-ingest export}: serves a prepared document, refuses, or fails. */

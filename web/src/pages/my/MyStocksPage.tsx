@@ -7,7 +7,6 @@ import PortfolioConnect from '@/components/portfolio/PortfolioConnect';
 import { getPortfolio } from '@/apis/portfolio/portfolio';
 import { getSettings } from '@/apis/settings/settings';
 import { useAsyncData } from '@/hooks/useAsyncData';
-import { useAuth } from '@/hooks/useAuth';
 import type { CompanySearchTerms } from '@/types/company';
 
 const CONNECT_PARAM = 'account';
@@ -19,7 +18,6 @@ const CONNECT_VALUE = 'connect';
 //   목록은 숨기기만 하고 언마운트하지 않아 관심 검색어·결과가 남고, 돌아오면 스크롤 위치를 되살린다.
 //   연결 성공·취소·브라우저 뒤로 가기 모두 내 종목으로 돌아온다.
 export default function MyStocksPage() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
@@ -82,9 +80,6 @@ export default function MyStocksPage() {
             terms={terms}
             onTermsChange={setTerms}
           />
-          <button type="button" onClick={logout} className="underline">
-            로그아웃
-          </button>
         </PageShell>
       </div>
     </>

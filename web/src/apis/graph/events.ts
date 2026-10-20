@@ -1,3 +1,4 @@
+import { assertSnapshot } from './snapshot';
 import { call } from '@/apis/auth/ApiService';
 import type { EventContext, EventDetail } from '@/types/map/event';
 import type { EventMockScenario } from '@/mocks/events/fixture';
@@ -15,7 +16,11 @@ export async function getEvent(
   context: EventContext = {},
 ): Promise<EventDetail> {
   // Same explicit opt-out as the map. Production never imports synthetic data.
-  if (import.meta.env.DEV && import.meta.env.VITE_GRAPH_DATA_SOURCE !== 'api') {
+  if (
+    !context.round &&
+    import.meta.env.DEV &&
+    import.meta.env.VITE_GRAPH_DATA_SOURCE !== 'api'
+  ) {
     const { createMockEvent } = await import('@/mocks/events/fixture');
     await new Promise((resolve) => setTimeout(resolve, 300));
     return createMockEvent(
@@ -37,5 +42,6 @@ export async function getEvent(
     event.metadata.graphVersion !== context.graphVersion
   )
     throw new Error('지도의 데이터 버전과 사건 응답이 일치하지 않습니다.');
+  if (context.round) assertSnapshot(event.metadata, context);
   return event;
 }

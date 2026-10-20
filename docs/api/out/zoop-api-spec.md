@@ -16,11 +16,11 @@
 
 ### sessionLifecycle
 
-로그아웃과 차단은 서버 세션을 폐기한다. 회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 회원 쿠키는 Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200이며 서버 만료가 최종 권위다. 회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
+회원 로그아웃은 현재 회원 세션만 폐기하고 관리자 로그아웃은 현재 관리자 세션만 폐기한다. 회원·비회원 세션은 절대 만료 12시간, 유휴 만료 없음이다. 둘 다 zoop_session 쿠키(Secure·HttpOnly·SameSite=Lax·Path=/api/v1·host-only·Max-Age=43200)를 사용하며 서버 만료가 최종 권위다. 회원·비회원 CSRF는 ERD v6의 세션 결합 HMAC-SHA256 형식으로 파생하고 키 유실 시 재인증한다. 관리자 유휴/절대 만료와 SSO 제공자는 별도 확인 대상이다. 세션 응답의 expiresAt 및 csrfToken으로 실제 적용값을 전달한다.
 
 ### signupPolicy
 
-2026-10-14 사용자 확정: 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 15~128 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md.
+2026-10-14 사용자 확정(비밀번호 길이는 2026-10-16 변경): 가입 직후 새 member 세션을 발급한다. PR2에서는 이메일 소유 확인 메일을 보내지 않으며 주소를 검증된 소유로 표시하지 않는다. 이메일만으로 계정 복구·기존 소셜 계정 연결을 허용하지 않는다. 이메일 비교키는 trim 후 Locale.ROOT 소문자(최대 254 ASCII 문자, 제공자별 별칭 통합 없음), 표시명은 생략 시 '회원'·명시 시 trim 후 1~40 Unicode code point/제어 문자 제외, 새 비밀번호는 8~32 Unicode code point·제어 문자 제외·trim 없음이다. 비밀번호 해시는 Argon2id(salt16,hash32,memory19MiB,t2,p1)로 저장한다. 상세 근거는 docs/development/signup-policy-2026-10-13.md.
 
 ### socialAuthPolicy
 
@@ -129,7 +129,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [logIn](#login) | POST | /api/v1/auth/login | 공개 | P1 |
 | [startGuestSession](#startguestsession) | POST | /api/v1/auth/guest | 공개 | P1 |
 | [logOut](#logout) | POST | /api/v1/auth/logout | 공개 | P1 |
-| [setTutorialState](#settutorialstate) | PUT | /api/v1/auth/tutorial | 회원 또는 비회원 세션 | P1 |
+| [setTutorialState](#settutorialstate) | PUT | /api/v1/auth/tutorial | 회원 | P1 |
 | [listSocialProviders](#listsocialproviders) | GET | /api/v1/auth/social/providers | 공개 | P1 |
 | [authorizeSocialLogin](#authorizesociallogin) | GET | /api/v1/auth/social/{provider}/authorize | 공개 | P1 |
 | [completeSocialLogin](#completesociallogin) | GET | /api/v1/auth/social/{provider}/callback | 공개 | P1 |
@@ -212,9 +212,9 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 <a id="getmembersession"></a>
 
-## getMemberSession · 회원 세션과 초기 설정 조회
+## getMemberSession · 회원·비회원 세션과 초기 설정 조회
 
-유효한 회원 세션은 member와 세션 결합 csrfToken·expiresAt을 반환한다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
+유효한 회원 세션은 해당 회원의 현재 저장된 초기 설정 상태와 함께 member로 반환한다. 유효한 비회원 세션은 guest로 반환하며 user=null, setup.completed=false, setup.tutorialCompleted=false이고 튜토리얼 진행·완료·건너뛰기 상태를 서버에 저장하지 않는다. 세션 없음·만료·폐기 시 새 세션을 만들지 않고 user=null, setup=null인 anonymous와 null csrfToken/expiresAt을 반환하며 무효 zoop_session 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -324,7 +324,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## startGuestSession · 비회원 시작
 
-비회원 시작.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원가입이나 로그인 없이 비회원 세션을 시작한다. 200 SessionResponse(kind=guest, authenticated=true, user=null, setup={completed:false,tutorialCompleted:false})와 zoop_session 쿠키를 반환한다. 토큰 원문은 쿠키로만 전달하고 서버에는 토큰 해시를 저장한다. guest는 전체 그래프와 공개 기업·브리핑을 읽을 수 있지만 계좌 연결, 관심종목 저장, 개인화 조회, AI 질문·평가를 이용할 수 없다. 튜토리얼은 회원과 동일하게 제공하며 진행·완료·건너뛰기 상태는 저장하지 않는다. POST에는 허용 Origin을 요구한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -350,7 +350,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## logOut · 회원 로그아웃
 
-회원 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_session 쿠키만 제거하며 관리자 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
+회원 로그아웃은 현재 회원 세션만 자연 멱등하게 폐기하며 Idempotency-Key를 요구하지 않는다. 활성 zoop_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증한다. 활성 회원 세션이면 해당 세션만 폐기하고, 비회원 세션이면 서버 세션을 폐기하지 않는다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료 상태에서는 다른 세션을 변경하지 않고 204를 반환한다. 모든 경우 zoop_session 쿠키만 제거하며 관리자 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -377,12 +377,12 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 
 ## setTutorialState · 튜토리얼 진행 결과 저장
 
-튜토리얼 진행 결과 저장.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 튜토리얼 진행 결과만 저장한다. guest의 진행·완료·건너뛰기는 저장하지 않으므로 클라이언트 로컬에서 관리하며 이 작업은 guest에게 403 MEMBER_REQUIRED를 반환한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `PUT /api/v1/auth/tutorial` |
-| 권한·우선순위 | 회원 또는 비회원 세션 · P1 |
+| 권한·우선순위 | 회원 · P1 |
 | 요청 본문 | [TutorialUpdate](#schema-tutorialupdate) |
 | 응답 | 200: [SessionResponse](#schema-sessionresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
@@ -666,7 +666,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listVirtualAccountProfiles · 가상 계좌 프로필 목록
 
-가상 계좌 프로필 목록.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필 목록. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -694,7 +694,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getVirtualAccountProfile · 가상 계좌 프로필 조회
 
-가상 계좌 프로필 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+서비스 시연용 고정 Mock 프로필을 조회한다. 실제 증권계좌·자격 증명 연동이 아니며 프로필의 예수금·보유종목 값은 변경하지 않는다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -721,7 +721,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## connectVirtualAccount · 가상 계좌 연결
 
-가상 계좌 연결.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원에게 서비스 시연용 고정 Mock 프로필을 연결한다. 실제 증권계좌·자격 증명을 사용하지 않는다. 같은 Idempotency-Key와 같은 프로필의 재요청은 기존 결과를 반환하고, 같은 키에 다른 프로필을 지정하면 409다. 키 결과는 회원 계정이 존재하는 동안 보존한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -751,7 +751,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getMyPortfolio · 모의 보유 정보 조회
 
-모의 보유 정보 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+연결된 서비스 시연용 Mock 프로필과 고정 보유정보를 조회한다. Mock 보유수량·평균 매입가는 변경하지 않으며 가격을 제공하지 않는 경우 평가 금액과 비중은 unavailable로 반환한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -760,9 +760,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 요청 본문 | 없음 |
 | 응답 | 200: [PortfolioResponse](#schema-portfolioresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED |
-| FS/NFS | [FS039](../../system/out/feature-FS039.md) · [FS054](../../system/out/feature-FS054.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
-| 화면 | [D-COM-01](../../system/out/screen-D-COM-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
-| WBS | 6.1.2, 6.11.1, 6.4.1, 6.4.3, 6.4.6, 6.7.8 |
+| FS/NFS | [FS009](../../system/out/feature-FS009.md) · [FS062](../../system/out/feature-FS062.md) · [FS010](../../system/out/feature-FS010.md) · [FS039](../../system/out/feature-FS039.md) · [FS054](../../system/out/feature-FS054.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) |
+| 화면 | [D-ONB-02](../../system/out/screen-D-ONB-02.md) · [D-COM-01](../../system/out/screen-D-COM-01.md) · [D-MY-01](../../system/out/screen-D-MY-01.md) · [M-COM-01](../../system/out/screen-M-COM-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.3.2, 6.4.1, 6.4.3, 6.4.4, 6.4.6, 6.7.8 |
 | 프로토타입 대응 | /api/portfolio |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
@@ -777,7 +777,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## disconnectVirtualAccount · 가상 계좌 연결 해제
 
-가상 계좌 연결 해제.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+현재 회원 본인의 서비스 시연용 Mock 프로필 연결을 해제한다. 다른 초기 설정과 관심종목은 유지한다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -956,7 +956,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCompanyMetrics · 기업 주요 지표 조회
 
-기업 주요 지표 조회. 공급자가 제공한 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업 주요 지표 조회. 최신 공급자 값과 기준 시각만 반환하며 시세·재무 수치를 추정·0으로 대체하지 않는다. graphVersion 또는 asOf를 지정한 요청은 422 INVALID_REQUEST로 거절하며, 해당 시점의 과거 지표처럼 최신값을 반환하지 않는다. 정상 자료 부재(not_connected/unsupported_symbol/no_data)는 200 unavailable이고 공급자 인증·네트워크·timeout/429/5xx·형식 장애는 503 SOURCE_UNAVAILABLE이다. retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1244,7 +1244,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |
 
 ### 요청 필드
 
@@ -1272,7 +1272,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |
 
 ### 요청 필드
 
@@ -1299,7 +1299,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/current |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |
 
 ### 요청 필드
 
@@ -1311,7 +1311,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1325,7 +1325,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -1356,7 +1356,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.4, 6.9.5, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |
 
 ### 요청 필드
 
@@ -1383,7 +1383,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/retry |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다. |
 
 ### 요청 필드
 
@@ -1412,7 +1412,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/cancel |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다. |
 
 ### 요청 필드
 
@@ -1427,7 +1427,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getAdminSession · 관리자 세션 조회
 
-관리자 세션 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 세션 조회. zoop_admin_session 쿠키만 검사하며 회원 세션과 분리된다. 활성 세션은 idleExpiresAt까지의 유휴 만료와 expiresAt까지의 절대 만료를 적용한다(기본 30분/8시간). 만료 세션은 expired 및 expiredReason(idle|absolute)을 반환하고 해당 쿠키를 제거한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1453,7 +1453,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## logInAdmin · 관리자 로그인
 
-관리자 로그인.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+활성 admin 계정의 이메일/비밀번호로 로그인한다. 성공 시 HttpOnly·SameSite=Lax zoop_admin_session 쿠키와 세션 결합 CSRF 토큰을 반환한다. 회원 쿠키와 별개이며 이전 관리자 세션은 폐기된다. 실패 응답은 계정 존재 여부를 숨기고 IP 및 이메일 기준 시도를 제한한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1481,7 +1481,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## logOutAdmin · 관리자 로그아웃
 
-관리자 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_admin_session이 있으면 동일 쿠키·Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_admin_session 쿠키만 제거하며 회원 세션/쿠키에는 영향을 주지 않는다. 선택 인증·선택 헤더 표기는 조건부 런타임 검증을 자동 강제하지 않는다.
+관리자 로그아웃은 자연 멱등 세션 폐기이며 Idempotency-Key를 요구하지 않는다. 활성 zoop_admin_session이 있으면 동일 쿠키·허용 Origin·세션 결합 X-CSRF-Token을 반드시 검증하고 해당 세션만 폐기한다. Origin/CSRF 실패는 403 ACCESS_DENIED이며 무세션 분기로 우회하지 않는다. 세션 없음·무효·만료이면 다른 세션을 변경하지 않고 204를 반환한다. zoop_admin_session 쿠키만 제거하며 회원 세션/쿠키에는 영향을 주지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2679,7 +2679,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyGraphAsOf · 기업·기준 시점 중심 관계 그래프 조회
 
-타임라인에서 고른 시각을 asOf로 명시하고 그 시점 이전에 공개된 기업·이슈 관계만 조회한다. 응답은 실제 사용한 공개 버전을 고정한다. 이후 공개된 문서나 관계를 섞지 않으며 자료 미상·미제공·조회 장애를 구분한다. depth는 실제 연결선의 hop 수다.
+타임라인에서 고른 시각을 asOf로 명시하고 그 시점까지 검증·공개된 기업·이슈 관계만 조회한다(검증 시각·근거 공개 시각 ≤ asOf, 현재 공개 제외 아님). 사업 관계의 유효기간은 표시 여부를 정하지 않고 validity(예정·유효·종료·기간 미상)로 구분한다(FS042). 응답은 실제 사용한 공개 버전을 고정한다. 이후 공개된 문서나 관계를 섞지 않으며 자료 미상·미제공·조회 장애를 구분한다. depth는 실제 연결선의 hop 수다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2903,9 +2903,10 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | relationType | 필수 | string |  |
 | sourceUrl | 필수 | string / null |  |
 | verifiedAt | 필수 | string (date-time) / null |  |
-| validFrom | 필수 | string / null |  |
-| validUntil | 필수 | string / null |  |
+| validFrom | 필수 | string / null | 사업 관계가 효력을 갖기 시작한 날(YYYY-MM-DD, 시간대 없음). null이면 시작일 미상이다. |
+| validUntil | 필수 | string / null | 사업 관계의 마지막 유효일(YYYY-MM-DD, 그날 포함). null이면 종료 시점 미상이며 종료로 판단하지 않는다. |
 | countries | 필수 | string[] |  |
+| validity | 필수 | string {scheduled, active, ended, unknown} | 응답 metadata.asOf(asOf를 주지 않으면 조회 시각)의 Asia/Seoul 날짜 D 기준 사업 관계 상태(FS042): D < validFrom이면 scheduled, validFrom ≤ D ≤ validUntil이면 active, D > validUntil이면 ended, validFrom이 없고 종료가 아니면 unknown. 날짜끼리만 비교하며 원문 날짜에 시각을 붙이지 않는다. 표시 여부를 정하지 않는다. |
 
 <a id="schema-briefingcorrection"></a>
 
@@ -3372,6 +3373,7 @@ What the answer was actually built on.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | label | 필수 | string |  |
+| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. |
 
 <a id="schema-chatcontextitem"></a>
 
@@ -3393,8 +3395,8 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| contextIds | 선택 | string[] | Company, issue, edge or evidence ids |
-| evidenceIds | 선택 | string[] | Narrows the evidence to these references |
+| contextIds | 선택 | string[] (uniqueItems) | Company, issue, edge or evidence ids |
+| evidenceIds | 선택 | string[] (uniqueItems) | Narrows the evidence to these references |
 | period | 선택 | [ChatPeriod](#schema-chatperiod) / null | Explicit period of the selection; the question's own period wins |
 | asOf | 선택 | string, null (date-time) |  |
 | graphVersion | 선택 | string, null |  |
@@ -3428,7 +3430,7 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, permission_denied, internal} |  |
+| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} |  |
 | reason | 필수 | string / null |  |
 | message | 필수 | string |  |
 | retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. |
@@ -3504,12 +3506,13 @@ The selection frozen when the question was first received.
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
 | answer | 필수 | string |  |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다. |
 | reason | 필수 | string / null |  |
-| sources | 필수 | string[] |  |
+| sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
 | graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
-| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: companies the member can pick (each becomes a new question) |
+| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
@@ -4081,6 +4084,7 @@ The selection frozen when the question was first received.
 | verification | 필수 | [Verification](#schema-verification) |  |
 | via | 필수 | [ViaIssue](#schema-viaissue)[] |  |
 | explanation | 필수 | string / null |  |
+| validity | 필수 | string {scheduled, active, ended, unknown} / null | 구조 관계 간선의 사업 관계 상태(metadata.asOf 기준). GraphEdge.validity와 같다. 현재 유효한 관계로 오해되지 않도록 basis별 validity와 함께 표시한다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-endpointref"></a>
@@ -4477,6 +4481,7 @@ same request again never toggles anything.
 | derived | 필수 | boolean |  |
 | via | 필수 | string[] | Shared issue ids; derived edges only |
 | evidenceIds | 필수 | string[] | Evidence ids of the approved relations behind the edge (same as `GET /api/graph/edges/{id}` evidenceIds); empty for derived edges. |
+| validity | 필수 | string {scheduled, active, ended, unknown} / null | STRUCTURALLY_RELATED_TO 간선의 사업 관계 상태(metadata.asOf 기준, BasisOut.validity와 같은 규칙): 근거 중 하나라도 active면 active, 아니면 scheduled, 아니면 unknown, 모두 ended면 ended. 기간이 끝나도 이슈 발생 당시 유효했던 연결은 간선으로 남는다. 다른 관계 유형과 파생 간선은 null. |
 
 <a id="schema-graphmetadata"></a>
 
@@ -5758,7 +5763,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | authenticated | 필수 | boolean |  |
 | kind | 필수 | string {anonymous, guest, member} |  |
 | user | 필수 | [UserInfo](#schema-userinfo) / null |  |
-| setup | 필수 | [SetupState](#schema-setupstate) / null |  |
+| setup | 필수 | [SetupState](#schema-setupstate) / null | 회원은 해당 계정의 현재 저장 상태를 반환하고 guest는 두 값 모두 false다. anonymous에는 초기 설정 상태가 없어 null이다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 | csrfToken | 필수 | string, null | 인증 세션 쓰기에 사용하는 세션 결합 토큰. 무세션은 null. |
 | expiresAt | 필수 | string, null (date-time) |  |
@@ -5783,8 +5788,7 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 
 ### SettingsUpdate
 
-Unset fields keep their stored value; ``version`` must equal the stored version unless the request
-changes nothing (a resent request is answered with the stored settings). The mode field also keeps its stored value when explicitly null.
+Unset fields keep their stored value; null mode, watchlistIds, completed, and tutorialCompleted keep their stored value, while null investor clears the answer. completed cannot be true unless investor has been answered and mode has been selected. version must equal the stored version unless applying the patch changes nothing, in which case the current settings are returned. Changed settings increment version once.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
@@ -5792,15 +5796,14 @@ changes nothing (a resent request is answered with the stored settings). The mod
 | mode | 선택 | string {assets, watchlist} / null | assets/watchlist를 지정하면 방식을 선택한다. null 또는 생략은 현재 값을 변경하지 않는다. |
 | watchlistIds | 선택 | string[] / null |  |
 | tutorialCompleted | 선택 | boolean / null |  |
-| completed | 선택 | boolean / null |  |
+| completed | 선택 | boolean / null | Cannot be true unless investor has been answered and mode has been selected. Set false to clear completion. |
 | investor | 선택 | boolean / null | Answer to 'do you invest in stocks now?' |
 
 <a id="schema-setupstate"></a>
 
 ### SetupState
 
-Guests: ``completed`` is always false (they have no settings); ``tutorialCompleted`` is kept on the
-guest session only.
+For members, these booleans reflect the current persisted state of the authenticated member. For guests, both are always false and tutorial progress, completion, and skip state are never persisted; the client can run or replay the tutorial locally. Anonymous sessions have no setup state and return setup=null.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |

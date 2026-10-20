@@ -147,6 +147,63 @@ describe('Issue35 · FS003 D-AUT-02', () => {
     expect(await screen.findByText('필수 약관에 동의해 주세요.')).toBeTruthy();
     expect(server.calls('POST', '/api/v1/auth/signup')).toHaveLength(0);
   });
+  it.each([
+    ['7 ASCII characters', 'aB3!xY7'],
+    ['33 ASCII characters', 'A7!b'.repeat(8) + 'x'],
+    ['7 Unicode code points', '🦊'.repeat(7)],
+    ['33 Unicode code points', '🦊'.repeat(33)],
+  ])('blocks %s before sending', async (_label, input) => {
+    open();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('이메일'), email);
+    await user.type(screen.getByLabelText('비밀번호'), input);
+    await user.click(await screen.findByLabelText('모두 동의'));
+    expect(
+      screen.getByText(/8자 이상 32자 이하로 입력해 주세요. 공백은 그대로/),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '가입하고 시작하기' }));
+    expect(
+      await screen.findByText('비밀번호는 8자 이상 32자 이하로 입력해 주세요.'),
+    ).toBeTruthy();
+    expect(server.calls('POST', '/api/v1/auth/signup')).toHaveLength(0);
+  });
+  it.each([
+    ['8 ASCII characters', 'abCD!567'],
+    ['14 ASCII characters', 'abCD!567xyz123'],
+    ['32 ASCII characters', 'A7!b'.repeat(8)],
+    ['8 Unicode code points', '🦊'.repeat(8)],
+    ['32 Unicode code points', '🦊'.repeat(32)],
+    ['8 characters including surrounding spaces', ' aB3!xY '],
+  ])('submits %s without changing the password', async (_label, input) => {
+    open();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('이메일'), email);
+    await user.type(screen.getByLabelText('비밀번호'), input);
+    await user.click(await screen.findByLabelText('모두 동의'));
+    await user.click(screen.getByRole('button', { name: '가입하고 시작하기' }));
+    await screen.findByTestId('destination');
+    expect(server.calls('POST', '/api/v1/auth/signup')).toHaveLength(1);
+    expect(server.calls('POST', '/api/v1/auth/signup')[0].body).toMatchObject({
+      password: input,
+    });
+  });
+  it('explains the current policy when the server rejects a common password', async () => {
+    server.on('POST', '/api/v1/auth/signup', () =>
+      apiError(422, 'INVALID_REQUEST'),
+    );
+    open();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('이메일'), email);
+    await user.type(screen.getByLabelText('비밀번호'), 'password');
+    await user.click(await screen.findByLabelText('모두 동의'));
+    await user.click(screen.getByRole('button', { name: '가입하고 시작하기' }));
+    expect(
+      await screen.findByText(
+        '입력한 가입 정보를 확인해 주세요. 비밀번호는 8자 이상 32자 이하이며 제어 문자와 흔한 비밀번호는 쓸 수 없어요.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('destination')).toBeNull();
+  });
   it('sends actual term versions and preserves password spaces, verifies session, opens onboarding', async () => {
     open();
     const user = await fillSignup();

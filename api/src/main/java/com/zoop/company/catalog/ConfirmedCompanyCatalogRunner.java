@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /** Reconciles the bundled catalog after Flyway, including when the JSON changes. */
 @Component
-@Profile("!catalog-import")
+@Profile("!catalog-import & !admin-provision")
 public class ConfirmedCompanyCatalogRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(ConfirmedCompanyCatalogRunner.class);
     private final CompanyCatalogImportService importer;

@@ -1,0 +1,1199 @@
+{
+ "schema": "zoop-verify-cases-1",
+ "corpusId": "fin-verify-ko-v1",
+ "revision": "1",
+ "split": "dev",
+ "provenance": {
+  "fictional": true,
+  "language": "ko",
+  "documents": "허구의 회사와 수치로 직접 쓴 합성 문장. 실제 기사나 실제 기업이 아니다.",
+  "candidates": "사람이 직접 쓴 후보 claim. 어떤 모델의 출력도 아니다.",
+  "split": "dev 전용. test split 없음."
+ },
+ "cases": [
+  {
+   "caseId": "VK-01",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-01-c1",
+      "text": "한빛전자의 2026년 3분기 연결 매출액은 전년 같은 기간보다 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-01-e1"
+      ]
+     },
+     {
+      "claimId": "VK-01-c2",
+      "text": "한빛전자의 3분기 영업이익은 전년 같은 기간보다 감소했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-01-e2"
+      ]
+     },
+     {
+      "claimId": "VK-01-c3",
+      "text": "이 기사에는 한빛전자의 4분기 실적 전망치가 포함되어 있지 않다.",
+      "assertionKind": "limitation",
+      "evidenceIds": []
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-01-e1",
+      "start": 16,
+      "end": 56,
+      "quote": "연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다"
+     },
+     {
+      "evidenceId": "VK-01-e2",
+      "start": 63,
+      "end": 99,
+      "quote": "영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-02",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-02-c1",
+      "text": "한빛전자의 3분기 연결 매출액은 전년 같은 기간보다 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-02-e1"
+      ]
+     },
+     {
+      "claimId": "VK-02-c2",
+      "text": "한빛전자의 3분기 영업이익은 전년 같은 기간보다 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-02-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-02-e1",
+      "start": 16,
+      "end": 56,
+      "quote": "연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다"
+     },
+     {
+      "evidenceId": "VK-02-e2",
+      "start": 63,
+      "end": 99,
+      "quote": "영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-03",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-03-c1",
+      "text": "한빛전자의 3분기 연결 매출액은 전년 같은 기간보다 18% 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-03-e1"
+      ]
+     },
+     {
+      "claimId": "VK-03-c2",
+      "text": "한빛전자의 3분기 영업이익은 전년 같은 기간보다 감소했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-03-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-03-e1",
+      "start": 16,
+      "end": 56,
+      "quote": "연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다"
+     },
+     {
+      "evidenceId": "VK-03-e2",
+      "start": 63,
+      "end": 99,
+      "quote": "영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-04",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-04-c1",
+      "text": "한빛전자의 3분기 영업이익은 연결 매출액의 8%를 넘는다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-04-e1"
+      ]
+     },
+     {
+      "claimId": "VK-04-c2",
+      "text": "한빛전자의 3분기 영업이익률은 12%이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-04-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-04-e1",
+      "start": 16,
+      "end": 99,
+      "quote": "연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-05",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-05-c1",
+      "text": "한빛전자의 3분기 영업이익은 전년 같은 기간보다 감소했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-05-e1"
+      ]
+     },
+     {
+      "claimId": "VK-05-c2",
+      "text": "한빛전자의 영업이익 감소는 중국 수요 둔화 때문이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-05-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-05-e1",
+      "start": 63,
+      "end": 99,
+      "quote": "영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다"
+     },
+     {
+      "evidenceId": "VK-05-e2",
+      "start": 105,
+      "end": 145,
+      "quote": "반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-06",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-06-c1",
+      "text": "한빛전자의 3분기 영업이익은 전년 같은 기간보다 감소했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-06-e1"
+      ]
+     },
+     {
+      "claimId": "VK-06-c2",
+      "text": "한빛전자 주식은 지금 매수하는 것이 유리하다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-06-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-06-e1",
+      "start": 63,
+      "end": 99,
+      "quote": "영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-07",
+   "document": {
+    "documentId": "doc-d2",
+    "text": "새솔화학은 2026년 2분기 영업이익 320억 원으로 흑자 전환했다고 공시했다. 전년 2분기에는 150억 원의 영업손실을 냈다. 회사는 같은 기간 평균 가동률이 87%였다고 덧붙였다."
+   },
+   "company": {
+    "companyId": "COMP-SAESOL",
+    "name": "새솔화학"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-07-c1",
+      "text": "새솔화학은 2026년 2분기에 흑자로 전환했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-07-e1"
+      ]
+     },
+     {
+      "claimId": "VK-07-c2",
+      "text": "새솔화학의 전년 2분기 영업손익은 손실이었다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-07-e2"
+      ]
+     },
+     {
+      "claimId": "VK-07-c3",
+      "text": "새솔화학의 2분기 평균 가동률은 87%였다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-07-e3"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-07-e1",
+      "start": 6,
+      "end": 37,
+      "quote": "2026년 2분기 영업이익 320억 원으로 흑자 전환했다"
+     },
+     {
+      "evidenceId": "VK-07-e2",
+      "start": 45,
+      "end": 70,
+      "quote": "전년 2분기에는 150억 원의 영업손실을 냈다"
+     },
+     {
+      "evidenceId": "VK-07-e3",
+      "start": 82,
+      "end": 95,
+      "quote": "평균 가동률이 87%였다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-08",
+   "document": {
+    "documentId": "doc-d2",
+    "text": "새솔화학은 2026년 2분기 영업이익 320억 원으로 흑자 전환했다고 공시했다. 전년 2분기에는 150억 원의 영업손실을 냈다. 회사는 같은 기간 평균 가동률이 87%였다고 덧붙였다."
+   },
+   "company": {
+    "companyId": "COMP-SAESOL",
+    "name": "새솔화학"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-08-c1",
+      "text": "새솔화학은 2026년 3분기에 흑자로 전환했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-08-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-08-e1",
+      "start": 6,
+      "end": 37,
+      "quote": "2026년 2분기 영업이익 320억 원으로 흑자 전환했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-09",
+   "document": {
+    "documentId": "doc-d2",
+    "text": "새솔화학은 2026년 2분기 영업이익 320억 원으로 흑자 전환했다고 공시했다. 전년 2분기에는 150억 원의 영업손실을 냈다. 회사는 같은 기간 평균 가동률이 87%였다고 덧붙였다."
+   },
+   "company": {
+    "companyId": "COMP-SAESOL",
+    "name": "새솔화학"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-09-c1",
+      "text": "새솔화학은 2026년 2분기에 흑자로 전환했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-09-e1"
+      ]
+     },
+     {
+      "claimId": "VK-09-c2",
+      "text": "새솔화학의 2분기 영업이익 320억 원은 시장 기대치를 웃돌았다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-09-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-09-e1",
+      "start": 6,
+      "end": 37,
+      "quote": "2026년 2분기 영업이익 320억 원으로 흑자 전환했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-10",
+   "document": {
+    "documentId": "doc-d3",
+    "text": "대하물산은 호주 광산 지분 20%를 인수하기로 했다고 밝혔다. 인수 금액은 3,000억 원이며 계약은 올해 말 완료될 예정이다. 경쟁사인 동성상사는 이번 입찰에 참여하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-DAEHA",
+    "name": "대하물산"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-10-c1",
+      "text": "대하물산은 호주 광산 지분 20% 인수를 추진한다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-10-e1"
+      ]
+     },
+     {
+      "claimId": "VK-10-c2",
+      "text": "대하물산의 인수 금액은 3,000억 원이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-10-e2"
+      ]
+     },
+     {
+      "claimId": "VK-10-c3",
+      "text": "대하물산의 인수 계약은 올해 말 완료될 예정이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-10-e3"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-10-e1",
+      "start": 6,
+      "end": 28,
+      "quote": "호주 광산 지분 20%를 인수하기로 했다"
+     },
+     {
+      "evidenceId": "VK-10-e2",
+      "start": 35,
+      "end": 52,
+      "quote": "인수 금액은 3,000억 원이며"
+     },
+     {
+      "evidenceId": "VK-10-e3",
+      "start": 53,
+      "end": 70,
+      "quote": "계약은 올해 말 완료될 예정이다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-11",
+   "document": {
+    "documentId": "doc-d3",
+    "text": "대하물산은 호주 광산 지분 20%를 인수하기로 했다고 밝혔다. 인수 금액은 3,000억 원이며 계약은 올해 말 완료될 예정이다. 경쟁사인 동성상사는 이번 입찰에 참여하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-DAEHA",
+    "name": "대하물산"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-11-c1",
+      "text": "동성상사가 호주 광산 지분 20%를 인수하기로 했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-11-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-11-e1",
+      "start": 6,
+      "end": 28,
+      "quote": "호주 광산 지분 20%를 인수하기로 했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-12",
+   "document": {
+    "documentId": "doc-d3",
+    "text": "대하물산은 호주 광산 지분 20%를 인수하기로 했다고 밝혔다. 인수 금액은 3,000억 원이며 계약은 올해 말 완료될 예정이다. 경쟁사인 동성상사는 이번 입찰에 참여하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-DAEHA",
+    "name": "대하물산"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-12-c1",
+      "text": "동성상사는 이번 입찰에 참여했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-12-e1"
+      ]
+     },
+     {
+      "claimId": "VK-12-c2",
+      "text": "대하물산은 호주 광산 지분을 인수하기로 했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-12-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-12-e1",
+      "start": 77,
+      "end": 98,
+      "quote": "동성상사는 이번 입찰에 참여하지 않았다"
+     },
+     {
+      "evidenceId": "VK-12-e2",
+      "start": 6,
+      "end": 28,
+      "quote": "호주 광산 지분 20%를 인수하기로 했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-13",
+   "document": {
+    "documentId": "doc-d3",
+    "text": "대하물산은 호주 광산 지분 20%를 인수하기로 했다고 밝혔다. 인수 금액은 3,000억 원이며 계약은 올해 말 완료될 예정이다. 경쟁사인 동성상사는 이번 입찰에 참여하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-DAEHA",
+    "name": "대하물산"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-13-c1",
+      "text": "대하물산의 인수 금액은 3,000억 원이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-13-e1"
+      ]
+     },
+     {
+      "claimId": "VK-13-c2",
+      "text": "대하물산은 인수 자금을 전액 회사채로 조달한다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-13-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-13-e1",
+      "start": 35,
+      "end": 52,
+      "quote": "인수 금액은 3,000억 원이며"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-14",
+   "document": {
+    "documentId": "doc-d4",
+    "text": "푸른바이오는 신약 후보물질 PB-201의 임상 2상에서 주평가지표를 충족하지 못했다고 발표했다. 회사는 하위 분석 결과를 검토한 뒤 임상 3상 진행 여부를 결정하겠다고 밝혔다. 임상은 국내 12개 병원에서 진행됐다."
+   },
+   "company": {
+    "companyId": "COMP-PURUN",
+    "name": "푸른바이오"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-14-c1",
+      "text": "푸른바이오의 PB-201 임상 2상은 주평가지표를 충족하지 못했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-14-e1"
+      ]
+     },
+     {
+      "claimId": "VK-14-c2",
+      "text": "푸른바이오는 임상 3상 진행 여부를 아직 확정하지 않았다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-14-e2"
+      ]
+     },
+     {
+      "claimId": "VK-14-c3",
+      "text": "이 기사에는 임상 결과의 구체적 수치가 포함되어 있지 않다.",
+      "assertionKind": "limitation",
+      "evidenceIds": []
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-14-e1",
+      "start": 15,
+      "end": 46,
+      "quote": "PB-201의 임상 2상에서 주평가지표를 충족하지 못했다"
+     },
+     {
+      "evidenceId": "VK-14-e2",
+      "start": 74,
+      "end": 92,
+      "quote": "임상 3상 진행 여부를 결정하겠다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-15",
+   "document": {
+    "documentId": "doc-d4",
+    "text": "푸른바이오는 신약 후보물질 PB-201의 임상 2상에서 주평가지표를 충족하지 못했다고 발표했다. 회사는 하위 분석 결과를 검토한 뒤 임상 3상 진행 여부를 결정하겠다고 밝혔다. 임상은 국내 12개 병원에서 진행됐다."
+   },
+   "company": {
+    "companyId": "COMP-PURUN",
+    "name": "푸른바이오"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-15-c1",
+      "text": "푸른바이오의 PB-201 임상 2상은 주평가지표를 충족했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-15-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-15-e1",
+      "start": 15,
+      "end": 46,
+      "quote": "PB-201의 임상 2상에서 주평가지표를 충족하지 못했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-16",
+   "document": {
+    "documentId": "doc-d4",
+    "text": "푸른바이오는 신약 후보물질 PB-201의 임상 2상에서 주평가지표를 충족하지 못했다고 발표했다. 회사는 하위 분석 결과를 검토한 뒤 임상 3상 진행 여부를 결정하겠다고 밝혔다. 임상은 국내 12개 병원에서 진행됐다."
+   },
+   "company": {
+    "companyId": "COMP-PURUN",
+    "name": "푸른바이오"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-16-c1",
+      "text": "푸른바이오의 PB-201 임상 2상은 주평가지표를 충족하지 못했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-16-e1"
+      ]
+     },
+     {
+      "claimId": "VK-16-c2",
+      "text": "푸른바이오 주가는 임상 3상 발표 후 50% 상승할 것이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-16-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-16-e1",
+      "start": 15,
+      "end": 46,
+      "quote": "PB-201의 임상 2상에서 주평가지표를 충족하지 못했다"
+     },
+     {
+      "evidenceId": "VK-16-e2",
+      "start": 74,
+      "end": 92,
+      "quote": "임상 3상 진행 여부를 결정하겠다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-17",
+   "document": {
+    "documentId": "doc-d4",
+    "text": "푸른바이오는 신약 후보물질 PB-201의 임상 2상에서 주평가지표를 충족하지 못했다고 발표했다. 회사는 하위 분석 결과를 검토한 뒤 임상 3상 진행 여부를 결정하겠다고 밝혔다. 임상은 국내 12개 병원에서 진행됐다."
+   },
+   "company": {
+    "companyId": "COMP-PURUN",
+    "name": "푸른바이오"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-17-c1",
+      "text": "푸른바이오의 PB-201 임상 2상은 주평가지표를 충족하지 못했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-17-e1"
+      ]
+     },
+     {
+      "claimId": "VK-17-c2",
+      "text": "이 기사는 임상 3상 결과를 상세히 다룬다.",
+      "assertionKind": "limitation",
+      "evidenceIds": []
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-17-e1",
+      "start": 15,
+      "end": 46,
+      "quote": "PB-201의 임상 2상에서 주평가지표를 충족하지 못했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-18",
+   "document": {
+    "documentId": "doc-d5",
+    "text": "미래모빌리티의 10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다. 전년 같은 달 3,500대와 비교하면 늘었다. 회사는 배터리 수급 지연으로 일부 생산 라인을 이틀간 멈췄다고 밝혔다."
+   },
+   "company": {
+    "companyId": "COMP-MIRAE",
+    "name": "미래모빌리티"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-18-c1",
+      "text": "미래모빌리티의 10월 판매량은 전월보다 16% 감소했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-18-e1"
+      ]
+     },
+     {
+      "claimId": "VK-18-c2",
+      "text": "미래모빌리티의 10월 판매량은 전년 같은 달보다 20% 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-18-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-18-e1",
+      "start": 8,
+      "end": 44,
+      "quote": "10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다"
+     },
+     {
+      "evidenceId": "VK-18-e2",
+      "start": 8,
+      "end": 70,
+      "quote": "10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다. 전년 같은 달 3,500대와 비교하면 늘었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-19",
+   "document": {
+    "documentId": "doc-d5",
+    "text": "미래모빌리티의 10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다. 전년 같은 달 3,500대와 비교하면 늘었다. 회사는 배터리 수급 지연으로 일부 생산 라인을 이틀간 멈췄다고 밝혔다."
+   },
+   "company": {
+    "companyId": "COMP-MIRAE",
+    "name": "미래모빌리티"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-19-c1",
+      "text": "미래모빌리티의 10월 판매량은 전월보다 20% 감소했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-19-e1"
+      ]
+     },
+     {
+      "claimId": "VK-19-c2",
+      "text": "미래모빌리티의 10월 판매량은 전년 같은 달보다 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-19-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-19-e1",
+      "start": 8,
+      "end": 44,
+      "quote": "10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다"
+     },
+     {
+      "evidenceId": "VK-19-e2",
+      "start": 46,
+      "end": 70,
+      "quote": "전년 같은 달 3,500대와 비교하면 늘었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-20",
+   "document": {
+    "documentId": "doc-d5",
+    "text": "미래모빌리티의 10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다. 전년 같은 달 3,500대와 비교하면 늘었다. 회사는 배터리 수급 지연으로 일부 생산 라인을 이틀간 멈췄다고 밝혔다."
+   },
+   "company": {
+    "companyId": "COMP-MIRAE",
+    "name": "미래모빌리티"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-20-c1",
+      "text": "미래모빌리티의 10월 판매량은 전월보다 줄었다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-20-e1"
+      ]
+     },
+     {
+      "claimId": "VK-20-c2",
+      "text": "미래모빌리티의 판매량 감소는 배터리 수급 지연이 원인이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-20-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-20-e1",
+      "start": 8,
+      "end": 44,
+      "quote": "10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다"
+     },
+     {
+      "evidenceId": "VK-20-e2",
+      "start": 76,
+      "end": 105,
+      "quote": "배터리 수급 지연으로 일부 생산 라인을 이틀간 멈췄다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-21",
+   "document": {
+    "documentId": "doc-d6",
+    "text": "가온에너지는 이사회에서 주당 500원의 현금배당을 결의했다. 지난해 배당은 주당 400원이었다. 배당 기준일은 12월 31일이다."
+   },
+   "company": {
+    "companyId": "COMP-GAON",
+    "name": "가온에너지"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-21-c1",
+      "text": "가온에너지는 주당 500원의 현금배당을 결의했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-21-e1"
+      ]
+     },
+     {
+      "claimId": "VK-21-c2",
+      "text": "가온에너지의 이번 배당금은 지난해보다 늘었다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-21-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-21-e1",
+      "start": 13,
+      "end": 32,
+      "quote": "주당 500원의 현금배당을 결의했다"
+     },
+     {
+      "evidenceId": "VK-21-e2",
+      "start": 13,
+      "end": 52,
+      "quote": "주당 500원의 현금배당을 결의했다. 지난해 배당은 주당 400원이었다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-22",
+   "document": {
+    "documentId": "doc-d6",
+    "text": "가온에너지는 이사회에서 주당 500원의 현금배당을 결의했다. 지난해 배당은 주당 400원이었다. 배당 기준일은 12월 31일이다."
+   },
+   "company": {
+    "companyId": "COMP-GAON",
+    "name": "가온에너지"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-22-c1",
+      "text": "가온에너지의 배당 기준일은 3월 31일이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-22-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-22-e1",
+      "start": 54,
+      "end": 71,
+      "quote": "배당 기준일은 12월 31일이다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-23",
+   "document": {
+    "documentId": "doc-d6",
+    "text": "가온에너지는 이사회에서 주당 500원의 현금배당을 결의했다. 지난해 배당은 주당 400원이었다. 배당 기준일은 12월 31일이다."
+   },
+   "company": {
+    "companyId": "COMP-GAON",
+    "name": "가온에너지"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-23-c1",
+      "text": "가온에너지는 주당 500원의 현금배당을 결의했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-23-e1"
+      ]
+     },
+     {
+      "claimId": "VK-23-c2",
+      "text": "가온에너지는 배당 매력이 높아 보유를 권한다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-23-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-23-e1",
+      "start": 13,
+      "end": 32,
+      "quote": "주당 500원의 현금배당을 결의했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-24",
+   "document": {
+    "documentId": "doc-d7",
+    "text": "동서철강은 노조와 임금 협상을 진행 중이라고 밝혔다. 협상 타결 시점은 정해지지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-DONGSEO",
+    "name": "동서철강"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-24-c1",
+      "text": "동서철강은 이번 달 안에 임금 협상을 타결할 것이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-24-e1"
+      ]
+     },
+     {
+      "claimId": "VK-24-c2",
+      "text": "이 기사는 임금 협상의 쟁점을 다루지 않는다.",
+      "assertionKind": "limitation",
+      "evidenceIds": []
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-24-e1",
+      "start": 30,
+      "end": 48,
+      "quote": "협상 타결 시점은 정해지지 않았다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-25",
+   "document": {
+    "documentId": "doc-d7",
+    "text": "동서철강은 노조와 임금 협상을 진행 중이라고 밝혔다. 협상 타결 시점은 정해지지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-DONGSEO",
+    "name": "동서철강"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-25-c1",
+      "text": "동서철강은 노조와 임금 협상을 진행 중이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-25-e1"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-25-e1",
+      "start": 6,
+      "end": 28,
+      "quote": "노조와 임금 협상을 진행 중이라고 밝혔다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-26",
+   "document": {
+    "documentId": "doc-d1",
+    "text": "한빛전자는 2026년 3분기 연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다고 밝혔다. 영업이익은 1,050억 원으로 전년 같은 기간 대비 12% 줄었다. 회사는 반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다. 회사는 4분기 실적 전망은 제시하지 않았다."
+   },
+   "company": {
+    "companyId": "COMP-HANBIT",
+    "name": "한빛전자"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-26-c1",
+      "text": "한빛전자의 반도체 부문 영업이익은 적자였다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-26-e1"
+      ]
+     },
+     {
+      "claimId": "VK-26-c2",
+      "text": "한빛전자의 3분기 연결 매출액은 전년 같은 기간보다 증가했다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-26-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-26-e1",
+      "start": 105,
+      "end": 145,
+      "quote": "반도체 부문 재고 평가손실 반영이 영업이익 감소의 주된 이유라고 설명했다"
+     },
+     {
+      "evidenceId": "VK-26-e2",
+      "start": 16,
+      "end": 56,
+      "quote": "연결 매출액이 1조 2,400억 원으로 전년 같은 기간보다 8% 증가했다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-27",
+   "document": {
+    "documentId": "doc-d5",
+    "text": "미래모빌리티의 10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다. 전년 같은 달 3,500대와 비교하면 늘었다. 회사는 배터리 수급 지연으로 일부 생산 라인을 이틀간 멈췄다고 밝혔다."
+   },
+   "company": {
+    "companyId": "COMP-MIRAE",
+    "name": "미래모빌리티"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-27-c1",
+      "text": "미래모빌리티의 10월 해외 판매 비중은 40%였다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-27-e1"
+      ]
+     },
+     {
+      "claimId": "VK-27-c2",
+      "text": "미래모빌리티는 생산 라인 일부를 이틀간 멈췄다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-27-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-27-e1",
+      "start": 8,
+      "end": 44,
+      "quote": "10월 전기차 판매량은 4,200대로 전월 5,000대보다 줄었다"
+     },
+     {
+      "evidenceId": "VK-27-e2",
+      "start": 76,
+      "end": 105,
+      "quote": "배터리 수급 지연으로 일부 생산 라인을 이틀간 멈췄다"
+     }
+    ]
+   }
+  },
+  {
+   "caseId": "VK-28",
+   "document": {
+    "documentId": "doc-d4",
+    "text": "푸른바이오는 신약 후보물질 PB-201의 임상 2상에서 주평가지표를 충족하지 못했다고 발표했다. 회사는 하위 분석 결과를 검토한 뒤 임상 3상 진행 여부를 결정하겠다고 밝혔다. 임상은 국내 12개 병원에서 진행됐다."
+   },
+   "company": {
+    "companyId": "COMP-PURUN",
+    "name": "푸른바이오"
+   },
+   "candidate": {
+    "claims": [
+     {
+      "claimId": "VK-28-c1",
+      "text": "푸른바이오의 임상은 국내 12개 병원에서 진행됐다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-28-e1"
+      ]
+     },
+     {
+      "claimId": "VK-28-c2",
+      "text": "푸른바이오는 하위 분석 결과를 검토할 계획이다.",
+      "assertionKind": "fact",
+      "evidenceIds": [
+       "VK-28-e2"
+      ]
+     }
+    ],
+    "citations": [
+     {
+      "evidenceId": "VK-28-e1",
+      "start": 103,
+      "end": 119,
+      "quote": "국내 12개 병원에서 진행됐다"
+     },
+     {
+      "evidenceId": "VK-28-e2",
+      "start": 58,
+      "end": 73,
+      "quote": "하위 분석 결과를 검토한 뒤"
+     }
+    ]
+   }
+  }
+ ]
+}

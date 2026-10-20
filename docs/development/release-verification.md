@@ -54,7 +54,7 @@ F03 도메인 구현은 회원 `6.2.5` 및 관리자 `6.10.1/6.10.13`, F05는 �
 | 회차 그래프 근거 | `/api/briefings/{id}/graph` | `/api/v1/briefings/{id}/graph`, `getBriefingGraphBasis`. F07은 목표 설명의 helper 경로를 이 버전으로 정정한 것이다. |
 | 상태 확인 | `GET /api/health`, `routers/system.py::health` | production health/readiness 경로는 대상 구현에서 확정한다. 현 BFF 경로를 Spring에서 가동한다고 가정하지 않는다. |
 | AI 실행 | `ai/worker/src/zoop_ai/{contracts,cli,runner,store,provider}.py`, BFF `zoop_bff.ai_worker.AiWorkerClient`, 로컬 내부 HTTP `ai/service/src/zoop_ai_service/` ([계약](../api/internal-ai-openapi.yaml)) | 언어 독립 JSON seam. Spring 후보도 Python import/worker DB 공유 쓰기 대신 schema·transport·오류/복구 계약을 구현해야 한다. 내부 HTTP는 같은 CLI를 감싼 로컬 구현이며 BFF는 아직 이를 소비하지 않는다. Spring 쪽 전송 클라이언트는 `api/src/main/java/com/zoop/ai/`([설명](../../api/docs/AI_INTEGRATION.md))에 5개 operation 전부 구현·실제 서비스로 검증했지만 공개 인증·도메인 소비자는 아직 없다. S1 문서 요약·기업 판정은 operator 전용 비웹 [문서 분석](../../api/docs/DOCUMENT_ANALYSIS.md)이 이 클라이언트로 결과를 앱 DB에 저장한다(로컬 구현·검증, 공개 읽기 경로·S2/S3·outlook import는 없다). |
-| 오프라인 원문 준비 | `ai/pipeline`의 `zoop_ai_pipeline.ingestion_cli`, `ingestion{,_contracts,_parsers}.py` | 내부 `zoop-ingestion-s2-1` 프로세스다. `/api/v1` 공개 수집 API나 이미 연결된 admin job이 아니다. |
+| 일회성 문서 수집·오프라인 원문 준비 | `ai/pipeline`의 `zoop_ai_pipeline.collection_cli`(`zoop-ai-collect`), `ingestion_cli`, `collection{,_contracts}.py`, `ingestion{,_contracts,_parsers,_pdf,_url}.py` | 내부 `zoop-collection-1`·`zoop-ingestion-s2-1` 프로세스다(private PoC 없이 기본 설치로 동작). `/api/v1` 공개 수집 API나 이미 연결된 admin job이 아니며, 자동 크롤링·검색·API 인증·스케줄러는 없다. |
 
 목표 경로 정정은 현재 BFF의 prefix cutover나 운영 가동을 뜻하지 않는다. F07 확인은 다섯 operation(`getGraph/getCompanyRelation/getCompany/getEvent/getEvidence`) 설명의 회차 helper, 실제 배포 router·프록시·FE client 요청을 각각 대조한다. 목표는 `/api/v1`, 현 프로토타입 consumer는 `/api`라는 사실을 숨기는 alias를 만들지 않는다. 본개발 선택은 [이식 경계](../migration/README.md)를 따른다.
 
@@ -67,8 +67,8 @@ F03 도메인 구현은 회원 `6.2.5` 및 관리자 `6.10.1/6.10.13`, F05는 �
 | `ZOOP_SENTIMENT_MODEL` → `ZOOP_AI_DOCUMENT_SENTIMENT_MODEL` | 현재 예제는 비어 있다. 실제 선택 모델은 별도 승인한다. |
 | `ZOOP_SENTIMENT_REASONING_EFFORT` → `ZOOP_AI_DOCUMENT_SENTIMENT_REASONING_EFFORT` | 비어 있으면 provider 요청에서 effort 필드를 생략한다. |
 | 옛 회차 sentiment 설정 → `ZOOP_AI_BRIEFING_OUTLOOK_MODEL`, `ZOOP_AI_BRIEFING_OUTLOOK_REASONING_EFFORT` | 현재 둘 다 비어 있다. 문서 판정과 회차 판정은 별도 stage이며 하나의 모델 export를 자동 공유하지 않는다. |
-| 새 요약 / 새 의미 검증 | `ZOOP_AI_DOCUMENT_SUMMARY_MODEL/REASONING_EFFORT`, `ZOOP_AI_VERIFY_MODEL/REASONING_EFFORT`도 비어 있다. 문서 live 작업은 생성 stage와 VERIFY 양쪽 설정이 필요하다. |
-| provider / endpoint | `ZOOP_AI_PROVIDER=openai-compatible`, `ZOOP_AI_BASE_URL=https://api.openai.com/v1`은 공개 예제다. API key 값은 인수 문서에 싣지 않는다. endpoint와 grant recipient/providerRevision의 일치를 확인한다. |
+| 새 요약 / 새 의미 검증 | `ZOOP_AI_DOCUMENT_SUMMARY_MODEL/REASONING_EFFORT`도 비어 있다. 의미 검증은 기본 chat 검증기면 `ZOOP_AI_VERIFY_MODEL/REASONING_EFFORT`가 필요하고, 네이티브 Jev(`ZOOP_AI_VERIFY_PROVIDER=typesafe-native`)면 이 둘은 **비우고** `TYPESAFE_VALIDATION_MODEL=jev-1.14.0`·`TYPESAFE_API_KEY`가 필요하다. 문서 live 작업은 생성 stage와 VERIFY 양쪽 설정이 필요하다. |
+| provider / endpoint | `ZOOP_AI_PROVIDER=openai-compatible`, `ZOOP_AI_BASE_URL=https://api.openai.com/v1`, 네이티브 검증의 `TYPESAFE_BASE_URL=https://api.typesafe.ai/v1`은 공개 예제다. API key 값은 인수 문서에 싣지 않는다. endpoint와 grant recipient/providerRevision의 일치를 확인한다(생성은 `openai-compatible:<rev>`, 네이티브 검증은 `typesafe-native:<rev>`, 두 수신자 모두 grant에 있어야 한다). 네이티브 Jev 임계치는 잠정 값이며 보정되지 않았다. |
 | live / 호출 상한 | 예제 `ZOOP_AI_LIVE_ENABLED=0`, `ZOOP_AI_GLOBAL_MAX_CALLS=0`. live 활성화에는 명시적 `1`, 양수 durable 상한, stage model, 현재 권리 registry, 별도 전송·비용 승인이 모두 필요하다. 호출 수 상한은 금액 상한의 대체물이 아니다. |
 | 격리 합성 smoke | AI 문서 예시의 `ZOOP_QUOTE_PROVIDER=off`, `ZOOP_METRICS_PROVIDER=off`, `ZOOP_BRIEFING_SCHEDULER=0` 및 별도 `ZOOP_STATE_DIR/ZOOP_SNAPSHOT_PATH/ZOOP_COMPANY_CATALOG`를 사용한다. 실제 운영 설정이라고 옮기지 않는다. |
 | 인증·배포 설정 | `ZOOP_CORS_ORIGINS`, `ZOOP_COOKIE_SECURE`, 회원/관리자 session 정책·DB/상태 경로는 앱/운영 책임자가 환경별로 확정한다. localhost의 기본값·데모 계정·로컬 DSN을 production 값으로 사용하지 않는다. |

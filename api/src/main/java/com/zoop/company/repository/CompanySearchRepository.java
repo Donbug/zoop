@@ -69,6 +69,34 @@ public class CompanySearchRepository {
         return jdbc.query(sql.toString(), parameters, ROW_MAPPER);
     }
 
+    public java.util.Optional<CompanyProfileRow> findProfile(String id) {
+        List<CompanyProfileRow> rows = jdbc.query("""
+                SELECT id, name, ticker, exchange_code, market, aliases, brand_color, logo_url,
+                       profile ->> 'legalName' AS legal_name,
+                       profile ->> 'representative' AS representative,
+                       profile ->> 'foundedDate' AS founded_date,
+                       profile ->> 'websiteUrl' AS website_url,
+                       profile ->> 'sector' AS sector
+                FROM companies WHERE id = :id
+                """, new MapSqlParameterSource("id", id), (rs, rowNumber) -> {
+            Array sqlArray = rs.getArray("aliases");
+            List<String> aliases = new ArrayList<>();
+            if (sqlArray != null) {
+                try {
+                    for (Object value : (Object[]) sqlArray.getArray()) aliases.add((String) value);
+                } finally {
+                    try { sqlArray.free(); } catch (SQLException ignored) { }
+                }
+            }
+            return new CompanyProfileRow(rs.getString("id"), rs.getString("name"), rs.getString("ticker"),
+                    rs.getString("exchange_code"), rs.getString("market"), List.copyOf(aliases),
+                    rs.getString("brand_color"), rs.getString("logo_url"), rs.getString("legal_name"),
+                    rs.getString("representative"), rs.getString("founded_date"), rs.getString("website_url"),
+                    rs.getString("sector"));
+        });
+        return rows.stream().findFirst();
+    }
+
     private static String exactIdentity() {
         return "(c.id = :q OR " + normalized("c.id") + " = :q OR (c.ticker IS NOT NULL AND "
                 + normalized("c.ticker") + " = :q))";

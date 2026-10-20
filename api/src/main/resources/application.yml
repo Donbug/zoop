@@ -14,7 +14,44 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+# Swagger and the generated OpenAPI document are enabled by default and can be disabled per environment.
+springdoc:
+  api-docs:
+    enabled: ${ZOOP_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${ZOOP_SWAGGER_ENABLED:false}
+    path: /swagger-ui.html
+
 zoop:
+  market:
+    quote-provider: ${ZOOP_QUOTE_PROVIDER:toss}
+    toss-client-id: ${ZOOP_TOSS_CLIENT_ID:}
+    toss-client-secret: ${ZOOP_TOSS_CLIENT_SECRET:}
+    toss-base-url: ${ZOOP_TOSS_BASE_URL:https://openapi.tossinvest.com}
+    metrics-provider: ${ZOOP_METRICS_PROVIDER:off}
+    naver-domestic-url: ${ZOOP_NAVER_DOMESTIC_URL:https://m.stock.naver.com}
+    naver-world-url: ${ZOOP_NAVER_WORLD_URL:https://api.stock.naver.com}
+    naver-autocomplete-url: ${ZOOP_NAVER_AC_URL:https://ac.stock.naver.com}
+    timeout: ${ZOOP_MARKET_TIMEOUT:5s}
+  api:
+    cors:
+      allowed-origins: ${ZOOP_API_CORS_ALLOWED_ORIGINS:}
+  auth:
+    allowed-origins: ${ZOOP_AUTH_ALLOWED_ORIGINS:}
+    allow-http-loopback-origins: false
+    session-cookie-secure: true
+    social:
+      frontend-origin: ${ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN:}
+  admin:
+    session:
+      idle-timeout: ${ZOOP_ADMIN_IDLE_TIMEOUT:30m}
+      absolute-timeout: ${ZOOP_ADMIN_ABSOLUTE_TIMEOUT:8h}
+  graph:
+    snapshot:
+      # Public graph snapshot source: none (default; reads fail closed), fixture (local/dev synthetic data only) or artifact
+      # (snapshots staged by the operator graph handoff import, read-only and verified; needs artifact-root).
+      source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
+      artifact-root: ${ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT:}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.
@@ -66,6 +103,37 @@ zoop:
     ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
     ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  graph-handoff-import:
+    # Operator-only, non-web staging of one AI handoff as an INACTIVE graph version (see api/README.md). Disabled by default; the
+    # application starts without any of these settings. Enabled, it refuses to start unless the run is non-web
+    # (--spring.main.web-application-type=none), no document import/analysis and no fixture snapshot source runs in the same process,
+    # and every path below is valid. There is ONE source registry (`ingestion-sources`) and ONE S2-1 ledger (`ingestion-state-dir`):
+    # the handoff export and the per-observation `zoop-ai-ingest export --require-store` both read them. `canonical`, `decisions`
+    # and `bindings` are the operator files the handoff was frozen with (pinned by hash in its manifest). Paths only; the database
+    # uses DB_*, which no CLI receives.
+    enabled: ${ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED:false}
+    request: ${ZOOP_GRAPH_HANDOFF_IMPORT_REQUEST:}
+    result: ${ZOOP_GRAPH_HANDOFF_IMPORT_RESULT:}
+    handoff-cli: ${ZOOP_HANDOFF_CLI:}
+    handoff-state-dir: ${ZOOP_HANDOFF_STATE_DIR:}
+    relation-state-dir: ${ZOOP_RELATION_STATE_DIR:}
+    extraction-state-dir: ${ZOOP_EXTRACTION_STATE_DIR:}
+    ingestion-cli: ${ZOOP_INGESTION_CLI:}
+    ingestion-state-dir: ${ZOOP_INGESTION_STATE_DIR:}
+    ingestion-sources: ${ZOOP_INGESTION_SOURCES:}
+    canonical: ${ZOOP_HANDOFF_CANONICAL:}
+    decisions: ${ZOOP_HANDOFF_DECISIONS:}
+    bindings: ${ZOOP_HANDOFF_BINDINGS:}
+    artifact-root: ${ZOOP_ARTIFACT_ROOT:}
+  document-read:
+    # Public GET /api/v1/evidence/{id} (see api/docs/DOCUMENT_ANALYSIS.md). Both settings are optional, independent of the operator
+    # import/analysis flags above, and read-only: nothing is created, locked or written. Paths only; the database uses DB_*.
+    # `grants` is the operator's flat S1 grant registry (the same file as ZOOP_DOCUMENT_ANALYSIS_GRANTS / the AI service),
+    # re-read on every request; unset, every evidence read answers 503. `artifact-root` is only needed to read the exact receipt
+    # of a summary that was served from the AI artifact cache; unset, only that read answers 503. A set value that is not a
+    # normalized absolute path to an existing file/directory fails startup.
+    grants: ${ZOOP_DOCUMENT_READ_GRANTS:}
+    artifact-root: ${ZOOP_DOCUMENT_READ_ARTIFACT_ROOT:}
 
 server:
   port: ${SERVER_PORT:8080}

@@ -22,6 +22,28 @@
       ]
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].context.graphVersion:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answerBasis": {
+      "type": "string",
+      "enum": [
+        "general_knowledge",
+        "zoop_documented",
+        "evidence_grounded",
+        "mixed",
+        "none"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answerBasis:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.choices[].kind": {
+      "type": "string",
+      "enum": [
+        "company",
+        "period",
+        "scope",
+        "snapshot",
+        "other"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.choices[].kind:required": true,
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.metadata.failures": {
       "type": "array"
     },
@@ -439,6 +461,16 @@
         "type": "string"
       }
     },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].context.evidenceCount": {
+      "target": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 20
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
     "response:200:application/json.conversation<anyOf:0>.jobs[].createdAt": {
       "target": {
         "type": "string",
@@ -448,10 +480,44 @@
         "type": "string"
       }
     },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].failure<anyOf:0>.kind": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "validation_failed",
+          "save_failed",
+          "result_lost",
+          "transient",
+          "budget_exceeded",
+          "permission_denied",
+          "internal"
+        ]
+      },
+      "bff": {
+        "type": "string",
+        "enum": [
+          "validation_failed",
+          "save_failed",
+          "result_lost",
+          "transient",
+          "permission_denied",
+          "internal"
+        ]
+      }
+    },
     "response:200:application/json.conversation<anyOf:0>.jobs[].finishedAt<anyOf:0>": {
       "target": {
         "type": "string",
         "format": "date-time"
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.answer": {
+      "target": {
+        "type": "string",
+        "maxLength": 12000
       },
       "bff": {
         "type": "string"
@@ -466,6 +532,24 @@
         "type": "string"
       }
     },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.choices": {
+      "target": {
+        "type": "array",
+        "maxItems": 6
+      },
+      "bff": {
+        "type": "array"
+      }
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations": {
+      "target": {
+        "type": "array",
+        "maxItems": 20
+      },
+      "bff": {
+        "type": "array"
+      }
+    },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.citations[].publishedAt<anyOf:0>": {
       "target": {
         "type": "string",
@@ -475,6 +559,15 @@
         "type": "string"
       }
     },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.graphTargets": {
+      "target": {
+        "type": "array",
+        "maxItems": 50
+      },
+      "bff": {
+        "type": "array"
+      }
+    },
     "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.metadata.asOf": {
       "target": {
         "type": "string",
@@ -482,6 +575,16 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].result<anyOf:0>.sources": {
+      "target": {
+        "type": "array",
+        "maxItems": 20,
+        "uniqueItems": true
+      },
+      "bff": {
+        "type": "array"
       }
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].updatedAt": {

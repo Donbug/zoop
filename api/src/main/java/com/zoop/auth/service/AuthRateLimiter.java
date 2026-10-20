@@ -48,18 +48,34 @@ public class AuthRateLimiter {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void checkLoginEmailFailures(String emailKey) {
-        Key emailFailures = key("login_email_failure", emailKey);
-        Instant now = clock.instant();
-        store.lock(emailFailures.scope(), emailFailures.hash());
-        long retry = retryAfter(emailFailures, LOGIN_WINDOW, 20, now);
-        if (retry > 0) {
-            throw new RateLimitedException(retry);
-        }
+        checkFailureScope("login_email_failure", emailKey);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordLoginIpAttempt(String clientIp) {
         recordIpOnly("login_ip", clientIp, LOGIN_WINDOW, 100);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordAdminLoginIpAttempt(String clientIp) {
+        recordIpOnly("admin_login_ip", clientIp, LOGIN_WINDOW, 100);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void checkAdminLoginEmailFailures(String emailKey) {
+        checkFailureScope("admin_login_email_failure", emailKey);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordAdminLoginFailure(String emailKey) {
+        recordFailureScope("admin_login_email_failure", emailKey);
+    }
+
+    @Transactional
+    public void clearAdminLoginFailures(String emailKey) {
+        Key email = key("admin_login_email_failure", emailKey);
+        store.lock(email.scope(), email.hash());
+        store.clear(email.scope(), email.hash());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -75,7 +91,21 @@ public class AuthRateLimiter {
     /** Call only for INVALID_CREDENTIALS, including unknown accounts. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordLoginFailure(String emailKey) {
-        Key email = key("login_email_failure", emailKey);
+        recordFailureScope("login_email_failure", emailKey);
+    }
+
+    private void checkFailureScope(String scope, String emailKey) {
+        Key emailFailures = key(scope, emailKey);
+        Instant now = clock.instant();
+        store.lock(emailFailures.scope(), emailFailures.hash());
+        long retry = retryAfter(emailFailures, LOGIN_WINDOW, 20, now);
+        if (retry > 0) {
+            throw new RateLimitedException(retry);
+        }
+    }
+
+    private void recordFailureScope(String scope, String emailKey) {
+        Key email = key(scope, emailKey);
         Instant now = clock.instant();
         store.lock(email.scope(), email.hash());
         long retry = retryAfter(email, LOGIN_WINDOW, 20, now);

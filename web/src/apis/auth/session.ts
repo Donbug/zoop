@@ -66,3 +66,59 @@ export async function listSignupTerms(): Promise<SignupTerm[]> {
     throw new ApiError(200, 'INVALID_TERMS', '약관을 확인하지 못했어요.');
   return terms;
 }
+
+export type SocialProvider = { id: SocialProviderId; name: string };
+
+/** listSocialProviders: 커서 전체를 순회한 소셜 로그인 제공자. */
+export async function listSocialProviders(): Promise<SocialProvider[]> {
+  const providers: SocialProvider[] = [];
+  const providerIds = new Set<SocialProviderId>();
+  const cursors = new Set<string>();
+  let cursor: string | null = null;
+
+  do {
+    const query: string = cursor ? `?${new URLSearchParams({ cursor })}` : '';
+    const page: {
+      items: SocialProvider[];
+      nextCursor: string | null;
+    } = await call(`/api/v1/auth/social/providers${query}`, 'GET', undefined, {
+      skipAuth: true,
+    });
+
+    for (const provider of page.items) {
+      if (providerIds.has(provider.id))
+        throw new ApiError(
+          200,
+          'INVALID_SOCIAL_PROVIDERS',
+          '소셜 로그인 방법을 확인하지 못했어요.',
+        );
+      providerIds.add(provider.id);
+      providers.push(provider);
+    }
+
+    cursor = page.nextCursor;
+    if (cursor && cursors.has(cursor))
+      throw new ApiError(
+        200,
+        'INVALID_SOCIAL_PROVIDERS',
+        '소셜 로그인 방법을 확인하지 못했어요.',
+      );
+    if (cursor) cursors.add(cursor);
+  } while (cursor);
+
+  return providers;
+}
+
+/**
+ * completeSocialSignup: 소셜 콜백이 검증해 둔 신규 인증(zoop_oauth_pending 쿠키)으로 가입을 마친다.
+ * 이메일·제공자는 서버가 보관한 값만 쓰고, 화면은 표시 이름과 약관 동의만 보낸다.
+ * 201이면 회원 세션 쿠키가 발급된다. 403은 인증 만료·없음, 409 SOCIAL_LINK_REQUIRED는 같은 이메일 계정이 이미 있음.
+ */
+export function completeSocialSignup(body: {
+  displayName?: string;
+  agreements: { id: string; version: string; accepted: boolean }[];
+}) {
+  return call<Session>('/api/v1/auth/social/signup', 'POST', body, {
+    skipAuth: true,
+  });
+}

@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import GraphIcon from '@/components/graph/GraphIcon';
+import GraphTutorial from '@/components/graph/GraphTutorial';
+import GraphFocusControls from '@/components/graph/GraphFocusControls';
+import CompanyPathPanel from '@/components/graph/CompanyPathPanel';
+import { companyPath } from '@/components/graph/company-path';
+import ImpactPathPanel from '@/components/graph/ImpactPathPanel';
 import CompanyDetailPanel from '@/components/graph/CompanyDetailPanel';
 import RelationDetailPanel from '@/components/graph/RelationDetailPanel';
 import type { RelationDetail } from '@/types/map/relation';
@@ -10,12 +15,15 @@ import EventDetailPanel, {
   type EventAction,
 } from '@/components/graph/EventDetailPanel';
 import AiChatDrawer from '@/components/ai/AiChatDrawer';
+import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
 import { useGraphData } from '@/hooks/useGraphData';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
+import { useImpactPath } from '@/hooks/useImpactPath';
 import { companyUrl } from '@/apis/company/company';
+import { setTutorialCompleted } from '@/apis/graph/tutorial';
 import { impactEdges, exactTime } from '@/components/company/detail-model';
 import type { Impact } from '@/types/company/detail';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,7 +31,12 @@ import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useAiChatStore } from '@/stores/useAiChatStore';
 import { useGraphUiStore } from '@/stores/useGraphUiStore';
 import type { EventDetail } from '@/types/map/event';
-import type { GraphTarget, MapMode, PersonalScope } from '@/types/map';
+import type {
+  GraphTarget,
+  GraphTutorialStep,
+  MapMode,
+  PersonalScope,
+} from '@/types/map';
 import '@/components/graph/relationship-map.css';
 
 const FILTER_KEY = 'zoop.graph.personal-filter';
@@ -44,7 +57,11 @@ export default function MapPage() {
   const token = useAuthStore(selectMemberId);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
+  const [tutorialSaving, setTutorialSaving] = useState(false);
+  const [tutorialError, setTutorialError] = useState('');
   const openAi = useAiChatStore((state) => state.open);
+  const tutorialStep = useGraphUiStore((state) => state.tutorialStep);
+  const setTutorialStep = useGraphUiStore((state) => state.setTutorialStep);
   const desiredMode: MapMode =
     params.get('mode') === 'personal' ? 'personal' : 'all';
   const requestedMode =
@@ -59,7 +76,7 @@ export default function MapPage() {
     ? (params.get('graphVersion') ?? undefined)
     : undefined;
   const detailEventId = params.get('event');
-  const impact = useCompanyResource<Impact>(
+  const historicalImpact = useCompanyResource<Impact>(
     historical && detailEventId
       ? companyUrl(
           companyId!,
@@ -68,7 +85,12 @@ export default function MapPage() {
         )
       : null,
   );
+  const impactParts = params.get('impact')?.split(',') ?? [];
+  const impactCompanyId = impactParts.length === 2 ? impactParts[0] : null;
+  const impactIssueId = impactParts.length === 2 ? impactParts[1] : null;
   const returnTo = params.get('returnTo');
+  const round =
+    requestedMode === 'all' ? (params.get('round') ?? undefined) : undefined;
   const { data, error, loading } = useGraphData(
     {
       mode: requestedMode,
@@ -77,6 +99,7 @@ export default function MapPage() {
       asOf,
       graphVersion,
       depth: params.get('depth') === '2' ? 2 : 1,
+      round,
     },
     token,
     retry,
@@ -84,6 +107,13 @@ export default function MapPage() {
   const appliedMode = data?.metadata.mode ?? 'all';
   const stats = data ? graphSummary(data) : null;
   const rawSelection = params.get('select');
+  const pathParts = params.get('path')?.split(',') ?? [];
+  const pathFrom = pathParts[0] || null;
+  const pathTo = pathParts.length === 2 ? pathParts[1] || null : null;
+  const displayedPath =
+    data && !loading && !error && pathFrom && pathTo
+      ? companyPath(data, pathFrom, pathTo)
+      : null;
   const edgeId = rawSelection?.startsWith('edge:')
     ? rawSelection.slice(5) || null
     : null;
@@ -94,13 +124,42 @@ export default function MapPage() {
     data?.nodes.find((node) => node.id === selectedId) ?? null;
   const companyNode = selectedNode?.kind === 'company' ? selectedNode : null;
   const eventId =
-    selectedId && (data || !loading) && selectedNode?.kind !== 'company'
+    selectedId &&
+    (data || (!round && !loading)) &&
+    selectedNode?.kind !== 'company'
       ? selectedId
       : null;
   const mapRegion = useRef<HTMLElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const previousEvent = useRef<string | null>(null);
-  const selectedPanel = eventId ?? edgeId ?? companyNode?.id ?? null;
+  const selectedPanel =
+    pathFrom ?? impactIssueId ?? eventId ?? edgeId ?? companyNode?.id ?? null;
+  const focusId = params.get('focus');
+  const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
+  const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
+  const tutorialOpen = params.get('tour') === '1';
+  useEffect(() => {
+    if (tutorialOpen && tutorialStep === null) setTutorialStep(1);
+    if (!tutorialOpen && tutorialStep !== null) setTutorialStep(null);
+  }, [setTutorialStep, tutorialOpen, tutorialStep]);
+  // FS015: 튜토리얼을 마치거나 건너뛰지 않은 회원은 지도에 들어오면 한 번 자동으로 연다.
+  // 완료·건너뛰기는 PUT /api/v1/auth/tutorial로 계정에 저장되어 다음부터는 열지 않는다.
+  const tutorialPending = useAuthStore(
+    (state) =>
+      state.session?.kind === 'member' &&
+      state.session.setup?.tutorialCompleted === false,
+  );
+  const tutorialMemberId = useAuthStore(selectMemberId);
+  const autoTutorial = useRef({ memberId: tutorialMemberId, opened: false });
+  useEffect(() => {
+    if (autoTutorial.current.memberId !== tutorialMemberId)
+      autoTutorial.current = { memberId: tutorialMemberId, opened: false };
+    // 이번 방문에 이미 열렸던 튜토리얼(주소의 tour=1 포함)은 닫은 뒤 다시 자동으로 열지 않는다.
+    if (tutorialOpen) autoTutorial.current.opened = true;
+    if (!tutorialPending || autoTutorial.current.opened) return;
+    autoTutorial.current.opened = true;
+    updateQuery({ tour: '1' }, { replace: true });
+  }, [tutorialMemberId, tutorialPending, tutorialOpen, updateQuery]);
   useEffect(() => {
     if (previousEvent.current && !selectedPanel) {
       (opener.current?.isConnected
@@ -137,33 +196,52 @@ export default function MapPage() {
       }))
       .sort((a, b) => b.sharedIssueCount - a.sharedIssueCount);
   }, [companyNode, data]);
-  const selectNode = useCallback(
-    (id: string | null) => {
-      if (
-        id &&
-        document.activeElement instanceof HTMLElement &&
-        !document.activeElement.closest('.event-panel')
-      )
-        opener.current = mapRegion.current?.contains(document.activeElement)
-          ? document.activeElement
-          : null;
-      updateQuery({ select: id ? `node:${id}` : null, id: null });
-    },
-    [updateQuery],
-  );
+  const selectNode = (id: string | null) => {
+    if (pathFrom && !id) {
+      updateQuery({ path: null, select: null });
+      return;
+    }
+    if (
+      pathFrom &&
+      id &&
+      data?.nodes.some((node) => node.id === id && node.kind === 'company')
+    ) {
+      if (id !== pathFrom)
+        updateQuery({ path: `${pathFrom},${id}`, select: null });
+      return;
+    }
+    if (
+      id &&
+      document.activeElement instanceof HTMLElement &&
+      !document.activeElement.closest('.event-panel')
+    )
+      opener.current = mapRegion.current?.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+    updateQuery({
+      select: id ? `node:${id}` : null,
+      id: null,
+      impact: null,
+    });
+  };
   const eventContext = {
-    round: params.get('round') ?? undefined,
+    round,
     graphVersion:
       params.get('graphVersion') ?? data?.metadata.graphVersion ?? undefined,
     asOf: params.get('asOf') ?? data?.metadata.asOf ?? undefined,
   };
+  const impact = useImpactPath(
+    round && !data ? null : impactCompanyId,
+    round && !data ? null : impactIssueId,
+    round ? eventContext : undefined,
+  );
   function selectEdge(id: string) {
     if (
       document.activeElement instanceof HTMLElement &&
       mapRegion.current?.contains(document.activeElement)
     )
       opener.current = document.activeElement;
-    updateQuery({ select: `edge:${id}`, id: null });
+    updateQuery({ select: `edge:${id}`, id: null, impact: null, path: null });
   }
   function relationAction(
     action: 'evidence' | 'ai',
@@ -211,6 +289,40 @@ export default function MapPage() {
     if (action === 'ai') useAiChatStore.getState().open(target);
     if (action === 'focus') updateQuery({ focus: event.id, hops: '1' });
   }
+  function openImpact(companyId: string, issueId: string) {
+    updateQuery({
+      select: `node:${companyId}`,
+      impact: `${companyId},${issueId}`,
+      focus: null,
+      hops: null,
+    });
+  }
+  function impactTarget(evidenceIds?: string[]): GraphTarget {
+    return {
+      kind: 'path',
+      id: `${impactCompanyId},${impactIssueId}`,
+      label: `${focusNode?.label ?? companyNode?.label ?? impactCompanyId} 영향 경로`,
+      evidenceIds,
+      mapContext: { ...eventContext, url: `/?${params}` },
+    };
+  }
+  async function closeTutorial() {
+    if (tutorialSaving) return;
+    setTutorialError('');
+    if (token) {
+      setTutorialSaving(true);
+      try {
+        await setTutorialCompleted(true);
+      } catch {
+        setTutorialError('튜토리얼 완료 상태를 저장하지 못했습니다.');
+        setTutorialSaving(false);
+        return;
+      }
+      setTutorialSaving(false);
+    }
+    setTutorialStep(null);
+    updateQuery({ tour: null });
+  }
   const loginNeeded =
     !checking && !token && (desiredMode === 'personal' || notice === 'login');
   function changeMode(mode: MapMode) {
@@ -231,29 +343,45 @@ export default function MapPage() {
       focus: null,
       hops: null,
       tour: null,
+      impact: null,
+      path: null,
     });
   }
   function changeFilter(scope: PersonalScope) {
     sessionStorage.setItem(FILTER_KEY, scope);
-    updateQuery({ mode: 'personal', scope, select: null, id: null });
+    updateQuery({
+      mode: 'personal',
+      scope,
+      select: null,
+      id: null,
+      impact: null,
+      path: null,
+    });
   }
   return (
-    <div className="relationship-map">
+    <div
+      className={
+        round
+          ? 'relationship-map min-w-0! max-sm:[&_.relationship-header]:h-auto! max-sm:[&_.relationship-header]:flex-wrap! max-sm:[&_.relationship-header]:gap-2! max-sm:[&_.relationship-header]:py-2! max-sm:[&_.relationship-header_nav]:order-last max-sm:[&_.relationship-header_nav]:w-full max-sm:[&_.relationship-header_nav]:overflow-x-auto max-sm:[&_.relationship-toolbar]:max-w-full max-sm:[&_.relationship-toolbar]:overflow-x-auto'
+          : 'relationship-map'
+      }
+    >
       <ServiceHeader />
       {returnTo?.startsWith('/companies/') && (
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
       )}
       {historical && (
-        <p className="border-l-2 border-[var(--zoop-faint)] bg-[var(--zoop-soft)] p-2 text-xs">
+        <p className="border-l-2 border-zoop-faint bg-zoop-soft p-2 text-xs">
           기업 상세에서 선택한 시점 · {asOf} · {graphVersion ?? '버전 미제공'}
         </p>
       )}
-      {impact.error && (
+      {historicalImpact.error && (
         <p role="alert">
           영향 경로 조회 실패. 관계를 임의 강조하지 않았어요.
-          <button onClick={impact.retry}>영향 경로 다시 조회</button>
+          <button onClick={historicalImpact.retry}>영향 경로 다시 조회</button>
         </p>
       )}
+      {round && <BriefingSnapshotBanner roundId={round} />}
       <main className="relationship-main">
         <section
           ref={mapRegion}
@@ -261,15 +389,25 @@ export default function MapPage() {
           aria-label="관계 지도"
           className="relationship-view"
           data-screen-id={
-            edgeId
-              ? 'D-GRP-04'
-              : eventId
-                ? 'D-GRP-02'
-                : companyNode
-                  ? 'D-GRP-03'
-                  : appliedMode === 'personal'
-                    ? 'D-GRP-01b'
-                    : 'D-GRP-01'
+            tutorialOpen
+              ? `D-GRP-T${tutorialStep && tutorialStep > 1 ? tutorialStep : ''}`
+              : pathFrom
+                ? 'D-GRP-07'
+                : impactIssueId
+                  ? 'D-GRP-06'
+                  : focusNode?.kind === 'company'
+                    ? 'D-GRP-07b'
+                    : edgeId
+                      ? 'D-GRP-04'
+                      : eventId
+                        ? 'D-GRP-02'
+                        : companyNode
+                          ? 'D-GRP-03'
+                          : appliedMode === 'personal'
+                            ? 'D-GRP-01b'
+                            : round
+                              ? 'D-BRF-04'
+                              : 'D-GRP-01'
           }
         >
           <div className="relationship-toolbar">
@@ -371,29 +509,42 @@ export default function MapPage() {
                 <GraphIcon name="info" size={15} />
               </button>
               <button
-                onClick={() => setNotice(notice === 'help' ? '' : 'help')}
-                aria-label="지도 조작 안내"
+                onClick={() => {
+                  setTutorialStep(1);
+                  updateQuery({ tour: '1' });
+                }}
+                aria-label="튜토리얼 다시 보기"
               >
                 <GraphIcon name="help" size={15} />
               </button>
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ' has-company-panel' : ''}`}
+            className={`relationship-body${selectedPanel ? ' has-company-panel' : ''}${tutorialOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
             {data ? (
               <GraphCanvas
                 data={data}
-                selectedId={selectedId ?? detailEventId ?? companyId}
-                highlightedEdgeIds={impactEdges(data, impact.data)}
+                selectedId={
+                  pathFrom ?? selectedId ?? detailEventId ?? companyId
+                }
+                connectionPath={Boolean(pathFrom)}
+                highlightedEdgeIds={
+                  pathFrom
+                    ? (displayedPath?.edgeIds ?? [])
+                    : impactEdges(data, impact.data ?? historicalImpact.data)
+                }
                 selectedEdgeId={edgeId}
                 onSelectEdge={selectEdge}
                 onSelect={selectNode}
                 focusId={
-                  params.get('focus') ??
-                  (historical ? (detailEventId ?? companyId) : null)
+                  pathFrom
+                    ? null
+                    : (focusId ??
+                      (historical ? (detailEventId ?? companyId) : null))
                 }
+                focusHops={focusHops}
               />
             ) : (
               <div className="relationship-canvas">
@@ -404,21 +555,49 @@ export default function MapPage() {
                 </p>
               </div>
             )}
-            {companyNode && (
+            {focusNode?.kind === 'company' && !pathFrom && (
+              <GraphFocusControls
+                label={focusNode.label}
+                hops={focusHops}
+                onHopsChange={(hops) => updateQuery({ hops: String(hops) })}
+                onClear={() => updateQuery({ focus: null, hops: null })}
+              />
+            )}
+            {tutorialOpen && tutorialStep && (
+              <GraphTutorial
+                step={tutorialStep}
+                saving={tutorialSaving}
+                error={tutorialError}
+                onStepChange={(step: GraphTutorialStep) => {
+                  setTutorialError('');
+                  setTutorialStep(step);
+                }}
+                onFinish={() => void closeTutorial()}
+                onSkip={() => void closeTutorial()}
+                onRetry={() => void closeTutorial()}
+              />
+            )}
+            {companyNode && !impactIssueId && !pathFrom && (
               <CompanyDetailPanel
                 key={companyNode.id}
                 companyId={companyNode.id}
+                context={round ? eventContext : undefined}
                 fallback={companyNode}
                 relatedCompanies={relatedCompanies}
                 token={token}
                 onClose={() => selectNode(null)}
-                onSelectIssue={selectNode}
+                onSelectIssue={(issueId) => openImpact(companyNode.id, issueId)}
                 onFocus={() =>
                   updateQuery({ focus: companyNode.id, hops: '1' })
                 }
                 onConnections={() => {
-                  updateQuery({ path: companyNode.id });
-                  setNotice('connections');
+                  updateQuery({
+                    path: companyNode.id,
+                    select: null,
+                    focus: null,
+                    hops: null,
+                    impact: null,
+                  });
                 }}
                 onSelectRelation={(companyId) => {
                   const edge = data?.edges.find(
@@ -434,7 +613,65 @@ export default function MapPage() {
                 onAskAi={() => openAi({ kind: 'company', id: companyNode.id })}
               />
             )}
-            {eventId && (
+            {pathFrom && (
+              <CompanyPathPanel
+                graph={data}
+                from={pathFrom}
+                to={pathTo}
+                loading={loading}
+                error={error}
+                onRetry={() => setRetry((v) => v + 1)}
+                onClose={() => updateQuery({ path: null })}
+                onPick={(id) =>
+                  updateQuery({
+                    path: id ? `${pathFrom},${id}` : pathFrom,
+                    select: null,
+                  })
+                }
+                onEvidence={(id) => {
+                  const node = data?.nodes.find((n) => n.id === id);
+                  const evidenceIds = [
+                    ...new Set(
+                      data?.edges
+                        .filter((e) => e.source === id || e.target === id)
+                        .flatMap((e) => e.evidenceIds) ?? [],
+                    ),
+                  ];
+                  useGraphUiStore.getState().openEvidence({
+                    kind: 'issue',
+                    id,
+                    label: node?.label ?? id,
+                    evidenceIds,
+                    mapContext: { ...eventContext, url: `/?${params}` },
+                  });
+                }}
+              />
+            )}
+            {data && impactCompanyId && impactIssueId && !pathFrom && (
+              <ImpactPathPanel
+                companyId={impactCompanyId}
+                issueId={impactIssueId}
+                graph={data}
+                impact={impact.data}
+                loading={impact.loading}
+                error={impact.error}
+                onRetry={impact.retry}
+                onClose={() => updateQuery({ impact: null })}
+                onViewIssue={() =>
+                  updateQuery({
+                    select: `node:${impactIssueId}`,
+                    impact: null,
+                  })
+                }
+                onEvidence={(evidenceIds) =>
+                  useGraphUiStore
+                    .getState()
+                    .openEvidence(impactTarget(evidenceIds))
+                }
+                onAskAi={() => openAi(impactTarget())}
+              />
+            )}
+            {eventId && !pathFrom && (
               <EventDetailPanel
                 key={eventId}
                 id={eventId}
@@ -444,7 +681,7 @@ export default function MapPage() {
                 onAction={eventAction}
               />
             )}
-            {edgeId && (
+            {edgeId && !pathFrom && (
               <RelationDetailPanel
                 key={edgeId}
                 id={edgeId}
@@ -500,12 +737,6 @@ export default function MapPage() {
                     및 연결선 이동 · Enter로 선택 · Escape로 상세 닫기.
                   </p>
                 )}
-                {notice === 'connections' && (
-                  <p>
-                    연결 탐색의 시작 기업을 저장했습니다. 지도에서 비교할 기업을
-                    선택해 주세요.
-                  </p>
-                )}
                 {data?.metadata.partial && (
                   <p>
                     일부 데이터를 조회하지 못했습니다.{' '}
@@ -527,7 +758,9 @@ export default function MapPage() {
           </div>
           <AiChatDrawer />
           <EvidenceDrawer
-            onViewOnMap={(id) => updateQuery({ focus: id, hops: '1' })}
+            onViewOnMap={(id) =>
+              updateQuery({ focus: id, hops: '1', path: null })
+            }
           />
         </section>
       </main>

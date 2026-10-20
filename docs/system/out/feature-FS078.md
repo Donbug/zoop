@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:104 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:104 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:224 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 기업–이슈·기업–기업 관계 추출: 정규화된 기업·이슈와 근거로 기업–이슈 영향 관계, 기업–기업 공급·고객·경쟁·투자 관계 후보를 추출한다. AI가 관계 의미·방향·설명을 생성하고 백엔드 B가 간선 스키마와 식별·조회 계약을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:224 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — 기업–이슈·기업–기업 관계 추출: 정규화된 기업·이슈와 근거로 기업–이슈 영향 관계, 기업–기업 공급·고객·경쟁·투자 관계 후보를 추출한다. AI가 관계 의미·방향·설명을 생성하고 백엔드 B가 간선 스키마와 식별·조회 계약을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS055](feature-FS055.md) · [FS058](feature-FS058.md)
 

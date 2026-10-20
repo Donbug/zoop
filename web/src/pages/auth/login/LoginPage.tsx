@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/apis/auth/ApiService';
 import {
+  listSocialProviders,
   logIn,
   socialLoginUrl,
   startGuestSession,
-  type SocialProviderId,
+  type SocialProvider,
 } from '@/apis/auth/session';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -13,12 +14,33 @@ import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import { acceptMemberSession, loadSession } from '@/apis/auth/member-session';
 import AuthFrame from '@/components/auth/AuthFrame';
 import SessionStatus from '@/components/auth/SessionStatus';
+import {
+  authAlert,
+  authInput,
+  authLabel,
+  authNote,
+  authPrimaryButton,
+  authSecondaryButton,
+} from '@/components/auth/authStyles';
 import type { LoginLocationState } from '@/types/auth';
 
-const SOCIAL: { id: SocialProviderId; label: string }[] = [
-  { id: 'google', label: '구글 로그인' },
-  { id: 'kakao', label: '카카오톡 로그인' },
-];
+// 와이어프레임 D-AUT-01 버튼 문구. 서버가 알려 준 제공자만 버튼을 둔다.
+const SOCIAL_LABEL: Record<string, string> = {
+  google: '구글 로그인',
+  kakao: '카카오톡 로그인',
+};
+
+/** 소셜 인증 콜백이 /login?social=... 로 돌려준 결과 안내 */
+function socialResultMessage(result: string | null) {
+  if (result === 'cancelled') return '소셜 로그인을 취소했어요.';
+  if (result === 'email_required')
+    return '소셜 계정에서 확인된 이메일을 받지 못했어요. 이메일 제공에 동의한 뒤 다시 시도해 주세요.';
+  if (result === 'link_required')
+    return '이미 이메일로 가입한 계정이에요. 이메일로 로그인한 뒤 내 정보에서 소셜 계정을 연결해 주세요.';
+  if (result === 'failed')
+    return '소셜 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  return null;
+}
 
 function loginErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
@@ -67,6 +89,23 @@ export default function LoginPage() {
   const [pending, setPending] = useState<'login' | 'guest' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guestError, setGuestError] = useState(false);
+  // 서버에 설정된 소셜 제공자. 불러오기 전·실패 시에는 소셜 버튼을 두지 않는다.
+  const [providers, setProviders] = useState<SocialProvider[]>([]);
+  const socialResult = socialResultMessage(
+    new URLSearchParams(location.search).get('social'),
+  );
+  useEffect(() => {
+    let alive = true;
+    listSocialProviders().then(
+      (items) => {
+        if (alive) setProviders(items);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // FS006: existing members use the same confirmed holdings/interests branch.
   useEffect(() => {
@@ -136,18 +175,21 @@ export default function LoginPage() {
       : flow.error
         ? loginErrorMessage(new ApiError(0, flow.error, flow.error))
         : null);
-  const secondaryButton =
-    'flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-950 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50';
-
   return (
     <AuthFrame screen="D-AUT-01">
-      <section className="flex w-full max-w-md flex-col gap-6">
+      <section className="flex w-full max-w-[400px] flex-col gap-6 text-zoop-ink">
         <div>
-          <p className="text-3xl font-bold text-gray-950">줍</p>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="text-[28px] font-[750] tracking-[-0.045em]">줍</p>
+          <p className="mt-1.5 text-xs text-zoop-muted">
             내 종목 주변의 사건과 근거를 탐색해요
           </p>
         </div>
+
+        {socialResult && (
+          <p role="alert" className={authAlert}>
+            {socialResult}
+          </p>
+        )}
 
         {/* 세션 확인이 실패해도 로그인은 할 수 있게 안내와 폼을 함께 보여 준다.
             폼을 가리는 것은 경합이 생기는 확인 중일 때뿐이다. */}
@@ -159,44 +201,46 @@ export default function LoginPage() {
             noValidate
             aria-labelledby="login-title"
             onSubmit={(event) => void handleSubmit(event)}
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-1"
           >
-            <h1 id="login-title" className="font-semibold text-gray-950">
+            <h1 id="login-title" className="mb-3 text-sm font-bold">
               이메일로 로그인
             </h1>
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+            <label htmlFor="login-email" className={authLabel}>
               이메일
-              <input
-                type="email"
-                name="email"
-                autoComplete="email"
-                value={email}
-                disabled={busy}
-                aria-invalid={missing && !email.trim()}
-                onChange={(event) => setEmail(event.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-3 text-base font-normal text-gray-950"
-              />
             </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+            <input
+              id="login-email"
+              type="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              disabled={busy}
+              aria-invalid={missing && !email.trim()}
+              onChange={(event) => setEmail(event.target.value)}
+              className={authInput}
+            />
+            <label htmlFor="login-password" className={authLabel}>
               비밀번호
-              <input
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                value={password}
-                disabled={busy}
-                aria-invalid={missing && !password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-3 text-base font-normal text-gray-950"
-              />
             </label>
+            <input
+              id="login-password"
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              disabled={busy}
+              aria-invalid={missing && !password}
+              onChange={(event) => setPassword(event.target.value)}
+              className={authInput}
+            />
             {missing && (
-              <p role="alert" className="text-sm text-red-700">
+              <p role="alert" className={authAlert}>
                 이메일과 비밀번호를 모두 입력해 주세요.
               </p>
             )}
             {shownError && (
-              <p role="alert" className="text-sm text-red-700">
+              <p role="alert" className={authAlert}>
                 {shownError}
               </p>
             )}
@@ -204,7 +248,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 disabled={flow.busy}
-                className="mt-1 w-full rounded-lg bg-gray-950 px-4 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-progress disabled:bg-gray-500"
+                className={authPrimaryButton}
                 onClick={() =>
                   void flow.run(undefined, email.trim() || undefined, from)
                 }
@@ -215,7 +259,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={busy}
-                className="mt-1 w-full rounded-lg bg-gray-950 px-4 py-3 font-semibold text-white hover:bg-gray-800 disabled:cursor-progress disabled:bg-gray-500"
+                className={authPrimaryButton}
               >
                 {flow.busy ? '로그인하고 있어요' : '로그인'}
               </button>
@@ -223,49 +267,48 @@ export default function LoginPage() {
           </form>
         )}
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-gray-600">
+        <div className="flex flex-col gap-2.5">
+          <p className="text-[11px] text-zoop-muted">
             처음이거나 다른 방법으로 시작하기
           </p>
           <Link
             to="/signup"
             aria-disabled={busy}
-            className={secondaryButton}
+            className={authSecondaryButton}
             onClick={(event) => busy && event.preventDefault()}
           >
             이메일로 회원가입
           </Link>
-          {SOCIAL.map((provider) => (
+          {providers.map((provider) => (
             <a
               key={provider.id}
-              href={socialLoginUrl(provider.id, from ?? '/')}
+              // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
+              href={socialLoginUrl(provider.id, '/login')}
               aria-disabled={busy}
-              className={secondaryButton}
+              className={authSecondaryButton}
               onClick={(event) => busy && event.preventDefault()}
             >
-              {provider.label}
+              {SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`}
             </a>
           ))}
           <button
             type="button"
             disabled={busy}
             onClick={() => void startAsGuest()}
-            className={secondaryButton}
+            className={authSecondaryButton}
           >
             {pending === 'guest' ? '시작하고 있어요' : '로그인 없이 둘러보기'}
           </button>
           {guestError && (
-            <p role="alert" className="text-sm text-red-700">
+            <p role="alert" className={authAlert}>
               비회원으로 시작하지 못했어요. 다시 시도해 주세요.
             </p>
           )}
-          <p className="text-xs text-gray-500">
+          <p className={authNote}>
             로그인 없이도 시장 전체 지도와 공개 브리핑을 볼 수 있어요. 계좌
             연결·관심 종목·AI 질문은 로그인 후 이용할 수 있어요.
           </p>
-          <p className="text-xs text-gray-500">
-            본 서비스는 투자 권유를 제공하지 않아요.
-          </p>
+          <p className={authNote}>본 서비스는 투자 권유를 제공하지 않아요.</p>
         </div>
       </section>
     </AuthFrame>

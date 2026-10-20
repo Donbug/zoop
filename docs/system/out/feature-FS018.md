@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:28 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:28 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — 전체 관계 그래프: 사용자의 보유·관심종목 여부와 관계없이 공개 시장 데이터를 기준으로 기업 노드와 이슈 노드로 구성된 전체 관계 그래프를 제공한다. 이슈 노드는 국내 / 국제 속성을 가진다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv) — 전체 관계 그래프: 시스템은 사용자의 종목 보유 여부와 관계없이 전체 시장 관계 그래프를 제공해야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 전체 관계 그래프: 사용자의 보유·관심종목 여부와 관계없이 공개 시장 데이터를 기준으로 기업 노드와 이슈 노드로 구성된 전체 관계 그래프를 제공한다. 이슈 노드는 국내 / 국제 속성을 가진다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:197 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

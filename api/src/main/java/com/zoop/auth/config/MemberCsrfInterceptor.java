@@ -11,7 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** Protects member-cookie writes; authentication of cookie-free requests belongs to each resource. */
+/** Protects member/guest-cookie writes; authorization of cookie-free requests belongs to each resource. */
 @Component
 public class MemberCsrfInterceptor implements HandlerInterceptor {
     private final AuthOriginPolicy origins;
@@ -29,6 +29,10 @@ public class MemberCsrfInterceptor implements HandlerInterceptor {
             return true;
         }
         String token = null;
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        if (path.startsWith("/api/v1/admin/")) {
+            return true;
+        }
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if (SessionCookie.NAME.equals(cookie.getName())) {
@@ -40,6 +44,9 @@ public class MemberCsrfInterceptor implements HandlerInterceptor {
             }
         }
         if (token != null) {
+            if ("/api/v1/auth/logout".equals(path) && !sessions.isActiveSession(token)) {
+                return true;
+            }
             origins.verify(request);
             var headers = request.getHeaders("X-CSRF-Token");
             if (!headers.hasMoreElements()) {

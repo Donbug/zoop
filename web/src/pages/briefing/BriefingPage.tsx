@@ -1,45 +1,60 @@
-import MarketIndicators from '@/components/briefing/MarketIndicators';
-import BriefingIssueList from '@/components/briefing/BriefingIssueList';
-import BriefingComparison from '@/components/briefing/BriefingComparison';
+import { useAuth } from '@/hooks/useAuth';
+import PublishedBriefing from '@/components/briefing/PublishedBriefing';
+import BriefingRoundPicker from '@/components/briefing/BriefingRoundPicker';
+import { FOCUS_RING } from '@/components/briefing/briefingStyles';
 import GraphIcon from '@/components/graph/GraphIcon';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import type { BriefingEdition } from '@/types/briefing';
+import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
+const EDITION_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
+
+// D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
   const { params, updateQuery } = useRouteQuery();
+  const auth = useAuth();
+  const memberId = useAuthStore(selectMemberId);
+  const revision = useAuthStore((s) => s.sessionRevision);
   const edition: BriefingEdition =
     params.get('edition') === 'evening' ? 'evening' : 'morning';
   const date = params.get('date') ?? '';
-  const label = edition === 'morning' ? '출근' : '퇴근';
+  // FS036: 공통 / 내 종목 기준. 주소(?view=personal)에 남는다.
+  const personal = params.get('view') === 'personal';
   return (
     <section
-      className="briefing-page"
+      className="mx-auto w-full max-w-[800px] text-zoop-ink"
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
-      <h1 className="briefing-page-title">
+      <h1 className="flex items-center gap-2.5 text-[28px] font-[750] tracking-[-0.045em]">
         <GraphIcon name="briefing" size={24} />
         브리핑
       </h1>
-      <p className="briefing-kicker">
+      <p className="mt-1.5 text-xs text-zoop-muted">
         시장의 주요 변화와 내 종목 주변 사건을 한눈에 확인하세요.
       </p>
 
-      <div className="briefing-controls" aria-label="브리핑 회차 선택">
-        <label className="sr-only" htmlFor="briefing-date">
-          날짜
-        </label>
-        <input
-          id="briefing-date"
-          className="briefing-date"
-          type="date"
-          value={date}
-          onChange={(event) => updateQuery({ date: event.target.value })}
+      {auth.failed && (
+        <p role="alert" className="mt-3 text-xs text-zoop-muted">
+          로그인 상태를 확인하지 못해 공통 브리핑을 표시합니다.{' '}
+          <button type="button" className={FOCUS_RING} onClick={auth.retry}>
+            로그인 상태 다시 확인
+          </button>
+        </p>
+      )}
+      <div
+        className="mt-5 flex items-center gap-2.5 max-sm:flex-col max-sm:items-stretch"
+        aria-label="브리핑 회차 선택"
+      >
+        <BriefingRoundPicker
+          date={date}
+          onChange={(next) => updateQuery({ date: next || null })}
         />
-        <div className="briefing-editions">
+        <div className="flex h-[38px] rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px] max-sm:w-full">
           <button
             type="button"
             aria-pressed={edition === 'morning'}
             onClick={() => updateQuery({ edition: 'morning' })}
+            className={EDITION_BUTTON}
           >
             ☼ 출근
           </button>
@@ -47,24 +62,42 @@ export default function BriefingPage() {
             type="button"
             aria-pressed={edition === 'evening'}
             onClick={() => updateQuery({ edition: 'evening' })}
+            className={EDITION_BUTTON}
           >
             ◔ 퇴근
           </button>
         </div>
       </div>
 
-      <article className="briefing-card" aria-labelledby="briefing-card-title">
-        <header className="briefing-card-header">
-          <div>
-            <h2 id="briefing-card-title">{label} 브리핑</h2>
-            <p>{date || '날짜를 선택해 주세요'} · 회차 데이터 연결 준비 중</p>
-          </div>
-          <span className="briefing-status">준비 중</span>
-        </header>
-        <MarketIndicators />
-        <BriefingIssueList />
-        {edition === 'evening' && <BriefingComparison />}
-      </article>
+      <div
+        role="group"
+        aria-label="브리핑 기준"
+        className="mt-3 inline-flex h-8 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-soft p-[3px]"
+      >
+        <button
+          type="button"
+          aria-pressed={!personal}
+          onClick={() => updateQuery({ view: null })}
+          className={`px-3 ${EDITION_BUTTON}`}
+        >
+          공통
+        </button>
+        <button
+          type="button"
+          aria-pressed={personal}
+          onClick={() => updateQuery({ view: 'personal' })}
+          className={`px-3 ${EDITION_BUTTON}`}
+        >
+          내 종목 기준
+        </button>
+      </div>
+
+      <PublishedBriefing
+        key={`${date}:${edition}:${memberId ?? 'public'}:${revision}`}
+        date={date}
+        edition={edition}
+        personal={personal}
+      />
     </section>
   );
 }

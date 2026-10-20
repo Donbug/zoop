@@ -15,6 +15,8 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.auth.repository.MemberSessionRepository;
 import com.zoop.auth.repository.MemberSessionRow;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,11 +27,19 @@ public class MemberSessionService {
     private final MemberSessionRepository repository;
     private final CsrfKeyRing keyRing;
     private final Clock clock;
+    private final boolean sessionCookieSecure;
 
     public MemberSessionService(MemberSessionRepository repository, CsrfKeyRing keyRing, Clock clock) {
+        this(repository, keyRing, clock, true);
+    }
+
+    @Autowired
+    public MemberSessionService(MemberSessionRepository repository, CsrfKeyRing keyRing, Clock clock,
+            @Value("${zoop.auth.session-cookie-secure:true}") boolean sessionCookieSecure) {
         this.repository = repository;
         this.keyRing = keyRing;
         this.clock = clock;
+        this.sessionCookieSecure = sessionCookieSecure;
     }
 
     /** Called after member creation/authentication; the caller sets the cookie after transaction commit. */
@@ -45,7 +55,22 @@ public class MemberSessionService {
             repository.revokeMemberSession(hashToken(previousCookieToken), memberId, now);
         }
         MemberSessionRow row = repository.findByTokenHash(hash).orElseThrow();
-        return new IssuedSession(token, memberResponse(row, now, requestId));
+        return new IssuedSession(token, memberResponse(row, now, requestId), sessionCookieSecure);
+    }
+
+    /** Creates an unowned guest session; a prior guest token is rotated without revoking member sessions. */
+    @Transactional
+    public IssuedSession issueGuest(String previousCookieToken, String requestId) {
+        Instant now = clock.instant();
+        String token = randomToken();
+        String hash = hashToken(token);
+        repository.insertGuestSession(randomToken(), randomToken(), hash, keyRing.activeKeyId(),
+                now, now.plus(SessionCookie.LIFETIME));
+        if (validToken(previousCookieToken)) {
+            repository.revokeGuestSession(hashToken(previousCookieToken), now);
+        }
+        MemberSessionRow row = repository.findByTokenHash(hash).orElseThrow();
+        return new IssuedSession(token, guestResponse(row, now, requestId), sessionCookieSecure);
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +88,35 @@ public class MemberSessionService {
                         row.get().id(), row.get().csrfVersion()).isEmpty()) {
             return new SessionLookup(SessionResponse.anonymous(now, requestId), true);
         }
-        return new SessionLookup(memberResponse(row.get(), now, requestId), false);
+        SessionResponse response = "guest".equals(row.get().kind())
+                ? guestResponse(row.get(), now, requestId)
+                : memberResponse(row.get(), now, requestId);
+        return new SessionLookup(response, false);
+    }
+
+    /** True only when this cookie identifies a currently usable member or guest session. */
+    @Transactional(readOnly = true)
+    public boolean isActiveSession(String cookieToken) {
+        if (!validToken(cookieToken)) return false;
+        Instant now = clock.instant();
+        var row = repository.findByTokenHash(hashToken(cookieToken));
+        return row.filter(value -> isUsable(value, now)
+                && keyRing.derive(value.csrfKeyId(), value.kind(), value.id(), value.csrfVersion()).isPresent())
+                .isPresent();
+    }
+
+    /** Revokes only the current member session; guest sessions are outside member logout scope. */
+    @Transactional
+    public void logoutMember(String cookieToken) {
+        if (!validToken(cookieToken)) return;
+        Instant now = clock.instant();
+        String tokenHash = hashToken(cookieToken);
+        var row = repository.findByTokenHash(tokenHash);
+        if (row.isPresent() && "member".equals(row.get().kind()) && isUsable(row.get(), now)
+                && keyRing.derive(row.get().csrfKeyId(), row.get().kind(),
+                        row.get().id(), row.get().csrfVersion()).isPresent()) {
+            repository.revokeMemberSession(tokenHash, row.get().memberId(), now);
+        }
     }
 
     /** Returns the active member and exact session binding for a privileged OAuth link flow. */
@@ -77,12 +130,40 @@ public class MemberSessionService {
         if (!validToken(cookieToken)) return Optional.empty();
         Instant now = clock.instant();
         var row = repository.findByTokenHash(hashToken(cookieToken));
-        if (row.isEmpty() || !isUsable(row.get(), now)
+        if (row.isEmpty() || !"member".equals(row.get().kind()) || !isUsable(row.get(), now)
                 || keyRing.derive(row.get().csrfKeyId(), row.get().kind(),
                         row.get().id(), row.get().csrfVersion()).isEmpty()) {
             return Optional.empty();
         }
         return Optional.of(new SessionBinding(row.get().memberId(), row.get().id()));
+    }
+
+    /** Resolves the authenticated member for a member-only API. Never trusts an ID from request data. */
+    @Transactional(readOnly = true)
+    public MemberPrincipal requireMember(String cookieToken) {
+        if (!validToken(cookieToken)) {
+            throw new CustomException(ErrorCode.AUTH_REQUIRED);
+        }
+        Instant now = clock.instant();
+        var row = repository.findByTokenHash(hashToken(cookieToken));
+        if (row.isEmpty() || !isUsable(row.get(), now)
+                || keyRing.derive(row.get().csrfKeyId(), row.get().kind(),
+                        row.get().id(), row.get().csrfVersion()).isEmpty()) {
+            throw new CustomException(ErrorCode.AUTH_REQUIRED);
+        }
+        if (!"member".equals(row.get().kind())) {
+            throw new CustomException(ErrorCode.MEMBER_REQUIRED);
+        }
+        return new MemberPrincipal(row.get().memberId(), row.get().id());
+    }
+
+    /** Call after loading a personal resource; ownership must match the authenticated member. */
+    public void requireOwner(MemberPrincipal principal, String resourceMemberId) {
+        if (principal == null || resourceMemberId == null
+                || !MessageDigest.isEqual(principal.memberId().getBytes(StandardCharsets.UTF_8),
+                        resourceMemberId.getBytes(StandardCharsets.UTF_8))) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
     }
 
     /** Require an active member session and its exact session-bound CSRF token for a cookie write. */
@@ -107,9 +188,11 @@ public class MemberSessionService {
     }
 
     private boolean isUsable(MemberSessionRow row, Instant now) {
-        return "member".equals(row.kind()) && "active".equals(row.memberStatus())
-                && row.revokedAt() == null && row.expiresAt().isAfter(now)
-                && !row.createdAt().isAfter(now) && row.memberId() != null;
+        boolean ownerValid = "member".equals(row.kind())
+                ? row.memberId() != null && "active".equals(row.memberStatus())
+                : "guest".equals(row.kind()) && row.memberId() == null;
+        return ownerValid && row.revokedAt() == null && row.expiresAt().isAfter(now)
+                && !row.createdAt().isAfter(now);
     }
 
     private SessionResponse memberResponse(MemberSessionRow row, Instant now, String requestId) {
@@ -118,6 +201,14 @@ public class MemberSessionService {
         return new SessionResponse(true, "member",
                 new SessionResponse.User(row.memberId(), row.email(), row.displayName()),
                 new SessionResponse.Setup(row.completed(), row.tutorialCompleted()),
+                SessionResponse.metadata(now, requestId), csrf, row.expiresAt());
+    }
+
+    private SessionResponse guestResponse(MemberSessionRow row, Instant now, String requestId) {
+        String csrf = keyRing.derive(row.csrfKeyId(), row.kind(), row.id(), row.csrfVersion())
+                .orElseThrow(() -> new IllegalStateException("CSRF key unavailable"));
+        return new SessionResponse(true, "guest", null,
+                new SessionResponse.Setup(false, false),
                 SessionResponse.metadata(now, requestId), csrf, row.expiresAt());
     }
 
@@ -141,9 +232,13 @@ public class MemberSessionService {
         }
     }
 
-    public record IssuedSession(String token, SessionResponse response) {
+    public record IssuedSession(String token, SessionResponse response, boolean secureCookie) {
+        public IssuedSession(String token, SessionResponse response) {
+            this(token, response, true);
+        }
+
         public ResponseCookie cookie() {
-            return SessionCookie.issue(token);
+            return SessionCookie.issue(token, secureCookie);
         }
 
         @Override
@@ -155,6 +250,13 @@ public class MemberSessionService {
     public record SessionLookup(SessionResponse response, boolean clearCookie) {
     }
 
+    public ResponseCookie clearCookie() {
+        return SessionCookie.clear(sessionCookieSecure);
+    }
+
     public record SessionBinding(String memberId, String sessionId) {
+    }
+
+    public record MemberPrincipal(String memberId, String sessionId) {
     }
 }

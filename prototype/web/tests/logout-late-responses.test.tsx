@@ -53,12 +53,17 @@ describe("로그아웃과 이전 회원의 늦은 응답", () => {
     await held.arrived();
     await logOut(user);
     await waitFor(() => expect(pathname()).toBe("/login"));
+    // 주소만 바뀐 순간에는 로그아웃의 세션 재조회·가드 이동이 아직 남을 수 있다.
+    // 이전 개인 응답은 계속 붙잡되, 로그아웃 처리가 끝난 로그인 화면에서 다음 회원으로 들어간다.
+    await settle();
+    await screen.findByRole("button", { name: "로그인" });
 
     world.nextLogin = memberSession({ id: "member-2", displayName: OTHER_MEMBER_NAME });
     world.portfolio = holdingsPortfolio(BETA);
     world.settings = watchSettings([BETA.id]);
-    await navigate("/me/stocks");
+    await settle();
     await logIn(user);
+    await navigate("/me/stocks");
     await waitFor(() => expect(screen.queryAllByText(BETA.name).length).toBeGreaterThan(1));
 
     held.respond(json(holdingsPortfolio(ALPHA)));
@@ -79,11 +84,15 @@ describe("로그아웃과 이전 회원의 늦은 응답", () => {
 
     await logOut(user);
     await waitFor(() => expect(pathname()).toBe("/login"));
+    // 저장 응답을 풀지 않고 로그아웃·로그인 화면 전환만 완료한다.
+    await settle();
+    await screen.findByRole("button", { name: "로그인" });
     world.nextLogin = memberSession({ id: "member-2", displayName: OTHER_MEMBER_NAME });
     world.portfolio = holdingsPortfolio(BETA);
     world.settings = watchSettings([BETA.id]);
-    await navigate("/me/stocks");
+    await settle();
     await logIn(user);
+    await navigate("/me/stocks");
     await waitFor(() => expect(screen.queryAllByText(BETA.name).length).toBeGreaterThan(1));
 
     save.respond(json({ ...watchSettings([]), version: 2 }));

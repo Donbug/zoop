@@ -159,10 +159,12 @@ class Store:
             return ordinal
 
     def receive(self, attempt_id: str, reply, duration_ms: float):
-        # Deliberately independent from validation and the application import transaction.
+        # Deliberately independent from validation and the application import transaction. A response the adapter refused
+        # (`reply.invalid`) is failed under its exact code in the SAME transaction as its receipt, so no crash can separate them.
         with self.transaction() as c:
-            c.execute("UPDATE calls SET state='received',received_at=?,receipt=?,content=?,usage=?,duration_ms=? WHERE attempt_id=?",
-                      (now(), canonical(reply.raw), reply.content, canonical(reply.usage), duration_ms, attempt_id))
+            c.execute("UPDATE calls SET state=?,error=?,received_at=?,receipt=?,content=?,usage=?,duration_ms=? WHERE attempt_id=?",
+                      ("failed" if reply.invalid else "received", reply.invalid, now(), canonical(reply.raw), reply.content,
+                       canonical(reply.usage), duration_ms, attempt_id))
             c.execute("UPDATE jobs SET phase='receivedreceipt.saved' WHERE job_id=(SELECT job_id FROM calls WHERE attempt_id=?) AND state!='cancelled'", (attempt_id,))
 
     def save_artifact(self, artifact, cache_key: str | None, fence: int):

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:41 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:41 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv) — 주요 시장 지표 제공: 시스템은 각 브리핑에 시장이 어떻게 움직였는지 수치로 확인할 수 있도록 KOSPI, KOSDAQ, 원/달러 환율을 제공한다. 핵심 이슈의 영향 설명과 확인할 사항은 별도 영역으로 제공한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv) — 주요 시장 지표 제공: 시스템은 각 브리핑에 시장이 어떻게 움직였는지 수치로 확인할 수 있도록 KOSPI, KOSDAQ, 원/달러 환율을 제공한다. 핵심 이슈의 영향 설명과 확인할 사항은 별도 영역으로 제공한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:89 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

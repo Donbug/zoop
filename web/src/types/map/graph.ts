@@ -56,4 +56,6 @@ export interface GraphRequest {
   asOf?: string;
   graphVersion?: string;
   depth?: 1 | 2;
+  /** D-BRF-04 브리핑 회차 id. 그 회차가 발행될 때의 그래프를 읽는다. */
+  round?: string;
 }

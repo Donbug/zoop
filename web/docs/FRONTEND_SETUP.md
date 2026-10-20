@@ -99,6 +99,42 @@ VITE_API_BASE_URL=https://api.example.com
 
 이 주소는 예시다. Vite의 `VITE_*` 값은 클라이언트 번들에 포함되므로 비밀키를 넣지 않는다.
 
+### 로컬에서 실제 api/(Spring)와 연결하기
+
+인증 API는 가입·로그인 요청의 Origin이 **정확한 HTTPS Origin**일 때만 받고(`ZOOP_AUTH_ALLOWED_ORIGINS`), 세션 쿠키는 `Secure; SameSite=Lax; Path=/api/v1`이다. 그래서 로컬에서는 개발 서버를 HTTPS로 띄우고 `/api`를 같은 Origin의 프록시로 API에 넘긴다. 두 설정은 아래 값이 있을 때만 켜지며, 없으면 기존 개발 서버와 같다.
+
+1. `api/README.md`대로 `api/.env`를 만들고 `ZOOP_AUTH_ALLOWED_ORIGINS=https://localhost:5173`(개발 서버 주소와 정확히 같게)을 넣은 뒤 DB와 API를 실행한다. 8080이 사용 중이면 `SERVER_PORT`를 바꾼다.
+2. 로컬 전용 인증서를 만든다(`web/.cert`는 Git에서 제외된다).
+
+   ```sh
+   mkdir -p web/.cert
+   openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=localhost" \
+     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+     -keyout web/.cert/localhost-key.pem -out web/.cert/localhost.pem
+   ```
+
+3. `web/.env.local`에 아래 값을 둔다. `ZOOP_DEV_*`는 개발 서버 설정에서만 읽고 클라이언트 번들에 들어가지 않는다. `VITE_API_BASE_URL`은 비워 같은 Origin으로 요청하게 한다.
+
+   ```dotenv
+   ZOOP_DEV_API_TARGET=http://localhost:8080
+   ZOOP_DEV_HTTPS_CERT=.cert/localhost.pem
+   ZOOP_DEV_HTTPS_KEY=.cert/localhost-key.pem
+   ```
+
+4. `pnpm --dir web dev`로 띄운 `https://localhost:5173/login`을 브라우저에서 열고, 자체 서명 인증서 경고는 이 로컬 주소에 한해 진행한다.
+
+현재 `api/`에는 인증(가입·로그인·로그아웃·비회원·세션·약관·소셜), 튜토리얼 상태(`PUT /api/v1/auth/tutorial`), 초기 설정(`GET·PUT /api/v1/me/settings`), 관심 종목(`PUT /api/v1/me/watchlist/{id}`), 가상 계좌(`/api/v1/portfolio`·모의 계좌·연결·해제), 기업 검색·상세·시세·지표, 전체 관계 지도(`GET /api/v1/graph`)가 구현되어 있다. 그래서 가입 → 투자 여부 → 가상 계좌 → 관심 종목 → 지도 튜토리얼까지 실제 API로 진행된다. 개인 지도(`mode=personal`)는 아직 503이고, 기업 가격·문서·사건 API는 아직 404다.
+
+- API를 `SPRING_PROFILES_ACTIVE=local`로 띄우면 `ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN`(소셜 로그인 후 돌아올 개발 서버 주소, 예: `https://localhost:5173`)이 필요하다. 없으면 API가 시작하지 않는다.
+- 관계 지도를 보려면 API를 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`로 띄우고(합성 그래프), `web/.env.local`에 `VITE_GRAPH_DATA_SOURCE=api`를 둔다. 이 값은 테스트에도 적용되므로 `vitest`는 `VITE_GRAPH_DATA_SOURCE=mock`으로 실행한다.
+
+소셜 로그인은 `api/.env`의 제공자 client ID·secret과 redirect URI(`https://localhost:5173/api/v1/auth/social/{provider}/callback`)가 있어야 실제로 동작한다. 콜백은 개발 서버 주소를 거쳐야 로그인·가입 화면으로 돌아온다.
+
+- 키는 팀이 함께 쓰는 개발용 OAuth 클라이언트 하나를 쓰고 Git에 넣지 않는다. `api/.env`를 바꾸면 API를 다시 시작해야 반영된다.
+- Google: OAuth 클라이언트의 **승인된 리디렉션 URI**에 위 주소를 그대로 등록한다. `api/.env`의 client ID가 그 클라이언트의 것이어야 한다. 동의 화면 사용자 유형이 **내부**이면 개인 Gmail은 `org_internal`로 막히므로, **외부 + 테스트** 상태로 두고 테스트 사용자를 등록한다.
+- 카카오: **Redirect URI**에 위 주소를 등록하고 OpenID Connect와 이메일 동의항목을 켠다.
+- 처음 소셜 로그인한 사용자는 `/signup?social=pending`으로 돌아와 표시 이름과 약관 동의만으로 가입을 마친다(D-AUT-02 소셜 가입).
+
 `src/apis/auth/ApiService.ts`:
 
 - Base URL, JSON 헤더/본문, `credentials: include`로 세션 쿠키(`zoop_session`) 전송.

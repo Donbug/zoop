@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "zoop-graph-tool-queries-1",
+  "queriesId": "zoop-graph-tool-dev-1",
+  "split": "dev",
+  "about": "Visible dev-only query set for the deterministic zoop-ai-graph tool baseline. It names WHAT to ask (version, anchor company, depth) and holds no expected answer; the hand-authored expectation lives in expected.json and is opened only by `score`. The world is synthetic: S1/S2/S3 authored replay (ai/pipeline/scripts graph_projection_smoke.py world plus the `split` job in graph_tool_bench.py `prepare`), projected into a throwaway Neo4j database. Company IDs are the canonical IDs the operator registry assigns to SYNTH-2 (kr-000050), SYNTH-1 (kr-000100), SYNTH-3 (kr-000300) and SYNTH-4 (kr-000400).",
+  "versions": {
+    "main": "S3 job rel-main: 7 eligible relations over all five projected types, one two-step indirect supply path, one symmetric pair, one event and one topic node.",
+    "split": "S3 job rel-split: one INVESTS_IN edge and one COMPETES_WITH edge over four companies, two disconnected components."
+  },
+  "cases": [
+    {"caseId": "GT01", "category": "ego-depth-1", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000400", "depth": 1},
+    {"caseId": "GT02", "category": "ego-depth-2", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000400", "depth": 2},
+    {"caseId": "GT03", "category": "ego-depth-3", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000400", "depth": 3},
+    {"caseId": "GT04", "category": "ego-depth-1", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000100", "depth": 1},
+    {"caseId": "GT05", "category": "ego-depth-2", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000100", "depth": 2},
+    {"caseId": "GT06", "category": "ego-depth-3-saturated", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000100", "depth": 3},
+    {"caseId": "GT07", "category": "symmetric-edge", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000050", "depth": 1},
+    {"caseId": "GT08", "category": "ego-depth-2", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000050", "depth": 2},
+    {"caseId": "GT09", "category": "orientation-both-roles", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-000300", "depth": 1},
+    {"caseId": "GT10", "category": "unknown-company", "role": "timing", "version": "main", "command": "focus", "companyId": "kr-999999", "depth": 2},
+    {"caseId": "GT11", "category": "disconnected", "role": "timing", "version": "split", "command": "focus", "companyId": "kr-000400", "depth": 3},
+    {"caseId": "GT12", "category": "disconnected", "role": "timing", "version": "split", "command": "focus", "companyId": "kr-000050", "depth": 3},
+    {"caseId": "GT13", "category": "symmetric-edge", "role": "timing", "version": "split", "command": "focus", "companyId": "kr-000100", "depth": 1},
+    {"caseId": "GC01", "category": "control-full-read", "role": "control", "version": "main", "command": "read"},
+    {"caseId": "GC02", "category": "control-full-read", "role": "control", "version": "split", "command": "read"},
+    {"caseId": "GC03", "category": "control-ledger-inspect", "role": "control", "version": "main", "command": "inspect"},
+    {"caseId": "GC04", "category": "control-ledger-inspect", "role": "control", "version": "split", "command": "inspect"}
+  ],
+  "checks": [
+    {"checkId": "CK01", "kind": "authority-denial", "mutation": "grant-disabled", "version": "main", "companyId": "kr-000100", "depth": 1},
+    {"checkId": "CK02", "kind": "authority-denial", "mutation": "grant-revision-changed", "version": "main", "companyId": "kr-000100", "depth": 1},
+    {"checkId": "CK03", "kind": "authority-denial", "mutation": "canonical-topic-removed", "version": "main", "companyId": "kr-000100", "depth": 1},
+    {"checkId": "CK04", "kind": "input-refusal", "mutation": null, "version": "main", "companyId": "kr-000100", "depth": 4},
+    {"checkId": "CK05", "kind": "input-refusal", "mutation": null, "version": "@absent", "companyId": "kr-000100", "depth": 1}
+  ]
+}

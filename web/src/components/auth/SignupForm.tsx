@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listSignupTerms, signUp } from '@/apis/auth/session';
+import {
+  completeSocialSignup,
+  listSignupTerms,
+  signUp,
+} from '@/apis/auth/session';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import type { SignupTerm } from '@/types/auth/session';
@@ -14,6 +18,7 @@ import {
   authPrimaryButton,
   authSmallButton,
   authStatus,
+  authNote,
 } from './authStyles';
 
 const checkLabel =
@@ -22,7 +27,11 @@ const checkbox = 'size-[18px] shrink-0 accent-gray-950';
 
 const usable = (term: SignupTerm) =>
   term.bodyAvailable && !!term.body?.trim() && !!term.version?.trim();
-export default function SignupForm() {
+/**
+ * D-AUT-02 회원가입. social이면 소셜 콜백이 검증한 신규 인증으로 가입을 마친다(/signup?social=pending).
+ * 이때 이메일·비밀번호는 받지 않고 표시 이름과 약관 동의만 보낸다.
+ */
+export default function SignupForm({ social = false }: { social?: boolean }) {
   const auth = useAuth();
   const flow = useAuthCompletion();
   const [attempt, setAttempt] = useState(0);
@@ -61,17 +70,21 @@ export default function SignupForm() {
   const frozen = flow.busy || flow.recovering;
   const message =
     validation ??
-    (flow.error === 'EMAIL_TAKEN'
-      ? '이미 가입된 이메일이에요. 다른 이메일을 입력하거나 로그인해 주세요.'
-      : flow.error === 'TERMS_REQUIRED'
-        ? '필수 약관과 동의한 버전을 다시 확인해 주세요.'
-        : flow.error === 'RATE_LIMITED'
-          ? '요청이 많아요. 잠시 후 다시 시도해 주세요.'
-          : flow.error === 'INVALID_REQUEST'
-            ? '입력한 가입 정보를 확인해 주세요.'
-            : flow.error && flow.error.match(/^[A-Z_]+$/)
-              ? '가입하지 못했어요. 입력 내용을 확인하고 다시 시도해 주세요.'
-              : flow.error);
+    (social && flow.error === 'ACCESS_DENIED'
+      ? '소셜 인증이 만료됐거나 확인되지 않았어요. 로그인 화면에서 소셜 로그인을 다시 시작해 주세요.'
+      : social && flow.error === 'SOCIAL_LINK_REQUIRED'
+        ? '이미 같은 이메일로 가입한 계정이 있어요. 이메일로 로그인한 뒤 소셜 계정을 연결해 주세요.'
+        : flow.error === 'EMAIL_TAKEN'
+          ? '이미 가입된 이메일이에요. 다른 이메일을 입력하거나 로그인해 주세요.'
+          : flow.error === 'TERMS_REQUIRED'
+            ? '필수 약관과 동의한 버전을 다시 확인해 주세요.'
+            : flow.error === 'RATE_LIMITED'
+              ? '요청이 많아요. 잠시 후 다시 시도해 주세요.'
+              : flow.error === 'INVALID_REQUEST'
+                ? '입력한 가입 정보를 확인해 주세요. 비밀번호는 8자 이상 32자 이하이며 제어 문자와 흔한 비밀번호는 쓸 수 없어요.'
+                : flow.error && flow.error.match(/^[A-Z_]+$/)
+                  ? '가입하지 못했어요. 입력 내용을 확인하고 다시 시도해 주세요.'
+                  : flow.error);
   if (
     (auth.status !== 'ready' && !submitted) ||
     (auth.isAuthenticated && !submitted)
@@ -94,13 +107,40 @@ export default function SignupForm() {
           ← 시작 화면으로
         </Link>
       )}
-      <h1 className={authHeading}>이메일로 가입하기</h1>
+      <h1 className={authHeading}>
+        {social ? '소셜 계정으로 가입하기' : '이메일로 가입하기'}
+      </h1>
+      {social && (
+        <p className={authNote}>
+          소셜 계정에서 확인한 이메일로 가입해요. 표시 이름과 약관 동의만
+          확인하면 돼요.
+        </p>
+      )}
       <form
         className="flex flex-col gap-2.5"
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
           if (frozen || !terms || termsError || unavailable) return;
+          if (social) {
+            if (!consentReady) {
+              setValidation('필수 약관에 동의해 주세요.');
+              return;
+            }
+            setValidation(null);
+            setSubmitted(true);
+            void flow.run(() =>
+              completeSocialSignup({
+                ...(name.trim() ? { displayName: name.trim() } : {}),
+                agreements: terms.filter(usable).map((t) => ({
+                  id: t.id,
+                  version: t.version!,
+                  accepted: !!accepted[t.id],
+                })),
+              }),
+            );
+            return;
+          }
           const trimmed = email.trim();
           if (!trimmed || !password) {
             setValidation('이메일과 비밀번호를 입력해 주세요.');
@@ -111,6 +151,12 @@ export default function SignupForm() {
             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
           ) {
             setValidation('올바른 이메일 형식을 입력해 주세요.');
+            return;
+          }
+          // SignupRequest.password: 8~32 Unicode code point, trim 없음. 제어 문자·흔한 비밀번호는 서버가 거절한다.
+          const length = [...password].length;
+          if (length < 8 || length > 32) {
+            setValidation('비밀번호는 8자 이상 32자 이하로 입력해 주세요.');
             return;
           }
           if (!consentReady) {
@@ -135,31 +181,40 @@ export default function SignupForm() {
           );
         }}
       >
-        <label htmlFor="signup-email" className={authLabel}>
-          이메일
-        </label>
-        <input
-          id="signup-email"
-          className={authInput}
-          type="email"
-          autoComplete="email"
-          placeholder="name@example.com"
-          value={email}
-          disabled={frozen}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <label htmlFor="signup-password" className={authLabel}>
-          비밀번호
-        </label>
-        <input
-          id="signup-password"
-          className={authInput}
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          disabled={frozen}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        {!social && (
+          <>
+            <label htmlFor="signup-email" className={authLabel}>
+              이메일
+            </label>
+            <input
+              id="signup-email"
+              className={authInput}
+              type="email"
+              autoComplete="email"
+              placeholder="name@example.com"
+              value={email}
+              disabled={frozen}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <label htmlFor="signup-password" className={authLabel}>
+              비밀번호
+            </label>
+            <input
+              id="signup-password"
+              className={authInput}
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              disabled={frozen}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-describedby="signup-password-rule"
+            />
+            <p id="signup-password-rule" className={authNote}>
+              8자 이상 32자 이하로 입력해 주세요. 공백은 그대로 사용되며, 제어
+              문자와 흔한 비밀번호는 쓸 수 없어요.
+            </p>
+          </>
+        )}
         <label htmlFor="signup-name" className={authLabel}>
           표시 이름 (선택)
         </label>
@@ -255,6 +310,13 @@ export default function SignupForm() {
             {message}
           </p>
         )}
+        {social &&
+          (flow.error === 'ACCESS_DENIED' ||
+            flow.error === 'SOCIAL_LINK_REQUIRED') && (
+            <Link to="/login" className={authLink}>
+              로그인 화면으로
+            </Link>
+          )}
         {flow.recovering ? (
           <>
             <button

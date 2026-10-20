@@ -1,28 +1,31 @@
 schemaVersion: 1
 sources:
-  specDir: docs/evidence/raw/functional-spec_2026-10-12
+  specDir: docs/evidence/raw/functional-spec_2026-10-18
   wbsDir: docs/evidence/raw/wbs_2026-10-12
   requirementsDir: docs/evidence/raw/requirements-sheet_2026-10-06
   screens: docs/screen-plan/captures/slide-index.json
   gap: docs/evidence/spec-v1.2-gap.md
+  historicalSpecFiles:
+  - docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+  - docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
 fingerprints:
-  docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv: 4d5505aad267724a958436db9304e4fb62ccaf49bedfcce0aa2c4dd80ab045a2
-  docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv: c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74
-  docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv: 6791468a7182c719146b5b7db966bbc0f8246c956d33edd85a22f75dec228c8a
   docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv: f12f4de4e9987c3e7ff3a001786f823bad0695c37e82f05c7d5ca6d27daff67d
-  docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv: 76a315e56e1a2fd018b347da2fee3eac5c563c077bad437d6bc3510cebeed53d
-  docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv: 6f772f7ed09fe1c17ae8365cacbc34dd3341034a60edda799e542914ec3245cc
-  docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv: fec5fd6647910b770104368cad2f5298303c2163fa7e27d6a0e4de11803bcf63
   docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv: c17d26d4d6f3f868b81db406fbb13a2dda9f172c584fc3a8b5a771c9c31c07c6
-  docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv: 5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90
-  docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv: a8cb1cb80b359eb5cc187450bcdbb96ca9c0fcfc1d9f2b8b7e436fbcbd973560
-  docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv: 8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6
-  docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv: d214f780afcf3e01d3cafc43fc4e006f87ed98d7c54beabc8073c9c20d41363a
-  docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv: fc03c7cc08a7f78e17a4608b4e70654e9374473f865497bb5a6cdbb634de5dba
-  docs/evidence/raw/functional-spec_2026-10-12/13-변경-내역.csv: 0279b675b4b1e829bf094036ad547c4841fb15c96e5543a999f0fb30450df46e
-  docs/evidence/raw/functional-spec_2026-10-12/14-제안-확인-사항.csv: a5d50ff2500e2382eb7470109fa2acac13114572419a40001a43e4f7c4c51089
-  docs/evidence/raw/functional-spec_2026-10-12/_collection-manifest.json: 3acc346d50562ee41c5453808ffeb8848beee3c887b7aa6db34aead04db2893e
-  docs/evidence/raw/functional-spec_2026-10-12/zoop-functional-spec_2026-10-12.xlsx: 49fc383bce873367036c449bd02bde23b08ab3893e21b9bf340096845b82267c
+  docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv: 4d5505aad267724a958436db9304e4fb62ccaf49bedfcce0aa2c4dd80ab045a2
+  docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv: c2feed59a5232e310de8c7e54fe21953cae4816bc6f3ee08fd5d4c8a66c08a74
+  docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv: c07b0ddcf3a055b9c087c295bb03ac637da872f630e7360ccbaa3bd8313e5541
+  docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv: dd707d3eb708f6426c3a5f4328d0f4742ac58495362b6d74091ee6f2df516a05
+  docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv: 647627f382ee1eb63fd1e67157fe2834b46be2f09d4e237587fec71530bf0647
+  docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv: 437b6826c5e374b095885a2d2076df638f21dccda95fbe7a644b03af3e2eca20
+  docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv: 5836c1bb98c4b7377da26af75283aeddf85edbf55d33a8b396f167f31f4bfb90
+  docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv: ac09b5a762d039d23e826997faf19a36a5d21f788719136db0f70ed10a23d4d5
+  docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv: 8ac603b6c53641c6d808e8eba8911669e7aaf96b53733dd5f32f0d4894943fe6
+  docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv: 97679445a88a3714b5a7a11665b89c60482f2cccf9edbc1912179956904206c2
+  docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv: 41995ded3b10043dc379c8afab1e3e9f341c26941cc59b67b550ddccb5f552e4
+  docs/evidence/raw/functional-spec_2026-10-18/13-변경-내역.csv: 52b0d0606bea399de6d6b71e38dd6be4e8c5fc9b506e26600702d3e0d986d61f
+  docs/evidence/raw/functional-spec_2026-10-18/14-제안-확인-사항.csv: 4c588d550b2146c8ae5c90144442392c7bdff20e42cc648eaa0dec9f2fd7d131
+  docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json: d71774715d111f7ba40068cba8e45f297b5d4ed901f7a550c14d08c0c0911f70
+  docs/evidence/raw/functional-spec_2026-10-18/zoop-functional-spec_2026-10-18.xlsx: a659bd514c654fa487926c2e61e349cde6201aee81ceefdc4ae3a2bc95690273
   docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv: 79661cfc0bc2643f7222158c1fdc4c5652216954892e622b34f0de6ceb637d23
   docs/evidence/raw/requirements-sheet_2026-10-06/2-검증-기준.csv: 03202210c85c90d837225fce10888257a0566856ac920ad52719ac586711252b
   docs/evidence/raw/requirements-sheet_2026-10-06/3-정책-결정.csv: 3dc355e4d3204ab8a42a838e6d28e91665bb0910170956c28eebebdccb1ab4ed
@@ -44,14 +47,14 @@ specs:
   requirementIds:
   - '1'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 10
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -99,14 +102,14 @@ specs:
   requirementIds:
   - '2'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 11
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -165,14 +168,14 @@ specs:
   requirementIds:
   - '3'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 12
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -242,14 +245,14 @@ specs:
   requirementIds:
   - '4'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 13
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -348,14 +351,14 @@ specs:
   requirementIds:
   - '5'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 14
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -433,14 +436,14 @@ specs:
   requirementIds:
   - '6'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 15
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -483,14 +486,14 @@ specs:
   requirementIds:
   - '7'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 16
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -561,14 +564,14 @@ specs:
   requirementIds:
   - '8'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 17
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -612,14 +615,14 @@ specs:
   requirementIds:
   - '9'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 18
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -692,14 +695,14 @@ specs:
   requirementIds:
   - '10'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 19
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -762,14 +765,14 @@ specs:
   requirementIds:
   - '11'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 20
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 분리
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -835,14 +838,14 @@ specs:
   requirementIds:
   - '11'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 21
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 분리
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -890,14 +893,14 @@ specs:
   requirementIds:
   - '12'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 22
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -941,22 +944,22 @@ specs:
   requirementIds:
   - '13'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 23
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 93
       rowUnit: xlsx-row
     fields:
       기능명: 초기 설정 저장
       기능 설명: 시스템은 회원의 투자 여부, 가상계좌 연결 상태, 관심종목 등 초기 설정 정보를 해당 회원 계정에 저장한다. 저장 실패 시
         초기 설정 완료로 처리하지 않고 현재 선택 내용을 유지한 상태에서 다시 시도할 수 있도록 한다. 비회원의 개인 설정은 저장하지 않으며,
-        개인 설정 기능을 이용하려는 경우 로그인 및 회원 초기 설정 절차로 안내한다. 튜토리얼 완료·건너뛰기 여부는 초기 설정 완료 판정과
-        별도로 관리한다.
+        개인 설정 기능을 이용하려는 경우 로그인 및 회원 초기 설정 절차로 안내한다. 튜토리얼 완료 여부(`tutorialCompleted`)는
+        초기 설정 완료 판정과 별도로 관리한다.
       선행조건: 회원이 입력한 초기 설정 또는 관심종목 선택을 저장하려 한다.
       입력값: 본인 회원 식별 정보, 투자 여부, 모의 계좌 연결 상태, 관심종목 등 현재 선택한 초기 설정값.
       입력·검증 규칙: '설정은 해당 회원 계정에 저장한다.
@@ -965,7 +968,7 @@ specs:
 
         비회원의 관심종목 등 개인 설정 저장은 허용하지 않는다.
 
-        튜토리얼 완료 여부 또는 건너뛰기 여부를 초기 설정 완료 판정 조건으로 사용하지 않는다.
+        튜토리얼 `tutorialCompleted` 값은 초기 설정 완료 판정에 사용하지 않는다.
 
         초기 설정 저장과 튜토리얼 상태 저장은 서로 독립된 기능으로 처리한다.'
       처리 절차 및 분기: '1. 설정과 관심종목을 해당 계정에 저장한다.
@@ -987,7 +990,7 @@ specs:
 
         ④ 비회원의 초기 설정은 회원 데이터로 저장되지 않는다.
 
-        ⑤ 회원의 초기 설정 완료 여부와 튜토리얼 완료·건너뛰기 여부는 독립적으로 관리된다.'
+        ⑤ 회원의 초기 설정 완료 여부와 튜토리얼 `tutorialCompleted` 값은 독립적으로 관리된다.'
       확인 필요 사항: '-'
     heading:
       row: 91
@@ -1002,14 +1005,14 @@ specs:
   requirementIds:
   - '14'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 24
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -1076,14 +1079,14 @@ specs:
   requirementIds:
   - '15'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 25
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -1125,89 +1128,88 @@ specs:
   requirementIds:
   - '16'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 26
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv
       row: 135
       rowUnit: xlsx-row
     fields:
       기능명: 튜토리얼 완료와 건너뛰기
-      기능 설명: 사용자는 튜토리얼을 끝까지 완료하거나 진행 중 건너뛰어 메인 그래프로 이동할 수 있어야 한다. 회원의 경우 튜토리얼 처리 상태를
-        계정에 저장하여 이후 자동 노출 여부 판단에 사용한다. 비회원의 경우 튜토리얼 완료, 건너뛰기 및 진행 상태를 저장하지 않는다. 회원과
-        비회원 모두 메인 그래프의 튜토리얼 다시 보기 기능을 통해 튜토리얼을 다시 실행할 수 있다.
-      선행조건: 회원 또는 비회원이 튜토리얼을 진행 중이다.
-      입력값: 완료 또는 건너뛰기 선택, 회원인 경우 해당 회원의 튜토리얼 완료 상태.
+      기능 설명: 사용자는 튜토리얼을 끝까지 완료하거나 진행 중 건너뛰어 메인 그래프로 이동할 수 있다. API는 `completed` boolean
+        하나로 결과를 저장한다. `true`는 완료, `false`는 미완료를 뜻하며 중간 건너뛰기도 `false`로 처리한다. 회원의 `tutorialCompleted`는
+        계정에 저장하고 비회원의 값은 게스트 세션에만 보관한다. 일반 진입 시 값이 `true`이면 자동 노출하지 않고, `false`이면
+        튜토리얼을 표시한다. 회원과 비회원 모두 메인 그래프에서 다시 보기를 실행할 수 있다.
+      선행조건: 회원 또는 비회원 세션에서 사용자가 튜토리얼을 진행하거나 메인 그래프의 다시 보기를 선택한다.
+      입력값: '튜토리얼 마지막 단계에서 완료 또는 진행 중 건너뛰기 선택. API 요청은 `PUT /api/v1/auth/tutorial`의
+        `completed: true|false`이며, 응답의 `tutorialCompleted` 값을 사용한다.'
       입력·검증 규칙: '① 완료와 건너뛰기 모두 메인 그래프 진입을 허용한다.
 
-        ② 회원이 마지막 단계까지 완료하면 튜토리얼 상태를 COMPLETED로 저장한다.
+        ② 마지막 단계까지 완료하면 `completed: true`를 보내고 응답의 `tutorialCompleted`를 `true`로 반영한다.
 
-        ③ 회원이 중간에 건너뛰면 SKIPPED 상태로 저장한다. SKIPPED는 완료로 간주하지 않는다.
+        ③ 중간에 건너뛰면 `completed: false`를 보낸다. 별도의 `SKIPPED` 상태는 저장하지 않으며 `false`는 미완료를
+        뜻한다.
 
-        ④ COMPLETED와 SKIPPED 회원 모두 이후 일반 로그인 시 튜토리얼을 자동으로 다시 표시하지 않는다.
+        ④ 일반 진입 시 `tutorialCompleted: true`이면 자동 표시하지 않고, `false`이면 튜토리얼을 표시한다. 따라서
+        건너뛴 회원도 다음 일반 로그인에서 다시 표시된다.
 
-        ⑤ 회원은 상태와 관계없이 튜토리얼 다시 보기를 선택할 수 있다.
+        ⑤ 회원은 상태와 관계없이 다시 보기를 선택할 수 있고, 다시 보기는 첫 단계부터 시작한다. 다시 보기 진입만으로 저장값을 변경하지
+        않는다.
 
-        ⑥ 튜토리얼 다시 보기를 실행하는 것만으로 기존 COMPLETED 또는 SKIPPED 상태를 변경하지 않는다.
+        ⑥ 회원 값은 해당 계정에 저장한다. 비회원 값은 게스트 세션에만 저장하고 회원 계정에는 저장하지 않으며, 새 게스트 세션에서는 이전
+        값을 복원하지 않는다.
 
-        ⑦ 비회원의 튜토리얼 완료, 건너뛰기 및 현재 단계는 저장하지 않는다.
+        ⑦ 현재 진행 단계는 저장하지 않는다.
 
-        ⑧ 비회원은 다시 방문했을 때 이전 튜토리얼 상태를 복원하지 않는다.
+        ⑧ 초기 설정 완료 여부와 `tutorialCompleted` 값은 서로 독립적으로 관리한다.'
+      처리 절차 및 분기: '① 일반 진입 시 서버 세션의 `tutorialCompleted` 값을 확인한다. `true`이면 메인 그래프로
+        이동하고, `false`이면 튜토리얼을 표시한다.
 
-        ⑨ 초기 설정 완료 여부와 튜토리얼 상태는 서로 독립적으로 관리한다.'
-      처리 절차 및 분기: '① 사용자가 튜토리얼 마지막 단계에서 완료를 선택한 경우 로그인 여부를 확인한다.
+        ② 사용자가 마지막 단계에서 완료하면 `PUT /api/v1/auth/tutorial`에 `{"completed": true}`를 전송한다.
+        성공 응답의 `tutorialCompleted: true`를 반영한 뒤 메인 그래프로 이동한다.
 
-        ② 회원이면 COMPLETED 상태를 회원 계정에 저장한 후 메인 그래프로 이동한다.
+        ③ 사용자가 진행 중 건너뛰면 같은 API에 `{"completed": false}`를 전송한다. 성공 응답의 `tutorialCompleted:
+        false`를 반영한 뒤 메인 그래프로 이동한다.
 
-        ③ 비회원이면 상태 저장 없이 메인 그래프로 이동한다.
+        ④ 회원은 결과를 회원 계정에 저장하고, 비회원은 게스트 세션에만 저장한다.
 
-        ④ 사용자가 진행 중 건너뛰기를 선택한 경우 회원이면 SKIPPED 상태를 저장한 후 메인 그래프로 이동한다.
+        ⑤ 메인 그래프에서 다시 보기를 선택하면 회원·비회원 모두 첫 단계부터 시작한다. 진입 시 저장값은 바꾸지 않고 종료 결과에 따라 `true`
+        또는 `false`를 저장한다.'
+      정상 결과: 완료 또는 건너뛰기 후 메인 그래프에 진입할 수 있다. API 응답의 `tutorialCompleted`는 완료 시 `true`,
+        건너뛰기 시 `false`다. 회원 값은 계정에, 비회원 값은 게스트 세션에 보관한다. 일반 진입의 자동 노출은 이 boolean 값만
+        기준으로 한다.
+      예외 처리: '튜토리얼 결과 저장 API 실패: 응답되지 않은 값을 저장 성공으로 간주하지 않는다. 메인 그래프 이동은 허용하며 오류를
+        기록하고 재시도를 제공한다. 이후 진입은 서버가 반환하는 마지막 저장값을 따른다.
 
-        ⑤ 비회원이 건너뛰기를 선택하면 상태 저장 없이 메인 그래프로 이동한다.
+        비회원 결과 저장: 회원 계정에 기록하지 않고 현재 게스트 세션에만 저장한다. 게스트 세션 종료 후에는 복원하지 않는다.
 
-        ⑥ 메인 그래프에서 튜토리얼 다시 보기를 선택하면 회원·비회원 모두 첫 단계부터 튜토리얼을 다시 실행한다.
+        튜토리얼 다시 보기 실패: 기존 메인 그래프 상태를 유지하고 오류 안내와 재시도를 제공한다.
 
-        ⑦ 다시 보기 종료 후 회원은 완료 또는 건너뛰기 결과에 따라 상태를 갱신할 수 있으며, 비회원은 어떠한 진행 상태도 저장하지 않는다.'
-      정상 결과: 완료 또는 건너뛰기 이후 메인 그래프에 진입할 수 있다. 회원은 COMPLETED 또는 SKIPPED 상태가 계정에 저장되며,
-        비회원은 튜토리얼 상태가 저장되지 않는다. 회원과 비회원 모두 필요할 때 튜토리얼을 다시 실행할 수 있다.
-      예외 처리: '회원 완료·건너뛰기 상태 저장 실패: 메인 그래프 이동 자체는 차단하지 않는다. 서버에서 저장을 재시도하거나 다음 회원 상태
-        조회 시 미저장 상태를 확인할 수 있도록 오류를 기록한다. 저장되지 않은 상태를 성공적으로 저장된 것으로 응답하지 않는다.
-
-        비회원 완료·건너뛰기: 별도의 저장 요청을 수행하지 않고 즉시 메인 그래프로 이동한다.
-
-        비회원 재방문: 이전 진행 상태를 복원하지 않으며 일반 비회원 시작 정책에 따라 튜토리얼을 제공한다.
-
-        튜토리얼 다시 보기 실패: 기존 메인 그래프 상태를 유지하고 오류 안내와 재시도 기능을 제공한다.
-
-        회원 재시청 중 중단: 기존 저장 상태를 임의로 삭제하거나 초기화하지 않는다.'
+        재시청 중 중단: 기존에 저장된 `tutorialCompleted` 값을 임의로 변경하지 않는다.'
       수용 기준: '① 회원·비회원 모두 완료 또는 건너뛰기로 메인 그래프에 진입할 수 있다.
 
-        ② 회원이 튜토리얼을 완료하면 COMPLETED 상태가 저장된다.
+        ② 완료 결과는 API 요청 `completed: true` 및 응답 `tutorialCompleted: true`로 처리한다.
 
-        ③ 회원이 튜토리얼을 건너뛰면 SKIPPED 상태가 저장되고 완료로 처리되지 않는다.
+        ③ 건너뛰기 결과는 API 요청 `completed: false` 및 응답 `tutorialCompleted: false`로 처리하며
+        별도 `SKIPPED` 상태를 저장하지 않는다.
 
-        ④ COMPLETED 또는 SKIPPED 회원에게 일반적인 다음 로그인에서 튜토리얼을 자동 재노출하지 않는다.
+        ④ 일반 진입에서 `true`는 자동 표시하지 않고 `false`는 표시한다. 건너뛴 회원은 다음 일반 로그인에서 튜토리얼을 다시 본다.
 
-        ⑤ 비회원의 완료·건너뛰기·진행 상태는 저장되지 않는다.
+        ⑤ 비회원의 `tutorialCompleted`는 게스트 세션에만 보관하고 회원 계정에 저장하지 않는다. 새 게스트 세션에서 이전 값을
+        복원하지 않는다.
 
-        ⑥ 비회원 재방문 시 이전 튜토리얼 진행 위치가 복원되지 않는다.
+        ⑥ 현재 단계는 저장하지 않으며 다시 보기는 첫 단계부터 시작한다.
 
-        ⑦ 회원과 비회원 모두 튜토리얼 다시 보기를 이용할 수 있다.
+        ⑦ 튜토리얼 다시 보기는 시작만으로 기존 값을 바꾸지 않고, 종료 결과를 저장한다.
 
-        ⑧ 튜토리얼 다시 보기는 첫 단계부터 시작한다.
+        ⑧ 다른 회원의 상태를 사용하지 않는다.
 
-        ⑨ 다른 회원의 튜토리얼 상태를 사용하지 않는다.
-
-        ⑩ 초기 설정 완료 여부와 튜토리얼 상태는 서로 영향을 주지 않는다.'
-      확인 필요 사항: '[확인 필요: 건너뛰기의 완료 상태 저장 여부·미완료 재노출 방식·재시청 진입 위치 결정 필요]
-
-        [확인 필요: 건너뛰기 저장값과 비회원 완료 상태 보관 여부 결정 필요]
-
-        [확인 필요: 저장 실패 안내 및 진행 상태 보관·재노출 방식 결정 필요]'
+        ⑨ 초기 설정 완료 여부와 튜토리얼 상태는 서로 영향을 주지 않는다.'
+      확인 필요 사항: '-'
     heading:
       row: 133
       text: FS016  튜토리얼 완료와 건너뛰기
@@ -1221,12 +1223,107 @@ specs:
   requirementIds:
   - '17'
   source: &id001
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 27
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
+      row: 9
+      rowUnit: xlsx-row
+    fields:
+      기능명: 개인화 관계 그래프
+      기능 설명: 로그인 회원의 보유종목과 관심종목을 기준으로 개인화 관계 그래프를 제공한다. 개인화 그래프는 기업 노드와 이슈 노드로 구성하며,
+        기준 기업과 관련 기업 및 관련 이슈의 관계를 표시한다. 기업 노드는 보유·관심 상태를 구분하여 표시하고, 이슈 노드는 국내 / 국제
+        속성을 가진다. 사용자는 전체 / 보유 / 관심 필터를 이용하여 그래프의 기준 종목 범위를 변경할 수 있다.
+      선행조건: 로그인 회원이 개인화 관계 그래프를 조회한다.
+      입력값: 회원의 보유종목 목록, 관심종목 목록, 선택한 개인화 필터, 기준 기업과 연결된 기업·이슈 관계 데이터.
+      입력·검증 규칙: '① 회원 본인의 보유종목과 관심종목만 개인화 기준으로 사용한다.
+
+        ② 그래프 노드는 기업, 이슈 두 종류만 사용한다.
+
+        ③ 동일 기업이 보유·관심 양쪽에 있더라도 하나의 기업 노드만 생성하고 보유·관심 상태를 함께 표시한다.
+
+        ④ 기업 노드에는 보유, 관심 상태를 각각 표시할 수 있다.
+
+        ⑤ 이슈 노드는 국내, 국제 속성을 가진다.
+
+        ⑥ 전체 필터는 보유종목과 관심종목의 합집합을 기준으로 한다.
+
+        ⑦ 보유 필터는 보유종목만 기준으로 한다.
+
+        ⑧ 관심 필터는 관심종목만 기준으로 한다.
+
+        ⑨ 기준 기업과 연결된 관련 기업 및 이슈를 함께 표시한다.
+
+        ⑩ 비회원에게 개인화 그래프를 제공하지 않는다.
+
+        ⑪ 필터 변경 중 이전 요청 응답이 늦게 도착하더라도 현재 선택 필터의 결과만 화면에 반영한다.'
+      처리 절차 및 분기: '① 회원의 보유종목과 관심종목을 조회한다.
+
+        ② 기본 진입 시 전체 필터를 적용한다.
+
+        ③ 선택 필터에 따라 기준 기업 목록을 구성한다.
+
+        ④ 동일 기업은 기업 식별자 기준으로 하나의 노드로 통합하고 보유·관심 상태를 표시한다.
+
+        ⑤ 기준 기업에 연결된 관련 기업과 이슈를 조회한다.
+
+        ⑥ 이슈 노드에는 국내 / 국제 속성을 적용한다.
+
+        ⑦ 조회 결과를 관계 그래프로 구성한다.
+
+        ⑧ 사용자가 필터를 변경하면 선택한 필터 기준으로 그래프를 다시 조회한다.
+
+        ⑨ 선택한 분류에 종목이 없으면 해당 상태를 안내하고 다른 필터 선택을 제공한다.'
+      정상 결과: 현재 선택한 전체 / 보유 / 관심 기준에 맞는 개인화 관계 그래프가 표시된다. 사용자는 기준 기업과 관련 기업·이슈의 관계
+        및 기업별 보유·관심 상태를 확인할 수 있다.
+      예외 처리: '전체 기준 종목 없음: 보유종목 또는 관심종목이 없습니다.를 표시하고 관심종목 설정을 안내한다.
+
+        보유종목 없음: 보유종목이 없습니다.를 표시하고 전체 / 관심 필터 전환을 제공한다.
+
+        관심종목 없음: 관심종목이 없습니다.를 표시하고 관심종목 추가 및 전체 / 보유 필터 전환을 제공한다.
+
+        관계 0건: 기준 기업은 유지하고 현재 확인된 관련 관계가 없습니다.를 표시한다.
+
+        조회 실패: 현재 선택 필터와 직전 정상 그래프를 유지하고 다시 시도를 제공한다.
+
+        지연 응답: 현재 필터 및 최신 요청 식별자와 일치하지 않는 응답은 폐기한다.
+
+        비회원 접근: 개인화 데이터를 반환하지 않고 로그인 필요 안내를 제공한다.'
+      수용 기준: '① 전체 필터는 보유·관심종목의 합집합과 일치한다.
+
+        ② 보유 필터는 보유종목만 기준으로 한다.
+
+        ③ 관심 필터는 관심종목만 기준으로 한다.
+
+        ④ 동일 기업이 보유·관심 양쪽에 있어도 하나의 노드만 표시된다.
+
+        ⑤ 동일 노드에서 보유·관심 상태를 동시에 확인할 수 있다.
+
+        ⑥ 그래프의 노드 종류는 기업과 이슈 두 종류로 제한된다.
+
+        ⑦ 이슈 노드는 국내·국제 속성을 가진다.
+
+        ⑧ 빠르게 필터를 변경해도 마지막 선택 필터와 결과가 일치한다.'
+      확인 필요 사항: '확정: 개인화 그래프 기본 필터는 전체로 한다.
+
+        확정: 필터 상태는 현재 로그인 세션 동안 유지하고 새 로그인 또는 새 세션에서는 전체로 초기화한다.
+
+        확정: 보유·관심 상태는 기업 노드 내부의 배지 또는 동일 수준의 시각 표시로 구분한다.
+
+        확정: 이슈 속성은 국내 / 국제 두 값으로 운영한다.
+
+        확정: 이슈의 국내·국제 값이 없는 데이터는 사용자 그래프에 표시하기 전 데이터 검증 단계에서 제외하거나 보완하며, 임의 값을 생성하지
+        않는다.
+
+        확정: 그래프 조회 실패 시 기존 정상 그래프를 제거하지 않고 재시도를 제공한다.'
+    heading:
+      row: 7
+      text: FS017 개인화 관계 그래프
+    meta: 원본 우선순위
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
       row: 9
@@ -1323,101 +1420,6 @@ specs:
       row: 7
       text: FS017  개인화 관계 그래프
     meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 17   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
-      row: 9
-      rowUnit: xlsx-row
-    fields:
-      기능명: 개인화 관계 그래프
-      기능 설명: 로그인 회원의 보유종목과 관심종목을 기준으로 개인화 관계 그래프를 제공한다. 개인화 그래프는 기업 노드와 이슈 노드로 구성하며,
-        기준 기업과 관련 기업 및 관련 이슈의 관계를 표시한다. 기업 노드는 보유·관심 상태를 구분하여 표시하고, 이슈 노드는 국내 / 국제
-        속성을 가진다. 사용자는 전체 / 보유 / 관심 필터를 이용하여 그래프의 기준 종목 범위를 변경할 수 있다.
-      선행조건: 로그인 회원이 개인화 관계 그래프를 조회한다.
-      입력값: 회원의 보유종목 목록, 관심종목 목록, 선택한 개인화 필터, 기준 기업과 연결된 기업·이슈 관계 데이터.
-      입력·검증 규칙: '① 회원 본인의 보유종목과 관심종목만 개인화 기준으로 사용한다.
-
-        ② 그래프 노드는 기업, 이슈 두 종류만 사용한다.
-
-        ③ 동일 기업이 보유·관심 양쪽에 있더라도 하나의 기업 노드만 생성하고 보유·관심 상태를 함께 표시한다.
-
-        ④ 기업 노드에는 보유, 관심 상태를 각각 표시할 수 있다.
-
-        ⑤ 이슈 노드는 국내, 국제 속성을 가진다.
-
-        ⑥ 전체 필터는 보유종목과 관심종목의 합집합을 기준으로 한다.
-
-        ⑦ 보유 필터는 보유종목만 기준으로 한다.
-
-        ⑧ 관심 필터는 관심종목만 기준으로 한다.
-
-        ⑨ 기준 기업과 연결된 관련 기업 및 이슈를 함께 표시한다.
-
-        ⑩ 비회원에게 개인화 그래프를 제공하지 않는다.
-
-        ⑪ 필터 변경 중 이전 요청 응답이 늦게 도착하더라도 현재 선택 필터의 결과만 화면에 반영한다.'
-      처리 절차 및 분기: '① 회원의 보유종목과 관심종목을 조회한다.
-
-        ② 기본 진입 시 전체 필터를 적용한다.
-
-        ③ 선택 필터에 따라 기준 기업 목록을 구성한다.
-
-        ④ 동일 기업은 기업 식별자 기준으로 하나의 노드로 통합하고 보유·관심 상태를 표시한다.
-
-        ⑤ 기준 기업에 연결된 관련 기업과 이슈를 조회한다.
-
-        ⑥ 이슈 노드에는 국내 / 국제 속성을 적용한다.
-
-        ⑦ 조회 결과를 관계 그래프로 구성한다.
-
-        ⑧ 사용자가 필터를 변경하면 선택한 필터 기준으로 그래프를 다시 조회한다.
-
-        ⑨ 선택한 분류에 종목이 없으면 해당 상태를 안내하고 다른 필터 선택을 제공한다.'
-      정상 결과: 현재 선택한 전체 / 보유 / 관심 기준에 맞는 개인화 관계 그래프가 표시된다. 사용자는 기준 기업과 관련 기업·이슈의 관계
-        및 기업별 보유·관심 상태를 확인할 수 있다.
-      예외 처리: '전체 기준 종목 없음: 보유종목 또는 관심종목이 없습니다.를 표시하고 관심종목 설정을 안내한다.
-
-        보유종목 없음: 보유종목이 없습니다.를 표시하고 전체 / 관심 필터 전환을 제공한다.
-
-        관심종목 없음: 관심종목이 없습니다.를 표시하고 관심종목 추가 및 전체 / 보유 필터 전환을 제공한다.
-
-        관계 0건: 기준 기업은 유지하고 현재 확인된 관련 관계가 없습니다.를 표시한다.
-
-        조회 실패: 현재 선택 필터와 직전 정상 그래프를 유지하고 다시 시도를 제공한다.
-
-        지연 응답: 현재 필터 및 최신 요청 식별자와 일치하지 않는 응답은 폐기한다.
-
-        비회원 접근: 개인화 데이터를 반환하지 않고 로그인 필요 안내를 제공한다.'
-      수용 기준: '① 전체 필터는 보유·관심종목의 합집합과 일치한다.
-
-        ② 보유 필터는 보유종목만 기준으로 한다.
-
-        ③ 관심 필터는 관심종목만 기준으로 한다.
-
-        ④ 동일 기업이 보유·관심 양쪽에 있어도 하나의 노드만 표시된다.
-
-        ⑤ 동일 노드에서 보유·관심 상태를 동시에 확인할 수 있다.
-
-        ⑥ 그래프의 노드 종류는 기업과 이슈 두 종류로 제한된다.
-
-        ⑦ 이슈 노드는 국내·국제 속성을 가진다.
-
-        ⑧ 빠르게 필터를 변경해도 마지막 선택 필터와 결과가 일치한다.'
-      확인 필요 사항: '확정: 개인화 그래프 기본 필터는 전체로 한다.
-
-        확정: 필터 상태는 현재 로그인 세션 동안 유지하고 새 로그인 또는 새 세션에서는 전체로 초기화한다.
-
-        확정: 보유·관심 상태는 기업 노드 내부의 배지 또는 동일 수준의 시각 표시로 구분한다.
-
-        확정: 이슈 속성은 국내 / 국제 두 값으로 운영한다.
-
-        확정: 이슈의 국내·국제 값이 없는 데이터는 사용자 그래프에 표시하기 전 데이터 검증 단계에서 제외하거나 보완하며, 임의 값을 생성하지
-        않는다.
-
-        확정: 그래프 조회 실패 시 기존 정상 그래프를 제거하지 않고 재시도를 제공한다.'
-    heading:
-      row: 7
-      text: FS017 개인화 관계 그래프
-    meta: 원본 우선순위
   scopeClass: existing
 - id: FS018
   title: 전체 관계 그래프
@@ -1427,47 +1429,14 @@ specs:
   requirementIds:
   - '18'
   source: &id002
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 28
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
-      row: 23
-      rowUnit: xlsx-row
-    fields:
-      기능명: 전체 관계 그래프
-      기능 설명: 시스템은 사용자의 종목 보유 여부와 관계없이 전체 시장 관계 그래프를 제공해야 한다.
-      선행조건: 사용자가 전체 시장 관계 그래프 조회를 선택한다.
-      입력값: 전체 그래프 조회 요청, 공개 대상 시장 관계 데이터.
-      입력·검증 규칙: '비회원·미보유 회원·보유 회원 모두 조회할 수 있다.
-
-        종목 보유 여부를 전체 그래프 이용 조건으로 두지 않는다.
-
-        개인 보유 정보나 비공개 분석 결과를 전체 시장 그래프에 섞지 않는다.'
-      처리 절차 및 분기: 1. 사용자의 종목 보유 여부와 무관하게 공개 대상인 시장 전체 관계 데이터를 조회한다.
-      정상 결과: 공개 대상인 전체 시장 관계 그래프가 표시된다.
-      예외 처리: '공개 데이터 없음: [확인 필요: 빈 그래프 안내 방식 결정 필요].
-
-        조회 실패: [확인 필요: 기존 화면 유지 및 재시도 방식 결정 필요].
-
-        처리 중·검증 실패 등 비공개 결과: 공개 조회에서 제외한다.'
-      수용 기준: '1. 비회원·미보유 회원·보유 회원 모두 전체 그래프를 조회할 수 있다.
-
-        2. 비공개 분석 결과는 노출되지 않는다.'
-      확인 필요 사항: '[확인 필요: 전체 그래프의 범위·대표 이슈 및 기업 선정·초기 노드 수·관계 깊이·정렬 기준 결정 필요]
-
-        [확인 필요: 빈 그래프 안내 방식 결정 필요]
-
-        [확인 필요: 기존 화면 유지 및 재시도 방식 결정 필요]'
-    heading:
-      row: 21
-      text: FS018  전체 관계 그래프
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 18   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -1525,6 +1494,39 @@ specs:
       row: 21
       text: FS018  전체 관계 그래프
     meta: 항목
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+      row: 23
+      rowUnit: xlsx-row
+    fields:
+      기능명: 전체 관계 그래프
+      기능 설명: 시스템은 사용자의 종목 보유 여부와 관계없이 전체 시장 관계 그래프를 제공해야 한다.
+      선행조건: 사용자가 전체 시장 관계 그래프 조회를 선택한다.
+      입력값: 전체 그래프 조회 요청, 공개 대상 시장 관계 데이터.
+      입력·검증 규칙: '비회원·미보유 회원·보유 회원 모두 조회할 수 있다.
+
+        종목 보유 여부를 전체 그래프 이용 조건으로 두지 않는다.
+
+        개인 보유 정보나 비공개 분석 결과를 전체 시장 그래프에 섞지 않는다.'
+      처리 절차 및 분기: 1. 사용자의 종목 보유 여부와 무관하게 공개 대상인 시장 전체 관계 데이터를 조회한다.
+      정상 결과: 공개 대상인 전체 시장 관계 그래프가 표시된다.
+      예외 처리: '공개 데이터 없음: [확인 필요: 빈 그래프 안내 방식 결정 필요].
+
+        조회 실패: [확인 필요: 기존 화면 유지 및 재시도 방식 결정 필요].
+
+        처리 중·검증 실패 등 비공개 결과: 공개 조회에서 제외한다.'
+      수용 기준: '1. 비회원·미보유 회원·보유 회원 모두 전체 그래프를 조회할 수 있다.
+
+        2. 비공개 분석 결과는 노출되지 않는다.'
+      확인 필요 사항: '[확인 필요: 전체 그래프의 범위·대표 이슈 및 기업 선정·초기 노드 수·관계 깊이·정렬 기준 결정 필요]
+
+        [확인 필요: 빈 그래프 안내 방식 결정 필요]
+
+        [확인 필요: 기존 화면 유지 및 재시도 방식 결정 필요]'
+    heading:
+      row: 21
+      text: FS018  전체 관계 그래프
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 18   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS019
   title: 그래프 모드 전환
@@ -1534,53 +1536,14 @@ specs:
   requirementIds:
   - '19'
   source: &id003
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 29
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
-      row: 37
-      rowUnit: xlsx-row
-    fields:
-      기능명: 그래프 모드 전환
-      기능 설명: 사용자는 전체 관계 그래프와 개인화 관계 그래프를 전환할 수 있어야 한다. 시스템은 현재 선택한 모드를 표시해야 한다.
-      선행조건: 사용자가 메인 그래프 화면을 이용 중이다.
-      입력값: '선택 모드: 전체 관계 그래프 또는 개인화 관계 그래프. 현재 조회 조건과 최신 조회 식별 정보.'
-      입력·검증 규칙: '모드는 전체 관계 그래프와 회원의 통합 개인화 관계 그래프로 구분한다.
-
-        전환 전 모드의 확대·탐색 위치·선택·필터를 같은 이용 세션에서 보관한다.
-
-        새 모드가 정상 조회되기 전에는 이전 모드의 데이터에 새 모드 이름을 붙이지 않는다.
-
-        비회원의 개인화 선택은 로그인 안내로 연결하고 개인화 데이터는 조회하지 않는다.'
-      처리 절차 및 분기: '1. 현재 모드 상태를 보관하고 대상 모드 조회를 시작한다.
-
-        2. 조회가 성공하면 대상 모드와 데이터를 함께 적용한다.
-
-        3. 이전 방문 상태가 있으면 유효한 선택·필터·탐색 위치를 복원한다.
-
-        4. 없어진 선택은 해제하고 그 사유를 표시한다.'
-      정상 결과: 선택한 모드가 표시되고 해당 모드 기준의 그래프를 탐색할 수 있다.
-      예외 처리: '대상 모드 조회 실패: 이전 모드와 화면을 유지하고 다시 시도를 제공한다.
-
-        모드 전환 중 이전 응답 도착: 현재 모드 데이터로 반영하지 않는다.
-
-        비회원 개인화 선택: 전체 그래프를 유지하고 로그인 필요를 안내한다.'
-      수용 기준: '1. 두 모드 전환과 현재 모드 표시가 일치한다.
-
-        2. 빠른 전환에도 이전 모드 데이터가 최종 화면에 남지 않는다.'
-      확인 필요 사항: '이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
-
-        브라우저 새로고침·다른 기기까지 탐색 상태를 유지하는 정책은 이번 제안 범위에 포함하지 않는다.'
-    heading:
-      row: 35
-      text: FS019  그래프 모드 전환
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 19   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 39
       rowUnit: xlsx-row
     fields:
@@ -1624,6 +1587,45 @@ specs:
       row: 36
       text: FS019 그래프 모드 전환
     meta: 항목
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+      row: 37
+      rowUnit: xlsx-row
+    fields:
+      기능명: 그래프 모드 전환
+      기능 설명: 사용자는 전체 관계 그래프와 개인화 관계 그래프를 전환할 수 있어야 한다. 시스템은 현재 선택한 모드를 표시해야 한다.
+      선행조건: 사용자가 메인 그래프 화면을 이용 중이다.
+      입력값: '선택 모드: 전체 관계 그래프 또는 개인화 관계 그래프. 현재 조회 조건과 최신 조회 식별 정보.'
+      입력·검증 규칙: '모드는 전체 관계 그래프와 회원의 통합 개인화 관계 그래프로 구분한다.
+
+        전환 전 모드의 확대·탐색 위치·선택·필터를 같은 이용 세션에서 보관한다.
+
+        새 모드가 정상 조회되기 전에는 이전 모드의 데이터에 새 모드 이름을 붙이지 않는다.
+
+        비회원의 개인화 선택은 로그인 안내로 연결하고 개인화 데이터는 조회하지 않는다.'
+      처리 절차 및 분기: '1. 현재 모드 상태를 보관하고 대상 모드 조회를 시작한다.
+
+        2. 조회가 성공하면 대상 모드와 데이터를 함께 적용한다.
+
+        3. 이전 방문 상태가 있으면 유효한 선택·필터·탐색 위치를 복원한다.
+
+        4. 없어진 선택은 해제하고 그 사유를 표시한다.'
+      정상 결과: 선택한 모드가 표시되고 해당 모드 기준의 그래프를 탐색할 수 있다.
+      예외 처리: '대상 모드 조회 실패: 이전 모드와 화면을 유지하고 다시 시도를 제공한다.
+
+        모드 전환 중 이전 응답 도착: 현재 모드 데이터로 반영하지 않는다.
+
+        비회원 개인화 선택: 전체 그래프를 유지하고 로그인 필요를 안내한다.'
+      수용 기준: '1. 두 모드 전환과 현재 모드 표시가 일치한다.
+
+        2. 빠른 전환에도 이전 모드 데이터가 최종 화면에 남지 않는다.'
+      확인 필요 사항: '이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+
+        브라우저 새로고침·다른 기기까지 탐색 상태를 유지하는 정책은 이번 제안 범위에 포함하지 않는다.'
+    heading:
+      row: 35
+      text: FS019  그래프 모드 전환
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 19   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS020
   title: 기업 노드 정보
@@ -1633,49 +1635,14 @@ specs:
   requirementIds:
   - '20'
   source: &id004
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 30
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
-      row: 51
-      rowUnit: xlsx-row
-    fields:
-      기능명: 기업 노드 정보
-      기능 설명: 사용자가 선택한 기업의 현황과 관련 이슈를 빠르게 이해할 수 있도록 기업 정보 패널을 제공.기업의 기본 정보, 시세, 주요
-        재무 정보, AI 요약, 직접·간접 이슈 및 관련 기업을 표시하고, 상세 정보는 기업 상세페이지에서 확인할 수 있어야 한다.
-      선행조건: 사용자가 그래프에서 기업 노드를 선택했다.
-      입력값: 선택 기업 식별자, 현재 조회 조건 및 최신 선택·조회 식별 정보.
-      입력·검증 규칙: '기업 기본 정보·시세·주요 재무·AI 요약·직접/간접 이슈·관련 기업을 선택 기업 기준으로 조회한다.
-
-        기준 시점과 미제공 상태를 구분하며 없는 값을 임의 수치로 채우지 않는다.
-
-        이전 기업의 지연 응답을 새 기업 패널에 표시하지 않는다.'
-      처리 절차 및 분기: '1. 선택 기업의 기본 정보·시세·주요 재무·AI 요약·직접/간접 이슈·관련 기업을 조회한다.
-
-        2. 더 자세한 내용은 기업 상세페이지로 연결한다.'
-      정상 결과: 선택 기업 정보 패널이 표시되고 같은 기업의 상세페이지로 이동할 수 있다.
-      예외 처리: '일부 정보 미제공: 해당 상태를 표시한다.
-
-        기업 A에서 B 선택 후 A 응답 도착: B 패널에 반영하지 않는다.
-
-        유효하지 않은 기업 또는 조회 실패: [확인 필요: 패널 안내와 재시도 방식 결정 필요]'
-      수용 기준: '1. 기업 A에서 B로 바꿀 때 A의 늦은 응답이 B 패널을 덮지 않는다.
-
-        2. 상세 이동 대상도 B와 일치한다.'
-      확인 필요 사항: '[확인 필요: 기업 정보 패널의 지표·요약 범위·표시 단위·순서·최신성 기준 및 상세페이지와의 표시 정책 통일 결정
-        필요]
-
-        [확인 필요: 패널 안내와 재시도 방식 결정 필요]'
-    heading:
-      row: 49
-      text: FS020  기업 노드 정보
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 20   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 53
       rowUnit: xlsx-row
     fields:
@@ -1731,6 +1698,41 @@ specs:
       row: 50
       text: FS20  기업 노드 정보
     meta: 항목
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+      row: 51
+      rowUnit: xlsx-row
+    fields:
+      기능명: 기업 노드 정보
+      기능 설명: 사용자가 선택한 기업의 현황과 관련 이슈를 빠르게 이해할 수 있도록 기업 정보 패널을 제공.기업의 기본 정보, 시세, 주요
+        재무 정보, AI 요약, 직접·간접 이슈 및 관련 기업을 표시하고, 상세 정보는 기업 상세페이지에서 확인할 수 있어야 한다.
+      선행조건: 사용자가 그래프에서 기업 노드를 선택했다.
+      입력값: 선택 기업 식별자, 현재 조회 조건 및 최신 선택·조회 식별 정보.
+      입력·검증 규칙: '기업 기본 정보·시세·주요 재무·AI 요약·직접/간접 이슈·관련 기업을 선택 기업 기준으로 조회한다.
+
+        기준 시점과 미제공 상태를 구분하며 없는 값을 임의 수치로 채우지 않는다.
+
+        이전 기업의 지연 응답을 새 기업 패널에 표시하지 않는다.'
+      처리 절차 및 분기: '1. 선택 기업의 기본 정보·시세·주요 재무·AI 요약·직접/간접 이슈·관련 기업을 조회한다.
+
+        2. 더 자세한 내용은 기업 상세페이지로 연결한다.'
+      정상 결과: 선택 기업 정보 패널이 표시되고 같은 기업의 상세페이지로 이동할 수 있다.
+      예외 처리: '일부 정보 미제공: 해당 상태를 표시한다.
+
+        기업 A에서 B 선택 후 A 응답 도착: B 패널에 반영하지 않는다.
+
+        유효하지 않은 기업 또는 조회 실패: [확인 필요: 패널 안내와 재시도 방식 결정 필요]'
+      수용 기준: '1. 기업 A에서 B로 바꿀 때 A의 늦은 응답이 B 패널을 덮지 않는다.
+
+        2. 상세 이동 대상도 B와 일치한다.'
+      확인 필요 사항: '[확인 필요: 기업 정보 패널의 지표·요약 범위·표시 단위·순서·최신성 기준 및 상세페이지와의 표시 정책 통일 결정
+        필요]
+
+        [확인 필요: 패널 안내와 재시도 방식 결정 필요]'
+    heading:
+      row: 49
+      text: FS020  기업 노드 정보
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 20   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS021
   title: 이슈 노드 정보
@@ -1740,48 +1742,14 @@ specs:
   requirementIds:
   - '21'
   source: &id005
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 31
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
-      row: 65
-      rowUnit: xlsx-row
-    fields:
-      기능명: 이슈 노드 정보
-      기능 설명: 시스템은 이슈의 내용과 관련 기업을 이해할 수 있도록 이슈 정보 패널을 제공한다. 기업별 긍정·부정·혼재 등의 영향 해석과
-        불확실성을 근거와 함께 설명. 이를 주가 상승·하락 확률로 표현해서는 안 된다.
-      선행조건: 사용자가 그래프에서 이슈 노드를 선택했다.
-      입력값: 선택 이슈 식별자, 관련 기업 목록, 기업별 영향 해석·근거·불확실성.
-      입력·검증 규칙: '기업별 긍정·부정·혼재 등 영향 해석과 근거를 구분해 표시한다.
-
-        확보된 반대 근거 및 해석의 한계를 함께 제공한다.
-
-        영향 분류를 주가 상승·하락 확률로 바꾸어 표현하지 않는다.'
-      처리 절차 및 분기: '1. 이슈 내용과 관련 기업을 조회한다.
-
-        2. 기업별 긍정·부정·혼재 등 영향 해석을 근거·불확실성과 함께 표시한다.'
-      정상 결과: 이슈 내용과 관련 기업을 보여 주는 패널에서 기업별 영향 및 해석의 불확실성을 확인할 수 있다.
-      예외 처리: '근거가 부족한 영향 해석: 불확실성과 해석 한계를 표시하고 확정 판단으로 제시하지 않는다.
-
-        이슈 또는 관련 기업 정보가 없거나 조회 실패: [확인 필요: 미제공 안내 및 재시도 방식 결정 필요]'
-      수용 기준: '1. 서로 다른 기업의 영향 해석과 근거가 구분된다.
-
-        2. 확보된 반대 근거와 한계를 누락해 확정 판단으로 표시하지 않는다.'
-      확인 필요 사항: '긍정·부정·혼재는 기업 영향 해석이며 주가 상승·하락 확률로 표시하지 않는다.
-
-        [확인 필요: 영향 해석의 판단 기준·불확실성 표현과 갱신 정책 결정 필요]
-
-        [확인 필요: 미제공 안내 및 재시도 방식 결정 필요]'
-    heading:
-      row: 63
-      text: FS021  이슈 노드 정보
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 21   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 67
       rowUnit: xlsx-row
     fields:
@@ -1843,6 +1811,40 @@ specs:
       row: 64
       text: FS021  이슈 노드 정보
     meta: 항목
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+      row: 65
+      rowUnit: xlsx-row
+    fields:
+      기능명: 이슈 노드 정보
+      기능 설명: 시스템은 이슈의 내용과 관련 기업을 이해할 수 있도록 이슈 정보 패널을 제공한다. 기업별 긍정·부정·혼재 등의 영향 해석과
+        불확실성을 근거와 함께 설명. 이를 주가 상승·하락 확률로 표현해서는 안 된다.
+      선행조건: 사용자가 그래프에서 이슈 노드를 선택했다.
+      입력값: 선택 이슈 식별자, 관련 기업 목록, 기업별 영향 해석·근거·불확실성.
+      입력·검증 규칙: '기업별 긍정·부정·혼재 등 영향 해석과 근거를 구분해 표시한다.
+
+        확보된 반대 근거 및 해석의 한계를 함께 제공한다.
+
+        영향 분류를 주가 상승·하락 확률로 바꾸어 표현하지 않는다.'
+      처리 절차 및 분기: '1. 이슈 내용과 관련 기업을 조회한다.
+
+        2. 기업별 긍정·부정·혼재 등 영향 해석을 근거·불확실성과 함께 표시한다.'
+      정상 결과: 이슈 내용과 관련 기업을 보여 주는 패널에서 기업별 영향 및 해석의 불확실성을 확인할 수 있다.
+      예외 처리: '근거가 부족한 영향 해석: 불확실성과 해석 한계를 표시하고 확정 판단으로 제시하지 않는다.
+
+        이슈 또는 관련 기업 정보가 없거나 조회 실패: [확인 필요: 미제공 안내 및 재시도 방식 결정 필요]'
+      수용 기준: '1. 서로 다른 기업의 영향 해석과 근거가 구분된다.
+
+        2. 확보된 반대 근거와 한계를 누락해 확정 판단으로 표시하지 않는다.'
+      확인 필요 사항: '긍정·부정·혼재는 기업 영향 해석이며 주가 상승·하락 확률로 표시하지 않는다.
+
+        [확인 필요: 영향 해석의 판단 기준·불확실성 표현과 갱신 정책 결정 필요]
+
+        [확인 필요: 미제공 안내 및 재시도 방식 결정 필요]'
+    heading:
+      row: 63
+      text: FS021  이슈 노드 정보
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 21   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS022
   title: 기업 패널에서 이슈 영향 경로 확인
@@ -1852,12 +1854,54 @@ specs:
   requirementIds:
   - '22'
   source: &id006
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 32
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
+      row: 80
+      rowUnit: xlsx-row
+    fields:
+      기능명: 기업 패널에서 이슈 영향 경로 확인
+      기능 설명: 사용자가 기업 노드를 선택한 뒤 기업 패널의 관련 이슈를 선택하면 해당 이슈와 기업의 직접·간접 영향 경로, 단계별 연결 이유와
+        근거를 확인한다.
+      선행조건: 선택 기업의 정보 패널에 관련 이슈가 제공되어 있다.
+      입력값: 기업 식별자, 패널에서 선택한 이슈 식별자, 그래프 기준 시점, 직접·간접 경로와 단계별 근거.
+      입력·검증 규칙: '기업 패널에서 관련 이슈를 선택하여 진입한다. 이슈-기업 간선은 표시만 하며 직접 클릭 대상으로 사용하지 않는다.
+
+        기업 간 간선 클릭은 별도 관계 조회 기능으로 유지한다.
+
+        직접 경로와 중간 기업·산업·제품을 거친 경로를 구분한다.
+
+        확인된 사실·예상 영향·반대 근거·해석 한계를 구분한다. 현재 선택 기업·이슈·기준 시점의 최신 조회만 반영한다.'
+      처리 절차 및 분기: '1. 사용자가 기업 노드를 선택하여 패널을 연다.
+
+        2. 패널의 관련 이슈 중 하나를 선택한다.
+
+        3. 시스템은 해당 기업·이슈의 유효한 경로와 단계별 근거를 조회한다.
+
+        4. 경로와 연결 이유를 표시하고 근거 확인이 가능하게 한다.'
+      정상 결과: 선택 기업과 이슈의 경로, 단계별 연결 이유, 근거 및 해석 한계를 확인할 수 있다.
+      예외 처리: '유효 경로 없음: 경로 없음 안내를 표시하고 임의 관계선을 생성하지 않는다.
+
+        근거 부족·상충: 확보된 근거와 한계를 함께 표시한다.
+
+        조회 실패: 선택 대상을 유지하고 경로 영역의 다시 시도를 제공한다. 다른 이슈의 이전 경로를 현재 결과로 표시하지 않는다.'
+      수용 기준: '1. 기업 노드와 패널의 관련 이슈 선택으로 경로를 확인한다.
+
+        2. 이슈-기업 간선 클릭 없이 기능을 수행할 수 있다.
+
+        3. 이슈를 바꾼 뒤 이전 응답이 와도 새 선택의 경로를 덮지 않는다.
+
+        4. 확인되지 않은 인과관계를 사실로 단정하지 않는다.'
+      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 78
+      text: FS022  기업 패널에서 이슈 영향 경로 확인
+    meta: '원본 우선순위: P1   ·   원본 상태: 검토 중   ·   요구사항: 22   ·   v1.2: 제안 기준 반영'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
       row: 79
@@ -1900,48 +1944,6 @@ specs:
       row: 77
       text: FS022  기업 패널에서 이슈 영향 경로 확인
     meta: '원본 우선순위: P1   ·   원본 상태: 검토 중   ·   요구사항: 22   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
-      row: 80
-      rowUnit: xlsx-row
-    fields:
-      기능명: 기업 패널에서 이슈 영향 경로 확인
-      기능 설명: 사용자가 기업 노드를 선택한 뒤 기업 패널의 관련 이슈를 선택하면 해당 이슈와 기업의 직접·간접 영향 경로, 단계별 연결 이유와
-        근거를 확인한다.
-      선행조건: 선택 기업의 정보 패널에 관련 이슈가 제공되어 있다.
-      입력값: 기업 식별자, 패널에서 선택한 이슈 식별자, 그래프 기준 시점, 직접·간접 경로와 단계별 근거.
-      입력·검증 규칙: '기업 패널에서 관련 이슈를 선택하여 진입한다. 이슈-기업 간선은 표시만 하며 직접 클릭 대상으로 사용하지 않는다.
-
-        기업 간 간선 클릭은 별도 관계 조회 기능으로 유지한다.
-
-        직접 경로와 중간 기업·산업·제품을 거친 경로를 구분한다.
-
-        확인된 사실·예상 영향·반대 근거·해석 한계를 구분한다. 현재 선택 기업·이슈·기준 시점의 최신 조회만 반영한다.'
-      처리 절차 및 분기: '1. 사용자가 기업 노드를 선택하여 패널을 연다.
-
-        2. 패널의 관련 이슈 중 하나를 선택한다.
-
-        3. 시스템은 해당 기업·이슈의 유효한 경로와 단계별 근거를 조회한다.
-
-        4. 경로와 연결 이유를 표시하고 근거 확인이 가능하게 한다.'
-      정상 결과: 선택 기업과 이슈의 경로, 단계별 연결 이유, 근거 및 해석 한계를 확인할 수 있다.
-      예외 처리: '유효 경로 없음: 경로 없음 안내를 표시하고 임의 관계선을 생성하지 않는다.
-
-        근거 부족·상충: 확보된 근거와 한계를 함께 표시한다.
-
-        조회 실패: 선택 대상을 유지하고 경로 영역의 다시 시도를 제공한다. 다른 이슈의 이전 경로를 현재 결과로 표시하지 않는다.'
-      수용 기준: '1. 기업 노드와 패널의 관련 이슈 선택으로 경로를 확인한다.
-
-        2. 이슈-기업 간선 클릭 없이 기능을 수행할 수 있다.
-
-        3. 이슈를 바꾼 뒤 이전 응답이 와도 새 선택의 경로를 덮지 않는다.
-
-        4. 확인되지 않은 인과관계를 사실로 단정하지 않는다.'
-      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
-    heading:
-      row: 78
-      text: FS022  기업 패널에서 이슈 영향 경로 확인
-    meta: '원본 우선순위: P1   ·   원본 상태: 검토 중   ·   요구사항: 22   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS023
   title: 기업 간 관계 확인(기업 간 간선 클릭)
@@ -1951,12 +1953,38 @@ specs:
   requirementIds:
   - '23'
   source: &id007
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 33
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
+      row: 94
+      rowUnit: xlsx-row
+    fields:
+      기능명: 기업 간 관계 확인(기업 간 간선 클릭)
+      기능 설명: 사용자가 두 기업이 연결된 이유를 이해할 수 있도록 기업 간 관계선을 선택하면 관계 설명을 제공해야 한다. 공급·고객·경쟁·투자
+        등 확인된 관계 유형과 관계의 방향, 관련 사업·제품 범위, 현재 상태 및 확인 시점을 표시해야함.
+      선행조건: 사용자가 기업과 기업 사이의 관계선을 선택한다.
+      입력값: 두 기업 식별자, 선택 관계 식별자, 관계 유형·방향·사업/제품 범위·현재 상태·확인 시점.
+      입력·검증 규칙: '선택한 기업 쌍과 관계에 해당하는 정보만 표시한다.
+
+        확인된 공급·고객·경쟁·투자 등의 유형과 방향을 구분한다.
+
+        관계 확인 시점과 근거 문서 발행 시점을 혼동하지 않는다.'
+      처리 절차 및 분기: 1. 확인된 공급·고객·경쟁·투자 등 관계 유형, 방향, 관련 사업·제품 범위, 현재 상태, 확인 시점을 조회한다.
+      정상 결과: 기업 간 관계 패널에서 연결 이유, 유형·방향·범위·상태·확인 시점을 확인할 수 있다.
+      예외 처리: '관계 정보가 없거나 삭제·접근 불가·조회 실패인 경우: [확인 필요: 미제공 안내와 재조회 방식 결정 필요].
+
+        근거가 부족한 관계를 확인된 사실로 임의 보완하지 않는다.'
+      수용 기준: 1. 선택한 기업 쌍의 관계만 표시되며 유형·방향·범위·상태·확인 시점을 확인할 수 있다.
+      확인 필요 사항: '[확인 필요: 미제공 안내와 재조회 방식 결정 필요]'
+    heading:
+      row: 92
+      text: FS023  기업 간 관계 확인(기업 간 간선 클릭)
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 23   ·   v1.2: 기존 기준 유지'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
       row: 93
@@ -1983,32 +2011,6 @@ specs:
       row: 91
       text: FS023  기업 간 관계 확인(기업 간 간선 클릭)
     meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 23   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
-      row: 94
-      rowUnit: xlsx-row
-    fields:
-      기능명: 기업 간 관계 확인(기업 간 간선 클릭)
-      기능 설명: 사용자가 두 기업이 연결된 이유를 이해할 수 있도록 기업 간 관계선을 선택하면 관계 설명을 제공해야 한다. 공급·고객·경쟁·투자
-        등 확인된 관계 유형과 관계의 방향, 관련 사업·제품 범위, 현재 상태 및 확인 시점을 표시해야함.
-      선행조건: 사용자가 기업과 기업 사이의 관계선을 선택한다.
-      입력값: 두 기업 식별자, 선택 관계 식별자, 관계 유형·방향·사업/제품 범위·현재 상태·확인 시점.
-      입력·검증 규칙: '선택한 기업 쌍과 관계에 해당하는 정보만 표시한다.
-
-        확인된 공급·고객·경쟁·투자 등의 유형과 방향을 구분한다.
-
-        관계 확인 시점과 근거 문서 발행 시점을 혼동하지 않는다.'
-      처리 절차 및 분기: 1. 확인된 공급·고객·경쟁·투자 등 관계 유형, 방향, 관련 사업·제품 범위, 현재 상태, 확인 시점을 조회한다.
-      정상 결과: 기업 간 관계 패널에서 연결 이유, 유형·방향·범위·상태·확인 시점을 확인할 수 있다.
-      예외 처리: '관계 정보가 없거나 삭제·접근 불가·조회 실패인 경우: [확인 필요: 미제공 안내와 재조회 방식 결정 필요].
-
-        근거가 부족한 관계를 확인된 사실로 임의 보완하지 않는다.'
-      수용 기준: 1. 선택한 기업 쌍의 관계만 표시되며 유형·방향·범위·상태·확인 시점을 확인할 수 있다.
-      확인 필요 사항: '[확인 필요: 미제공 안내와 재조회 방식 결정 필요]'
-    heading:
-      row: 92
-      text: FS023  기업 간 관계 확인(기업 간 간선 클릭)
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 23   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS024
   title: 관계 근거 확인
@@ -2018,47 +2020,14 @@ specs:
   requirementIds:
   - '24'
   source: &id008
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 34
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
-      row: 107
-      rowUnit: xlsx-row
-    fields:
-      기능명: 관계 근거 확인
-      기능 설명: 사용자가 그래프의 연결과 설명을 직접 확인할 수 있도록 기업·이슈·관계에 연결된 근거 자료를 제공한다. 근거 뉴스·공시의 제목,
-        출처, 발행 시각, 확보된 원문 구간과 원문 링크를 표시해야 한다. 원문 접근이 불가능하거나 근거가 충분하지 않은 경우 해당 상태를
-        안내하고, 문서 발행 시각과 관계 확인 시점을 구분해야 한다.
-      선행조건: 사용자가 기업·이슈·관계 설명에서 근거 보기를 선택한다.
-      입력값: 선택 대상, 연결된 뉴스·공시 참조, 제목·출처·발행 시각·확보된 원문 구간·원문 링크·관계 확인 시점.
-      입력·검증 규칙: '선택 설명을 뒷받침하는 문서와 참조가 일치해야 한다.
-
-        확보된 원문 구간만 인용하며 없는 원문을 생성하지 않는다.
-
-        문서 발행 시각과 관계 확인 시점을 구분한다.'
-      처리 절차 및 분기: '1. 참조에 연결된 뉴스·공시의 제목·출처·발행 시각·확보된 원문 구간·원문 링크를 조회한다.
-
-        2. 관계 확인 시점은 따로 표시한다.'
-      정상 결과: 연결된 근거 자료의 정보와 확보된 인용을 확인하고 제공된 링크로 원문에 접근할 수 있다.
-      예외 처리: '원문 접근 불가: 접근 불가 상태를 안내하고 확보된 메타데이터는 유지한다.
-
-        근거 부족: 부족 상태를 안내하며 충분한 근거인 것처럼 표시하지 않는다.
-
-        근거 조회 장애: [확인 필요: 장애 안내와 재시도 방식 결정 필요]'
-      수용 기준: '1. 참조 대상과 문서가 일치한다.
-
-        2. 원문이 없는데 인용을 생성하지 않고 접근 실패 안내가 나온다.'
-      확인 필요 사항: '[확인 필요: 장애 안내와 재시도 방식 결정 필요]'
-    heading:
-      row: 105
-      text: FS024  관계 근거 확인
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 24   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 112
       rowUnit: xlsx-row
     fields:
@@ -2103,6 +2072,39 @@ specs:
       row: 109
       text: FS024  관계 근거 확인
     meta: 항목
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+      row: 107
+      rowUnit: xlsx-row
+    fields:
+      기능명: 관계 근거 확인
+      기능 설명: 사용자가 그래프의 연결과 설명을 직접 확인할 수 있도록 기업·이슈·관계에 연결된 근거 자료를 제공한다. 근거 뉴스·공시의 제목,
+        출처, 발행 시각, 확보된 원문 구간과 원문 링크를 표시해야 한다. 원문 접근이 불가능하거나 근거가 충분하지 않은 경우 해당 상태를
+        안내하고, 문서 발행 시각과 관계 확인 시점을 구분해야 한다.
+      선행조건: 사용자가 기업·이슈·관계 설명에서 근거 보기를 선택한다.
+      입력값: 선택 대상, 연결된 뉴스·공시 참조, 제목·출처·발행 시각·확보된 원문 구간·원문 링크·관계 확인 시점.
+      입력·검증 규칙: '선택 설명을 뒷받침하는 문서와 참조가 일치해야 한다.
+
+        확보된 원문 구간만 인용하며 없는 원문을 생성하지 않는다.
+
+        문서 발행 시각과 관계 확인 시점을 구분한다.'
+      처리 절차 및 분기: '1. 참조에 연결된 뉴스·공시의 제목·출처·발행 시각·확보된 원문 구간·원문 링크를 조회한다.
+
+        2. 관계 확인 시점은 따로 표시한다.'
+      정상 결과: 연결된 근거 자료의 정보와 확보된 인용을 확인하고 제공된 링크로 원문에 접근할 수 있다.
+      예외 처리: '원문 접근 불가: 접근 불가 상태를 안내하고 확보된 메타데이터는 유지한다.
+
+        근거 부족: 부족 상태를 안내하며 충분한 근거인 것처럼 표시하지 않는다.
+
+        근거 조회 장애: [확인 필요: 장애 안내와 재시도 방식 결정 필요]'
+      수용 기준: '1. 참조 대상과 문서가 일치한다.
+
+        2. 원문이 없는데 인용을 생성하지 않고 접근 실패 안내가 나온다.'
+      확인 필요 사항: '[확인 필요: 장애 안내와 재시도 방식 결정 필요]'
+    heading:
+      row: 105
+      text: FS024  관계 근거 확인
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 24   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS025
   title: 선택한 노드로 AI 질문
@@ -2112,12 +2114,51 @@ specs:
   requirementIds:
   - '25'
   source: &id009
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 35
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
+      row: 125
+      rowUnit: xlsx-row
+    fields:
+      기능명: 선택한 노드로 AI 질문
+      기능 설명: 시스템은 그래프에서 선택한 노드에서 AI 질문을 선택하면 선택 대상, 적용 기간 및 근거 자료 정보를 질문에 연결하고, 사용자가
+        연결된 대상을 확인한 뒤 질문을 보낼 수 있어야 한다.  관계 탐색, 자료 요약 및 허용된 개인화 질문에 공통 챗봇 규칙을 적용해야
+        한다. 개인화 정보는 사용자의 조회 권한 범위에서만 활용해야 한다.
+      선행조건: 로그인 회원이 그래프에서 노드를 선택한 뒤 AI 질문을 선택한다.
+      입력값: 선택 대상 식별자, 적용 기간, 근거 참조, 사용자가 입력한 질문 및 대화·작업 식별 정보.
+      입력·검증 규칙: '대상·기간·근거 참조를 질문창에 표시하고 실제 질문 작업에도 전달한다.
+
+        사용자가 연결된 대상을 확인한 뒤 질문을 전송한다.
+
+        서버에서 본인 대화와 대상·근거·개인화 정보 접근 권한을 확인한다.
+
+        비회원의 질문 전송과 빈 입력, 같은 대화의 처리 중 추가 질문을 제한한다.'
+      처리 절차 및 분기: '1. 선택 대상·기간·근거 참조를 질문 맥락에 연결한다.
+
+        2. 사용자가 적용 대상을 확인하고 질문을 전송하도록 한다.
+
+        3. 서버의 대화·근거·개인화 권한 검증을 거친다.'
+      정상 결과: 선택 맥락을 포함한 질문창이 열리며 질문이 올바른 대화·작업에 연결된다.
+      예외 처리: '비회원 전송: 로그인 필요 안내와 함께 제한한다.
+
+        권한 없는 개인화 정보·근거: 조회 및 모델 전달에서 제외하고 권한 없는 요청을 거절한다.
+
+        질문 대상 불명확: 추가 정보를 되묻는 공통 챗봇 규칙을 적용한다.'
+      수용 기준: '1. 선택 근거 참조가 실제 질문 작업에 전달된다.
+
+        2. 비회원은 질문을 전송할 수 없고 다른 회원 정보가 사용되지 않는다.
+
+        3. 선택한 대상·기간·근거 참조가 화면에 보이는 조건과 실제 전송 조건에서 일치한다.'
+      확인 필요 사항: 기존 문서에서 추가로 지정한 미결정 사항 없음. 기능의 승인 상태는 상단 원본 상태를 따른다.
+    heading:
+      row: 123
+      text: FS025  선택한 노드로 AI 질문
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 25   ·   v1.2: 기존 기준 유지'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
       row: 121
@@ -2157,45 +2198,6 @@ specs:
       row: 119
       text: FS025  선택한 노드로 AI 질문
     meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 25   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
-      row: 125
-      rowUnit: xlsx-row
-    fields:
-      기능명: 선택한 노드로 AI 질문
-      기능 설명: 시스템은 그래프에서 선택한 노드에서 AI 질문을 선택하면 선택 대상, 적용 기간 및 근거 자료 정보를 질문에 연결하고, 사용자가
-        연결된 대상을 확인한 뒤 질문을 보낼 수 있어야 한다.  관계 탐색, 자료 요약 및 허용된 개인화 질문에 공통 챗봇 규칙을 적용해야
-        한다. 개인화 정보는 사용자의 조회 권한 범위에서만 활용해야 한다.
-      선행조건: 로그인 회원이 그래프에서 노드를 선택한 뒤 AI 질문을 선택한다.
-      입력값: 선택 대상 식별자, 적용 기간, 근거 참조, 사용자가 입력한 질문 및 대화·작업 식별 정보.
-      입력·검증 규칙: '대상·기간·근거 참조를 질문창에 표시하고 실제 질문 작업에도 전달한다.
-
-        사용자가 연결된 대상을 확인한 뒤 질문을 전송한다.
-
-        서버에서 본인 대화와 대상·근거·개인화 정보 접근 권한을 확인한다.
-
-        비회원의 질문 전송과 빈 입력, 같은 대화의 처리 중 추가 질문을 제한한다.'
-      처리 절차 및 분기: '1. 선택 대상·기간·근거 참조를 질문 맥락에 연결한다.
-
-        2. 사용자가 적용 대상을 확인하고 질문을 전송하도록 한다.
-
-        3. 서버의 대화·근거·개인화 권한 검증을 거친다.'
-      정상 결과: 선택 맥락을 포함한 질문창이 열리며 질문이 올바른 대화·작업에 연결된다.
-      예외 처리: '비회원 전송: 로그인 필요 안내와 함께 제한한다.
-
-        권한 없는 개인화 정보·근거: 조회 및 모델 전달에서 제외하고 권한 없는 요청을 거절한다.
-
-        질문 대상 불명확: 추가 정보를 되묻는 공통 챗봇 규칙을 적용한다.'
-      수용 기준: '1. 선택 근거 참조가 실제 질문 작업에 전달된다.
-
-        2. 비회원은 질문을 전송할 수 없고 다른 회원 정보가 사용되지 않는다.
-
-        3. 선택한 대상·기간·근거 참조가 화면에 보이는 조건과 실제 전송 조건에서 일치한다.'
-      확인 필요 사항: 기존 문서에서 추가로 지정한 미결정 사항 없음. 기능의 승인 상태는 상단 원본 상태를 따른다.
-    heading:
-      row: 123
-      text: FS025  선택한 노드로 AI 질문
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 25   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS026
   title: 사이드바 기업 선택
@@ -2205,41 +2207,14 @@ specs:
   requirementIds:
   - '26'
   source: &id010
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 36
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
-      row: 135
-      rowUnit: xlsx-row
-    fields:
-      기능명: 사이드바 기업 선택
-      기능 설명: 사용자는 사이드바에서 선택한 기업을 중심으로 그래프를 확대 및 이동 시킬 수 있다.
-      선행조건: 사용자가 메인 그래프와 사이드바를 보고 있다.
-      입력값: 사이드바에서 선택한 기업 식별자, 현재 그래프 표시 범위와 탐색 위치.
-      입력·검증 규칙: '사이드바 선택 기업과 그래프 이동·확대의 중심 기업이 일치해야 한다.
-
-        현재 표시되지 않는 기업의 추가 조회 여부와 확대 수준은 임의로 확정하지 않는다.'
-      처리 절차 및 분기: 1. 선택 기업을 중심으로 그래프의 확대와 위치 이동을 수행한다.
-      정상 결과: 선택 기업을 중심으로 그래프가 확대·이동하여 탐색 대상이 된다.
-      예외 처리: '기업 노드가 현재 표시 범위에 없음: [확인 필요: 추가 조회·필터 변경·안내 방식 결정 필요].
-
-        선택 기업이 더 이상 유효하지 않거나 이동 처리 실패: [확인 필요: 오류 안내 방식 결정 필요]'
-      수용 기준: 1. 사이드바 선택 기업과 그래프의 중심 대상이 일치한다.
-      확인 필요 사항: '[확인 필요: 현재 그래프 범위 밖 기업 선택 시 추가 조회 여부와 확대 수준 결정 필요]
-
-        [확인 필요: 추가 조회·필터 변경·안내 방식 결정 필요]
-
-        [확인 필요: 오류 안내 방식 결정 필요]'
-    heading:
-      row: 133
-      text: FS026  사이드바 기업 선택
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 26   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 139
       rowUnit: xlsx-row
     fields:
@@ -2288,6 +2263,33 @@ specs:
       row: 137
       text: FS026  사이드바 기업 선택
     meta: 항목
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
+      row: 135
+      rowUnit: xlsx-row
+    fields:
+      기능명: 사이드바 기업 선택
+      기능 설명: 사용자는 사이드바에서 선택한 기업을 중심으로 그래프를 확대 및 이동 시킬 수 있다.
+      선행조건: 사용자가 메인 그래프와 사이드바를 보고 있다.
+      입력값: 사이드바에서 선택한 기업 식별자, 현재 그래프 표시 범위와 탐색 위치.
+      입력·검증 규칙: '사이드바 선택 기업과 그래프 이동·확대의 중심 기업이 일치해야 한다.
+
+        현재 표시되지 않는 기업의 추가 조회 여부와 확대 수준은 임의로 확정하지 않는다.'
+      처리 절차 및 분기: 1. 선택 기업을 중심으로 그래프의 확대와 위치 이동을 수행한다.
+      정상 결과: 선택 기업을 중심으로 그래프가 확대·이동하여 탐색 대상이 된다.
+      예외 처리: '기업 노드가 현재 표시 범위에 없음: [확인 필요: 추가 조회·필터 변경·안내 방식 결정 필요].
+
+        선택 기업이 더 이상 유효하지 않거나 이동 처리 실패: [확인 필요: 오류 안내 방식 결정 필요]'
+      수용 기준: 1. 사이드바 선택 기업과 그래프의 중심 대상이 일치한다.
+      확인 필요 사항: '[확인 필요: 현재 그래프 범위 밖 기업 선택 시 추가 조회 여부와 확대 수준 결정 필요]
+
+        [확인 필요: 추가 조회·필터 변경·안내 방식 결정 필요]
+
+        [확인 필요: 오류 안내 방식 결정 필요]'
+    heading:
+      row: 133
+      text: FS026  사이드바 기업 선택
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 26   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS027
   title: 관심 종목 수정
@@ -2297,12 +2299,51 @@ specs:
   requirementIds:
   - '27'
   source: &id011
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 37
     rowUnit: xlsx-row
   detailRange: A147:B159
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
+      row: 154
+      rowUnit: xlsx-row
+    fields:
+      기능명: 관심 종목 수정
+      기능 설명: 사용자는 사이드바 또는 기업 노드를 클릭하여 관심 종목을 선택 및 해제할 수 있다.
+      선행조건: 로그인 회원이 사이드바 또는 기업 노드에서 관심종목 등록·해제를 선택한다.
+      입력값: 본인 회원 식별 정보, 기업 식별자, 등록 또는 해제할 관심 상태.
+      입력·검증 규칙: '해당 회원의 관심종목만 변경한다.
+
+        반복 전송으로 동일 관심 정보가 중복 생성되지 않도록 한다.
+
+        비회원은 관심종목을 선택·저장할 수 없다.
+
+        원본의 관심종목 무제한 정책에 없는 개수 제한을 추가하지 않는다.'
+      처리 절차 및 분기: '1. 회원이 추가·삭제할 종목을 편집한다.
+
+        2. 저장을 요청하면 본인 권한과 종목 유효성·중복을 확인한다.
+
+        3. 저장 성공 후 관심 상태와 통합 개인화 그래프를 새 목록으로 갱신한다.
+
+        4. 관심에서 제거한 기업이 보유종목이면 보유 노드로 유지하고 관심 상태만 해제한다.'
+      정상 결과: 변경한 관심 상태가 계정에 저장되고 재조회한 관심종목 목록에 반영된다.
+      예외 처리: '저장 실패: 기존 저장 목록·그래프는 유지하고 편집 내용을 보관하여 재시도할 수 있게 한다.
+
+        저장 성공 후 그래프 갱신 실패: 저장 성공과 그래프 조회 실패를 구분하고 그래프만 다시 조회한다. 관심 변경을 중복 저장하지 않는다.
+
+        동일 종목 중복: 한 관심 항목으로 유지한다. 비회원은 변경을 허용하지 않는다.'
+      수용 기준: '1. 저장 성공한 관심 변경만 실제 관심 상태에 반영된다.
+
+        2. 보유·관심 기업을 관심에서 삭제해도 보유 노드는 유지된다.
+
+        3. 그래프 조회 재시도가 이미 성공한 관심 변경을 반복 실행하지 않는다.'
+      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
+    heading:
+      row: 152
+      text: FS027  관심 종목 수정
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 27   ·   v1.2: 제안 기준 반영'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv
       row: 149
@@ -2342,45 +2383,6 @@ specs:
       row: 147
       text: FS027  관심 종목 수정
     meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 27   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
-      row: 154
-      rowUnit: xlsx-row
-    fields:
-      기능명: 관심 종목 수정
-      기능 설명: 사용자는 사이드바 또는 기업 노드를 클릭하여 관심 종목을 선택 및 해제할 수 있다.
-      선행조건: 로그인 회원이 사이드바 또는 기업 노드에서 관심종목 등록·해제를 선택한다.
-      입력값: 본인 회원 식별 정보, 기업 식별자, 등록 또는 해제할 관심 상태.
-      입력·검증 규칙: '해당 회원의 관심종목만 변경한다.
-
-        반복 전송으로 동일 관심 정보가 중복 생성되지 않도록 한다.
-
-        비회원은 관심종목을 선택·저장할 수 없다.
-
-        원본의 관심종목 무제한 정책에 없는 개수 제한을 추가하지 않는다.'
-      처리 절차 및 분기: '1. 회원이 추가·삭제할 종목을 편집한다.
-
-        2. 저장을 요청하면 본인 권한과 종목 유효성·중복을 확인한다.
-
-        3. 저장 성공 후 관심 상태와 통합 개인화 그래프를 새 목록으로 갱신한다.
-
-        4. 관심에서 제거한 기업이 보유종목이면 보유 노드로 유지하고 관심 상태만 해제한다.'
-      정상 결과: 변경한 관심 상태가 계정에 저장되고 재조회한 관심종목 목록에 반영된다.
-      예외 처리: '저장 실패: 기존 저장 목록·그래프는 유지하고 편집 내용을 보관하여 재시도할 수 있게 한다.
-
-        저장 성공 후 그래프 갱신 실패: 저장 성공과 그래프 조회 실패를 구분하고 그래프만 다시 조회한다. 관심 변경을 중복 저장하지 않는다.
-
-        동일 종목 중복: 한 관심 항목으로 유지한다. 비회원은 변경을 허용하지 않는다.'
-      수용 기준: '1. 저장 성공한 관심 변경만 실제 관심 상태에 반영된다.
-
-        2. 보유·관심 기업을 관심에서 삭제해도 보유 노드는 유지된다.
-
-        3. 그래프 조회 재시도가 이미 성공한 관심 변경을 반복 실행하지 않는다.'
-      확인 필요 사항: 이번 보완 항목의 추가 미정 없음. 신규 동작은 v1.2 제안 기준이며 원본의 승인·구현 상태를 변경한 것은 아니다.
-    heading:
-      row: 152
-      text: FS027  관심 종목 수정
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 27   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS028
   title: 출근 브리핑 생성
@@ -2390,21 +2392,21 @@ specs:
   requirementIds:
   - '28'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 38
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 9
       rowUnit: xlsx-row
     fields:
       기능명: 출근 브리핑 생성
-      기능 설명: 시스템은 매일 07:40에 출근 브리핑을 자동 생성한다. 직전 퇴근 브리핑의 데이터 기준 시점 이후부터 이번 회차의 데이터
+      기능 설명: 시스템은 매일 09:20에 출근 브리핑을 자동 생성한다. 직전 퇴근 브리핑의 데이터 기준 시점 이후부터 이번 회차의 데이터
         마감 시점까지 확보한 미국 증시·국제정세·국내 주요 뉴스를 바탕으로 시장 요약, 핵심 이슈, 관련 기업과 주요 시장 변수를 제공.
-      선행조건: 매일 07:40 출근 브리핑 생성 회차가 시작된다.
+      선행조건: 매일 09:20 출근 브리핑 생성 회차가 시작된다.
       입력값: 발행일·출근 구분, 직전 퇴근 브리핑의 데이터 기준 시점, 이번 회차 데이터 마감 시점, 해당 범위에 확보된 미국 증시·국제정세·국내
         주요 뉴스와 시장 자료.
       입력·검증 규칙: '직전 퇴근 회차 기준 시점 이후부터 이번 회차 마감 시점까지 확보된 자료를 사용한다.
@@ -2419,10 +2421,17 @@ specs:
         2. 시장 요약·핵심 이슈·관련 기업·주요 변수를 생성하여 회차에 연결한다.'
       정상 결과: 해당 출근 회차의 시장 요약·핵심 이슈·관련 기업·주요 변수가 생성되어 회차 정보와 함께 저장·제공된다.
       예외 처리: "자료 일부 지연: 기준 시점과 지연 상태를 표시하고 확보된 자료로 생성. \n핵심 이슈 없음: 요약·시장 변수만 발행.\n\
-        반복 생성 요청: 기존 회차 상태를 확인하여 중복 발행하지 않는다.\n필수 저장 실패: 발행하지 않고 실패 상태 기록."
-      수용 기준: '1. 원본 시각 07:40에 생성이 시작되고 이전 퇴근 회차 이후의 자료 범위를 사용한다.
+        반복 생성 요청: 기존 회차 상태를 확인하여 중복 발행하지 않는다.\n필수 저장 실패: 발행하지 않고 실패 상태 기록.\nAWS 09:00~18:00\
+        \ 운영 환경에서 기동 후 야간 자료 준비가 늦으면 실제 확보 범위·기준 시점·지연을 표시한다. 기동만으로 야간 자료 전체 수집 완료를\
+        \ 가정하지 않는다."
+      수용 기준: '1. 한국 시간 09:20에 생성이 시작되고 이전 퇴근 회차 이후의 자료 범위를 사용한다.
 
-        2. 핵심 이슈는 최대 3개이다.'
+        2. 핵심 이슈는 최대 3개이다.
+
+        3. 09:20은 생성 시작 시각이며 데이터 마감·발행 완료 시각과 구분한다. 야간 자료의 수집·분석 준비 지연은 실제 확보 범위와
+        함께 표시한다.'
+      확인 필요 사항: '운영 조건: 매일 09:20 KST 생성 시작(AWS 09:00~18:00 사용 환경). 생성 시작·자료 마감·실제
+        발행 완료를 구분한다. 휴일/운영 중단 예외는 별도 운영 설정으로 확인한다.'
     heading:
       row: 7
       text: FS028  출근 브리핑 생성
@@ -2436,22 +2445,22 @@ specs:
   requirementIds:
   - '29'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 39
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 23
       rowUnit: xlsx-row
     fields:
       기능명: 퇴근 브리핑 생성
-      기능 설명: "시스템은 매일 18:10에 사용자가 당일 국내 시장에서 발생한 주요 변화를 정리할 수 있도록 퇴근 \n브리핑을 자동 생성한다.\
+      기능 설명: "시스템은 매일 17:30에 사용자가 당일 국내 시장에서 발생한 주요 변화를 정리할 수 있도록 퇴근 \n브리핑을 자동 생성한다.\
         \ 당일 출근 브리핑의 데이터 기준 시점 이후부터 이번 회차의 데이터 마감 시점까지 확보한 국내 증시 동향과 주요 기업·산업 이슈를\
         \ 바탕으로 시장 요약, 핵심 이슈, 관련 기업과 주요 시장 변수를 제공해야 한다."
-      선행조건: 매일 18:10 퇴근 브리핑 생성 회차가 시작된다.
+      선행조건: 매일 17:30 퇴근 브리핑 생성 회차가 시작된다.
       입력값: 발행일·퇴근 구분, 당일 출근 브리핑의 데이터 기준 시점, 이번 회차 데이터 마감 시점, 국내 증시 동향과 주요 기업·산업 이슈
         자료.
       입력·검증 규칙: '당일 출근 회차 기준 시점 이후부터 이번 회차 마감 시점까지 확보된 자료를 사용한다.
@@ -2466,10 +2475,17 @@ specs:
         2. 시장 요약·핵심 이슈·관련 기업·주요 변수를 작성한다.'
       정상 결과: 당일 퇴근 회차의 국내 시장 주요 변화가 요약되어 회차 정보와 함께 저장·제공된다.
       예외 처리: "자료 일부 지연: 기준 시점과 지연 상태를 표시하고 확보된 자료로 생성. \n핵심 이슈 없음: 요약·시장 변수만 발행.\n\
-        반복 생성 요청: 기존 회차 상태를 확인하여 중복 발행하지 않는다.\n필수 저장 실패: 발행하지 않고 실패 상태 기록."
-      수용 기준: '1. 18:10에 생성이 시작되고 해당 출근 회차 이후 범위를 사용한다.
+        반복 생성 요청: 기존 회차 상태를 확인하여 중복 발행하지 않는다.\n필수 저장 실패: 발행하지 않고 실패 상태 기록.\n18:00\
+        \ 종료 전 미완료이면 회차·실행·실패/미완료 단계와 보존 결과를 기록한다. 다음 기동 시 기존 상태·실행권을 확인한 뒤 허용된 단계만\
+        \ 복구하며 이미 발행된 본문은 유지한다."
+      수용 기준: '1. 17:30에 생성이 시작되고 해당 출근 회차 이후 범위를 사용한다.
 
-        2. 출근용 자료 범위와 혼동하지 않는다.'
+        2. 출근용 자료 범위와 혼동하지 않는다.
+
+        3. 17:30은 생성 시작 시각이다. 생성 시작 지연과 발행 완료 지연을 구분하며 18:00 종료 시 미완료를 성공·발행으로 표시하지
+        않는다.'
+      확인 필요 사항: '운영 조건: 매일 17:30 KST 생성 시작. 종료 전 신규 작업 접수 마감, 최대 대기/처리 시간 및 미완료 작업
+        복구 절차는 담당자 확인·실행 검증 필요. 30분 내 완료를 검증 없이 보장하지 않는다.'
     heading:
       row: 21
       text: FS029  퇴근 브리핑 생성
@@ -2483,14 +2499,14 @@ specs:
   requirementIds:
   - '30'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 40
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -2524,14 +2540,14 @@ specs:
   requirementIds:
   - '31'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 41
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -2540,8 +2556,10 @@ specs:
         핵심 이슈의 영향 설명과 확인할 사항은 별도 영역으로 제공한다.
       선행조건: 브리핑을 작성하거나 해당 브리핑의 주요 시장 지표를 조회한다.
       입력값: KOSPI 지수·등락률, KOSDAQ 지수·등락률, 원/달러 환율·변화율, 출처, 관측 시각, 제공 상태
-      입력·검증 규칙: 지표 값과 등락률·변화율은 관측 사실로만 표시한다. 비교 기준은 직전 거래일 종가로 통일한다. 출근 브리핑은 직전 거래일
-        종가와 최근 환율을, 퇴근 브리핑은 당일 장 마감 지수와 18:05 이전 최근 환율을 사용한다.
+      입력·검증 규칙: 지표 값과 등락률·변화율은 관측 사실로만 표시한다. 비교 기준은 직전 거래일 종가로 유지한다. 출근 브리핑(09:20
+        생성)은 직전 거래일 종가와 확정된 데이터 마감 이전의 최근 환율을, 퇴근 브리핑(17:30 생성)은 당일 장 마감 지수와 확정된 데이터
+        마감 이전의 최근 환율을 사용한다. 생성 시작 시각·데이터 마감 시각·발행 완료 시각을 구분하고 실제 관측 시각·출처를 보존한다. 마감
+        이후 자료는 해당 발행본에 섞지 않는다.
       처리 절차 및 분기: '1. 회차 기준 시점에 이용 가능한 KOSPI·KOSDAQ·원/달러 환율을 조회한다.
 
         2. 값·변화율·관측 시각·출처를 저장한다.
@@ -2555,6 +2573,9 @@ specs:
         2. 지연·미제공을 정상값처럼 표시하지 않는다.
 
         3. 핵심 이슈·확인할 사항과 주요 시장 지표가 화면에서 구분된다.'
+      확인 필요 사항: '확인 필요: 회차별 데이터 마감과 환율 cutoff의 정확한 시각은 공급원 갱신 주기·지연·수집/분석 준비 시간을 검증해
+        생성 시작 이전으로 확정한다. 기존 18:05 기준은 17:30 생성과 맞지 않아 폐기한다. 17:25 등 새 값을 임의 확정하지 않는다.
+        09:20 변경만으로 출근 지수를 장중 지수로 바꾸지 않는다.'
     heading:
       row: 49
       text: FS031  주요 시장 지표 제공
@@ -2568,14 +2589,14 @@ specs:
   requirementIds:
   - '32'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 42
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -2618,14 +2639,14 @@ specs:
   requirementIds:
   - '33'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 43
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -2664,14 +2685,14 @@ specs:
   requirementIds:
   - '34'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 44
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -2718,14 +2739,14 @@ specs:
   - '35'
   - '69'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 45
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -2787,14 +2808,14 @@ specs:
   requirementIds:
   - '36'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 46
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -2839,14 +2860,14 @@ specs:
   status: ''
   requirementIds: []
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 47
     rowUnit: xlsx-row
   detailRange: ''
   change: ''
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -2903,14 +2924,14 @@ specs:
   requirementIds:
   - '38'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 48
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -2958,14 +2979,14 @@ specs:
   requirementIds:
   - '39'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 49
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -3012,14 +3033,14 @@ specs:
   requirementIds:
   - '40'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 50
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -3066,14 +3087,14 @@ specs:
   requirementIds:
   - '41'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 51
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -3113,48 +3134,71 @@ specs:
   requirementIds:
   - '42'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 52
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 79
       rowUnit: xlsx-row
     fields:
       기능명: 시점 기반 관계 그래프 조회
-      기능 설명: 시스템은 기업 상세에서 선택한 기준 시점의 기업 관계 그래프를 제공한다. 기업의 비교적 고정적인 구조 관계와, 해당 시점까지
-        공개되어 유효한 이슈 기반 관계를 구분하여 함께 표시한다.
+      기능 설명: 시스템은 기업 상세에서 선택한 기준 시점의 기업 관계 그래프를 제공한다. 기준 시점까지 검증·공개 가능한 구조 관계와 이슈
+        기반 관계를 구분하여 함께 표시하고, 각 사업 관계에는 조회 기준 시점의 상태(예정·유효·종료·기간 미상)를 함께 보여 준다.
       선행조건: 사용자가 기업 상세의 관계 그래프 영역을 열거나 차트·타임라인에서 기간 또는 기준 시점을 변경한다.
       입력값: 중심 기업 ID, 선택 기준 시점(asOf), 기간, 선택 이슈 ID(선택), 최대 탐색 깊이, 그래프 조회 식별자
-      입력·검증 규칙: 그래프는 중심 기업에서 최대 2-hop의 공개·검증 완료 관계만 조회한다. 구조 관계는 기준 시점에 유효한 관계만, 이슈
-        기반 관계는 공개 시각 ≤ asOf 및 관계 유효 시작 ≤ asOf < 관계 유효 종료 조건을 만족할 때만 표시한다. 관계마다 유형·방향
-        가능성·근거 문서 참조·기준 시점을 제공한다. 근거가 없는 관계, 후보 상태 관계, 주가 인과를 확정하는 표현은 표시하지 않는다.
+      입력·검증 규칙: '그래프는 중심 기업에서 최대 2-hop의 관계만 조회한다.
+
+        [공개 가능 조건] 관계는 공개 버전·승인·권한 조건을 충족하고 현재 공개 제외 대상이 아니며, 검증 시각(verifiedAt) ≤
+        asOf이고 근거 문서 공개 시각 ≤ asOf일 때 표시한다. 사업 관계의 유효기간(validFrom·validUntil)은 표시 여부를
+        정하지 않는다.
+
+        [관계 상태] 조회 기준 시점(asOf, 없으면 조회 시각)을 Asia/Seoul 날짜 D로 바꿔 날짜끼리 비교한다. 원문 날짜에 임의의
+        시각이나 하루를 더하지 않는다. D < validFrom이면 예정, validFrom ≤ D ≤ validUntil이면 유효(validUntil은
+        마지막 유효일로 그날을 포함), D > validUntil이면 종료, validFrom이 없고 종료가 아니면 기간 미상이다. validUntil이
+        없으면 종료 시점 미상으로 보고 종료로 판단하지 않는다.
+
+        [이슈와의 관련성] 구조 관계는 이슈 발생 당시 유효했던 사업 관계만 근거로 연결한다. 관계 기간 종료만으로 과거 이슈와의 연결을 제거하지
+        않되, 조회 시점의 사업 관계 상태를 구분해 표시한다. 시작 전인 관계를 그 이전에 발생한 이슈의 구조 근거로 적용하지 않는다.
+
+        관계마다 유형·방향 가능성·근거 문서 참조·기준 시점·사업 관계 상태를 제공한다. 근거가 없는 관계, 후보 상태 관계, 주가 인과를
+        확정하는 표현은 표시하지 않는다.'
       처리 절차 및 분기: '1. 중심 기업과 기준 시점을 확인한다.
 
-        2. GraphDB에서 기준 시점에 유효한 구조 관계와 이슈 기반 관계를 조회한다.
+        2. 기준 시점까지 검증·공개 가능하고 현재 공개 제외되지 않은 구조 관계와 이슈 기반 관계를 조회하고, 사업 관계마다 기준 시점의
+        상태(예정·유효·종료·기간 미상)를 계산한다.
 
         3. 관계별 근거 문서 참조와 공개 시각을 확인한다.
 
         4. 이전 기준 시점과 비교해 새로 나타난·사라진 노드와 간선이 있을 때만 변화 애니메이션을 적용한다.
 
         5. 관계가 없으면 중심 기업과 빈 상태를 표시한다.'
-      정상 결과: 사용자는 기준 시점에 해당 기업과 연결된 기업·이슈·제품 및 근거 있는 관계를 그래프로 확인할 수 있다. 기준 시점 변경 시
-        같은 화면에서 이슈와 관계 그래프가 함께 갱신된다.
+      정상 결과: 사용자는 기준 시점에 해당 기업과 연결된 기업·이슈·제품 및 근거 있는 관계를 그래프로 확인할 수 있고, 각 사업 관계가 그
+        시점에 예정·유효·종료·기간 미상 중 어떤 상태인지 구분할 수 있다. 기준 시점 변경 시 같은 화면에서 이슈와 관계 그래프가 함께 갱신된다.
       예외 처리: '관계 조회 실패: 관계 그래프 영역만 오류·재시도. 기준 시점 이후 데이터 없음: 가장 가까운 이전 제공 시점을 안내하고
         임의 관계를 생성하지 않음. 근거 문서 접근 실패: 관계는 유지하되 근거 문서 접근 실패를 표시. 관계 0건: 중심 기업과 표시할 검증
-        관계 없음을 표시.'
+        관계 없음을 표시. 공개 제외된 관계(오연결·잘못된 근거·권한 철회 등): 과거 기준 시점 조회에서도 다시 표시하지 않음.'
       수용 기준: '1. 과거 기준 시점에는 그 이후 공개된 이슈 노드·이슈 관계가 표시되지 않는다.
 
         2. 기준 시점 변경 시 차트·타임라인·관계 그래프가 같은 기준 시점을 사용한다.
 
         3. 구조 관계와 이슈 기반 관계를 사용자가 구분할 수 있다.
 
-        4. 그래프는 중심 기업 기준 최대 2-hop을 넘지 않는다.'
-      확인 필요 사항: 구조 관계의 유효 시작·종료 시각을 초기 데이터 구축 시 입력한다. 이슈 관계의 유효 종료 시각을 아직 알 수 없으면
-        유효 종료 미정으로 유지하며, 새 이슈가 생겼다고 기존 관계를 자동 삭제하지 않는다.
+        4. 그래프는 중심 기업 기준 최대 2-hop을 넘지 않는다.
+
+        5. 기준 시점에 시작 전인 사업 관계도 그 시점까지 검증·공개 가능하면 예정 상태로 표시되고, 유효한 관계로 표시되지 않는다.
+
+        6. 이슈 발생 당시 유효했던 사업 관계는 이후 종료돼도 그 이슈와의 연결이 유지되며, 현재 시점 조회에서는 종료 상태로 표시된다.
+
+        7. 공개 제외된 관계는 어느 기준 시점 조회에서도 표시되지 않는다.'
+      확인 필요 사항: 구조 관계의 유효 시작·종료일을 초기 데이터 구축 시 입력한다. validUntil은 마지막 유효일(포함)로 정의하며
+        AI 판정·백엔드 조회·테스트를 같은 기준으로 맞춘다. 이미 동결된 인계 묶음의 의미는 바꾸지 않는다. 이슈 발생일이 월·연 단위이거나
+        미상일 때 "발생 당시 유효" 판정 방식은 AI 판정 규칙에서 확정한다. "현재 유효한 기업 간 사업 관계만 보기" 같은 별도 조회에서는
+        종료 관계를 제외할 수 있다. 이슈 관계의 유효 종료 시각을 아직 알 수 없으면 유효 종료 미정으로 유지하며, 새 이슈가 생겼다고 기존
+        관계를 자동 삭제하지 않는다.
     heading:
       row: 77
       text: FS042  시점 기반 관계 그래프 조회
@@ -3168,14 +3212,14 @@ specs:
   requirementIds:
   - '43'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 53
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -3225,14 +3269,14 @@ specs:
   requirementIds:
   - '44'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 54
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -3272,12 +3316,45 @@ specs:
   requirementIds:
   - '45'
   source: &id012
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 55
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
+      row: 9
+      rowUnit: xlsx-row
+    fields:
+      기능명: AI 질문 진입과 맥락 전달
+      기능 설명: 시스템은 전역 AI 패널과 기업·이슈·관계 패널의 AI에게 질문하기에서 질문을 시작할 수 있게 한다. 선택한 기업, 이슈,
+        관계, 기준 시점, 근거 문서는 질문 맥락으로 함께 전달한다. 전역 질문은 선택 맥락 없이도 시작할 수 있다.
+      선행조건: 로그인 회원이 AI 패널 또는 AI 질문 버튼을 연다.
+      입력값: 질문 본문, 대화 ID, 선택 기업·이슈·관계 ID(선택), 기준 시점(asOf, 선택), 근거 문서 ID(선택)
+      입력·검증 규칙: 선택 맥락은 질문 입력창 상단에 표시하고 실제 요청에도 포함한다. 사용자가 질문에서 다른 기업·기간을 명시하면 질문의
+        명시 조건을 우선한다. 빈 입력은 전송하지 않는다. 같은 대화에서 답변 생성 중이면 추가 전송 버튼을 비활성화한다. 비회원은 AI 질문
+        전송이 불가하며 로그인 안내를 제공한다.
+      처리 절차 및 분기: '1. 진입 위치의 선택 맥락을 수집하여 표시한다.
+
+        2. 사용자가 질문을 작성·전송한다.
+
+        3. 빈 입력·로그인 상태·동일 대화 처리 중 여부를 확인한다.
+
+        4. 통과하면 질문과 맥락을 해당 대화에 저장하고 해석 단계로 전달한다.'
+      정상 결과: 질문과 적용 맥락이 대화 및 질문 작업에 연결되어 처리된다.
+      예외 처리: "빈 입력: 전송 차단. 비회원: 로그인 안내. \n처리 중: 입력을 유지하고 기존 답변 생성 중 안내. \n전송 결과 미수신:\
+        \ 새 질문을 만들지 않고 기존 요청 상태를 확인한다."
+      수용 기준: '1. 기업·이슈·관계에서 시작한 질문은 해당 맥락을 표시하고 서버 요청에도 포함한다.
+
+        2. 전역 질문은 선택 맥락 없이도 전송된다.
+
+        3. 빈 입력·비회원·동일 대화 처리 중 추가 전송이 차단된다.'
+      확인 필요 사항: 질문 글자 수와 사용자별 일일 이용 한도는 운영 정책 확정 후 적용한다.
+    heading:
+      row: 7
+      text: FS045  AI 질문 진입과 맥락 전달
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 45   ·   v1.2: 기존 기준 유지'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
       row: 9
@@ -3317,39 +3394,6 @@ specs:
       row: 7
       text: FS045  AI 질문 진입과 전송
     meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 45   ·   v1.2: 기존 기준 유지'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
-      row: 9
-      rowUnit: xlsx-row
-    fields:
-      기능명: AI 질문 진입과 맥락 전달
-      기능 설명: 시스템은 전역 AI 패널과 기업·이슈·관계 패널의 AI에게 질문하기에서 질문을 시작할 수 있게 한다. 선택한 기업, 이슈,
-        관계, 기준 시점, 근거 문서는 질문 맥락으로 함께 전달한다. 전역 질문은 선택 맥락 없이도 시작할 수 있다.
-      선행조건: 로그인 회원이 AI 패널 또는 AI 질문 버튼을 연다.
-      입력값: 질문 본문, 대화 ID, 선택 기업·이슈·관계 ID(선택), 기준 시점(asOf, 선택), 근거 문서 ID(선택)
-      입력·검증 규칙: 선택 맥락은 질문 입력창 상단에 표시하고 실제 요청에도 포함한다. 사용자가 질문에서 다른 기업·기간을 명시하면 질문의
-        명시 조건을 우선한다. 빈 입력은 전송하지 않는다. 같은 대화에서 답변 생성 중이면 추가 전송 버튼을 비활성화한다. 비회원은 AI 질문
-        전송이 불가하며 로그인 안내를 제공한다.
-      처리 절차 및 분기: '1. 진입 위치의 선택 맥락을 수집하여 표시한다.
-
-        2. 사용자가 질문을 작성·전송한다.
-
-        3. 빈 입력·로그인 상태·동일 대화 처리 중 여부를 확인한다.
-
-        4. 통과하면 질문과 맥락을 해당 대화에 저장하고 해석 단계로 전달한다.'
-      정상 결과: 질문과 적용 맥락이 대화 및 질문 작업에 연결되어 처리된다.
-      예외 처리: "빈 입력: 전송 차단. 비회원: 로그인 안내. \n처리 중: 입력을 유지하고 기존 답변 생성 중 안내. \n전송 결과 미수신:\
-        \ 새 질문을 만들지 않고 기존 요청 상태를 확인한다."
-      수용 기준: '1. 기업·이슈·관계에서 시작한 질문은 해당 맥락을 표시하고 서버 요청에도 포함한다.
-
-        2. 전역 질문은 선택 맥락 없이도 전송된다.
-
-        3. 빈 입력·비회원·동일 대화 처리 중 추가 전송이 차단된다.'
-      확인 필요 사항: 질문 글자 수와 사용자별 일일 이용 한도는 운영 정책 확정 후 적용한다.
-    heading:
-      row: 7
-      text: FS045  AI 질문 진입과 맥락 전달
-    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 45   ·   v1.2: 기존 기준 유지'
   scopeClass: existing
 - id: FS046
   title: 질문 대상·기간 해석 및 되묻기
@@ -3359,12 +3403,45 @@ specs:
   requirementIds:
   - '46'
   source: &id013
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 56
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
+      row: 23
+      rowUnit: xlsx-row
+    fields:
+      기능명: 질문 대상·기간 해석 및 되묻기
+      기능 설명: 시스템은 질문과 전달된 맥락에서 분석 대상·기간을 해석한다. 대상 또는 기간을 하나로 정할 수 없으면 임의로 분석하지 않고
+        확인 질문을 제공한다.
+      선행조건: 유효한 AI 질문이 접수된다.
+      입력값: 질문 본문, 질문 시각, 선택 기업·이슈·관계·기준 시점, 대화의 직전 확정 맥락
+      입력·검증 규칙: 질문에 직접 적힌 기업·이슈·기간 조건을 화면 맥락보다 우선한다. 이 회사, 이 이슈는 현재 선택 맥락 또는 직전 답변의
+        명시 대상을 우선 참조한다. 여러 기업·기간으로 해석 가능한 경우 추정하지 않는다. 최근은 답변에 실제 적용 기간을 표시한다. 과거
+        기준 시점(asOf) 질문은 그 시점 이후 공개된 문서를 사용하지 않는다.
+      처리 절차 및 분기: '1. 질문의 기업·이슈·관계·기간 조건을 추출한다.
+
+        2. 질문 조건과 전달 맥락을 비교해 분석 범위를 확정한다.
+
+        3. 범위가 불명확하면 선택지를 포함한 확인 질문을 반환한다.
+
+        4. 범위가 확정되면 근거 조회 단계로 전달한다.'
+      정상 결과: 실제 적용 대상·기간·기준 시점이 확정되거나 확인 질문이 제공된다.
+      예외 처리: '대상·기간 불명확: 확인 질문 제공. 해석 처리 장애: 분석 준비 중 오류와 재시도 안내를 제공하며 근거 부족으로 위장하지
+        않는다. 과거 기준 시점 이전 자료 없음: 자료 없음 안내를 제공한다.'
+      수용 기준: '1. 명시한 기업·기간은 화면 맥락보다 우선한다.
+
+        2. 불명확한 질문은 임의 대상 분석 대신 확인 질문을 제공한다.
+
+        3. 과거 기준 시점 질문에 그 이후 공개된 문서가 사용되지 않는다.'
+      확인 필요 사항: 최근의 기본 범위는 1개월로 적용하되, UI에서 실제 적용 기간을 항상 표시한다.
+    heading:
+      row: 21
+      text: FS046 질문 대상·기간 해석 및 되묻기
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 46   ·   v1.2: 제안 기준 반영'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
       row: 23
@@ -3415,39 +3492,6 @@ specs:
       row: 21
       text: FS046  AI 권한과 중복 작업 통제
     meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 46   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
-      row: 23
-      rowUnit: xlsx-row
-    fields:
-      기능명: 질문 대상·기간 해석 및 되묻기
-      기능 설명: 시스템은 질문과 전달된 맥락에서 분석 대상·기간을 해석한다. 대상 또는 기간을 하나로 정할 수 없으면 임의로 분석하지 않고
-        확인 질문을 제공한다.
-      선행조건: 유효한 AI 질문이 접수된다.
-      입력값: 질문 본문, 질문 시각, 선택 기업·이슈·관계·기준 시점, 대화의 직전 확정 맥락
-      입력·검증 규칙: 질문에 직접 적힌 기업·이슈·기간 조건을 화면 맥락보다 우선한다. 이 회사, 이 이슈는 현재 선택 맥락 또는 직전 답변의
-        명시 대상을 우선 참조한다. 여러 기업·기간으로 해석 가능한 경우 추정하지 않는다. 최근은 답변에 실제 적용 기간을 표시한다. 과거
-        기준 시점(asOf) 질문은 그 시점 이후 공개된 문서를 사용하지 않는다.
-      처리 절차 및 분기: '1. 질문의 기업·이슈·관계·기간 조건을 추출한다.
-
-        2. 질문 조건과 전달 맥락을 비교해 분석 범위를 확정한다.
-
-        3. 범위가 불명확하면 선택지를 포함한 확인 질문을 반환한다.
-
-        4. 범위가 확정되면 근거 조회 단계로 전달한다.'
-      정상 결과: 실제 적용 대상·기간·기준 시점이 확정되거나 확인 질문이 제공된다.
-      예외 처리: '대상·기간 불명확: 확인 질문 제공. 해석 처리 장애: 분석 준비 중 오류와 재시도 안내를 제공하며 근거 부족으로 위장하지
-        않는다. 과거 기준 시점 이전 자료 없음: 자료 없음 안내를 제공한다.'
-      수용 기준: '1. 명시한 기업·기간은 화면 맥락보다 우선한다.
-
-        2. 불명확한 질문은 임의 대상 분석 대신 확인 질문을 제공한다.
-
-        3. 과거 기준 시점 질문에 그 이후 공개된 문서가 사용되지 않는다.'
-      확인 필요 사항: 최근의 기본 범위는 1개월로 적용하되, UI에서 실제 적용 기간을 항상 표시한다.
-    heading:
-      row: 21
-      text: FS046 질문 대상·기간 해석 및 되묻기
-    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 46   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS047
   title: 근거·관계 그래프 맥락 조회
@@ -3457,12 +3501,45 @@ specs:
   requirementIds:
   - '47'
   source: &id014
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 57
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
+      row: 37
+      rowUnit: xlsx-row
+    fields:
+      기능명: 근거·관계 그래프 맥락 조회
+      기능 설명: 시스템은 확정된 질문 범위에 맞는 검증 완료 그래프 관계와 뉴스·공시 근거를 조회한다. 개인 보유·관심 종목은 본인 권한이
+        있을 때만 질문 맥락에 포함한다.
+      선행조건: 질문 대상·기간이 확정되었다.
+      입력값: 기업·이슈·관계 ID, 기간·기준 시점, 선택 근거 문서 ID(선택), 사용자 ID(선택)
+      입력·검증 규칙: GraphDB에서는 공개·검증 완료 상태의 관계만 조회한다. 문서는 질문 기간 및 기준 시점 조건을 만족하는 자료만 사용한다.
+        선택 문서가 있으면 해당 문서를 우선하되, 접근 불가 또는 삭제된 문서는 최신 문서로 조용히 대체하지 않는다. 개인화 정보는 본인의
+        보유·관심 종목만 조회한다.
+      처리 절차 및 분기: '1. GraphDB에서 대상 중심 최대 2-hop 관계와 관계 근거 참조를 조회한다.
+
+        2. 뉴스·공시 저장소에서 근거 문서의 제목·출처·공개 시각·확보된 인용 구간을 조회한다.
+
+        3. 필요 시 본인의 보유·관심 종목과 겹치는 관계만 추가로 조회한다.
+
+        4. 근거와 관계를 답변 생성에 전달한다.'
+      정상 결과: 질문 조건에 맞는 기업·이슈·관계와 근거 문서가 답변 생성에 제공된다.
+      예외 처리: '근거 부족: 확보한 사실과 판단할 근거가 부족함을 답변으로 제공. 선택 문서 접근 불가: 해당 문서 사용 불가 안내. 개인화
+        정보 없음: 일반 시장 설명으로 제공. GraphDB·문서 조회 장애: 기술 오류와 재시도 안내.'
+      수용 기준: '1. 답변에 사용하는 관계는 공개·검증 완료 상태다.
+
+        2. 답변 근거는 질문 대상·기간·기준 시점과 일치한다.
+
+        3. 타인의 보유·관심 정보는 조회·모델 입력·답변에 포함되지 않는다.'
+      확인 필요 사항: P1의 그래프 조회 범위는 중심 대상 기준 최대 2-hop으로 제한한다.
+    heading:
+      row: 35
+      text: FS047  근거·관계 그래프 맥락 조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 47   ·   v1.2: 제안 기준 반영'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
       row: 37
@@ -3503,39 +3580,6 @@ specs:
       row: 35
       text: FS047  질문 해석과 되묻기
     meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 47   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
-      row: 37
-      rowUnit: xlsx-row
-    fields:
-      기능명: 근거·관계 그래프 맥락 조회
-      기능 설명: 시스템은 확정된 질문 범위에 맞는 검증 완료 그래프 관계와 뉴스·공시 근거를 조회한다. 개인 보유·관심 종목은 본인 권한이
-        있을 때만 질문 맥락에 포함한다.
-      선행조건: 질문 대상·기간이 확정되었다.
-      입력값: 기업·이슈·관계 ID, 기간·기준 시점, 선택 근거 문서 ID(선택), 사용자 ID(선택)
-      입력·검증 규칙: GraphDB에서는 공개·검증 완료 상태의 관계만 조회한다. 문서는 질문 기간 및 기준 시점 조건을 만족하는 자료만 사용한다.
-        선택 문서가 있으면 해당 문서를 우선하되, 접근 불가 또는 삭제된 문서는 최신 문서로 조용히 대체하지 않는다. 개인화 정보는 본인의
-        보유·관심 종목만 조회한다.
-      처리 절차 및 분기: '1. GraphDB에서 대상 중심 최대 2-hop 관계와 관계 근거 참조를 조회한다.
-
-        2. 뉴스·공시 저장소에서 근거 문서의 제목·출처·공개 시각·확보된 인용 구간을 조회한다.
-
-        3. 필요 시 본인의 보유·관심 종목과 겹치는 관계만 추가로 조회한다.
-
-        4. 근거와 관계를 답변 생성에 전달한다.'
-      정상 결과: 질문 조건에 맞는 기업·이슈·관계와 근거 문서가 답변 생성에 제공된다.
-      예외 처리: '근거 부족: 확보한 사실과 판단할 근거가 부족함을 답변으로 제공. 선택 문서 접근 불가: 해당 문서 사용 불가 안내. 개인화
-        정보 없음: 일반 시장 설명으로 제공. GraphDB·문서 조회 장애: 기술 오류와 재시도 안내.'
-      수용 기준: '1. 답변에 사용하는 관계는 공개·검증 완료 상태다.
-
-        2. 답변 근거는 질문 대상·기간·기준 시점과 일치한다.
-
-        3. 타인의 보유·관심 정보는 조회·모델 입력·답변에 포함되지 않는다.'
-      확인 필요 사항: P1의 그래프 조회 범위는 중심 대상 기준 최대 2-hop으로 제한한다.
-    heading:
-      row: 35
-      text: FS047  근거·관계 그래프 맥락 조회
-    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 47   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS048
   title: 근거 기반 답변 생성 및 안전 검증
@@ -3545,12 +3589,45 @@ specs:
   requirementIds:
   - '48'
   source: &id015
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 58
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
+      row: 51
+      rowUnit: xlsx-row
+    fields:
+      기능명: 근거 기반 답변 생성 및 안전 검증
+      기능 설명: 시스템은 조회된 근거·관계·시장 데이터만 바탕으로 답변을 생성한다. 답변에는 적용 대상·기간, 핵심 설명, 연결 근거, 한계
+        또는 추가 확인 사항을 포함한다. 매수·매도 권유나 수익·가격 예측은 제공하지 않는다.
+      선행조건: 사용 가능한 근거·관계 맥락이 확보되었거나 근거 부족 상태가 확정되었다.
+      입력값: 질문 본문, 적용 기업·이슈·기간·기준 시점, 관계 경로, 근거 문서·인용 구간, 개인화 정보(권한 범위 내), 답변 초안
+      입력·검증 규칙: 답변의 사실 주장에는 적어도 하나의 근거 문서 참조를 연결한다. 관계·문서에 없는 사실을 확정적으로 말하지 않는다. 영향
+        방향은 긍정 가능, 부정 가능, 혼재, 불확실로 표현한다. 주가 움직임을 단일 원인으로 단정하지 않고, 근거 부족 시 판단을 보류한다.
+        자동 매수·매도·목표가·수익 보장 문구를 생성하지 않는다.
+      처리 절차 및 분기: '1. 질문과 근거를 바탕으로 답변 초안을 생성한다.
+
+        2. 적용 대상·기간·인용 참조·그래프 대상의 유효성을 확인한다.
+
+        3. 근거 없는 주장·투자 권유·유효하지 않은 참조가 있으면 답변을 제공하지 않고 오류 상태로 기록한다.
+
+        4. 검증된 답변을 저장하고 사용자에게 제공한다.'
+      정상 결과: 사용자는 적용 조건, 근거 링크, 관계 설명, 한계·확인 사항이 포함된 답변을 확인할 수 있다.
+      예외 처리: '근거 부족: 판단 보류와 확인 가능한 근거만 제공. 인용·그래프 참조 검증 실패: 답변 제공 중단 및 재질문 안내. 저장
+        실패: 답변 완료로 표시하지 않고 저장 재시도. AI 처리 장애: 오류·재시도 안내.'
+      수용 기준: '1. 답변은 실제 적용 대상·기간·기준 시점을 표시한다.
+
+        2. 사실 주장마다 근거 문서 참조를 확인할 수 있다.
+
+        3. 매수·매도 권유, 가격·수익 보장, 단일 원인 단정 문구가 없다.'
+      확인 필요 사항: 인용 구간 자동 검증은 제목·출처·문서 ID 일치 검증부터 구현하고, 세부 문장 단위 사실성 평가는 P2로 둔다.
+    heading:
+      row: 49
+      text: FS048  근거 기반 답변 생성 및 안전 검증
+    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 48   ·   v1.2: 제안 기준 반영'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
       row: 51
@@ -3597,39 +3674,6 @@ specs:
       row: 49
       text: FS048  개인화 조건과 근거 확보
     meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 48   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
-      row: 51
-      rowUnit: xlsx-row
-    fields:
-      기능명: 근거 기반 답변 생성 및 안전 검증
-      기능 설명: 시스템은 조회된 근거·관계·시장 데이터만 바탕으로 답변을 생성한다. 답변에는 적용 대상·기간, 핵심 설명, 연결 근거, 한계
-        또는 추가 확인 사항을 포함한다. 매수·매도 권유나 수익·가격 예측은 제공하지 않는다.
-      선행조건: 사용 가능한 근거·관계 맥락이 확보되었거나 근거 부족 상태가 확정되었다.
-      입력값: 질문 본문, 적용 기업·이슈·기간·기준 시점, 관계 경로, 근거 문서·인용 구간, 개인화 정보(권한 범위 내), 답변 초안
-      입력·검증 규칙: 답변의 사실 주장에는 적어도 하나의 근거 문서 참조를 연결한다. 관계·문서에 없는 사실을 확정적으로 말하지 않는다. 영향
-        방향은 긍정 가능, 부정 가능, 혼재, 불확실로 표현한다. 주가 움직임을 단일 원인으로 단정하지 않고, 근거 부족 시 판단을 보류한다.
-        자동 매수·매도·목표가·수익 보장 문구를 생성하지 않는다.
-      처리 절차 및 분기: '1. 질문과 근거를 바탕으로 답변 초안을 생성한다.
-
-        2. 적용 대상·기간·인용 참조·그래프 대상의 유효성을 확인한다.
-
-        3. 근거 없는 주장·투자 권유·유효하지 않은 참조가 있으면 답변을 제공하지 않고 오류 상태로 기록한다.
-
-        4. 검증된 답변을 저장하고 사용자에게 제공한다.'
-      정상 결과: 사용자는 적용 조건, 근거 링크, 관계 설명, 한계·확인 사항이 포함된 답변을 확인할 수 있다.
-      예외 처리: '근거 부족: 판단 보류와 확인 가능한 근거만 제공. 인용·그래프 참조 검증 실패: 답변 제공 중단 및 재질문 안내. 저장
-        실패: 답변 완료로 표시하지 않고 저장 재시도. AI 처리 장애: 오류·재시도 안내.'
-      수용 기준: '1. 답변은 실제 적용 대상·기간·기준 시점을 표시한다.
-
-        2. 사실 주장마다 근거 문서 참조를 확인할 수 있다.
-
-        3. 매수·매도 권유, 가격·수익 보장, 단일 원인 단정 문구가 없다.'
-      확인 필요 사항: 인용 구간 자동 검증은 제목·출처·문서 ID 일치 검증부터 구현하고, 세부 문장 단위 사실성 평가는 P2로 둔다.
-    heading:
-      row: 49
-      text: FS048  근거 기반 답변 생성 및 안전 검증
-    meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 48   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS049
   title: 답변 근거와 관련 그래프 탐색
@@ -3639,12 +3683,36 @@ specs:
   requirementIds:
   - '49'
   source: &id016
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 59
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
+      row: 65
+      rowUnit: xlsx-row
+    fields:
+      기능명: 답변 근거와 관련 그래프 탐색
+      기능 설명: 사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다.
+        AI 답변 자체는 새 관계를 생성하지 않는다.
+      선행조건: 근거 또는 그래프 대상이 연결된 AI 답변이 표시된다.
+      입력값: 답변 ID, 선택 근거 문서 ID 또는 기업·이슈·관계 ID, 현재 접근 권한
+      입력·검증 규칙: 선택한 답변에 실제 연결된 근거·대상만 제공한다. 문서에는 제목·출처·공개 시각·확보된 인용 구간·원문 링크를 제공한다.
+        그래프는 존재하고 공개된 대상만 강조한다. 원문·인용·관계를 AI가 임의 생성하지 않는다.
+      처리 절차 및 분기: 1. 사용자가 답변의 근거 또는 그래프 대상을 선택한다.2. 답변과 선택 대상의 연결 및 권한을 확인한다.3. 근거
+        선택 시 문서 정보·인용 구간·원문 링크를 표시한다.4. 그래프 대상 선택 시 해당 대상 중심의 기존 그래프를 열고 경로를 강조한다.
+      정상 결과: 사용자는 답변의 출처를 확인하거나 관련 관계를 그래프에서 탐색할 수 있다.
+      예외 처리: '원문 링크 없음: 원문 미제공 안내. 외부 원문 접근 실패: 확보된 출처·인용은 유지. 그래프 대상 없음·권한 없음: 강조하지
+        않고 이용 불가 안내. 조회 장애: 답변은 유지하고 해당 기능만 재시도.'
+      수용 기준: 1. 표시되는 근거는 선택 답변과 연결된 문서다.2. 그래프 강조 대상은 실제 존재하는 공개 대상이다.3. 원문 접근 실패가
+        AI 답변 재생성을 유발하지 않는다.
+      확인 필요 사항: 뉴스 원문은 링크로 이동하며 서비스 내 기사 전문 재배포는 하지 않는다.
+    heading:
+      row: 63
+      text: FS049  답변 근거와 관련 그래프 탐색
+    meta: '원본 우선순위: P1 · 원본 상태: 팀 검토 전 · v1.3: MVP 기준 확정'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
       row: 65
@@ -3703,30 +3771,6 @@ specs:
       row: 63
       text: FS049  답변 검증과 제공
     meta: '원본 우선순위: P1   ·   원본 상태: 팀 검토 전   ·   요구사항: 49   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
-      row: 65
-      rowUnit: xlsx-row
-    fields:
-      기능명: 답변 근거와 관련 그래프 탐색
-      기능 설명: 사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다.
-        AI 답변 자체는 새 관계를 생성하지 않는다.
-      선행조건: 근거 또는 그래프 대상이 연결된 AI 답변이 표시된다.
-      입력값: 답변 ID, 선택 근거 문서 ID 또는 기업·이슈·관계 ID, 현재 접근 권한
-      입력·검증 규칙: 선택한 답변에 실제 연결된 근거·대상만 제공한다. 문서에는 제목·출처·공개 시각·확보된 인용 구간·원문 링크를 제공한다.
-        그래프는 존재하고 공개된 대상만 강조한다. 원문·인용·관계를 AI가 임의 생성하지 않는다.
-      처리 절차 및 분기: 1. 사용자가 답변의 근거 또는 그래프 대상을 선택한다.2. 답변과 선택 대상의 연결 및 권한을 확인한다.3. 근거
-        선택 시 문서 정보·인용 구간·원문 링크를 표시한다.4. 그래프 대상 선택 시 해당 대상 중심의 기존 그래프를 열고 경로를 강조한다.
-      정상 결과: 사용자는 답변의 출처를 확인하거나 관련 관계를 그래프에서 탐색할 수 있다.
-      예외 처리: '원문 링크 없음: 원문 미제공 안내. 외부 원문 접근 실패: 확보된 출처·인용은 유지. 그래프 대상 없음·권한 없음: 강조하지
-        않고 이용 불가 안내. 조회 장애: 답변은 유지하고 해당 기능만 재시도.'
-      수용 기준: 1. 표시되는 근거는 선택 답변과 연결된 문서다.2. 그래프 강조 대상은 실제 존재하는 공개 대상이다.3. 원문 접근 실패가
-        AI 답변 재생성을 유발하지 않는다.
-      확인 필요 사항: 뉴스 원문은 링크로 이동하며 서비스 내 기사 전문 재배포는 하지 않는다.
-    heading:
-      row: 63
-      text: FS049  답변 근거와 관련 그래프 탐색
-    meta: '원본 우선순위: P1 · 원본 상태: 팀 검토 전 · v1.3: MVP 기준 확정'
   scopeClass: existing
 - id: FS050
   title: 새 대화와 후속 질문
@@ -3736,14 +3780,14 @@ specs:
   requirementIds:
   - '50'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 60
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -3776,12 +3820,38 @@ specs:
   requirementIds:
   - '50'
   source: &id017
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 61
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 동작 보완
   definitions:
+  - source:
+      path: docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv
+      row: 94
+      rowUnit: xlsx-row
+    fields:
+      기능명: AI 패널 상태 유지와 결과 재조회
+      기능 설명: 사용자가 AI 패널을 닫았다가 다시 열거나 네트워크 응답을 받지 못해도, 기존 질문 작업의 상태와 저장된 결과를 재조회할 수
+        있다. 패널 닫기·재열기는 질문 취소나 새 AI 생성으로 처리하지 않는다.
+      선행조건: 로그인 회원에게 기존 대화 또는 질문 작업이 있다.
+      입력값: 대화 ID, 질문 작업 ID, 현재 사용자 권한, 작업 상태
+      입력·검증 규칙: 패널 닫기는 상세 화면·대화·서버 작업을 삭제하거나 취소하지 않는다. 재열기와 응답 미수신 후 복구는 기존 작업 상태
+        조회로 처리한다. 완료 작업은 저장된 답변을 반환하고, 처리 중 작업은 상태만 표시한다. 같은 작업을 중복 생성하지 않는다. 권한이
+        바뀌면 보호된 대화·개인화 정보를 표시하지 않는다.
+      처리 절차 및 분기: 1. 패널 재열기 또는 응답 미수신 시 기존 작업 상태를 조회한다.2. 완료면 저장 답변을 반환하고, 처리 중이면
+        진행 상태를 표시한다.3. 서버가 실패를 확정한 경우에만 사용자가 같은 질문을 다시 전송할 수 있게 한다.4. 상세 기업이 바뀌어도
+        기존 대화의 적용 맥락은 자동으로 바꾸지 않는다.
+      정상 결과: 패널을 닫거나 일시적으로 연결이 끊겨도 기존 질문의 진행 상태 또는 저장 답변을 확인할 수 있다.
+      예외 처리: '상태 조회 실패: 미등록·실패로 단정하지 않고 다시 확인 안내. 권한 변경: 대화 내용 숨김 및 로그인·권한 안내. 서버
+        실패 확정: 실패 사유와 새 질문 또는 재시도 안내.'
+      수용 기준: 1. 패널을 닫은 동안 완료된 질문은 재열기 시 저장 답변으로 확인된다.2. 응답 미수신 후 상태 조회만으로 중복 모델 호출이
+        발생하지 않는다.3. 상세 기업 변경이 기존 대화의 적용 대상·기간을 자동 변경하지 않는다.
+      확인 필요 사항: 처리 상태 자동 확인 간격과 최대 대기 시간은 구현 환경에서 측정 후 결정한다.
+    heading:
+      row: 92
+      text: FS051  AI 패널 상태 유지와 결과 재조회
+    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 51   ·   v1.2: 제안 기준 반영'
   - source:
       path: docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv
       row: 107
@@ -3823,32 +3893,6 @@ specs:
       row: 105
       text: FS051  새 대화 시작
     meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 51   ·   v1.2: 제안 기준 반영'
-  - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv
-      row: 94
-      rowUnit: xlsx-row
-    fields:
-      기능명: AI 패널 상태 유지와 결과 재조회
-      기능 설명: 사용자가 AI 패널을 닫았다가 다시 열거나 네트워크 응답을 받지 못해도, 기존 질문 작업의 상태와 저장된 결과를 재조회할 수
-        있다. 패널 닫기·재열기는 질문 취소나 새 AI 생성으로 처리하지 않는다.
-      선행조건: 로그인 회원에게 기존 대화 또는 질문 작업이 있다.
-      입력값: 대화 ID, 질문 작업 ID, 현재 사용자 권한, 작업 상태
-      입력·검증 규칙: 패널 닫기는 상세 화면·대화·서버 작업을 삭제하거나 취소하지 않는다. 재열기와 응답 미수신 후 복구는 기존 작업 상태
-        조회로 처리한다. 완료 작업은 저장된 답변을 반환하고, 처리 중 작업은 상태만 표시한다. 같은 작업을 중복 생성하지 않는다. 권한이
-        바뀌면 보호된 대화·개인화 정보를 표시하지 않는다.
-      처리 절차 및 분기: 1. 패널 재열기 또는 응답 미수신 시 기존 작업 상태를 조회한다.2. 완료면 저장 답변을 반환하고, 처리 중이면
-        진행 상태를 표시한다.3. 서버가 실패를 확정한 경우에만 사용자가 같은 질문을 다시 전송할 수 있게 한다.4. 상세 기업이 바뀌어도
-        기존 대화의 적용 맥락은 자동으로 바꾸지 않는다.
-      정상 결과: 패널을 닫거나 일시적으로 연결이 끊겨도 기존 질문의 진행 상태 또는 저장 답변을 확인할 수 있다.
-      예외 처리: '상태 조회 실패: 미등록·실패로 단정하지 않고 다시 확인 안내. 권한 변경: 대화 내용 숨김 및 로그인·권한 안내. 서버
-        실패 확정: 실패 사유와 새 질문 또는 재시도 안내.'
-      수용 기준: 1. 패널을 닫은 동안 완료된 질문은 재열기 시 저장 답변으로 확인된다.2. 응답 미수신 후 상태 조회만으로 중복 모델 호출이
-        발생하지 않는다.3. 상세 기업 변경이 기존 대화의 적용 대상·기간을 자동 변경하지 않는다.
-      확인 필요 사항: 처리 상태 자동 확인 간격과 최대 대기 시간은 구현 환경에서 측정 후 결정한다.
-    heading:
-      row: 92
-      text: FS051  AI 패널 상태 유지와 결과 재조회
-    meta: '원본 우선순위: P1   ·   원본 상태: 확정   ·   요구사항: 51   ·   v1.2: 제안 기준 반영'
   scopeClass: existing
 - id: FS054
   title: 사용자와 모의 보유
@@ -3858,14 +3902,14 @@ specs:
   requirementIds:
   - '66'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 62
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -3942,14 +3986,14 @@ specs:
   requirementIds:
   - '67'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 63
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -4041,14 +4085,14 @@ specs:
   requirementIds:
   - '68'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 64
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -4109,28 +4153,29 @@ specs:
   requirementIds:
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 65
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv
       row: 51
       rowUnit: xlsx-row
     fields:
       기능명: 신규 경제뉴스 정기 수집 및 이슈 분석
-      기능 설명: 분석시스템은 한국 시간 매시 05분과 35분에 신규 경제뉴스 수집을 시작한다. 공급원의 등록·수정 정보 등으로 신규·지연 등록·수정
-        문서를 확인하고 동일 내용의 중복을 제외한다. 발견 가능한 범위는 실제 공급원의 지원과 검증된 조회 방식에 따른다. 뉴스·공시 같은
-        문서에서 개별 사건을 추출하고 관련 이슈에 연결하거나 신규 이슈를 만든 뒤 기업·영향 경로·근거를 분석한다. 이슈는 관련 사건을 연결해
-        관리하는 분석 주제이며 사건 하나부터 구성할 수 있다. 핵심 이슈는 이슈 중 중요하게 선정해 보여 주는 대상이며 별도의 사건 유형이
-        아니다. 자동 검증을 통과한 결과만 공개 대상으로 지정한다.
-      선행조건: 한국 시간 매시 05분과 35분의 정기 수집 회차가 시작된다.
+      기능 설명: 분석시스템은 한국 시간 운영 구간(09:00 이상 18:00 미만)의 매시 05분과 35분에 신규 경제뉴스 수집을 시작한다.
+        공급원의 등록·수정 정보 등으로 신규·지연 등록·수정 문서를 확인하고 동일 내용의 중복을 제외한다. 발견 가능한 범위는 실제 공급원의
+        지원과 검증된 조회 방식에 따른다. 뉴스·공시 같은 문서에서 개별 사건을 추출하고 관련 이슈에 연결하거나 신규 이슈를 만든 뒤 기업·영향
+        경로·근거를 분석한다. 이슈는 관련 사건을 연결해 관리하는 분석 주제이며 사건 하나부터 구성할 수 있다. 핵심 이슈는 이슈 중 중요하게
+        선정해 보여 주는 대상이며 별도의 사건 유형이 아니다. 자동 검증을 통과한 결과만 공개 대상으로 지정한다.
+      선행조건: 한국 시간 운영 구간(09:00 이상 18:00 미만)의 매시 05분과 35분의 정기 수집 회차가 시작된다.
       입력값: 수집 회차·시작 시각, 직전 성공 조회 기준과 제공되는 변경 커서, 조회 범위·페이지 정보, 문서·원문 근거·공급 문서 ID·원문
         주소, 발행 시각·공급원 등록/수정 시각·서비스 관측 시점, 문서 버전·이전 버전과 그 근거를 사용한 사건·이슈·기업 관계 참조, 단계별
         처리 상태.
-      입력·검증 규칙: '한국 시간 매시 05분·35분 수집 시작을 유지하고 마지막 성공 조회 기준·공급원의 변경 커서를 관리한다.
+      입력·검증 규칙: '한국 시간 운영 구간(09:00 이상 18:00 미만)의 매시 05분·35분 수집 시작을 유지하고 마지막 성공 조회
+        기준·공급원의 변경 커서를 관리한다.
 
         수집 성공은 해당 조회 범위의 응답·필수 페이지 처리·수집 문서 저장 확인이 끝난 경우다. 정상 신규 0건도 성공 기준과 제공되는 변경
         커서를 갱신한다. 수집 성공과 분석 성공은 별도 상태로 기록한다.
@@ -4180,8 +4225,12 @@ specs:
         분석 결과 저장만 실패: 보존된 결과의 유효성을 확인하고 저장만 재시도한다. 결과가 소실되면 복구 불가 상태를 남긴다.
 
         자동 검증 실패·검토 대기: 공개하지 않고 원인과 상태를 남긴다. 실패를 이유로 모델을 무제한 자동 재호출하지 않는다. 재처리는 허용
-        범위·횟수가 정해진 정책에 따르고 중복 실행을 막는다.'
-      수용 기준: '1. 한국 시간 매시 05분·35분에 수집을 시작한다.
+        범위·횟수가 정해진 정책에 따르고 중복 실행을 막는다.
+
+        비운영 시간(18:00~다음 09:00)에는 정기 회차를 시작하지 않는다. 다음 기동 시 마지막 성공 커서/조회 경계와 공급원에서 검증된
+        겹침 범위로 야간 신규·지연 등록·수정 문서를 확인한다. 문서 ID·버전·내용 해시와 회차 멱등성 키로 중복을 제거한다. 겹침 조회만으로
+        누락·중복 방지를 보장하지 않는다.'
+      수용 기준: '1. 한국 시간 운영 구간(09:00 이상 18:00 미만)의 매시 05분·35분에 수집을 시작한다.
 
         2. 수집 실패 시 성공 기준·변경 커서가 전진하지 않고 누락 범위를 다시 조회한다. 정상 신규 0건은 실패와 구분된다.
 
@@ -4210,7 +4259,10 @@ specs:
 
         [확인 필요: 원문 주소 정규화·내용 중복/수정 판정 및 자동 검증 상세 기준·품질 목표는 실제 자료 검증 후 확정 필요]
 
-        [확인 필요: 오류별 재처리 허용 범위·횟수·간격은 운영 정책으로 결정 필요]'
+        [확인 필요: 오류별 재처리 허용 범위·횟수·간격은 운영 정책으로 결정 필요]
+
+        운영 확인: 기동 후 야간 backlog의 수집·분석 완료와 09:20 브리핑 준비 여부를 구분한다. 공급원 조회 범위·기동 지연·18시
+        미완료 처리 및 접수 마감은 실연동/운영 검증 후 확정하며 정상 0건으로 숨기지 않는다.'
     heading:
       row: 49
       text: FS058  신규 경제뉴스 정기 수집 및 이슈 분석
@@ -4224,14 +4276,14 @@ specs:
   requirementIds:
   - '71'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 66
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -4256,8 +4308,8 @@ specs:
 
         이전 공개 버전을 제공하더라도 현재 공개 제외된 항목은 모든 조회 경로에서 숨긴다.
 
-        저장 성공과 사용자 조회 반영 성공을 구분한다. 정상 운영에서는 한국 시간 매시 10분·40분까지 두 화면의 조회 반영을 완료하며,
-        기한을 맞추기 위해 미검증 결과를 공개하지 않는다.
+        저장 성공과 사용자 조회 반영 성공을 구분한다. 정상 운영 구간(09:00 이상 18:00 미만)에 예정된 정기 회차는 한국 시간 매시
+        10분·40분까지 두 화면의 조회 반영을 완료하며, 기한을 맞추기 위해 미검증 결과를 공개하지 않는다.
 
         표시 데이터의 기준 시점과 이번 회차를 확인한 시점을 구분한다. 정상적인 신규 0건 완료로 기존 데이터를 유지하는 것만으로 갱신 지연을
         표시하지 않는다.'
@@ -4317,7 +4369,10 @@ specs:
 
         [확인 필요: 캐시 갱신 구현·두 조회 경로의 공통 공개 버전 전환 방식은 개발 환경에서 검증 필요]
 
-        [확인 필요: 이미 열린 화면의 자동 갱신 여부·시점과 미반영 유효 결과의 후속 반영 운영 방식 결정 필요]'
+        [확인 필요: 이미 열린 화면의 자동 갱신 여부·시점과 미반영 유효 결과의 후속 반영 운영 방식 결정 필요]
+
+        기동 후 야간 backlog 복구는 운영 중 정기 회차의 10분·40분 반영 기한과 분리해 추적한다. 기동/정기 시작 지연은 정상 기한
+        달성으로 기록하지 않는다. backlog 완료 기한은 처리량 검증 후 확정한다.'
     heading:
       row: 63
       text: FS059  분석 결과 저장 및 조회 반영
@@ -4331,14 +4386,14 @@ specs:
   requirementIds:
   - '72'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 67
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/09-데이터-관리.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/09-데이터-관리.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -4426,14 +4481,14 @@ specs:
   requirementIds:
   - '73'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 68
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -4518,14 +4573,14 @@ specs:
   requirementIds:
   - '74'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 69
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -4595,14 +4650,14 @@ specs:
   requirementIds:
   - '75'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 70
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -4684,14 +4739,14 @@ specs:
   requirementIds:
   - '76'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 71
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/10-외부-연동.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/10-외부-연동.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -4770,14 +4825,14 @@ specs:
   requirementIds:
   - '77'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 72
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -4849,14 +4904,14 @@ specs:
   - '37'
   - '78'
   source: &id018
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 73
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 통합
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv
       row: 134
       rowUnit: xlsx-row
     fields:
@@ -4882,7 +4937,7 @@ specs:
       text: FS066-01  브리핑 리뷰
     meta: '원본 우선순위: P2   ·   원본 상태: 검토 중   ·   요구사항: 36   ·   v1.2: 기존 기준 유지'
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -4954,14 +5009,14 @@ specs:
   requirementIds:
   - '78'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 74
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -5034,14 +5089,14 @@ specs:
   requirementIds:
   - '78'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 75
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -5111,14 +5166,14 @@ specs:
   requirementIds:
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 76
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -5187,14 +5242,14 @@ specs:
   requirementIds:
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 77
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 동작 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -5266,14 +5321,14 @@ specs:
   requirementIds:
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 78
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -5346,14 +5401,14 @@ specs:
   requirementIds:
   - '80'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 79
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -5425,14 +5480,14 @@ specs:
   requirementIds:
   - '81'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 80
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -5500,14 +5555,14 @@ specs:
   requirementIds:
   - '81'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 81
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 135
       rowUnit: xlsx-row
     fields:
@@ -5581,14 +5636,14 @@ specs:
   requirementIds:
   - '82'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 82
     rowUnit: xlsx-row
   detailRange: A147:B159
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 149
       rowUnit: xlsx-row
     fields:
@@ -5604,10 +5659,13 @@ specs:
         생성·검증·저장·발행을 구분한다. 생성 또는 저장 성공만으로 사용자에게 발행됐다고 간주하지 않는다. 실제 제공 중인 버전과 정정·제공
         중단 상태를 구분해 확인한다.
 
-        데이터 기준 시점, 단계별 처리 시각, 관제 확인 시각을 구분해 표시한다. 출근 07:40·퇴근 18:10은 생성 시작 시각이며 발행
+        데이터 기준 시점, 단계별 처리 시각, 관제 확인 시각을 구분해 표시한다. 출근 09:20·퇴근 17:30은 생성 시작 시각이며 발행
         완료 기한으로 해석하지 않는다. 지연·실패를 구분하되 지연 판정 기준은 임의로 확정하지 않는다.
 
-        상태 조회 불가를 회차 없음·미발행·실패·지연·정상 완료로 단정하지 않는다. 조회·재조회만으로 미발행 회차를 재처리하지 않는다.'
+        상태 조회 불가를 회차 없음·미발행·실패·지연·정상 완료로 단정하지 않는다. 조회·재조회만으로 미발행 회차를 재처리하지 않는다.
+
+        회차의 예정 시작·실제 시작·데이터 마감·생성 완료·발행 완료를 각각의 의미로 기록한다. 생성 시작 지연과 발행 지연을 구분하며 실제
+        미확인 종료/완료 시각을 만들지 않는다.'
       처리 절차 및 분기: '1. 관리자가 날짜·출근/퇴근 회차를 선택한다.
 
         2. 서버가 현재 권한·대상 범위를 확인하고 같은 회차·버전의 단계별 상태를 조회한다.
@@ -5662,14 +5720,14 @@ specs:
   requirementIds:
   - '82'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 83
     rowUnit: xlsx-row
   detailRange: A161:B173
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 163
       rowUnit: xlsx-row
     fields:
@@ -5694,7 +5752,10 @@ specs:
         이미 발행된 본문은 일반 재처리로 변경하지 않는다. 검증 실패·근거 부족은 재처리로 우회하지 않으며 공개 가능한 결과만 발행한다.
 
         필수 저장 실패 시 발행하지 않는다. 자료 일부 지연은 확보 범위와 지연을 표시하는 기존 기준을 따르며, 정상적인 적격 이슈 0개는
-        요약·시장 변수만 발행할 수 있다.'
+        요약·시장 변수만 발행할 수 있다.
+
+        AWS 종료로 미완료된 작업도 종료 사유·회차·실행권·보존 결과를 먼저 확인한다. 다음 기동만으로 전체 재생성하지 않는다. 기존 suspended(발행
+        후 제공 중단)와 혼용하거나 새 작업 상태 enum을 임의 추가하지 않는다.'
       처리 절차 및 분기: '1. 관리자가 대상 미발행 회차와 실패 단계를 확인해 재처리를 요청한다.
 
         2. 서버가 현재 권한·회차/실행 상태·기존 요청 처리 여부·보존 결과·재처리 허용 조건을 확인한다.
@@ -5742,7 +5803,10 @@ specs:
         [확인 필요: 보존 결과 소실·자료/기준 시점 변경이 필요한 경우의 복구 허용 범위와 재처리 종료 기준 결정 필요]
 
         [팀 협의 필요: 기존 생성/중복 발행 방지 명세의 상태 확인 불가 시 ‘발행 실패 처리’ 문구를 담당자와 정합화해야 한다. 이번 재처리
-        요청의 확인 실패·미실행과 실제 회차의 발행 실패를 구분하며 조회 장애만으로 기존 발행 상태를 변경하지 않는다]'
+        요청의 확인 실패·미실행과 실제 회차의 발행 실패를 구분하며 조회 장애만으로 기존 발행 상태를 변경하지 않는다]
+
+        18:00 종료 시 접수 마감·안전 종료·작업 소유권/임대 정리와 다음 기동의 복구 조건·담당·기한은 운영 정책/실행 시험으로 확정한다.
+        미완료 사유 기록과 공개 제공 중단 상태는 구분한다.'
     heading:
       row: 161
       text: FS070-02  미발행 브리핑 회차 재처리
@@ -5756,14 +5820,14 @@ specs:
   requirementIds:
   - '83'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 84
     rowUnit: xlsx-row
   detailRange: A175:B187
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 177
       rowUnit: xlsx-row
     fields:
@@ -5836,14 +5900,14 @@ specs:
   requirementIds:
   - '83'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 85
     rowUnit: xlsx-row
   detailRange: A189:B201
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 191
       rowUnit: xlsx-row
     fields:
@@ -5920,14 +5984,14 @@ specs:
   requirementIds:
   - '84'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 86
     rowUnit: xlsx-row
   detailRange: A203:B215
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 205
       rowUnit: xlsx-row
     fields:
@@ -6000,14 +6064,14 @@ specs:
   requirementIds:
   - '85'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 87
     rowUnit: xlsx-row
   detailRange: A217:B229
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv
       row: 219
       rowUnit: xlsx-row
     fields:
@@ -6077,14 +6141,14 @@ specs:
   requirementIds:
   - '54'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 88
     rowUnit: xlsx-row
   detailRange: A7:B19
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 9
       rowUnit: xlsx-row
     fields:
@@ -6145,14 +6209,14 @@ specs:
   requirementIds:
   - '55'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 89
     rowUnit: xlsx-row
   detailRange: A21:B33
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 23
       rowUnit: xlsx-row
     fields:
@@ -6223,14 +6287,14 @@ specs:
   requirementIds:
   - '56'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 90
     rowUnit: xlsx-row
   detailRange: A35:B47
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 37
       rowUnit: xlsx-row
     fields:
@@ -6303,14 +6367,14 @@ specs:
   requirementIds:
   - '57'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 91
     rowUnit: xlsx-row
   detailRange: A49:B61
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 51
       rowUnit: xlsx-row
     fields:
@@ -6371,14 +6435,14 @@ specs:
   requirementIds:
   - '58'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 92
     rowUnit: xlsx-row
   detailRange: A63:B75
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 65
       rowUnit: xlsx-row
     fields:
@@ -6450,14 +6514,14 @@ specs:
   requirementIds:
   - '59'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 93
     rowUnit: xlsx-row
   detailRange: A77:B89
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 79
       rowUnit: xlsx-row
     fields:
@@ -6516,14 +6580,14 @@ specs:
   requirementIds:
   - '60'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 94
     rowUnit: xlsx-row
   detailRange: A91:B103
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 93
       rowUnit: xlsx-row
     fields:
@@ -6588,14 +6652,14 @@ specs:
   requirementIds:
   - '61'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 95
     rowUnit: xlsx-row
   detailRange: A105:B117
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 107
       rowUnit: xlsx-row
     fields:
@@ -6660,14 +6724,14 @@ specs:
   requirementIds:
   - '62'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 96
     rowUnit: xlsx-row
   detailRange: A119:B131
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 121
       rowUnit: xlsx-row
     fields:
@@ -6695,7 +6759,11 @@ specs:
         5. 브리핑은 같은 날짜·출근/퇴근 회차를 중복 생성·발행하지 않는다. 허용된 미발행 회차의 실패 단계만 복구하고 이미 발행된 본문은
         일반 재처리로 덮어쓰지 않는다.
 
-        6. 복구 유형·실패 단계·결과를 기존 작업이나 회차에 연결해 기록한다. 복구 불가 시 사유와 허용된 다음 조치만 안내한다.'
+        6. 복구 유형·실패 단계·결과를 기존 작업이나 회차에 연결해 기록한다. 복구 불가 시 사유와 허용된 다음 조치만 안내한다.
+
+        7. AWS 09:00~18:00 환경의 계획 종료 시 미완료 작업·회차·단계·checkpoint·보존 결과와 종료 사유를 기록한다.
+        다음 기동 시 이전 실행의 종료/권한 회수·만료와 늦은 쓰기 차단을 확인하고 허용된 단계만 복구한다. 발행 후 제공 중단을 뜻하는 suspended를
+        작업 중단 상태로 재사용하지 않는다.'
       정상 상태: 복구 가능한 작업은 기존 상태·권한에 맞게 복구되고 유효한 답변·브리핑이 중복 생성·발행되지 않는다. 복구 불가 작업은 실패
         사유와 허용된 다음 조치를 확인할 수 있다.
       미충족·예외 처리: '완료 작업: 현재 조회 권한을 확인하고 저장 결과를 회수한다. 처리 중·종료 불명확: 새 실행 없이 상태를 다시 확인한다.
@@ -6720,7 +6788,10 @@ specs:
         5. 복구 불가 안내에 금지된 재실행이 포함되지 않는지 확인한다.
 
         6. 처리 중 상태가 계속되는 작업에 중단 판정·실행 권한 정리 절차를 적용한다. 시간초과만인 경우, 종료/권한 회수가 확인된 경우,
-        판단 불가인 경우를 나누고 옛 실행의 늦은 저장·발행을 시험한다.'
+        판단 불가인 경우를 나누고 옛 실행의 늦은 저장·발행을 시험한다.
+
+        7. 18:00 종료 경계와 다음 09:00 기동을 시계 주입으로 시험하고, 미완료 상태/보존 결과·실행권 회수·늦은 결과 차단·저장만
+        복구·중복 발행 방지를 확인한다.'
       수용 기준: '1. 중단·저장 실패·동시 복구에도 유효한 결과와 브리핑 발행본이 중복되지 않고 이전 실행이 현재 결과를 덮지 않는다.
 
         2. 챗봇 보존 결과의 저장 복구에는 추가 모델 호출이 없다. 검증 실패·결과 소실·상태 불명확만으로 동일 작업 AI 재생성이 발생하지
@@ -6738,7 +6809,10 @@ specs:
         시스템·운영자의 담당 및 검토 종료 절차 확정 필요. 복구 횟수·간격·검증 결과 보존 방식·브리핑 오류별 허용 범위도 결정·검증 필요]
 
         [팀 협의 필요: 브리핑의 상태 확인 불가 시 ‘발행 실패’ 표기와 실제 발행 여부 미확인·조회 장애의 상태 매핑을 명료화한다. 조회
-        장애만으로 실제 실행 실패를 확정하거나 재생성하지 않는다.]'
+        장애만으로 실제 실행 실패를 확정하거나 재생성하지 않는다.]
+
+        계획 종료 전 신규 접수 마감·종료 유예 및 다음날 복구 완료 기한은 추가 확인 사항이다. 기록할 상태/사유의 API 매핑은 담당자와
+        확정하며 새 enum을 이 문서만으로 추가하지 않는다.'
     heading:
       row: 119
       text: NFS009  중단 작업 복구
@@ -6753,14 +6827,14 @@ specs:
   requirementIds:
   - '63'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 97
     rowUnit: xlsx-row
   detailRange: A133:B145
   change: 유지
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 135
       rowUnit: xlsx-row
     fields:
@@ -6823,14 +6897,14 @@ specs:
   requirementIds:
   - '64'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 98
     rowUnit: xlsx-row
   detailRange: A147:B159
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 149
       rowUnit: xlsx-row
     fields:
@@ -6894,23 +6968,27 @@ specs:
   requirementIds:
   - '65'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 99
     rowUnit: xlsx-row
   detailRange: A161:B173
   change: 검증 기준 보완
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv
       row: 163
       rowUnit: xlsx-row
     fields:
       요구사항명: 정기 갱신 반영 시간 보장
-      요구사항 설명: 정상 운영 시 시스템은 한국 시간 기준 매시 05분에 시작한 회차의 공개 대상 결과를 해당 시각 10분까지, 매시 35분에
-        시작한 회차의 결과를 해당 시각 40분까지 조회 가능하게 해야 한다. 완료 여부는 저장소 반영만이 아니라, 메인 그래프와 기업 상세페이지
-        조회에서 해당 새 결과를 확인할 수 있는지를 기준으로 판단해야 한다.
-      적용 대상·범위: 정상 운영 중 한국 시간 매시 05분·35분에 시작하는 경제뉴스 수집·분석 회차의 공개 대상 결과. 메인 그래프와 기업
-        상세페이지의 조회 반영을 모두 포함한다.
+      요구사항 설명: '[운영 적용 범위: Asia/Seoul 09:00 이상 18:00 미만에 예정된 매시 05분·35분 정기 회차.]
+
+        정상 운영 시 시스템은 한국 시간 기준 매시 05분에 시작한 회차의 공개 대상 결과를 해당 시각 10분까지, 매시 35분에 시작한 회차의
+        결과를 해당 시각 40분까지 조회 가능하게 해야 한다. 완료 여부는 저장소 반영만이 아니라, 메인 그래프와 기업 상세페이지 조회에서
+        해당 새 결과를 확인할 수 있는지를 기준으로 판단해야 한다.'
+      적용 대상·범위: '[운영 적용 범위: Asia/Seoul 09:00 이상 18:00 미만에 예정된 매시 05분·35분 정기 회차.]
+
+        정상 운영 중 한국 시간 매시 05분·35분에 시작하는 경제뉴스 수집·분석 회차의 공개 대상 결과. 메인 그래프와 기업 상세페이지의
+        조회 반영을 모두 포함한다.'
       적용 조건·검증 입력: '한국 시간 기준 예정 시작·실제 시작 시각, 회차 식별자, 공개 대상 결과·공개 버전과 처리 상태, 두 화면의
         기업·기간·선택 조건, 각 조회 경로의 확인 시각.
 
@@ -6919,8 +6997,10 @@ specs:
 
         회차별 기사·문서 수, 문서 길이의 단위와 분포, 분석 대상 수, 동시 처리 조건 및 시험환경을 기록한다. 실제 시험 처리량과 승인할
         예상 운영범위를 구분한다.'
-      품질 목표·준수 규칙: '1. 한국 시간 매시 05분 예정 회차는 10분까지, 35분 예정 회차는 40분까지 공개 대상 새 결과를 메인
-        그래프와 기업 상세의 새 조회에서 확인할 수 있어야 한다. 시작이 늦어져도 기한을 임의 연장하지 않는다.
+      품질 목표·준수 규칙: '[운영 적용 범위: Asia/Seoul 09:00 이상 18:00 미만에 예정된 매시 05분·35분 정기 회차.]
+
+        1. 한국 시간 매시 05분 예정 회차는 10분까지, 35분 예정 회차는 40분까지 공개 대상 새 결과를 메인 그래프와 기업 상세의
+        새 조회에서 확인할 수 있어야 한다. 시작이 늦어져도 기한을 임의 연장하지 않는다.
 
         2. 저장 완료만으로 달성 판정하지 않는다. 두 조회 경로의 준비를 확인한 공통 공개 버전을 사용하며 각 화면의 기업·기간·선택 조건에
         맞는 결과를 확인한다.
@@ -6947,8 +7027,14 @@ specs:
         기한 초과·시작 지연·장애: 실제 지연과 미완료 상태를 기록한다. 필요한 저장·조회 반영 단계만 복구하며 기한 달성을 위해 AI 분석이나
         미검증 결과 공개를 반복하지 않는다.
 
-        관측 누락: 기한 내 반영 여부는 확인 불가로 표시한다. 늦게 확인된 결과를 기한 내 완료로 소급하지 않는다.'
-      검증 방법: '1. 예상 운영범위의 기사·문서 수, 문서 길이, 분석 대상 수와 동시 처리 조건으로 시험한다. 시험환경·실제 처리량, 05분·35분
+        관측 누락: 기한 내 반영 여부는 확인 불가로 표시한다. 늦게 확인된 결과를 기한 내 완료로 소급하지 않는다.
+
+        계획 비운영 시간에는 정기 회차의 10분·40분 SLA를 적용하지 않는다. 기동 후 야간 backlog 복구는 별도 회차/사유로 추적한다.
+        운영 구간 정기 회차가 기동/시작 지연으로 늦어진 경우 실제 예정·시작·반영 시각을 남기며 기한을 임의 연장하거나 정상 달성으로 기록하지
+        않는다.'
+      검증 방법: '[운영 적용 범위: Asia/Seoul 09:00 이상 18:00 미만에 예정된 매시 05분·35분 정기 회차.]
+
+        1. 예상 운영범위의 기사·문서 수, 문서 길이, 분석 대상 수와 동시 처리 조건으로 시험한다. 시험환경·실제 처리량, 05분·35분
         회차의 예정·실제 시작과 마감, 공개 대상·공개 버전을 기록한다.
 
         2. 대상 결과가 조회되는 기업·기간 조건으로 메인 그래프와 기업 상세를 새로 조회하여 각 확인 시각·회차·공개 버전을 대조한다.
@@ -6977,7 +7063,10 @@ specs:
       확인 필요 사항: '[확인 필요: 예상 운영 처리량 범위(기사·문서 수·문서 길이·분석 대상 수·동시 처리)와 대표 시험환경을 최종 완료
         검증 조건으로 확정 필요. 처리량 수치를 임의로 정하거나 기한을 완화하지 않는다]
 
-        [확인 필요: 실제 확인 간격·대상 표본 범위·회차별 공개 대상 확정 시점·장애 분류·경보 및 복구 운영 기준 검증 필요]'
+        [확인 필요: 실제 확인 간격·대상 표본 범위·회차별 공개 대상 확정 시점·장애 분류·경보 및 복구 운영 기준 검증 필요]
+
+        운영 구간은 정기 회차 예정 시작 시각으로 판단한다. 야간 backlog 복구의 완료 목표·정기 회차와의 자원 경합·브리핑 입력 준비
+        기준은 실측 후 확정한다. 09:20·17:30은 별도 브리핑 생성 일정이며 이 10분·40분 조회 반영 기한을 대체하지 않는다.'
     heading:
       row: 161
       text: NFS012  정기 갱신 반영 시간 보장
@@ -6993,22 +7082,22 @@ specs:
   - '70'
   - '75'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 100
     rowUnit: xlsx-row
   detailRange: A166:B178
   change: 파이프라인 상세 추가 · FS058·FS063 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 168
       rowUnit: xlsx-row
     fields:
       기능명: 뉴스·공시 수집 및 수집 회차 관리
       기능 설명: 메인 그래프 분석에 사용할 뉴스·공시의 신규·수정 문서를 수집한다. FS058의 회차 관리와 FS063의 공급원 연동을 재사용하며,
         별도 수집기를 중복 구현하지 않는다. AI는 공급원 연동·수집을, 백엔드 B는 후속 처리에 필요한 문서 계약·상태 연계를 담당한다.
-      선행조건: 이용 권한과 제공 범위가 확인된 공급원이 있고, FS058의 한국 시간 매시 05분·35분 회차 또는 허용된 실패 회차 재처리가
-        시작된다.
+      선행조건: 이용 권한과 제공 범위가 확인된 공급원이 있고, FS058의 한국 시간 운영 구간(09:00 이상 18:00 미만)의 매시 05분·35분
+        회차 또는 허용된 실패 회차 재처리가 시작된다.
       입력값: 회차 ID, 공급원·문서 ID, 조회 범위·페이지·변경 커서, 직전 성공 기준, 원문 URL·제목·본문, 발행·등록/수정·관측
         시각.
       입력·검증 규칙: '조회 범위의 필수 페이지와 문서 저장이 모두 완료된 경우만 수집 성공으로 기록한다.
@@ -7032,7 +7121,10 @@ specs:
 
         2. 동일 회차 재시도 시 완료 문서가 중복되지 않고 미완료 범위만 복구된다.
 
-        3. 정상 0건과 장애가 구분되고, 수집 완료가 분석·공개 완료로 표시되지 않는다.'
+        3. 정상 0건과 장애가 구분되고, 수집 완료가 분석·공개 완료로 표시되지 않는다.
+
+        4. 운영 시간 밖에는 정기 실행이 시작되지 않고 다음 기동 시 마지막 성공 커서/검증된 겹침 범위·문서 중복 제거 키로 야간 미완료
+        범위를 복구한다. 별도 수집기를 만들지 않고 FS058을 재사용한다.'
       확인 필요 사항: '공급처·이용 조건·페이지/커서 지원·겹침 재조회 범위는 기존 FS058·FS063의 미정 사항을 유지한다.
 
         추가 명세이며 구현·테스트 통과 또는 팀 승인 완료를 의미하지 않는다. 상세 일정·가중치는 기존 연계 업무와 중복 없이 산정한다.'
@@ -7050,14 +7142,14 @@ specs:
   - '68'
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 101
     rowUnit: xlsx-row
   detailRange: A180:B192
   change: 파이프라인 상세 추가 · FS056·FS058 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 182
       rowUnit: xlsx-row
     fields:
@@ -7107,14 +7199,14 @@ specs:
   - '70'
   - '76'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 102
     rowUnit: xlsx-row
   detailRange: A194:B206
   change: 파이프라인 상세 추가 · FS056·FS058·FS064 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 196
       rowUnit: xlsx-row
     fields:
@@ -7163,14 +7255,14 @@ specs:
   - '68'
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 103
     rowUnit: xlsx-row
   detailRange: A208:B220
   change: 파이프라인 상세 추가 · FS056·FS058 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 210
       rowUnit: xlsx-row
     fields:
@@ -7221,14 +7313,14 @@ specs:
   - '67'
   - '70'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 104
     rowUnit: xlsx-row
   detailRange: A222:B234
   change: 파이프라인 상세 추가 · FS055·FS058 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 224
       rowUnit: xlsx-row
     fields:
@@ -7283,14 +7375,14 @@ specs:
   - '70'
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 105
     rowUnit: xlsx-row
   detailRange: A236:B248
   change: 파이프라인 상세 추가 · FS021·FS055·FS058·FS067-02 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 238
       rowUnit: xlsx-row
     fields:
@@ -7345,14 +7437,14 @@ specs:
   - '67'
   - '71'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 106
     rowUnit: xlsx-row
   detailRange: A250:B262
   change: 파이프라인 상세 추가 · FS055·FS059 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 252
       rowUnit: xlsx-row
     fields:
@@ -7411,14 +7503,14 @@ specs:
   - '71'
   - '79'
   source:
-    path: docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv
+    path: docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv
     row: 107
     rowUnit: xlsx-row
   detailRange: A264:B276
   change: 파이프라인 상세 추가 · FS055·FS058·FS059·FS067-03 연계
   definitions:
   - source:
-      path: docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv
+      path: docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv
       row: 266
       rowUnit: xlsx-row
     fields:

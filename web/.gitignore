@@ -28,3 +28,6 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Local HTTPS certificates for the dev server (see vite.config.ts)
+.cert

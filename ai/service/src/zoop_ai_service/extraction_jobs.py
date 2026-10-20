@@ -55,7 +55,7 @@ MAX_PENDING = 1000
 CLI_SLOTS = 4
 BUSY_WAIT = 10.0
 CONFIG_CODES = frozenset({"input_or_configuration_invalid", "persistence_failed", "extraction_internal_failure", "ledger_version_unknown",
-                          "poc_contract_changed", "pinned_poc_unavailable", "state_ownership_unconfigured", "replay_fixture_invalid",
+                          "analysis_contract_changed", "state_ownership_unconfigured", "replay_fixture_invalid",
                           "replay_fixture_required", "replay_provenance_conflict", "replay_prompt_version_conflict", "live_mode_unsupported",
                           "fixture_not_allowed", "command_input_limit"})
 

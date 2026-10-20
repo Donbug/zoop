@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:19 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:19 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/02-온보딩-튜토리얼.csv) — 가상계좌 연결 재시도와 건너뛰기: 회원은 가상계좌 연결을 건너뛰고 관심종목을 선택할 수 있어야 한다. 연결 실패 시에는 실패 안내와 함께 다시 시도하거나 관심종목 선택으로 진행할 수 있어야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/02-온보딩-튜토리얼.csv) — 가상계좌 연결 재시도와 건너뛰기: 회원은 가상계좌 연결을 건너뛰고 관심종목을 선택할 수 있어야 한다. 연결 실패 시에는 실패 안내와 함께 다시 시도하거나 관심종목 선택으로 진행할 수 있어야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:183 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
@@ -34,9 +34,10 @@
 
 ## 화면·목표 API
 
-[D-ONB-01](screen-D-ONB-01.md) · [D-ONB-02](screen-D-ONB-02.md) · [D-WAT-01](screen-D-WAT-01.md) · [D-WAT-01b](screen-D-WAT-01b.md)
+[D-ONB-01](screen-D-ONB-01.md) · [D-ONB-02](screen-D-ONB-02.md) · [D-WAT-01](screen-D-WAT-01.md) · [D-WAT-01b](screen-D-WAT-01b.md) · [D-COM-01](screen-D-COM-01.md) · [D-MY-01](screen-D-MY-01.md) · [M-COM-01](screen-M-COM-01.md)
 
 | 작업 | 메서드·목표 경로 | WBS | 권한 |
 | --- | --- | --- | --- |
 | [updateMySettings](../../api/out/zoop-api-spec.md#updatemysettings) | PUT /api/v1/me/settings | 6.1.2, 6.11.1, 6.3.1, 6.3.2, 6.3.4, 6.3.5, 6.3.8, 6.3.9, 6.4.5 | 회원(본인) |
 | [connectVirtualAccount](../../api/out/zoop-api-spec.md#connectvirtualaccount) | POST /api/v1/portfolio/connections | 6.1.2, 6.11.1, 6.3.2, 6.3.9, 6.4.4, 6.4.6 | 회원(본인) |
+| [getMyPortfolio](../../api/out/zoop-api-spec.md#getmyportfolio) | GET /api/v1/portfolio | 6.1.2, 6.11.1, 6.3.2, 6.4.1, 6.4.3, 6.4.4, 6.4.6, 6.7.8 | 회원(본인) |

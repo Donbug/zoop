@@ -53,8 +53,8 @@ export type CompanyQuote =
         dayHigh: number | null;
         dayLow: number | null;
         volume: number | null;
-        week52High: number | null;
-        week52Low: number | null;
+        fiftyTwoWeekHigh: number | null;
+        fiftyTwoWeekLow: number | null;
       };
     };
 

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import GraphIcon from '@/components/graph/GraphIcon';
-import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
+import AccountMenu from './AccountMenu';
 import './service-shell.css';
 
 const menus = [
@@ -16,8 +16,6 @@ export default function ServiceHeader({
 }: {
   navLabel?: string;
 }) {
-  const token = useAuthStore(selectMemberId);
-  const member = useAuthStore((s) => s.member);
   return (
     <header className="relationship-header">
       <NavLink to="/" className="relationship-logo">
@@ -47,13 +45,7 @@ export default function ServiceHeader({
             <GraphIcon name={icon} size={16} />
           </button>
         ))}
-        <NavLink to={token ? '/my' : '/login'} className="relationship-user">
-          <span>
-            <GraphIcon name="user" />
-          </span>
-          {token ? (member?.displayName ?? '회원') : '로그인'}
-          <GraphIcon name="chevron" size={12} />
-        </NavLink>
+        <AccountMenu />
       </div>
     </header>
   );

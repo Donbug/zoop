@@ -31,6 +31,8 @@ public class AuthOriginInterceptor implements HandlerInterceptor {
                 rates.recordSignupIpAttempt(ip);
             } else if ("/api/v1/auth/login".equals(path)) {
                 rates.recordLoginIpAttempt(ip);
+            } else if ("/api/v1/admin/auth/login".equals(path)) {
+                rates.recordAdminLoginIpAttempt(ip);
             }
         }
         return true;

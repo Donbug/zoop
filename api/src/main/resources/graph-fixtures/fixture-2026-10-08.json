@@ -1,0 +1,462 @@
+{
+  "snapshotFormat": 3,
+  "versionId": "fixture-2026-10-08",
+  "sourceBundleId": null,
+  "companies": [
+    {
+      "companyId": "KRX:005930",
+      "label": "삼성전자",
+      "brandColor": "#1428A0",
+      "logoUrl": null
+    },
+    {
+      "companyId": "KRX:000660",
+      "label": "SK하이닉스",
+      "brandColor": null,
+      "logoUrl": null
+    },
+    {
+      "companyId": "NASDAQ:NVDA",
+      "label": "NVIDIA",
+      "brandColor": "#76B900",
+      "logoUrl": null
+    },
+    {
+      "companyId": "NYSE:TSM",
+      "label": "TSMC",
+      "brandColor": null,
+      "logoUrl": null
+    },
+    {
+      "companyId": "NASDAQ:ASML",
+      "label": "ASML",
+      "brandColor": null,
+      "logoUrl": null
+    },
+    {
+      "companyId": "KRX:042700",
+      "label": "한미반도체",
+      "brandColor": null,
+      "logoUrl": null
+    },
+    {
+      "companyId": "NASDAQ:AMD",
+      "label": "AMD",
+      "brandColor": "#ED1C24",
+      "logoUrl": null
+    }
+  ],
+  "issues": [
+    {
+      "issueId": "iss-fixture-hbm-supply",
+      "label": "[합성] 차세대 GPU용 HBM 공급 계약",
+      "eventTime": "2026-09-22",
+      "timePrecision": "day",
+      "action": "공급 계약",
+      "target": "HBM",
+      "geography": "international",
+      "geographyPolicyVersion": "fixture-geo-1",
+      "geographyEvidenceIds": [
+        "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395"
+      ],
+      "articleIds": [
+        "art-hbm-supply"
+      ],
+      "evidenceIds": [
+        "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395",
+        "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"
+      ],
+      "assertionStatus": "occurred",
+      "mentions": [
+        {
+          "mentionId": "men-fixture-hbm-supply-1",
+          "articleId": "art-hbm-supply",
+          "articleVersion": "v1"
+        }
+      ],
+      "representativeMentionId": "men-fixture-hbm-supply-1",
+      "latestPublishedAt": "2026-09-22T01:00:00Z"
+    },
+    {
+      "issueId": "iss-fixture-hbm-equip",
+      "label": "[합성] HBM 생산 장비 증설 발표",
+      "eventTime": "2026-09-25",
+      "timePrecision": "day",
+      "action": "증설",
+      "target": "HBM 장비",
+      "geography": "domestic",
+      "geographyPolicyVersion": "fixture-geo-1",
+      "geographyEvidenceIds": [
+        "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c"
+      ],
+      "articleIds": [
+        "art-hbm-equip"
+      ],
+      "evidenceIds": [
+        "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c",
+        "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf"
+      ],
+      "assertionStatus": "announced",
+      "mentions": [
+        {
+          "mentionId": "men-fixture-hbm-equip-1",
+          "articleId": "art-hbm-equip",
+          "articleVersion": "v1"
+        }
+      ],
+      "latestPublishedAt": "2026-09-25"
+    },
+    {
+      "issueId": "iss-fixture-euv-export",
+      "label": "[합성] EUV 장비 수출 규제 강화",
+      "eventTime": "2026-09",
+      "timePrecision": "month",
+      "action": "규제 강화",
+      "target": "EUV 장비",
+      "geography": "international",
+      "geographyPolicyVersion": "fixture-geo-1",
+      "geographyEvidenceIds": [
+        "ev-63f463a0464041f09503f04f07ff1f660a0a5628a3507b4732a44ec95cbc5bd8"
+      ],
+      "articleIds": [
+        "art-euv-export"
+      ],
+      "evidenceIds": [
+        "ev-63f463a0464041f09503f04f07ff1f660a0a5628a3507b4732a44ec95cbc5bd8",
+        "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62",
+        "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e"
+      ],
+      "period": "2026Q4",
+      "assertionStatus": "announced",
+      "mentions": [
+        {
+          "mentionId": "men-fixture-euv-export-1",
+          "articleId": "art-euv-export",
+          "articleVersion": "v1"
+        },
+        {
+          "mentionId": "men-fixture-euv-export-2",
+          "articleId": "art-euv-export",
+          "articleVersion": "v1"
+        }
+      ],
+      "representativeMentionId": "men-fixture-euv-export-1",
+      "latestPublishedAt": "2026-09-28T03:30:00Z"
+    },
+    {
+      "issueId": "iss-fixture-ai-accel",
+      "label": "[합성] AI 가속기 신제품 출시",
+      "eventTime": "2026-10-05",
+      "timePrecision": "day",
+      "action": "출시",
+      "target": "AI 가속기",
+      "geography": "international",
+      "geographyPolicyVersion": "fixture-geo-1",
+      "geographyEvidenceIds": [
+        "ev-3dfec567fd2b09acb8f7f37802f212e506fa2373d2dda8cd2a940cd9f21484fc"
+      ],
+      "articleIds": [
+        "art-ai-accel"
+      ],
+      "evidenceIds": [
+        "ev-3dfec567fd2b09acb8f7f37802f212e506fa2373d2dda8cd2a940cd9f21484fc",
+        "ev-ad0886d0b329f92985f80ed213d6a2b204c804c0240f311e32b02a7fb4c0a500"
+      ],
+      "assertionStatus": "occurred",
+      "mentions": [
+        {
+          "mentionId": "men-fixture-ai-accel-1",
+          "articleId": "art-ai-accel",
+          "articleVersion": "v1"
+        }
+      ],
+      "latestPublishedAt": "2026-10-05T09:00:00Z"
+    }
+  ],
+  "relations": [
+    {
+      "relationId": "rel-fixture-01",
+      "relationType": "INVOLVES",
+      "source": "iss-fixture-hbm-supply",
+      "target": "NASDAQ:NVDA",
+      "role": "구매",
+      "assertionStatus": "occurred",
+      "evidenceIds": [
+        "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395"
+      ],
+      "basis": []
+    },
+    {
+      "relationId": "rel-fixture-02",
+      "relationType": "INVOLVES",
+      "source": "iss-fixture-hbm-supply",
+      "target": "KRX:000660",
+      "role": "공급",
+      "assertionStatus": "occurred",
+      "evidenceIds": [
+        "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421"
+      ],
+      "basis": []
+    },
+    {
+      "relationId": "rel-fixture-03",
+      "relationType": "INVOLVES",
+      "source": "iss-fixture-hbm-equip",
+      "target": "KRX:042700",
+      "role": "장비 공급",
+      "assertionStatus": "announced",
+      "evidenceIds": [
+        "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c"
+      ],
+      "basis": []
+    },
+    {
+      "relationId": "rel-fixture-04",
+      "relationType": "STRUCTURALLY_RELATED_TO",
+      "source": "iss-fixture-hbm-equip",
+      "target": "KRX:000660",
+      "role": null,
+      "assertionStatus": null,
+      "evidenceIds": [
+        "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf"
+      ],
+      "basis": [
+        {
+          "basisId": "basis-fixture-04",
+          "relationType": "SUPPLIES",
+          "verifiedAt": "2026-09-29T00:00:00Z",
+          "validFrom": "2026-09-01",
+          "validUntil": null,
+          "countries": [
+            "KR"
+          ],
+          "articles": [
+            {
+              "articleId": "art-hbm-equip",
+              "articleVersion": "v1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "relationId": "rel-fixture-05",
+      "relationType": "INVOLVES",
+      "source": "iss-fixture-euv-export",
+      "target": "NASDAQ:ASML",
+      "role": "규제 대상",
+      "assertionStatus": "announced",
+      "evidenceIds": [
+        "ev-63f463a0464041f09503f04f07ff1f660a0a5628a3507b4732a44ec95cbc5bd8"
+      ],
+      "basis": []
+    },
+    {
+      "relationId": "rel-fixture-06",
+      "relationType": "STRUCTURALLY_RELATED_TO",
+      "source": "iss-fixture-euv-export",
+      "target": "NYSE:TSM",
+      "role": null,
+      "assertionStatus": null,
+      "evidenceIds": [
+        "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62"
+      ],
+      "basis": [
+        {
+          "basisId": "basis-fixture-06",
+          "relationType": "USES",
+          "verifiedAt": "2026-09-29T00:00:00Z",
+          "validFrom": "2026-09-01",
+          "validUntil": null,
+          "countries": [
+            "TW",
+            "NL"
+          ],
+          "articles": [
+            {
+              "articleId": "art-euv-export",
+              "articleVersion": "v1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "relationId": "rel-fixture-07",
+      "relationType": "STRUCTURALLY_RELATED_TO",
+      "source": "iss-fixture-euv-export",
+      "target": "KRX:005930",
+      "role": null,
+      "assertionStatus": null,
+      "evidenceIds": [
+        "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e"
+      ],
+      "basis": [
+        {
+          "basisId": "basis-fixture-07",
+          "relationType": "USES",
+          "verifiedAt": "2026-09-29T00:00:00Z",
+          "validFrom": "2026-09-01",
+          "validUntil": null,
+          "countries": [
+            "KR",
+            "NL"
+          ],
+          "articles": [
+            {
+              "articleId": "art-euv-export",
+              "articleVersion": "v1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "relationId": "rel-fixture-08",
+      "relationType": "FOLLOWS",
+      "source": "iss-fixture-hbm-equip",
+      "target": "iss-fixture-hbm-supply",
+      "role": null,
+      "assertionStatus": null,
+      "evidenceIds": [],
+      "basis": []
+    },
+    {
+      "relationId": "rel-fixture-09",
+      "relationType": "INVOLVES",
+      "source": "iss-fixture-ai-accel",
+      "target": "NASDAQ:AMD",
+      "role": "출시",
+      "assertionStatus": "occurred",
+      "evidenceIds": [
+        "ev-3dfec567fd2b09acb8f7f37802f212e506fa2373d2dda8cd2a940cd9f21484fc"
+      ],
+      "basis": []
+    },
+    {
+      "relationId": "rel-fixture-10",
+      "relationType": "STRUCTURALLY_RELATED_TO",
+      "source": "iss-fixture-ai-accel",
+      "target": "NYSE:TSM",
+      "role": null,
+      "assertionStatus": null,
+      "evidenceIds": [
+        "ev-ad0886d0b329f92985f80ed213d6a2b204c804c0240f311e32b02a7fb4c0a500"
+      ],
+      "basis": [
+        {
+          "basisId": "basis-fixture-10",
+          "relationType": "PRODUCES",
+          "verifiedAt": "2026-09-29T00:00:00Z",
+          "validFrom": "2026-09-01",
+          "validUntil": null,
+          "countries": [
+            "TW",
+            "US"
+          ],
+          "articles": [
+            {
+              "articleId": "art-ai-accel",
+              "articleVersion": "v1"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "articles": [
+    {
+      "articleId": "art-hbm-supply",
+      "version": "v1",
+      "title": "[합성] HBM 공급 계약 보도",
+      "url": "https://example.invalid/zoop-fixture/art-hbm-supply",
+      "publishedAt": "2026-09-22T01:00:00Z"
+    },
+    {
+      "articleId": "art-hbm-equip",
+      "version": "v1",
+      "title": "[합성] HBM 장비 증설 보도",
+      "url": "https://example.invalid/zoop-fixture/art-hbm-equip",
+      "publishedAt": "2026-09-25"
+    },
+    {
+      "articleId": "art-euv-export",
+      "version": "v1",
+      "title": "[합성] EUV 장비 수출 규제 보도",
+      "url": "https://example.invalid/zoop-fixture/art-euv-export",
+      "publishedAt": "2026-09-28T03:30:00Z"
+    },
+    {
+      "articleId": "art-ai-accel",
+      "version": "v1",
+      "title": "[합성] AI 가속기 신제품 출시 보도",
+      "url": "https://example.invalid/zoop-fixture/art-ai-accel",
+      "publishedAt": "2026-10-05T09:00:00Z"
+    }
+  ],
+  "evidence": [
+    {
+      "evidenceId": "ev-912843a071ee90c12ee7e909c65f06ce748d2a35c7c29c6c871faac130e4f395",
+      "articleId": "art-hbm-supply",
+      "articleVersion": "v1",
+      "start": 0,
+      "end": 40
+    },
+    {
+      "evidenceId": "ev-bb3008cb36e9b51c0d2fd77af059259332b1887cc04862e185a496c3dcc9e421",
+      "articleId": "art-hbm-supply",
+      "articleVersion": "v1",
+      "start": 41,
+      "end": 90
+    },
+    {
+      "evidenceId": "ev-e194f2923147a4df39496036f54d7a335eaea21b9706941a05417c2aa2c7833c",
+      "articleId": "art-hbm-equip",
+      "articleVersion": "v1",
+      "start": 0,
+      "end": 55
+    },
+    {
+      "evidenceId": "ev-fd9d18853fde470f24184b7db11e534270c580072fc0ca877323825a751c94bf",
+      "articleId": "art-hbm-equip",
+      "articleVersion": "v1",
+      "start": 56,
+      "end": 120
+    },
+    {
+      "evidenceId": "ev-63f463a0464041f09503f04f07ff1f660a0a5628a3507b4732a44ec95cbc5bd8",
+      "articleId": "art-euv-export",
+      "articleVersion": "v1",
+      "start": 0,
+      "end": 60
+    },
+    {
+      "evidenceId": "ev-2efb74012127277470344892d9ba439c77a42180b4538d86c319d643bfefbc62",
+      "articleId": "art-euv-export",
+      "articleVersion": "v1",
+      "start": 61,
+      "end": 130
+    },
+    {
+      "evidenceId": "ev-d2cb5acbc5dc430d53378e9dcdc47549436b0a7c48011ef79314fd1e188cd50e",
+      "articleId": "art-euv-export",
+      "articleVersion": "v1",
+      "start": 131,
+      "end": 180
+    },
+    {
+      "evidenceId": "ev-3dfec567fd2b09acb8f7f37802f212e506fa2373d2dda8cd2a940cd9f21484fc",
+      "articleId": "art-ai-accel",
+      "articleVersion": "v1",
+      "start": 0,
+      "end": 50
+    },
+    {
+      "evidenceId": "ev-ad0886d0b329f92985f80ed213d6a2b204c804c0240f311e32b02a7fb4c0a500",
+      "articleId": "art-ai-accel",
+      "articleVersion": "v1",
+      "start": 51,
+      "end": 110
+    }
+  ]
+}

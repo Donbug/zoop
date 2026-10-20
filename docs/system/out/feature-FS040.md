@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:50 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:50 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 차트와 타임라인 기간 조회: 시스템은 기업별 1일, 1주, 1개월, 1년 기간을 제공한다. 사용자가 차트 또는 타임라인에서 기준 시점을 선택하면 해당 시점까지 공개·유효한 이슈를 함께 표시한다. 기본 기간은 1개월, 기본 기준 시점은 최신 제공 시점이다.
+- [docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv) — 차트와 타임라인 기간 조회: 시스템은 기업별 1일, 1주, 1개월, 1년 기간을 제공한다. 사용자가 차트 또는 타임라인에서 기준 시점을 선택하면 해당 시점까지 공개·유효한 이슈를 함께 표시한다. 기본 기간은 1개월, 기본 기준 시점은 최신 제공 시점이다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:84 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

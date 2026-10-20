@@ -1,0 +1,21 @@
+# Opt-in local HTTP browser testing only. Activate with SPRING_PROFILES_ACTIVE=local.
+zoop:
+  api:
+    cors:
+      # The frontend crosses origins; API-hosted Swagger UI does not.
+      allowed-origins: ${ZOOP_API_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  auth:
+    # Include the frontend and API origins so browser forms and API-hosted Swagger UI can exercise auth writes.
+    # Override the list when local ports differ. These values are never active without the local profile.
+    allowed-origins: ${ZOOP_AUTH_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+    allow-http-loopback-origins: true
+    session-cookie-secure: false
+    social:
+      frontend-origin: ${ZOOP_AUTH_SOCIAL_FRONTEND_ORIGIN:http://localhost:5173}
+
+springdoc:
+  api-docs:
+    enabled: ${ZOOP_SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${ZOOP_SWAGGER_ENABLED:true}
+    path: /swagger-ui.html

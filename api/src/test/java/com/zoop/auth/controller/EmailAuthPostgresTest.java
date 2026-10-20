@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "DB_URL", matches = "jdbc:postgresql:.*")
 @Tag("auth-postgres")
 class EmailAuthPostgresTest {
-    private static final String PASSWORD = "correct horse battery staple 2026";
+    private static final String PASSWORD = "correct horse battery staple";
     private static final String ORIGIN = "https://zoop.example";
 
     @Autowired WebApplicationContext context;
@@ -119,6 +119,16 @@ class EmailAuthPostgresTest {
                     .andReturn();
             String loginToken = token(relogin);
             assertNotEquals(signupToken, loginToken);
+            var loginResponse = json.readTree(relogin.getResponse().getContentAsString());
+            var sessionResponse = json.readTree(mvc.perform(get("/api/v1/auth/session")
+                            .cookie(new Cookie("zoop_session", loginToken)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.kind").value("member"))
+                    .andReturn().getResponse().getContentAsString());
+            assertEquals(loginResponse.path("user"), sessionResponse.path("user"));
+            assertEquals(loginResponse.path("setup"), sessionResponse.path("setup"));
+            assertFalse(sessionResponse.path("setup").path("completed").asBoolean());
+            assertFalse(sessionResponse.path("setup").path("tutorialCompleted").asBoolean());
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_rate_events WHERE scope = 'login_email_failure' AND subject_hash = ?",
                     Integer.class, subjectHash("login_email_failure", email)));
             mvc.perform(get("/api/v1/auth/session").cookie(new Cookie("zoop_session", signupToken)))
@@ -135,6 +145,44 @@ class EmailAuthPostgresTest {
                             .contentType(MediaType.APPLICATION_JSON).content(loginJson(email, PASSWORD)))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.error.code").value("MEMBER_BLOCKED"));
+        } finally {
+            cleanup(email);
+        }
+    }
+
+    @Test
+    void loginAndSessionReturnLatestCompletedSetupState() throws Exception {
+        String email = "setup-complete-" + UUID.randomUUID() + "@example.com";
+        String ip = remoteIp();
+        try {
+            var signup = mvc.perform(post("/api/v1/auth/signup").with(remote(ip))
+                            .header("Origin", ORIGIN)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(signupJson(email, currentAgreements())))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.setup.completed").value(false))
+                    .andReturn();
+            String memberId = json.readTree(signup.getResponse().getContentAsString())
+                    .path("user").path("id").asText();
+            jdbc.update("UPDATE members SET completed = true, tutorial_completed = true WHERE id = ?", memberId);
+
+            var login = mvc.perform(post("/api/v1/auth/login").with(remote(ip))
+                            .header("Origin", ORIGIN)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginJson(email, PASSWORD)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.kind").value("member"))
+                    .andExpect(jsonPath("$.setup.completed").value(true))
+                    .andExpect(jsonPath("$.setup.tutorialCompleted").value(true))
+                    .andReturn();
+            var loginResponse = json.readTree(login.getResponse().getContentAsString());
+            var sessionResponse = json.readTree(mvc.perform(get("/api/v1/auth/session")
+                            .cookie(new Cookie("zoop_session", token(login))))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+
+            assertEquals(loginResponse.path("user"), sessionResponse.path("user"));
+            assertEquals(loginResponse.path("setup"), sessionResponse.path("setup"));
         } finally {
             cleanup(email);
         }

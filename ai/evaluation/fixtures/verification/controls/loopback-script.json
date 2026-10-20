@@ -1,0 +1,622 @@
+{
+ "schema": "zoop-verify-loopback-script-1",
+ "kind": "authored_control_not_a_model",
+ "corpusId": "fin-verify-ko-v1",
+ "inputsSha256": "cf368670e081cb022f6b1557e92d1667b52f63139014b88c75a3925fb57c0c81",
+ "note": "Scripted answers for a local fake native server. Authored from the gold plus explicit deviations: a harness control, never a model.",
+ "entries": [
+  {
+   "caseId": "VK-01",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 260,
+    "outputTokens": 24
+   }
+  },
+  {
+   "caseId": "VK-02",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-03",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.85,
+     "confidence": 0.9
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-04",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-05",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.55,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-06",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.96,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-07",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 260,
+    "outputTokens": 24
+   }
+  },
+  {
+   "caseId": "VK-08",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 220,
+    "outputTokens": 16
+   }
+  },
+  {
+   "caseId": "VK-09",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.93,
+     "confidence": 0.9
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-10",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 260,
+    "outputTokens": 24
+   }
+  },
+  {
+   "caseId": "VK-11",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 220,
+    "outputTokens": 16
+   }
+  },
+  {
+   "caseId": "VK-12",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-13",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "insufficient",
+     "p": 0.8,
+     "confidence": 0.7
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-14",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 260,
+    "outputTokens": 24
+   }
+  },
+  {
+   "caseId": "VK-15",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 220,
+    "outputTokens": 16
+   }
+  },
+  {
+   "caseId": "VK-16",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.96,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-17",
+   "scenario": "model_mismatch",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   },
+   "model": "jev-latest"
+  },
+  {
+   "caseId": "VK-18",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-19",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-20",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.96,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-21",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-22",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 220,
+    "outputTokens": 16
+   }
+  },
+  {
+   "caseId": "VK-23",
+   "scenario": "http_error",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.96,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   },
+   "status": 500
+  },
+  {
+   "caseId": "VK-24",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-25",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 220,
+    "outputTokens": 16
+   }
+  },
+  {
+   "caseId": "VK-26",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "contradicted",
+     "p": 0.96,
+     "confidence": 0.92
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-27",
+   "scenario": "non_json",
+   "claims": [
+    {
+     "choice": "insufficient",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  },
+  {
+   "caseId": "VK-28",
+   "scenario": "answers",
+   "claims": [
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    },
+    {
+     "choice": "supported",
+     "p": 0.97,
+     "confidence": 0.93
+    }
+   ],
+   "prohibited": 0.02,
+   "causality": 0.03,
+   "usage": {
+    "inputTokens": 240,
+    "outputTokens": 20
+   }
+  }
+ ]
+}

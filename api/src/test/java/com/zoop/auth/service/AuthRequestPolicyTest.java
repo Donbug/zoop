@@ -33,6 +33,23 @@ class AuthRequestPolicyTest {
     }
 
     @Test
+    void httpOriginsAreAcceptedOnlyForExplicitLoopbackDevelopmentPolicy() {
+        var policy = new AuthOriginPolicy("http://localhost:3000,http://localhost:8080", true);
+        var request = new MockHttpServletRequest();
+        request.addHeader("Origin", "http://localhost:3000");
+        policy.verify(request);
+        request.removeHeader("Origin");
+        request.addHeader("Origin", "http://localhost:8080");
+        policy.verify(request);
+
+        assertThrows(IllegalArgumentException.class, () -> new AuthOriginPolicy("http://localhost:3000"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AuthOriginPolicy("http://192.168.1.10:3000", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AuthOriginPolicy("http://localhost.evil:3000", true));
+    }
+
+    @Test
     void forwardedIpIsUsedOnlyWhenEveryCloserHopIsTrusted() {
         var resolver = new AuthClientIpResolver("192.0.2.10,192.0.2.11");
         var request = new MockHttpServletRequest();

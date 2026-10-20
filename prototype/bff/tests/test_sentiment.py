@@ -247,6 +247,50 @@ def test_received_attempt_import_advances_state_and_usage_without_duplicate_char
             verify["usage"]["inputTokens"], verify["usage"]["outputTokens"]) == (1, 0, 1, 13, 5)
 
 
+def test_generation_and_verification_recipients_are_each_authorized_for_their_own_purpose_at_import_and_read(make_admin, tmp_path):
+    _, _, results = populated(make_admin, tmp_path / "source")
+    chat, native = "openai-compatible:synthetic-chat-revision", "typesafe-native:synthetic-native-revision"
+    both = {**fixture("grants")["grants"][0], "recipients": [chat, native]}
+    document_id = results[0]["input"]["input"]["document"]["documentId"]
+
+    def live_result(suffix):
+        ready = cloned_ready_result(results[0], suffix)
+        ready["input"]["mode"] = "live"
+        ready["input"]["provenance"] = {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"}
+        ready["grant"] = both
+        for call in ready["calls"]:  # generation went to the chat endpoint, verification to the native one
+            provider, revision = (native if call["stage"] == "semantic-verification" else chat).split(":")
+            call["mode"] = "live"
+            call["config"]["provider"], call["config"]["providerRevision"] = provider, revision
+        for artifact in ready["artifacts"]:
+            artifact["provenance"] = ready["input"]["provenance"]
+            call = next(c for c in ready["calls"] if c["attemptId"] == artifact["attemptId"])
+            artifact["modelConfigRevision"] = _digest(call["config"])
+        return ready
+
+    def kit_with(recipients):
+        kit = make_admin(fixture("snapshot"))
+        register_current_grants(kit, [{**both, "recipients": recipients}])
+        return kit, kit.services.sentiment.analysis_store
+
+    kit, store = kit_with([chat, native])
+    assert store.import_job(kit.services.provider.get(), live_result("both"))["status"] == "available"
+    shown = store.public(kit.services.provider.get(), document_id, "SYNTH-A")
+    assert shown["analysis_status"]["summary"] == {"status": "available", "reason": None} and shown["document_summary"] is not None
+    # Revoking either recipient withholds the same stored result at read time; the chat grant never stands in for the verifier.
+    for remaining in ([chat], [native]):
+        register_current_grants(kit, [{**both, "recipients": remaining}])
+        withheld = store.public(kit.services.provider.get(), document_id, "SYNTH-A")
+        assert withheld["analysis_status"]["summary"] == {"status": "withheld", "reason": "source_purpose_or_recipient_denied"}
+        assert withheld["document_summary"] is None
+    # The same holds when the result is first imported.
+    for remaining in ([chat], [native]):
+        other, other_store = kit_with(remaining)
+        imported = other_store.import_job(other.services.provider.get(), live_result("partial"))
+        assert imported == {"jobId": imported["jobId"], "status": "withheld", "reason": "source_purpose_or_recipient_denied",
+                            "artifactId": None}
+
+
 def test_import_rejects_raw_forgery_source_change_and_actual_replay(make_admin, tmp_path):
     kit, _, results = populated(make_admin, tmp_path)
     forged = copy.deepcopy(results[0])
