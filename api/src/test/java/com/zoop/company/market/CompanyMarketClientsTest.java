@@ -36,6 +36,8 @@ class CompanyMarketClientsTest {
     /** Daily candles stamped like Toss: KRX at KST midnight, US at New York midnight shown in KST. */
     private volatile boolean exchangeDaily;
     private volatile boolean malformedCandle;
+    /** NVDA daily candles around the 2026-03-08 US DST start, stamped at New York midnight shown in KST. */
+    private volatile boolean dstDaily;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -258,6 +260,16 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void aWeekEndingBeforeTheDstStartDoesNotTakeTheNextMondaysBar() {
+        dstDaily = true;
+        // Friday close before the 03-08 DST start: the week of 03-02 ends at 03-09 00:00 EDT, which is 167 hours on.
+        var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1y", null,
+                java.time.Instant.parse("2026-03-06T21:00:00Z").plusNanos(1));
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00-05:00", 110, 115, 109, 114, 5.0)),
+                result.points());
+    }
+
+    @Test
     void aRateLimitedPageIsRetriedAfterTheBucketRefills() {
         rateLimitOnce = true;
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null);
@@ -367,6 +379,12 @@ class CompanyMarketClientsTest {
         if (path.equals("/api/v1/stocks")) return """
                 {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"},{"symbol":"NVDA","currency":"USD"}]}
                 """.replace(omitStockCurrency ? ",\"currency\":\"KRW\"" : "never-in-body", "");
+        if (path.equals("/api/v1/candles") && dstDaily) return """
+                {"result":{"candles":[
+                  {"timestamp":"2026-03-09T13:00:00+09:00","openPrice":120,"highPrice":125,"lowPrice":119,"closePrice":124,"volume":7},
+                  {"timestamp":"2026-03-06T14:00:00+09:00","openPrice":110,"highPrice":115,"lowPrice":109,"closePrice":114,"volume":5}
+                ],"nextBefore":null}}
+                """;
         if (path.equals("/api/v1/candles") && exchangeDaily) {
             String day = rawQuery.contains("symbol=NVDA") ? "T13:00:00+09:00" : "T00:00:00+09:00";
             return """

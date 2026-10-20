@@ -157,7 +157,8 @@ public class TossMarketClient {
                 // A daily bar starts at its exchange-local midnight; a week bucket at that week's Monday.
                 Instant first = weekly ? PriceBars.weekStart(start, zone)
                         : start.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant();
-                Instant last = weekly ? PriceBars.weekStart(end.minusNanos(1), zone).plus(java.time.Duration.ofDays(7)) : end;
+                // The next local Monday, not +168 hours: a DST week is 167 or 169 hours long.
+                Instant last = weekly ? PriceBars.weekStart(end.minusNanos(1).atZone(zone).plusWeeks(1).toInstant(), zone) : end;
                 List<PriceBars.Bar> daily = new java.util.ArrayList<>();
                 for (JsonNode candle : dailyCandles(code, 10, last, first)) {
                     PriceBars.Bar bar = bar(candle, at -> at);
