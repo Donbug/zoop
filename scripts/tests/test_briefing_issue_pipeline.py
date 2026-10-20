@@ -11,6 +11,7 @@ import io
 import os
 from pathlib import Path
 import sqlite3
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -423,6 +424,118 @@ class IssuePipelineTest(unittest.TestCase):
         self.assertTrue(all(d["issueId"] is None and not d["approved"] for d in archive["decisions"]))
         self.assertEqual({"issue_comparison"}, {h["stage"] for h in archive["held"]})
         self.assertEqual(1, sum(not r["usageKnown"] for r in archive["receipts"]))
+
+    def comparison_data(self, index=0, copies=3):
+        article, mention = self.article_and_mention()
+        prior_article = self.rules.article({**article.model_dump(), "article_id": "earlier-article"})
+        evidence = {**mention.evidence[0].model_dump(), "article_id": prior_article.article_id, "article_version": prior_article.version}
+        prior = mention.model_copy(update={"article_id": prior_article.article_id, "article_version": prior_article.version,
+                                          "evidence": [self.rules.domain.Evidence.model_validate(evidence)]})
+        issue = self.rules.issue_snapshot({"issue_id": "stable-issue", "mentions": [prior], "articles": [prior_article]})
+        native = self.prompts.request_input("compare", mention=mention, issue=issue, article=article)
+        return {"authorization": {"scope": "authored-test", "index": index},
+                "pairs": {"pair-" + str(i): {"mentionKey": "incoming-mention", "targetIssueId": issue.issue_id,
+                                               "input": copy.deepcopy(native)} for i in range(copies)},
+                "retrievalMeaning": "authored bounded retrieval"}
+
+    def test_article_catalog_is_lossless_and_keeps_whole_members_and_metadata(self):
+        original = self.comparison_data(copies=4)
+        before = copy.deepcopy(original)
+        encoded = pipeline.comparison_catalogue_data(original)
+        self.assertEqual(before, original)
+        self.assertEqual(pipeline.COMPARISON_WIRE, encoded["comparisonWireVersion"])
+        self.assertEqual(2, len(encoded["articleCatalog"]))
+        self.assertEqual(original, pipeline.expand_comparison_catalogue(encoded))
+        self.assertLess(len(pipeline.canonical(encoded)), len(pipeline.canonical(original)))
+        for key, value in encoded["articleCatalog"].items():
+            self.assertEqual(key, pipeline.digest(pipeline.canonical(value)))
+            self.assertIn("body", value)
+            self.assertIn("published_at", value)
+            self.assertIn("allow_model_send", value)
+        for key, pair in encoded["pairs"].items():
+            self.assertEqual(original["pairs"][key]["input"]["mention"], pair["input"]["mention"])
+            self.assertEqual(original["pairs"][key]["input"]["issue"]["mentions"], pair["input"]["issue"]["mentions"])
+        tampered = copy.deepcopy(encoded)
+        first = next(iter(tampered["articleCatalog"]))
+        tampered["articleCatalog"][first]["body"] += " changed"
+        with self.assertRaisesRegex(pipeline.Error, "reference_unbound"):
+            pipeline.expand_comparison_catalogue(tampered)
+
+    def test_nine_original_comparison_recordings_reuse_with_unchanged_prompt_and_receipts(self):
+        native_output = self.root / "native"
+        prompts = {"issue_comparison": "Original audited native comparison instructions."}
+        transport = AuthoredIssueTransport()
+        native = pipeline.IssueClient(native_output, transport, prompts, 400)
+        schema = pipeline.obj({"comparisons": pipeline.obj({"pair-0": pipeline.obj({
+            "relation": pipeline.strings(), "reason": pipeline.strings(), "evidence": {"type": "array", "items": {}}})})})
+        results = [native.ask("issue_comparison", self.comparison_data(index, 1), schema, 18000) for index in range(9)]
+        target = self.root / "catalog"
+        target.mkdir(mode=0o700)
+        shutil.copytree(native.calls, target / "calls")
+        before = {p.name: p.read_bytes() for p in (target / "calls").glob("*")}
+        def deny(_):
+            raise AssertionError("old native recording must not be sent again")
+        client = pipeline.IssueClient(target, deny, prompts, 400, comparison_wire=pipeline.COMPARISON_WIRE)
+        for index, expected in enumerate(results):
+            self.assertEqual(expected, client.ask("issue_comparison", self.comparison_data(index, 1), schema, 18000))
+        self.assertEqual(0, len(client.new_calls))
+        self.assertEqual(9, len(client.reused_calls))
+        self.assertEqual(before, {p.name: p.read_bytes() for p in client.calls.glob("*")})
+        data = self.comparison_data(9)
+        request, _, prompt_sha = client.request("issue_comparison", data, "issue_comparison", "issue_comparison", 18000, schema)
+        recorded = pipeline.base.strict_load(request)
+        self.assertEqual(prompts["issue_comparison"] + pipeline.COMPARISON_CATALOG_INSTRUCTIONS, recorded["instructions"])
+        self.assertEqual(pipeline.digest(recorded["instructions"].encode()), prompt_sha)
+        self.assertEqual(data, pipeline.expand_comparison_catalogue(pipeline.base.strict_load(recorded["input"])))
+
+    def test_optional_catalog_wire_preserves_same_event_result_and_native_default_identity(self):
+        self.prepared(self.same_event_rows(2))
+        native_args = self.args(True)
+        native_args.comparison_batch_size = 2
+        native_transport = SameEventTransport()
+        with contextlib.redirect_stdout(io.StringIO()):
+            native_result = pipeline.run(native_args, native_transport)
+        native_archive = pipeline.base.strict_load((self.root / "output/grouped-issues.json").read_bytes())
+        native_identity = pipeline.base.strict_load((self.root / "output/identity.json").read_bytes())
+        self.assertNotIn("comparisonCodec", native_identity)
+        catalog_args = self.args(True)
+        catalog_args.comparison_batch_size = 2
+        catalog_args.output = str(self.root / "catalog-output")
+        catalog_args.comparison_wire = pipeline.COMPARISON_WIRE
+        catalog_transport = SameEventTransport()
+        with contextlib.redirect_stdout(io.StringIO()):
+            catalog_result = pipeline.run(catalog_args, catalog_transport)
+        catalog_archive = pipeline.base.strict_load((self.root / "catalog-output/grouped-issues.json").read_bytes())
+        catalog_identity = pipeline.base.strict_load((self.root / "catalog-output/identity.json").read_bytes())
+        self.assertEqual(native_result["assignmentCounts"], catalog_result["assignmentCounts"])
+        self.assertEqual({"NEW": 1, "MERGE": 1, "HOLD": 0}, catalog_result["assignmentCounts"])
+        self.assertEqual(native_archive["decisions"], catalog_archive["decisions"])
+        self.assertEqual(native_archive["issues"], catalog_archive["issues"])
+        codec = catalog_identity.pop("comparisonCodec")
+        self.assertEqual(native_identity, catalog_identity)
+        self.assertEqual(pipeline.COMPARISON_WIRE, codec["wireVersion"])
+        self.assertEqual(native_identity["promptSha256"]["issue_comparison"], codec["nativePromptSha256"])
+        native_requests = [pipeline.base.strict_load(raw) for raw in native_transport.calls]
+        catalog_requests = [pipeline.base.strict_load(raw) for raw in catalog_transport.calls]
+        self.assertEqual(native_requests[:2], catalog_requests[:2])
+        native_request, catalog_request = native_requests[2], catalog_requests[2]
+        self.assertEqual(pipeline.base.strict_load(native_request["input"]),
+                         pipeline.expand_comparison_catalogue(pipeline.base.strict_load(catalog_request["input"])))
+        self.assertEqual(codec["catalogPromptSha256"], pipeline.digest(catalog_request["instructions"].encode()))
+
+    def test_catalog_wire_offline_is_explicit_and_never_calls_provider(self):
+        self.prepared()
+        native_args = self.args()
+        catalog_args = self.args()
+        catalog_args.comparison_wire = pipeline.COMPARISON_WIRE
+        transport = AuthoredIssueTransport()
+        native = pipeline.run(native_args, transport)
+        catalog = pipeline.run(catalog_args, transport)
+        self.assertNotEqual(native["identitySha256"], catalog["identitySha256"])
+        self.assertEqual("OFFLINE", catalog["status"])
+        self.assertEqual(0, catalog["newPaidCalls"])
+        self.assertEqual([], transport.calls)
+        self.assertFalse((self.root / "output").exists())
 
     def test_offline_plan_never_calls_provider_or_creates_output(self):
         self.prepared()
