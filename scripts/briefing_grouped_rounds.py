@@ -15,6 +15,10 @@ _SPEC.loader.exec_module(sim)
 base, ReplayError = sim.base, sim.ReplayError
 PROMPTS = Path(__file__).resolve().parents[1] / "api/src/main/resources/briefing/prompts/grouped-issues"
 SELECTION_STAGE = "grouped_issue_selection"
+# Official model documentation checked 2026-10-20; account-specific service
+# availability is still determined by the recorded provider response.
+MODEL_MAX_OUTPUT_TOKENS = 128000
+MODEL_OUTPUT_LIMIT_SOURCE = "https://developers.openai.com/api/docs/models/gpt-6-luna"
 # Only known completed output mistakes may receive one bounded correction. Input
 # identity, source/clock integrity, provider failures and unknown usage never do.
 CORRECTABLE_SELECTION_ERRORS = frozenset({
@@ -162,6 +166,43 @@ def selection_schema(candidates):
         "required": ids, "additionalProperties": False}
     value["properties"]["selected"]["items"]["properties"]["issueId"]["enum"] = ids or ["__no_candidate__"]
     return value
+
+
+def selection_output_plan(candidates):
+    """Deterministic allowance for exhaustive assessments, not a model limit.
+
+    Prior same-model Korean assessment JSON used 0.4206-0.4908 visible tokens
+    per character. The half-character estimate below, 4K reasoning allowance
+    and 20% margin are planning heuristics, not an exact tokenizer or a proof
+    that arbitrarily verbose schema-valid output fits. Actual provider/model
+    output limit below is the documented model limit, not an account guarantee.
+    """
+    ids = sorted(_indexed(candidates, "issueId", "grouped_duplicate_candidate"))
+    minimum = {"importance": 0, "priority": 0, "status": "HOLD", "reason": "a",
+               "scope": "COMPANY", "affectedSectors": [], "transmission": ""}
+    minimum_raw = base.canonical({"assessments": {key: minimum for key in ids}, "selected": []})
+    minimum_characters = len(minimum_raw.decode("utf-8"))
+    # Same seven fields in prior real responses had a median of 221 characters
+    # per assessment before its ID/key. Add 96 characters above the structural
+    # minimum per issue, plus 4K characters for up to three supported selections.
+    realistic_characters = minimum_characters + 96 * len(ids) + 4096
+    visible_tokens = (realistic_characters + 1) // 2
+    reasoning_reserve = 4096
+    with_margin = ((visible_tokens + reasoning_reserve) * 6 + 4) // 5
+    cap = max(12000, ((with_margin + 1023) // 1024) * 1024)
+    require(cap <= MODEL_MAX_OUTPUT_TOKENS, "grouped_selection_output_plan_exceeds_provider_limit")
+    return {"policy": "exhaustive_grouped_assessment_output_v1", "candidateCount": len(ids),
+            "minimumJsonCharacters": minimum_characters, "minimumJsonBytes": len(minimum_raw),
+            "realisticJsonCharacters": realistic_characters, "estimatedVisibleTokens": visible_tokens,
+            "reasoningTokenReserve": reasoning_reserve, "headroomPercent": 20,
+            "maxOutputTokens": cap, "providerOutputLimitVerified": True,
+            "providerMaxOutputTokens": MODEL_MAX_OUTPUT_TOKENS,
+            "providerOutputLimitSource": MODEL_OUTPUT_LIMIT_SOURCE,
+            "providerOutputLimitCheckedOn": "2026-10-20"}
+
+
+def selection_output_cap(candidates):
+    return selection_output_plan(candidates)["maxOutputTokens"]
 
 
 def _catalog(candidate):
@@ -320,9 +361,10 @@ def attempt_grouped_selection(client, candidates, context, identity_sha, previou
     candidates, context, previous_selected = copied(candidates), copied(context), copied(list(previous_selected))
     _frozen_candidate_inputs(candidates, previous_selected)
     data, output_schema = grouped_selection_data(candidates, context, previous_selected), selection_schema(candidates)
+    max_output = selection_output_cap(candidates)
     request_digest = client.request_digest(SELECTION_STAGE, data, "selection.md", "selection.schema.json",
-                                           max_output=12000, schema_override=output_schema)
-    reply = client.call(SELECTION_STAGE, data, "selection.md", "selection.schema.json", max_output=12000,
+                                           max_output=max_output, schema_override=output_schema)
+    reply = client.call(SELECTION_STAGE, data, "selection.md", "selection.schema.json", max_output=max_output,
                         schema_override=output_schema)
     try:
         selected = freeze_grouped_selection(reply, candidates, identity_sha, previous_selected)
@@ -345,9 +387,9 @@ def attempt_grouped_selection(client, candidates, context, identity_sha, previou
             "Recheck every selected issue, keep maximum three, and omit unsupported issues rather than invent facts."}
     corrected_data = {**data, "selectionCorrection": correction}
     corrected_digest = client.request_digest(SELECTION_STAGE, corrected_data, "selection.md", "selection.schema.json",
-                                             max_output=12000, schema_override=output_schema)
+                                             max_output=max_output, schema_override=output_schema)
     corrected_reply = client.call(SELECTION_STAGE, corrected_data, "selection.md", "selection.schema.json",
-                                  max_output=12000, schema_override=output_schema)
+                                  max_output=max_output, schema_override=output_schema)
     audit = {"attempt": 1, "reason": failure, "originalRequestDigest": request_digest,
              "originalResponseSha256": receipt["responseSha256"], "correctedRequestDigest": corrected_digest,
              "sameFrozenInputs": True, "status": "PASS"}

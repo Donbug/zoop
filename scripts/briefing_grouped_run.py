@@ -39,7 +39,9 @@ def run(args, transport=None):
         candidates = grouped.build_grouped_candidates(archive,spec)
         prepared.append((spec,inputs,clocks,duplicates,coverage,candidates))
     plan = {"runId":run_id,"groupArchiveSha256":archive_sha,"maximumPaidCalls":args.max_calls,
-            "rounds":[{**spec,"candidateIssues":len(candidates)} for spec,_,_,_,_,candidates in prepared]}
+            "rounds":[{**spec,"candidateIssues":len(candidates),
+                       "selectionOutputPlan":grouped.selection_output_plan(candidates)}
+                      for spec,_,_,_,_,candidates in prepared]}
     if not args.execute_authorized:
         return {**plan,"status":"OFFLINE","newPaidCalls":0}
     if not args.user_inbox_ref or not (args.key_file or transport):
@@ -82,7 +84,7 @@ def run(args, transport=None):
             record["selectionStatus"]="HELD_SOURCE_COVERAGE"
         else:
             data=grouped.grouped_selection_data(candidates,context,published_history)
-            selection_digest=client.request_digest(grouped.SELECTION_STAGE,data,"selection.md","selection.schema.json",max_output=12000,
+            selection_digest=client.request_digest(grouped.SELECTION_STAGE,data,"selection.md","selection.schema.json",max_output=grouped.selection_output_cap(candidates),
                                                    schema_override=grouped.selection_schema(candidates))
             record["groupedSelectionRequestDigest"]=selection_digest
             try:

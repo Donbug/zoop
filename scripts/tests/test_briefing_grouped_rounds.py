@@ -51,7 +51,7 @@ def round_spec(edition="morning"):
 
 def selection(candidates, indexes=None):
     indexes = list(range(min(3, len(candidates)))) if indexes is None else indexes
-    return {"assessments": {c["issueId"]: {"importance": 2, "priority": 70 + i,
+    return {"assessments": {c["issueId"]: {"importance": 2, "priority": min(100, 70 + i),
         "status": "SELECTABLE", "reason": "실제 적용 계약을 합성 원문으로 확인", "scope": "COMPANY",
         "affectedSectors": [], "transmission": ""} for i, c in enumerate(candidates)},
         "selected": [{"issueId": candidates[i]["issueId"], "title": "합성 건물 관리 기술 적용 계약",
@@ -437,6 +437,50 @@ class GroupedRoundTests(unittest.TestCase):
             self.assertEqual(1, len(transport.requests))
             self.assertEqual(1, len(client.receipts()))
             self.assertTrue(client.stopped.is_set())
+
+    def test_output_cap_uses_full_population_length_floor_and_stable_id_size(self):
+        rows = [{"issueId": "issue-" + format(i, "024x")} for i in range(174)]
+        plans = [grouped.selection_output_plan(rows[:n]) for n in (0, 1, 8, 45, 95, 174)]
+        caps = [p["maxOutputTokens"] for p in plans]
+        self.assertEqual([12000, 12000, 12000], caps[:3])
+        self.assertEqual(sorted(caps), caps)
+        self.assertEqual(33792, caps[-1])
+        self.assertEqual(25957, plans[-1]["minimumJsonCharacters"])
+        self.assertEqual(46757, plans[-1]["realisticJsonCharacters"])
+        self.assertTrue(plans[-1]["providerOutputLimitVerified"])
+        self.assertEqual(plans[-1], grouped.selection_output_plan(list(reversed(rows))))
+        longer = [{"issueId": "issue-" + "x" * 100 + str(i)} for i in range(174)]
+        self.assertGreater(grouped.selection_output_cap(longer), caps[-1])
+
+    def test_oversized_exhaustive_output_plan_stops_before_provider_call(self):
+        rows = [{"issueId": "issue-" + format(i, "024x")} for i in range(2000)]
+        with self.assertRaisesRegex(grouped.ReplayError, "grouped_selection_output_plan_exceeds_provider_limit"):
+            grouped.selection_output_cap(rows)
+
+    def test_large_population_initial_digest_and_single_correction_share_dynamic_cap(self):
+        groups = []
+        for i in range(95):
+            doc = document("doc-cap-" + str(i), "2026-10-07T08:00:00+09:00")
+            groups.append(("issue-" + format(i, "024x"), [(doc, mention(doc, "cap-" + str(i)))]))
+        candidates = grouped.build_grouped_candidates(archive(*groups), round_spec())
+        with tempfile.TemporaryDirectory() as directory:
+            transport = CorrectionTransport()
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", transport)
+            expected_cap = grouped.selection_output_cap(candidates)
+            self.assertGreater(expected_cap, 12000)
+            first_digest = client.request_digest(grouped.SELECTION_STAGE,
+                grouped.grouped_selection_data(candidates, {}), "selection.md", "selection.schema.json",
+                max_output=expected_cap, schema_override=grouped.selection_schema(candidates))
+            outcome = grouped.attempt_grouped_selection(client, candidates, {}, "identity")
+            self.assertIsNone(outcome["failure"])
+            self.assertEqual(2, len(transport.requests))
+            self.assertEqual(first_digest, base.digest(transport.requests[0]))
+            self.assertEqual(outcome["requestDigest"], base.digest(transport.requests[-1]))
+            for raw in transport.requests:
+                request = base.strict_load(raw)
+                self.assertEqual(expected_cap, request["max_output_tokens"])
+                self.assertEqual(95, len(base.strict_load(request["input"])["issues"]))
+            self.assertEqual(2, len(client.receipts()))
 
 
 if __name__ == "__main__":
