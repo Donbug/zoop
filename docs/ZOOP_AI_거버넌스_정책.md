@@ -264,7 +264,7 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 - 출력 검증은 결정론적 검사 다음 의미 검증 순서다. 결정론적 검사(스키마, 요구 커버리지, 인용 실재·원문 일치·철회, 구간 규칙, 수치·날짜, 그래프, 버전·회원 범위, 투자 표현 규칙)에 실패하면 Jev를 호출하지 않고 `validation_failed`로 종료한다.
 - 의미 검증 대상은 `evidence_grounded`·`zoop_documented` 구간의 claim과 그 인용 원문이다. 모든 claim(최대 20개)을 한 번의 호출로 보내 claim마다 `supported / contradicted / insufficient`와 Noul(`prohibitedAdvice`, `unsupportedCausality`)을 판정한다. `general_knowledge` 구간은 비교할 권위 자료가 없으므로 사실 판정(Choice)을 하지 않고 Noul `prohibitedAdvice`만 판정한다. 이는 투자 권유 차단용이며 사실 검증 통과로 기록하지 않는다. 따라서 `answered` 결과는 일반 개념만 답한 경우에도 의미 검증 Jev를 1회 호출한다.
 - 하나라도 `contradicted`이거나 Noul이 예이면 답변 전체를 `validation_failed`(retry 없음)로 종료한다. `insufficient`이거나 Noul이 불확실한 hold claim이 있으면 그 claim이 속한 요구의 구간을 서버가 결정론적으로 제외하고 `evidence_insufficient` limitation으로 기록한다. 남은 답변 요구가 없으면 `insufficient_evidence`다. 이 제외는 재생성이 아니며, 이를 위해 각 답변 구간은 내부적으로 하나의 요구에만 속하고 여러 요구를 잇는 통합 문장은 별도 구간으로 두어 관련 요구 중 하나라도 제외되면 함께 제외한다.
-- Jev timeout·모델 불일치·응답 형식 오류는 원문 응답을 영수증으로 먼저 저장하고 재시도 없이 `failed`(`transient`, retry=`rerun`)로 닫는다. 의미 검증을 건너뛰고 결과를 저장하는 경로는 없다.
+- Jev 모델 불일치·응답 형식 오류는 응답을 받은 확정 실패이므로 원문 응답을 영수증으로 먼저 저장하고 재시도 없이 `failed`(`transient`, `provider_error`, retry=`rerun`)로 닫는다. 송신 후 timeout·연결 끊김으로 응답 여부를 모르면 `failed`(`transient`, `response_unknown`, retry=null)로 닫고 호출은 `unknown`·`reconcile_only`로 남긴다(6.3.3절 한도 초과 분류). 의미 검증을 건너뛰고 결과를 저장하는 경로는 없다.
 - 판정 임계값은 S1 의미 검증의 잠정 공학값(Choice 승리 확률 ≥ 0.90 그리고 confidence ≥ 0.80, Noul ≥ 0.90 예 / ≤ 0.10 아니오, 그 사이 불확실)으로 시작한다. 이 값은 보정되지 않았으며 D15 출시 승인 전에 챗봇 고정 평가 세트로 보정한다.
 
 **MCP 레지스트리와 소유 경계**
@@ -320,10 +320,14 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 | --- | --- | --- |
 | 계획 시점 예산 초과, 체크포인트 fan-out 초과 | `clarification` | 해당 없음 |
 | 보충 라운드가 호출 상한 때문에 불가 | 해당 요구를 `results_truncated` 또는 `evidence_insufficient` limitation으로 기록 | 해당 없음 |
-| 모델·MCP 단계 상한 초과(`model_timeout`, `tool_timeout`), 시작 전 잔여 기한 부족(`deadline_guard`), 공급자 오류(`provider_error`) | `failed`·`transient` | `rerun` |
+| 모델 송신 전 실패: 시작 전 잔여 기한 부족(`deadline_guard`), 연결 실패·처리하지 않았음이 명시된 공급자 오류(429·503 등)·응답을 받았으나 형식·모델이 맞지 않음(`provider_error`) | `failed`·`transient` | `rerun` |
+| MCP 단계·개별 상한 초과(`tool_timeout`) | `failed`·`transient`, 호출은 `unknown`으로 기록 | `rerun` |
+| 모델 송신 후 단계 상한 초과·연결 끊김·게이트웨이 timeout으로 응답 불명(`response_unknown`) | `failed`·`transient`, 호출은 `unknown`·`reconcile_only` | 없음(retry=null). 운영자 정산 대상 |
 | 압축 후에도 Luna 입력 상한 초과(`context_too_large`), 답변이 출력 상한에 닿아 미완성(`output_limit`) | `failed`·`budget_exceeded` | 없음. 범위를 좁힌 새 질문 안내 |
 
 - 괄호 안의 값은 `ChatFailure.reason` 코드다. UI 문구와 관리자 집계는 이 코드를 기준으로 한다.
+- `rerun`은 공급자가 요청을 처리하지 않았거나 응답을 받아 실패가 확정된 경우에만 허용한다. 모델 송신 후 응답 불명은 공급자가 이미 처리·과금했을 수 있어 같은 job을 다시 실행하면 중복 호출이 되므로, 7.4절의 내부 worker 결과 불명 규칙과 같이 자동 재전송과 공개 재실행을 모두 막고 영수증·운영자 확인으로 정산한다. 정산 뒤에도 끝난 job의 `retry`는 바꾸지 않으며 회원은 새 질문으로 진행한다.
+- MCP 도구는 앱 내부의 읽기 전용 조회라 다시 실행해도 외부 상태나 과금이 바뀌지 않는다. 그래서 `tool_timeout`은 원 호출을 `unknown`으로 남긴 채 새 실행에서 다시 조회하는 `rerun`을 허용한다.
 - `rerun`은 작업당 실행 3회(`runs` ≤ 3)까지 허용하며 이후에는 `retry=null`이다. 모델을 호출하지 않는 `save_only`는 이 횟수에 포함하지 않으므로, 세 번째 실행이 검증까지 마친 뒤 저장에만 실패해도 검증된 결과를 복구할 수 있다. 재실행은 이전 실행 종료와 현재 권한을 확인한 뒤 최초 질문·고정 문맥으로만 수행한다.
 - 진행 중 작업은 공개 `ChatJob.phase`(`planning`, `retrieving`, `writing`, `verifying`)로 현재 단계를 알린다. 검증 전 생성 본문은 계속 노출하지 않는다.
 
@@ -349,7 +353,8 @@ Q02는 최신 금융 상황을 일반 지식으로 답하기 위한 우회 경�
 | 초과 | 다음 단계를 호출하지 않는다. 실제 조회된 대상으로 선택지를 만들고(조합 6개 이하, `kind=scope`), 넘으면 자유 입력을 받는다 | `clarification` |
 | 조건 미달(1개 이상) | 조회된 대상에 대한 요구는 답하고 의존 요구는 `precondition_unmet` limitation으로 기록한다 | `answered` |
 | 0개이고 `truncated=false`·오류 없음 | 해당 대상이 없음을 조회 범위·기준 시각과 함께 답한다 | `answered` |
-| 0개이고 `truncated=true` 또는 도구 오류 | 없다고 표현하지 않는다 | `insufficient_evidence` 또는 `failed` |
+| 0개이고 `truncated=true`·오류 없음 | 없다고 표현하지 않는다 | `insufficient_evidence` |
+| 단계의 도구 호출이 timeout·장애·권한 오류로 끝남 | 개수 조건을 평가하지 않고 근거 부족으로 저장하지 않는다 | `failed`(`ChatFailure`) |
 
 - `clarification`은 답변 생성 전, 즉 계획 시점이나 선언된 체크포인트에서만 반환한다. 체크포인트에서 멈추면 Luna 답변 생성을 호출하지 않으며 생성 뒤의 결과를 `clarification`으로 바꾸지 않는다.
 - 선택지는 실제 도구 결과로만 만들고 choice id는 서버가 다시 해석할 수 있는 불투명 값이다. 회원의 선택은 `resolves`를 담은 새 작업으로 접수하며 새 작업은 원 작업의 asOf·graphVersion을 복사한다. 같은 결과가 재현되도록 조회 도구는 고정 asOf 이후 자료를 제외한다.
@@ -679,7 +684,7 @@ UI 고지에는 AI 생성·보조 결과라는 사실, 사건 답변의 기준 �
 - 2026년 10월 16일 제품 논의. Q02의 전용 용어 저장소 부재, 제한된 일반 LLM 경로, multi-hop 오류 전파 통제, 직접·간접 관계의 의미 분리, 간선 근거와 챗봇 자동 검증의 경계를 반영했다.
 - 2026년 10월 17일 제품 결정. 범용 금융·산업 용어 사전은 구축하지 않고 일반 개념은 Luna 생성과 자동 검사로 처리하며, ZOOP 고유 정책·도움말 문서는 유지한다. 챗봇 분류는 Jev의 Q01~Q08 typed multi-label 판정과 허용된 논리 기능 선택, Luna의 분리된 coverage-verifier stage, 서버의 동적 MCP allowlist 호출, Luna answer-generator stage로 구성한다. 유형 수는 세 개로 고정하지 않고 필요한 도구를 실행 예산 안에서 호출한다.
 - 2026년 10월 17일 v0.7 초기 구현 결정. Jev `0.70/0.35` 선택 기준, Luna 커버리지 최대 2회와 답변 생성 1회, 다섯 MCP 레지스트리 그룹, MCP 12회·동시 4회·추가 1라운드·ChatJob 30초·문서 20개·그래프 3-hop·24k/2k 토큰 상한, Q02 고정 안내와 MVP `PARTIAL` 미지원을 채택했다.
-- 2026년 10월 20일 v0.8 설계 검토. 조회 결과로 대상이 정해지는 복합 질문은 호출 전에 되물을 수 없으므로, 계획에 단계와 서버가 평가하는 개수 체크포인트를 선언하고 답변 생성 전까지 `clarification`을 허용했다. 추가 조회를 계획된 단계와 보충 라운드로 구분했다. `answered`에서 답하지 않은 요구를 본문 문장 대신 공개 `ChatResult.limitations`로 구조화하고 출력 검증이 요구 커버리지를 기계적으로 확인하게 했다. Q02 고정 안내·빈 인용이 일반 개념과 근거 기반 사실을 함께 답하는 `mixed` 결과와 충돌했으므로, 본문을 근거 수준별 `sections`로 나누고 Q02 규칙을 `general_knowledge` 구간에 한정했으며 `answerBasis`를 구간에서 계산하게 했다. 구현 계획에서 빠져 있던 챗봇 Jev 의미 검증의 순서(결정론적 검사 후), 대상(근거 구간 claim), 판정 처리(contradicted·금지 조언은 전체 실패, hold는 요구 단위 제외)와 장애 처리를 정했다. 근거 없이 정한 ChatJob 30초를 단계별 잠정 상한과 계획 경로별 실행 기한(최대 60초)으로 바꾸고 실측 보정 규칙을 두었으며, 실행 중 한도 초과를 재실행 가능한 `transient`와 재실행해도 같은 `budget_exceeded`로 나누고 `reason` 코드·재실행 3회 상한·공개 `phase`를 정했다. 챗봇 Q04·Q05가 비공개 AI 투영 저장소인 Neo4j를 읽는 것으로 적혀 있어 지도와 다른 그래프로 답할 위험이 있었으므로, 그래프 도구를 공개 그래프 API와 같은 앱 스냅샷 읽기 경로로 고정하고 소유를 애플리케이션 백엔드로 옮겼으며 hop을 화면 depth 의미로 정의했다.
+- 2026년 10월 20일 v0.8 설계 검토. 조회 결과로 대상이 정해지는 복합 질문은 호출 전에 되물을 수 없으므로, 계획에 단계와 서버가 평가하는 개수 체크포인트를 선언하고 답변 생성 전까지 `clarification`을 허용했다. 추가 조회를 계획된 단계와 보충 라운드로 구분했다. `answered`에서 답하지 않은 요구를 본문 문장 대신 공개 `ChatResult.limitations`로 구조화하고 출력 검증이 요구 커버리지를 기계적으로 확인하게 했다. Q02 고정 안내·빈 인용이 일반 개념과 근거 기반 사실을 함께 답하는 `mixed` 결과와 충돌했으므로, 본문을 근거 수준별 `sections`로 나누고 Q02 규칙을 `general_knowledge` 구간에 한정했으며 `answerBasis`를 구간에서 계산하게 했다. 구현 계획에서 빠져 있던 챗봇 Jev 의미 검증의 순서(결정론적 검사 후), 대상(근거 구간 claim), 판정 처리(contradicted·금지 조언은 전체 실패, hold는 요구 단위 제외)와 장애 처리를 정했다. 근거 없이 정한 ChatJob 30초를 단계별 잠정 상한과 계획 경로별 실행 기한(최대 60초)으로 바꾸고 실측 보정 규칙을 두었으며, 실행 중 한도 초과를 재실행 가능한 `transient`와 재실행해도 같은 `budget_exceeded`로 나누고 `reason` 코드·재실행 3회 상한·공개 `phase`를 정했다. 챗봇 Q04·Q05가 비공개 AI 투영 저장소인 Neo4j를 읽는 것으로 적혀 있어 지도와 다른 그래프로 답할 위험이 있었으므로, 그래프 도구를 공개 그래프 API와 같은 앱 스냅샷 읽기 경로로 고정하고 소유를 애플리케이션 백엔드로 옮겼으며 hop을 화면 depth 의미로 정의했다. PR 리뷰에서 모델 송신 후 응답 불명 timeout까지 재실행을 허용하면 중복 호출·과금이 생길 수 있다는 지적에 따라, 송신 전 실패와 응답을 받은 확정 실패만 `rerun`하고 응답 불명은 `response_unknown`(retry 없음, `reconcile_only`)으로 분리했다. 같은 리뷰에서 도구 오류를 근거 부족으로 분류할 수 있던 체크포인트 규칙을 `failed` 우선으로 고쳤다.
 - 저장소 `52b50d0` 기준 [목표 API](api/openapi.yaml)와 [문서 연결 기준](system/links.yaml). 회원 전용 질문, 최초 문맥 고정, 최근 1개월, 작업 상태·결과·오류 분리, 자동 재생성 금지의 기준으로 사용했다.
 - [ERD v6](erd/zoop-core-erd-v6.md) 및 [v6 변경 이력](erd/zoop-core-erd-v6-changes.md). 불변 결과·저장 복구, 회차당 단일 발행, 검수 revision, 관리자 복수 대기·단일 실행 규칙을 반영했다. 변경 이력 상단의 2026년 10월 13일 추가 변경이 최초 슬롯 정책을 대체한다.
 - [AI 실행과 문서 공개 계약](design/ai-system.md), [내부 HTTP 계약](api/internal-ai-openapi.yaml), [계약 인계 문서](migration/contract-handoff.md). 문서별 판정과 검증, 호출 영수증, worker ready와 앱 completed 구분, 무호출 복구, 실제 구현 범위의 근거로 사용했다.

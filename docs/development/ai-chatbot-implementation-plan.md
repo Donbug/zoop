@@ -80,7 +80,7 @@ flowchart LR
 1. 입력 정규화와 `requirementId` 분해를 구현한다. 질문에 명시된 대상·기간은 선택 문맥보다 우선한다. 명시적 요구가 6개를 넘으면 모델 라우팅·MCP 호출 전에 `clarification`으로 범위를 나눈다.
 2. `route_summary`를 단계별로 쓰되 자유 형식 chain-of-thought는 저장하지 않는다.
 3. 계획 검증 전에는 도구 호출을 예약하지 않고, 확정 계획은 `chat_tool_calls(status=reserved)`로 원자 저장한다.
-4. 의존 실행은 `stages[]`와 `checkpoint`로 선언하고, 단계가 끝날 때마다 서버가 개수 조건을 평가해 진행·`clarification`(초과)·제한 답변(미달)·없음 답변(0개, 잘림 없음)·근거 부족(0개, 잘림 또는 오류)으로 나눈다. 체크포인트에서 멈추면 남은 예약 호출을 취소하고 생성 stage를 호출하지 않는다.
+4. 의존 실행은 `stages[]`와 `checkpoint`로 선언하고, 단계가 끝날 때마다 서버가 개수 조건을 평가해 진행·`clarification`(초과)·제한 답변(미달)·없음 답변(0개, 잘림 없음)·근거 부족(0개, 오류 없이 잘림)으로 나눈다. 단계의 도구 호출이 timeout·장애·권한 오류로 끝나면 개수 조건을 평가하지 않고 해당 `ChatFailure`로 먼저 종료한다. 체크포인트에서 멈추면 남은 예약 호출을 취소하고 생성 stage를 호출하지 않는다.
 5. 단계별 시간 상한(라우터 4초, 커버리지 회당 6초, MCP 단계 10초·개별 3초, 생성 25초, 의미 검증 6초, 서버 처리 3초)과 계획 경로별 실행 기한(실행할 단계 상한의 합, 최대 60초), 동시 4개, 최대 12회, 의존 3단계·fan-out 5개와 보충 1라운드를 서버에서 강제한다. 모델 단계 시작 전 잔여 기한이 그 단계와 이후 남은 필수 단계 상한의 합보다 적으면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다. 실행 단계마다 `phase`를 owner token 조건부로 갱신한다. 예산은 체크포인트 조건의 최악의 경우로 계산한다.
 
 완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 체크포인트 초과 시 다음 단계 호출 0회·생성 호출 0회와 실제 결과 기반 choices, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
@@ -180,14 +180,14 @@ flowchart LR
 | 동시성 | 대화당 활성 job 하나, 취소와 늦은 완료 경합, lease 만료 회수 |
 | 라우팅 | 8유형 단일·복합, 명시 요구 보존, 4개 이상 유형, 낮은 확률 필수 요구 |
 | 계획 | 미등록 도구, 중복 제거, 의존·병렬 순서, 12회·4동시·3단계·fan-out 5·보충 1라운드 한도 |
-| 체크포인트 | `exactly(2)`에 0개(잘림 없음/잘림/오류)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
+| 체크포인트 | `exactly(2)`에 0개(잘림 없음 → 없음 답변, 잘림 → 근거 부족, 도구 오류 → 개수 평가 없이 failed)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
-| 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 비활성·미게시 버전 미사용, 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
+| 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 공개 활성화 이력이 없는 버전·사용 불가 버전 거부, 이전 공개 버전은 현재 공개 제외 결정을 적용해 조회(Q05), 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
 | 결과 | answerBasis를 sections에서 계산(단일·mixed·none), `zoop_documented` 구간의 `zoop_doc` 인용과 `evidence_grounded` 구간의 `article` 인용 교차 사용 거부, 이어 붙인 answer 12,000자 초과 거부, Q02 단독은 general_knowledge 구간 하나와 빈 sources·citations, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, no PARTIAL |
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |
 | 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념 구간은 Choice 없이 `prohibitedAdvice`만 판정하고 예이면 전체 실패, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
 | 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
-| 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, 단계 상한 초과 `transient`·`model_timeout`/`tool_timeout`, 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
+| 기한·한도 | 경로별 기한 계산(Q02 단독 44초·단순 조회 54초·복합 60초), 모든 경로 합 60초 이하, MCP 상한 초과 `tool_timeout`(rerun), 모델 송신 전 연결 실패 `provider_error`(rerun), 모델 송신 후 상한 초과·연결 끊김 `response_unknown`(retry null, 호출 `unknown`, 자동·수동 재전송 0회), 남은 필수 단계 합보다 기한이 부족하면 모델 호출 0회와 `deadline_guard`(생성 뒤 의미 검증 직전 중단 없음), 커버리지 재확인 생략 조건, 요구 7개 질문의 계획 시점 clarification, `save_only`가 실행 횟수에 포함되지 않음, 입력 24k 초과 `budget_exceeded`·`context_too_large`(retry null), 출력 상한 도달 `output_limit`, 실행 3회 뒤 retry null, lease 만료 뒤 늦은 완료 거부, `phase` 전이와 종료 시 null |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |

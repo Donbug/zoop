@@ -87,7 +87,7 @@
 | `insufficient_evidence` | 실제 조회 범위와 부족한 근거 설명. “사건이 없다”로 바꾸지 않음 |
 | `validation_failed` | 결과 미표시, 자동 재생성 없음, 요청 ID와 허용된 복구 안내 |
 | `budget_exceeded` | 부분 답변 미표시, 재시도 버튼 없음. `reason`이 `context_too_large`면 대상·기간을 줄이도록, `output_limit`이면 질문을 나누도록 안내하고 새 질문을 유도 |
-| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공. `model_timeout`·`tool_timeout`·`deadline_guard`·`provider_error`는 “일시적으로 처리하지 못했어요” 계열 문구를 쓰고 “자료 없음”으로 표현하지 않음 |
+| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공. `tool_timeout`·`deadline_guard`·`provider_error`는 “일시적으로 처리하지 못했어요” 계열 문구를 쓰고 “자료 없음”으로 표현하지 않음. `response_unknown`은 재시도 버튼 없이 처리 결과를 확인하지 못했다는 안내와 요청 ID를 보여 주고 새 질문을 유도 |
 | `permission_denied` | 개인·원문 데이터 미표시, 로그인·권한 안내 |
 
 ## 5. 접근성·상태 보존

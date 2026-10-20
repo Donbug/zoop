@@ -99,7 +99,7 @@ Q02는 최신 기업 상태, 가격, 공시, 시장 전망을 일반 지식으�
 
 문서에 표시한 `help.search`, `document.search`, `graph.path.read` 등의 이름은 목표 논리 도구 ID다. 실제 MCP가 등록된 것으로 간주하지 않는다.
 
-**그래프 조회 원천.** `graph.path.read`·`graph.version.diff`는 공개 그래프 API와 같은 앱 읽기 경로 `PublicGraphReader`(버전 고정 → 불변 스냅샷 → asOf 필터 → 현재 공개 제외 결정 적용)만 사용한다. Neo4j는 AI 파이프라인의 관계 투영·검증 저장소이고 AI 내부 그래프 읽기 API는 비공개·미게시 버전을 다루므로, 챗봇은 둘 다 호출하지 않는다. 그래서 답변의 `graphVersion`·경로·철회 상태가 사용자가 지도에서 보는 그래프와 같다. hop은 화면 `depth`와 같은 기업 간 관계 hop이며(스냅샷 내부의 기업–이슈 간선 수가 아님) 최대 3이다.
+**그래프 조회 원천.** `graph.path.read`·`graph.version.diff`는 공개 그래프 API와 같은 앱 읽기 경로 `PublicGraphReader`(버전 고정 → 불변 스냅샷 → asOf 필터 → 현재 공개 제외 결정 적용)만 사용한다. Neo4j는 AI 파이프라인의 관계 투영·검증 저장소이고 AI 내부 그래프 읽기 API는 비공개·미게시 버전을 다루므로, 챗봇은 둘 다 호출하지 않는다. 그래서 답변의 `graphVersion`·경로·철회 상태가 사용자가 지도에서 보는 그래프와 같다. hop은 화면 `depth`와 같은 기업 간 관계 hop이며(스냅샷 내부의 기업–이슈 간선 수가 아님) 최대 3이다. 과거 graphVersion·asOf는 공개 그래프 API와 같이 공개 활성화 이력이 있는 버전만 허용하고, 그 버전에도 현재 공개 제외 결정을 적용한다(Q05 기간 비교).
 
 ### 5.1 확정된 초기 선택값
 
@@ -158,10 +158,12 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | --- | --- | --- |
 | 계획 시점 예산·체크포인트 fan-out 초과 | `clarification` | 해당 없음 |
 | 보충 라운드가 호출 상한 때문에 불가 | `results_truncated`·`evidence_insufficient` limitation | 해당 없음 |
-| 단계 상한 초과·잔여 기한 부족·공급자 오류 | `transient`(`model_timeout`, `tool_timeout`, `deadline_guard`, `provider_error`) | `rerun` |
+| 모델 송신 전 실패(잔여 기한 부족, 연결 실패·처리 거부가 명시된 공급자 오류, 형식·모델 불일치 응답) | `transient`(`deadline_guard`, `provider_error`) | `rerun` |
+| MCP 단계·개별 상한 초과 | `transient`(`tool_timeout`) | `rerun` |
+| 모델 송신 후 상한 초과·연결 끊김으로 응답 불명 | `transient`(`response_unknown`), 호출 `unknown`·`reconcile_only` | 없음(중복 호출·과금 방지, 운영자 정산) |
 | 압축 후에도 입력 24k 초과, 출력 2k 상한 도달로 미완성 | `budget_exceeded`(`context_too_large`, `output_limit`) | 없음, 범위를 좁힌 새 질문 안내 |
 
-`rerun`은 작업당 실행 3회까지이며 이후 `retry=null`이다. 모델을 호출하지 않는 `save_only`는 이 횟수에 포함하지 않는다.
+`rerun`은 작업당 실행 3회까지이며 이후 `retry=null`이다. 모델을 호출하지 않는 `save_only`는 이 횟수에 포함하지 않는다. 공급자가 이미 처리·과금했을 수 있는 응답 불명 모델 호출은 다시 실행하지 않는다. MCP 도구는 읽기 전용 내부 조회라 timeout 뒤 재실행해도 외부 상태·과금이 바뀌지 않는다.
 
 ### 5.2 단계와 체크포인트
 
@@ -173,7 +175,8 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | 초과 | 다음 단계 미호출, 실제 조회된 대상으로 선택지 구성(조합 6개 이하, `kind=scope`), 넘으면 자유 입력 | `clarification` |
 | 미달(1개 이상) | 조회된 대상은 답하고 의존 요구는 `precondition_unmet` limitation으로 기록 | `answered` |
 | 0개, `truncated=false`·오류 없음 | 해당 대상 없음을 조회 범위·기준 시각과 함께 답변 | `answered` |
-| 0개, `truncated=true` 또는 도구 오류 | “없음”으로 표현하지 않음 | `insufficient_evidence` 또는 `failed` |
+| 0개, `truncated=true`·오류 없음 | “없음”으로 표현하지 않음 | `insufficient_evidence` |
+| 도구 timeout·장애·권한 오류 | 개수 조건을 평가하지 않음 | `failed` |
 
 `clarification`은 답변 생성 전, 즉 계획 시점이나 선언된 체크포인트에서만 반환한다. 체크포인트에서 멈추면 Luna 생성은 호출하지 않는다. 회원의 선택은 `resolves`를 담은 새 작업이 되고 원 작업의 asOf·graphVersion을 복사하므로 같은 조회 결과 위에서 이어진다. 체크포인트 판정과 중단 단계는 `route_summary`에, 이미 실행한 호출은 `chat_tool_calls`에 남긴다.
 
@@ -280,7 +283,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | `insufficient` 또는 Noul 불확실(hold) | 그 claim이 속한 요구의 구간을 서버가 제외하고 `evidence_insufficient` limitation 기록 | 남은 요구가 있으면 `answered`, 없으면 `insufficient_evidence` |
 
 - hold 제외는 재생성이 아닌 결정론적 처리다. 이를 위해 각 구간은 내부적으로 하나의 요구에만 속하고, 여러 요구를 잇는 통합 문장은 별도 구간으로 두어 관련 요구 중 하나라도 제외되면 함께 제외한다.
-- Jev timeout·모델 불일치·응답 형식 오류는 원문 응답을 영수증으로 먼저 저장하고 재시도 없이 `failed`(`transient`, retry=`rerun`)로 닫는다. 검증을 건너뛰는 경로는 없다.
+- Jev 모델 불일치·응답 형식 오류는 원문 응답을 영수증으로 먼저 저장하고 재시도 없이 `failed`(`transient`, `provider_error`, retry=`rerun`)로 닫는다. 송신 후 timeout으로 응답을 모르면 `response_unknown`(retry 없음)이고 호출은 운영자 정산 대상이다. 검증을 건너뛰는 경로는 없다.
 - 질문 집합·정책 버전·영수증은 S1 의미 검증과 분리한다. 임계값은 S1 잠정값(Choice ≥ 0.90 그리고 confidence ≥ 0.80, Noul ≥ 0.90 / ≤ 0.10)으로 시작하며, 미보정 값이므로 출시 승인 전에 챗봇 평가 세트로 보정한다.
 
 Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의만으로 사실 검증을 통과했다고 표시하지 않는다. 일반 개념 범위, 최신 사실·수치 포함 여부, 투자 판단, 내부 모순과 명백한 오류를 검사한 뒤 일반 개념 설명으로만 제공한다. 이 검사는 `general_knowledge` 구간 단위로 하며, 근거 구간의 사실 주장은 그 구간의 `evidenceIds`에서만 인용하는지, 모든 `evidenceIds`가 `citations`에 있는지, 서버가 계산한 `answerBasis`가 구간 basis와 일치하는지 함께 확인한다.
