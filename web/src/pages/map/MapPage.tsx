@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
+import { companyLogo } from '@/util/company-logo';
 import { Link } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
@@ -91,6 +93,11 @@ export default function MapPage() {
   }, [paramsKey, memoryOwner]);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [centerRequest, setCenterRequest] = useState<{
+    id: string;
+    seq: number;
+  } | null>(null);
   const [tutorialSaving, setTutorialSaving] = useState(false);
   const [tutorialError, setTutorialError] = useState('');
   const openAi = useAiChatStore((state) => state.open);
@@ -515,8 +522,10 @@ export default function MapPage() {
           <div className="relationship-toolbar">
             <button
               className="relationship-sidebar-toggle"
-              onClick={() => setNotice('sidebar')}
-              title="내 종목 사이드바 디자인 확인 대기"
+              aria-expanded={sidebarOpen}
+              aria-controls="holdings-sidebar"
+              onClick={() => setSidebarOpen((open) => !open)}
+              title="내가 보유 중인 종목 보기"
             >
               <GraphIcon name="sidebar" />내 종목
             </button>
@@ -622,12 +631,39 @@ export default function MapPage() {
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ' has-company-panel max-md:pb-[48dvh]!' : ''}${tutorialOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ' has-company-panel max-md:pb-[48dvh]!' : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
+            {sidebarOpen && (
+              <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
+                <HoldingsSidebar
+                  member={Boolean(token)}
+                  logoOf={(id) =>
+                    companyLogo(
+                      id,
+                      data?.nodes.find((node) => node.id === id)?.logoUrl,
+                    )
+                  }
+                  onPick={(id) => {
+                    if (!data?.nodes.some((node) => node.id === id)) {
+                      setNotice('holding-missing');
+                      return;
+                    }
+                    setNotice('');
+                    selectNode(id);
+                    setCenterRequest((request) => ({
+                      id,
+                      seq: (request?.seq ?? 0) + 1,
+                    }));
+                  }}
+                  onClose={() => setSidebarOpen(false)}
+                />
+              </div>
+            )}
             {data ? (
               <GraphCanvas
                 data={data}
+                centerRequest={centerRequest}
                 memoryOwner={memoryOwner}
                 onOpenIsolated={() => {
                   updateQuery({
@@ -866,10 +902,9 @@ export default function MapPage() {
                     <Link to="/login">로그인</Link>
                   </p>
                 )}
-                {notice === 'sidebar' && (
+                {notice === 'holding-missing' && (
                   <p>
-                    내 종목 목록 사이드바는 Figma 프레임 확인 대기 중입니다.
-                    임의 UI는 구현하지 않았습니다.
+                    이 종목은 지금 지도에 없어요. 시장 전체 지도에서 찾아보세요.
                   </p>
                 )}
                 {notice === 'info' && (

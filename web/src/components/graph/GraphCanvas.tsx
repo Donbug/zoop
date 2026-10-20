@@ -42,6 +42,7 @@ export default function GraphCanvas({
   connectionPath = false,
   memoryOwner = 'public',
   onOpenIsolated,
+  centerRequest = null,
 }: {
   data: GraphResponse;
   selectedId?: string | null;
@@ -54,6 +55,8 @@ export default function GraphCanvas({
   connectionPath?: boolean;
   memoryOwner?: string;
   onOpenIsolated?: () => void;
+  /** 내 종목 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
+  centerRequest?: { id: string; seq: number } | null;
 }) {
   const viewKey = `${memoryOwner}:${data.metadata.mode}`;
   const [viewState, setViewState] = useState(() => ({
@@ -118,11 +121,15 @@ export default function GraphCanvas({
       const visibleIds = new Set(
         rendered.nodes?.map((node) => String(node.id)),
       );
+      // 마우스를 올린 노드가 우선이고, 없으면 클릭해 선택한 노드의 연결을 계속 강조한다.
+      const anchor =
+        hovered.current ??
+        (selected && nodeKinds.has(selected) ? selected : null);
       const active =
-        hovered.current &&
-        visibleIds.has(hovered.current) &&
-        (!focusId || focusedNodes.has(hovered.current))
-          ? hovered.current
+        anchor &&
+        visibleIds.has(anchor) &&
+        (!focusId || focusedNodes.has(anchor))
+          ? anchor
           : null;
       const relatedNodes = new Set(active ? [active] : []);
       const relatedEdges = new Set<string>();
@@ -146,7 +153,9 @@ export default function GraphCanvas({
         states[id] = active
           ? [
               id === active
-                ? 'hovered'
+                ? id === hovered.current
+                  ? 'hovered'
+                  : 'related'
                 : relatedNodes.has(id)
                   ? 'related'
                   : 'inactive',
@@ -194,6 +203,27 @@ export default function GraphCanvas({
   const retainFocus = useEffectEvent(() => {
     lastFocused.current = focusId;
   });
+  useEffect(() => {
+    if (!centerRequest) return;
+    const graph = instance.current;
+    if (!graph) return;
+    drawing.current = drawing.current
+      .then(async () => {
+        if (graph.destroyed || instance.current !== graph) return;
+        if (
+          !renderedData.current?.nodes?.some(
+            (node) => String(node.id) === centerRequest.id,
+          )
+        )
+          return;
+        // 사용자가 고른 위치이므로 자동 맞춤을 멈춘다.
+        followFit.current = false;
+        await graph.focusElement(centerRequest.id, false);
+      })
+      .catch(() => {
+        if (!graph.destroyed) setRenderError(true);
+      });
+  }, [centerRequest]);
   async function fitVisibleGraph(graph: Graph) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)

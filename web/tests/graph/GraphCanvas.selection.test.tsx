@@ -138,6 +138,18 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.created).toHaveBeenCalledOnce();
     expect(screen.queryByRole('alert')).toBeNull();
   });
+  it('centers the map on a company picked from the my-stocks sidebar', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { rerender } = render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    canvas.focusElement.mockClear();
+    rerender(
+      <GraphCanvas data={data} centerRequest={{ id: 'KRX:005930', seq: 1 }} />,
+    );
+    await waitFor(() =>
+      expect(canvas.focusElement).toHaveBeenCalledWith('KRX:005930', false),
+    );
+  });
   it('explains each legend item in its tooltip', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
@@ -347,7 +359,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(canvas.created).toHaveBeenCalledOnce();
   });
 
-  it('D-GRP-01 moving between nodes ignores stale leave and restores the clicked selection on exit', async () => {
+  it('D-GRP-01 moving between nodes ignores stale leave and keeps the clicked node emphasized on exit', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const shared = data.edges.find(
       (edge) => edge.relationType === 'SHARES_ISSUE',
@@ -388,10 +400,11 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
     await waitFor(() =>
       expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        // Without hover, the clicked node keeps its connections emphasized.
         expect.objectContaining({
-          'mock-issue-1': [],
-          'KRX:005930': ['selected'],
-          [shared.id]: ['selected'],
+          'mock-issue-1': ['related'],
+          'KRX:005930': ['related', 'selected'],
+          [shared.id]: expect.arrayContaining(['selected']),
         }),
       ),
     );
@@ -487,7 +500,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     rerender(<GraphCanvas {...props} selectedId="mock-issue-1" />);
     await waitFor(() =>
       expect(canvas.setElementState).toHaveBeenLastCalledWith(
-        expect.objectContaining({ 'mock-issue-1': ['selected'] }),
+        expect.objectContaining({ 'mock-issue-1': ['related', 'selected'] }),
       ),
     );
     rerender(<GraphCanvas {...props} />);
