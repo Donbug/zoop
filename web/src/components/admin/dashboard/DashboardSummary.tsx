@@ -1,7 +1,15 @@
-import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { getAdminDashboard } from '@/apis/admin/dashboard';
-import { ApiError } from '@/apis/auth/ApiService';
+import {
+  Empty,
+  ErrorBox,
+  Loading,
+  Metric,
+  PageHeader,
+  Section,
+  Table,
+} from '@/components/admin/common/AdminUi';
+import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
 import {
   editionLabel,
   graphDbStatusLabel,
@@ -12,84 +20,7 @@ import {
 import { useAsyncData } from '@/hooks/useAsyncData';
 import type { Dashboard } from '@/types/admin/dashboard';
 import { formatKst } from '@/util/format';
-
-const count = (value: number) => value.toLocaleString('ko-KR');
-
-const RETRY_BUTTON =
-  'h-8 shrink-0 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-paper px-3 text-xs font-semibold text-zoop-ink hover:bg-zoop-wash disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
-const TH =
-  'border-b-[0.667px] border-zoop-line px-2 py-2 text-left text-[11px] font-medium text-zoop-muted';
-const TD = 'border-b-[0.667px] border-zoop-line px-2 py-2.5 text-xs';
-
-function errorMessage(error: Error) {
-  if (
-    error instanceof ApiError &&
-    (error.status === 403 || error.code === 'ACCESS_DENIED')
-  )
-    return '대시보드를 볼 권한이 없어요. 관리자 권한을 확인해 주세요.';
-  if (error instanceof ApiError && error.code === 'SOURCE_UNAVAILABLE')
-    return '운영 현황을 모으는 서버에 연결하지 못했어요.';
-  return '잠시 후 다시 시도해 주세요.';
-}
-
-function Metric({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: ReactNode;
-  detail?: ReactNode;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <dt className="text-[11px] text-zoop-muted">{label}</dt>
-      <dd className="text-xl font-[750] tracking-[-0.03em] tabular-nums">
-        {value}
-      </dd>
-      {detail && (
-        <dd className="text-[11px] leading-relaxed text-zoop-faint tabular-nums">
-          {detail}
-        </dd>
-      )}
-    </div>
-  );
-}
-
-function Section({
-  title,
-  to,
-  linkLabel,
-  children,
-}: {
-  title: string;
-  to: string;
-  linkLabel: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex min-w-0 flex-col gap-2" aria-label={title}>
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold">{title}</h2>
-        <Link
-          to={to}
-          className="text-[11px] text-zoop-muted hover:text-zoop-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink"
-        >
-          {linkLabel} →
-        </Link>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Empty({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-[3px] border-[0.667px] border-dashed border-zoop-line bg-zoop-wash px-3 py-4 text-[11px] text-zoop-muted">
-      {children}
-    </p>
-  );
-}
+import InsightsOverviewSection from './InsightsOverviewSection';
 
 function Overview({ data }: { data: Dashboard }) {
   const { candidates, graph, jobs, ai } = data;
@@ -170,16 +101,14 @@ function Briefings({ data }: { data: Dashboard }) {
   return (
     <Section
       title="최근 브리핑 회차"
-      to="/admin/briefings"
-      linkLabel="브리핑 운영"
+      link={[{ to: '/admin/briefings', label: '브리핑 운영' }]}
     >
       {!briefing ? (
         <Empty>브리핑 원장을 읽지 못했어요.</Empty>
       ) : briefing.latest.length === 0 ? (
         <Empty>아직 브리핑 회차가 없어요.</Empty>
       ) : (
-        <table className="w-full border-collapse">
-          <caption className="sr-only">브리핑 회차 목록</caption>
+        <Table caption="브리핑 회차 목록">
           <thead>
             <tr>
               <th className={TH}>회차</th>
@@ -202,7 +131,7 @@ function Briefings({ data }: { data: Dashboard }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
       {briefing && briefing.delayedOrFailed > 0 && (
         <p className="text-[11px] text-zoop-alert">
@@ -217,14 +146,16 @@ function Briefings({ data }: { data: Dashboard }) {
 function Jobs({ data }: { data: Dashboard }) {
   const jobs = data.jobs;
   return (
-    <Section title="최근 작업" to="/admin/pipeline" linkLabel="작업 관제">
+    <Section
+      title="최근 작업"
+      link={[{ to: '/admin/pipeline', label: '작업 관제' }]}
+    >
       {!jobs ? (
         <Empty>작업 원장을 읽지 못했어요.</Empty>
       ) : jobs.recent.length === 0 ? (
         <Empty>아직 실행한 작업이 없어요.</Empty>
       ) : (
-        <table className="w-full border-collapse">
-          <caption className="sr-only">최근 작업 목록</caption>
+        <Table caption="최근 작업 목록">
           <thead>
             <tr>
               <th className={TH}>작업</th>
@@ -245,7 +176,7 @@ function Jobs({ data }: { data: Dashboard }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </Section>
   );
@@ -254,14 +185,16 @@ function Jobs({ data }: { data: Dashboard }) {
 function AiFeatures({ data }: { data: Dashboard }) {
   const ai = data.ai;
   return (
-    <Section title="AI 기능별 요청(7일)" to="/admin/ai" linkLabel="AI 운영">
+    <Section
+      title="AI 기능별 요청(7일)"
+      link={[{ to: '/admin/ai', label: 'AI 운영' }]}
+    >
       {!ai ? (
         <Empty>AI 요청 원장을 읽지 못했어요.</Empty>
       ) : ai.features.length === 0 ? (
         <Empty>최근 7일 동안 AI 요청이 없어요.</Empty>
       ) : (
-        <table className="w-full border-collapse">
-          <caption className="sr-only">AI 기능별 요청</caption>
+        <Table caption="AI 기능별 요청">
           <thead>
             <tr>
               <th className={TH}>기능</th>
@@ -282,7 +215,7 @@ function AiFeatures({ data }: { data: Dashboard }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </Section>
   );
@@ -291,7 +224,10 @@ function AiFeatures({ data }: { data: Dashboard }) {
 function Usage({ data }: { data: Dashboard }) {
   const { members, audit } = data;
   return (
-    <Section title="이용 현황" to="/admin/audit" linkLabel="감사 로그">
+    <Section
+      title="이용 현황"
+      link={[{ to: '/admin/audit', label: '감사 로그' }]}
+    >
       <dl className="grid grid-cols-3 gap-6 py-2">
         <Metric
           label="등록 회원"
@@ -321,55 +257,45 @@ function Usage({ data }: { data: Dashboard }) {
 export default function DashboardSummary() {
   const dashboard = useAsyncData(getAdminDashboard);
   const data = dashboard.data;
+  // 새로 고침하면 이용·선호도 영역도 다시 읽는다.
+  const [refresh, setRefresh] = useState(0);
 
   return (
     <div className="flex flex-col gap-6 py-8 text-zoop-ink">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-[750] tracking-[-0.035em]">대시보드</h1>
-        <div className="flex items-center gap-3">
-          {data && (
-            <p className="font-inter text-[11px] text-zoop-muted tabular-nums">
-              갱신 {formatKst(data.generatedAt)}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={dashboard.reload}
-            disabled={dashboard.status === 'loading'}
-            className={RETRY_BUTTON}
-          >
-            새로 고침
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="대시보드"
+        actions={
+          <>
+            {data && (
+              <p className="font-inter text-[11px] text-zoop-muted tabular-nums">
+                갱신 {formatKst(data.generatedAt)}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                dashboard.reload();
+                setRefresh((value) => value + 1);
+              }}
+              disabled={dashboard.status === 'loading'}
+              className={BUTTON}
+            >
+              새로 고침
+            </button>
+          </>
+        }
+      />
 
       {dashboard.status === 'loading' && (
-        <p role="status" className="text-xs text-zoop-muted">
-          대시보드를 불러오고 있어요
-        </p>
+        <Loading>대시보드를 불러오고 있어요</Loading>
       )}
 
       {dashboard.status === 'error' && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center gap-3 rounded-[3px] border-[0.667px] border-zoop-line bg-zoop-wash px-4 py-3"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold">
-              대시보드를 불러오지 못했어요
-            </p>
-            <p className="mt-0.5 text-[11px] text-zoop-muted">
-              {errorMessage(dashboard.error)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={dashboard.reload}
-            className={RETRY_BUTTON}
-          >
-            다시 시도
-          </button>
-        </div>
+        <ErrorBox
+          title="대시보드를 불러오지 못했어요"
+          error={dashboard.error}
+          onRetry={dashboard.reload}
+        />
       )}
 
       {data && (
@@ -392,6 +318,7 @@ export default function DashboardSummary() {
             <AiFeatures data={data} />
             <Usage data={data} />
           </div>
+          <InsightsOverviewSection key={refresh} />
         </>
       )}
     </div>
