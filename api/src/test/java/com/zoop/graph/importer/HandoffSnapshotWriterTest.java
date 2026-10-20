@@ -142,6 +142,8 @@ class HandoffSnapshotWriterTest {
         JsonNode receipt = HandoffFixtures.parse(HandoffSnapshotWriter.receipt(verified));
         assertEquals(root.get("bundle"), receipt.get("bundle"));
         assertEquals(3, receipt.get("bundle").get("issues").get(1).get("sourceEvents").size());
+        // Three source events of two document versions are two original mentions (the comparison and the snapshot list m-a of document a).
+        assertEquals(2, receipt.get("bundle").get("issues").get(1).get("mentions").size());
         assertTrue(receipt.get("bundle").get("issues").get(0).has("period"));
     }
 
@@ -177,6 +179,11 @@ class HandoffSnapshotWriterTest {
         JsonNode events = receipt.get("bundle").get("issues").get(1).get("sourceEvents");
         assertEquals(3, events.size());
         assertTrue(events.values().stream().allMatch(event -> event.get("mentionId").stringValue().equals("m-a")));
+        // ... and the two documents stay two original mentions with one local id, never merged and never renamed in the receipt.
+        JsonNode mentions = receipt.get("bundle").get("issues").get(1).get("mentions");
+        assertEquals(2, mentions.size());
+        assertTrue(mentions.values().stream().allMatch(mention -> mention.get("mentionId").stringValue().equals("m-a")));
+        assertEquals(2, mentions.values().stream().map(mention -> mention.get("documentId").stringValue()).distinct().count());
     }
 
     @Test

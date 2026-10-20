@@ -52,7 +52,7 @@ POST 가입·로그인·소셜 가입 완료·명시적 소셜 연결 시작과 
 
 ### chartResolution
 
-가격 차트의 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). PriceSeries.interval은 공급된 해상도를 그대로 담으며 목표 해상도를 제공하지 못하면 다른 해상도의 값을 이름만 바꾸거나 집계·보간해 채우지 않고 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이다. 이 값은 목표 계약이며 공급자 출력을 만들어내지 않는다. 기계 판독용 매핑은 x-zoop-approvals.chartResolution이다.
+가격 차트의 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). PriceSeries.interval은 응답 봉의 해상도이며 다른 해상도의 값을 이름만 바꿔 담지 않는다. 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이다. 기계 판독용 매핑은 x-zoop-approvals.chartResolution이다.
 
 ### publicationVersions
 
@@ -985,7 +985,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCompanyPrices · 기간별 가격 차트 조회
 
-기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 해당 해상도를 제공하지 않으면 다른 해상도의 값을 이름만 바꾸거나 집계·보간해 채우지 않고 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각(to는 그 시각 포함)이며, 각 점은 [from, to]와 겹치는 구간(5m·1h·거래소 하루·월요일 시작 주) 하나로 구간 전체 값을 담는다. 가격은 공개 그래프 버전·기준 시점과 무관하므로 asOf·graphVersion을 받지 않으며 주면 422 INVALID_REQUEST다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1007,11 +1007,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | period | query | 선택 | string {1d, 1w, 1m, 1y} |  |
-| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. |
+| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. 범위는 period 하나(1d=하루, 1w=7일, 1m=한 달, 1y=1년, KST 달력 기준)까지이며, from이 to(생략 시 요청 시각)에서 그만큼 전보다 앞서면 422 INVALID_REQUEST다. |
 | to | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
-| graphVersion | query | 선택 | string | 조회할 불변 공개 버전 ID. round/asOf와 일치해야 한다. |
-| asOf | query | 선택 | string (date-time) | 이 시각 이전의 공개 자료만 사용한다. 오프셋 필수. |
 
 <a id="listcompanydocuments"></a>
 
@@ -1508,7 +1506,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getAdminDashboard · 운영 대시보드 조회
 
-운영 대시보드 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+운영 대시보드 조회. 영역별로 독립 집계하며 일부 영역을 조회할 수 없으면 성공 영역을 유지하고 metadata.partial/failures에 미조회 영역을 기록한다. metadata.asOf는 generatedAt과 같으며 metadata.graphVersion은 null이다. members.registered는 차단 회원을 포함한 전체 가입 회원 수, activeMemberSessions는 기준 시각에 계정 상태가 active이고 세션이 유효한 회원 세션 수, activeGuestSessions는 기준 시각에 유효한 비회원 세션 수다. ai.requests는 7일 동안 접수된 사용자 요청 수이며 모델 실행 시도 수가 아니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3839,15 +3837,16 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| generatedAt | 필수 | string (date-time) |  |
+| generatedAt | 필수 | string (date-time) | 대시보드 집계 기준 시각. 모든 기간 집계는 이 시각을 기준으로 계산한다. |
+| metadata | 필수 | [Metadata](#schema-metadata) | 이 대시보드 응답의 metadata.asOf는 generatedAt과 같고, 그래프 버전 자체를 조회 기준으로 사용하지 않으므로 graphVersion은 null이다. |
 | ledger | 필수 | [DashboardLedger](#schema-dashboardledger) |  |
-| graph | 필수 | [DashboardGraph](#schema-dashboardgraph) |  |
-| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null |  |
-| jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) |  |
-| ai | 필수 | [DashboardAi](#schema-dashboardai) |  |
-| briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) |  |
-| members | 필수 | [DashboardMembers](#schema-dashboardmembers) |  |
-| audit | 필수 | [DashboardAudit](#schema-dashboardaudit) |  |
+| graph | 필수 | [DashboardGraph](#schema-dashboardgraph) / null | null when the graph version summary could not be read; subarea failures are listed individually in metadata.failures. |
+| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null | null when candidate source is unavailable; an empty but successfully read source returns zero counts. |
+| jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) / null | null when the job source is unavailable; a successfully read source with no jobs returns zero counts and an empty recent list. |
+| ai | 필수 | [DashboardAi](#schema-dashboardai) / null | null when user-request records are unavailable; model execution attempts are not substituted. |
+| briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) / null | null when the briefing-round source is unavailable; no rounds in an available source returns an empty latest list. |
+| members | 필수 | [DashboardMembers](#schema-dashboardmembers) / null | null when member/session counts could not be read. |
+| audit | 필수 | [DashboardAudit](#schema-dashboardaudit) / null | null when the 24-hour audit count could not be read. |
 
 <a id="schema-dashboardai"></a>
 
@@ -3857,10 +3856,10 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| window | 필수 | string |  |
-| requests | 필수 | integer |  |
-| succeeded | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| window | 필수 | string | 생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt). |
+| requests | 필수 | integer | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
+| succeeded | 필수 | integer | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
+| failed | 필수 | integer | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
 | features | 필수 | [DashboardAiFeature](#schema-dashboardaifeature)[] |  |
 
 <a id="schema-dashboardaifeature"></a>
@@ -3873,8 +3872,8 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | feature | 필수 | string |  |
 | label | 필수 | string |  |
-| requests | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| requests | 필수 | integer | 해당 AI 기능에 접수된 사용자 요청 수. |
+| failed | 필수 | integer | 해당 기능에서 실패로 종료된 사용자 요청 수. |
 
 <a id="schema-dashboardaudit"></a>
 
@@ -3884,7 +3883,7 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| last24h | 필수 | integer |  |
+| last24h | 필수 | integer | [generatedAt-24h, generatedAt) 구간의 감사 기록 수. |
 
 <a id="schema-dashboardbriefings"></a>
 
@@ -3922,11 +3921,29 @@ The selection frozen when the question was first received.
 | activeVersionId | 필수 | string / null |  |
 | activatedAt | 필수 | string (date-time) / null |  |
 | versionCount | 필수 | integer |  |
-| activeVersion | 필수 | [GraphVersionOut](#schema-graphversionout) / null |  |
-| reviewRevision | 필수 | integer |  |
-| reviewDecisions | 필수 | integer |  |
-| rules | 필수 | [ReviewRuleOut](#schema-reviewruleout)[] |  |
+| activeVersion | 필수 | [DashboardActiveGraphVersion](#schema-dashboardactivegraphversion) / null |  |
+| reviewRevision | 필수 | integer / null | Latest decision revision when available; null when the review source has not been implemented or read. |
+| reviewDecisions | 필수 | integer / null | Current review decision count, or null when unavailable. |
+| rules | 필수 | [ReviewRuleOut](#schema-reviewruleout)[] / null | Current rules, or null when the review source is unavailable. An empty array means it was read and has no rules. |
 | graphDb | 필수 | [GraphDbStatus](#schema-graphdbstatus) / null |  |
+
+<a id="schema-dashboardactivegraphversion"></a>
+
+### DashboardActiveGraphVersion
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| sequence | 필수 | integer |  |
+| kind | 필수 | string | 그래프 저장소가 기록한 버전 종류. |
+| sourceLabel | 필수 | string |  |
+| createdAt | 필수 | string (date-time) |  |
+| activatedAt | 필수 | string (date-time) / null | Null if the active version has no activation record at the snapshot time. |
+| issueCount | 필수 | integer |  |
+| relationCount | 필수 | integer |  |
+| articleCount | 필수 | integer |  |
 
 <a id="schema-dashboardjobs"></a>
 
@@ -3961,10 +3978,10 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| registered | 필수 | integer |  |
-| activeMemberSessions | 필수 | integer |  |
-| activeGuestSessions | 필수 | integer |  |
-| source | 필수 | string |  |
+| registered | 필수 | integer | 차단 회원을 포함한 전체 가입 회원 수. |
+| activeMemberSessions | 필수 | integer | 기준 시각에 회원 계정이 active이며 만료되지 않고 폐기되지 않은 회원 세션 수. |
+| activeGuestSessions | 필수 | integer | 기준 시각에 만료되지 않고 폐기되지 않은 비회원 세션 수. |
+| source | 필수 | string | 집계 데이터 원천. |
 
 <a id="schema-datawindow"></a>
 
@@ -5360,7 +5377,7 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | period | 필수 | string {1d, 1w, 1m, 1y} |  |
 | source | 필수 | [QuoteSourceOut](#schema-quotesourceout) |  |
 | currency | 필수 | string |  |
-| interval | 필수 | string {5m, 1h, 1d, 1wk} | 공급된 가격 봉 해상도다. 기간별로 고정이며 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉)다. 조회 기간과 구분하고 from/to 및 자료 기준 시각을 함께 표시한다. 목표 해상도를 제공하지 못하면 다른 해상도를 이 필드로 위장하지 않고 unavailable을 반환한다. |
+| interval | 필수 | string {5m, 1h, 1d, 1wk} | 공급된 가격 봉 해상도다. 기간별로 고정이며 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉)다. 조회 기간과 구분하고 from/to 및 자료 기준 시각을 함께 표시한다. 더 촘촘한 봉을 집계한 경우에도 집계 결과의 해상도를 담으며, 다른 해상도를 이 필드로 위장하지 않는다(x-zoop.chartResolution). |
 | points | 필수 | [PricePoint](#schema-pricepoint)[] | Oldest first. |
 
 <a id="schema-priceseriesunavailable"></a>

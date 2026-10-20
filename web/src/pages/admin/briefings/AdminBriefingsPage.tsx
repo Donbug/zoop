@@ -1,10 +1,10 @@
-import PageShell from '@/components/common/PageShell';
 import BriefingOperations from '@/components/admin/briefings/BriefingOperations';
 
+// A-ADM-04 브리핑 운영 (/admin/briefings)
 export default function AdminBriefingsPage() {
   return (
-    <PageShell title="브리핑 운영">
+    <div data-screen-id="A-ADM-04">
       <BriefingOperations />
-    </PageShell>
+    </div>
   );
 }
