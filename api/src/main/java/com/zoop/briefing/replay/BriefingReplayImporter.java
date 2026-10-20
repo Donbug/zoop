@@ -168,14 +168,16 @@ public final class BriefingReplayImporter {
     private ImportResult importSimulation(byte[] sourceBytes, byte[] bundleBytes, StrictJson.Obj bundle) {
         String scope = "publication_clock_simulation", sourceSha = Canonical.sha256(sourceBytes), bundleSha = Canonical.sha256(bundleBytes);
         boolean grouped = BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"));
+        BriefingGroupedRecoveryRules.Layer recovery = BriefingGroupedRecoveryRules.load(bundle, settings.bundle().getParent(), settings.userInboxRef());
         String run = text(bundle, "runId"), clockSha = text(bundle, "clockFileSha256");
+        String effectiveRun = recovery == null ? run : recovery.root().string("runId");
         require(run.matches("[A-Za-z0-9_-]{1,96}") && clockSha.matches("[0-9a-f]{64}"), "simulation_identity");
         require(scope.equals(bundle.string("mode")) && sourceSha.equals(bundle.string("sourceFileSha256"))
                 && bundle.bool("retrospectiveBodies") && !bundle.bool("operationalCollectionGate"), "simulation_mode");
         StrictJson.Obj authorization = bundle.object("authorization");
         require(scope.equals(authorization.string("scope")) && !authorization.bool("productionAuthorized")
                 && sourceSha.equals(authorization.string("sourceSha256"))
-                && (bundle.has("marketEnrichment") || settings.userInboxRef().equals(authorization.string("userInboxRef"))), "simulation_authorization");
+                && (recovery != null || bundle.has("marketEnrichment") || settings.userInboxRef().equals(authorization.string("userInboxRef"))), "simulation_authorization");
         Map<String, StrictJson.Obj> marketRounds = validateMarketEnrichment(bundle, settings.userInboxRef(), settings.bundle().getParent());
         Map<String, Source> pool = sources(sourceBytes);
         Map<String, JsonNode> sourceNodes = new LinkedHashMap<>(); pool.forEach((key, value) -> sourceNodes.put(key, value.row().node()));
@@ -185,7 +187,7 @@ public final class BriefingReplayImporter {
         List<StrictJson.Obj> definitions = bundle.objects("rounds"); require(definitions.size() == 14, "simulation_fourteen_rounds");
         boolean qualityV2 = simulationQualityV2(definitions.getFirst().object("identity"));
         ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray();
-        String namespace = "brf-sim-" + Canonical.sha256(run).substring(0, 16);
+        String namespace = "brf-sim-" + Canonical.sha256(effectiveRun).substring(0, 16);
         Map<String, Source> documents = new LinkedHashMap<>(); Map<String, Citation> citations = new LinkedHashMap<>();
         Map<String, Blob> blobs = new LinkedHashMap<>(); List<Round> publications = new ArrayList<>();
         List<Held> held = new ArrayList<>(); List<String> ids = new ArrayList<>();
@@ -324,6 +326,84 @@ public final class BriefingReplayImporter {
             ids.add(id);
         }
         require(accounted.equals(allReceipts.keySet()), "simulation_unowned_paid_receipt");
+        // The old fourteen-round chain, source population and provider recordings have all passed unchanged above.
+        // Only now may a separately authorized item layer replace the effective publication/held views.
+        if (recovery != null) {
+            BriefingGroupedRecoveryRules.validate(recovery, bundle, settings.bundle().getParent());
+            publications.clear(); held.clear(); citations.clear();
+            blobs.put(namespace + "-base-bundle", blob("ai_submit", recovery.baseBytes()));
+            blobs.put(namespace + "-recovery-layer", blob("briefing_input", StrictJson.write(recovery.root().node())));
+            if (recovery.editorialBytes() != null) blobs.put(namespace + "-editorial-review", blob("verification_receipt", recovery.editorialBytes()));
+            int recoveryIndex = 0;
+            for (StrictJson.Obj original : definitions) {
+                StrictJson.Obj effective = recovery.rounds().get(original.string("roundId"));
+                String id = original.string("roundId"), edition = original.string("edition"); LocalDate date = LocalDate.parse(original.string("date"));
+                Instant from = Instant.parse(original.object("window").string("from")), cutoff = Instant.parse(original.object("window").string("to"));
+                Map<String, Source> inputs = new LinkedHashMap<>();
+                for (StrictJson.Obj source : original.objects("inputSources")) {
+                    String key = source.string("documentId") + "\u0000" + source.string("bodySha256"); inputs.put(key, pool.get(key));
+                }
+                Map<String, Issue> selected = selections(effective, inputs, true);
+                for (StrictJson.Obj item : effective.objects("selected")) {
+                    Set<String> supplied = new HashSet<>(), resolved = new HashSet<>();
+                    item.objects("companyLinks").forEach(c -> supplied.add(c.string("companyId")));
+                    selected.get(item.string("issueId")).companies().forEach(c -> resolved.add(c.id()));
+                    require(supplied.equals(resolved), "grouped_company_catalog_identity");
+                }
+                ObjectNode marker = StrictJson.newObject().put("scope", scope).put("runId", effectiveRun).put("sourceFileSha256", sourceSha)
+                        .put("clockFileSha256", clockSha).put("bundleSha256", bundleSha).put("userInboxRef", settings.userInboxRef())
+                        .put("retrospectiveBodies", true).put("operationalCollectionGate", false).put("selectionStatus", effective.string("status"))
+                        .put("baseBundleSha256", recovery.root().string("baseBundleSha256")).put("baseRoundSha256", effective.string("baseRoundSha256"))
+                        .put("recoveryPolicyVersion", recovery.root().string("policyVersion"));
+                marker.set("identity", original.object("identity").node().deepCopy());
+                marker.set("sourceCoverage", original.object("sourceCoverage").node().deepCopy());
+                ArrayNode itemAudit = marker.putArray("itemRecovery");
+                for (StrictJson.Obj issue : effective.objects("issues")) {
+                    ObjectNode audit = itemAudit.addObject().put("issueId", issue.string("issueId")).put("status", issue.string("status"))
+                            .put("originalRank", issue.count("originalRank")); audit.set("errors", issue.array("errors").deepCopy());
+                }
+                blobs.put(namespace + "-recovery-input-" + recoveryIndex, blob("briefing_input", StrictJson.write(effective.node())));
+                if (!"SELECTED".equals(effective.string("status"))) {
+                    require(selected.isEmpty(), "recovery_held_selection"); ObjectNode snapshot = StrictJson.newObject(); snapshot.set("replay", marker);
+                    held.add(new Held(id, date, edition, from, cutoff, "HELD_SOURCE_COVERAGE".equals(effective.string("status")) ? "missing" : "failed", snapshot));
+                } else {
+                    StrictJson.Obj result = effective.object("result"); validateGeneration(result, selected);
+                    Instant generated = Instant.parse(result.string("generatedAt")); if (generated.isAfter(created)) created = generated;
+                    Map<String, Source> publishedSources = new LinkedHashMap<>();
+                    for (Issue issue : selected.values()) for (Citation citation : issue.citations()) {
+                        publishedSources.put(citation.source().key(), citation.source());
+                        Citation previous = citations.putIfAbsent(citation.id(), citation); require(previous == null || previous.equals(citation), "recovery_evidence_conflict");
+                    }
+                    Round base = round(namespace, edition, date, date.minusDays(1), sourceSha, bundleSha, effectiveRun,
+                            original.object("identity"), selected, result, publishedSources, generated);
+                    ObjectNode payload = base.payload(); payload.put("id", id);
+                    payload.set("dataWindow", StrictJson.newObject().put("start", from.toString()).put("end", cutoff.toString()).put("openStart", false));
+                    payload.put("selectedFrom", inputs.size());
+                    for (JsonNode value : payload.path("items")) {
+                        Issue issue = selected.get(value.path("eventId").stringValue());
+                        ((ObjectNode) value).put("reportedAt", issue.citations().stream().map(c -> clocks.verified.get(c.source().key()).publishedAt()).max(Instant::compareTo).orElseThrow().toString());
+                    }
+                    ObjectNode metadata = (ObjectNode) payload.path("metadata"); metadata.put("source", "zoop-briefing-publication-clock-simulation");
+                    ((ObjectNode) metadata.path("selection")).put("reason", "기존 회차의 중요도 선정과 원문 근거를 유지하고, 문장별 검증·이전 발행 근거 비교를 통과한 항목을 제공합니다.");
+                    ArrayNode failures = metadata.putArray("failures");
+                    failure(failures, "dataWindow", "RETROSPECTIVE_BODY", "원 발행시각 기준의 과거 시뮬레이션이며 당시 수집·동일 본문 버전·전체 시장 모집단을 입증하지 않습니다.");
+                    failure(failures, "marketVariables", "SOURCE_UNAVAILABLE", "당시 KOSPI·KOSDAQ·환율 및 전망 성과는 제공하지 않습니다.");
+                    failure(failures, "graphVersion", "SOURCE_UNAVAILABLE", "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.");
+                    if (effective.bool("partial")) failure(failures, "items", "ITEMS_WITHHELD", "선정 항목 중 문장 검증 또는 이전 발행 근거 비교를 통과하지 못한 항목은 보류했습니다.");
+                    ObjectNode snapshot = base.snapshot(); snapshot.set("replay", marker);
+                    ((ObjectNode) snapshot.path("marketSummary")).put("reason", "이번 이슈 묶음 브리핑에서는 시장 요약을 새로 생성하지 않았습니다.");
+                    marker.put("resultSha256", effective.string("resultSha256")).put("inputArtifactId", namespace + "-recovery-input-" + recoveryIndex)
+                            .put("resultArtifactId", namespace + "-recovery-result-" + recoveryIndex).put("verificationArtifactId", namespace + "-recovery-verification-" + recoveryIndex);
+                    blobs.put(namespace + "-recovery-result-" + recoveryIndex, blob("analysis_result", StrictJson.write(result.node())));
+                    blobs.put(namespace + "-recovery-verification-" + recoveryIndex, blob("verification_receipt", StrictJson.write(result.object("verification").node())));
+                    ObjectNode comparison = "morning".equals(edition) ? null : StrictJson.newObject().put("status", "unavailable")
+                            .put("reason", "이전 발행의 원문 근거와 반복 여부만 비교했으며 실제 장중 변화·전망 성과 평가는 없습니다.");
+                    publications.add(new Round(id, date, edition, cutoff, from, generated, generated, payload, snapshot, comparison));
+                }
+                recoveryIndex++;
+            }
+            recovery.receipts().forEach((key, value) -> require(allReceipts.putIfAbsent(key, value) == null, "recovery_receipt_ownership"));
+        }
         if (grouped) {
             blobs.put(namespace + "-grouped-issues", blob("briefing_input", groupedArchive.bytes()));
             for (BriefingGroupedSimulationRules.UnknownCall call : groupedArchive.unknownCalls()) {
@@ -355,11 +435,11 @@ public final class BriefingReplayImporter {
         sourceBlobs(namespace, sourceSha, documents, citations, blobs);
         int receiptIndex = 0; for (JsonNode receipt : allReceipts.values()) blobs.put(namespace + "-usage-" + receiptIndex++, blob("ai_call_receipt", StrictJson.write(receipt)));
         paidResponseBlobs(namespace, allReceipts, blobs);
-        ObjectNode grants = grants(run, sourceSha, documents.values().stream().toList()); grants.put("scope", scope);
+        ObjectNode grants = grants(effectiveRun, sourceSha, documents.values().stream().toList()); grants.put("scope", scope);
         byte[] grantBytes = StrictJson.write(grants); checkExisting(settings.grants(), grantBytes);
         if (Files.exists(settings.manifest(), LinkOption.NOFOLLOW_LINKS)) {
             StrictJson.Obj prior = StrictJson.parseObject(read(settings.manifest()));
-            require(scope.equals(prior.string("scope")) && run.equals(prior.string("runId"))
+            require(scope.equals(prior.string("scope")) && effectiveRun.equals(prior.string("runId"))
                     && bundleSha.equals(prior.string("bundleSha256")) && clockSha.equals(prior.string("clockFileSha256")), "simulation_manifest_conflict");
         }
         Instant storedAt = created;
@@ -377,7 +457,7 @@ public final class BriefingReplayImporter {
                 return count == ids.size();
             });
             ObjectNode manifest = StrictJson.newObject().put("schemaVersion", "zoop-briefing-replay-manifest-v1").put("scope", scope)
-                    .put("runId", run).put("sourceFileSha256", sourceSha).put("clockFileSha256", clockSha).put("bundleSha256", bundleSha)
+                    .put("runId", effectiveRun).put("sourceFileSha256", sourceSha).put("clockFileSha256", clockSha).put("bundleSha256", bundleSha)
                     .put("userInboxRef", settings.userInboxRef()).put("grantsSha256", Canonical.sha256(grantBytes));
             ArrayNode summaries = manifest.putArray("rounds");
             for (String id : ids) {
@@ -390,7 +470,7 @@ public final class BriefingReplayImporter {
             ArrayNode artifactList = manifest.putArray("artifacts"); stored.forEach((id, value) -> artifactList.addObject().put("id", id)
                     .put("sha256", value.sha256()).put("bytes", value.bytes()).put("uri", value.uri()));
             publish(settings.grants(), grantBytes); publish(settings.manifest(), StrictJson.write(manifest));
-            return new ImportResult(run, List.copyOf(ids), documents.size(), citations.size(), blobs.size(), Boolean.TRUE.equals(existed));
+            return new ImportResult(effectiveRun, List.copyOf(ids), documents.size(), citations.size(), blobs.size(), Boolean.TRUE.equals(existed));
         }
     }
 
