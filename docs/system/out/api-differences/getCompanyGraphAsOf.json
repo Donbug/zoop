@@ -11,6 +11,19 @@
       "type": "string"
     },
     "query.graphVersion:required": false,
+    "response:200:application/json.edges[].validity:required": true,
+    "response:200:application/json.edges[].validity<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "active",
+        "ended",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.edges[].validity<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.metadata.failures": {
       "type": "array"
     },

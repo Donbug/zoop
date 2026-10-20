@@ -114,9 +114,46 @@ class GraphSnapshotCodecTest {
     }
 
     @Test
+    void structuralBasisKeepsItsPathAndMustCiteAPinnedArticle() throws IOException {
+        var basis = GraphSnapshotCodec.read(v1().getBytes(StandardCharsets.UTF_8), "fixture-2026-10-01").relations().stream()
+                .filter(r -> r.relationId().equals("rel-fixture-04")).findFirst().orElseThrow().basis().get(0);
+        assertEquals("basis-fixture-04", basis.basisId());
+        assertEquals("SUPPLIES", basis.relationType());
+        assertEquals(java.util.List.of("KR"), basis.countries());
+        assertEquals(java.util.List.of(new PublicGraphSnapshot.ArticleRef("art-hbm-equip", "v1")), basis.articles());
+
+        String unpinned = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?\"articleVersion\": )\"v1\"", "$1\"v9\"");
+        assertEquals("snapshot_invalid:relation_basis_article", reason(unpinned, "fixture-2026-10-01"));
+        // A reference needs both its id and version, and the list itself is required (empty when none is named).
+        String half = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?\"articleVersion\": )\"v1\"", "$1null");
+        assertEquals("snapshot_malformed", reason(half, "fixture-2026-10-01"));
+        String noList = v1().replaceFirst("(\"basisId\": \"basis-fixture-04\",[\\s\\S]*?)\"articles\": \\[[\\s\\S]*?\\]", "$1\"other\": []");
+        assertEquals("snapshot_malformed", reason(noList, "fixture-2026-10-01"));
+    }
+
+    @Test
+    void issueKeepsPeriodStatusAndMentionsThatCiteItsOwnArticles() throws IOException {
+        var issues = GraphSnapshotCodec.read(v1().getBytes(StandardCharsets.UTF_8), "fixture-2026-10-01").issues();
+        var supply = issues.stream().filter(i -> i.issueId().equals("iss-fixture-hbm-supply")).findFirst().orElseThrow();
+        assertEquals("occurred", supply.assertionStatus());
+        assertEquals("men-fixture-hbm-supply-1", supply.representativeMentionId());
+        assertEquals("art-hbm-supply", supply.mentions().get(0).articleId());
+        var euv = issues.stream().filter(i -> i.issueId().equals("iss-fixture-euv-export")).findFirst().orElseThrow();
+        assertEquals("2026Q4", euv.period());
+        assertEquals(2, euv.mentions().size());
+
+        String foreign = v1().replaceFirst("(\"mentionId\": \"men-fixture-hbm-supply-1\",\\s*\"articleId\": )\"art-hbm-supply\"",
+                "$1\"art-hbm-equip\"");
+        assertEquals("snapshot_invalid:issue_mention_reference", reason(foreign, "fixture-2026-10-01"));
+        String dangling = v1().replace("\"representativeMentionId\": \"men-fixture-hbm-supply-1\"",
+                "\"representativeMentionId\": \"men-unknown\"");
+        assertEquals("snapshot_invalid:issue_representative_mention", reason(dangling, "fixture-2026-10-01"));
+    }
+
+    @Test
     void emptyGraphIsAValidSnapshot() {
         String json = """
-                {"snapshotFormat": 1, "versionId": "fixture-empty", "sourceBundleId": null, "companies": [],
+                {"snapshotFormat": 3, "versionId": "fixture-empty", "sourceBundleId": null, "companies": [],
                  "issues": [], "relations": [], "articles": [], "evidence": []}
                 """;
         PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(json.getBytes(StandardCharsets.UTF_8), "fixture-empty");

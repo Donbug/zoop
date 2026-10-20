@@ -15,6 +15,16 @@
       "type": "string"
     },
     "query.graphVersion:required": false,
+    "response:200:application/json.directIssues[].basis[].validity": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "active",
+        "ended",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.directIssues[].basis[].validity:required": true,
     "response:200:application/json.foundedDate": {
       "type": [
         "string",
@@ -89,6 +99,16 @@
       ]
     },
     "response:200:application/json.representative:required": true,
+    "response:200:application/json.structuralIssues[].basis[].validity": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "active",
+        "ended",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.structuralIssues[].basis[].validity:required": true,
     "response:200:application/json.summary<anyOf:0>": {
       "type": "object"
     },

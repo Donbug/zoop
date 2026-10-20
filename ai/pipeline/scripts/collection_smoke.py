@@ -3,9 +3,13 @@
 
 Everything is synthetic and loopback-only (the policy sets `syntheticLoopback`, the only way an http/loopback URL is ever fetched). No
 external site, model, provider, proxy or credential is used, the original PoC is not imported, and all state is removed afterwards.
+
+`--output-dir DIR` instead runs only the collect -> ingest -> export demonstration of the same synthetic site and KEEPS its files (configs, collected bytes,
+ingestion state, one export JSON per document) for a recipient to inspect. Nothing in that directory is a real collected document.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
@@ -123,17 +127,25 @@ class CollectionKit(OfflineFixture):
                 **{key: ref[key] for key in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")}}
 
 
+def synthetic_routes(site: LocalSite):
+    site.route("/robots.txt", ROBOTS, content_type="text/plain")
+    site.route("/news/a", NEWS)
+    site.route("/disclosure/b.pdf", authored_pdf("disclosure body"), content_type="application/pdf")
+    site.route("/private/x", NEWS)
+
+
+def synthetic_targets(kit: CollectionKit, site: LocalSite):
+    return [kit.target(site.url("/news/a"), "n1", title="synthetic news", published="2026-10-14"),
+            kit.target(site.url("/disclosure/b.pdf"), "d1", title="synthetic disclosure", kind="disclosure", published="2026-10-14T09:00:00+09:00", supplier="filing-1")]
+
+
 def smoke(root: Path) -> dict:
     site = LocalSite()
     checks = []
     try:
         kit = CollectionKit(root / "kit")
-        site.route("/robots.txt", ROBOTS, content_type="text/plain")
-        site.route("/news/a", NEWS)
-        site.route("/disclosure/b.pdf", authored_pdf("disclosure body"), content_type="application/pdf")
-        site.route("/private/x", NEWS)
-        targets = [kit.target(site.url("/news/a"), "n1", published="2026-10-14"),
-                   kit.target(site.url("/disclosure/b.pdf"), "d1", kind="disclosure", published="2026-10-14T09:00:00+09:00", supplier="filing-1")]
+        synthetic_routes(site)
+        targets = synthetic_targets(kit, site)
         first = kit.collect("collect-1", targets, env=PROXY_ENV)
         assert first["state"] == "complete" and first["provenance"] == "collected_http" and first["replayed"] is False, first
         assert first["usage"] == {"requests": 3, "bytes": first["usage"]["bytes"], "targets": 2, "collected": 2}, first["usage"]
@@ -212,7 +224,48 @@ def smoke(root: Path) -> dict:
     return {"status": "passed", "providerCalls": 0, "modelCalls": 0, "externalNetwork": "none: loopback server only", "checks": checks}
 
 
+def demo(root: Path) -> dict:
+    """The recipient demonstration: the same synthetic loopback collect -> ingest -> export, but the files are kept under `root`."""
+    if root.exists() and any(root.iterdir()):
+        raise SystemExit(f"--output-dir must be absent or empty: {root}")
+    root = root.resolve()
+    site = LocalSite()
+    try:
+        kit = CollectionKit(root)
+        synthetic_routes(site)
+        targets = synthetic_targets(kit, site)
+        collect_request = kit.collection_request("demo-collect-1", targets)
+        (root / "collect-request.json").write_bytes(json_bytes(collect_request))
+        collected = kit.collect_raw(collect_request, env=PROXY_ENV)
+        assert collected["state"] == "complete", collected
+        manifest = Path(collected["manifestPath"])
+        ingest_request = kit.request(manifest, "demo-round-1")
+        (root / "ingest-run-request.json").write_bytes(json_bytes(ingest_request))
+        ran = kit.cli("run", ingest_request, manifest=manifest)
+        assert ran["state"] == "complete" and ran["counts"]["textReady"] == len(targets), ran
+        exports = root / "exports"
+        exports.mkdir()
+        written = []
+        for ref, target in zip(ran["documentRefs"], targets):
+            exported = kit.cli("export", kit.export_selector("demo-round-1", ref), extra=["--require-store"])
+            path = exports / f"{target['candidateId']}.json"
+            path.write_text(json.dumps(exported, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            written.append(str(path))
+    finally:
+        site.close()
+    return {"status": "passed", "synthetic": True, "network": "synthetic_loopback: a throwaway 127.0.0.1 server, not an external document",
+            "providerCalls": 0, "modelCalls": 0, "outputDir": str(root), "sources": str(kit.registry_path), "policy": str(kit.policy_path),
+            "collectionDir": str(kit.inputs / "collections" / "demo-collect-1"), "ingestionState": str(root / "state" / "ingestion.sqlite3"),
+            "exports": written}
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, help="keep the synthetic configs, collected bytes, ingestion state and exports here (must be absent or empty) instead of running the full regression smoke")
+    args = parser.parse_args()
+    if args.output_dir is not None:
+        print(json.dumps(demo(args.output_dir), ensure_ascii=False, indent=2))
+        return
     with tempfile.TemporaryDirectory(prefix="zoop-collection-smoke-") as temporary:
         root = Path(temporary).resolve()
         result = smoke(root)
