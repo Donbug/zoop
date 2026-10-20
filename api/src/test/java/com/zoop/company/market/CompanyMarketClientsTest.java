@@ -33,6 +33,9 @@ class CompanyMarketClientsTest {
     private volatile boolean paginateCandles;
     private volatile boolean rateLimitOnce;
     private volatile boolean omitStockCurrency;
+    /** Daily candles stamped like Toss: KRX at KST midnight, US at New York midnight shown in KST. */
+    private volatile boolean exchangeDaily;
+    private volatile boolean malformedCandle;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -160,6 +163,7 @@ class CompanyMarketClientsTest {
 
     @Test
     void monthOfDailyBarsOldestFirstWithTheExchangeOffset() {
+        exchangeDaily = true;
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null);
 
         assertEquals("available", result.status());
@@ -167,8 +171,7 @@ class CompanyMarketClientsTest {
         assertEquals("1d", result.interval());
         assertEquals("KRW", result.currency());
         assertEquals("toss", result.source().provider());
-        // Default range starts one month before today (KST 2026-10-16), so the 2025 bars are left out.
-        assertEquals(List.of("2026-10-14T09:00+09:00", "2026-10-15T09:00+09:00"),
+        assertEquals(List.of("2026-10-14T00:00+09:00", "2026-10-15T00:00+09:00"),
                 result.points().stream().map(p -> p.time()).toList());
         var last = result.points().get(1);
         assertEquals(695.0, last.open());
@@ -177,15 +180,55 @@ class CompanyMarketClientsTest {
     }
 
     @Test
-    void dailyBarsAreKeptByTheirKstDay() {
+    void aDailyBarIsInTheRangeWhenItsExchangeDayOverlapsIt() {
+        exchangeDaily = true;
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
                 kst("2026-10-15T00:00"), kst("2026-10-16T00:00"));
-        assertEquals(1, result.points().size());
+        assertEquals(List.of("2026-10-15T00:00+09:00"), result.points().stream().map(p -> p.time()).toList());
 
         var empty = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
                 kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
         assertEquals("unavailable", empty.status());
         assertEquals("no_data", empty.reasonCode());
+    }
+
+    @Test
+    void anExactToCutsAUsDailyBarThatStartsAfterIt() {
+        // NVDA's 10-15 bar starts at New York midnight, 13:00 KST: after a 10:00 KST cutoff, so it is not returned.
+        exchangeDaily = true;
+        var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1m",
+                kst("2026-10-01T00:00"), kst("2026-10-15T10:00").plusNanos(1));
+        assertEquals(List.of("2026-10-14T00:00-04:00"), result.points().stream().map(p -> p.time()).toList());
+        assertEquals("USD", result.currency());
+    }
+
+    @Test
+    void theLatestPointComesBackWhenTheChartSendsItsTimeAsTo() {
+        exchangeDaily = true;
+        var client = tossClient("test-client", "test-secret");
+        var first = client.prices("KRX:005930", "KRX", "005930", "1m", null, null);
+        var latest = first.points().getLast();
+
+        java.time.Instant to = java.time.OffsetDateTime.parse(latest.time()).toInstant().plusNanos(1);
+        var again = client.prices("KRX:005930", "KRX", "005930", "1m", TossMarketClient.periodStart("1m", to), to);
+        assertEquals(latest, again.points().getLast());
+    }
+
+    @Test
+    void dailyPagesStartAtTheRequestedEndSoAnOldRangeIsNotCutByThePageLimit() {
+        exchangeDaily = true;
+        tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
+                kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
+        assertTrue(candleQueries.get(0).contains("before=2026-01-31T15"), candleQueries.get(0));
+    }
+
+    @Test
+    void aMalformedCandleIsAProviderFormatFailureNotASkippedRow() {
+        exchangeDaily = true;
+        malformedCandle = true;
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null));
+        assertFalse(error.retryable());
     }
 
     @Test
@@ -322,8 +365,17 @@ class CompanyMarketClientsTest {
                 {"result":{"candles":[],"nextBefore":null}}
                 """;
         if (path.equals("/api/v1/stocks")) return """
-                {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"}]}
+                {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"},{"symbol":"NVDA","currency":"USD"}]}
                 """.replace(omitStockCurrency ? ",\"currency\":\"KRW\"" : "never-in-body", "");
+        if (path.equals("/api/v1/candles") && exchangeDaily) {
+            String day = rawQuery.contains("symbol=NVDA") ? "T13:00:00+09:00" : "T00:00:00+09:00";
+            return """
+                {"result":{"candles":[
+                  {"timestamp":"2026-10-15DAY","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
+                  {"timestamp":"2026-10-14DAY","openPrice":OPEN,"highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400}
+                ],"nextBefore":null}}
+                """.replace("DAY", day).replace("OPEN", malformedCandle ? "\"n/a\"" : "645");
+        }
         if (path.equals("/api/v1/candles")) return """
                 {"result":{"candles":[
                   {"timestamp":"2026-10-15T00:00:00Z","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},

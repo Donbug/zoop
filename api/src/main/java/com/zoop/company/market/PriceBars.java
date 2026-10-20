@@ -29,8 +29,12 @@ final class PriceBars {
 
     /** 1wk buckets: weeks starting on Monday of the bar's exchange-local date. */
     static List<Point> byWeek(List<Bar> bars, ZoneId zone) {
-        return group(bars, b -> b.start().atZone(zone).toLocalDate()
-                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(zone).toInstant(), zone);
+        return group(bars, b -> weekStart(b.start(), zone), zone);
+    }
+
+    static Instant weekStart(Instant at, ZoneId zone) {
+        return at.atZone(zone).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                .atStartOfDay(zone).toInstant();
     }
 
     static List<Point> asIs(List<Bar> bars, ZoneId zone) {
@@ -45,8 +49,9 @@ final class PriceBars {
             group.sort(Comparator.comparing(Bar::start));
             double high = group.stream().mapToDouble(Bar::high).max().orElseThrow();
             double low = group.stream().mapToDouble(Bar::low).min().orElseThrow();
-            Double volume = group.stream().allMatch(b -> b.volume() == null) ? null
-                    : group.stream().mapToDouble(b -> b.volume() == null ? 0 : b.volume()).sum();
+            // One unknown volume makes the bucket's volume unknown; it is never counted as zero.
+            Double volume = group.stream().anyMatch(b -> b.volume() == null) ? null
+                    : group.stream().mapToDouble(Bar::volume).sum();
             points.add(new Point(start.atZone(zone).toOffsetDateTime().toString(), group.getFirst().open(), high, low,
                     group.getLast().close(), volume));
         });

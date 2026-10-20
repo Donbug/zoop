@@ -69,7 +69,7 @@ public class TossMarketClient {
             JsonNode stocks = get("/api/v1/stocks", Map.of("symbols", code));
             JsonNode stock = matching(stocks.path("result"), code);
             Double shares = stock == null ? null : number(stock.get("sharesOutstanding"));
-            List<JsonNode> daily = dailyCandles(code, 3, null);
+            List<JsonNode> daily = dailyCandles(code, 3, null, null);
             // Daily candles are dated in the market's own calendar, so the quote's session day uses the same zone.
             String sessionDate = asOf == null ? null : asOf.atZone(marketZone(exchange)).toLocalDate().toString();
             // The 52-week range only uses candles from the year ending on the quote's session date.
@@ -127,8 +127,9 @@ public class TossMarketClient {
     /**
      * getCompanyPrices over [from, to). Toss serves only 1-minute and daily candles, so 1d/1w are 1-minute bars and
      * 1y daily bars aggregated into the contract's fixed resolution (x-zoop.chartResolution); 1m is the daily bars as
-     * they are. Daily bars are kept by their KST day, intraday bars by their start time. A missing to is now and a
-     * missing from one period before it.
+     * they are. A point is a whole bucket (5 minutes, an hour, an exchange day or a Monday week) that overlaps
+     * [from, to): the chart sends a point's own start back as to, and that point must come back with the same values.
+     * A missing to is now and a missing from one period before it.
      */
     public CompanyPriceResponse prices(String companyId, String exchange, String code, String period,
             Instant from, Instant to) {
@@ -147,17 +148,22 @@ public class TossMarketClient {
             List<CompanyPriceResponse.Point> points;
             if ("5m".equals(interval) || "1h".equals(interval)) {
                 long size = "5m".equals(interval) ? 300 : 3600;
-                points = PriceBars.byInterval(minuteBars(code, zone, start, end), size, zone);
+                // Every minute of the first and last bucket, so the edge buckets are whole.
+                Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(), size) * size);
+                Instant last = Instant.ofEpochSecond(Math.floorDiv(end.minusNanos(1).getEpochSecond(), size) * size + size);
+                points = PriceBars.byInterval(minuteBars(code, zone, first, last), size, zone);
             } else {
-                LocalDate fromDay = start.atZone(KST).toLocalDate(), toDay = end.minusNanos(1).atZone(KST).toLocalDate();
+                boolean weekly = "1wk".equals(interval);
+                // A daily bar starts at its exchange-local midnight; a week bucket at that week's Monday.
+                Instant first = weekly ? PriceBars.weekStart(start, zone)
+                        : start.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant();
+                Instant last = weekly ? PriceBars.weekStart(end.minusNanos(1), zone).plus(java.time.Duration.ofDays(7)) : end;
                 List<PriceBars.Bar> daily = new java.util.ArrayList<>();
-                for (JsonNode candle : dailyCandles(code, 10, fromDay)) {
+                for (JsonNode candle : dailyCandles(code, 10, last, first)) {
                     PriceBars.Bar bar = bar(candle, at -> at);
-                    if (bar == null) continue;
-                    LocalDate day = bar.start().atZone(KST).toLocalDate();
-                    if (!day.isBefore(fromDay) && !day.isAfter(toDay)) daily.add(bar);
+                    if (bar != null && !bar.start().isBefore(first) && bar.start().isBefore(last)) daily.add(bar);
                 }
-                points = "1wk".equals(interval) ? PriceBars.byWeek(daily, zone) : PriceBars.asIs(daily, zone);
+                points = weekly ? PriceBars.byWeek(daily, zone) : PriceBars.asIs(daily, zone);
             }
             if (points.isEmpty()) {
                 return CompanyPriceResponse.unavailable(companyId, period, "no_data", "이 기간에는 거래된 시세가 없어요(휴장일 등).");
@@ -261,19 +267,26 @@ public class TossMarketClient {
         return bars;
     }
 
-    /** A candle as a bar starting at start(timestamp); null when its time or prices are missing. */
+    /**
+     * A candle as a bar starting at start(timestamp). Absent prices are no bar; a candle without a readable time or
+     * with a present value of the wrong shape is a provider format failure (503), never skipped as missing data.
+     */
     private static PriceBars.Bar bar(JsonNode candle, java.util.function.UnaryOperator<Instant> start) {
-        Instant at = instant(text(candle.get("timestamp")));
-        Double open = number(candle.get("openPrice")), high = number(candle.get("highPrice"));
-        Double low = number(candle.get("lowPrice")), close = number(candle.get("closePrice"));
-        if (at == null || open == null || high == null || low == null || close == null) return null;
-        return new PriceBars.Bar(start.apply(at), open, high, low, close, number(candle.get("volume")));
+        String timestamp = strictText(candle.get("timestamp"));
+        Instant at = timestamp == null ? null : instant(timestamp);
+        if (at == null) throw formatFailure();
+        Double open = strictNumber(candle.get("openPrice")), high = strictNumber(candle.get("highPrice"));
+        Double low = strictNumber(candle.get("lowPrice")), close = strictNumber(candle.get("closePrice"));
+        Double volume = strictNumber(candle.get("volume"));
+        if (open == null || high == null || low == null || close == null) return null;
+        return new PriceBars.Bar(start.apply(at), open, high, low, close, volume);
     }
 
     /** Daily candles newest first, following nextBefore for up to maxPages pages or until a page ends before stopBefore (KST day). */
-    private List<JsonNode> dailyCandles(String code, int maxPages, LocalDate stopBefore) {
+    private List<JsonNode> dailyCandles(String code, int maxPages, Instant startBefore, Instant stopBefore) {
         List<JsonNode> daily = new java.util.ArrayList<>();
-        String before = null;
+        // Starting at the requested end keeps an old range from falling off the page limit.
+        String before = startBefore == null ? null : startBefore.toString();
         for (int page = 0; page < maxPages; page++) {
             var candleParams = new java.util.HashMap<String, Object>();
             candleParams.put("symbol", code); candleParams.put("interval", "1d"); candleParams.put("count", "200");
@@ -284,7 +297,7 @@ public class TossMarketClient {
             candles.forEach(daily::add);
             if (candles.isEmpty() || !candlePage.hasNonNull("nextBefore")) break;
             Instant oldest = instant(text(candles.get(candles.size() - 1).get("timestamp")));
-            if (stopBefore != null && oldest != null && oldest.atZone(KST).toLocalDate().isBefore(stopBefore)) break;
+            if (stopBefore != null && oldest != null && oldest.isBefore(stopBefore)) break;
             before = text(candlePage.get("nextBefore"));
         }
         return daily;
