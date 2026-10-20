@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.zoop.ZoopApplication;
+import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
 import com.zoop.graph.read.GraphQueryService;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
@@ -31,6 +32,7 @@ class GraphVersionPostgresIntegrationTest {
     private static JdbcGraphVersionRepository repository;
     private static GraphVersionSelector selector;
     private static FixtureGraphVersionSeeder seeder;
+    private static AdminDashboardRepository dashboardRepository;
 
     @BeforeAll
     static void start() {
@@ -51,6 +53,7 @@ class GraphVersionPostgresIntegrationTest {
         repository = context.getBean(JdbcGraphVersionRepository.class);
         selector = context.getBean(GraphVersionSelector.class);
         seeder = context.getBean(FixtureGraphVersionSeeder.class);
+        dashboardRepository = context.getBean(AdminDashboardRepository.class);
     }
 
     @AfterAll
@@ -90,6 +93,18 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void dashboardUsesTheLastGraphActivationAtOrBeforeItsAsOfTime() {
+        Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
+
+        var summary = dashboardRepository.graphSummaryAt(asOf);
+
+        assertEquals(2, summary.versionCount());
+        assertEquals("fixture-2026-10-01", summary.activeVersion().orElseThrow().id());
+        assertEquals(Instant.parse("2026-10-01T00:00:00Z"),
+                summary.activeVersion().orElseThrow().activatedAt());
+    }
+
+    @Test
     void anotherSnapshotUnderAnExistingIdIsRefusedNotOverwritten() {
         assertThrows(GraphVersionConflictException.class, () -> repository.registerSystemVersion(new NewGraphVersion(
                 "fixture-2026-10-01", "fixture", "tampered", "artifact-fixture-other",
@@ -109,6 +124,25 @@ class GraphVersionPostgresIntegrationTest {
     }
 
     @Test
+    void changedBundledFixturesResetOnlyTheFixtureRowsAndSeedAgain() throws Exception {
+        // As if an older fixture file (e.g. snapshot format 1) had been seeded under the same id. Artifact rows are
+        // immutable, so the older seed is recreated from scratch instead of edited.
+        jdbc.update("DELETE FROM graph_activations");
+        jdbc.update("DELETE FROM graph_versions");
+        jdbc.update("DELETE FROM artifacts WHERE kind = 'graph_snapshot' AND id LIKE 'artifact-fixture-%'");
+        repository.registerSystemVersion(new NewGraphVersion("fixture-2026-10-01", "fixture", "older fixture",
+                "artifact-fixture-older", "classpath:graph-fixtures/fixture-2026-10-01.json", "0".repeat(64), 1, 0, 0, 0),
+                "older seed", Instant.parse("2026-10-01T00:00:00Z"));
+        seeder.run(null);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM artifacts WHERE id = 'artifact-fixture-older'", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM graph_versions", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM graph_activations", Integer.class));
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(3, context.getBean(GraphSnapshotStore.class)
+                .load(selector.select(null, "fixture-2026-10-01", null).version()).issues().size());
+    }
+
+    @Test
     void fixtureSeedingRefusesADatabaseWithImportedVersions() {
         jdbc.update("""
                 INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)
@@ -125,11 +159,11 @@ class GraphVersionPostgresIntegrationTest {
 
     @Test
     void getGraphReadsTheActiveFixtureVersionThroughTheRealDatabase() {
-        var response = context.getBean(GraphQueryService.class).getGraph(null, null, null, null, null, null, "it-1");
+        var response = context.getBean(GraphQueryService.class).getGraph(null, null, null, null, null, null, null, null, "it-1");
         assertEquals("fixture-2026-10-08", response.metadata().graphVersion());
         assertEquals(11, response.nodes().size());
         var past = context.getBean(GraphQueryService.class)
-                .getGraph("all", null, null, null, null, "2026-10-05T00:00:00Z", "it-2");
+                .getGraph("all", null, null, null, null, "2026-10-05T00:00:00Z", null, null, "it-2");
         assertEquals("fixture-2026-10-01", past.metadata().graphVersion());
     }
 

@@ -88,5 +88,10 @@ public class CompanyDetailService {
     public record CompanyDetail(String id, String name, String legalName, String market, String representative,
             LocalDate foundedDate, String websiteUrl, String ticker, List<String> aliases, String sector,
             String brandColor, String logoUrl, List<CompanyIssueRef> directIssues, List<CompanyIssueRef> structuralIssues,
-            Object summary, Boolean holding, Boolean watch, Metadata metadata) { }
+            Object summary, Boolean holding, Boolean watch, Metadata metadata) {
+        public CompanyDetail withPersonal(Boolean holding, Boolean watch) {
+            return new CompanyDetail(id, name, legalName, market, representative, foundedDate, websiteUrl, ticker, aliases,
+                    sector, brandColor, logoUrl, directIssues, structuralIssues, summary, holding, watch, metadata);
+        }
+    }
 }

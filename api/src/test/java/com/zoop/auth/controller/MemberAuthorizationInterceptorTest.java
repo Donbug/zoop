@@ -15,6 +15,18 @@ import static org.mockito.Mockito.*;
 
 class MemberAuthorizationInterceptorTest {
     @Test
+    void allowsCorsPreflightWithoutMemberAuthentication() {
+        var sessions = mock(MemberSessionService.class);
+        var interceptor = new MemberAuthorizationInterceptor(sessions);
+        var request = new MockHttpServletRequest("OPTIONS", "/api/v1/me/settings");
+        request.addHeader("Origin", "http://localhost:5173");
+        request.addHeader("Access-Control-Request-Method", "GET");
+
+        assertTrue(interceptor.preHandle(request, new MockHttpServletResponse(), new Object()));
+        verifyNoInteractions(sessions);
+    }
+
+    @Test
     void attachesAuthenticatedPrincipalForMemberResources() {
         var sessions = mock(MemberSessionService.class);
         var principal = new MemberSessionService.MemberPrincipal("member-1", "session-1");
