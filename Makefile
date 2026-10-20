@@ -147,7 +147,7 @@ api-ai-smoke:
 .PHONY: api-ai-pipeline-smoke
 api-ai-pipeline-smoke:
 	$(SERVICE_PYTHON) api/scripts/ai_pipeline_gate.py
-# Real installed zoop-ai-handoff/-ingest -> built jar -> PostgreSQL, 14 steps, no provider/model call, no activation. Needs `make pipeline-install api-build` first (not run
+# Real installed zoop-ai-handoff/-ingest -> built jar -> PostgreSQL and evidence HTTP reads; no provider/model calls. Only the isolated smoke harness activates a synthetic version. Needs `make pipeline-install api-build` first (not run
 # automatically; fails, never skips) and DB_URL/DB_USERNAME/DB_PASSWORD for a dedicated EMPTY loopback database (no default; the script refuses a non-empty one and never cleans it).
 # Optional: GRAPH_IMPORT_PSQL_CONTAINER (docker exec psql instead of host psql), GRAPH_IMPORT_DB_USER, GRAPH_IMPORT_DB_NAME (default to DB_USERNAME and the DB_URL database).
 API_JAR ?= api/build/libs/zoop-api-0.0.1-SNAPSHOT.jar
@@ -162,3 +162,14 @@ api-build:
 	$(API_GRADLE) assemble
 package-artifacts:
 	$(PYTHON) scripts/package_artifacts.py --root . --output "$(ARTIFACT_DIR)" --commit "$(COMMIT)"
+
+# Local read-only PR discovery; state and acknowledgements stay outside the repository.
+PR_WATCH_STATE ?= $(HOME)/.local/state/zoop-pr-watchdog
+PR_WATCH_INTERVAL ?= 300
+.PHONY: pr-watch-once pr-watch-status pr-watch
+pr-watch-once:
+	$(PYTHON) scripts/pr_watchdog.py --state-dir "$(PR_WATCH_STATE)" --once
+pr-watch-status:
+	$(PYTHON) scripts/pr_watchdog.py --state-dir "$(PR_WATCH_STATE)" --status
+pr-watch:
+	$(PYTHON) scripts/pr_watchdog.py --state-dir "$(PR_WATCH_STATE)" --interval "$(PR_WATCH_INTERVAL)" --watch

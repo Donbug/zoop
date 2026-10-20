@@ -2,6 +2,8 @@ package com.zoop.graph.importer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -121,7 +123,8 @@ class HandoffBundleVerifierTest {
         assertRefused("unknown top-level key", b -> b.put("operatorPath", "/private/x"));
         assertRefused("unknown nested key", b -> ((ObjectNode) b.get("provenance")).put("extra", "x"));
         assertRefused("missing key", b -> b.remove("readiness"));
-        assertRefused("wrong schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-2"));
+        assertRefused("the earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-1"));
+        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
         assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
         assertRefused("an actual-model run is not producible", b -> ((ObjectNode) b.get("provenance")).put("executionMode", "live"));
         assertRefused("declared and observed kind differ", b -> ((ObjectNode) b.get("provenance")).put("observedSourceKind", "actual"));
@@ -195,6 +198,316 @@ class HandoffBundleVerifierTest {
         ((ObjectNode) copy.get("companies").get(0)).put("label", "다른 이름");
 
         assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(copy));
+    }
+
+    // ------------------------------------------------------------------------------------------------ original mentions ---
+
+    private static final String SECOND_ARTICLE = "doc-" + "d".repeat(64);
+    private static final String SECOND_VERSION = "e".repeat(64);
+    private static final String SECOND_RAW = "f".repeat(64);
+
+    private static ObjectNode mention(ObjectNode bundle, int index) {
+        return (ObjectNode) bundle.get("issues").get(0).get("mentions").get(index);
+    }
+
+    private static ObjectNode participant(ObjectNode bundle, int mention, int index) {
+        return (ObjectNode) mention(bundle, mention).get("participants").get(index);
+    }
+
+    /**
+     * Adds a second document to the only issue of a copy: its article, one evidence row, a second source event whose S2 local
+     * mention id is the SAME {@code m-1} (legal: the id is unique only within one document version) and its own mention with
+     * values of its own. Everything the closure needs is kept consistent, so only a rule the caller then breaks can fail.
+     *
+     * @return the id of the second document's evidence row
+     */
+    private static String addSecondDocument(ObjectNode b) {
+        String evidenceId = HandoffBundleVerifier.appEvidenceId(SECOND_ARTICLE, SECOND_VERSION, 0, 3);
+        ObjectNode row = ((ArrayNode) b.get("evidence")).addObject();
+        row.put("id", evidenceId);
+        row.put("kind", HandoffBundleVerifier.EVIDENCE_KIND);
+        row.put("articleId", SECOND_ARTICLE);
+        row.put("articleVersion", SECOND_VERSION);
+        row.put("start", 0);
+        row.put("end", 3);
+        row.put("offsetUnit", HandoffBundleVerifier.OFFSET_UNIT);
+        row.put("quoteSha256", "a".repeat(64));
+        row.putArray("rawLocatorIds").add("loc-1");
+        ObjectNode rowSource = row.putObject("source");
+        rowSource.put("documentId", SECOND_ARTICLE);
+        rowSource.put("documentVersion", SECOND_VERSION);
+        rowSource.put("rawVersion", SECOND_RAW);
+        rowSource.put("textArtifactId", "text-" + SECOND_VERSION);
+        rowSource.put("sourceEvidenceId", "ev-" + "1".repeat(32));
+        rowSource.put("inputKind", "body");
+
+        ObjectNode article = ((ArrayNode) b.get("articles")).addObject();
+        article.put("articleId", SECOND_ARTICLE);
+        article.put("articleVersion", SECOND_VERSION);
+        article.put("documentId", SECOND_ARTICLE);
+        article.put("documentVersion", SECOND_VERSION);
+        article.put("rawVersion", SECOND_RAW);
+        article.put("title", "후속 보도");
+        article.put("url", "https://example.invalid/b");
+        article.put("publishedAt", "2026-10-09T09:00:00+09:00");
+        article.put("publicationPrecision", "datetime");
+        ObjectNode observed = article.putArray("observations").addObject();
+        observed.put("roundId", HandoffFixtures.SELECTOR.roundId());
+        observed.put("sourceId", HandoffFixtures.SELECTOR.sourceId());
+        observed.put("page", 0);
+        observed.put("ordinal", 1);
+        observed.put("observedAt", HandoffFixtures.OBSERVED_AT);
+        observed.putObject("grant").put("grantId", "operator-grant").put("revision", "rights-1");
+
+        ObjectNode issue = (ObjectNode) b.get("issues").get(0);
+        ObjectNode event = ((ObjectNode) issue.get("sourceEvents").get(0)).deepCopy();
+        event.put("ref", "evc-" + "4".repeat(64));
+        event.put("documentId", SECOND_ARTICLE);
+        event.put("documentVersion", SECOND_VERSION);
+        ObjectNode observation = (ObjectNode) event.get("observation");
+        observation.put("ordinal", 1);
+        observation.put("documentId", SECOND_ARTICLE);
+        observation.put("rawVersion", SECOND_RAW);
+        observation.put("documentVersion", SECOND_VERSION);
+        ((ArrayNode) issue.get("sourceEvents")).add(event);
+        ObjectNode basis = event.deepCopy();
+        basis.putArray("countries").add("KR");
+        ((ArrayNode) issue.get("geography").get("basis")).add(basis);
+
+        ObjectNode second = mention(b, 0).deepCopy();
+        second.put("documentId", SECOND_ARTICLE);
+        second.put("documentVersion", SECOND_VERSION);
+        second.put("articleId", SECOND_ARTICLE);
+        second.put("articleVersion", SECOND_VERSION);
+        second.put("title", "후속 보도 원문 제목");
+        second.putNull("target");
+        second.put("eventTime", "2026-10");
+        second.put("timePrecision", "month");
+        second.putNull("period");
+        second.put("assertionStatus", "planned");
+        second.put("background", true);
+        second.putArray("participants");
+        second.putArray("evidenceIds").add(evidenceId);
+        ((ArrayNode) issue.get("mentions")).add(second);
+
+        addEvidenceId(issue, evidenceId);
+        ((ObjectNode) b.get("counts")).put("evidence", 4).put("articles", 2);
+        return evidenceId;
+    }
+
+    /** The id added to the owner's {@code evidenceIds}, which stay strictly ascending. */
+    private static void addEvidenceId(ObjectNode owner, String id) {
+        List<String> ids = new ArrayList<>();
+        owner.get("evidenceIds").values().forEach(existing -> ids.add(existing.stringValue()));
+        ids.add(id);
+        Collections.sort(ids);
+        ArrayNode array = owner.putArray("evidenceIds");
+        ids.forEach(array::add);
+    }
+
+    private static void assertRefusedWithTwoDocuments(String rule, Consumer<ObjectNode> change) {
+        assertRefused(rule, b -> {
+            addSecondDocument(b);
+            change.accept(b);
+        });
+    }
+
+    @Test
+    void everyMentionFieldAndParticipantRuleIsEnforced() {
+        String foreign = "ev-" + "0".repeat(64);
+        assertRefused("an issue without its mentions", b -> ((ObjectNode) b.get("issues").get(0)).remove("mentions"));
+        assertRefused("mentions that are not an array", b -> ((ObjectNode) b.get("issues").get(0)).put("mentions", "x"));
+        for (String key : List.of("documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification",
+                "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "background",
+                "participants", "evidenceIds")) {
+            assertRefused("a mention without " + key, b -> mention(b, 0).remove(key));
+        }
+        for (String key : List.of("sourceCompanyId", "companyId", "name", "role")) {
+            assertRefused("a participant without " + key, b -> participant(b, 0, 0).remove(key));
+        }
+        assertRefused("an unknown mention key", b -> mention(b, 0).put("extra", "x"));
+        assertRefused("a publisher is no mention field", b -> mention(b, 0).put("publisher", "x"));
+        assertRefused("an approval is no mention field", b -> mention(b, 0).put("approval", "none"));
+        assertRefused("field decisions are no mention field", b -> mention(b, 0).putObject("fieldDecisions"));
+        assertRefused("an unknown participant key", b -> participant(b, 0, 0).put("roleConfirmed", true));
+
+        assertRefused("a verified mention", b -> mention(b, 0).put("verification", "verified"));
+        assertRefused("a null verification", b -> mention(b, 0).putNull("verification"));
+        assertRefused("background as a string", b -> mention(b, 0).put("background", "false"));
+        assertRefused("background as a number", b -> mention(b, 0).put("background", 0));
+        assertRefused("background as null", b -> mention(b, 0).putNull("background"));
+        assertRefused("time precision outside the set", b -> mention(b, 0).put("timePrecision", "hour"));
+        assertRefused("assertion status outside the S2 enum", b -> mention(b, 0).put("assertionStatus", "confirmed"));
+        assertRefused("a null assertion status", b -> mention(b, 0).putNull("assertionStatus"));
+        assertRefused("a null title", b -> mention(b, 0).putNull("title"));
+        assertRefused("a null action", b -> mention(b, 0).putNull("action"));
+        assertRefused("a non-string target", b -> mention(b, 0).put("target", 5));
+        assertRefused("participants that are not an array", b -> mention(b, 0).put("participants", "x"));
+        assertRefused("a null participant name", b -> participant(b, 0, 0).putNull("name"));
+        assertRefused("a null participant role", b -> participant(b, 0, 0).putNull("role"));
+        assertRefused("a non-string source company id", b -> participant(b, 0, 0).put("sourceCompanyId", 5));
+
+        assertRefused("a participant company outside this bundle", b -> participant(b, 0, 0).put("companyId", "SYNTH:999999"));
+        assertRefused("a participant company that is not a string", b -> participant(b, 0, 0).put("companyId", 5));
+        assertRefused("a participant company without a source company id",
+                b -> participant(b, 0, 2).put("companyId", HandoffFixtures.COMPANY_A));
+
+        assertRefused("a mention without evidence", b -> mention(b, 0).putArray("evidenceIds"));
+        assertRefused("a mention citing unknown evidence", b -> mention(b, 0).putArray("evidenceIds").add(foreign));
+        assertRefused("mention evidence not strictly ascending", b -> {
+            ArrayNode ids = mention(b, 0).putArray("evidenceIds");
+            List<String> descending = new ArrayList<>(BUILT.evidenceIds());
+            Collections.reverse(descending);
+            descending.forEach(ids::add);
+        });
+        assertRefused("a mention of an article version nobody carries", b -> mention(b, 0).put("articleVersion", "9".repeat(64)));
+        assertRefused("a mention naming another article id", b -> mention(b, 0).put("articleId", "doc-" + "9".repeat(64)));
+        assertRefused("a mention of a document without a source event", b -> mention(b, 0).put("documentVersion", "9".repeat(64)));
+        assertRefused("an empty local mention id", b -> mention(b, 0).put("mentionId", ""));
+        assertRefused("a local id the source event does not carry", b -> mention(b, 0).put("mentionId", "m-other"));
+        assertRefused("a mention no source event carries", b -> {
+            ObjectNode extra = mention(b, 0).deepCopy();
+            extra.put("mentionId", "m-2");
+            ((ArrayNode) b.get("issues").get(0).get("mentions")).add(extra);
+        });
+        assertRefused("the same mention twice", b -> ((ArrayNode) b.get("issues").get(0).get("mentions")).add(mention(b, 0).deepCopy()));
+        assertRefused("issue evidence missing what a mention cites", b -> ((ArrayNode) b.get("issues").get(0).get("evidenceIds")).remove(0));
+        assertRefused("issue evidence that no mention or geography cites", b -> {
+            ArrayNode ids = ((ObjectNode) b.get("issues").get(0)).putArray("evidenceIds");
+            BUILT.evidenceIds().forEach(ids::add);
+        });
+    }
+
+    @Test
+    void mentionValuesAreTheOriginalOnesAndNeverCopiedFromTheMergedIssue() {
+        HandoffBundle bundle = HandoffBundleVerifier.verify(mutated(b -> {
+            ObjectNode m = mention(b, 0);
+            m.put("title", "원문 제목");
+            m.put("action", "다른 행위");
+            m.putNull("target");
+            m.put("eventTime", "2026");
+            m.put("timePrecision", "year");
+            m.putNull("period");
+            m.put("assertionStatus", "forecast");
+            m.put("background", true);
+            m.putArray("participants");
+        }));
+
+        HandoffBundle.Issue issue = bundle.issues().get(0);
+        assertEquals("합성 공급 계약", issue.title());
+        assertEquals("2026-09-30", issue.eventTime());
+        assertEquals("announced", issue.assertionStatus());
+        assertEquals("합성 공급 계약", BUILT.bundle().get("issues").get(0).get("title").stringValue());
+    }
+
+    @Test
+    void aParticipantKeepsItsSourceIdAndRoleTextWithOrWithoutAPublicCompany() {
+        JsonNode participants = BUILT.bundle().get("issues").get(0).get("mentions").get(0).get("participants");
+
+        assertEquals(3, participants.size());
+        assertEquals(HandoffFixtures.COMPANY_A, participants.get(0).get("companyId").stringValue());
+        assertEquals("s2-co-a", participants.get(0).get("sourceCompanyId").stringValue());
+        assertTrue(participants.get(1).get("companyId").isNull());
+        assertEquals("s2-co-unlisted", participants.get(1).get("sourceCompanyId").stringValue());
+        assertTrue(participants.get(2).get("sourceCompanyId").isNull() && participants.get(2).get("companyId").isNull());
+        HandoffBundleVerifier.verify(BUILT.bundle());
+    }
+
+    @Test
+    void twoDocumentsOfOneIssueMayShareALocalMentionIdAndStayTwoMentionsWithTheirOwnValues() {
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        String evidenceId = addSecondDocument(copy);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+
+        HandoffBundle bundle = HandoffBundleVerifier.verify(copy);
+
+        JsonNode mentions = copy.get("issues").get(0).get("mentions");
+        assertEquals(2, mentions.size());
+        assertEquals("m-1", mentions.get(0).get("mentionId").stringValue());
+        assertEquals("m-1", mentions.get(1).get("mentionId").stringValue());
+        assertEquals(List.of(HandoffFixtures.ARTICLE_ID, SECOND_ARTICLE),
+                List.of(mentions.get(0).get("documentId").stringValue(), mentions.get(1).get("documentId").stringValue()));
+        assertEquals("후속 보도 원문 제목", mentions.get(1).get("title").stringValue());
+        assertEquals("합성 공급 계약", mentions.get(0).get("title").stringValue());
+        assertEquals(List.of(evidenceId), List.of(mentions.get(1).get("evidenceIds").get(0).stringValue()));
+        assertEquals(2, bundle.articles().size());
+        assertEquals(4, bundle.evidence().size());
+    }
+
+    @Test
+    void theMentionPartitionAndClosureAreEnforcedAcrossDocuments() {
+        assertRefusedWithTwoDocuments("mentions out of identity order", b -> {
+            ArrayNode list = (ArrayNode) b.get("issues").get(0).get("mentions");
+            JsonNode first = list.remove(0);
+            list.add(first);
+        });
+        assertRefusedWithTwoDocuments("a source event whose document has no mention", b -> ((ArrayNode) b.get("issues").get(0).get("mentions")).remove(1));
+        assertRefusedWithTwoDocuments("a mention citing evidence of another document's article", b -> {
+            ArrayNode ids = mention(b, 1).putArray("evidenceIds");
+            List<String> both = new ArrayList<>(List.of(BUILT.evidenceIds().get(0), b.get("evidence").get(3).get("id").stringValue()));
+            Collections.sort(both);
+            both.forEach(ids::add);
+        });
+        assertRefusedWithTwoDocuments("a mention naming the other document's article", b -> {
+            mention(b, 1).put("articleId", HandoffFixtures.ARTICLE_ID);
+            mention(b, 1).put("articleVersion", HandoffFixtures.ARTICLE_VERSION);
+        });
+        assertRefusedWithTwoDocuments("a source event that does not close against its document's article raw version", b -> {
+            ((ObjectNode) b.get("issues").get(0).get("sourceEvents").get(1).get("observation")).put("rawVersion", "9".repeat(64));
+            ((ObjectNode) b.get("issues").get(0).get("geography").get("basis").get(1).get("observation")).put("rawVersion", "9".repeat(64));
+        });
+        assertRefusedWithTwoDocuments("a source event whose observation the article never had", b -> {
+            ((ObjectNode) b.get("issues").get(0).get("sourceEvents").get(1).get("observation")).put("ordinal", 7);
+            ((ObjectNode) b.get("issues").get(0).get("geography").get("basis").get(1).get("observation")).put("ordinal", 7);
+        });
+        assertRefusedWithTwoDocuments("a second article of the same document version", b -> {
+            String twinId = "doc-" + "9".repeat(64);
+            ObjectNode twin = ((ObjectNode) b.get("articles").get(1)).deepCopy();
+            twin.put("articleId", twinId);
+            ((ArrayNode) b.get("articles")).add(twin);
+            ObjectNode row = ((ObjectNode) b.get("evidence").get(3)).deepCopy();
+            String rowId = HandoffBundleVerifier.appEvidenceId(twinId, SECOND_VERSION, 0, 3);
+            row.put("id", rowId);
+            row.put("articleId", twinId);
+            ((ArrayNode) b.get("evidence")).add(row);
+            ObjectNode issue = (ObjectNode) b.get("issues").get(0);
+            addEvidenceId(issue, rowId);
+            addEvidenceId((ObjectNode) issue.get("geography"), rowId);
+            ((ObjectNode) b.get("counts")).put("evidence", 5).put("articles", 3);
+        });
+    }
+
+    @Test
+    void aMentionTimeThatCannotBeWrittenWithItsStatedPrecisionIsTemporalUnsupportedNotInvented() {
+        for (String[] time : new String[][] {{"2026-09", "day"}, {"2026-09-30", "year"}, {"2026-09-30T09", "datetime"},
+                {"2026-09-30", "unknown"}, {null, "day"}}) {
+            GraphHandoffException failure = assertThrows(GraphHandoffException.class, () -> HandoffBundleVerifier.verify(mutated(b -> {
+                mention(b, 0).put("eventTime", time[0]);
+                mention(b, 0).put("timePrecision", time[1]);
+            })), String.join("|", String.valueOf(time[0]), time[1]));
+            assertEquals(GraphHandoffFailure.TEMPORAL_UNSUPPORTED, failure.failure());
+        }
+        HandoffBundleVerifier.verify(mutated(b -> {
+            mention(b, 0).put("eventTime", "2026-09-30T09:00:00+09:00");
+            mention(b, 0).put("timePrecision", "datetime");
+        }));
+    }
+
+    @Test
+    void anExportOfTheEarlierBundleSchemaIsRefusedAsAnInvalidBundleBeforeAnyWrite() {
+        byte[] earlier = HandoffFixtures.envelopeAfter(BUILT, root -> {
+            ObjectNode bundle = (ObjectNode) root.get("bundle");
+            bundle.put("schemaVersion", "zoop-graph-handoff-bundle-1");
+            ((ObjectNode) bundle.get("issues").get(0)).remove("mentions");
+            ((ObjectNode) root.get("receipt")).put("bundleSchema", "zoop-graph-handoff-bundle-1");
+        });
+        JsonNode root = HandoffFixtures.parse(earlier);
+
+        GraphHandoffException failure = assertThrows(GraphHandoffException.class,
+                () -> new HandoffExportParser().parse(earlier, new GraphHandoffRequest(root.get("handoffId").stringValue(),
+                        Canonical.digest(root.get("manifest")), Canonical.sha256(Canonical.bytes(root.get("bundle"))), "operator-a")));
+
+        assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure());
     }
 
     @Test

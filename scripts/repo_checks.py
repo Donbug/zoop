@@ -37,8 +37,9 @@ Pipeline (native replay-only, public dependencies, no private PoC or token): mak
 Recipient demos (synthetic, no AWS/Neo4j/model keys): make pipeline-collection-demo | pipeline-handoff-package HANDOFF_PACKAGE_DIR=/absolute/new/path | pipeline-handoff-package-verify HANDOFF_PACKAGE_DIR=/absolute/package/path
 Service only (internal HTTP over the S1 CLI, public deps): make service-install | service-test | service-smoke | service-openapi-check | service-build
 Service + installed pipeline (S2 extraction jobs and S3 relation jobs; needs both make pipeline-install and make service-install, fails without them): make service-pipeline-test | service-pipeline-smoke
-API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate) | api-graph-handoff-import-smoke (after make pipeline-install api-build; DB_URL/DB_USERNAME/DB_PASSWORD of a dedicated EMPTY PostgreSQL database; no model call, no activation)
+API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate) | api-graph-handoff-import-smoke (after make pipeline-install api-build; dedicated EMPTY PostgreSQL DB_URL/DB_USERNAME/DB_PASSWORD; no model call; synthetic activation only in the evidence-read test harness)
 Local graph API development: make api-build api-graph-dev (Java 21, Python, Docker, cached postgres:16.13-alpine; temporary DB, fixture reads, Ctrl-C cleanup; never reads .env or pulls images)
+PR monitoring (local, GitHub read-only, no automatic reviews or merges): make pr-watch-once | pr-watch-status | pr-watch (state outside repo, 300-second interval; see docs/development/github-setup.md)
 Worker fixture drift: make worker-contracts-check (installed BFF Python)
 BFF/web type drift: make bff-types-check (installed BFF Python + web tool)
 Artifacts: make package-artifacts COMMIT=<40-char-sha> ARTIFACT_DIR=<outside-repo>
