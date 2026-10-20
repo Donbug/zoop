@@ -1,0 +1,16 @@
+package com.zoop.graph.read.dto;
+
+import java.util.List;
+
+/** OpenAPI {@code EventListResponse} ({@code listEvents}); every key is serialized, nulls included. */
+public record EventListResponse(List<EventSummary> items, List<EventSummary> unknownTimeItems, Metadata metadata,
+        String nextCursor) {
+
+    /** relationTypes: the direct approved edge types between the requested company and this event only. */
+    public record EventSummary(String title, String id, String action, String target, String eventTime,
+            String timePrecision, String period, List<String> companyIds, List<String> relationTypes, int articleCount,
+            String reportedAt) { }
+
+    public record Metadata(String source, String asOf, String graphVersion, int total, int excludedUnknownTime,
+            String latestEventTime, String latestReportedAt) { }
+}
