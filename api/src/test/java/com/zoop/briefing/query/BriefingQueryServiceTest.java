@@ -74,6 +74,52 @@ class BriefingQueryServiceTest {
 
     private BriefingRound published() { return round("morning", "published", ignored -> { }); }
 
+    private BriefingRound authoredAnalysis(Consumer<ObjectNode> transform) {
+        var row = published();
+        var summary = ((ObjectNode) row.publicSnapshot()).putObject("marketSummary").put("text", "확인된 기업 사실\n조건부 해석\n수집 범위 한정")
+                .put("generatedAt", row.generatedAt().toString()).put("resultVersion", "authored-outlook");
+        summary.putArray("evidenceIds").add("e-original");
+        var analysis = summary.putObject("analysis").put("schemaVersion", "zoop-market-outlook-analysis-v1").put("edition", "morning")
+                .put("cutoff", MORNING.toString()).put("mode", "morning_update").put("scopeNote", "수집 범위 한정");
+        analysis.putObject("previousPublication").put("status", "unavailable").put("kind", "simulated_previous_output")
+                .put("reason", "immediate_previous_summary_withheld");
+        analysis.putObject("coverage").put("documents", 3).put("newDocuments", 1).put("backgroundDocuments", 2)
+                .put("marketRepresentative", false).put("sectorPriceFeedAvailable", false).putArray("companyNames").add("원본 기업");
+        var claims = analysis.putArray("claims");
+        for (String kind : List.of("fact", "interpretation")) {
+            var claim = claims.addObject().put("claimId", "market:claim:" + claims.size()).put("kind", kind)
+                    .put("text", "fact".equals(kind) ? "확인된 기업 사실" : "조건부 해석")
+                    .putNull("targetId").putNull("direction").putNull("updateAction");
+            for (String field : List.of("evidenceIds", "indicatorIds", "previousPublicationIds", "previousForecastIds", "evaluationIds", "conditions", "counterFactors")) claim.putArray(field);
+            claim.withArray("evidenceIds").add("e-original");
+        }
+        analysis.putArray("forecasts"); analysis.putArray("forecastEvaluations");
+        transform.accept(analysis); return row;
+    }
+
+    @Test void structuredMarketAnalysisRestoresSameVerifiedTextWithoutInvokingProducer() {
+        var row = authoredAnalysis(ignored -> { }); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+        var result = service.get(DATE, "morning", "request");
+        assertEquals("morning_update", result.at("/marketSummary/analysis/mode").asString());
+        assertEquals("조건부 해석", result.at("/marketSummary/analysis/claims/1/text").asString());
+        assertEquals("immediate_previous_summary_withheld", result.at("/marketSummary/analysis/previousPublication/reason").asString());
+        assertEquals(row.publicSnapshot().path("marketSummary"), result.path("marketSummary"));
+    }
+
+    @Test void alteredAnalysisTextCutoffForeignEvidenceOrFabricatedEvaluationCannotBeDisclosed() {
+        List<Consumer<ObjectNode>> changes = List.of(
+                a -> ((ObjectNode) a.at("/claims/0")).put("text", "생성 기록에 없는 새 전망"),
+                a -> a.put("cutoff", MORNING.plusSeconds(1).toString()),
+                a -> ((ObjectNode) a.get("coverage")).put("marketRepresentative", true),
+                a -> ((ObjectNode) a.get("coverage")).put("backgroundDocuments", 3),
+                a -> ((tools.jackson.databind.node.ArrayNode) a.at("/claims/0/evidenceIds")).add("foreign-evidence"),
+                a -> a.putArray("forecastEvaluations").addObject().put("evaluationId", "invented-evaluation"));
+        for (var change : changes) {
+            var row = authoredAnalysis(change); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
+            assertUnavailable(() -> service.get(DATE, "morning", "request"));
+        }
+    }
+
     @Test void restoresRealNestedDtoAndCorrectionsWithoutChangingOriginal() {
         var row = published(); when(repository.find(DATE, "morning")).thenReturn(Optional.of(row));
         when(repository.changes(row.id())).thenReturn(List.of(new BriefingChange(1, "correction", "event-original", "원문",

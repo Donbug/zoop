@@ -10,12 +10,12 @@ import type { FeedbackValue } from '@/types/feedback';
 import type { BriefingEdition, BriefingResponse } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
 import MarketIndicators from './MarketIndicators';
+import MarketSummary from './MarketSummary';
 import BriefingIssueList from './BriefingIssueList';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
 import { hasOnlyKnownLimitations } from './briefingLimitations';
 import {
-  BODY,
   CARD,
   EMPTY,
   NOTE,
@@ -241,14 +241,11 @@ export default function PublishedBriefing({
                   ))}
                 </div>
               )}
-              <section className={SECTION}>
-                <h3 className={SECTION_TITLE}>시장 요약</h3>
-                <p className={BODY}>
-                  {'text' in result.marketSummary
-                    ? result.marketSummary.text
-                    : result.marketSummary.reason}
-                </p>
-              </section>
+              <MarketSummary
+                summary={result.marketSummary}
+                edition={result.edition}
+                dataAsOf={result.dataAsOf}
+              />
               <MarketIndicators variables={result.marketVariables} />
               {personal && (
                 <PersonalBasisNotice

@@ -6561,6 +6561,7 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 | evidenceIds | 필수 | string[] |  |
 | generatedAt | 필수 | string (date-time) |  |
 | resultVersion | 필수 | string |  |
+| analysis | 선택 | [MarketOutlookAnalysis](#schema-marketoutlookanalysis) / null | 검증된 시장 요약의 구조화된 전망·비교. 기존 이슈 요약과 이전 발행본에는 생략되거나 null일 수 있다. 별도 생성 결과가 아니라 같은 검증 문장의 표현이다. |
 
 <a id="schema-socialprovider"></a>
 
@@ -6628,3 +6629,129 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 
 string {INVALID_REQUEST, INVALID_CREDENTIALS, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, MEMBER_BLOCKED, EMAIL_TAKEN, TERMS_REQUIRED, RESOURCE_NOT_FOUND, EVIDENCE_UNAVAILABLE, VERSION_UNAVAILABLE, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, ALREADY_PUBLISHED, VALIDATION_FAILED, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED, SOCIAL_LINK_REQUIRED, SOCIAL_EMAIL_REQUIRED, INVALID_CURSOR, RATE_LIMITED, SOURCE_UNAVAILABLE, MODEL_UNAVAILABLE, AUDIT_UNAVAILABLE, MASKING_FAILED, INTERNAL_ERROR}
+
+<a id="schema-marketoutlookanalysis"></a>
+
+### MarketOutlookAnalysis
+
+출근은 새 정보에 따른 오늘 전망 갱신, 퇴근은 아침 판단과 확인 가능한 실제 흐름 비교 및 다음 거래일 전망이다. 문장은 근거·지표·실제 직전 브리핑에 결속되고 검증을 통과한 경우에만 공개한다. 과거 시뮬레이션을 당시 운영 발행이나 전체 시장 분석으로 표현하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string {zoop-market-outlook-analysis-v1} |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| mode | 필수 | string {morning_update, evening_review} |  |
+| scopeNote | 필수 | string |  |
+| previousPublication | 필수 | [MarketPreviousPublication](#schema-marketpreviouspublication) |  |
+| coverage | 필수 | [MarketCoverage](#schema-marketcoverage) |  |
+| claims | 필수 | [MarketOutlookClaim](#schema-marketoutlookclaim)[] |  |
+| forecasts | 필수 | [MarketForecast](#schema-marketforecast)[] |  |
+| forecastEvaluations | 필수 | [MarketForecastEvaluation](#schema-marketforecastevaluation)[] |  |
+
+<a id="schema-marketpreviouspublication"></a>
+
+### MarketPreviousPublication
+
+회차 창 시작과 일치하는 실제 직전 검증 결과. available이면 회차·시각·결과 버전이 제공되고, unavailable이면 이유를 제공한다. 이전 비공개 요청이나 문서 본문은 포함하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable} |  |
+| kind | 필수 | string {simulated_previous_output} |  |
+| roundId | 선택 | string, null |  |
+| date | 선택 | string, null (date) |  |
+| edition | 선택 | string, null {morning, evening, None} |  |
+| cutoff | 선택 | string, null (date-time) |  |
+| resultVersion | 선택 | string, null |  |
+| reason | 선택 | string, null |  |
+
+<a id="schema-marketcoverage"></a>
+
+### MarketCoverage
+
+회차 마감까지 원 발행시각을 확인한 적격 자료 범위. documents=newDocuments+backgroundDocuments이며 해당 기업 목록이다. 전체 시장 대표성과 별도 업종 시세 보유를 주장하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| documents | 필수 | integer |  |
+| newDocuments | 필수 | integer |  |
+| backgroundDocuments | 필수 | integer |  |
+| companyNames | 필수 | string[] |  |
+| marketRepresentative | 필수 | boolean |  |
+| sectorPriceFeedAvailable | 필수 | boolean |  |
+
+<a id="schema-marketoutlookclaim"></a>
+
+### MarketOutlookClaim
+
+원문 사실·해석·가격 전망·이전 전망 갱신·결과 비교를 구분한 검증 문장. forecast에는 실제 평가 대상과 반대 요인이 필요하다. forecast_update는 출근 회차의 실제 이전 전망과 새 근거를 연결한다. result_comparison은 퇴근 회차에서만 제공한다. 가격 전망 이외에는 targetId/direction이 null이고 conditions/counterFactors는 빈 배열이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| claimId | 필수 | string |  |
+| kind | 필수 | string {fact, interpretation, forecast, forecast_update, result_comparison} |  |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] |  |
+| indicatorIds | 필수 | string {kospi, kosdaq, usdkrw}[] |  |
+| previousPublicationIds | 필수 | string[] |  |
+| previousForecastIds | 필수 | string[] |  |
+| evaluationIds | 필수 | string[] |  |
+| targetId | 필수 | string, null |  |
+| direction | 필수 | string, null {up, down, flat, uncertain, None} |  |
+| conditions | 필수 | string[] |  |
+| counterFactors | 필수 | string[] |  |
+| updateAction | 필수 | string, null {maintain, strengthen, weaken, withdraw, None} |  |
+
+<a id="schema-marketforecast"></a>
+
+### MarketForecast
+
+검증된 forecast 문장과 동일한 내용의 불변 전망 원장. 조건과 반대 요인을 보존한다. 방향은 단정된 수익 약속이나 매수·매도 권유가 아니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| forecastId | 필수 | string |  |
+| text | 필수 | string |  |
+| direction | 필수 | string {up, down, flat, uncertain} |  |
+| conditions | 필수 | string[] |  |
+| counterFactors | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] |  |
+| indicatorIds | 필수 | string {kospi, kosdaq, usdkrw}[] |  |
+| target | 필수 | [MarketForecastTarget](#schema-marketforecasttarget) |  |
+
+<a id="schema-marketforecasttarget"></a>
+
+### MarketForecastTarget
+
+확인된 거래 세션과 회차 마감 전에 사용 가능한 종가로 고정한 가격 비교 대상. 출근은 당일, 퇴근은 다음 확인된 거래일 종가를 대상으로 하며 원/달러 은행 고시 환율을 주식 종가 대상으로 바꾸지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| targetId | 필수 | string |  |
+| indicatorId | 필수 | string {kospi, kosdaq} |  |
+| valueKind | 필수 | string {close} |  |
+| baselineDate | 필수 | string (date) |  |
+| baselineValue | 필수 | number |  |
+| targetDate | 필수 | string (date) |  |
+| targetEnd | 필수 | string (date-time) |  |
+| calendarRef | 필수 | string |  |
+| rule | 필수 | string {close_vs_baseline_v1} |  |
+
+<a id="schema-marketforecastevaluation"></a>
+
+### MarketForecastEvaluation
+
+실제 직전 전망 원장의 평가 대상·조건을 그대로 복원한다. 조건 충족을 관측하지 못했거나 대상 기간이 끝나지 않았거나 정확한 대상 종가가 없으면 unavailable과 이유를 제공하고 actualValue/actualDirection/directionMatched는 null이다. 평가 가능한 경우에만 고정 기준값 대비 종가 방향을 비교하며 개별 뉴스의 인과관계나 투자 성과를 뜻하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evaluationId | 필수 | string |  |
+| forecastId | 필수 | string |  |
+| target | 필수 | [MarketForecastTarget](#schema-marketforecasttarget) |  |
+| rule | 필수 | string {close_vs_baseline_v1} |  |
+| status | 필수 | string {evaluated, unavailable} |  |
+| reason | 필수 | string, null |  |
+| actualValue | 필수 | number, null |  |
+| actualDirection | 필수 | string, null {up, down, flat, None} |  |
+| directionMatched | 필수 | boolean, null |  |

@@ -1,6 +1,14 @@
 export type BriefingEdition = 'morning' | 'evening';
 
 import type { EventDetail } from '@/types/map/event';
+import type { MarketOutlookAnalysis } from './marketOutlook';
+export type { MarketOutlookAnalysis } from './marketOutlook';
+/** 전망 분석은 발행 당시 검증한 구조화 결과가 있는 회차에만 존재한다. */
+export type BriefingMarketSummary =
+  | (Extract<EventDetail['summary'], { text: string }> & {
+      analysis?: MarketOutlookAnalysis;
+    })
+  | Extract<EventDetail['summary'], { status: 'unavailable' }>;
 export type BriefingItem = Pick<
   EventDetail,
   | 'title'
@@ -129,7 +137,7 @@ export type BriefingResponse = {
   dataAsOf: string | null;
   graphVersion: string | null;
   items: BriefingItem[];
-  marketSummary: EventDetail['summary'];
+  marketSummary: BriefingMarketSummary;
   marketVariables:
     | { status: 'available'; indicators: MarketIndicator[] }
     | { status: 'unavailable'; reason: string };

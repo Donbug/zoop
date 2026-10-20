@@ -2,6 +2,7 @@ package com.zoop.briefing.controller;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -87,7 +88,48 @@ public final class BriefingHttpSchemas {
     public record DocumentSentiment(String label, String companyId, String rationale, List<String> quotes, Instant judgedAt,
             String model, String promptVersion) { }
     @Schema(name = "AnalysisSummary", requiredProperties = {"text", "evidenceIds", "generatedAt", "resultVersion"})
-    public record AnalysisSummary(String text, List<String> evidenceIds, Instant generatedAt, String resultVersion) { }
+    public record AnalysisSummary(String text, List<String> evidenceIds, Instant generatedAt, String resultVersion,
+            @Schema(nullable = true, description = "검증된 시장 요약의 구조화된 전망·비교입니다. 기존 이슈 요약과 이전 발행본에는 없을 수 있습니다.") MarketOutlookAnalysis analysis) { }
+
+    @Schema(name = "MarketOutlookAnalysis", requiredProperties = {"schemaVersion", "edition", "cutoff", "mode", "scopeNote", "previousPublication", "coverage", "claims", "forecasts", "forecastEvaluations"})
+    public record MarketOutlookAnalysis(String schemaVersion, @Schema(allowableValues = {"morning", "evening"}) String edition,
+            Instant cutoff, @Schema(allowableValues = {"morning_update", "evening_review"}) String mode, String scopeNote,
+            MarketPreviousPublication previousPublication, MarketCoverage coverage, List<MarketOutlookClaim> claims,
+            List<MarketForecast> forecasts, List<MarketForecastEvaluation> forecastEvaluations) { }
+
+    @Schema(name = "MarketPreviousPublication", requiredProperties = {"status", "kind"})
+    public record MarketPreviousPublication(@Schema(allowableValues = {"available", "unavailable"}) String status, String kind,
+            @Schema(nullable = true) String roundId, @Schema(nullable = true) LocalDate date,
+            @Schema(nullable = true) String edition, @Schema(nullable = true) Instant cutoff,
+            @Schema(nullable = true) String resultVersion, @Schema(nullable = true) String reason) { }
+
+    @Schema(name = "MarketCoverage", requiredProperties = {"documents", "newDocuments", "backgroundDocuments", "companyNames", "marketRepresentative", "sectorPriceFeedAvailable"})
+    public record MarketCoverage(int documents, int newDocuments, int backgroundDocuments, List<String> companyNames,
+            boolean marketRepresentative, boolean sectorPriceFeedAvailable) { }
+
+    @Schema(name = "MarketOutlookClaim", requiredProperties = {"claimId", "kind", "text", "evidenceIds", "indicatorIds", "previousPublicationIds", "previousForecastIds", "evaluationIds", "targetId", "direction", "conditions", "counterFactors", "updateAction"})
+    public record MarketOutlookClaim(String claimId,
+            @Schema(allowableValues = {"fact", "interpretation", "forecast", "forecast_update", "result_comparison"}) String kind,
+            String text, List<String> evidenceIds, List<String> indicatorIds, List<String> previousPublicationIds,
+            List<String> previousForecastIds, List<String> evaluationIds, @Schema(nullable = true) String targetId,
+            @Schema(nullable = true, allowableValues = {"up", "down", "flat", "uncertain"}) String direction,
+            List<String> conditions, List<String> counterFactors,
+            @Schema(nullable = true, allowableValues = {"maintain", "strengthen", "weaken", "withdraw"}) String updateAction) { }
+
+    @Schema(name = "MarketForecast", requiredProperties = {"forecastId", "text", "direction", "conditions", "counterFactors", "evidenceIds", "indicatorIds", "target"})
+    public record MarketForecast(String forecastId, String text, String direction, List<String> conditions,
+            List<String> counterFactors, List<String> evidenceIds, List<String> indicatorIds, MarketForecastTarget target) { }
+
+    @Schema(name = "MarketForecastTarget", requiredProperties = {"targetId", "indicatorId", "valueKind", "baselineDate", "baselineValue", "targetDate", "targetEnd", "calendarRef", "rule"})
+    public record MarketForecastTarget(String targetId, @Schema(allowableValues = {"kospi", "kosdaq"}) String indicatorId,
+            String valueKind, LocalDate baselineDate, BigDecimal baselineValue, LocalDate targetDate,
+            Instant targetEnd, String calendarRef, String rule) { }
+
+    @Schema(name = "MarketForecastEvaluation", requiredProperties = {"evaluationId", "forecastId", "target", "rule", "status", "reason", "actualValue", "actualDirection", "directionMatched"})
+    public record MarketForecastEvaluation(String evaluationId, String forecastId, MarketForecastTarget target, String rule,
+            @Schema(allowableValues = {"evaluated", "unavailable"}) String status, @Schema(nullable = true) String reason,
+            @Schema(nullable = true) BigDecimal actualValue, @Schema(nullable = true) String actualDirection,
+            @Schema(nullable = true) Boolean directionMatched) { }
     @Schema(name = "Unavailable", requiredProperties = {"status", "reason"})
     public record Unavailable(@Schema(allowableValues = {"unavailable"}) String status, String reason) { }
     @Schema(name = "BriefingWindow", requiredProperties = {"start", "end", "openStart"})

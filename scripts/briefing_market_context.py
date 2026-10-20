@@ -272,6 +272,15 @@ def _claims(draft, frozen, evidence, indicators, prior, evaluations):
         require(all(evaluations[e]["forecastId"] in c["previousForecastIds"] for e in c["evaluationIds"]), "market_context_evaluation_owner")
         claims.append({"claimId": "market:claim:" + str(index), **c})
     require(any(c["evidenceIds"] for c in claims), "market_context_news_required")
+    if frozen["context"].get("summaryPromptVersion") in {"market-context-v2.1-outlook", "market-context-v2.2-outlook"}:
+        kinds = {c["kind"] for c in claims}
+        if targets:
+            require("forecast" in kinds, "market_outlook_forecast_required")
+        if frozen["marketContext"]["previousPublication"]["status"] == "available":
+            if frozen["marketContext"]["edition"] == "morning" and prior:
+                require("forecast_update" in kinds, "market_outlook_update_required")
+            if frozen["marketContext"]["edition"] == "evening":
+                require("result_comparison" in kinds, "market_outlook_comparison_required")
     return claims
 
 

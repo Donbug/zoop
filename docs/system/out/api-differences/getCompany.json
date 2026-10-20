@@ -112,6 +112,494 @@
     "response:200:application/json.summary<anyOf:0>": {
       "type": "object"
     },
+    "response:200:application/json.summary<anyOf:0>.analysis:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[]": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].claimId": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].claimId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].conditions:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].counterFactors[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].direction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        "uncertain",
+        null
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].direction:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].evaluationIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].indicatorIds[]": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].kind": {
+      "type": "string",
+      "enum": [
+        "fact",
+        "interpretation",
+        "forecast",
+        "forecast_update",
+        "result_comparison"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].kind:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].previousForecastIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].previousPublicationIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].targetId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].targetId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].text:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].updateAction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "maintain",
+        "strengthen",
+        "weaken",
+        "withdraw",
+        null
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.claims[].updateAction:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.backgroundDocuments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.backgroundDocuments:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.companyNames[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.documents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.documents:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.marketRepresentative": {
+      "type": "boolean"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.marketRepresentative:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.newDocuments": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.newDocuments:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.sectorPriceFeedAvailable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage.sectorPriceFeedAvailable:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.coverage:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.cutoff:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.edition:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[]": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualDirection": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        null
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualDirection:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualValue": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].actualValue:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].directionMatched": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].directionMatched:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].evaluationId": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].evaluationId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].forecastId": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].forecastId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].reason:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].rule:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].status": {
+      "type": "string",
+      "enum": [
+        "evaluated",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].status:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineDate:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineValue": {
+      "type": "number"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.baselineValue:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.calendarRef": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.calendarRef:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.indicatorId": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.indicatorId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.rule:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetDate:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetEnd": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetEnd:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetId": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.targetId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.valueKind": {
+      "type": "string",
+      "enum": [
+        "close"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target.valueKind:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecastEvaluations[].target:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[]": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].conditions[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].counterFactors[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].direction": {
+      "type": "string",
+      "enum": [
+        "up",
+        "down",
+        "flat",
+        "uncertain"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].direction:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds": {
+      "type": "array",
+      "minItems": 1
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].forecastId": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].forecastId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds": {
+      "type": "array"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].indicatorIds[]": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq",
+        "usdkrw"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineDate:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineValue": {
+      "type": "number"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.baselineValue:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.calendarRef": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.calendarRef:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.indicatorId": {
+      "type": "string",
+      "enum": [
+        "kospi",
+        "kosdaq"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.indicatorId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.rule": {
+      "type": "string",
+      "enum": [
+        "close_vs_baseline_v1"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.rule:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetDate:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetEnd": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetEnd:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetId": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.targetId:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.valueKind": {
+      "type": "string",
+      "enum": [
+        "close"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target.valueKind:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].target:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].text": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.forecasts[].text:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.mode": {
+      "type": "string",
+      "enum": [
+        "morning_update",
+        "evening_review"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.mode:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication": {
+      "type": "object"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.cutoff": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.cutoff:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.date:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.edition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "morning",
+        "evening",
+        null
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.edition:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.kind": {
+      "type": "string",
+      "enum": [
+        "simulated_previous_output"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.kind:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.reason:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.resultVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.resultVersion:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.roundId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.roundId:required": false,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication.status:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.previousPublication:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.schemaVersion": {
+      "type": "string",
+      "enum": [
+        "zoop-market-outlook-analysis-v1"
+      ]
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.schemaVersion:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.scopeNote": {
+      "type": "string"
+    },
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:0>.scopeNote:required": true,
+    "response:200:application/json.summary<anyOf:0>.analysis<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.summary<anyOf:0>.evidenceIds": {
       "type": "array"
     },

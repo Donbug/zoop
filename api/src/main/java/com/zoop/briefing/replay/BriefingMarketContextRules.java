@@ -16,10 +16,52 @@ import tools.jackson.databind.node.ObjectNode;
 /** Internal historical context contract; never turns simulated predecessors into operating publications. */
 final class BriefingMarketContextRules {
     static final String POLICY = "market_context_prior_briefing_v2";
+    static final String ANALYSIS_SCHEMA = "zoop-market-outlook-analysis-v1";
     private BriefingMarketContextRules() { }
 
     static boolean contextual(StrictJson.Obj summary) {
         return summary.has("policy") && POLICY.equals(summary.string("policy"));
+    }
+
+    /** Public, verified analysis only. The frozen request and document bodies stay private. */
+    static ObjectNode analysis(StrictJson.Obj summary, StrictJson.Obj context, String cutoff) {
+        check(contextual(summary) && "PASS".equals(summary.object("verification").string("status")), "analysis_requires_verified_result");
+        ObjectNode result = StrictJson.newObject().put("schemaVersion", ANALYSIS_SCHEMA)
+                .put("edition", context.string("edition")).put("cutoff", cutoff)
+                .put("mode", "morning".equals(context.string("edition")) ? "morning_update" : "evening_review")
+                .put("scopeNote", summary.string("scopeNote"));
+        StrictJson.Obj previous = context.object("previousPublication");
+        ObjectNode prior = result.putObject("previousPublication");
+        for (String name : List.of("status", "kind", "roundId", "date", "edition", "cutoff", "reason"))
+            if (previous.has(name)) prior.set(name, previous.raw(name).deepCopy());
+        if ("available".equals(previous.string("status"))) prior.put("resultVersion", previous.object("summary").string("resultVersion"));
+        ObjectNode coverage = result.putObject("coverage");
+        for (String name : List.of("documents", "newDocuments", "backgroundDocuments", "companyNames", "marketRepresentative", "sectorPriceFeedAvailable"))
+            coverage.set(name, context.object("coverage").raw(name).deepCopy());
+        var claims = result.putArray("claims");
+        for (StrictJson.Obj claim : summary.objects("claims")) claims.add(project(claim, List.of("claimId", "kind", "text", "evidenceIds", "indicatorIds",
+                "previousPublicationIds", "previousForecastIds", "evaluationIds", "targetId", "direction", "conditions", "counterFactors", "updateAction")));
+        var forecasts = result.putArray("forecasts");
+        for (StrictJson.Obj forecast : summary.objects("forecasts")) {
+            ObjectNode value = project(forecast, List.of("forecastId", "text", "direction", "conditions", "counterFactors", "evidenceIds", "indicatorIds"));
+            value.set("target", publicTarget(forecast.object("target"))); forecasts.add(value);
+        }
+        var evaluations = result.putArray("forecastEvaluations");
+        for (StrictJson.Obj evaluation : summary.objects("forecastEvaluations")) {
+            ObjectNode value = project(evaluation, List.of("evaluationId", "forecastId", "rule", "status", "reason", "actualValue", "actualDirection", "directionMatched"));
+            value.set("target", publicTarget(evaluation.object("target"))); evaluations.add(value);
+        }
+        return result;
+    }
+
+    private static ObjectNode project(StrictJson.Obj source, List<String> fields) {
+        ObjectNode result = StrictJson.newObject();
+        for (String name : fields) result.set(name, source.raw(name).deepCopy());
+        return result;
+    }
+
+    private static ObjectNode publicTarget(StrictJson.Obj target) {
+        return project(target, List.of("targetId", "indicatorId", "valueKind", "baselineDate", "baselineValue", "targetDate", "targetEnd", "calendarRef", "rule"));
     }
 
     static Set<String> evidence(StrictJson.Obj context) {
@@ -27,6 +69,17 @@ final class BriefingMarketContextRules {
         for (StrictJson.Obj document : context.objects("documents")) for (StrictJson.Obj citation : document.objects("sources"))
             check(result.add(citation.string("evidenceId")), "duplicate_evidence");
         return result;
+    }
+
+    /** New outlook executions must fulfill the requested edition purpose; old recordings remain valid. */
+    static void outlookRequired(StrictJson.Obj summary, StrictJson.Obj context) {
+        if (!"PASS".equals(summary.object("verification").string("status"))) return;
+        Set<String> kinds = new HashSet<>(); summary.objects("claims").forEach(c -> kinds.add(c.string("kind")));
+        if (!context.objects("forecastTargets").isEmpty()) check(kinds.contains("forecast"), "outlook_forecast_required");
+        if ("morning".equals(context.string("edition")) && !priorForecasts(context).isEmpty())
+            check(kinds.contains("forecast_update"), "outlook_update_required");
+        if ("evening".equals(context.string("edition")) && "available".equals(context.object("previousPublication").string("status")))
+            check(kinds.contains("result_comparison"), "outlook_comparison_required");
     }
 
     static void previous(StrictJson.Obj record, List<StrictJson.Obj> records) {

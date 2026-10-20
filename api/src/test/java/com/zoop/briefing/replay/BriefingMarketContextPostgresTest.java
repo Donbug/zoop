@@ -90,6 +90,11 @@ class BriefingMarketContextPostgresTest {
         assertEquals("published", payload.path("status").asText());
         assertTrue(payload.at("/marketSummary/text").asText().contains("시험 기업"));
         assertTrue(payload.at("/marketSummary/evidenceIds/0").asText().startsWith("market-evidence-"));
+        assertEquals("zoop-market-outlook-analysis-v1", payload.at("/marketSummary/analysis/schemaVersion").asText());
+        assertEquals("evening_review", payload.at("/marketSummary/analysis/mode").asText());
+        assertTrue(payload.at("/marketSummary/analysis/coverage/companyNames").toString().contains("시험 기업"));
+        assertFalse(payload.at("/marketSummary/analysis").has("documents"));
+        assertFalse(payload.at("/marketSummary/analysis/previousPublication").has("summary"));
         assertEquals(15, jdbc.queryForObject("SELECT count(*) FROM articles", Integer.class));
         assertTrue(jdbc.queryForObject("SELECT count(*) FROM evidence WHERE id LIKE 'market-evidence-%'", Integer.class) >= 4);
         JsonNode saved = snapshot("2026-10-03", "morning");
