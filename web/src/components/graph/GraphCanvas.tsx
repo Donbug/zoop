@@ -619,13 +619,25 @@ export default function GraphCanvas({
       }
       instance.current = graph;
       syncSelection();
+      let lastSize = [host.clientWidth, host.clientHeight];
       observer = new ResizeObserver(() => {
         if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
         resizeFrame = requestAnimationFrame(() => {
           resizeFrame = null;
           if (!graph || disposed || graph.destroyed) return;
           if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
-          graph.setSize(host.clientWidth, host.clientHeight);
+          const [width, height] = [host.clientWidth, host.clientHeight];
+          graph.setSize(width, height);
+          // 사이드바·패널이 열려 지도 크기가 바뀌면, 사용자가 둔 위치는 화면 가운데를 유지한다.
+          if (
+            !followFit.current &&
+            (width !== lastSize[0] || height !== lastSize[1])
+          )
+            void graph.translateBy(
+              [(width - lastSize[0]) / 2, (height - lastSize[1]) / 2],
+              false,
+            );
+          lastSize = [width, height];
           if (followFit.current) fitPending.current = true;
           syncSelection();
         });

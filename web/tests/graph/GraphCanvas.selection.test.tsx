@@ -150,6 +150,31 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       expect(canvas.focusElement).toHaveBeenCalledWith('KRX:005930', false),
     );
   });
+  it('keeps a user-placed view centered when a sidebar narrows the map', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    sessionStorage.setItem(
+      'zoop.graph.view:member-a:all',
+      JSON.stringify({
+        url: '/?mode=all',
+        view: {
+          hidden: [],
+          camera: { zoom: 1, position: [0, 0], size: [0, 0] },
+        },
+      }),
+    );
+    render(<GraphCanvas data={data} memoryOwner="member-a" />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 900 },
+      clientHeight: { configurable: true, value: 600 },
+    });
+    canvas.translateBy.mockClear();
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() =>
+      expect(canvas.translateBy).toHaveBeenCalledWith([450, 300], false),
+    );
+  });
   it('explains each legend item in its tooltip', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
