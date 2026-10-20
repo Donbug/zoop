@@ -36,7 +36,7 @@ import tools.jackson.databind.node.ObjectNode;
  * version), article versions (title, URL, publication time at its stated precision) and evidence spans. The writer reads the
  * fields the verifier does not type from the verified raw bundle of the {@link VerifiedHandoff}, never from a second parse.
  *
- * <p><b>Mention references are a projection, not full source-event coverage.</b> A source event becomes a mention only when the
+ * <p><b>Mention references are a projection of the original mentions.</b> A source event becomes a mention only when the
  * article version its document belongs to ({@code documentId}, {@code documentVersion}, {@code rawVersion} and the observation
  * pin) is one the issue's own evidence cites; the reference carries that article version, so the read-time {@code asOf} filter that
  * covers the issue's articles covers its mentions too. The producer's {@code mentionId} is unique only within a document version
@@ -46,9 +46,14 @@ import tools.jackson.databind.node.ObjectNode;
  * local id on the same article version, as one S2 comparison and one S2 snapshot both list it) are one mention. The same input
  * always gives the same ids. The representative event resolves to its article version the same way, and is written as
  * {@code null} when that mention is not among the written ones, never as a mention the snapshot lacks. A document identity that
- * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS}).
- * Every other source event, the producer's own mention ids, the decisions, source references and each producer field the snapshot
- * has no place for stay in the receipt, which is the complete provenance.
+ * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS});
+ * the verifier of {@code zoop-graph-handoff-bundle-2} already requires exactly one article per mention document version, and every
+ * original mention cites evidence of its own article, so under that schema the references cover every mention of an issue. The
+ * snapshot does not carry the mention values (title, action, time, assertion status, background, participants): they are the
+ * producer's S2 candidate or snapshot values ({@code verification: "none"}) and stay only in the receipt, which keeps the whole
+ * bundle, the producer's own mention ids and decisions, source references and each producer field the snapshot has no place for.
+ * Any later reader of receipt mentions must check {@code receipt.bundle.schemaVersion}: for {@code zoop-graph-handoff-bundle-1}
+ * the mention values are unavailable, never empty and never copied from the issue.
  *
  * <p>{@code validUntil} is the last valid day (inclusive) and {@code null} is unknown, never "forever": days are written verbatim
  * or not at all ({@link HandoffTime#dayOrNull}); no midnight and no extra day is ever added.

@@ -18,6 +18,7 @@ export type Company = {
   id: string;
   name: string;
   ticker: string | null;
+  logoUrl?: string | null;
   legalName: string | null;
   market: string | null;
   sector: string | null;
@@ -75,8 +76,14 @@ export type Prices =
       source: Source;
       currency: string;
       interval: string;
+      range?: PriceRange | null;
       points: PricePoint[];
     };
+export type PriceRange = {
+  from: string;
+  to: string;
+  sessionDate?: string | null;
+};
 export type Event = {
   id: string;
   title: string;

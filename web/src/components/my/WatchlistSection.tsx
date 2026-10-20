@@ -95,6 +95,7 @@ export default function WatchlistSection({
             id: company.id,
             name: company.name,
             ticker: company.ticker,
+            logoUrl: company.logoUrl,
             issueCount: company.issueCount,
           },
         },
@@ -187,6 +188,7 @@ export default function WatchlistSection({
                   key={id}
                   id={id}
                   name={brief.name}
+                  logoUrl={brief.logoUrl}
                   description={
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="tabular-nums">

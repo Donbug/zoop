@@ -36,6 +36,8 @@
 
 **남은 일(앱 측):** 앱 스냅샷 형식과 수입기, 그래프 근거의 `getEvidence` 연결, `graph_versions`/`graph_activations` 기반 활성화와 asOf 두 단계, 제외 overlay와 revision 분리 저장, fixture 시나리오(정상·geography 미판정·근거 누락·철회).
 
+**2026-10-20:** 그래프 근거의 `getEvidence` 연결은 로컬에서 구현됐다(고정 snapshot·선택된 버전의 receipt·S2-1 source registry, 활성화 기능 없음, 백엔드 소유자 확인 대기). [규칙](../../api/docs/GRAPH_READ_HANDOFF.md#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시).
+
 이 문서는 [그래프 조회 계약 대조안](graph-read-contract-review.md)의 미결정 항목에 대한 **결정 기록과 남은 제안**이다. §0과 본문의 "확정" 표시는 결정된 방향이고, "제안·확인 필요"로 남은 것만 미결정이다. `openapi.yaml`, ERD, Neo4j writer, 앱 코드는 아직 이 결정대로 수정하지 않았다. 정본 계약은 [`openapi.yaml`](openapi.yaml)이다. 근거는 `investmate-poc/src/investmate/{domain,graph}.py`, `prototype/bff/src/zoop_bff/{dataset,graph,graph_versions}.py`, `docs/erd/zoop-core-erd-v6.md`다.
 
 **2026-10-16 확인 근거:** 원격 `main`의 [`api/docs/GRAPH_READ_HANDOFF.md`](https://github.com/Donbug/zoop/blob/cb345f7744da43bfc29150ec2e1b768219f03390/api/docs/GRAPH_READ_HANDOFF.md)와 `docs/api/internal-ai-openapi.{json,yaml}`의 `graph-versions` 계약을 추가로 대조했다. 이는 **현재 구현된 AI 내부 읽기 계약**이다. 아래의 앱 공개 조회·스냅샷·활성화 제안과 같은 계약으로 취급하지 않는다. 인수 문서의 작성 당시 로컬 검증·커밋 상태 설명은 현재 원격 `main`에 반영된 사실과 시점이 다르므로, 기능 범위와 wire 형식만 근거로 삼는다.

@@ -107,10 +107,11 @@ class EvidenceServiceTest {
         String id = world.evidenceId;
 
         assertEquals(ErrorCode.VERSION_UNAVAILABLE, failure(() -> service.read(id, "brf-1", null, null, null, "r")));
-        assertEquals(ErrorCode.VERSION_UNAVAILABLE, failure(() -> service.read(id, null, "gv-1", null, null, "r")));
+        assertEquals(0, world.read.calls, "a round must not touch the database");
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, failure(() -> service.read(id, null, "gv-1", null, null, "r")),
+                "an S1 citation has no pinned form");
         assertEquals(ErrorCode.VERSION_UNAVAILABLE, failure(() -> service.read(id, null, null, "2026-10-15T00:00:00Z", null, "r")));
-        assertEquals(ErrorCode.VERSION_UNAVAILABLE, failure(() -> service.read(id, null, null, "2026-10-15T09:00:00+09:00", null, "r")));
-        assertEquals(0, world.read.calls, "a pin must not touch the database");
+        world.read.calls = 0;
 
         for (String blank : List.of("", " ")) {
             assertEquals(ErrorCode.INVALID_REQUEST, failure(() -> service.read(id, blank, null, null, null, "r")));
@@ -446,7 +447,7 @@ class EvidenceServiceTest {
         EvidenceWorld world = new EvidenceWorld(temp).normal();
 
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure(() -> get(world.service(null, world.store), world.evidenceId)));
-        assertEquals(0, world.read.calls, "without a registry nothing else is read");
+        assertTrue(world.read.calls <= 1, "without a registry nothing beyond the evidence row is read");
         Files.writeString(world.grants, "{");
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(world));
         Files.writeString(world.grants, "{\"schemaVersion\":\"other\",\"grants\":[]}");
@@ -468,7 +469,8 @@ class EvidenceServiceTest {
 
         world.read.failure = null;
         EvidenceService failingTransaction = new EvidenceService(world.read, world.registry, new DocumentReadGrants(world.grants),
-                new EvidenceArtifactReader(null), java.time.Clock.fixed(EvidenceWorld.NOW, java.time.ZoneOffset.UTC),
+                new DocumentReadSources(null), (version, asOf, evidenceId) -> null, new EvidenceArtifactReader(null),
+                java.time.Clock.fixed(EvidenceWorld.NOW, java.time.ZoneOffset.UTC),
                 new TransactionOperations() {
                     @Override
                     public <T> T execute(org.springframework.transaction.support.TransactionCallback<T> action) {

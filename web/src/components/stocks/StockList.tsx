@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import GraphIcon from '@/components/graph/GraphIcon';
 import StockQuote from '@/components/stocks/StockQuote';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import type { CompanyBrief } from '@/types/company';
 
 type StockListProps = {
@@ -36,12 +37,11 @@ export default function StockList({
             key={row.id}
             className="flex items-center gap-3 border-b-[0.667px] border-zoop-line px-2 py-3.5 max-md:flex-wrap max-md:gap-2.5 max-md:px-0 max-md:py-3"
           >
-            <span
-              aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-zoop-ink text-xs font-bold text-zoop-paper"
-            >
-              {row.name.slice(0, 1)}
-            </span>
+            <CompanyLogo
+              name={row.name}
+              logoUrl={row.logoUrl}
+              className="size-8 rounded-full bg-zoop-ink text-xs font-bold text-zoop-paper"
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold text-zoop-ink">
                 {row.name}

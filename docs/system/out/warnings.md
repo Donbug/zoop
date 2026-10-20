@@ -262,7 +262,7 @@
 | BFF_PATH_DIFFERENCE | difference | getCompanyMetrics | 목표 /api/v1/companies/{id}/metrics ↔ BFF /api/companies/{id}/metrics |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyMetrics | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyPrices | 목표 /api/v1/companies/{id}/prices ↔ BFF /api/companies/{id}/prices |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyPrices | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyPrices | 목표만 80 · BFF만 39 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listCompanyDocuments | 목표 /api/v1/companies/{id}/documents ↔ BFF /api/companies/{id}/documents |  |
 | BFF_FIELD_DIFFERENCE | difference | listCompanyDocuments | 목표만 118 · BFF만 64 · 형식/필수/권한 변경 19 |  |
 | BFF_PATH_DIFFERENCE | difference | listEvents | 목표 /api/v1/events ↔ BFF /api/events |  |

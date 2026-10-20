@@ -126,13 +126,19 @@ zoop:
     bindings: ${ZOOP_HANDOFF_BINDINGS:}
     artifact-root: ${ZOOP_ARTIFACT_ROOT:}
   document-read:
-    # Public GET /api/v1/evidence/{id} (see api/docs/DOCUMENT_ANALYSIS.md). Both settings are optional, independent of the operator
-    # import/analysis flags above, and read-only: nothing is created, locked or written. Paths only; the database uses DB_*.
+    # Public GET /api/v1/evidence/{id} (see api/docs/DOCUMENT_ANALYSIS.md, api/docs/GRAPH_READ_HANDOFF.md). All settings are optional,
+    # independent of the operator import/analysis flags above, and read-only: nothing is created, locked or written. Paths only;
+    # the database uses DB_*.
     # `grants` is the operator's flat S1 grant registry (the same file as ZOOP_DOCUMENT_ANALYSIS_GRANTS / the AI service),
-    # re-read on every request; unset, every evidence read answers 503. `artifact-root` is only needed to read the exact receipt
-    # of a summary that was served from the AI artifact cache; unset, only that read answers 503. A set value that is not a
-    # normalized absolute path to an existing file/directory fails startup.
+    # re-read on every request; unset, every S1 evidence read answers 503.
+    # `ingestion-sources` is the operator's S2-1 source registry for graph evidence reads. It MUST name the same file as
+    # ZOOP_INGESTION_SOURCES (the registry the handoff import checks), is re-read on every request, has no default and never falls
+    # back to the S1 registry; unset, every graph evidence read answers 503.
+    # `artifact-root` is only needed to read the exact receipt of a summary served from the AI artifact cache and the import
+    # receipt of a graph version; unset, only those reads answer 503. A set value that is not a normalized absolute path to an
+    # existing file/directory fails startup.
     grants: ${ZOOP_DOCUMENT_READ_GRANTS:}
+    ingestion-sources: ${ZOOP_DOCUMENT_READ_INGESTION_SOURCES:}
     artifact-root: ${ZOOP_DOCUMENT_READ_ARTIFACT_ROOT:}
 
 server:

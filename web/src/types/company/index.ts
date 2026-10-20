@@ -21,7 +21,10 @@ export type CompanySummary = {
 };
 
 /** 관심 종목 행에 쓰는 기업 요약. 검색 결과(CompanySummary)나 기업 상세에서 얻는다. */
-export type CompanyBrief = Pick<CompanySummary, 'id' | 'name' | 'ticker'> & {
+export type CompanyBrief = Pick<
+  CompanySummary,
+  'id' | 'name' | 'ticker' | 'logoUrl'
+> & {
   /** 승인된 사건 수. 서버가 사건 섹션을 제공하지 못하면 null(0이 아님) */
   issueCount: number | null;
 };
