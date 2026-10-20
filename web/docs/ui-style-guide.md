@@ -63,3 +63,7 @@ The component uses existing Tailwind tokens, focus rings and native buttons with
 Use `AccountMenu` from `@/components/common/AccountMenu` through `ServiceHeader` for D-GRP-01/D-MY-01 and other service screens, including mobile. It replaces the member link to `/my` with a popup containing confirmed name/email and logout only; nonmembers retain the login link. This is the user's approved account-navigation refinement, rather than a new profile/settings page. Keep styles in Tailwind tokens.
 
 Click/tap, Enter/Space and arrow keys open the menu, with `aria-expanded` reflecting its state. Focus the logout item when opening; Escape closes and returns focus to the trigger, and outside pointer/Tab/focus departure close it. Disabling a focused action can cause a native browser blur, so keep pending/error UI visible and restore retry focus. Logout reuses cookie/CSRF transport, preserves the session on failure, prevents duplicate requests and ignores old responses after a member change. D-MY-01's page body no longer owns logout. Cover these behaviors with `tests/auth/account-menu.test.tsx` and `tests/auth/authJourney.test.tsx`.
+
+## Graph feature port
+
+D-GRP-01/01b uses `graph-view` for member/mode-scoped state and legend keys. G6 supplies flow layout and the conditional desktop minimap. `MapDetailSheet` owns M-GRP-01 modal snaps and focus return; `IsolatedIssuesPanel` reuses the detail panel tokens. Keep the source-to-implementation map in `PROTOTYPE_GRAPH_PORT_20261020.md` when changing these interactions.

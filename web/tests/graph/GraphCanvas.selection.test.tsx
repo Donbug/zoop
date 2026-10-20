@@ -12,6 +12,13 @@ const canvas = vi.hoisted(() => ({
   draw: vi.fn(),
   setElementState: vi.fn(),
   focusElement: vi.fn(),
+  setLayout: vi.fn(),
+  layout: vi.fn(),
+  setPlugins: vi.fn(),
+  zoomTo: vi.fn(),
+  translateTo: vi.fn(),
+  getZoom: vi.fn(() => 1),
+  getPosition: vi.fn(() => [0, 0]),
   setSize: vi.fn(),
   resizeCallbacks: [] as (() => void)[],
   handlers: new Map<string, (event: { target: { id: string } }) => void>(),
@@ -26,6 +33,16 @@ vi.mock('@antv/g6', () => ({
       canvas.handlers.set(name, handler);
     }
     async render() {}
+    setLayout = canvas.setLayout;
+    layout = canvas.layout;
+    setPlugins = canvas.setPlugins;
+    getZoom = canvas.getZoom;
+    getPosition = canvas.getPosition;
+    zoomTo = canvas.zoomTo;
+    translateTo = canvas.translateTo;
+    getNodeData() {
+      return canvas.setData.mock.lastCall?.[0]?.nodes ?? [];
+    }
     setSize = canvas.setSize;
     setData = canvas.setData;
     draw = canvas.draw;
@@ -40,6 +57,9 @@ vi.mock('@antv/g6', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
+  canvas.getZoom.mockReturnValue(1);
+  canvas.getPosition.mockReturnValue([0, 0]);
   canvas.handlers.clear();
   canvas.resizeCallbacks.length = 0;
   Object.defineProperty(document, 'fonts', {
@@ -58,6 +78,89 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('ports legend filters without moving nodes and keeps at least one node kind visible', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const before = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
+      (node) => node.id === 'NASDAQ:NVDA',
+    )?.style;
+    await userEvent.click(screen.getByRole('button', { name: /■ 기업/ }));
+    await waitFor(() =>
+      expect(
+        (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
+          (node) => node.id === 'NASDAQ:NVDA',
+        )?.style?.visibility,
+      ).toBe('hidden'),
+    );
+    expect(
+      (screen.getByRole('button', { name: /■ 사건 \d/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    const after = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
+      (node) => node.id === 'NASDAQ:NVDA',
+    )?.style;
+    expect([after?.x, after?.y]).toEqual([before?.x, before?.y]);
+    await userEvent.click(screen.getByRole('button', { name: /□ 기업/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: '흐름 순으로 정렬' }),
+    );
+    await waitFor(() => expect(canvas.layout).toHaveBeenCalled());
+    expect(canvas.setLayout).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: 'dagre' }),
+    );
+  });
+  it('restores zoom and pan separately for each mode', async () => {
+    const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const personal = createMockGraph({
+      mode: 'personal',
+      personalFilter: 'all',
+    });
+    const { rerender } = render(
+      <GraphCanvas data={all} memoryOwner="member-a" />,
+    );
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    canvas.getZoom.mockReturnValue(1.8);
+    canvas.getPosition.mockReturnValue([40, 60]);
+    act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+    rerender(<GraphCanvas data={personal} memoryOwner="member-a" />);
+    await waitFor(() => expect(canvas.created).toHaveBeenCalledTimes(2));
+    canvas.getZoom.mockReturnValue(1.2);
+    canvas.getPosition.mockReturnValue([5, 10]);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));
+    act(() => canvas.handlers.get('aftertransform')!({ target: { id: '' } }));
+    rerender(<GraphCanvas data={all} memoryOwner="member-a" />);
+    await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalledWith(1.8, false));
+    expect(canvas.translateTo).toHaveBeenCalledWith([40, 60], false);
+  });
+  it('enables the desktop minimap only above sixty visible nodes', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { rerender } = render(<GraphCanvas data={data} />);
+    const host = screen.getByRole('img');
+    Object.defineProperty(host, 'clientWidth', {
+      configurable: true,
+      value: 1200,
+    });
+    await waitFor(() => expect(canvas.setPlugins).toHaveBeenCalledWith([]));
+    const company = data.nodes.find((node) => node.kind === 'company')!;
+    const large = {
+      ...data,
+      nodes: [
+        ...data.nodes,
+        ...Array.from({ length: 70 }, (_, index) => ({
+          ...company,
+          id: `more-${index}`,
+        })),
+      ],
+    };
+    rerender(<GraphCanvas data={large} />);
+    await waitFor(() =>
+      expect(canvas.setPlugins).toHaveBeenLastCalledWith([
+        expect.objectContaining({ type: 'minimap', size: [192, 128] }),
+      ]),
+    );
+  });
+
   it('D-GRP-01 redraws at the current container size after resize and ignores a disposed observer', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const personal = createMockGraph({

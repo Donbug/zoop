@@ -3,6 +3,14 @@ import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import GraphIcon from './GraphIcon';
+import {
+  emptyView,
+  isolatedIssues,
+  readModeEntry,
+  saveModeEntry,
+  type GraphView,
+  type LegendKey,
+} from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 
 export default function GraphCanvas({
@@ -15,6 +23,8 @@ export default function GraphCanvas({
   selectedEdgeId = null,
   onSelectEdge,
   connectionPath = false,
+  memoryOwner = 'public',
+  onOpenIsolated,
 }: {
   data: GraphResponse;
   selectedId?: string | null;
@@ -25,7 +35,43 @@ export default function GraphCanvas({
   selectedEdgeId?: string | null;
   onSelectEdge?: (id: string) => void;
   connectionPath?: boolean;
+  memoryOwner?: string;
+  onOpenIsolated?: () => void;
 }) {
+  const viewKey = `${memoryOwner}:${data.metadata.mode}`;
+  const [viewState, setViewState] = useState(() => ({
+    key: viewKey,
+    view: readModeEntry(memoryOwner, data.metadata.mode)?.view ?? emptyView(),
+  }));
+  let view = viewState.view;
+  if (viewState.key !== viewKey) {
+    view = readModeEntry(memoryOwner, data.metadata.mode)?.view ?? emptyView();
+    setViewState({ key: viewKey, view });
+  }
+  const flowPositions = useRef(new Map<string, { x: number; y: number }>());
+  const layoutSignature = useRef('');
+  function changeView(next: GraphView) {
+    setViewState({ key: viewKey, view: next });
+    const saved = readModeEntry(memoryOwner, data.metadata.mode);
+    saveModeEntry(memoryOwner, data.metadata.mode, {
+      url: saved?.url ?? `/?mode=${data.metadata.mode}`,
+      view: { ...next, camera: saved?.view.camera },
+    });
+  }
+  function toggleKind(key: LegendKey) {
+    if (
+      (key === 'company' || key === 'issue') &&
+      !view.hidden.includes(key) &&
+      view.hidden.includes(key === 'company' ? 'issue' : 'company')
+    )
+      return;
+    changeView({
+      ...view,
+      hidden: view.hidden.includes(key)
+        ? view.hidden.filter((item) => item !== key)
+        : [...view.hidden, key],
+    });
+  }
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<Graph | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -33,7 +79,9 @@ export default function GraphCanvas({
   const lastFocused = useRef<string | null>(null);
   const hovered = useRef<string | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
-  const selectNode = useEffectEvent((id: string | null) => onSelect?.(id));
+  const selectNode = useEffectEvent((id: string | null) =>
+    id === '__isolated__' ? onOpenIsolated?.() : onSelect?.(id),
+  );
   const selectEdge = useEffectEvent((id: string) => {
     if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
       onSelectEdge?.(id);
@@ -41,6 +89,7 @@ export default function GraphCanvas({
   const [renderError, setRenderError] = useState(false);
   const [retry, setRetry] = useState(0);
   const stats = graphSummary(data);
+  const nodeKinds = new Map(data.nodes.map((node) => [node.id, node.kind]));
   const personal = data.metadata.mode === 'personal';
   const focusedNodes = focusNeighborhood(data, focusId, focusHops);
   const selectedNode = data.nodes.find((n) => n.id === selected);
@@ -119,6 +168,9 @@ export default function GraphCanvas({
     // A late leave from the previous node must not clear the new node's hover.
     if (hovered.current === id) hoverNode(null);
   });
+  const retainFocus = useEffectEvent(() => {
+    lastFocused.current = focusId;
+  });
   const syncSelection = useEffectEvent(() => {
     const graph = instance.current;
     const host = container.current;
@@ -156,8 +208,110 @@ export default function GraphCanvas({
               }
             : edge,
         );
+        if (
+          onOpenIsolated &&
+          isolatedIssues(data).length &&
+          !view.hidden.includes('issue')
+        )
+          rendered.nodes?.push({
+            id: '__isolated__',
+            type: 'circle',
+            style: {
+              x: host.clientWidth - 65,
+              y: host.clientHeight / 2,
+              size: 48,
+              fill: '#dfdfdc',
+              stroke: '#1a1a1a',
+              labelText: `연결 없는 사건 ${stats.disconnected}건`,
+              labelPlacement: 'bottom',
+              iconText: String(stats.disconnected),
+              cursor: 'pointer',
+            },
+          });
+        const pathNodes = new Set(
+          data.edges
+            .filter((edge) => highlightedEdgeIds.includes(edge.id))
+            .flatMap((edge) => [edge.source, edge.target]),
+        );
+        const hiddenNodes = new Set(
+          data.nodes
+            .filter(
+              (node) =>
+                view.hidden.includes(node.kind) && !pathNodes.has(node.id),
+            )
+            .map((node) => node.id),
+        );
+        rendered.nodes = rendered.nodes?.map((node) => ({
+          ...node,
+          style: {
+            ...node.style,
+            ...(view.flow ? flowPositions.current.get(String(node.id)) : {}),
+            visibility: hiddenNodes.has(String(node.id)) ? 'hidden' : 'visible',
+          },
+        }));
+        rendered.edges = rendered.edges?.map((edge) => ({
+          ...edge,
+          style: {
+            ...edge.style,
+            visibility:
+              !highlightedEdgeIds.includes(String(edge.id)) &&
+              (hiddenNodes.has(String(edge.source)) ||
+                hiddenNodes.has(String(edge.target)) ||
+                view.hidden.includes(
+                  data.edges.find((item) => item.id === edge.id)!.relationType,
+                ))
+                ? 'hidden'
+                : 'visible',
+          },
+        }));
+        const signature = `${view.flow}:${rendered.nodes?.map((node) => node.id).join(',')}`;
         graph.setData(rendered);
         await graph.draw();
+        if (signature !== layoutSignature.current) {
+          graph.setLayout(
+            view.flow
+              ? { type: 'dagre', rankdir: 'LR', nodesep: 90, ranksep: 150 }
+              : [],
+          );
+          if (view.flow) {
+            await graph.layout();
+            flowPositions.current = new Map(
+              graph.getNodeData().map((node) => [
+                String(node.id),
+                {
+                  x: Number(node.style?.x ?? 0),
+                  y: Number(node.style?.y ?? 0),
+                },
+              ]),
+            );
+          } else flowPositions.current.clear();
+          layoutSignature.current = signature;
+        }
+        const visibleCount =
+          rendered.nodes?.filter((node) => node.style?.visibility !== 'hidden')
+            .length ?? 0;
+        graph.setPlugins(
+          visibleCount > 60 && host.clientWidth >= 768
+            ? [
+                {
+                  type: 'minimap',
+                  key: 'graph-overview',
+                  size: [192, 128],
+                  position: 'right-bottom',
+                  className:
+                    'hidden md:block rounded-panel border border-panel-line bg-white shadow-lg',
+                  filter: (id: string, kind: string) =>
+                    kind === 'node'
+                      ? !hiddenNodes.has(id)
+                      : (rendered.edges?.some(
+                          (edge) =>
+                            edge.id === id &&
+                            edge.style?.visibility !== 'hidden',
+                        ) ?? false),
+                },
+              ]
+            : [],
+        );
         if (graph.destroyed) return;
         renderedData.current = rendered;
         await syncVisualStates(graph, rendered);
@@ -182,6 +336,8 @@ export default function GraphCanvas({
     focusHops,
     highlightedEdgeIds,
     connectionPath,
+    view.hidden,
+    view.flow,
   ]);
   useEffect(() => {
     const host = container.current;
@@ -194,6 +350,25 @@ export default function GraphCanvas({
     host.addEventListener('pointerleave', clearHover);
     hovered.current = null;
     renderedData.current = null;
+    layoutSignature.current = '';
+    flowPositions.current.clear();
+    const graphMode = data.metadata.mode;
+    const rememberCamera = () => {
+      if (!graph || disposed || graph.destroyed || instance.current !== graph)
+        return;
+      const position = graph.getPosition();
+      const saved = readModeEntry(memoryOwner, graphMode);
+      saveModeEntry(memoryOwner, graphMode, {
+        url: saved?.url ?? `/?mode=${graphMode}`,
+        view: {
+          ...(saved?.view ?? emptyView()),
+          camera: {
+            zoom: graph.getZoom(),
+            position: [position[0], position[1]],
+          },
+        },
+      });
+    };
     async function mount() {
       await document.fonts.ready;
       if (disposed || !host) return;
@@ -254,6 +429,7 @@ export default function GraphCanvas({
         if (!graph || disposed) return;
         try {
           setZoom(graph.getZoom());
+          rememberCamera();
         } catch {
           /* transform may fire before canvas init */
         }
@@ -264,6 +440,12 @@ export default function GraphCanvas({
         if (!disposed) setRenderError(true);
       }
       if (disposed) return;
+      const camera = readModeEntry(memoryOwner, graphMode)?.view.camera;
+      if (camera) {
+        retainFocus();
+        await graph.zoomTo(camera.zoom, false);
+        await graph.translateTo(camera.position, false);
+      }
       instance.current = graph;
       syncSelection();
       observer = new ResizeObserver(() => {
@@ -282,6 +464,7 @@ export default function GraphCanvas({
       if (!disposed) setRenderError(true);
     });
     return () => {
+      rememberCamera();
       disposed = true;
       host.removeEventListener('pointerleave', clearHover);
       observer?.disconnect();
@@ -289,7 +472,7 @@ export default function GraphCanvas({
       graph?.destroy();
       instance.current = null;
     };
-  }, [data, retry]);
+  }, [data, retry, memoryOwner]);
   async function control(action: 'in' | 'out' | 'fit') {
     const graph = instance.current;
     if (!graph || graph.destroyed) return;
@@ -331,45 +514,68 @@ export default function GraphCanvas({
           <p className="relationship-meta">
             {stats.company} COMPANIES · {stats.sharedIssues} SHARED EVENTS
           </p>
-          <div className="relationship-legend-items">
-            <h2>LEGEND</h2>
-            <span>
-              <b className="legend-company" />
-              기업
-            </span>
-            <span>
-              <b className="legend-focus" />
-              중심·선택
-            </span>
-            <span>
-              <b className="legend-issue" />
-              공유 사건
-            </span>
-            <span>
-              <b className="legend-folded">ϟn</b>접힌 사건
-            </span>
-            <span>
-              <b className="legend-line" />
-              직접 관련
-            </span>
-            <span>
-              <b className="legend-line dashed" />
-              사건 공유
-            </span>
-            <span>
-              <b className="legend-line arrow" />
-              후속 사건
-            </span>
-            <span>
-              <b className="legend-size">○◯</b>크기=활동
-            </span>
+          <div className="mt-3 border-t border-zoop-line pt-2">
+            <h2 className="mb-2 text-[10px] tracking-widest">
+              LEGEND · 표시 필터
+            </h2>
+            <div className="grid grid-cols-2 gap-1">
+              {(
+                [
+                  ['company', '기업'],
+                  ['issue', '사건'],
+                  ['INVOLVES', '직접 관련'],
+                  ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
+                  ['FOLLOWS', '후속 사건'],
+                  ['SHARES_ISSUE', '사건 공유'],
+                ] as [LegendKey, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="pointer-events-auto rounded border border-zoop-line px-1 py-1 text-left text-[10px] aria-pressed:bg-white aria-pressed:font-bold focus-visible:outline-2"
+                  aria-pressed={!view.hidden.includes(key)}
+                  disabled={
+                    (key === 'company' || key === 'issue') &&
+                    !view.hidden.includes(key) &&
+                    view.hidden.includes(
+                      key === 'company' ? 'issue' : 'company',
+                    )
+                  }
+                  onClick={() => toggleKind(key)}
+                >
+                  {view.hidden.includes(key) ? '□' : '■'} {label}{' '}
+                  {key === 'company'
+                    ? stats.company
+                    : key === 'issue'
+                      ? stats.issue
+                      : data.edges.filter((edge) => edge.relationType === key)
+                          .length}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="pointer-events-auto mt-2 w-full rounded border border-zoop-line px-2 py-1 text-left text-[11px] aria-pressed:bg-white focus-visible:outline-2"
+              aria-pressed={view.flow}
+              onClick={() => changeView({ ...view, flow: !view.flow })}
+            >
+              흐름 순으로 정렬
+            </button>
+            <p className="mt-2 text-[10px]">○ 기업 · ◆ 사건 · 크기=활동</p>
           </div>
         </aside>
       )}
-      <div className="relationship-disconnected">
-        <span>{stats.disconnected}</span>
-        <p>연결 없는 사건</p>
-      </div>
+      {stats.disconnected > 0 && !view.hidden.includes('issue') && (
+        <button
+          type="button"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-12 focus:right-3 focus:z-20 focus:bg-white focus:p-3"
+          onClick={onOpenIsolated}
+          aria-label={`연결 없는 사건 ${stats.disconnected}건 보기`}
+        >
+          {stats.disconnected}
+          <span className="block">연결 없는 사건</span>
+        </button>
+      )}
       <div className="relationship-source">
         <p>SOURCE · {data.metadata.source}</p>
         <p>
@@ -395,10 +601,7 @@ export default function GraphCanvas({
         >
           <GraphIcon name="fit" />
         </button>
-        <output>
-          {Math.round(zoom * (personal ? 69 : 100))}% · 드래그로 이동 · 휠로
-          확대
-        </output>
+        <output>{Math.round(zoom * 100)}% · 드래그로 이동 · 휠로 확대</output>
       </div>
       {selectedNode && (
         <p className="relationship-selection" role="status">
@@ -437,29 +640,42 @@ export default function GraphCanvas({
         className="relationship-accessible-nodes"
         aria-label="키보드로 기업·사건·연결선 선택"
       >
-        {data.nodes.map((node) => (
-          <button
-            key={node.id}
-            aria-pressed={selected === node.id}
-            onClick={() => onSelect?.(node.id)}
-          >
-            {node.kind === 'issue' ? '사건: ' : '기업: '}
-            {node.label}
-            {node.holding ? ' · 보유' : ''}
-            {node.watch ? ' · 관심' : ''}
-          </button>
-        ))}
-        {data.edges.filter(isSelectableRelation).map((edge) => (
-          <button
-            key={edge.id}
-            aria-pressed={selectedEdgeId === edge.id}
-            onClick={() => onSelectEdge?.(edge.id)}
-          >
-            연결선: {data.nodes.find((node) => node.id === edge.source)?.label}{' '}
-            – {data.nodes.find((node) => node.id === edge.target)?.label} ·{' '}
-            {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}
-          </button>
-        ))}
+        {data.nodes
+          .filter((node) => !view.hidden.includes(node.kind))
+          .map((node) => (
+            <button
+              key={node.id}
+              aria-pressed={selected === node.id}
+              onClick={() => onSelect?.(node.id)}
+            >
+              {node.kind === 'issue' ? '사건: ' : '기업: '}
+              {node.label}
+              {node.holding ? ' · 보유' : ''}
+              {node.watch ? ' · 관심' : ''}
+            </button>
+          ))}
+        {data.edges
+          .filter(
+            (edge) =>
+              isSelectableRelation(edge) &&
+              !view.hidden.includes(edge.relationType) &&
+              [edge.source, edge.target].every((id) => {
+                const kind = nodeKinds.get(id);
+                return !kind || !view.hidden.includes(kind);
+              }),
+          )
+          .map((edge) => (
+            <button
+              key={edge.id}
+              aria-pressed={selectedEdgeId === edge.id}
+              onClick={() => onSelectEdge?.(edge.id)}
+            >
+              연결선:{' '}
+              {data.nodes.find((node) => node.id === edge.source)?.label} –{' '}
+              {data.nodes.find((node) => node.id === edge.target)?.label} ·{' '}
+              {edge.relationType === 'SHARES_ISSUE' ? '사건 공유' : '후속 관계'}
+            </button>
+          ))}
       </div>
     </div>
   );
