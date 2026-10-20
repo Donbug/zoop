@@ -28,7 +28,7 @@ class BriefingReplayBoundaryTest {
     void ordinaryReadSettingsRemainDisabledWithoutOpeningDatabase() {
         var jdbc = mock(JdbcTemplate.class);
         var settings = new MockEnvironment();
-        assertNotNull(new BriefingReplayConfiguration().briefingReplayReadPolicy(settings, jdbc, new DocumentReadProperties(null, null)));
+        assertNotNull(new BriefingReplayConfiguration().briefingReplayReadPolicy(settings, jdbc, new DocumentReadProperties(null, null, null)));
         verifyNoInteractions(jdbc);
     }
 
@@ -41,7 +41,7 @@ class BriefingReplayBoundaryTest {
                     .withProperty("spring.datasource.url", "jdbc:postgresql://127.0.0.1/briefing_replay");
             env.setActiveProfiles(localProfile ? "local" : "production");
             assertThrows(IllegalStateException.class, () -> new BriefingReplayConfiguration()
-                    .briefingReplayReadPolicy(env, jdbc, new DocumentReadProperties(null, null)));
+                    .briefingReplayReadPolicy(env, jdbc, new DocumentReadProperties(null, null, null)));
         }
         verifyNoInteractions(jdbc);
     }
