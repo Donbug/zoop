@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:105 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:105 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:238 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 영향 방향·근거 검증 및 공개 적격 판정: 기업별 영향 방향과 지지·반대 근거를 분석하고 관계·경로의 참조와 공개 조건을 검증한다. AI는 영향 해석·품질 검증을, 백엔드 B는 서버의 검증 상태·공개 제외 적용을 담당한다. FS021은 이 결과를 조회·표시한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:238 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — 영향 방향·근거 검증 및 공개 적격 판정: 기업별 영향 방향과 지지·반대 근거를 분석하고 관계·경로의 참조와 공개 조건을 검증한다. AI는 영향 해석·품질 검증을, 백엔드 B는 서버의 검증 상태·공개 제외 적용을 담당한다. FS021은 이 결과를 조회·표시한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS021](feature-FS021.md) · [FS055](feature-FS055.md) · [FS058](feature-FS058.md) · [FS067-02](feature-FS067-02.md)
 

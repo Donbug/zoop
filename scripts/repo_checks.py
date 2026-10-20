@@ -22,7 +22,7 @@ PROJECTS = (
     ("ai-evaluation", "ai/evaluation", "Offline authored-control scoring; Korean verification gate uses the installed public worker runtime", "make worker-install (from repository root)", "make evaluation-verification-check (from repository root)"),
     ("ai-service", "ai/service", "S1 internal loopback HTTP transport to the installed zoop-ai CLI (public dependencies only; local preparation, not deployed)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/service_smoke.py; scripts/export_openapi.py --check; uv build"),
     ("ai-pipeline", "ai/pipeline", "Native replay-only document collection, S2-1 ingestion, S2-2 event/topic candidates, S3 relation/impact candidates, S4 dependents, private graph projection and handoff (public dependencies only; no PoC, token or live model)", "uv sync --frozen --group dev", ".venv/bin/python -m pytest tests; scripts/*_smoke.py; uv build"),
-    ("api", "api", "Spring Boot 4.1.1 / Java 21 app backend foundation plus the internal S1 AI transport client (no auth or domain endpoints yet; needs JDK 21)", "JAVA_HOME=<JDK 21>; ./api/gradlew -p api --version", "make api-test api-build; make service-install api-ai-smoke"),
+    ("api", "api", "Spring Boot 4.1.1 / Java 21 app backend with auth, company/graph reads and internal AI clients; local fixture development needs no cloud or Neo4j", "JAVA_HOME=<JDK 21>; ./api/gradlew -p api --version", "make api-test api-build; make api-graph-dev (built jar + cached PostgreSQL Docker image); make service-install api-ai-smoke; make pipeline-install api-graph-handoff-import-smoke (dedicated empty PostgreSQL DB_URL/DB_USERNAME/DB_PASSWORD)"),
     ("contracts", "docs/api", "Language-neutral target contract", "existing PyYAML/OpenAPI validator", "make contracts-check docs-check"),
 )
 HELP = """Polyglot monorepo: app code stays in its current directories.
@@ -34,9 +34,11 @@ BFF only: make bff-install | bff-test | bff-build
 Worker only: make worker-install | worker-test | worker-schema-check | worker-build
 Evaluation (Korean verification, installed worker required): make evaluation-verification-check (actual loopback CLI smoke, corpus validation, targeted evaluation tests; no real provider)
 Pipeline (native replay-only, public dependencies, no private PoC or token): make pipeline-install | pipeline-test | pipeline-smoke | pipeline-build
+Recipient demos (synthetic, no AWS/Neo4j/model keys): make pipeline-collection-demo | pipeline-handoff-package HANDOFF_PACKAGE_DIR=/absolute/new/path | pipeline-handoff-package-verify HANDOFF_PACKAGE_DIR=/absolute/package/path
 Service only (internal HTTP over the S1 CLI, public deps): make service-install | service-test | service-smoke | service-openapi-check | service-build
 Service + installed pipeline (S2 extraction jobs and S3 relation jobs; needs both make pipeline-install and make service-install, fails without them): make service-pipeline-test | service-pipeline-smoke
-API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate)
+API only (Spring Boot, JDK 21): make api-test | api-build | api-ai-smoke (api-ai-smoke also needs make service-install; real Java -> ai/service -> zoop-ai replay gate) | api-graph-handoff-import-smoke (after make pipeline-install api-build; DB_URL/DB_USERNAME/DB_PASSWORD of a dedicated EMPTY PostgreSQL database; no model call, no activation)
+Local graph API development: make api-build api-graph-dev (Java 21, Python, Docker, cached postgres:16.13-alpine; temporary DB, fixture reads, Ctrl-C cleanup; never reads .env or pulls images)
 Worker fixture drift: make worker-contracts-check (installed BFF Python)
 BFF/web type drift: make bff-types-check (installed BFF Python + web tool)
 Artifacts: make package-artifacts COMMIT=<40-char-sha> ARTIFACT_DIR=<outside-repo>
@@ -232,7 +234,8 @@ def docs() -> None:
         sources = catalog["sources"]
         run([sys.executable, "docs/system/import_sources.py", "--spec-dir", sources["specDir"],
              "--wbs-dir", sources["wbsDir"], "--requirements-dir", sources["requirementsDir"],
-             "--screens", sources["screens"], "--gap", sources["gap"]], cwd=target)
+             "--screens", sources["screens"], "--gap", sources["gap"],
+             *[arg for path in sources.get("historicalSpecFiles", []) for arg in ("--historical-spec-file", path)]], cwd=target)
         generated = yaml.safe_load((target / "docs/system/catalog.yaml").read_text())
         if generated != catalog:
             raise ValueError("Generated catalog drift: run documented import_sources.py command.")

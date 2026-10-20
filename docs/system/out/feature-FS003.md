@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:12 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:12 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv) — 이메일 회원가입: 사용자가 가입 정보를 입력하고 필수 약관에 동의하여 계정을 생성한다. 필수 입력, 입력 형식, 필수 약관 동의, 이메일 중복 여부를 회원가입 기능 내부에서 검증한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv) — 이메일 회원가입: 사용자가 가입 정보를 입력하고 필수 약관에 동의하여 계정을 생성한다. 필수 입력, 입력 형식, 필수 약관 동의, 이메일 중복 여부를 회원가입 기능 내부에서 검증한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:171 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

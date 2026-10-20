@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -86,6 +86,45 @@ function setup(url = '/?mode=all') {
   return router;
 }
 
+it('D-GRP-07 restores a pair from URL, lets the user repick and closes without changing the graph mode', async () => {
+  anonymous();
+  vi.mocked(getGraph).mockResolvedValue(
+    createMockGraph({ mode: 'all', personalFilter: 'all' }),
+  );
+  const router = setup('/?mode=all&path=KRX%3A005930%2CNASDAQ%3ANVDA');
+  const panel = await screen.findByRole('complementary', {
+    name: '두 기업 사이 경로',
+  });
+  await within(panel).findByRole('heading', { name: '2단계 연결' });
+  expect(within(panel).getAllByText('삼성전자').length).toBeGreaterThan(0);
+  await userEvent.click(
+    within(panel).getByRole('button', { name: '다른 기업 고르기' }),
+  );
+  await userEvent.click(
+    within(panel).getByRole('button', { name: /^NVIDIA$/ }),
+  );
+  expect(new URLSearchParams(router.state.location.search).get('path')).toBe(
+    'KRX:005930,NASDAQ:NVDA',
+  );
+  await act(async () => {
+    await router.navigate(-1);
+  });
+  await within(panel).findByRole('heading', { name: '두 번째 기업 선택' });
+  await act(async () => {
+    await router.navigate(1);
+  });
+  await within(panel).findByRole('heading', { name: '2단계 연결' });
+  await userEvent.click(
+    within(panel).getByRole('button', { name: '경로 닫기' }),
+  );
+  expect(new URLSearchParams(router.state.location.search).has('path')).toBe(
+    false,
+  );
+  expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
+    'all',
+  );
+});
+
 it('D-BRF-04 회차 지도를 최신 main 지도에 연결하고 현재 지도로 복귀한다', async () => {
   anonymous();
   vi.mocked(getGraph).mockImplementation(async (request) =>
@@ -162,6 +201,66 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     expect(setTutorialCompleted).not.toHaveBeenCalled();
   });
 
+  it('FS015: 튜토리얼을 마치지 않은 회원은 지도에 들어오면 자동으로 열고, 마친 회원은 열지 않는다', async () => {
+    member();
+    const router = setup('/?mode=all');
+    expect(
+      await screen.findByRole('heading', { name: '지도 움직이기' }),
+    ).toBeTruthy();
+    expect(new URLSearchParams(router.state.location.search).get('tour')).toBe(
+      '1',
+    );
+  });
+
+  it('튜토리얼을 마친 회원에게는 자동으로 열지 않는다', async () => {
+    member();
+    const session = useAuthStore.getState().session!;
+    useAuthStore.setState({
+      session: {
+        ...session,
+        setup: { completed: true, tutorialCompleted: true },
+      },
+    });
+    const router = setup('/?mode=all');
+    await screen.findByTestId('graph-canvas');
+    expect(screen.queryByRole('heading', { name: '지도 움직이기' })).toBeNull();
+    expect(new URLSearchParams(router.state.location.search).has('tour')).toBe(
+      false,
+    );
+  });
+
+  it('같은 지도에서 회원이 바뀌면 새 회원의 미완료 튜토리얼을 연다', async () => {
+    member();
+    const router = setup('/?mode=all');
+    await screen.findByRole('heading', { name: '지도 움직이기' });
+    await router.navigate('/?mode=all');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: '지도 움직이기' }),
+      ).toBeNull(),
+    );
+
+    useAuthStore.getState().setSession({
+      authenticated: true,
+      kind: 'member',
+      user: {
+        id: 'member-2',
+        email: 'member-2@zoop.test',
+        displayName: '새 회원',
+      },
+      setup: { completed: true, tutorialCompleted: false },
+      csrfToken: 'csrf-2',
+      expiresAt: null,
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: '지도 움직이기' }),
+    ).toBeTruthy();
+    expect(new URLSearchParams(router.state.location.search).get('tour')).toBe(
+      '1',
+    );
+  });
+
   it('회원 완료는 상태 API 성공 후에만 화면을 닫는다', async () => {
     member();
     vi.mocked(setTutorialCompleted).mockResolvedValue(
@@ -176,9 +275,17 @@ describe('D-GRP-T~T5 · 관계 그래프 튜토리얼', () => {
     await waitFor(() =>
       expect(setTutorialCompleted).toHaveBeenCalledWith(true),
     );
+    await waitFor(() =>
+      expect(
+        new URLSearchParams(router.state.location.search).has('tour'),
+      ).toBe(false),
+    );
+    // 저장 응답의 세션이 아직 미완료여도, 이번 방문에 연 튜토리얼을 다시 자동으로 열지 않는다.
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(new URLSearchParams(router.state.location.search).has('tour')).toBe(
       false,
     );
+    expect(screen.queryByRole('heading', { name: '지도 움직이기' })).toBeNull();
   });
 });
 

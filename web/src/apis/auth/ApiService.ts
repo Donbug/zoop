@@ -17,6 +17,7 @@ type ErrorBody = {
   error?: {
     code?: unknown;
     message?: unknown;
+    retryable?: unknown;
   };
 };
 
@@ -26,26 +27,37 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
+  /** 같은 요청을 다시 보내면 나아질 수 있는지(계약의 error.retryable). 서버가 주지 않으면 null */
+  readonly retryable: boolean | null;
 
-  constructor(status: number, code: string | null, message: string) {
+  constructor(
+    status: number,
+    code: string | null,
+    message: string,
+    retryable: boolean | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.retryable = retryable;
   }
 }
 
 async function toApiError(response: Response) {
   let code: string | null = null;
   let message = response.statusText || `HTTP ${response.status}`;
+  let retryable: boolean | null = null;
   try {
     const body = (await response.json()) as ErrorBody;
     if (typeof body.error?.code === 'string') code = body.error.code;
     if (typeof body.error?.message === 'string') message = body.error.message;
+    if (typeof body.error?.retryable === 'boolean')
+      retryable = body.error.retryable;
   } catch {
     // 본문이 JSON이 아니면 상태 문구만 쓴다.
   }
-  return new ApiError(response.status, code, message);
+  return new ApiError(response.status, code, message, retryable);
 }
 
 function createRequestOptions(
@@ -99,7 +111,7 @@ export async function call<TResponse = unknown>(
       ),
     );
   } catch {
-    throw new ApiError(0, 'NETWORK_ERROR', '요청을 보내지 못했어요.');
+    throw new ApiError(0, 'NETWORK_ERROR', '요청을 보내지 못했어요.', true);
   }
 
   if (!response.ok) {

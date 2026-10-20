@@ -192,7 +192,9 @@ export default function WatchlistSection({
                       <span className="tabular-nums">
                         {[
                           brief.ticker,
-                          `승인된 사건 ${brief.issueCount}건`,
+                          brief.issueCount === null
+                            ? '사건 수 미제공'
+                            : `승인된 사건 ${brief.issueCount}건`,
                           pending?.companyId === id && '저장 중',
                         ]
                           .filter(Boolean)

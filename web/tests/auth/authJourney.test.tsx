@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import LoginPage from '@/pages/auth/login/LoginPage';
 import SignupPage from '@/pages/auth/signup/SignupPage';
 import MyStocksPage from '@/pages/my/MyStocksPage';
+import AppLayout from '@/components/common/AppLayout';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import { call } from '@/apis/auth/ApiService';
 import { logout } from '@/apis/auth/auth';
@@ -71,7 +72,9 @@ function open(path: string) {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/" element={<h1>지도 목적지</h1>} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/my" element={<MyStocksPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/my" element={<MyStocksPage />} />
+          </Route>
           <Route path="/onboarding" element={<h1>초기 설정 목적지</h1>} />
         </Route>
       </Routes>
@@ -150,7 +153,12 @@ describe('#36 인증 화면·세션·보호 화면 통합', () => {
     useOnboardingStore.getState().toggleWatchlist('private-company');
     useAiChatStore.getState().setDraft('이전 회원 질문');
     sessionStorage.setItem('zoop.graph.personal-filter', 'holdings');
-    await reloaded.user.click(screen.getByRole('button', { name: '로그아웃' }));
+    await reloaded.user.click(
+      screen.getByRole('button', { name: '계정 메뉴 열기' }),
+    );
+    await reloaded.user.click(
+      screen.getByRole('menuitem', { name: '로그아웃' }),
+    );
     await screen.findByRole('heading', { name: '이메일로 로그인' });
     expect(cookieSession.kind).toBe('anonymous');
     expect(useAuthStore.getState().member).toBeNull();
@@ -324,8 +332,11 @@ describe('#36 인증 화면·세션·보호 화면 통합', () => {
     await screen.findByRole('heading', { name: '내 종목' });
     const pending = deferred<Response>();
     server.on('POST', '/api/v1/auth/logout', () => pending.promise);
-    await user.click(screen.getByRole('button', { name: '로그아웃' }));
-    const button = screen.getByRole('button', { name: '로그아웃하고 있어요' });
+    await user.click(screen.getByRole('button', { name: '계정 메뉴 열기' }));
+    await user.click(screen.getByRole('menuitem', { name: '로그아웃' }));
+    const button = screen.getByRole('menuitem', {
+      name: '로그아웃하고 있어요',
+    });
     expect((button as HTMLButtonElement).disabled).toBe(true);
     await user.click(button);
     expect(server.calls('POST', '/api/v1/auth/logout')).toHaveLength(1);
@@ -338,7 +349,7 @@ describe('#36 인증 화면·세션·보호 화면 통합', () => {
       return noContent();
     });
     await user.click(
-      screen.getByRole('button', { name: '로그아웃 다시 시도' }),
+      screen.getByRole('menuitem', { name: '로그아웃 다시 시도' }),
     );
     await screen.findByRole('heading', { name: '이메일로 로그인' });
     expect(useAuthStore.getState().member).toBeNull();
@@ -352,15 +363,17 @@ describe('#36 인증 화면·세션·보호 화면 통합', () => {
     await screen.findByRole('heading', { name: '내 종목' });
     const pending = deferred<Response>();
     server.on('POST', '/api/v1/auth/logout', () => pending.promise);
-    await user.click(screen.getByRole('button', { name: '로그아웃' }));
+    await user.click(screen.getByRole('button', { name: '계정 메뉴 열기' }));
+    await user.click(screen.getByRole('menuitem', { name: '로그아웃' }));
     await act(async () =>
       useAuthStore.getState().setSession(member('journey-b')),
     );
     await act(async () => pending.resolve(apiError(503, 'SOURCE_UNAVAILABLE')));
     expect(useAuthStore.getState().member?.id).toBe('journey-b');
     expect(screen.queryByText(/로그아웃하지 못했어요/)).toBeNull();
+    await user.click(screen.getByRole('button', { name: '계정 메뉴 열기' }));
     expect(
-      (screen.getByRole('button', { name: '로그아웃' }) as HTMLButtonElement)
+      (screen.getByRole('menuitem', { name: '로그아웃' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
   });

@@ -9,7 +9,7 @@
 | SPEC_NOT_IN_INDEX | warning | FS052-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS052-02 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:135 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS053 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:149 (xlsx-row) |
-| MULTIPLE_SPEC_DEFINITIONS | warning | FS066-01 | 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:73 (xlsx-row) |
+| MULTIPLE_SPEC_DEFINITIONS | warning | FS066-01 | 동일 ID의 여러 상세 정의가 공존한다. 우선 문서를 자동 선택하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:73 (xlsx-row) |
 | WBS_COVER_BODY_CONFLICT | warning | FS074~FS081 | 표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다. | docs/evidence/raw/wbs_2026-10-12/00-표지-변경이력.csv:19 (xlsx-row) |
 | WBS_COVER_BODY_CONFLICT | warning | FS074~FS081 | 표지/요약은 6.5.13~20·일정/가중치 미산정으로 소개하지만 본문은 6.6.13~20·P1·실명/기간/양수 가중치다. 원문 충돌은 정정 요청으로 보존하며 현재 요구 범위는 사용자 결정과 별도로 표시한다. | docs/evidence/raw/wbs_2026-10-12/02-개발-일정-요약.csv:29 (xlsx-row) |
 | HISTORICAL_DETAIL_SUPERSEDED | warning | FS017 | 옛 시트 03-메인-그래프.csv의 정의는 이력으로 보존한다. 현행 상세는 04-메인그래프-v2.csv이며 같은 번호라도 의미가 다를 수 있어 번호 일치로 합치지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:9 (xlsx-row) |
@@ -37,27 +37,27 @@
 | SCOPE_EXCEPTION | warning | RECOMMENDATION_FEATURE_EXCLUDED | 사용자 기능 제외 · API 유보: 추천 종목·산업·테마는 활성 기능·사용자 여정·수용 범위에서 제외한다. GET /me/recommendations 계약과 현재 BFF 동작은 삭제·무동작 대체·가짜 응답 없이 유보하며 이후 다시 반환할 수 있다. 유보는 활성 사용 허용을 뜻하지 않는다. | user-2026-10-10-feedback 항목 2. 원문 목차·요구 11·NFS004 사례는 변경되지 않았고 이번 팀 원본 diff에도 제거가 없다. 최신 사용자 지시가 활성 사용자 플로우만 대체한다. |
 | SCOPE_EXCEPTION | warning | FINANCE_REQUIREMENT_RESERVED | 요구 유지 · 전용 FS/WBS 미대응(유보): 재무·실적은 삭제·완료로 보고하지 않는다. 새 FS 번호나 도메인 WBS를 만들지 않고 요구사항 번호와 목표 작업 getCompanyFinancials로만 출처 한정 연결한다. 담당·일정은 팀 결정 전까지 미대응이다. | 10-10 목차의 FS042는 시점 기반 관계 그래프다. 최신 요구사항 정의서 42(기준일 재무·실적)와 20·38·75 및 NFS002·004의 재무 독립 기간/부분 실패는 그대로 남아 있고 재무 제외 결정은 없다. |
 | RESERVED_REQUIREMENT_UNMAPPED | warning | 요구42 | 요구 유지 · 전용 FS/WBS 미대응(유보): 요구 42는 시가총액·PER·PBR·부채비율·매출·영업이익 추이 등을 요구하며 폐기 선언이 없다. 새 FS 번호·도메인 WBS를 만들지 않고 목표 작업의 요구 번호 연결로만 남긴다. 구현 주체·일정은 팀 결정 전까지 미정이다. | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:48 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS019 | 목차 상세 위치 A35:B47와 현행 상세 구획 제목 행 [36]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:29 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS020 | 목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [50]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:30 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS021 | 목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [64]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:31 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS022 | 목차 상세 위치 A77:B89와 현행 상세 구획 제목 행 [78]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:32 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS023 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:33 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS024 | 목차 상세 위치 A105:B117와 현행 상세 구획 제목 행 [109]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:34 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS025 | 목차 상세 위치 A119:B131와 현행 상세 구획 제목 행 [123]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:35 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS026 | 목차 상세 위치 A133:B145와 현행 상세 구획 제목 행 [137]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:36 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS027 | 목차 상세 위치 A147:B159와 현행 상세 구획 제목 행 [152]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:37 (xlsx-row) |
-| INDEX_REQUIREMENT_META_MISMATCH | warning | FS037 | 목차 요구 번호 []와 현행 상세 메타 요구 번호 ['38']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:9 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS038 | 목차 상세 위치 A7:B19와 현행 상세 구획 제목 행 [21]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:48 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS039 | 목차 상세 위치 A21:B33와 현행 상세 구획 제목 행 [35]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:49 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS040 | 목차 상세 위치 A35:B47와 현행 상세 구획 제목 행 [49]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:50 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS041 | 목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [63]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:51 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS042 | 목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [77]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:52 (xlsx-row) |
-| INDEX_REQUIREMENT_META_MISMATCH | warning | FS042 | 목차 요구 번호 ['42']와 현행 상세 메타 요구 번호 ['41']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:79 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS043 | 목차 상세 위치 A77:B89와 현행 상세 구획 제목 행 [91]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:53 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS044 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [105]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:54 (xlsx-row) |
-| INDEX_DETAIL_RANGE_STALE | warning | FS051 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:61 (xlsx-row) |
-| INDEX_REQUIREMENT_META_MISMATCH | warning | FS051 | 목차 요구 번호 ['50']와 현행 상세 메타 요구 번호 ['51']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:94 (xlsx-row) |
-| INDEX_REQUIREMENT_META_MISMATCH | warning | FS066-01 | 목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:134 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS019 | 목차 상세 위치 A35:B47와 현행 상세 구획 제목 행 [36]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:29 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS020 | 목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [50]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:30 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS021 | 목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [64]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:31 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS022 | 목차 상세 위치 A77:B89와 현행 상세 구획 제목 행 [78]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:32 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS023 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:33 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS024 | 목차 상세 위치 A105:B117와 현행 상세 구획 제목 행 [109]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:34 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS025 | 목차 상세 위치 A119:B131와 현행 상세 구획 제목 행 [123]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:35 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS026 | 목차 상세 위치 A133:B145와 현행 상세 구획 제목 행 [137]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:36 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS027 | 목차 상세 위치 A147:B159와 현행 상세 구획 제목 행 [152]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:37 (xlsx-row) |
+| INDEX_REQUIREMENT_META_MISMATCH | warning | FS037 | 목차 요구 번호 []와 현행 상세 메타 요구 번호 ['38']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv:9 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS038 | 목차 상세 위치 A7:B19와 현행 상세 구획 제목 행 [21]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:48 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS039 | 목차 상세 위치 A21:B33와 현행 상세 구획 제목 행 [35]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:49 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS040 | 목차 상세 위치 A35:B47와 현행 상세 구획 제목 행 [49]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:50 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS041 | 목차 상세 위치 A49:B61와 현행 상세 구획 제목 행 [63]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:51 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS042 | 목차 상세 위치 A63:B75와 현행 상세 구획 제목 행 [77]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:52 (xlsx-row) |
+| INDEX_REQUIREMENT_META_MISMATCH | warning | FS042 | 목차 요구 번호 ['42']와 현행 상세 메타 요구 번호 ['41']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv:79 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS043 | 목차 상세 위치 A77:B89와 현행 상세 구획 제목 행 [91]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:53 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS044 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [105]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:54 (xlsx-row) |
+| INDEX_DETAIL_RANGE_STALE | warning | FS051 | 목차 상세 위치 A91:B103와 현행 상세 구획 제목 행 [92]이 다르다. 원문 값을 보존하며 자동 정정하지 않는다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:61 (xlsx-row) |
+| INDEX_REQUIREMENT_META_MISMATCH | warning | FS051 | 목차 요구 번호 ['50']와 현행 상세 메타 요구 번호 ['51']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:94 (xlsx-row) |
+| INDEX_REQUIREMENT_META_MISMATCH | warning | FS066-01 | 목차 요구 번호 ['37', '78']와 현행 상세 메타 요구 번호 ['36']가 다르다. 원문을 보존한다. | docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv:134 (xlsx-row) |
 | TEAM_DECISION_REQUIRED | warning | listSocialProviders | Google·카카오 운영 앱 등록과 관리자 SSO·권한 등급/회수 정책은 별도다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |  |
 | TEAM_DECISION_REQUIRED | warning | authorizeSocialLogin | 운영 앱 등록·OAuth pending TTL·시도 제한값·허용 복귀 경로의 환경별 값은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |  |
 | TEAM_DECISION_REQUIRED | warning | completeSocialLogin | 운영 앱 등록·OAuth pending TTL은 배포 전에 설정한다. 회원 연결 구현 기준은 docs/development/social-auth-policy-2026-10-15.md를 따른다. |  |
@@ -70,13 +70,13 @@
 | TEAM_DECISION_REQUIRED | warning | getBriefing | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listBriefingRounds | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getBriefingGraphBasis | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | createConversation | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | getConversation | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | getCurrentConversation | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | submitQuestion | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
-| TEAM_DECISION_REQUIRED | warning | getQuestionJob | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | retryQuestionJob | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | cancelQuestionJob | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | createConversation | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |  |
+| TEAM_DECISION_REQUIRED | warning | getConversation | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | getCurrentConversation | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | submitQuestion | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |  |
+| TEAM_DECISION_REQUIRED | warning | getQuestionJob | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |  |
+| TEAM_DECISION_REQUIRED | warning | retryQuestionJob | 실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다. |  |
+| TEAM_DECISION_REQUIRED | warning | cancelQuestionJob | 취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getAdminSession | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | logInAdmin | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | logOutAdmin | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
@@ -131,33 +131,33 @@
 | CONTRACT_UNDECIDED | warning | NFS007 | 측정 부하·데이터 규모·표본·성능 목표값이 미정이다. 계약 검증 WBS에 연결하고 서버 성능 수치를 만들어내지 않는다. |  |
 | REQUIREMENT_TITLE_REVIEW | warning | FS074 | 명세 '뉴스·공시 수집 및 수집 회차 관리' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS074 | 명세 '뉴스·공시 수집 및 수집 회차 관리' ↔ 요구사항 75 '뉴스와 시장 데이터 연동'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:81 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS074 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:100 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS074 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:100 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS075 | 명세 '원천 문서 정제·중복 제거 및 버전 관리' ↔ 요구사항 68 '사건과 문서 구분'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:74 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS075 | 명세 '원천 문서 정제·중복 제거 및 버전 관리' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS075 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:101 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS075 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:101 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS076 | 명세 'AI 사건·이슈 추출 및 이슈 후보 생성' ↔ 요구사항 68 '사건과 문서 구분'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:74 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS076 | 명세 'AI 사건·이슈 추출 및 이슈 후보 생성' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS076 | 명세 'AI 사건·이슈 추출 및 이슈 후보 생성' ↔ 요구사항 76 'AI 분석 연동'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:82 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS076 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:102 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS076 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:102 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS077 | 명세 '기업·이슈 Entity Linking 및 동일성 판정' ↔ 요구사항 68 '사건과 문서 구분'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:74 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS077 | 명세 '기업·이슈 Entity Linking 및 동일성 판정' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS077 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:103 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS077 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:103 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS078 | 명세 '기업–이슈·기업–기업 관계 추출' ↔ 요구사항 67 '관계와 근거 연결'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:73 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS078 | 명세 '기업–이슈·기업–기업 관계 추출' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS078 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:104 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS078 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:104 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS079 | 명세 '영향 방향·근거 검증 및 공개 적격 판정' ↔ 요구사항 21 '이슈 노드 정보'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:27 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS079 | 명세 '영향 방향·근거 검증 및 공개 적격 판정' ↔ 요구사항 67 '관계와 근거 연결'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:73 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS079 | 명세 '영향 방향·근거 검증 및 공개 적격 판정' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS079 | 명세 '영향 방향·근거 검증 및 공개 적격 판정' ↔ 요구사항 79 'AI 기반 이슈 판단의 진행 상태, 이슈 각각의 통과/보류/폐기 상태 등 확인 및 보류된 이슈의 검수 후 허용/거부 선택'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:85 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS079 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:105 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS079 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:105 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS080 | 명세 'GraphDB 노드·간선 upsert 및 공개 버전 반영' ↔ 요구사항 67 '관계와 근거 연결'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:73 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS080 | 명세 'GraphDB 노드·간선 upsert 및 공개 버전 반영' ↔ 요구사항 71 '분석 결과 저장 및 조회 반영'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:77 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS080 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:106 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS080 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:106 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS081 | 명세 '그래프 증분 갱신·관계 비활성화 및 실패 단계 복구' ↔ 요구사항 67 '관계와 근거 연결'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:73 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS081 | 명세 '그래프 증분 갱신·관계 비활성화 및 실패 단계 복구' ↔ 요구사항 70 '신규 경제뉴스 정기 수집 및 이슈 분석'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:76 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS081 | 명세 '그래프 증분 갱신·관계 비활성화 및 실패 단계 복구' ↔ 요구사항 71 '분석 결과 저장 및 조회 반영'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:77 (xlsx-row) |
 | REQUIREMENT_TITLE_REVIEW | warning | FS081 | 명세 '그래프 증분 갱신·관계 비활성화 및 실패 단계 복구' ↔ 요구사항 79 'AI 기반 이슈 판단의 진행 상태, 이슈 각각의 통과/보류/폐기 상태 등 확인 및 보류된 이슈의 검수 후 허용/거부 선택'. 분리·통합/번호 이동인지 확인 필요(자동 재연결하지 않음). | docs/evidence/raw/requirements-sheet_2026-10-06/1-요구사항-정의서.csv:85 (xlsx-row) |
-| RAW_SCOPE_STATUS_CORRECTION | warning | FS081 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:107 (xlsx-row) |
+| RAW_SCOPE_STATUS_CORRECTION | warning | FS081 | 원문 '추가 제안 · 검토 전'/우선순위 '미정'를 보존한다. 현재 user-2026-10-10-feedback의 유효 범위는 '팀합의요구/설계대상'이며 WBS 표기 충돌은 정정 요청이다. 구현 완료·유료 실행 승인은 별개다. | docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:107 (xlsx-row) |
 | WBS_EDITORIAL_ID_DIFFERENCE | warning | 6.5.1 | 원문 FS078는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다. | docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:72 (xlsx-row) |
 | WBS_EDITORIAL_ID_DIFFERENCE | warning | 6.5.1 | 원문 FS080는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다. | docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:72 (xlsx-row) |
 | WBS_EDITORIAL_ID_DIFFERENCE | warning | 6.5.2 | 원문 FS075는 의존/재사용 참조 또는 업무명과 다른 산출물 ID다. 제목·역할 기반 편집 연결과 rawSpecIds를 분리하며 원문을 자동 치환하지 않는다. | docs/evidence/raw/wbs_2026-10-12/01-프로젝트-WBS.csv:73 (xlsx-row) |
@@ -250,19 +250,19 @@
 | BFF_PATH_DIFFERENCE | difference | disconnectVirtualAccount | 목표 /api/v1/portfolio/connections/{id} ↔ BFF /api/portfolio/connections/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | disconnectVirtualAccount | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getGraph | 목표 /api/v1/graph ↔ BFF /api/graph |  |
-| BFF_FIELD_DIFFERENCE | difference | getGraph | 목표만 158 · BFF만 27 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | getGraph | 목표만 161 · BFF만 27 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyRelation | 목표 /api/v1/graph/edges/{id} ↔ BFF /api/graph/edges/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 118 · BFF만 43 · 형식/필수/권한 변경 6 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 135 · BFF만 43 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | searchCompanies | 목표 /api/v1/companies ↔ BFF /api/companies |  |
 | BFF_FIELD_DIFFERENCE | difference | searchCompanies | 목표만 108 · BFF만 50 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompany | 목표 /api/v1/companies/{id} ↔ BFF /api/companies/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompany | 목표만 143 · BFF만 48 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompany | 목표만 147 · BFF만 48 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyQuote | 목표 /api/v1/companies/{id}/quote ↔ BFF /api/companies/{id}/quote |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyQuote | 목표만 80 · BFF만 39 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyMetrics | 목표 /api/v1/companies/{id}/metrics ↔ BFF /api/companies/{id}/metrics |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyMetrics | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyPrices | 목표 /api/v1/companies/{id}/prices ↔ BFF /api/companies/{id}/prices |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyPrices | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyPrices | 목표만 80 · BFF만 39 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listCompanyDocuments | 목표 /api/v1/companies/{id}/documents ↔ BFF /api/companies/{id}/documents |  |
 | BFF_FIELD_DIFFERENCE | difference | listCompanyDocuments | 목표만 118 · BFF만 64 · 형식/필수/권한 변경 19 |  |
 | BFF_PATH_DIFFERENCE | difference | listEvents | 목표 /api/v1/events ↔ BFF /api/events |  |
@@ -280,17 +280,17 @@
 | BFF_PATH_DIFFERENCE | difference | createConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | createConversation | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 136 · BFF만 32 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 140 · BFF만 32 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | getCurrentConversation | 목표 /api/v1/chat/sessions/current ↔ BFF /api/chat/sessions/current |  |
-| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 136 · BFF만 32 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 140 · BFF만 32 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | submitQuestion | 목표 /api/v1/chat/sessions/{id}/jobs ↔ BFF /api/chat/sessions/{id}/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 211 · BFF만 34 · 형식/필수/권한 변경 24 |  |
+| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 219 · BFF만 34 · 형식/필수/권한 변경 38 |  |
 | BFF_PATH_DIFFERENCE | difference | getQuestionJob | 목표 /api/v1/chat/jobs/{job_id} ↔ BFF /api/chat/jobs/{job_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 153 · BFF만 23 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 157 · BFF만 23 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | retryQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/retry ↔ BFF /api/chat/jobs/{job_id}/retry |  |
-| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 207 · BFF만 34 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 215 · BFF만 34 · 형식/필수/권한 변경 35 |  |
 | BFF_PATH_DIFFERENCE | difference | cancelQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/cancel ↔ BFF /api/chat/jobs/{job_id}/cancel |  |
-| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 184 · BFF만 23 · 형식/필수/권한 변경 14 |  |
+| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 188 · BFF만 23 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminSession | 목표 /api/v1/admin/auth/session ↔ BFF /api/admin/auth/session |  |
 | BFF_FIELD_DIFFERENCE | difference | getAdminSession | 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | logInAdmin | 목표 /api/v1/admin/auth/login ↔ BFF /api/admin/auth/login |  |
@@ -298,7 +298,7 @@
 | BFF_PATH_DIFFERENCE | difference | logOutAdmin | 목표 /api/v1/admin/auth/logout ↔ BFF /api/admin/auth/logout |  |
 | BFF_FIELD_DIFFERENCE | difference | logOutAdmin | 목표만 162 · BFF만 0 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminDashboard | 목표 /api/v1/admin/dashboard ↔ BFF /api/admin/dashboard |  |
-| BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 114 · BFF만 59 · 형식/필수/권한 변경 31 |  |
+| BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 695 · BFF만 633 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | listAuditRecords | 목표 /api/v1/admin/audit-log ↔ BFF /api/admin/audit-log |  |
 | BFF_FIELD_DIFFERENCE | difference | listAuditRecords | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | getPipelineOverview | 목표 /api/v1/admin/pipeline/overview ↔ BFF /api/admin/pipeline/overview |  |
@@ -375,7 +375,7 @@
 | TARGET_ONLY_API | difference | getCompanyIssueImpact | GET /api/v1/companies/{id}/issues/{issueId}/impact: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getPersonalizedBriefing | GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyGraphAsOf | 목표 /api/v1/companies/{id}/graph ↔ BFF /api/companies/{id}/graph |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyGraphAsOf | 목표만 121 · BFF만 41 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyGraphAsOf | 목표만 124 · BFF만 41 · 형식/필수/권한 변경 7 |  |
 | PROTOTYPE_ONLY_API | difference | health_api_health_get | GET /api/health: 프로토타입 상태 점검 경로다. 정식 readiness/liveness 계약은 배포 설계에서 별도 확정한다. |  |
 | PROTOTYPE_ONLY_API | difference | mock_idp_consent_api_auth_social_mock_idp_consent_post | POST /api/auth/social/mock/idp/consent: 개발용 모의 IdP 동의 흐름은 정식 인증 계약에서 제외한다. |  |
 | PROTOTYPE_ONLY_API | difference | get_evaluations_api_briefings__id__evaluations_get | GET /api/briefings/{id}/evaluations: 프로토타입에서도 미제공인 가격/예측 평가 자리다. 투자 예측을 목표 계약에 넣지 않는다. |  |

@@ -1,0 +1,29 @@
+[
+  {
+    "sheet": "메인 그래프",
+    "before": [
+      160,
+      2
+    ],
+    "after": null
+  },
+  {
+    "sheet": "AI 챗봇",
+    "before": [
+      160,
+      2
+    ],
+    "after": null
+  },
+  {
+    "sheet": "변경 내역",
+    "before": [
+      66,
+      6
+    ],
+    "after": [
+      68,
+      6
+    ]
+  }
+]

@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:61 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:61 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:94 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — AI 패널 상태 유지와 결과 재조회: 사용자가 AI 패널을 닫았다가 다시 열거나 네트워크 응답을 받지 못해도, 기존 질문 작업의 상태와 저장된 결과를 재조회할 수 있다. 패널 닫기·재열기는 질문 취소나 새 AI 생성으로 처리하지 않는다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — 새 대화 시작: 사용자가 이전 대화와 독립된 주제로 질문할 수 있도록 ‘새 대화’ 기능을 제공해야 한다. 새 대화를 시작하면 별도의 대화 ID를 부여하고 이전 대화의 질문·답변 및 선택 조건을 자동으로 이어받지 않아야 한다. 기존 대화 기록은 유지하며, 이전 대화에서 처리 중이던 답변이 새 대화 화면에 표시되지 않아야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:94 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — AI 패널 상태 유지와 결과 재조회: 사용자가 AI 패널을 닫았다가 다시 열거나 네트워크 응답을 받지 못해도, 기존 질문 작업의 상태와 저장된 결과를 재조회할 수 있다. 패널 닫기·재열기는 질문 취소나 새 AI 생성으로 처리하지 않는다.
 
 ## 상세 권한과 의미 이행
 

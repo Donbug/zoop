@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:59 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:59 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — 답변 근거와 관련 그래프 탐색: 사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다. AI 답변 자체는 새 관계를 생성하지 않는다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — 답변 검증과 제공: AI 답변의 형식, 인용이 가리키는 문서·원문 구간, 답변에 포함된 그래프 대상의 유효성을 확인해야 한다. 현재 유효한 실행의 검증된 결과를 저장한 후 답변을 제공해야 한다. 실제 적용 기업·이슈·기간을 표시하고 검증 실패 시 답변을 자동으로 다시 생성하지 않아야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:65 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — 답변 근거와 관련 그래프 탐색: 사용자는 답변의 근거 문서 또는 관련 기업·이슈·관계를 선택해 출처를 확인하거나 해당 대상을 그래프에서 강조해 탐색할 수 있다. AI 답변 자체는 새 관계를 생성하지 않는다.
 
 ## 상세 권한과 의미 이행
 

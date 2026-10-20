@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:10 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:10 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/01-회원가입-로그인.csv) — 서비스 시작 방식 선택: 사용자가 서비스 시작 화면에서 이메일 로그인, 이메일 회원가입, 소셜 로그인, 비회원 시작 중 원하는 이용 방식을 선택한다. 선택한 방식에 해당하는 화면 또는 절차로 연결한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/01-회원가입-로그인.csv) — 서비스 시작 방식 선택: 사용자가 서비스 시작 화면에서 이메일 로그인, 이메일 회원가입, 소셜 로그인, 비회원 시작 중 원하는 이용 방식을 선택한다. 선택한 방식에 해당하는 화면 또는 절차로 연결한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:56 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

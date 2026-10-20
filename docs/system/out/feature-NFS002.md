@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:89 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:89 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 응답과 화면 정합성: 차트, 재무, 뉴스 등 각 영역에는 현재 기업과 조회 조건에 맞는 최신 결과만 반영해야 한다. 이전 요청의 늦은 결과가 해당 영역의 현재 내용을 덮어써서는 안 된다. AI 답변은 해당 대화와 질문에만 연결해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv:23 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv) — 응답과 화면 정합성: 차트, 재무, 뉴스 등 각 영역에는 현재 기업과 조회 조건에 맞는 최신 결과만 반영해야 한다. 이전 요청의 늦은 결과가 해당 영역의 현재 내용을 덮어써서는 안 된다. AI 답변은 해당 대화와 질문에만 연결해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:70 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

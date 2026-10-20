@@ -72,10 +72,13 @@ test('the chart positions prices by elapsed time instead of index', () => {
       groups={new Map()}
     />,
   );
-  const circles = screen.getByRole('img').querySelectorAll('circle');
-  const positions = [...circles].map((circle) =>
-    Number(circle.getAttribute('cx')),
-  );
+  const line = screen
+    .getByRole('group', { name: '공급된 종가 차트' })
+    .querySelector('polyline')!;
+  const positions = line
+    .getAttribute('points')!
+    .split(' ')
+    .map((pair) => Number(pair.split(',')[0]));
   expect(positions[1] - positions[0]).toBeLessThan(
     (positions[2] - positions[1]) / 20,
   );
@@ -111,4 +114,89 @@ test('prices outside the requested range are rejected', async () => {
       `/api/v1/companies/fixture-company/prices?period=1m&from=2026-09-06T03:00:00Z&to=${props.asOf}`,
     ),
   ).rejects.toThrow('조회 범위 밖');
+});
+
+test('a bucket-start bar before from is kept; only bars after the cutoff are rejected', async () => {
+  const server = createFakeServer();
+  const points = [
+    // 일봉은 구간 시작 시각(한국 자정)으로 찍혀 from(15:30)보다 앞선다.
+    { time: '2026-09-15T15:00:00Z', close: 100 },
+    { time: props.asOf, close: 120 },
+  ];
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: 'fixture-company',
+      period: '1m',
+      points,
+    }),
+  );
+  const prices = await readCompanyResource<{ points: unknown[] }>(
+    `/api/v1/companies/fixture-company/prices?period=1m&from=2026-09-16T06:30:00Z&to=${props.asOf}`,
+  );
+  expect(prices.points).toEqual(points);
+});
+
+test('a price bar older than one requested interval is rejected', async () => {
+  const server = createFakeServer();
+  server.on('GET', '/api/v1/companies/:id/prices', () =>
+    json({
+      status: 'available',
+      companyId: 'fixture-company',
+      period: '1m',
+      points: [{ time: '2026-09-14T06:30:00Z', close: 90 }],
+    }),
+  );
+  await expect(
+    readCompanyResource(
+      `/api/v1/companies/fixture-company/prices?period=1m&from=2026-09-16T06:30:00Z&to=${props.asOf}`,
+    ),
+  ).rejects.toThrow('조회 범위 밖');
+});
+
+test('a day-precision event gets a marker on the same KST day in the 1w chart', () => {
+  const dayEvent: Event = {
+    ...event,
+    eventTime: '2026-10-05',
+    timePrecision: 'day',
+  };
+  render(
+    <PriceChart
+      {...props}
+      period="1w"
+      points={[
+        { time: '2026-10-04T23:00:00Z', close: 100 },
+        { time: props.asOf, close: 120 },
+      ]}
+      groups={new Map([['2026-10-05 · 일 정밀도', [dayEvent]]])}
+    />,
+  );
+  expect(
+    screen.getByRole('button', {
+      name: '차트 사건 2026-10-05 · 일 정밀도 · 사건 1건',
+    }),
+  ).toBeTruthy();
+});
+
+test('an event marker previews the event titles on hover', () => {
+  render(
+    <PriceChart
+      {...props}
+      points={[{ time: props.asOf, close: 120 }]}
+      groups={
+        new Map([
+          [
+            '2026-10-05',
+            [event, { ...event, id: 'fixture-other', title: '합성 사건 2' }],
+          ],
+        ])
+      }
+    />,
+  );
+  const marker = screen.getByRole('button', {
+    name: '차트 사건 2026-10-05 · 사건 2건',
+  });
+  expect(marker.querySelector('title')?.textContent).toBe(
+    '합성 사건 / 합성 사건 2',
+  );
 });
