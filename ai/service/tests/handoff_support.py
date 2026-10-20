@@ -194,6 +194,12 @@ def full_bundle() -> dict[str, Any]:
     article = bundle["articles"][0]
     event = bundle["issues"][0]["sourceEvents"][0]
     bundle["issues"][0]["representative"] = copy.deepcopy(event)
+    # a second original mention that reuses the S2 local id of the first one in ANOTHER document (a local id is unique only within one document version), with
+    # values of its own: nothing of it is derived from the merged issue
+    first = bundle["issues"][0]["mentions"][0]
+    bundle["issues"][0]["mentions"].append({**copy.deepcopy(first), "documentId": "synthetic-doc-2", "documentVersion": "9" * 64, "articleId": "doc-" + "8" * 64,
+                                            "articleVersion": "9" * 64, "title": "합성 공급 계약 후속", "target": "합성 대상", "eventTime": None, "timePrecision": "unknown",
+                                            "period": "2026Q4", "assertionStatus": "planned", "background": True, "participants": []})
     bundle["sources"].append({**copy.deepcopy(bundle["sources"][0]), "relation": {"jobId": "s3-synthetic-relation-2", "inputDigest": "7" * 64}})
     relation_candidate = "rc-" + "4" * 64
     bundle["relations"].append({

@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-1} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-2} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -39,7 +39,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-1";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2";
     static final String POLICY = "zoop-public-projection-policy-1";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
@@ -76,6 +76,14 @@ final class HandoffBundleVerifier {
             "documentVersion", "observation");
     private static final Set<String> OBSERVATION_KEYS = Set.of("roundId", "sourceId", "page", "ordinal", "documentId",
             "rawVersion", "documentVersion");
+    private static final Set<String> MENTION_KEYS = Set.of("documentId", "documentVersion", "mentionId", "articleId",
+            "articleVersion", "verification", "title", "action", "target", "eventTime", "timePrecision", "period",
+            "assertionStatus", "background", "participants", "evidenceIds");
+    private static final Set<String> PARTICIPANT_KEYS = Set.of("sourceCompanyId", "companyId", "name", "role");
+    private static final Set<String> ASSERTION_STATUSES = Set.of("occurred", "announced", "planned", "forecast",
+            "cancelled", "unknown");
+    private static final int MAX_MENTIONS = 1_000;
+    private static final int MAX_PARTICIPANTS = 1_000;
 
     private HandoffBundleVerifier() {
     }
@@ -328,7 +336,8 @@ final class HandoffBundleVerifier {
         need(issueNodes.size() <= MAX_ISSUES);
         for (Obj i : issueNodes) {
             i.exactly(Set.of("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period",
-                    "assertionStatus", "geography", "evidenceIds", "sourceEvents", "decisionRef", "representative"));
+                    "assertionStatus", "geography", "evidenceIds", "sourceEvents", "mentions", "decisionRef",
+                    "representative"));
             String id = text(i, "id", ID);
             text(i, "canonicalId", ID);
             text(i, "decisionRef", ID);
@@ -352,7 +361,6 @@ final class HandoffBundleVerifier {
             need(countriesClass(countries).equals(geographyValue));
             List<String> evidenceIds = evidenceIds(i, "evidenceIds", 1, evidence, referenced);
             List<String> geographyEvidence = evidenceIds(geography, "evidenceIds", 1, evidence, referenced);
-            need(new HashSet<>(evidenceIds).containsAll(geographyEvidence));
 
             List<Obj> events = i.objects("sourceEvents");
             need(events.size() >= 1 && events.size() <= 1000);
@@ -362,27 +370,10 @@ final class HandoffBundleVerifier {
                 eventKeys.add(Canonical.write(event.node()));
             }
             need(sortedUnique(eventKeys));
-            for (Obj event : events) {
-                Obj observation = event.object("observation");
-                String documentId = event.string("documentId");
-                String documentVersion = event.string("documentVersion");
-                String rawVersion = observation.string("rawVersion");
-                String roundId = observation.string("roundId");
-                String sourceId = observation.string("sourceId");
-                int page = observation.count("page");
-                int ordinal = observation.count("ordinal");
-                boolean closed = false;
-                for (Article article : articles.values()) {
-                    if (article.documentId().equals(documentId) && article.documentVersion().equals(documentVersion)
-                            && article.rawVersion().equals(rawVersion)
-                            && article.observations().stream().anyMatch(ob -> ob.roundId().equals(roundId)
-                                    && ob.sourceId().equals(sourceId) && ob.page() == page && ob.ordinal() == ordinal)) {
-                        closed = true;
-                        break;
-                    }
-                }
-                need(closed);
-            }
+            Set<String> mentionEvidence = mentions(i, events, articles, companies, evidence, referenced);
+            Set<String> expectedEvidence = new HashSet<>(mentionEvidence);
+            expectedEvidence.addAll(geographyEvidence);
+            need(expectedEvidence.equals(new HashSet<>(evidenceIds)));
             List<Obj> basis = geography.objects("basis");
             need(basis.size() <= 1000 && basis.size() == events.size());
             for (int index = 0; index < basis.size(); index++) {
@@ -612,6 +603,101 @@ final class HandoffBundleVerifier {
     }
 
     // ------------------------------------------------------------------------------------------------ helpers ------------
+
+    /**
+     * The issue's original mentions: exactly the identities ({@code documentId}, {@code documentVersion}, S2 local
+     * {@code mentionId}) of its source events, one record each, strictly ascending. Each mention names the one bundle article of
+     * its document version, every carrying source event closes against that article, and every cited evidence row is on it. The
+     * values are the producer's S2 candidate or snapshot values ({@code verification} is always {@code none}); nothing is
+     * derived from the merged issue. Returns the union of the mentions' evidence ids.
+     */
+    private static Set<String> mentions(Obj issue, List<Obj> events, Map<String, Article> articles,
+            Map<String, Company> companies, Map<String, Evidence> evidence, Set<String> referenced) {
+        List<Obj> nodes = issue.objects("mentions");
+        need(nodes.size() >= 1 && nodes.size() <= MAX_MENTIONS);
+        List<String> keys = new ArrayList<>();
+        Map<String, Article> articleOf = new HashMap<>();
+        Set<String> union = new HashSet<>();
+        for (Obj mention : nodes) {
+            mention.exactly(MENTION_KEYS);
+            String documentId = text(mention, "documentId", ID);
+            String documentVersion = text(mention, "documentVersion", HASH);
+            String mentionId = mention.string("mentionId");
+            need(!mentionId.isEmpty());
+            String key = mentionKey(documentId, documentVersion, mentionId);
+            keys.add(key);
+            String articleId = text(mention, "articleId", ARTICLE_ID);
+            String articleVersion = text(mention, "articleVersion", HASH);
+            Article own = null;
+            int matching = 0;
+            for (Article article : articles.values()) {
+                if (article.documentId().equals(documentId) && article.documentVersion().equals(documentVersion)) {
+                    own = article;
+                    matching++;
+                }
+            }
+            need(matching == 1 && own.articleId().equals(articleId) && own.articleVersion().equals(articleVersion));
+            articleOf.put(key, own);
+
+            need("none".equals(mention.string("verification")));
+            mention.string("title");
+            mention.string("action");
+            mention.stringOrNull("target");
+            mention.stringOrNull("period");
+            String timePrecision = mention.string("timePrecision");
+            need(TIME_PRECISIONS.contains(timePrecision));
+            HandoffTime.mentionEventTime(mention.stringOrNull("eventTime"), timePrecision);
+            need(ASSERTION_STATUSES.contains(mention.string("assertionStatus")));
+            mention.bool("background");
+
+            List<Obj> participants = mention.objects("participants");
+            need(participants.size() <= MAX_PARTICIPANTS);
+            for (Obj participant : participants) {
+                participant.exactly(PARTICIPANT_KEYS);
+                String sourceCompanyId = participant.stringOrNull("sourceCompanyId");
+                String companyId = participant.stringOrNull("companyId");
+                need(companyId == null || (sourceCompanyId != null && companies.containsKey(companyId)));
+                participant.string("name");
+                participant.string("role");
+            }
+
+            List<String> cited = evidenceIds(mention, "evidenceIds", 1, evidence, referenced);
+            for (String evidenceId : cited) {
+                Evidence row = evidence.get(evidenceId);
+                need(row.articleId().equals(articleId) && row.articleVersion().equals(articleVersion));
+            }
+            union.addAll(cited);
+        }
+        need(sortedUnique(keys));
+
+        Set<String> carried = new HashSet<>();
+        for (Obj event : events) {
+            String key = mentionKey(event.string("documentId"), event.string("documentVersion"), event.string("mentionId"));
+            carried.add(key);
+            Article article = articleOf.get(key);
+            need(article != null);
+            Obj observation = event.object("observation");
+            String rawVersion = observation.string("rawVersion");
+            String roundId = observation.string("roundId");
+            String sourceId = observation.string("sourceId");
+            int page = observation.count("page");
+            int ordinal = observation.count("ordinal");
+            need(article.rawVersion().equals(rawVersion) && article.observations().stream().anyMatch(
+                    ob -> ob.roundId().equals(roundId) && ob.sourceId().equals(sourceId) && ob.page() == page
+                            && ob.ordinal() == ordinal));
+        }
+        need(carried.equals(new HashSet<>(keys)));
+        return union;
+    }
+
+    /** The canonical JSON of the S2 mention identity: the document version and the document-local mention id. */
+    private static String mentionKey(String documentId, String documentVersion, String mentionId) {
+        ObjectNode identity = StrictJson.newObject();
+        identity.put("documentId", documentId);
+        identity.put("documentVersion", documentVersion);
+        identity.put("mentionId", mentionId);
+        return Canonical.write(identity);
+    }
 
     private static void sourceEvent(Obj event, Set<String> upstreams) {
         event.exactly(SOURCE_EVENT_KEYS);
