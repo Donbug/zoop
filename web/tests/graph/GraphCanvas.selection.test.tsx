@@ -91,7 +91,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     });
     expect(canvas.setSize).not.toHaveBeenCalled();
   });
-  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches and an opaque legend', async () => {
+  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches and an semi-transparent legend', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const personal = createMockGraph({
       mode: 'personal',
@@ -104,7 +104,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(host.className).toContain('absolute!');
     expect(host.className).toContain('inset-0');
     expect(screen.getByLabelText('그래프 범례').className).toContain(
-      'bg-zoop-map',
+      'bg-zoop-map/60',
     );
     rerender(<GraphCanvas data={personal} />);
     await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));

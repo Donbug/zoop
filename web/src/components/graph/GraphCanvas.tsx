@@ -319,7 +319,7 @@ export default function GraphCanvas({
       />
       {!focusId && (
         <aside
-          className="relationship-legend z-10 bg-zoop-map pb-3"
+          className="relationship-legend z-10 bg-zoop-map/60 pb-3"
           aria-label="그래프 범례"
         >
           <div className="relationship-title">
