@@ -10147,6 +10147,7 @@ components:
             "$ref": "#/components/schemas/GraphTarget"
           type: "array"
           maxItems: 50
+          description: "답변 본문이 실제로 가리키는 기업·이슈·관계로 지도에서 열 대상이다. 답변 생성에 쓴 그래프 context 전체(노드 50개·간선 50개 상한)가 아니라 그 부분집합이며, 모두 같은 graphVersion의 도구 결과에 있어야 한다."
         applied:
           "$ref": "#/components/schemas/ChatApplied"
         choices:

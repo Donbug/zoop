@@ -3549,7 +3549,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | reason | 필수 | string / null |  |
 | sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
-| graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
+| graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] | 답변 본문이 실제로 가리키는 기업·이슈·관계로 지도에서 열 대상이다. 답변 생성에 쓴 그래프 context 전체(노드 50개·간선 50개 상한)가 아니라 그 부분집합이며, 모두 같은 graphVersion의 도구 결과에 있어야 한다. |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
 | choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 resolves.choiceId를 담은 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |

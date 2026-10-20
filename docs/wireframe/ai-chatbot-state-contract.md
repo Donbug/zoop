@@ -4,7 +4,7 @@
 
 기준 API: [`docs/api/openapi.yaml`](../api/openapi.yaml)의 `createConversation`, `getConversation`, `getCurrentConversation`, `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob`
 
-상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.8`](../ZOOP_AI_거버넌스_정책_v0.1.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
+상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.8`](../ZOOP_AI_거버넌스_정책.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
 
 이 문서는 네 정적 와이어프레임이 증명하지 않는 로딩·오류·빈 상태·권한·복구 동작을 구현 계약으로 보완한다. 새 시각 디자인을 임의로 만들기보다 같은 드로어 안의 상태 변형으로 먼저 구현한다. 별도 화면 ID가 필요한 수준으로 구조가 바뀌면 manifest와 Figma 화면을 함께 갱신한다.
 

@@ -9,7 +9,7 @@
 관련 문서:
 
 - [AI 챗봇 설계 요약](../design/ai-chatbot-design-summary.md)
-- [AI 거버넌스 정책](../ZOOP_AI_거버넌스_정책_v0.1.md)
+- [AI 거버넌스 정책](../ZOOP_AI_거버넌스_정책.md)
 - [공개 목표 API](../api/openapi.yaml)
 - [ERD v6](../erd/zoop-core-erd-v6.md)
 - [AI 챗봇 화면 상태 계약](../wireframe/ai-chatbot-state-contract.md)
