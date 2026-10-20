@@ -3,6 +3,7 @@ import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
 import { companyLogo } from '@/util/company-logo';
+import { separateNodes, shortTitle } from './graph-geometry';
 
 export function graphSummary(data: GraphResponse) {
   const companyNodes = data.nodes.filter((n) => n.kind === 'company');
@@ -171,7 +172,7 @@ export function toG6Data(
             }),
     );
   });
-  return {
+  const result: GraphData = {
     nodes: visible.map((n, i) => {
       const company = n.kind === 'company',
         p = positions.get(n.id),
@@ -254,13 +255,13 @@ export function toG6Data(
           iconFontFamily: 'Inter Variable',
           iconFontWeight: 700,
           iconFill: n.brandColor ?? '#1a1a1a',
-          labelText: company ? n.label : planned ? n.label : '',
+          labelText: company ? n.label : shortTitle(n.label, 13 * scale),
           labelPlacement: company ? 'bottom' : 'top',
           labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
-          labelFontSize: (company ? 17.2 : 9.57) * scale,
+          labelFontSize: (company ? 17.2 : 13) * scale,
           labelFontWeight: company ? 500 : 700,
           labelFill: company ? '#55554f' : '#1a1a1a',
-          labelOffsetY: company ? 10 : -5,
+          labelOffsetY: company ? (n.holding || n.watch ? 28 : 10) : -5,
           labelBackground: !company,
           labelBackgroundFill: '#ffffff',
           labelBackgroundStroke: '#1a1a1a',
@@ -300,4 +301,6 @@ export function toG6Data(
         };
       }),
   };
+  result.nodes = separateNodes(result.nodes ?? []);
+  return result;
 }
