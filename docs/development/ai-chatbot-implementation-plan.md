@@ -89,7 +89,7 @@ flowchart LR
 1. 기존 S1 `semantic-verification`과 분리된 Jev router schema·prompt·kind를 추가한다.
 2. 명시적 요구는 `required=true`; `p>=0.70` 자동 후보, `0.35<=p<0.70` 검토 후보로 적용한다.
 3. Luna `coverage-verifier`는 허용 capability ID만 반환하고 최초 1회+보완 뒤 재확인 1회로 제한한다.
-4. route·coverage 모델 호출은 `ai_executions(feature=chatbot)`에 서로 다른 stage와 영수증으로 기록한다.
+4. route·coverage 모델 호출은 `ai_executions(feature=chatbot)`에 서로 다른 stage와 영수증으로 기록한다. 단계 5의 answer-generator·semantic-verification도 같은 방식으로 분리 기록한다.
 
 완료 조건: multi-label macro F1·유형별 recall 기준, 명시적 필수 요구 누락 0건, 미등록 capability·인자 실행 0건.
 
@@ -115,9 +115,12 @@ flowchart LR
 1. `BranchContext`는 요구 ID별로 도구 결과·근거·버전·제한을 구조화하며 원문 전문을 무제한 합치지 않는다.
 2. Luna `answer-generator`는 1회만 호출하고 출력은 typed schema로 받는다.
 3. 서버 검증기는 요구 커버리지, citation offset·문서 버전·철회, 수치·통화·날짜, graph endpoint·hop, 회원 범위, 투자 판단, `answerBasis`를 검사한다. 요구 커버리지는 모든 필수 요구가 본문 답변과 `limitations` 항목 중 정확히 하나에 속하는지로 판정하고, `limitations`는 gate·체크포인트·`truncated`·citation 부재에서 서버가 만들며 `message`는 `kind`별 템플릿을 쓴다. 본문은 근거 수준별 `sections`로 받고, 서버가 `general_knowledge` 구간에 고정 안내를 붙이고 구간 text를 이어 `answer`를 만들며 `answerBasis`를 구간 basis에서 계산한다. 일반 개념 구간의 최신 사실·근거 연결, 근거 구간의 구간 밖 인용, `citations`에 없는 `evidenceIds`는 검증 실패다.
-4. 검증 실패는 `validation_failed`; 자동 재생성·부분 답변·근거 부족 성공으로 바꾸지 않는다.
+4. 3의 검사는 [설계 요약 8.2절](../design/ai-chatbot-design-summary.md)의 1층 결정론적 검사 표를 check ID 단위로 구현한다. 하나라도 실패하면 Jev를 호출하지 않는다.
+5. 1층을 통과하고 근거 구간이 있으면 Jev `semantic-verification` stage를 1회 호출한다. 챗봇 전용 질문 집합(claim별 Choice, Noul `prohibitedAdvice`·`unsupportedCausality`)과 정책 버전을 쓰고, S1 어댑터의 엄격한 응답 검사·영수증 선저장·무재시도 원칙을 재사용한다. 일반 개념만 답한 결과는 호출하지 않는다.
+6. 판정 처리: `contradicted` 또는 Noul 예 → 전체 `validation_failed`; hold → 해당 요구 구간 제외와 `evidence_insufficient` limitation, 남은 요구가 없으면 `insufficient_evidence`; Jev 장애 → `transient`(retry=`rerun`). 구간 제외 뒤 `answer`·`answerBasis`·`citations`를 서버가 다시 계산한다.
+7. 검증 실패는 `validation_failed`; 자동 재생성·부분 답변·근거 부족 성공으로 바꾸지 않는다.
 
-완료 조건: 모든 중요 사실 주장에 유효 근거, Q02 최신 사실 우회 0건, 철회 근거 노출 0건, 다른 회원 종목 노출 0건.
+완료 조건: 모든 중요 사실 주장에 유효 근거와 Jev supported 판정, 1층 실패 시 Jev 호출 0회, 일반 개념만 답한 결과의 Jev 호출 0회, Q02 최신 사실 우회 0건, 철회 근거 노출 0건, 다른 회원 종목 노출 0건.
 
 ### 단계 6 — 웹 연결
 
@@ -133,7 +136,7 @@ flowchart LR
 
 1. 단일 Q 유형보다 복합·모호·공격·장애 질문을 먼저 고정 평가에 포함한다.
 2. `chat_tool_calls`로 호출 수·중복·지연·오류·추가 라운드를, `ai_executions`로 모델 호출·토큰·비용을 분리 집계한다.
-3. Q02 → Q01 → Q03 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다. 준비되지 않은 유형을 일반 LLM으로 우회하지 않는다.
+3. Q02 → Q01 → Q03 → Q04/Q07 → Q05/Q06/Q08 순으로 feature flag를 연다. 준비되지 않은 유형을 일반 LLM으로 우회하지 않는다. Q02 단독 답변은 Jev 의미 검증을 쓰지 않으므로 Jev 계정·비용 없이 먼저 열 수 있고, Q01부터는 Jev 의미 검증과 임계값 보정이 선행 조건이다.
 4. 고정 평가와 보안 시험을 통과한 registry/model/prompt/policy 조합만 활성화한다.
 
 ## 4. 내부 챗봇 계약에 필요한 최소 스키마
@@ -148,8 +151,9 @@ flowchart LR
 | `ChatToolPlan` | planRevision, stages(순서·의존 단계), stage별 calls·parallelGroup, checkpoint(sourceStage, cardinality, onZero, onUnder, onExcess), capabilityId, registry tool binding, 최악의 경우 reserved budget |
 | `ChatCheckpointResult` | stage, observed count, truncated, decision(continue/clarify/limit/none_found/insufficient), 생성한 choice id |
 | `ChatToolResult` | toolCallId, capabilityId, dataVersion, items, evidenceIds, truncated, nextAllowed, error |
-| `ChatGeneratedAnswer` | requirementId별 answer/limitation/insufficient, 근거 수준별 sections(basis·text·claims·citation refs), graph targets. answerBasis는 제안하지 않고 서버가 계산 |
-| `ChatValidationReport` | deterministic check IDs·pass/fail, failing requirement/claim/citation, requirementId별 answered/limited 판정과 limitation 결정 근거, final answerBasis, final limitations, policyVersion |
+| `ChatGeneratedAnswer` | requirementId별 answer/limitation/insufficient, 근거 수준별 sections(basis·text·claims·citation refs·소속 requirementId 하나, 통합 구간은 관련 requirementId 목록), graph targets. answerBasis는 제안하지 않고 서버가 계산 |
+| `ChatSemanticVerification` | schemaVersion, model, policyVersion, claim별 claimId·sectionId·requirementId·Choice 분포·confidence·Noul 확률·판정(supported/contradicted/insufficient/hold), receipt artifact ID |
+| `ChatValidationReport` | deterministic check IDs·pass/fail, failing requirement/claim/citation, semantic verification 요약(호출 여부·전체 판정·hold로 제외한 requirementId), requirementId별 answered/limited 판정과 limitation 결정 근거, final answerBasis, final limitations, policyVersion |
 
 내부 응답에는 provider 원문 응답·비밀·자유 형식 추론을 넣지 않는다. 앱 completed는 AI 서비스가 ready를 반환한 시점이 아니라 Java가 artifact·영수증·도구 호출·검증 결과를 확인하고 DB에 원자 저장한 뒤에만 전이한다.
 
@@ -180,6 +184,7 @@ flowchart LR
 | 결과 | answerBasis를 sections에서 계산(단일·mixed·none), Q02 단독은 general_knowledge 구간 하나와 빈 sources·citations, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, no PARTIAL |
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |
+| 의미 검증 | 1층 실패 시 Jev 0회, 일반 개념만이면 Jev 0회, 전부 supported 통과, contradicted·prohibitedAdvice 예 전체 실패, 한 요구 hold 시 그 구간·통합 구간 제외와 limitation 및 answer·answerBasis·citations 재계산, 모든 요구 hold 시 insufficient_evidence, 응답 형식 오류 시 영수증 저장 후 transient |
 | 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |
 | 관측 | 모델·도구 호출 중복 집계 없음, 미보고 비용 NULL, 요청 ID 연계 |

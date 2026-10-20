@@ -369,7 +369,7 @@ CHECK(resolves_choice_id IS NULL OR resolves_job_id IS NOT NULL)
 
 `chat_results`, `chat_citations`, `chat_attempts`를 합친다. result는 `ChatResult` 전체로 sections/citations/sources/applied/choices/action/limitations/metadata를 포함한다. SQL message_id는 result.messageId와 일치해야 한다. frozen_context는 최초 `ChatFrozenContext`로 불변이다. 같은 jobId로 다른 질문/요청이 오면 409. 세션 잠금으로 seq를 부여한다.
 
-`route_summary`는 사용자에게 노출하지 않는 버전 고정 내부 계약이다. 명시적 `requirementId`, Q01~Q08 multi-label 결과, 논리 기능, 커버리지 판정, 선택·제외 이유, 계획 revision, 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계), 예약·사용 예산, `answerBasis`, 최종 계획·출력 검증 상태를 저장한다. 자유 형식 추론 원문은 저장하지 않는다. `route_schema_version` 없이 값을 저장하지 않으며 완료 뒤에는 불변이다. 실패 작업은 마지막으로 확정된 단계까지만 저장하고 완료한 것처럼 채우지 않는다.
+`route_summary`는 사용자에게 노출하지 않는 버전 고정 내부 계약이다. 명시적 `requirementId`, Q01~Q08 multi-label 결과, 논리 기능, 커버리지 판정, 선택·제외 이유, 계획 revision, 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계), 예약·사용 예산, `answerBasis`, 최종 계획·출력 검증 상태(결정론적 check ID별 결과, 의미 검증 호출 여부·전체 판정·hold로 제외한 요구)를 저장한다. claim별 Jev 분포와 원문 응답은 `ai_executions`의 영수증 artifact에 둔다. 자유 형식 추론 원문은 저장하지 않는다. `route_schema_version` 없이 값을 저장하지 않으며 완료 뒤에는 불변이다. 실패 작업은 마지막으로 확정된 단계까지만 저장하고 완료한 것처럼 채우지 않는다.
 
 attempts는 내부 스키마의 `{n, mode, ownerToken, recoveryKey, recoveryArtifactId, sourceAttemptNo, startedAt, finishedAt, status, failure}` 배열이다. n은 작업 안에서 유일하고 잠금 아래 증가시킨다. 새 생성 시도의 recoveryKey는 `chat/{jobId}/attempt/{n}/verified-result`처럼 작업+시도 번호로 결정하며 URI 경로 값은 안전하게 인코딩한다. 각 생성 시도의 키는 전역 유일하고 파일 덮어쓰기를 금지한다. DB 저장 전에 시도와 키를 먼저 커밋해 장애 뒤에도 찾을 수 있게 한다. job의 recovery_key/artifact는 현재 복구 대상 포인터이며 최초 실행 전 NULL이다.
 
