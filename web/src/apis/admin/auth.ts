@@ -30,6 +30,8 @@ export async function adminCall<TResponse = unknown>(
   api: string,
   method: string,
   request?: unknown,
+  /** 요청별 추가 헤더(예: 관리 작업의 Idempotency-Key) */
+  headers?: Record<string, string>,
 ) {
   const state = useAdminSessionStore.getState();
   const revision = state.revision;
@@ -38,10 +40,12 @@ export async function adminCall<TResponse = unknown>(
     return await call<TResponse>(api, method, request, {
       skipAuth: true,
       skipMemberCsrf: true,
-      headers:
-        csrfToken && method.toUpperCase() !== 'GET'
+      headers: {
+        ...headers,
+        ...(csrfToken && method.toUpperCase() !== 'GET'
           ? { 'X-CSRF-Token': csrfToken }
-          : undefined,
+          : {}),
+      },
     });
   } catch (error) {
     if (
