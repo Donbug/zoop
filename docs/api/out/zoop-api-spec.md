@@ -2679,7 +2679,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyGraphAsOf · 기업·기준 시점 중심 관계 그래프 조회
 
-타임라인에서 고른 시각을 asOf로 명시하고 그 시점 이전에 공개된 기업·이슈 관계만 조회한다. 응답은 실제 사용한 공개 버전을 고정한다. 이후 공개된 문서나 관계를 섞지 않으며 자료 미상·미제공·조회 장애를 구분한다. depth는 실제 연결선의 hop 수다.
+타임라인에서 고른 시각을 asOf로 명시하고 그 시점까지 검증·공개된 기업·이슈 관계만 조회한다(검증 시각·근거 공개 시각 ≤ asOf, 현재 공개 제외 아님). 사업 관계의 유효기간은 표시 여부를 정하지 않고 validity(예정·유효·종료·기간 미상)로 구분한다(FS042). 응답은 실제 사용한 공개 버전을 고정한다. 이후 공개된 문서나 관계를 섞지 않으며 자료 미상·미제공·조회 장애를 구분한다. depth는 실제 연결선의 hop 수다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2903,9 +2903,10 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | relationType | 필수 | string |  |
 | sourceUrl | 필수 | string / null |  |
 | verifiedAt | 필수 | string (date-time) / null |  |
-| validFrom | 필수 | string / null |  |
-| validUntil | 필수 | string / null |  |
+| validFrom | 필수 | string / null | 사업 관계가 효력을 갖기 시작한 날(YYYY-MM-DD, 시간대 없음). null이면 시작일 미상이다. |
+| validUntil | 필수 | string / null | 사업 관계의 마지막 유효일(YYYY-MM-DD, 그날 포함). null이면 종료 시점 미상이며 종료로 판단하지 않는다. |
 | countries | 필수 | string[] |  |
+| validity | 필수 | string {scheduled, active, ended, unknown} | 응답 metadata.asOf(asOf를 주지 않으면 조회 시각)의 Asia/Seoul 날짜 D 기준 사업 관계 상태(FS042): D < validFrom이면 scheduled, validFrom ≤ D ≤ validUntil이면 active, D > validUntil이면 ended, validFrom이 없고 종료가 아니면 unknown. 날짜끼리만 비교하며 원문 날짜에 시각을 붙이지 않는다. 표시 여부를 정하지 않는다. |
 
 <a id="schema-briefingcorrection"></a>
 
@@ -4081,6 +4082,7 @@ The selection frozen when the question was first received.
 | verification | 필수 | [Verification](#schema-verification) |  |
 | via | 필수 | [ViaIssue](#schema-viaissue)[] |  |
 | explanation | 필수 | string / null |  |
+| validity | 필수 | string {scheduled, active, ended, unknown} / null | 구조 관계 간선의 사업 관계 상태(metadata.asOf 기준). GraphEdge.validity와 같다. 현재 유효한 관계로 오해되지 않도록 basis별 validity와 함께 표시한다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-endpointref"></a>
@@ -4477,6 +4479,7 @@ same request again never toggles anything.
 | derived | 필수 | boolean |  |
 | via | 필수 | string[] | Shared issue ids; derived edges only |
 | evidenceIds | 필수 | string[] | Evidence ids of the approved relations behind the edge (same as `GET /api/graph/edges/{id}` evidenceIds); empty for derived edges. |
+| validity | 필수 | string {scheduled, active, ended, unknown} / null | STRUCTURALLY_RELATED_TO 간선의 사업 관계 상태(metadata.asOf 기준, BasisOut.validity와 같은 규칙): 근거 중 하나라도 active면 active, 아니면 scheduled, 아니면 unknown, 모두 ended면 ended. 기간이 끝나도 이슈 발생 당시 유효했던 연결은 간선으로 남는다. 다른 관계 유형과 파생 간선은 null. |
 
 <a id="schema-graphmetadata"></a>
 
