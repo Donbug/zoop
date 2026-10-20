@@ -12,7 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def create(directory, unknown=False):
+def create(directory, unknown=False, selection_mode="normal"):
     spec = importlib.util.spec_from_file_location("grouped_db_fixture_tests", ROOT / "scripts/tests/test_briefing_grouped_run.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -54,10 +54,31 @@ def create(directory, unknown=False):
             archive["held"] = [{"articleId": document["documentId"], "requestDigest": digest,
                 "stage": stage, "usageKnown": False, "reason": "operator_held_unresolved_paid_request"}]
             fixture.archive_path.write_bytes(module.base.canonical(archive))
-        transport = module.fixtures.AuthoredTransport()
+        if selection_mode not in {"normal", "held", "corrected"} or (unknown and selection_mode != "normal"):
+            raise ValueError("Unknown authored selection fixture mode")
+        class AuthoredSelectionFailure(module.fixtures.AuthoredTransport):
+            def __call__(self, raw):
+                status, response = super().__call__(raw)
+                request = module.base.strict_load(raw)
+                if request["text"]["format"]["name"] != module.fixtures.grouped.SELECTION_STAGE:
+                    return status, response
+                data = module.base.strict_load(request["input"])
+                if not any(issue["issueId"] == "stable-authored-issue-0" for issue in data["issues"]):
+                    return status, response
+                if selection_mode == "corrected" and "selectionCorrection" in data:
+                    return status, response
+                provider = module.base.strict_load(response)
+                part = provider["output"][0]["content"][0]
+                reply = module.base.strict_load(part["text"])
+                # The answer obeys JSON schema, but contradicts its own chosen issue's eligibility.
+                reply["assessments"]["stable-authored-issue-0"].update(status="HOLD", importance=1)
+                part["text"] = module.base.canonical(reply).decode()
+                return status, module.base.canonical(provider)
+        transport = module.fixtures.AuthoredTransport() if selection_mode == "normal" else AuthoredSelectionFailure()
         result = fixture.execute(transport)
-        expected = 13 if unknown else 14
-        if result["selectedRounds"] != expected or result["selectedIssues"] != expected or len(transport.requests) != expected * 3:
+        expected = 13 if unknown or selection_mode == "held" else 14
+        expected_calls = expected * 3 + (2 if selection_mode == "held" else 1 if selection_mode == "corrected" else 0)
+        if result["selectedRounds"] != expected or result["selectedIssues"] != expected or len(transport.requests) != expected_calls:
             raise AssertionError("Authored grouped fixture did not produce all fourteen successful rounds")
         return {"sources": str(fixture.clock.sources), "clocks": str(fixture.clock.clocks),
                 "archive": str(fixture.archive_path), "bundle": str(fixture.output / "bundle-v2.json"),
@@ -69,4 +90,5 @@ def create(directory, unknown=False):
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--unknown" in sys.argv))
+    mode = "held" if "--held-selection" in sys.argv else "corrected" if "--corrected-selection" in sys.argv else "normal"
+    print(create(Path(sys.argv[1]), "--unknown" in sys.argv, mode))

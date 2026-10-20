@@ -149,6 +149,59 @@ class BriefingGroupedReplayPostgresTest {
         } finally { database.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
     }
 
+    @Test void invalidCompletedSelectionCanStayHeldAndOneBoundCorrectionCanPublish() throws Exception {
+        for (String mode : new String[]{"held", "corrected"}) {
+            Path directory = Files.createTempDirectory(root, "selection-" + mode + "-").toRealPath();
+            ProcessBuilder command = new ProcessBuilder("python3", Path.of("scripts/briefing_grouped_fixture.py").toAbsolutePath().toString(),
+                    directory.toString(), "--" + mode + "-selection");
+            command.environment().put("PYTHONDONTWRITEBYTECODE", "1");
+            Process process = command.redirectErrorStream(true).redirectOutput(directory.resolve("fixture.log").toFile()).start();
+            int code = process.waitFor(); assertEquals(0, code, Files.readString(directory.resolve("fixture.log")));
+            String schema = "selection_case_" + UUID.randomUUID().toString().replace("-", "");
+            String baseUrl = System.getenv("DB_URL"), url = baseUrl + (baseUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema + ",public";
+            var datasource = new DriverManagerDataSource(url, username(), password()); var database = new JdbcTemplate(datasource);
+            try {
+                Flyway.configure().dataSource(datasource).schemas(schema).defaultSchema(schema).load().migrate();
+                database.update("INSERT INTO companies(id,name) VALUES ('company-authored','합성 기업')");
+                Path source = directory.resolve("sources.jsonl"), output = directory.resolve("output"), bundleFile = output.resolve("bundle-v2.json");
+                var settings = new BriefingReplaySettings(source, bundleFile, Files.createDirectory(directory.resolve("artifacts")),
+                        directory.resolve("grants.json"), directory.resolve("manifest.json"), ArtifactFileStore.sha256(Files.readAllBytes(source)),
+                        "inbox/authored-grouped-run.md", directory.resolve("clocks.json"));
+                var caseImporter = new BriefingReplayImporter(database, new DataSourceTransactionManager(datasource), settings);
+                caseImporter.importBundle();
+                assertEquals("held".equals(mode) ? 13 : 14,
+                        database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE published_at IS NOT NULL", Integer.class));
+                assertEquals("held".equals(mode) ? 41 : 43,
+                        database.queryForObject("SELECT count(*) FROM artifacts WHERE kind='ai_call_receipt'", Integer.class));
+                if ("held".equals(mode)) assertEquals(1, database.queryForObject("SELECT count(*) FROM briefing_rounds WHERE status='failed' AND published_payload IS NULL", Integer.class));
+                StrictJson.Obj saved = StrictJson.parseObject(Files.readAllBytes(bundleFile)), first = saved.objects("rounds").getFirst();
+                String finalDigest = first.string("groupedSelectionRequestDigest");
+                StrictJson.Obj request = StrictJson.parseObject(Files.readAllBytes(output.resolve("calls").resolve(finalDigest + ".request.json")));
+                StrictJson.Obj input = StrictJson.parseObject(request.string("input"));
+                assertTrue(input.has("selectionCorrection")); assertEquals(1, input.object("selectionCorrection").count("attempt"));
+                assertTrue(caseImporter.importBundle().alreadyImported());
+                String before = database.queryForObject("SELECT md5(string_agg(row_to_json(r)::text, '' ORDER BY id)) FROM briefing_rounds r", String.class);
+                // Rebind the changed request's byte digest and receipt honestly: the extra context is still forbidden.
+                var changedInput = (tools.jackson.databind.node.ObjectNode) input.node().deepCopy(); changedInput.put("extraUnfrozenContext", "changed");
+                var changedRequest = (tools.jackson.databind.node.ObjectNode) request.node().deepCopy(); changedRequest.put("input", com.zoop.common.json.Canonical.write(changedInput));
+                byte[] changedBytes = StrictJson.write(changedRequest); String changedDigest = ArtifactFileStore.sha256(changedBytes);
+                Files.write(output.resolve("calls").resolve(changedDigest + ".request.json"), changedBytes);
+                Files.copy(output.resolve("calls").resolve(finalDigest + ".response.json"), output.resolve("calls").resolve(changedDigest + ".response.json"));
+                var changedBundle = (tools.jackson.databind.node.ObjectNode) saved.node().deepCopy();
+                var changedRound = (tools.jackson.databind.node.ObjectNode) changedBundle.path("rounds").get(0);
+                changedRound.put("groupedSelectionRequestDigest", changedDigest);
+                for (tools.jackson.databind.JsonNode value : changedRound.path("receipts")) if (finalDigest.equals(value.path("requestDigest").asText()))
+                    ((tools.jackson.databind.node.ObjectNode) value).put("requestDigest", changedDigest);
+                for (tools.jackson.databind.JsonNode value : changedBundle.path("receipts")) if (finalDigest.equals(value.path("requestDigest").asText()))
+                    ((tools.jackson.databind.node.ObjectNode) value).put("requestDigest", changedDigest);
+                Files.write(bundleFile, StrictJson.write(changedBundle));
+                RuntimeException rejected = assertThrows(RuntimeException.class, caseImporter::importBundle);
+                assertTrue(rejected.getMessage().contains("selection_correction_frozen_inputs"), rejected.getMessage());
+                assertEquals(before, database.queryForObject("SELECT md5(string_agg(row_to_json(r)::text, '' ORDER BY id)) FROM briefing_rounds r", String.class));
+            } finally { database.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
+        }
+    }
+
     private static String url() { String base = System.getenv("DB_URL"); return base + (base.contains("?") ? "&" : "?") + "currentSchema=" + SCHEMA + ",public"; }
     private static String username() { return System.getenv().getOrDefault("DB_USERNAME", "company_test"); }
     private static String password() { return System.getenv().getOrDefault("DB_PASSWORD", ""); }

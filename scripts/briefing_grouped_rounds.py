@@ -15,6 +15,16 @@ _SPEC.loader.exec_module(sim)
 base, ReplayError = sim.base, sim.ReplayError
 PROMPTS = Path(__file__).resolve().parents[1] / "api/src/main/resources/briefing/prompts/grouped-issues"
 SELECTION_STAGE = "grouped_issue_selection"
+# Only known completed output mistakes may receive one bounded correction. Input
+# identity, source/clock integrity, provider failures and unknown usage never do.
+CORRECTABLE_SELECTION_ERRORS = frozenset({
+    "grouped_duplicate_selected_issue", "grouped_selected_issue_not_eligible",
+    "importance_three_impact_proof_missing", "grouped_unknown_or_duplicate_citation",
+    "grouped_selected_evidence_outside_current_round", "grouped_update_delta_not_current_round_evidence",
+    "grouped_repeat_issue_without_supported_material_update", "grouped_material_update_without_delta",
+    "grouped_unknown_or_duplicate_company", "grouped_company_without_selected_evidence",
+    "one_source_cannot_create_multiple_headline_issues",
+})
 
 
 def require(condition, code):
@@ -175,9 +185,7 @@ def _prior_by_id(previous_selected):
     return result
 
 
-def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=()):
-    """Validate model decisions and keep stable group IDs for existing generation."""
-    base.validate_schema(reply, selection_schema(candidates))
+def _frozen_candidate_inputs(candidates, previous_selected):
     allowed = _indexed(candidates, "issueId", "grouped_duplicate_candidate")
     previous = _prior_by_id(previous_selected)
     for candidate in candidates:
@@ -191,6 +199,14 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
                         or source.get("dateContext", {}).get("publishedAt")
                     require(published is not None and sim.aware(published) <= sim.aware(candidate["window"]["from"]),
                             "grouped_future_or_undated_previous_source")
+        _catalog(candidate)
+    return allowed, previous
+
+
+def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=()):
+    """Validate model decisions and keep stable group IDs for existing generation."""
+    base.validate_schema(reply, selection_schema(candidates))
+    allowed, previous = _frozen_candidate_inputs(candidates, previous_selected)
     selected, selected_ids, used_documents = [], set(), set()
     choices = sorted(reply["selected"], key=lambda c: (-reply["assessments"][c["issueId"]]["importance"],
         -reply["assessments"][c["issueId"]]["priority"], c["issueId"]))
@@ -290,11 +306,63 @@ def grouped_selection_data(candidates, context, previous_selected=()):
             "operationalCollectionGate": False, "historicalBodyUnchangedProven": False}
 
 
-def choose_grouped_round(client, candidates, context, identity_sha, previous_selected=()):
-    """Ask AI to assess every issue and choose at most three; no source rescoring."""
+def attempt_grouped_selection(client, candidates, context, identity_sha, previous_selected=()):
+    """Select, allowing one correction of a known completed output mistake.
+
+    The return value exposes the actual final request digest, including a
+    correction's digest. It never retries HTTP/unknown/incomplete calls and uses
+    the same client's existing write-ahead call budget for both attempts.
+    """
     if not candidates:
-        return []
-    data = grouped_selection_data(candidates, context, previous_selected)
+        return {"selected": [], "requestDigest": None, "corrections": [], "failure": None}
+    # Reject a changed snapshot/history before spending anything. Use one frozen
+    # copy for both attempts so another caller cannot alter the correction basis.
+    candidates, context, previous_selected = copied(candidates), copied(context), copied(list(previous_selected))
+    _frozen_candidate_inputs(candidates, previous_selected)
+    data, output_schema = grouped_selection_data(candidates, context, previous_selected), selection_schema(candidates)
+    request_digest = client.request_digest(SELECTION_STAGE, data, "selection.md", "selection.schema.json",
+                                           max_output=12000, schema_override=output_schema)
     reply = client.call(SELECTION_STAGE, data, "selection.md", "selection.schema.json", max_output=12000,
-                        schema_override=selection_schema(candidates))
-    return freeze_grouped_selection(reply, candidates, identity_sha, previous_selected)
+                        schema_override=output_schema)
+    try:
+        selected = freeze_grouped_selection(reply, candidates, identity_sha, previous_selected)
+        return {"selected": selected, "requestDigest": request_digest, "corrections": [], "failure": None}
+    except ReplayError as error:
+        failure = str(error)
+        if failure not in CORRECTABLE_SELECTION_ERRORS or client.stopped.is_set():
+            raise
+    # A parsed reply alone is insufficient: inspect the immutable original paid
+    # receipt/response before authorizing any different request.
+    receipt, response = client.inspect_recorded(request_digest)
+    require(receipt.get("status") == "completed" and response.get("status") == "completed"
+            and receipt.get("stage") == SELECTION_STAGE, "grouped_correction_requires_known_completed_response")
+    correction = {"attempt": 1, "failure": failure, "previousReply": reply,
+        "originalRequestDigest": request_digest, "originalResponseSha256": receipt["responseSha256"],
+        "sameFrozenInputs": True,
+        "instruction": "Correct the known output mistake once under the unchanged selection criteria. "
+            "Use only the same frozen issues and evidence, company links, clock window and prior history. "
+            "The previous reply and failure are repair hints, never fact evidence or approval. "
+            "Recheck every selected issue, keep maximum three, and omit unsupported issues rather than invent facts."}
+    corrected_data = {**data, "selectionCorrection": correction}
+    corrected_digest = client.request_digest(SELECTION_STAGE, corrected_data, "selection.md", "selection.schema.json",
+                                             max_output=12000, schema_override=output_schema)
+    corrected_reply = client.call(SELECTION_STAGE, corrected_data, "selection.md", "selection.schema.json",
+                                  max_output=12000, schema_override=output_schema)
+    audit = {"attempt": 1, "reason": failure, "originalRequestDigest": request_digest,
+             "originalResponseSha256": receipt["responseSha256"], "correctedRequestDigest": corrected_digest,
+             "sameFrozenInputs": True, "status": "PASS"}
+    try:
+        selected = freeze_grouped_selection(corrected_reply, candidates, identity_sha, previous_selected)
+        return {"selected": selected, "requestDigest": corrected_digest, "corrections": [audit], "failure": None}
+    except ReplayError as error:
+        if str(error) not in CORRECTABLE_SELECTION_ERRORS or client.stopped.is_set():
+            raise
+        audit.update(status="WITHHELD", validationError=str(error))
+        return {"selected": [], "requestDigest": corrected_digest, "corrections": [audit], "failure": str(error)}
+
+
+def choose_grouped_round(client, candidates, context, identity_sha, previous_selected=()):
+    """Compatibility list API; use attempt_grouped_selection for request audit."""
+    outcome = attempt_grouped_selection(client, candidates, context, identity_sha, previous_selected)
+    require(outcome["failure"] is None, outcome["failure"])
+    return outcome["selected"]

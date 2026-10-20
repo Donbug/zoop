@@ -13,3 +13,5 @@ previousSelectedIssues는 과거 시뮬레이션에서 이미 전달한 사건/�
 SELECTABLE이면서 importance>=2인 서로 다른 사건을 중요도 내림차순, 같은 중요도는 priority 내림차순으로 최대 3개 선정한다. 수를 채우기 위한 선정은 금지하고 0개도 허용한다. selected에는 원래 issueId, 한국어 title, evidenceIds, companyIds, novelty, deltaEvidenceIds, limitations만 작성한다. 한 문서를 여러 핵심 이슈에 중복 사용하지 않는다. evidenceIds는 그 issue의 newMentions.evidence/newEvidenceIds에 이미 있는 ID 중 실제 제목과 2~3개 원자적 문장을 입증할 충분한 인용을 선택한다. backgroundMentions는 중요도·변화 비교에 참고할 배경이고 이번 브리핑 사실 인용으로 직접 출력하지 않는다. 관련 회사는 companyId로만 고르고 그 회사 연결을 직접 뒷받침하는 이번 회차 evidenceIds도 반드시 함께 선택한다. 다른 이슈의 인용·없는 ID·외부 회사·모델 상식·추측을 사용하지 않는다. 기술을 설명하더라도 해당 기술과 실제 기업/사업 연결을 입증하는 인용이 필요하다.
 
 자료는 뒤늦게 수집한 원문과 현재 확인한 publisher 시각으로 구분한 회차별 과거 시뮬레이션이다. 당시 수집본/본문 동일성, 실시간 권한, 운영 발행 가능성을 증명하지 않는다. 시장 지표와 가격 성과 데이터는 이 선택 입력에 없다. 미래 장 방향·주가 전망·예측 적중·매수/매도/목표가를 생성하지 않는다. 제공된 JSON schema만 출력한다.
+
+selectionCorrection이 있으면 previousReply와 failure는 같은 고정 입력의 첫 완료 응답을 1회 보완하기 위한 참고일 뿐 사실 근거나 승인으로 사용하지 않는다. 기존 모든 선정·근거·신규성 조건을 다시 검사하며, 인용/기업/변화 근거를 입력에서 찾을 수 없는 이슈는 제외한다.

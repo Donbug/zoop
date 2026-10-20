@@ -135,6 +135,10 @@ final class BriefingGroupedSimulationRules {
             snapshot(candidate, expected.get(id), round, archive);
         }
         require(candidates.keySet().equals(expected.keySet()), "candidate_population");
+        selectionCorrection(round, receipts, receipt, selected, output);
+        boolean published = Set.of("SELECTED", "EMPTY_CONFIRMED").contains(round.string("selectionStatus"));
+        // Invalid completed model answers are retained as audit for held rounds; they do not authorize publication.
+        if (!published) return;
         StrictJson.Obj answer = selected.answer();
         answer.object("assessments").exactly(candidates.keySet());
         require(answer.objects("selected").size() <= 3, "selection_limit");
@@ -147,8 +151,6 @@ final class BriefingGroupedSimulationRules {
                     && !assessment.string("transmission").isBlank() && (!"BROAD_MARKET".equals(assessment.string("scope"))
                     || Set.copyOf(assessment.strings("affectedSectors")).size() >= 2), "broad_impact_proof");
         }
-        boolean published = Set.of("SELECTED", "EMPTY_CONFIRMED").contains(round.string("selectionStatus"));
-        if (!published) return; // Paid failed drafts remain audit records and cannot become publications.
         Set<String> actual = new HashSet<>();
         for (StrictJson.Obj item : round.objects("selected")) {
             String id = item.string("issueId"); StrictJson.Obj candidate = candidates.get(id);
@@ -223,6 +225,36 @@ final class BriefingGroupedSimulationRules {
                     && finalReceipt.node().equals(receipts.get(digest)), "result_receipt_binding");
         }
         require(usage.equals(Set.of(result.string("generationRequestDigest"), result.string("verificationRequestDigest"))), "result_usage_pair");
+    }
+
+    /** A single corrected selection may alter only its explicit correction block, never the frozen evidence/history. */
+    private static void selectionCorrection(StrictJson.Obj round, Map<String, JsonNode> receipts, StrictJson.Obj finalReceipt,
+            Recording selected, Path output) {
+        Map<String, StrictJson.Obj> attempts = new LinkedHashMap<>();
+        for (JsonNode value : receipts.values()) {
+            StrictJson.Obj receipt = StrictJson.Obj.of(value);
+            if (SELECTION_STAGE.equals(receipt.string("stage"))) attempts.put(receipt.string("requestDigest"), receipt);
+        }
+        require(!attempts.isEmpty() && attempts.size() <= 2, "selection_correction_limit");
+        if (!selected.input().has("selectionCorrection")) {
+            require(attempts.size() == 1, "selection_orphan_prior_attempt"); return;
+        }
+        StrictJson.Obj correction = selected.input().object("selectionCorrection");
+        require(correction.count("attempt") == 1 && correction.bool("sameFrozenInputs")
+                && !correction.string("failure").isBlank(), "selection_correction_scope");
+        String originalDigest = correction.string("originalRequestDigest");
+        StrictJson.Obj originalReceipt = attempts.get(originalDigest);
+        require(attempts.size() == 2 && originalReceipt != null && !originalDigest.equals(finalReceipt.string("requestDigest"))
+                && correction.string("originalResponseSha256").equals(originalReceipt.string("responseSha256")), "selection_correction_original_receipt");
+        Recording original = recording(originalReceipt, output, true);
+        require(!original.input().has("selectionCorrection") && original.answer().node().equals(correction.object("previousReply").node()), "selection_correction_original_reply");
+        ObjectNode baseline = (ObjectNode) selected.input().node().deepCopy(); baseline.remove("selectionCorrection");
+        require(baseline.equals(original.input().node()), "selection_correction_frozen_inputs");
+        ObjectNode originalRequest = (ObjectNode) StrictJson.parseObject(read(output.resolve("calls").resolve(originalDigest + ".request.json"))).node().deepCopy();
+        ObjectNode correctedRequest = (ObjectNode) StrictJson.parseObject(read(output.resolve("calls").resolve(finalReceipt.string("requestDigest") + ".request.json"))).node().deepCopy();
+        originalRequest.remove("input"); correctedRequest.remove("input");
+        require(originalRequest.equals(correctedRequest), "selection_correction_provider_contract");
+        context(original.input(), round);
     }
 
     private static Recording phase(Map<String, JsonNode> receipts, String digest, String stage, Path output) {

@@ -51,7 +51,7 @@ def run(args, transport=None):
     calls=output/"calls";base.private_dir(calls)
     for path in sorted((archive_path.parent/"calls").glob("*.json")):
         base.write_once(calls/path.name,base.regular(path))
-    client=grouped.GroupedSimulationClient(output,transport or base.authenticated_transport(Path(args.key_file)),args.max_calls)
+    client=grouped.GroupedSimulationClient(output,transport or base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls)
     rounds=[];published_history=[]
     for spec,inputs,clocks,duplicates,coverage,candidates in prepared:
         previous, previous_result=sim.previous_context(rounds[-1] if rounds else None)
@@ -86,9 +86,15 @@ def run(args, transport=None):
                                                    schema_override=grouped.selection_schema(candidates))
             record["groupedSelectionRequestDigest"]=selection_digest
             try:
-                selected=grouped.choose_grouped_round(client,candidates,context,identity_sha,published_history)
+                outcome=grouped.attempt_grouped_selection(client,candidates,context,identity_sha,published_history)
+                selected=outcome["selected"]
+                record["groupedSelectionRequestDigest"]=outcome["requestDigest"]
+                record["groupedSelectionCorrections"]=outcome["corrections"]
                 base.save_json(directory/"selected.json",selected)
-                if not selected:
+                if outcome["failure"]:
+                    record["selectionStatus"]="HELD_VALIDATION"
+                    record["groupedValidationFailure"]=outcome["failure"]
+                elif not selected:
                     record["selectionStatus"]="HELD_SOURCE_COVERAGE"
                 else:
                     # Generation receives stable issue/role/evidence records; no raw-news re-extraction.
@@ -100,7 +106,7 @@ def run(args, transport=None):
                         record["selectionStatus"]="HELD_VALIDATION"
             except sim.ReplayError as error:
                 # Preserve the exact unsuccessful paid response and continue only after known completed calls.
-                if client.stopped.is_set():raise
+                if client.stopped.is_set() or not client.has_recorded(record["groupedSelectionRequestDigest"]):raise
                 record["selectionStatus"]="HELD_VALIDATION";record["groupedValidationFailure"]=str(error)
         record["receipts"]=sim.context_receipts(client,identity_sha)
         if record["result"]:

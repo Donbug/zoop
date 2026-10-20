@@ -97,6 +97,27 @@ class AuthoredTransport:
             "output": [{"type": "message", "content": [{"type": "output_text", "text": base.canonical(value).decode()}]}]})
 
 
+class CorrectionTransport(AuthoredTransport):
+    def __init__(self, always_invalid=False, unknown=False):
+        super().__init__()
+        self.always_invalid, self.unknown = always_invalid, unknown
+
+    def __call__(self, raw):
+        status, response_raw = super().__call__(raw)
+        if self.unknown:
+            raise OSError("authored unknown provider result")
+        request = base.strict_load(raw)
+        data = base.strict_load(request["input"])
+        if request["text"]["format"]["name"] == grouped.SELECTION_STAGE \
+                and (self.always_invalid or "selectionCorrection" not in data):
+            response = base.strict_load(response_raw)
+            value = base.strict_load(response["output"][0]["content"][0]["text"])
+            value["selected"][0]["companyIds"] = ["authored-invented-company"]
+            response["output"][0]["content"][0]["text"] = base.canonical(value).decode()
+            response_raw = base.canonical(response)
+        return status, response_raw
+
+
 class GroupedRoundTests(unittest.TestCase):
     def setUp(self):
         self.doc = document("doc-current", "2026-10-07T08:00:00+09:00")
@@ -349,6 +370,73 @@ class GroupedRoundTests(unittest.TestCase):
                 self.assertIn("MATERIAL_UPDATE", text)
                 self.assertIn("deltaEvidenceIds", text)
                 self.assertIn("중복 브리핑", text)
+
+    def test_known_completed_company_mistake_corrected_once_with_exact_final_digest(self):
+        candidates = self.candidates()
+        context = {"context": {"mode": grouped.sim.MODE}, "contextSha256": "identity"}
+        with tempfile.TemporaryDirectory() as directory:
+            transport = CorrectionTransport()
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", transport)
+            outcome = grouped.attempt_grouped_selection(client, candidates, context, "identity")
+            self.assertIsNone(outcome["failure"])
+            self.assertEqual("issue-stable", outcome["selected"][0]["issueId"])
+            self.assertEqual(2, len(transport.requests))
+            self.assertEqual(base.digest(transport.requests[-1]), outcome["requestDigest"])
+            audit = outcome["corrections"][0]
+            self.assertEqual("PASS", audit["status"])
+            self.assertEqual(base.digest(transport.requests[0]), audit["originalRequestDigest"])
+            first = base.strict_load(base.strict_load(transport.requests[0])["input"])
+            second = base.strict_load(base.strict_load(transport.requests[1])["input"])
+            correction = second.pop("selectionCorrection")
+            self.assertEqual(first, second)
+            self.assertEqual("grouped_unknown_or_duplicate_company", correction["failure"])
+            self.assertEqual(["authored-invented-company"], correction["previousReply"]["selected"][0]["companyIds"])
+            self.assertEqual(audit["originalResponseSha256"], correction["originalResponseSha256"])
+            self.assertEqual(2, len(client.receipts()))
+            self.assertTrue(all(r["usageKnown"] is True for r in client.receipts()))
+            # Both immutable paid responses replay: the correction is not paid again.
+            self.assertEqual(outcome, grouped.attempt_grouped_selection(client, candidates, context, "identity"))
+            self.assertEqual(2, len(transport.requests))
+
+    def test_repeated_selection_mistake_stops_after_two_completed_calls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = CorrectionTransport(always_invalid=True)
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", transport)
+            outcome = grouped.attempt_grouped_selection(client, self.candidates(), {}, "identity")
+            self.assertEqual([], outcome["selected"])
+            self.assertEqual("grouped_unknown_or_duplicate_company", outcome["failure"])
+            self.assertEqual("WITHHELD", outcome["corrections"][0]["status"])
+            self.assertEqual(2, len(transport.requests))
+            self.assertEqual(base.digest(transport.requests[-1]), outcome["requestDigest"])
+            self.assertEqual(2, len(client.receipts()))
+            self.assertFalse(client.stopped.is_set())
+
+    def test_changed_source_snapshot_never_spends_or_corrects(self):
+        candidates = self.candidates()
+        candidates[0]["newMentions"][0]["evidence"][0]["quote"] = "변조된 원문"
+        with tempfile.TemporaryDirectory() as directory:
+            transport = CorrectionTransport()
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", transport)
+            with self.assertRaisesRegex(grouped.ReplayError, "changed_after_input_freeze"):
+                grouped.attempt_grouped_selection(client, candidates, {}, "identity")
+            self.assertEqual(0, len(transport.requests))
+            self.assertEqual([], client.receipts())
+
+    def test_provider_unknown_and_exhausted_budget_are_not_bypassed_by_correction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = CorrectionTransport(unknown=True)
+            client = grouped.GroupedSimulationClient(Path(directory) / "unknown", transport)
+            with self.assertRaises(grouped.ReplayError):
+                grouped.attempt_grouped_selection(client, self.candidates(), {}, "identity")
+            self.assertEqual(1, len(transport.requests))
+            self.assertTrue(client.stopped.is_set())
+            transport = CorrectionTransport()
+            client = grouped.GroupedSimulationClient(Path(directory) / "budget", transport, max_calls=1)
+            with self.assertRaisesRegex(grouped.ReplayError, "paid_call_budget_exhausted"):
+                grouped.attempt_grouped_selection(client, self.candidates(), {}, "identity")
+            self.assertEqual(1, len(transport.requests))
+            self.assertEqual(1, len(client.receipts()))
+            self.assertTrue(client.stopped.is_set())
 
 
 if __name__ == "__main__":

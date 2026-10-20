@@ -152,14 +152,18 @@ class GroupedRunTest(unittest.TestCase):
         self.assertEqual([], first["selected"])
         self.assertIsNone(first["result"])
         self.assertIsNone(first["resultSha256"])
-        self.assertEqual(1, len(transport.requests))
-        self.assertEqual(1, len(first["receipts"]))
-        receipt = first["receipts"][0]
+        self.assertEqual(2, len(transport.requests))
+        self.assertEqual(2, len(first["receipts"]))
+        self.assertEqual(1, len(first["groupedSelectionCorrections"]))
+        correction = first["groupedSelectionCorrections"][0]
+        self.assertEqual("WITHHELD", correction["status"])
+        self.assertEqual(first["groupedSelectionRequestDigest"], correction["correctedRequestDigest"])
+        receipt = next(r for r in first["receipts"] if r["requestDigest"] == correction["correctedRequestDigest"])
         self.assertEqual(first["groupedSelectionRequestDigest"], receipt["requestDigest"])
         self.assertTrue(receipt["usageKnown"])
         self.assertEqual(100, receipt["inputTokens"])
         self.assertEqual(50, receipt["outputTokens"])
-        self.assertEqual([receipt], bundle["receipts"])
+        self.assertEqual(first["receipts"], bundle["receipts"])
         self.assertEqual("unavailable", bundle["rounds"][1]["previous"]["status"])
         self.assertTrue((self.output / "calls" / (receipt["requestDigest"] + ".response.json")).is_file())
 
