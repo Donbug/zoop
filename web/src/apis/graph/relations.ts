@@ -7,9 +7,12 @@ import {
 } from '@/mocks/relations/fixture';
 import type { EventContext } from '@/types/map/event';
 
-// WBS 6.6.24 is mock-only, including production builds. No HTTP fallback.
+// D-GRP-04 연결선 상세(getCompanyRelation, #217). 지도와 같은 공개 버전·기준 시점으로 조회한다.
+// 개발 목업 모드(VITE_GRAPH_DATA_SOURCE≠api)에서만 합성 자료를 쓴다(graph.ts의 usesGraphMock과 같은 조건).
+const usesRelationMock =
+  import.meta.env.DEV && import.meta.env.VITE_GRAPH_DATA_SOURCE !== 'api';
 export async function getRelation(id: string, context: EventContext = {}) {
-  if (context.round) {
+  if (context.round || !usesRelationMock) {
     const relation = await call<RelationDetail>(
       snapshotUrl(`/api/v1/graph/edges/${encodeURIComponent(id)}`, context),
       'GET',
