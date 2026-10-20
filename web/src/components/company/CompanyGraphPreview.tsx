@@ -2,6 +2,12 @@ import { useRef, useState, type PointerEvent } from 'react';
 import type { GraphResponse } from '@/types/map/graph';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 
+/** getCompanyGraphAsOf의 emptyReason 코드를 사용자 문구로 바꾼다. 모르는 코드는 기본 문구를 쓴다. */
+const EMPTY_REASON: Record<string, string> = {
+  no_related_issues: '이 시점까지 공개된 관련 사건이 없어요.',
+  no_approved_issues: '이 시점까지 승인된 사건이 없어요.',
+};
+
 export default function CompanyGraphPreview({
   data,
   highlighted = [],
@@ -218,7 +224,9 @@ export default function CompanyGraphPreview({
       </ul>
       {data.edges.length === 0 && (
         <p>
-          관계 없음 · {data.metadata.emptyReason ?? '확인된 관계가 없습니다.'}
+          관계 없음 ·{' '}
+          {EMPTY_REASON[data.metadata.emptyReason ?? ''] ??
+            '확인된 관계가 없습니다.'}
         </p>
       )}
       {data.metadata.partial && (
