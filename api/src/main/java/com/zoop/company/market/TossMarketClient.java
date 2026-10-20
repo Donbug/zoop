@@ -181,7 +181,7 @@ public class TossMarketClient {
     }
 
     /** Default range: one day, 7 days, one calendar month or one calendar year (KST) before the end. */
-    static Instant periodStart(String period, Instant end) {
+    public static Instant periodStart(String period, Instant end) {
         var at = end.atZone(KST);
         var start = switch (period) {
             case "1d" -> at.minusDays(1);

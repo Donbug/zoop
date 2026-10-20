@@ -65,6 +65,7 @@ public class CompanyMarketController {
                     + "토스증권은 1분·일봉만 제공해 1d·1w는 1분봉, 1y는 일봉을 거래소 현지 시각 구간으로 집계합니다(점의 time은 구간 시작). "
                     + "from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각입니다. 1분봉은 [from, to)의 봉 시작 시각, 일봉은 KST 날짜로 비교합니다. "
                     + "to 생략 시 지금까지, from 생략 시 to에서 기간(하루·7일·한 달·1년)만큼 전부터입니다. "
+                    + "범위는 기간 하나까지이며, from이 to에서 기간만큼 전보다 앞서면 422입니다. "
                     + "키 미설정은 not_connected, 비상장은 unsupported_symbol, 기간 내 거래 없음은 no_data(모두 200)이고 "
                     + "공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE입니다. asOf·graphVersion은 받지 않습니다(422).")
     public CompanyPriceResponse prices(@PathVariable String id,
@@ -79,6 +80,10 @@ public class CompanyMarketController {
         if (!TossMarketClient.PERIOD_INTERVAL.containsKey(resolved)) throw new CustomException(ErrorCode.INVALID_REQUEST);
         Instant start = from == null ? null : bound(from, false), end = to == null ? null : bound(to, true);
         if (start != null && end != null && !start.isBefore(end)) throw new CustomException(ErrorCode.INVALID_REQUEST);
+        // One period at most: a longer range would let one public request read days of minute bars from the provider.
+        if (start != null && start.isBefore(TossMarketClient.periodStart(resolved, end != null ? end : Instant.now()))) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
         CompanyProfileRow company = company(id);
         if (company.exchangeCode() == null || company.ticker() == null) {
             return CompanyPriceResponse.unavailable(id, resolved, "unsupported_symbol", "이 기업은 상장 종목 시세를 제공하지 않아요.");
