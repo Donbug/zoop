@@ -51,21 +51,27 @@ public class JdbcAdminDashboardRepository implements AdminDashboardRepository {
 
     @Override
     public GraphSummary graphSummaryAt(Instant asOf) {
-        long count = jdbc.queryForObject("SELECT count(*) FROM graph_versions", new MapSqlParameterSource(), Long.class);
-        var active = jdbc.query("""
-                SELECT v.id, v.sequence, v.kind, v.source_label, v.created_at, activation.activated_at,
-                       v.issue_count, v.relation_count, v.article_count
-                FROM graph_versions v
-                JOIN LATERAL (
-                    SELECT a.version_id, a.activated_at
+        return jdbc.query("""
+                WITH version_count AS (
+                    SELECT count(*) AS total FROM graph_versions
+                ), active_version AS (
+                    SELECT v.id, v.sequence, v.kind, v.source_label, v.created_at, a.activated_at,
+                           v.issue_count, v.relation_count, v.article_count
                     FROM graph_activations a
+                    JOIN graph_versions v ON v.id = a.version_id
                     WHERE a.pointer_changed AND a.activated_at <= :asOf
                     ORDER BY a.activated_at DESC, a.id DESC
                     LIMIT 1
-                ) activation ON activation.version_id = v.id
-                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)),
-                JdbcAdminDashboardRepository::activeVersion);
-        return new GraphSummary(count, active.stream().findFirst());
+                )
+                SELECT version_count.total AS version_count, active_version.*
+                FROM version_count LEFT JOIN active_version ON TRUE
+                """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)), (rs, rowNum) -> {
+                    String activeId = rs.getString("id");
+                    Optional<DashboardActiveGraphVersion> active = activeId == null
+                            ? Optional.empty()
+                            : Optional.of(activeVersion(rs, rowNum));
+                    return new GraphSummary(rs.getLong("version_count"), active);
+                }).stream().findFirst().orElseThrow();
     }
 
     private static DashboardActiveGraphVersion activeVersion(ResultSet rs, int rowNum) throws SQLException {

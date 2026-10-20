@@ -17,6 +17,8 @@ import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.response.SectionFailure;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -43,7 +45,7 @@ public class AdminDashboardService {
                     counts.activeGuestSessions(), "zoop-db");
             successfulSourceReads++;
         } catch (DataAccessException exception) {
-            failures.add(failure("members", generatedAt));
+            failures.add(databaseFailure("members", generatedAt, exception));
         }
 
         DashboardAudit audit = null;
@@ -51,7 +53,7 @@ public class AdminDashboardService {
             audit = new DashboardAudit(repository.auditCountBetween(generatedAt.minus(Duration.ofHours(24)), generatedAt));
             successfulSourceReads++;
         } catch (DataAccessException exception) {
-            failures.add(failure("audit", generatedAt));
+            failures.add(databaseFailure("audit", generatedAt, exception));
         }
 
         DashboardGraph graph = null;
@@ -63,21 +65,22 @@ public class AdminDashboardService {
                     null, null, null, null);
             successfulSourceReads++;
         } catch (DataAccessException exception) {
-            failures.add(failure("graph", generatedAt));
+            failures.add(databaseFailure("graph", generatedAt, exception));
         }
 
         if (successfulSourceReads == 0) {
-            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE,
+                    failures.stream().anyMatch(SectionFailure::retryable));
         }
 
-        failures.add(failure("ledger", generatedAt));
-        failures.add(failure("candidates", generatedAt));
-        failures.add(failure("jobs", generatedAt));
-        failures.add(failure("ai", generatedAt));
-        failures.add(failure("briefings", generatedAt));
+        failures.add(notConnected("ledger", generatedAt));
+        failures.add(notConnected("candidates", generatedAt));
+        failures.add(notConnected("jobs", generatedAt));
+        failures.add(notConnected("ai", generatedAt));
+        failures.add(notConnected("briefings", generatedAt));
         if (graph != null) {
-            failures.add(failure("graph.review", generatedAt));
-            failures.add(failure("graph.graphDb", generatedAt));
+            failures.add(notConnected("graph.review", generatedAt));
+            failures.add(notConnected("graph.graphDb", generatedAt));
         }
 
         return AdminDashboardResponse.partial(generatedAt, requestId,
@@ -85,7 +88,14 @@ public class AdminDashboardService {
                 graph, members, audit, List.copyOf(failures));
     }
 
-    private static SectionFailure failure(String section, Instant asOf) {
+    private static SectionFailure notConnected(String section, Instant asOf) {
         return new SectionFailure(section, "SOURCE_UNAVAILABLE", UNAVAILABLE_MESSAGE, false, asOf);
+    }
+
+    private static SectionFailure databaseFailure(String section, Instant asOf, DataAccessException exception) {
+        boolean retryable = exception instanceof TransientDataAccessException
+                || exception instanceof DataAccessResourceFailureException;
+        return new SectionFailure(section, "SOURCE_UNAVAILABLE", "이 영역을 조회하는 중 오류가 발생했습니다.",
+                retryable, asOf);
     }
 }

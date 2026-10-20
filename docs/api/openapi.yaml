@@ -10063,7 +10063,6 @@ components:
           description: "guidance: what the member can do to meet the missing condition"
         metadata:
           "$ref": "#/components/schemas/Metadata"
-          description: "공통 부분 실패 정보. asOf는 generatedAt과 같고 graphVersion은 null이다."
       type: "object"
       required:
         - "outcome"
@@ -10789,6 +10788,7 @@ components:
           description: "대시보드 집계 기준 시각. 모든 기간 집계는 이 시각을 기준으로 계산한다."
         metadata:
           "$ref": "#/components/schemas/Metadata"
+          description: "이 대시보드 응답의 metadata.asOf는 generatedAt과 같고, 그래프 버전 자체를 조회 기준으로 사용하지 않으므로 graphVersion은 null이다."
         ledger:
           "$ref": "#/components/schemas/DashboardLedger"
         graph:

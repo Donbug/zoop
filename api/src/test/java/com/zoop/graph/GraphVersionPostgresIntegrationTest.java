@@ -98,6 +98,7 @@ class GraphVersionPostgresIntegrationTest {
 
         var summary = dashboardRepository.graphSummaryAt(asOf);
 
+        assertEquals(2, summary.versionCount());
         assertEquals("fixture-2026-10-01", summary.activeVersion().orElseThrow().id());
         assertEquals(Instant.parse("2026-10-01T00:00:00Z"),
                 summary.activeVersion().orElseThrow().activatedAt());

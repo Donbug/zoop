@@ -19,8 +19,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.jdbc.BadSqlGrammarException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -83,7 +86,55 @@ class AdminDashboardServiceTest {
         assertNull(response.members());
         assertEquals(1, response.audit().last24h());
         assertEquals(0, response.graph().versionCount());
-        assertTrue(response.metadata().failures().stream().anyMatch(f -> f.section().equals("members")));
+        var failure = response.metadata().failures().stream()
+                .filter(f -> f.section().equals("members")).findFirst().orElseThrow();
+        assertTrue(failure.retryable());
+        assertEquals("이 영역을 조회하는 중 오류가 발생했습니다.", failure.message());
+    }
+
+    @Test
+    void marksNonTransientDatabaseFailuresAsNotRetryable() {
+        when(repository.memberCountsAt(NOW)).thenThrow(new BadSqlGrammarException(
+                "memberCountsAt", "select broken", new java.sql.SQLException("syntax error")));
+        when(repository.auditCountBetween(NOW.minusSeconds(86_400), NOW)).thenReturn(1L);
+        when(repository.graphSummaryAt(NOW)).thenReturn(new GraphSummary(0, Optional.empty()));
+
+        var response = new AdminDashboardService(repository, Clock.fixed(NOW, ZoneOffset.UTC))
+                .getDashboard("request-non-transient");
+
+        var failure = response.metadata().failures().stream()
+                .filter(f -> f.section().equals("members")).findFirst().orElseThrow();
+        assertFalse(failure.retryable());
+        assertEquals("이 영역을 조회하는 중 오류가 발생했습니다.", failure.message());
+    }
+
+    @Test
+    void marksTransientDatabaseFailuresAsRetryable() {
+        when(repository.memberCountsAt(NOW)).thenThrow(new QueryTimeoutException("query timed out"));
+        when(repository.auditCountBetween(NOW.minusSeconds(86_400), NOW)).thenReturn(1L);
+        when(repository.graphSummaryAt(NOW)).thenReturn(new GraphSummary(0, Optional.empty()));
+
+        var response = new AdminDashboardService(repository, Clock.fixed(NOW, ZoneOffset.UTC))
+                .getDashboard("request-transient");
+
+        var failure = response.metadata().failures().stream()
+                .filter(f -> f.section().equals("members")).findFirst().orElseThrow();
+        assertTrue(failure.retryable());
+    }
+
+    @Test
+    void leavesNotYetConnectedAreasDistinctFromDatabaseReadFailures() {
+        when(repository.memberCountsAt(NOW)).thenReturn(new MemberCounts(12, 3, 2));
+        when(repository.auditCountBetween(NOW.minusSeconds(86_400), NOW)).thenReturn(1L);
+        when(repository.graphSummaryAt(NOW)).thenReturn(new GraphSummary(0, Optional.empty()));
+
+        var response = new AdminDashboardService(repository, Clock.fixed(NOW, ZoneOffset.UTC))
+                .getDashboard("request-not-connected");
+
+        var failure = response.metadata().failures().stream()
+                .filter(f -> f.section().equals("candidates")).findFirst().orElseThrow();
+        assertFalse(failure.retryable());
+        assertEquals("이 영역의 원천 데이터를 아직 조회할 수 없습니다.", failure.message());
     }
 
     @Test
@@ -97,5 +148,21 @@ class AdminDashboardServiceTest {
         CustomException error = assertThrows(CustomException.class, () -> service.getDashboard("request-3"));
 
         assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
+        assertTrue(error.isRetryable());
+    }
+
+    @Test
+    void marksWholeRequestUnavailableAsNonRetryableWhenEveryDatabaseFailureIsNonTransient() {
+        var failure = new BadSqlGrammarException("dashboard", "select broken",
+                new java.sql.SQLException("syntax error"));
+        when(repository.memberCountsAt(NOW)).thenThrow(failure);
+        when(repository.auditCountBetween(NOW.minusSeconds(86_400), NOW)).thenThrow(failure);
+        when(repository.graphSummaryAt(NOW)).thenThrow(failure);
+
+        var service = new AdminDashboardService(repository, Clock.fixed(NOW, ZoneOffset.UTC));
+        CustomException error = assertThrows(CustomException.class, () -> service.getDashboard("request-4"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
+        assertFalse(error.isRetryable());
     }
 }

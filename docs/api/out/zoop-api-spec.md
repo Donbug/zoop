@@ -3514,7 +3514,7 @@ The selection frozen when the question was first received.
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
 | choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
-| metadata | 필수 | [Metadata](#schema-metadata) | 공통 부분 실패 정보. asOf는 generatedAt과 같고 graphVersion은 null이다. |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-chatsessionresponse"></a>
 
@@ -3840,7 +3840,7 @@ The selection frozen when the question was first received.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | generatedAt | 필수 | string (date-time) | 대시보드 집계 기준 시각. 모든 기간 집계는 이 시각을 기준으로 계산한다. |
-| metadata | 필수 | [Metadata](#schema-metadata) |  |
+| metadata | 필수 | [Metadata](#schema-metadata) | 이 대시보드 응답의 metadata.asOf는 generatedAt과 같고, 그래프 버전 자체를 조회 기준으로 사용하지 않으므로 graphVersion은 null이다. |
 | ledger | 필수 | [DashboardLedger](#schema-dashboardledger) |  |
 | graph | 필수 | [DashboardGraph](#schema-dashboardgraph) / null | null when the graph version summary could not be read; subarea failures are listed individually in metadata.failures. |
 | candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null | null when candidate source is unavailable; an empty but successfully read source returns zero counts. |
