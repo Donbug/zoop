@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { applyInitialTheme, themeColor } from '@/util/theme-color';
 
 // Dark theme: the first paint follows ?theme= or the saved choice; the canvas reads token values.
@@ -20,6 +20,20 @@ it('starts light, follows ?theme=dark and remembers it', () => {
   window.history.replaceState(null, '', '/');
   applyInitialTheme();
   expect(document.documentElement.dataset.theme).toBe('dark');
+});
+
+it('applies the URL theme even when browser storage is unavailable', () => {
+  window.history.replaceState(null, '', '/?theme=dark');
+  const unavailable = vi
+    .spyOn(Storage.prototype, 'setItem')
+    .mockImplementation(() => {
+      throw new DOMException('blocked');
+    });
+
+  applyInitialTheme();
+
+  expect(document.documentElement.dataset.theme).toBe('dark');
+  unavailable.mockRestore();
 });
 
 it('reads the current token value for canvas colors and falls back to light', () => {

@@ -23,13 +23,14 @@ const KEY = 'zoop.theme';
 
 /** 처음 그리기 전에 테마를 정한다. ?theme=dark|light가 있으면 그 값을 쓰고 저장한다. */
 export function applyInitialTheme() {
-  let theme: string | null = null;
+  const query = new URLSearchParams(window.location.search).get('theme');
+  const queryTheme = query === 'dark' || query === 'light' ? query : null;
+  let theme: string | null = queryTheme;
   try {
-    const query = new URLSearchParams(window.location.search).get('theme');
-    if (query === 'dark' || query === 'light') localStorage.setItem(KEY, query);
-    theme = localStorage.getItem(KEY);
+    if (queryTheme) localStorage.setItem(KEY, queryTheme);
+    else theme = localStorage.getItem(KEY);
   } catch {
-    /* 저장소가 없어도 라이트로 연다. */
+    /* 저장소가 없어도 URL로 고른 테마는 적용한다. */
   }
   document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
 }
@@ -38,13 +39,14 @@ export function applyInitialTheme() {
 export function toggleTheme() {
   const next =
     document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  const url = new URL(window.location.href);
+  url.searchParams.delete('theme');
   try {
     localStorage.setItem(KEY, next);
   } catch {
-    /* 저장하지 못해도 이번 화면에는 적용한다. */
+    // 캔버스를 다시 그리려고 새로 불러와도 선택이 사라지지 않게 URL에 남긴다.
+    url.searchParams.set('theme', next);
   }
-  const url = new URL(window.location.href);
-  url.searchParams.delete('theme');
   document.documentElement.dataset.theme = next;
   window.location.replace(url.toString());
 }
