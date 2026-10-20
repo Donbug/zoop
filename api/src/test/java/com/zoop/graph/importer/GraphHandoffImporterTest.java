@@ -14,6 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 import com.zoop.artifact.storage.ArtifactFileStore;
+import com.zoop.common.json.Canonical;
 import com.zoop.document.analysis.repository.EvidenceRow;
 import com.zoop.document.importer.IngestionExportParser;
 import com.zoop.document.importer.Observation;
@@ -35,6 +36,7 @@ import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import static com.zoop.graph.importer.HandoffFixtures.ARTICLE_ID;
 import static com.zoop.graph.importer.HandoffFixtures.ARTICLE_VERSION;
@@ -245,6 +247,91 @@ class GraphHandoffImporterTest {
         assertEquals(1, written.get("provenance").get("relationOrigins").get("s3-relation").intValue());
         assertEquals("synthetic", written.get("provenance").get("sourceKind").stringValue());
         assertEquals(3, written.get("evidenceRows").get("registered").intValue());
+    }
+
+    @Test
+    void theReceiptKeepsTheOriginalMentionsRawWhileTheSnapshotStaysFormat3WithoutMentionValues() throws Exception {
+        assertTrue(importer.run(built.request()).succeeded());
+        String versionId = built.versionId();
+
+        JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
+        assertEquals("zoop-graph-handoff-bundle-2", receipt.get("bundle").get("schemaVersion").stringValue());
+        JsonNode mentions = receipt.get("bundle").get("issues").get(0).get("mentions");
+        assertEquals(built.bundle().get("issues").get(0).get("mentions"), mentions);
+        // The hand-written expectation of the fixture's one original mention: its own S2 values, never verified, and the
+        // participants exactly as extracted (a mapped company, an unmapped source id, a name without any id).
+        assertEquals(1, mentions.size());
+        JsonNode mention = mentions.get(0);
+        assertEquals("none", mention.get("verification").stringValue());
+        assertEquals("m-1", mention.get("mentionId").stringValue());
+        assertEquals(ARTICLE_ID, mention.get("documentId").stringValue());
+        assertEquals(ARTICLE_VERSION, mention.get("articleVersion").stringValue());
+        assertEquals("공급 계약", mention.get("action").stringValue());
+        assertEquals("배터리", mention.get("target").stringValue());
+        assertEquals("2026-09-30", mention.get("eventTime").stringValue());
+        assertEquals("day", mention.get("timePrecision").stringValue());
+        assertEquals("announced", mention.get("assertionStatus").stringValue());
+        assertFalse(mention.get("background").booleanValue());
+        JsonNode participants = mention.get("participants");
+        assertEquals(3, participants.size());
+        assertEquals(COMPANY_A, participants.get(0).get("companyId").stringValue());
+        assertEquals("공급자", participants.get(0).get("role").stringValue());
+        assertTrue(participants.get(1).get("companyId").isNull());
+        assertEquals("s2-co-unlisted", participants.get(1).get("sourceCompanyId").stringValue());
+        assertTrue(participants.get(2).get("sourceCompanyId").isNull() && participants.get(2).get("companyId").isNull());
+
+        // The public read format is unchanged: still format 3, one mention reference per original mention, and not one
+        // original mention value (no participant, source company id or role) reached the snapshot.
+        byte[] snapshotBytes = Files.readAllBytes(snapshotFile(versionId));
+        PublicGraphSnapshot snapshot = GraphSnapshotCodec.read(snapshotBytes, versionId);
+        assertEquals(3, snapshot.snapshotFormat());
+        assertEquals(PublicGraphSnapshot.FORMAT, snapshot.snapshotFormat());
+        assertEquals(1, snapshot.issues().get(0).mentions().size());
+        assertEquals(ARTICLE_ID, snapshot.issues().get(0).mentions().get(0).articleId());
+        String snapshotText = new String(snapshotBytes, StandardCharsets.UTF_8);
+        for (String original : List.of("participants", "sourceCompanyId", "s2-co-a", "미등록 협력사", "이름만 있는 참가자", "공급자")) {
+            assertFalse(snapshotText.contains(original), original);
+        }
+    }
+
+    @Test
+    void anExportOfTheEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        ObjectNode envelope = built.envelope().deepCopy();
+        ObjectNode bundle = (ObjectNode) envelope.get("bundle");
+        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-1");
+        ((ObjectNode) bundle.get("issues").get(0)).remove("mentions");
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        ((ObjectNode) envelope.get("receipt")).put("bundleSchema", "zoop-graph-handoff-bundle-1");
+        handoff.envelope = Canonical.bytes(envelope);
+        GraphHandoffRequest request = new GraphHandoffRequest(HANDOFF_ID, built.manifestDigest(),
+                Canonical.sha256(Canonical.bytes(bundle)), "operator-a");
+
+        GraphHandoffException failure = failure(importer.run(request));
+
+        assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure());
+        assertEquals(0, ingestion.calls.get());
+        assertEquals(0, graph.writes());
+        assertNothingWritten(graphBefore, registryBefore, filesBefore);
+    }
+
+    @Test
+    void aHandoffFrozenUnderTheEarlierBundleSchemaIsWithheldAndNothingIsWritten() throws Exception {
+        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+        InMemoryDocumentRegistry.State registryBefore = registry.state();
+        long filesBefore = fileCount();
+        GraphHandoffImporter legacy = new GraphHandoffImporter(handoffId -> {
+            throw GraphHandoffException.handoffWithheld("handoff_contract_changed");
+        }, ingestion, new IngestionExportParser(), store, registry, graph, transaction, Clock.fixed(NOW, ZoneOffset.UTC));
+
+        GraphHandoffException failure = failure(legacy.run(built.request()));
+
+        assertEquals(GraphHandoffFailure.HANDOFF_WITHHELD, failure.failure());
+        assertEquals("handoff_contract_changed", failure.cliCode());
+        assertEquals(0, ingestion.calls.get());
+        assertNothingWritten(graphBefore, registryBefore, filesBefore);
     }
 
     @Test

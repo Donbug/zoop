@@ -47,7 +47,7 @@ class BriefingMarketContextPostgresTest {
         var script = Path.of("scripts/briefing_market_context_fixture.py").toAbsolutePath();
         var process = new ProcessBuilder("python3", script.toString(), root.toString())
                 .redirectErrorStream(true).redirectOutput(root.resolve("fixture.log").toFile()).start();
-        assertEquals(0, process.waitFor(), () -> "Authored fixture failed; inspect " + root.resolve("fixture.log"));
+        assertEquals(0, process.waitFor(), () -> "Authored fixture failed: " + fixtureLog(root.resolve("fixture.log")));
         bundle = root.resolve("enriched/bundle-v2.json"); original = Files.readAllBytes(bundle);
         artifacts = Files.createDirectory(root.resolve("artifacts")); grants = root.resolve("grants.json"); manifest = root.resolve("manifest.json");
         var dataSource = new DriverManagerDataSource(url(), username(), password());
@@ -136,7 +136,7 @@ class BriefingMarketContextPostgresTest {
         try {
             var process = new ProcessBuilder("python3", Path.of("scripts/briefing_market_context_fixture.py").toAbsolutePath().toString(),
                     own.toString(), "--frozen").redirectErrorStream(true).redirectOutput(own.resolve("fixture.log").toFile()).start();
-            assertEquals(0, process.waitFor(), () -> "Frozen fixture failed; inspect " + own.resolve("fixture.log"));
+            assertEquals(0, process.waitFor(), () -> "Frozen fixture failed: " + fixtureLog(own.resolve("fixture.log")));
             Flyway.configure().dataSource(ds).schemas(schema).defaultSchema(schema).load().migrate();
             database.update("INSERT INTO companies(id,name) VALUES ('authored-context-company','시험 기업')");
             var imported = new BriefingReplayImporter(database, new DataSourceTransactionManager(ds),
@@ -180,6 +180,9 @@ class BriefingMarketContextPostgresTest {
     private static HttpResponse<String> get(String date, String edition) throws Exception {
         return HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port
                 + "/api/v1/briefings?date=" + date + "&edition=" + edition)).GET().build(), HttpResponse.BodyHandlers.ofString());
+    }
+    private static String fixtureLog(Path path) {
+        try { return Files.readString(path); } catch (java.io.IOException error) { return error.toString(); }
     }
     private static String url() {
         String value = System.getenv("DB_URL"); return value + (value.contains("?") ? "&" : "?") + "currentSchema=" + SCHEMA + ",public";

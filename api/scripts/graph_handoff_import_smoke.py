@@ -26,11 +26,18 @@ not cleaned):
     make api-graph-handoff-import-smoke
 
 (the Make target runs this script with --jar/--handoff-cli/--ingest-cli; the direct python invocation with those flags and
---psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217). A second, legal producer
-world is imported last: documents a and a2 of one issue both use the local mention id `m-a`, which the app maps to two distinct mention ids.
+--psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217) and carries no original mention value:
+the retained receipt keeps the complete `zoop-graph-handoff-bundle-2` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values.
+A second, legal producer world is imported last: documents a and a2 of one issue both use the local mention id `m-a`, which the app maps to two distinct
+mention ids and the receipt keeps as two original mentions.
 
 On success the last stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls": 0, ...}; any failed
-expectation exits non-zero.
+
+An evidence-read phase runs by default (turn it off with --no-with-evidence-read): after the collision import it starts the web jar on loopback
+(artifact source, ZOOP_DOCUMENT_READ_INGESTION_SOURCES = the same registry file, S1 grants unset), makes ONE explicit TEST-HARNESS psql activation of the
+second staged version (the import itself never activates; production has no activation route) and reads GET /api/v1/evidence/{id} for the graph body
+evidence, with CLI parity for the source registry and failure cases. The final line reports importActivationsWritten: 0 and harnessActivations: 1
+separately, plus evidenceReads.
 """
 from __future__ import annotations
 
@@ -49,7 +56,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 API_SCRIPTS = Path(__file__).resolve().parent
@@ -79,6 +86,33 @@ def mention_id(article: dict, source_mention_id: str) -> str:
     spaces) of the resolved article id and version and the producer's local mention id. Local ids repeat across documents; this one does not."""
     return "mention-" + sha256(hs.canonical({"articleId": article["articleId"], "articleVersion": article["articleVersion"],
                                               "sourceMentionId": source_mention_id}).encode("utf-8"))
+
+
+def participant(source_id: str | None, name: str, role: str, public_id: str | None = None) -> dict:
+    """One participant as the authored S2 replay states it; `public_id` is the AUTHORED public id (KRX:*), remapped to this smoke's catalog ids, or None when the
+    contract says the company is unmapped (no source id, no canonical entry, or no public decision)."""
+    return {"sourceCompanyId": source_id, "companyId": PUBLIC_IDS[public_id] if public_id else None, "name": name, "role": role}
+
+
+MAPPED = participant("SYNTH-1", "합성기업", "issuer", "KRX:005930")
+# The contract's mapping cases, hand-written from the authored world: mapped (two public companies), no source id, no public decision, no canonical entry.
+DOC_A = [MAPPED, participant("SYNTH-3", "합성부품", "supplier", "KRX:000660"), participant(None, "미상 거래처", "counterparty")]
+DOC_B = [MAPPED, participant("SYNTH-2", "합성협력", "partner"), participant("SYNTH-9", "미등록 법인", "observer")]
+
+
+def expected_mentions(world, *items: tuple) -> list:
+    """The original S2 mentions of one issue, written out by hand from the authored extraction replay (`extraction_smoke.Kit.mention` defaults plus what
+    `graph_handoff_smoke.build_world` overrides) and the operator's canonical/decisions files: every item is (document name, S2 local mention id, cited quote,
+    title, action, event time, period, participants). `verification` is always `none`; participants are the S2 text as extracted, in S2 order, with the public
+    company only where the contract maps it. Ordered as the bundle orders them: by the canonical JSON of the identity."""
+    found = []
+    for name, local_id, quote, title, action, event_time, period, participants in items:
+        ref = world.refs[name]
+        found.append({"documentId": ref["documentId"], "documentVersion": ref["documentVersion"], "mentionId": local_id,
+                      "articleId": ref["documentId"], "articleVersion": ref["documentVersion"], "verification": "none", "title": title, "action": action,
+                      "target": "공급 계약", "eventTime": event_time, "timePrecision": "day", "period": period, "assertionStatus": "announced", "background": False,
+                      "participants": participants, "evidenceIds": [hs.evidence_id(world, name, quote)]})
+    return sorted(found, key=lambda m: hs.canonical({k: m[k] for k in ("documentId", "documentVersion", "mentionId")}))
 
 
 def fingerprint(path: Path) -> dict:
@@ -253,6 +287,207 @@ class WebRun:
             return error.code, error.read().decode("utf-8", "replace")
 
 
+def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tuple, active_before: str) -> dict:
+    """Public GET /api/v1/evidence/{id} over real HTTP for the graph body evidence of the second staged handoff.
+
+    The import never activates, and no production activation exists, so a staged version is unreadable by design. This phase therefore adds
+    ONE explicit TEST-HARNESS activation of `vid2` by psql, mirroring JdbcGraphVersionRepository.activateSystem (same advisory lock, pointer move
+    and a `system` history row), in the smoke's own throwaway database. It is reported separately (`harnessActivations`) and is not an import
+    result. The evidence rows of `vid2` are shared with the first import, whose receipt they still point at: reading proves the SELECTED version's
+    receipt (not the row's own, older one) supplies the grant pins. Expectations come from the authored world, never from the reader under test."""
+    import urllib.parse
+    from datetime import timezone
+    reads = 0
+    spans = [("a", hs.EVT_A), ("a", hs.GEO_A), ("a", hs.SUP), ("a2", hs.EVT_A2), ("b", hs.QB), ("b", hs.GEO_B)]
+    snapshot = json.loads((layout.artifacts / "graph_snapshot" / f"{vid2}.json").read_text("utf-8"))
+    expected = {}
+    for name, quote in spans:
+        eid, span = hs.evidence_id(world, name, quote), hs.span(world, name, quote)
+        citing = [i["issueId"] for i in snapshot["issues"] if eid in i["evidenceIds"] or eid in i["geographyEvidenceIds"]]
+        expected[eid] = {"name": name, "quote": quote, "span": span, "events": citing}
+    main_id = hs.evidence_id(world, "a", hs.EVT_A)
+    check(expected[main_id]["events"], "the authored world's main evidence is cited by no issue of the snapshot")
+    ref = base.item(world.refs["a"])["observation"]
+    artifact_tree = fingerprint(layout.artifacts)
+    registry_bytes = layout.registry_path.read_bytes()
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout.registry_path)}
+
+    def get(web, evidence_id: str, **params) -> tuple[int, dict]:
+        nonlocal reads
+        reads += 1
+        query = urllib.parse.urlencode(params)
+        code, body = web.get(f"/api/v1/evidence/{evidence_id}" + (f"?{query}" if query else ""))
+        return code, (json.loads(body) if body.startswith("{") else {})
+
+    def error_code(body: dict) -> str:
+        return (body.get("error") or {}).get("code", "")
+
+    with smoke.web(web_env) as web:
+        # before any activation: the staged version cannot be pinned, and the active fixture version does not show this evidence ----
+        code, body = get(web, main_id, graphVersion=vid2)
+        check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"a staged version was readable through the evidence read: {code} {body}")
+        code, body = get(web, main_id)
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"the unpinned read before any activation: {code} {body}")
+        before_reads = smoke.table_fingerprint()
+
+        # the one explicit test-harness activation ------------------------------------------------------------------------------
+        at = datetime.now(timezone.utc)
+        check(at.year >= 2026 and db.scalar("SELECT count(*) FROM graph_activations") == 2, "unexpected activation history before the harness")
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid2}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid2}', '{active_before}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic activation', '{at.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid2 and db.scalar("SELECT count(*) FROM graph_activations") == 3,
+              "the harness activation did not apply")
+        harness_fingerprint = smoke.table_fingerprint()
+
+        # reads after the harness activation ---------------------------------------------------------------------------------------
+        for eid, fact in expected.items():
+            if not fact["events"]:
+                continue    # cited only by a relation: visible only while that relation is, not asserted here
+            code, body = get(web, eid)
+            span = fact["span"]
+            check(code == 200 and body["id"] == eid and body["quote"] == fact["quote"] and body["start"] == span["start"]
+                  and body["end"] == span["end"] and body["articleId"] == span["documentId"] and body["articleVersion"] == span["documentVersion"]
+                  and body["documentVersion"] == span["documentVersion"] and body["quoteVerified"] is True,
+                  f"graph evidence {fact['name']}: {code} {str(body)[:300]}")
+            check(body["eventIds"] == fact["events"] and body["sentiment"] is None and body["documentSummary"] is None
+                  and body["analysisStatus"] is None and body["analysisProvenance"] is None and body["resultVersion"] is None,
+                  f"graph evidence body fields {fact['name']}: {body}")
+            meta = body["metadata"]
+            check(meta["source"] == "public_graph_snapshot" and meta["graphVersion"] == vid2 and meta["partial"] is False and meta["failures"] == [],
+                  f"graph evidence metadata: {meta}")
+            check(abs((datetime.now(timezone.utc) - datetime.fromisoformat(meta["asOf"].replace("Z", "+00:00"))).total_seconds()) < 300,
+                  f"the unpinned read's asOf is not the request time: {meta['asOf']}")
+        code, body = get(web, main_id, graphVersion=vid2)
+        check(code == 200 and body["metadata"]["graphVersion"] == vid2, f"graphVersion read: {code} {body}")
+        later = (at + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        code, body = get(web, main_id, asOf=later)
+        check(code == 200 and body["metadata"]["graphVersion"] == vid2 and body["metadata"]["asOf"] == later, f"later asOf read: {code} {body}")
+        code, body = get(web, main_id, asOf="2026-10-09T00:00:00Z")
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"an asOf before the activation must not show the evidence: {code} {body}")
+        code, body = get(web, main_id, asOf="2026-10-09T00:00:00Z", graphVersion=vid2)
+        check(code == 422 and error_code(body) == "INVALID_REQUEST", f"inconsistent graphVersion and asOf: {code} {body}")
+        code, body = get(web, main_id, round="brf-1")
+        check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"round: {code} {body}")
+        for other in never_activated:
+            code, body = get(web, main_id, graphVersion=other)
+            check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {other} {code}")
+        code, body = get(web, main_id, asOf="yesterday")
+        check(code == 422 and error_code(body) == "INVALID_REQUEST", f"an invalid asOf: {code} {body}")
+        code, body = get(web, main_id, companyId="SYNTH:000001")
+        check(code == 200 and body["metadata"]["partial"] is True and body["sentiment"] is None
+              and [f["section"] for f in body["metadata"]["failures"]] == ["sentiment"], f"known company: {code} {body}")
+        code, body = get(web, main_id, companyId="NOPE:1")
+        check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown company: {code} {body}")
+        code, body = get(web, "ev-" + "0" * 64)
+        check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown evidence id: {code} {body}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        check(fingerprint(layout.artifacts) == artifact_tree, "a public read changed the artifact tree")
+        check(before_reads["evidence"] == harness_fingerprint["evidence"] and before_reads["artifacts"] == harness_fingerprint["artifacts"],
+              "the harness changed evidence or artifacts")
+        step("evidence read (web, artifact source, S1 grants unset): staged 409 / unpinned 404 before the harness activation; after it the six-field body, "
+             "selected graphVersion and asOf, eventIds, later asOf 200, earlier asOf 404, 422/409/404 paths, partial company context; nothing written")
+
+        # parity with the CLI: the same current registry decides the import's --require-store and this read ------------------------
+        original = json.loads(layout.registry_path.read_text("utf-8"))["sources"][0]["grant"]
+        now_past = "2020-01-01T00:00:00Z"
+        denied = {
+            "drop read": lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "read"]}),
+            "drop store": lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "store"]}),
+            "drop quote-display": lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "quote-display"]}),
+            "disabled": lambda g: g.update({"enabled": False}),
+            "rights unknown": lambda g: g.update({"rights": "unknown"}),
+            "rights denied": lambda g: g.update({"rights": "denied"}),
+            "blank evidence": lambda g: g.update({"evidence": ["  "]}),
+            "expired": lambda g: g.update({"expiresAt": now_past}),
+        }
+        for label, change in denied.items():
+            smoke.set_registry(change)
+            code, body = get(web, main_id)
+            cli = smoke.ingest_export(ref, require_store=True)
+            check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE" and cli != 0,
+                  f"parity {label}: the read answered {code} but the CLI exit was {cli}")
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+            code, body = get(web, main_id)
+            check(code == 200 and smoke.ingest_export(ref, require_store=True) == 0, f"parity {label}: restoring did not restore both")
+        # a changed revision or grant id is not something the CLI sees (its export takes no expected pin); the read compares the receipt's pins
+        for label, change in (("revision", lambda g: g.update({"revision": g["revision"] + "-next"})),
+                              ("grant id", lambda g: g.update({"grantId": g["grantId"] + "-other"}))):
+            smoke.set_registry(change)
+            code, body = get(web, main_id)
+            check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"a changed {label} did not withhold the evidence: {code} {body}")
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+        # control: model-send is not part of the rule (nothing is sent to a model); both with and without it the read and the CLI pass
+        for operations in (["read", "store", "quote-display"], ["read", "store", "model-send", "quote-display"]):
+            smoke.set_registry(lambda g: g.update({"allowedOperations": operations}))
+            code, body = get(web, main_id)
+            check(code == 200 and smoke.ingest_export(ref, require_store=True) == 0, f"control model-send {operations}: {code}")
+        smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+        step("parity: for every denial (missing read/store/quote-display, disabled, rights unknown/denied, blank evidence, expiry) the GET is 404 exactly when "
+             "`zoop-ai-ingest export --require-store` fails; a changed revision/grant id is 404; model-send in or out of the grant does not matter")
+
+        # failures: each is restored afterwards ---------------------------------------------------------------------------------
+        layout.registry_path.write_bytes(b"{")
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"a malformed source registry: {code} {body}")
+        parked = layout.registry_path.with_name("parked-sources.json")
+        layout.registry_path.replace(parked)
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"a missing source registry: {code} {body}")
+        parked.replace(layout.registry_path)
+        layout.registry_path.write_bytes(registry_bytes)
+        check(get(web, main_id)[0] == 200, "restoring the registry file did not restore the read")
+        # An expiresAt the S2-1 Python model rejects (a lowercase `z`) makes the WHOLE registry invalid: 503, never a per-source denial,
+        # whether it sits on the requested source or on an unrelated one. Each is restored byte-for-byte.
+        bad_expiry = "2030-01-01T00:00:00z"
+        requested = json.loads(registry_bytes.decode("utf-8"))
+        requested["sources"][0]["grant"]["expiresAt"] = bad_expiry
+        layout.registry_path.write_bytes(hs.json_bytes(requested))
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"an invalid expiresAt on the requested source: {code} {body}")
+        layout.registry_path.write_bytes(registry_bytes)
+        check(get(web, main_id)[0] == 200, "restoring the registry after an invalid requested-source expiry did not restore the read")
+        unrelated = json.loads(registry_bytes.decode("utf-8"))
+        other = json.loads(json.dumps(unrelated["sources"][0]))
+        other["sourceId"] = other["grant"]["sourceId"] = "unrelated-smoke-source"
+        other["grant"]["grantId"] = "unrelated-smoke-grant"
+        other["grant"]["expiresAt"] = bad_expiry
+        unrelated["sources"].append(other)
+        layout.registry_path.write_bytes(hs.json_bytes(unrelated))
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"an invalid expiresAt on an unrelated source: {code} {body}")
+        layout.registry_path.write_bytes(registry_bytes)
+        check(get(web, main_id)[0] == 200, "restoring the registry after an invalid unrelated-source expiry did not restore the read")
+        receipt_path = layout.artifacts / "verification_receipt" / f"{vid2}.json"
+        receipt_info = receipt_path.stat()
+        receipt_original = receipt_path.read_bytes()
+        receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
+        check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
+        code, body = get(web, main_id)
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"tampered receipt bytes: {code} {body}")
+        receipt_path.write_bytes(receipt_original)
+        os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
+        check(get(web, main_id)[0] == 200, "restoring the receipt did not restore the read")
+        article_id = expected[main_id]["span"]["documentId"]
+        db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{article_id}'")
+        code, body = get(web, main_id)
+        db.run(f"UPDATE articles SET access_status = 'available' WHERE id = '{article_id}'")
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"a private article stayed readable: {code} {body}")
+        check(get(web, main_id)[0] == 200, "restoring article access did not restore the read")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout.registry_path.read_bytes() == registry_bytes,
+              "a failure scenario was not restored exactly (artifact tree or registry file)")
+        step("failures: malformed or deleted source registry 503; an invalid expiresAt ('...00z') on the requested source or on an unrelated source 503; "
+             "tampered receipt bytes 404; a private article 404; each restored byte-for-byte")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 1,
+          "the harness activation count is not exactly one")
+    return {"harnessActivations": 1, "evidenceReads": reads}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--jar", required=True, type=Path)
@@ -263,6 +498,8 @@ def main() -> int:
     parser.add_argument("--psql", default=shutil.which("psql"), help="host psql (used without --psql-container)")
     parser.add_argument("--db-user", default=None)
     parser.add_argument("--db-name", default=None)
+    parser.add_argument("--no-with-evidence-read", dest="with_evidence_read", action="store_false",
+                        help="skip the public GET /api/v1/evidence/{id} phase (it needs the TEST-HARNESS activation of one staged version)")
     args = parser.parse_args()
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
         check(os.environ.get(name), f"{name} must be set (a dedicated loopback database)")
@@ -429,9 +666,26 @@ def main() -> int:
           "the receipt's manifest and bundle do not hash to the pins")
     check(receipt["appVerification"]["semanticTruth"] == "not-verified" and receipt["appVerification"]["activation"] == "none",
           "the receipt overclaims")
+    # The original mentions the receipt retains: per issue exactly the S2 values of each source document (title, action, time, period, status, background,
+    # participants as extracted), never the merged issue's, never verified. Hand-written from the authored world, not read from the producer's export.
+    receipt_issues = {i["id"]: i for i in receipt["bundle"]["issues"]}
+    check(receipt_issues["issue:supply-2026q3"]["mentions"] == expected_mentions(
+        world, ("a", "m-a", hs.EVT_A, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", DOC_A),
+        ("a2", "m-a2", hs.EVT_A2, "합성 공급 계약 체결 공개", "공급 계약 발표", "2026-09-30", "2026Q3", [MAPPED])),
+          f"supply mentions: {receipt_issues['issue:supply-2026q3']['mentions']}")
+    check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
+        world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
+          f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-2", "the retained bundle is not schema 2")
+    check(all(sorted(set(i["evidenceIds"])) == sorted({e for m in i["mentions"] for e in m["evidenceIds"]} | set(i["geography"]["evidenceIds"]))
+              for i in receipt["bundle"]["issues"]), "an issue's evidence is not the union of its mentions' and its geography's")
+    snapshot_text = snapshot_file.read_text("utf-8")
+    check(not any(word in snapshot_text for word in ('"participants"', '"sourceCompanyId"', "issuer", "counterparty", "observer", "미등록 법인")),
+          "a mention value reached the format 3 snapshot (it belongs to the receipt only)")
     check(db.scalar("SELECT count(*) FROM artifacts WHERE kind IN ('graph_snapshot', 'verification_receipt')") == 2 + 2,
           "unexpected extra graph artifacts (two fixture snapshots and this import's two are expected)")
-    step("snapshot (format 3: period, assertion status, mention references, structured basis) and receipt files registered with the registry's hash and size; the receipt retains the original manifest and bundle")
+    step("snapshot (format 3: period, assertion status, mention references, structured basis, no mention values) and receipt files registered with the registry's hash and size; "
+         "the receipt retains the original manifest and bundle, including each issue's original mentions")
 
     # nothing public ----------------------------------------------------------------------------------------------------
     with smoke.web({"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts)}) as web:
@@ -544,12 +798,21 @@ def main() -> int:
           "the collision snapshot dropped content")
     receipt3 = json.loads((layout.artifacts / "verification_receipt" / f"{vid3}.json").read_text("utf-8"))
     check(receipt3["bundle"] == collision["bundle"], "the collision receipt does not retain the producer's own mention ids")
+    supply_mentions = next(i for i in receipt3["bundle"]["issues"] if i["id"] == "issue:supply-2026q3")["mentions"]
+    check(supply_mentions == expected_mentions(world2, ("a", "m-a", hs.EVT_A, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", DOC_A),
+                                               ("a2", "m-a", hs.EVT_A2, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", [MAPPED]))
+          and len(supply_mentions) == 2 and {m["mentionId"] for m in supply_mentions} == {"m-a"}
+          and len({m["documentId"] for m in supply_mentions}) == 2, f"the collision receipt does not keep two original mentions with one local id: {supply_mentions}")
     status, again, _ = smoke2.graph_import("collision-again", smoke2.request(hid3, manifest3, bundle3))
     check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file3.read_bytes() == snapshot_bytes3,
           f"retrying the collision import changed ids or bytes: {again}")
     check({name: fingerprint(path) for name, path in layout2.ledgers.items()} == ledgers2_before, "the collision world's ledgers changed")
     step("a legal producer collision (documents a and a2 both use local mention id m-a): staged with two distinct app mention ids, the right representative and "
          "the producer's own ids retained in the receipt; a retry is a no-op with identical bytes")
+
+    harness = {"harnessActivations": 0, "evidenceReads": 0}
+    if args.with_evidence_read:
+        harness = evidence_read_phase(smoke, db, layout, world, vid2, (vid, vid3), active_before)
 
     # ledgers, logs --------------------------------------------------------------------------------------------------------
     check({name: fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before,
@@ -563,7 +826,8 @@ def main() -> int:
     step("every ledger is byte/mode/mtime identical; no path, secret or source text in any output")
 
     print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 3,
-                      "evidenceRows": 6, "stagedVersions": 3, "activationsWritten": 0, "importRuns": smoke.runs + smoke2.runs, "ledgerReadOnly": True}))
+                      "evidenceRows": 6, "stagedVersions": 3, "importActivationsWritten": 0, "harnessActivations": harness["harnessActivations"],
+                      "evidenceReads": harness["evidenceReads"], "importRuns": smoke.runs + smoke2.runs, "ledgerReadOnly": True}))
     return 0
 
 
