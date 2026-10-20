@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpServer;
+import com.zoop.company.market.dto.CompanyPriceResponse;
 import com.zoop.company.market.dto.CompanyMetricsResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,8 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CompanyMarketClientsTest {
+    private static final java.time.Clock CLOCK =
+            java.time.Clock.fixed(java.time.Instant.parse("2026-10-16T03:00:00Z"), java.time.ZoneOffset.UTC);
     private HttpServer server;
     private java.util.concurrent.ExecutorService executor;
     private final AtomicInteger tokenRequests = new AtomicInteger();
@@ -28,6 +31,13 @@ class CompanyMarketClientsTest {
     private volatile String priceTimestamp = "2026-10-15T06:30:00Z";
     private volatile String lastPriceJson = "700";
     private volatile boolean paginateCandles;
+    private volatile boolean rateLimitOnce;
+    private volatile boolean omitStockCurrency;
+    /** Daily candles stamped like Toss: KRX at KST midnight, US at New York midnight shown in KST. */
+    private volatile boolean exchangeDaily;
+    private volatile boolean malformedCandle;
+    /** NVDA daily candles around the 2026-03-08 US DST start, stamped at New York midnight shown in KST. */
+    private volatile boolean dstDaily;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -40,6 +50,7 @@ class CompanyMarketClientsTest {
             // Count before replying: once the client has the response the test may assert immediately.
             if (path.equals("/oauth2/token")) tokenRequests.incrementAndGet();
             int status = path.equals("/oauth2/token") ? tokenStatus : providerStatus;
+            if (path.equals("/api/v1/candles") && rateLimitOnce) { rateLimitOnce = false; status = 429; }
             String rawQuery = exchange.getRequestURI().getRawQuery();
             if (path.equals("/api/v1/candles")) candleQueries.add(rawQuery);
             String body = response(path, rawQuery);
@@ -153,6 +164,149 @@ class CompanyMarketClientsTest {
     }
 
     @Test
+    void monthOfDailyBarsOldestFirstWithTheExchangeOffset() {
+        exchangeDaily = true;
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null);
+
+        assertEquals("available", result.status());
+        assertEquals("1m", result.period());
+        assertEquals("1d", result.interval());
+        assertEquals("KRW", result.currency());
+        assertEquals("toss", result.source().provider());
+        assertEquals(List.of("2026-10-14T00:00+09:00", "2026-10-15T00:00+09:00"),
+                result.points().stream().map(p -> p.time()).toList());
+        var last = result.points().get(1);
+        assertEquals(695.0, last.open());
+        assertEquals(700.0, last.close());
+        assertEquals(1234.0, last.volume());
+    }
+
+    @Test
+    void aDailyBarIsInTheRangeWhenItsExchangeDayOverlapsIt() {
+        exchangeDaily = true;
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
+                kst("2026-10-15T00:00"), kst("2026-10-16T00:00"));
+        assertEquals(List.of("2026-10-15T00:00+09:00"), result.points().stream().map(p -> p.time()).toList());
+
+        var empty = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
+                kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
+        assertEquals("unavailable", empty.status());
+        assertEquals("no_data", empty.reasonCode());
+    }
+
+    @Test
+    void anExactToCutsAUsDailyBarThatStartsAfterIt() {
+        // NVDA's 10-15 bar starts at New York midnight, 13:00 KST: after a 10:00 KST cutoff, so it is not returned.
+        exchangeDaily = true;
+        var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1m",
+                kst("2026-10-01T00:00"), kst("2026-10-15T10:00").plusNanos(1));
+        assertEquals(List.of("2026-10-14T00:00-04:00"), result.points().stream().map(p -> p.time()).toList());
+        assertEquals("USD", result.currency());
+    }
+
+    @Test
+    void theLatestPointComesBackWhenTheChartSendsItsTimeAsTo() {
+        exchangeDaily = true;
+        var client = tossClient("test-client", "test-secret");
+        var first = client.prices("KRX:005930", "KRX", "005930", "1m", null, null);
+        var latest = first.points().getLast();
+
+        java.time.Instant to = java.time.OffsetDateTime.parse(latest.time()).toInstant().plusNanos(1);
+        var again = client.prices("KRX:005930", "KRX", "005930", "1m", TossMarketClient.periodStart("1m", to), to);
+        assertEquals(latest, again.points().getLast());
+    }
+
+    @Test
+    void dailyPagesStartAtTheRequestedEndSoAnOldRangeIsNotCutByThePageLimit() {
+        exchangeDaily = true;
+        tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m",
+                kst("2026-01-01T00:00"), kst("2026-02-01T00:00"));
+        assertTrue(candleQueries.get(0).contains("before=2026-01-31T15"), candleQueries.get(0));
+    }
+
+    @Test
+    void aMalformedCandleIsAProviderFormatFailureNotASkippedRow() {
+        exchangeDaily = true;
+        malformedCandle = true;
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null));
+        assertFalse(error.retryable());
+    }
+
+    @Test
+    void yearAggregatesDailyBarsIntoMondayWeeks() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1y", null, null);
+
+        assertEquals("1wk", result.interval());
+        // 10-14 and 10-15 fall in the week of Monday 10-12; the 2025 bars have no open and are left out.
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-12T00:00+09:00", 645, 720, 640, 700, 2634.0)),
+                result.points());
+    }
+
+    @Test
+    void dayAggregatesMinuteBarsByTheirStartIntoFiveMinuteBuckets() {
+        var client = tossClient("test-client", "test-secret");
+        var result = client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
+
+        assertEquals("5m", result.interval());
+        // Toss stamps a minute bar with its end: 12:01 and 12:02 start in the 12:00 bucket, 12:06 in 12:05.
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
+                new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
+
+        // Each day is read from its own end; the finished KST 10-15 is then kept and only today (10-16) is read again.
+        client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
+        assertEquals(1, candleQueries.stream().filter(q -> q.contains("before=2026-10-15T15")).count());
+        assertEquals(2, candleQueries.stream().filter(q -> q.contains("before=2026-10-16T15")).count());
+    }
+
+    @Test
+    void aWeekEndingBeforeTheDstStartDoesNotTakeTheNextMondaysBar() {
+        dstDaily = true;
+        // Friday close before the 03-08 DST start: the week of 03-02 ends at 03-09 00:00 EDT, which is 167 hours on.
+        var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1y", null,
+                java.time.Instant.parse("2026-03-06T21:00:00Z").plusNanos(1));
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-03-02T00:00-05:00", 110, 115, 109, 114, 5.0)),
+                result.points());
+    }
+
+    @Test
+    void aRateLimitedPageIsRetriedAfterTheBucketRefills() {
+        rateLimitOnce = true;
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null);
+        assertEquals("available", result.status());
+        assertEquals(false, rateLimitOnce);
+    }
+
+    @Test
+    void weekUsesHourBuckets() {
+        var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1w", null, null);
+        assertEquals("1h", result.interval());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 103, 16.0)),
+                result.points());
+        assertEquals("not_connected", tossClient("", "").prices("KRX:005930", "KRX", "005930", "1m", null, null).reasonCode());
+    }
+
+    private static java.time.Instant kst(String local) {
+        return java.time.LocalDateTime.parse(local).atZone(java.time.ZoneId.of("Asia/Seoul")).toInstant();
+    }
+
+    @Test
+    void barsWithoutACurrencyAreAProviderFormatFailureNotNoData() {
+        omitStockCurrency = true;
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null));
+        assertFalse(error.retryable());
+    }
+
+    @Test
+    void pricesProviderOutageIsARetryableSourceFailure() {
+        providerStatus = 503;
+        var error = assertThrows(MarketDataException.class,
+                () -> tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1m", null, null));
+        assertTrue(error.retryable());
+    }
+
+    @Test
     void naverMapsDomesticMetricsAndKeepsProviderReferenceTime() {
         var result = naverClient().metrics("KRX:005930", "KRX", "005930");
 
@@ -188,7 +342,7 @@ class CompanyMarketClientsTest {
     private TossMarketClient tossClient(String clientId, String clientSecret) {
         var settings = new CompanyMarketSettings("toss", clientId, clientSecret, baseUrl(), "naver",
                 baseUrl(), baseUrl(), baseUrl(), Duration.ofSeconds(2));
-        return new TossMarketClient(settings, JsonMapper.builder().build());
+        return new TossMarketClient(settings, JsonMapper.builder().build(), CLOCK);
     }
 
     private NaverMetricsClient naverClient() {
@@ -210,16 +364,40 @@ class CompanyMarketClientsTest {
                 """;
         if (path.equals("/api/v1/candles") && paginateCandles) return """
                 {"result":{"candles":[
-                  {"timestamp":"2026-10-15T00:00:00+09:00","highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
+                  {"timestamp":"2026-10-15T00:00:00+09:00","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
                 ],"nextBefore":"2026-10-15T00:00:00+09:00"}}
                 """;
-        if (path.equals("/api/v1/stocks")) return """
-                {"result":[{"symbol":"005930","sharesOutstanding":1000}]}
+        if (path.equals("/api/v1/candles") && rawQuery.contains("interval=1m")) return rawQuery.contains("before=2026-10-15T15") ? """
+                {"result":{"candles":[
+                  {"timestamp":"2026-10-15T12:06:00+09:00","openPrice":104,"highPrice":104,"lowPrice":103,"closePrice":103,"volume":1},
+                  {"timestamp":"2026-10-15T12:02:00+09:00","openPrice":100,"highPrice":105,"lowPrice":100,"closePrice":104,"volume":5},
+                  {"timestamp":"2026-10-15T12:01:00+09:00","openPrice":100,"highPrice":101,"lowPrice":99,"closePrice":100,"volume":10}
+                ],"nextBefore":null}}
+                """ : """
+                {"result":{"candles":[],"nextBefore":null}}
                 """;
+        if (path.equals("/api/v1/stocks")) return """
+                {"result":[{"symbol":"005930","sharesOutstanding":1000,"currency":"KRW"},{"symbol":"NVDA","currency":"USD"}]}
+                """.replace(omitStockCurrency ? ",\"currency\":\"KRW\"" : "never-in-body", "");
+        if (path.equals("/api/v1/candles") && dstDaily) return """
+                {"result":{"candles":[
+                  {"timestamp":"2026-03-09T13:00:00+09:00","openPrice":120,"highPrice":125,"lowPrice":119,"closePrice":124,"volume":7},
+                  {"timestamp":"2026-03-06T14:00:00+09:00","openPrice":110,"highPrice":115,"lowPrice":109,"closePrice":114,"volume":5}
+                ],"nextBefore":null}}
+                """;
+        if (path.equals("/api/v1/candles") && exchangeDaily) {
+            String day = rawQuery.contains("symbol=NVDA") ? "T13:00:00+09:00" : "T00:00:00+09:00";
+            return """
+                {"result":{"candles":[
+                  {"timestamp":"2026-10-15DAY","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
+                  {"timestamp":"2026-10-14DAY","openPrice":OPEN,"highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400}
+                ],"nextBefore":null}}
+                """.replace("DAY", day).replace("OPEN", malformedCandle ? "\"n/a\"" : "645");
+        }
         if (path.equals("/api/v1/candles")) return """
                 {"result":{"candles":[
-                  {"timestamp":"2026-10-15T00:00:00Z","highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
-                  {"timestamp":"2026-10-14T00:00:00Z","highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400},
+                  {"timestamp":"2026-10-15T00:00:00Z","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234},
+                  {"timestamp":"2026-10-14T00:00:00Z","openPrice":645,"highPrice":720,"lowPrice":640,"closePrice":650,"volume":1400},
                   {"timestamp":"2025-10-15T00:00:00Z","highPrice":750,"lowPrice":500,"closePrice":550,"volume":1000},
                   {"timestamp":"2025-10-14T00:00:00Z","highPrice":999,"lowPrice":1,"closePrice":600,"volume":900}
                 ]}}

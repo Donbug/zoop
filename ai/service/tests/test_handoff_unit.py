@@ -302,11 +302,26 @@ def test_the_documented_limits_are_enforced():
                    lambda b: b["articles"][0].update(title="x" * 2001), lambda b: b["articles"][0].update(url="x" * 4001),
                    lambda b: b["articles"][0].update(observations=[]), lambda b: b["relations"][0].update(basis=[{}, {}, {}]),
                    lambda b: b["issues"][0]["geography"].update(countries=["KR"] * 11), lambda b: b["companies"][0].update(id="a" * 201),
-                   lambda b: b["checks"].update(producerConfirmed=["x"] * 21)):
+                   lambda b: b["checks"].update(producerConfirmed=["x"] * 21),
+                   lambda b: b["issues"][0].update(mentions=[copy.deepcopy(b["issues"][0]["mentions"][0]) for _ in range(1001)]),
+                   lambda b: b["issues"][0]["mentions"][0].update(participants=[copy.deepcopy(b["issues"][0]["mentions"][0]["participants"][0]) for _ in range(1001)]),
+                   lambda b: b["issues"][0]["mentions"][0].update(evidenceIds=[]),
+                   lambda b: b["issues"][0]["mentions"][0].update(title="x" * (6 * 1024 * 1024 + 1))):
         broken = example_bundle()
         change(broken)
         with pytest.raises(ValidationError):
             Bundle.model_validate(broken)
+
+
+def test_native_empty_and_long_s2_mention_strings_are_relayed_verbatim_not_refused():
+    """S2 puts no emptiness or length rule on a mention's title/action/target/period or a participant's source id, name and role: the model keeps them as given."""
+    bundle = example_bundle()
+    mention = bundle["issues"][0]["mentions"][0]
+    mention.update(title="", action="", target="", period="")
+    mention["participants"][0].update(sourceCompanyId="", name="", role="")
+    mention["participants"][1].update(name="  공백 보존  ", role="x" * 50_000)
+    parsed = Bundle.model_validate(bundle)
+    assert parsed.wire() == bundle and canonical(parsed.wire()) == canonical(bundle)
 
 
 def test_the_envelope_projection_drops_what_the_application_may_not_read_and_keeps_the_bundle_as_received():
@@ -321,6 +336,7 @@ def test_the_envelope_projection_drops_what_the_application_may_not_read_and_kee
     lambda out: out.pop("usage"), lambda out: out["usage"].update(providerCalls=1), lambda out: out["usage"].update(modelCalls=True),
     lambda out: out["delivery"].update(status="maybe"), lambda out: out.update(state="published"), lambda out: out.update(publication="published"),
     lambda out: out["delivery"].update(checkedAt="yesterday"), lambda out: out["receipt"].update(bundleDigest="short"),
+    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-1"),
     lambda out: out["receipt"].update(bundleBytes=0), lambda out: out["receipt"].update(bundleSchema="other"), lambda out: out.update(bundle=[]),
     lambda out: out.update(manifest=[]),
 ])
@@ -399,6 +415,18 @@ def test_every_withheld_shape_has_identity_state_and_a_reason_and_nothing_of_the
             text = json.dumps(wire)
             for private in (*SOURCE_DATA, "KRX:005930", "ev-", pins(example_bundle())["bundleDigest"]):
                 assert private not in text
+
+
+def test_a_handoff_frozen_under_the_earlier_bundle_schema_is_withheld_with_its_reason_and_no_receipt_content(tmp_path):
+    legacy = withheld_output(code="handoff_contract_changed")
+    service, _, _ = reads(tmp_path, result(legacy, 2), result(legacy, 2))
+    for operation in (service.status, service.bundle):
+        wire = body(operation(PRINCIPAL, HANDOFF, Observation()))
+        assert wire["delivery"] == {"state": "withheld", "reason": "handoff_contract_changed", "checkedAt": None}
+        assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
+        text = json.dumps(wire)
+        for old in ("zoop-graph-handoff-bundle-1", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
+            assert old not in text
 
 
 @pytest.mark.parametrize("code,status,public", [

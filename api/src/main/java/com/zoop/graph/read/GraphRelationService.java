@@ -7,6 +7,7 @@ import com.zoop.graph.read.dto.EdgeDetail;
 import com.zoop.graph.read.dto.EdgeDetail.EndpointRef;
 import com.zoop.graph.read.dto.EdgeDetail.Verification;
 import com.zoop.graph.read.dto.EdgeDetail.ViaIssue;
+import com.zoop.graph.snapshot.PublicGraphSnapshot;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Article;
 import com.zoop.graph.snapshot.PublicGraphSnapshot.Relation;
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -32,9 +34,11 @@ public class GraphRelationService {
             "FOLLOWS", "앞 사건에 이어 일어난 사건이에요.");
 
     private final PublicGraphReader reader;
+    private final NamedParameterJdbcTemplate jdbc;
 
-    public GraphRelationService(PublicGraphReader reader) {
+    public GraphRelationService(PublicGraphReader reader, NamedParameterJdbcTemplate jdbc) {
         this.reader = reader;
+        this.jdbc = jdbc;
     }
 
     public EdgeDetail getRelation(String edgeId, String round, String graphVersion, String asOf, String requestId) {
@@ -48,10 +52,12 @@ public class GraphRelationService {
         Map<String, Article> articles = graph.snapshot.articles().stream()
                 .collect(Collectors.toMap(a -> a.articleId() + "@" + a.version(), Function.identity()));
         List<Relation> sources = edge.relationIds().stream().map(relations::get).toList();
+        Map<String, PublicGraphSnapshot.Company> catalog = CompanyAppearance.of(jdbc,
+                List.of(edge.source(), edge.target()).stream().filter(graph.companies::containsKey).toList());
         Metadata metadata = new Metadata("public_graph_snapshot", pinned.selected().asOf(),
                 pinned.selected().version().id(), requestId, false, List.of());
         return new EdgeDetail(edge.id(), edge.relationType(), edge.derived(), !edge.derived(),
-                endpoint(graph, edge.source()), endpoint(graph, edge.target()), edge.role(), edge.summary(),
+                endpoint(graph, catalog, edge.source()), endpoint(graph, catalog, edge.target()), edge.role(), edge.summary(),
                 sources.stream().map(Relation::role).filter(Objects::nonNull).map(RoleLabels::display).distinct().toList(),
                 edge.assertionStatus(), edge.evidenceIds(),
                 sources.stream().flatMap(r -> r.basis().stream())
@@ -75,10 +81,12 @@ public class GraphRelationService {
                 .toList();
     }
 
-    private static EndpointRef endpoint(DisplayGraph graph, String id) {
+    /** A company end carries its logo and brand colour (snapshot first, then the catalog); an issue end has none. */
+    private static EndpointRef endpoint(DisplayGraph graph, Map<String, PublicGraphSnapshot.Company> catalog, String id) {
         var issue = graph.issues.get(id);
-        if (issue != null) return new EndpointRef(id, "issue", issue.label());
-        return new EndpointRef(id, "company", graph.companies.get(id).label());
+        if (issue != null) return new EndpointRef(id, "issue", issue.label(), null, null);
+        var company = CompanyAppearance.fill(graph.companies.get(id), catalog.get(id));
+        return new EndpointRef(id, "company", company.label(), company.logoUrl(), company.brandColor());
     }
 
     private static Instant parseInstant(String value) {

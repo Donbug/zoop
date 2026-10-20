@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code getEvidence}: public ({@code security: []}); access is decided by the current document and grant gates. */
+/** {@code getEvidence}: public ({@code security: []}); access is decided by the current document state and the current operator authority (S1 grants or the S2-1 source registry). */
 @RestController
 @RequestMapping("/api/v1/evidence")
 public class EvidenceController {
