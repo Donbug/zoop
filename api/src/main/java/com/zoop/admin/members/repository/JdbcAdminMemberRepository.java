@@ -25,9 +25,11 @@ public class JdbcAdminMemberRepository implements AdminMemberRepository {
         return jdbc.query("""
                 SELECT m.id, m.email, m.signup_method, m.created_at, m.status, m.status_revision,
                        (SELECT count(*) FROM member_sessions s
-                        WHERE s.member_id = m.id AND s.kind = 'member' AND s.created_at < :asOf) AS sessions,
+                        WHERE s.member_id = m.id AND s.kind = 'member'
+                          AND s.created_at >= m.created_at AND s.created_at < :asOf) AS sessions,
                        (SELECT max(s.created_at) FROM member_sessions s
-                        WHERE s.member_id = m.id AND s.kind = 'member' AND s.created_at < :asOf) AS last_active_at
+                        WHERE s.member_id = m.id AND s.kind = 'member'
+                          AND s.created_at >= m.created_at AND s.created_at < :asOf) AS last_active_at
                 FROM members m
                 WHERE m.created_at < :asOf
                   AND (CAST(:status AS text) IS NULL OR m.status = CAST(:status AS text))
@@ -67,9 +69,11 @@ public class JdbcAdminMemberRepository implements AdminMemberRepository {
                 SELECT m.id, m.email, m.signup_method, m.created_at, m.status, m.status_revision,
                        m.completed, m.tutorial_completed,
                        (SELECT count(*) FROM member_sessions s
-                        WHERE s.member_id = m.id AND s.kind = 'member' AND s.created_at < :asOf) AS sessions,
+                        WHERE s.member_id = m.id AND s.kind = 'member'
+                          AND s.created_at >= m.created_at AND s.created_at < :asOf) AS sessions,
                        (SELECT max(s.created_at) FROM member_sessions s
-                        WHERE s.member_id = m.id AND s.kind = 'member' AND s.created_at < :asOf) AS last_active_at,
+                        WHERE s.member_id = m.id AND s.kind = 'member'
+                          AND s.created_at >= m.created_at AND s.created_at < :asOf) AS last_active_at,
                        (SELECT count(*) FROM member_watchlist w WHERE w.member_id = m.id) AS watchlist_count,
                        EXISTS (SELECT 1 FROM member_portfolio_connections p WHERE p.member_id = m.id)
                            AS account_connected

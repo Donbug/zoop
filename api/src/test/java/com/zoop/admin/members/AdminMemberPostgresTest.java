@@ -101,6 +101,31 @@ class AdminMemberPostgresTest {
     }
 
     @Test
+    void sessionActivityIncludesMemberCreationBoundaryButExcludesEarlierSessions() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        var login = loginAdmin(suffix);
+        String memberId = "member-period-" + suffix;
+        String email = "period-" + suffix + "@example.com";
+        Instant memberCreatedAt = insertMember(memberId, email, "active");
+        insertMemberSessionAt(memberId, "session-before-" + suffix, memberCreatedAt.minusSeconds(1));
+        insertMemberSessionAt(memberId, "session-at-boundary-" + suffix, memberCreatedAt);
+        insertMemberSessionAt(memberId, "session-after-" + suffix, memberCreatedAt.plusSeconds(1));
+
+        mvc.perform(get("/api/v1/admin/members").cookie(login.cookie())
+                        .param("q", email).param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].activity.sessions").value(2))
+                .andExpect(jsonPath("$.items[0].lastActiveAt")
+                        .value(memberCreatedAt.plusSeconds(1).toString()));
+
+        mvc.perform(get("/api/v1/admin/members/{memberId}", memberId).cookie(login.cookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.member.activity.sessions").value(2))
+                .andExpect(jsonPath("$.member.lastActiveAt")
+                        .value(memberCreatedAt.plusSeconds(1).toString()));
+    }
+
+    @Test
     void blockReplayConflictAndUnblockPreserveRevisionSessionAndAuditRules() throws Exception {
         String suffix = UUID.randomUUID().toString();
         var login = loginAdmin(suffix);
@@ -228,7 +253,7 @@ class AdminMemberPostgresTest {
         return new Login(cookie, csrf);
     }
 
-    private void insertMember(String memberId, String email, String status) {
+    private Instant insertMember(String memberId, String email, String status) {
         Instant now = Instant.now().minusSeconds(120);
         jdbc.update("""
                 INSERT INTO members (id, analytics_key, email, email_key, display_name,
@@ -239,17 +264,22 @@ class AdminMemberPostgresTest {
                         false, false, 1, ?, ?, NULL)
                 """, memberId, "analytics-" + memberId, email, email.toLowerCase(), status,
                 Timestamp.from(now), Timestamp.from(now));
+        return now;
     }
 
     private void insertMemberSession(String memberId, String sessionId) {
         Instant now = Instant.now().minusSeconds(60);
+        insertMemberSessionAt(memberId, sessionId, now);
+    }
+
+    private void insertMemberSessionAt(String memberId, String sessionId, Instant createdAt) {
         jdbc.update("""
                 INSERT INTO member_sessions
                   (id, member_id, kind, analytics_key, token_hash, csrf_key_id, csrf_version,
                    tutorial_completed, auth_flow, created_at, expires_at, revoked_at)
                 VALUES (?, ?, 'member', NULL, ?, 'test', 1, false, NULL, ?, ?, NULL)
                 """, sessionId, memberId, "hash-" + sessionId,
-                Timestamp.from(now), Timestamp.from(now.plusSeconds(3600)));
+                Timestamp.from(createdAt), Timestamp.from(createdAt.plusSeconds(3600)));
     }
 
     private int auditCount(String memberId) {
