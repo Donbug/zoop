@@ -323,8 +323,45 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
     return selected
 
 
+class HeldPaidRequest(ReplayError):
+    """Explicitly withhold a reservation already unresolved at process start."""
+    def __init__(self, request_digest, stage):
+        super().__init__("operator_held_unresolved_paid_request")
+        self.request_digest = request_digest
+        self.stage = stage
+
+
 class GroupedSimulationClient(sim.SimulationClient):
     """Keep original stages/schemas and add grouping-aware prompt semantics."""
+    def __init__(self, output, transport, max_calls=base.MAX_CALLS, authorized_truncations=(),
+                 hold_unresolved_requests=False):
+        super().__init__(output, transport, max_calls, authorized_truncations)
+        # Snapshot once. A failure created later in this process must continue to
+        # trigger the base client's global stop, never this disposition path.
+        self.held_at_start = frozenset(path.name.removesuffix(".pending.json")
+            for path in self.calls.glob("*.pending.json")
+            if not (self.calls / (path.name.removesuffix(".pending.json") + ".complete.json")).exists()) \
+            if hold_unresolved_requests else frozenset()
+
+    def call(self, stage, data, prompt_name, schema_name, max_output=8000, schema_override=None):
+        raw, _, _ = self.request(stage, data, prompt_name, schema_name, max_output, schema_override)
+        key = base.digest(raw)
+        if key in self.held_at_start and not self.stopped.is_set():
+            try:
+                reservation = base.strict_load(base.regular(self.calls / (key + ".pending.json")))
+                require(reservation.get("requestDigest") == key and reservation.get("model") == base.MODEL
+                        and reservation.get("stage") == stage
+                        and base.digest(base.regular(self.calls / (key + ".request.json"))) == key,
+                        "held_paid_reservation_identity_mismatch")
+            except Exception:
+                self.stopped.set()
+                raise
+            if not (self.calls / (key + ".complete.json")).exists():
+                # Outside ResponsesClient.call: preserve the unknown reservation
+                # and usage exactly while allowing unrelated later rounds.
+                raise HeldPaidRequest(key, stage)
+        return super().call(stage, data, prompt_name, schema_name, max_output, schema_override)
+
     def request(self, stage, data, prompt_name, schema_name, max_output=12000, schema_override=None):
         schema_root = sim.PROMPTS
         if stage == SELECTION_STAGE:

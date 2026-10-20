@@ -56,7 +56,8 @@ def run(args, transport=None):
     calls=output/"calls";base.private_dir(calls)
     for path in sorted((archive_path.parent/"calls").glob("*.json")):
         base.write_once(calls/path.name,base.regular(path))
-    client=grouped.GroupedSimulationClient(output,transport or base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls)
+    client=grouped.GroupedSimulationClient(output,transport or base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls,
+        hold_unresolved_requests=getattr(args,"hold_unresolved_requests",False))
     rounds=[];published_history=[]
     for spec,inputs,clocks,duplicates,coverage,candidates in prepared:
         previous, previous_result=sim.previous_context(rounds[-1] if rounds else None)
@@ -110,6 +111,17 @@ def run(args, transport=None):
                         record.update(selectionStatus="SELECTED",selected=selected,result=result)
                     else:
                         record["selectionStatus"]="HELD_VALIDATION"
+            except grouped.HeldPaidRequest as error:
+                # Only an unchanged reservation unresolved before this process
+                # started can reach here. Never synthesize a successful result,
+                # replace a receipt, or resend the unknown request.
+                record.update(selectionStatus="HELD_VALIDATION", selected=[], result=None, resultSha256=None,
+                    groupedValidationFailure=str(error),
+                    groupedUnresolvedPaidRequest={"requestDigest":error.request_digest,"stage":error.stage,
+                        "usageKnown":False,"inputTokens":None,"outputTokens":None,
+                        "operatorDisposition":"hold_without_retransmission","preexistingAtProcessStart":True})
+                if error.stage==grouped.SELECTION_STAGE:
+                    record["groupedSelectionRequestDigest"]=error.request_digest
             except sim.ReplayError as error:
                 # Preserve the exact unsuccessful paid response and continue only after known completed calls.
                 if client.stopped.is_set() or not client.has_recorded(record["groupedSelectionRequestDigest"]):raise
@@ -143,6 +155,8 @@ def parser():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ["archive","sources","clocks","output","user-inbox-ref"]:p.add_argument("--"+name,required=True)
     p.add_argument("--key-file");p.add_argument("--execute-authorized",action="store_true")
+    p.add_argument("--hold-unresolved-requests",action="store_true",
+        help="Withhold unchanged requests already pending without a completion at startup; never resend them.")
     p.add_argument("--max-calls",type=int,choices=range(1,513),default=400)
     p.add_argument("--max-repairs",type=int,choices=range(2),default=1)
     return p

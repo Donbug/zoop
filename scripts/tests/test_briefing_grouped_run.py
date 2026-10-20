@@ -38,6 +38,28 @@ class UnsupportedSelectionTransport(fixtures.AuthoredTransport):
         return status, base.canonical(provider)
 
 
+class UnknownStageTransport(fixtures.AuthoredTransport):
+    """One authored transport exception leaves its real write-ahead slot unknown."""
+    def __init__(self, stage):
+        super().__init__()
+        self.stage = stage
+
+    def __call__(self, raw):
+        response = super().__call__(raw)
+        request = base.strict_load(raw)
+        if request["text"]["format"]["name"] == self.stage:
+            raise OSError("authored transport outcome unknown")
+        return response
+
+
+class UnknownCorrectionTransport(UnsupportedSelectionTransport):
+    def __call__(self, raw):
+        response = super().__call__(raw)
+        if "selectionCorrection" in base.strict_load(base.strict_load(raw)["input"]):
+            raise OSError("authored correction outcome unknown")
+        return response
+
+
 class GroupedRunTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -81,9 +103,11 @@ class GroupedRunTest(unittest.TestCase):
             values.append("--execute-authorized")
         return run.parser().parse_args(values)
 
-    def execute(self, transport, execute=True):
+    def execute(self, transport, execute=True, hold_unresolved=False):
+        args = self.args(execute)
+        args.hold_unresolved_requests = hold_unresolved
         with contextlib.redirect_stdout(io.StringIO()):
-            return run.run(self.args(execute), transport)
+            return run.run(args, transport)
 
     def bundle(self):
         return base.strict_load((self.output / "bundle-v2.json").read_bytes())
@@ -185,6 +209,102 @@ class GroupedRunTest(unittest.TestCase):
         with self.assertRaisesRegex(run.sim.ReplayError, "grouped_run_source_binding_mismatch"):
             self.execute(transport)
         self.assertEqual([], transport.requests)
+
+    def test_hold_option_defaults_off(self):
+        self.assertFalse(self.args().hold_unresolved_requests)
+
+    def test_startup_unknown_in_any_phase_is_held_without_resend_then_other_rounds_run(self):
+        for stage in (run.grouped.SELECTION_STAGE, "round_simulation_morning_generation",
+                      "round_simulation_morning_verification"):
+            with self.subTest(stage=stage):
+                self.output = self.root / stage
+                self.prepare(count=3)
+                failed = UnknownStageTransport(stage)
+                with self.assertRaisesRegex(run.sim.ReplayError, "transport_unknown_usage_no_automatic_retry"):
+                    self.execute(failed)
+                calls = self.output / "calls"
+                unknown_digest = base.digest(failed.requests[-1])
+                old_calls = {p.name: base.digest(p.read_bytes()) for p in calls.iterdir() if p.is_file()}
+                self.assertTrue((calls / (unknown_digest + ".pending.json")).exists())
+                self.assertFalse((calls / (unknown_digest + ".complete.json")).exists())
+                def deny(_):
+                    raise AssertionError("old unresolved calls must never be resent")
+                # The ordinary default retains the old stop behavior.
+                with self.assertRaisesRegex(run.sim.ReplayError, "unresolved_paid_reservation_no_automatic_retry"):
+                    self.execute(deny)
+                resumed = fixtures.AuthoredTransport()
+                result = self.execute(resumed, hold_unresolved=True)
+                bundle = self.bundle()
+                held = bundle["rounds"][0]
+                self.assertEqual("HELD_VALIDATION", held["selectionStatus"])
+                self.assertEqual("operator_held_unresolved_paid_request", held["groupedValidationFailure"])
+                self.assertEqual([], held["selected"])
+                self.assertIsNone(held["result"])
+                self.assertIsNone(held["resultSha256"])
+                disposition = held["groupedUnresolvedPaidRequest"]
+                self.assertEqual(unknown_digest, disposition["requestDigest"])
+                self.assertEqual(stage, disposition["stage"])
+                self.assertEqual("hold_without_retransmission", disposition["operatorDisposition"])
+                self.assertTrue(disposition["preexistingAtProcessStart"])
+                receipt = next(r for r in held["receipts"] if r["requestDigest"] == unknown_digest)
+                self.assertEqual("unknown", receipt["status"])
+                self.assertFalse(receipt["usageKnown"])
+                self.assertIsNone(receipt["inputTokens"])
+                self.assertIsNone(receipt["outputTokens"])
+                self.assertEqual(2, result["selectedRounds"])
+                self.assertEqual(6, result["newPaidCalls"])
+                self.assertEqual(6, len(resumed.requests))
+                self.assertNotIn(unknown_digest, {base.digest(raw) for raw in resumed.requests})
+                self.assertEqual("unavailable", bundle["rounds"][1]["previous"]["status"])
+                for name, sha in old_calls.items():
+                    self.assertEqual(sha, base.digest((calls / name).read_bytes()))
+                before = {str(p.relative_to(self.output)): base.digest(p.read_bytes())
+                          for p in self.output.rglob("*") if p.is_file()}
+                reused = self.execute(deny, hold_unresolved=True)
+                self.assertEqual(0, reused["newPaidCalls"])
+                after = {str(p.relative_to(self.output)): base.digest(p.read_bytes())
+                         for p in self.output.rglob("*") if p.is_file()}
+                self.assertEqual(before, after)
+
+    def test_new_failure_after_holding_old_unknown_still_stops_the_run(self):
+        self.prepare(count=3)
+        first = UnknownStageTransport("round_simulation_morning_generation")
+        with self.assertRaises(run.sim.ReplayError):
+            self.execute(first)
+        first_unknown = base.digest(first.requests[-1])
+        old_files = {p.name: base.digest(p.read_bytes()) for p in (self.output / "calls").iterdir() if p.is_file()}
+        second = UnknownStageTransport("round_simulation_evening_generation")
+        with self.assertRaisesRegex(run.sim.ReplayError, "transport_unknown_usage_no_automatic_retry"):
+            self.execute(second, hold_unresolved=True)
+        self.assertEqual(2, len(second.requests))
+        self.assertNotIn(first_unknown, {base.digest(raw) for raw in second.requests})
+        self.assertFalse((self.output / "2026-10-02-evening" / "round.json").exists())
+        self.assertFalse((self.output / "2026-10-03-morning").exists())
+        self.assertFalse((self.output / "bundle-v2.json").exists())
+        for name, sha in old_files.items():
+            self.assertEqual(sha, base.digest((self.output / "calls" / name).read_bytes()))
+
+    def test_unknown_selection_correction_records_its_actual_final_digest(self):
+        self.prepare(count=2)
+        failed = UnknownCorrectionTransport()
+        with self.assertRaisesRegex(run.sim.ReplayError, "transport_unknown_usage_no_automatic_retry"):
+            self.execute(failed)
+        self.assertEqual(2, len(failed.requests))
+        unknown_digest = base.digest(failed.requests[-1])
+        original_digest = base.digest(failed.requests[0])
+        old_files = {p.name: base.digest(p.read_bytes()) for p in (self.output / "calls").iterdir() if p.is_file()}
+        resumed = fixtures.AuthoredTransport()
+        result = self.execute(resumed, hold_unresolved=True)
+        held = self.bundle()["rounds"][0]
+        self.assertEqual("HELD_VALIDATION", held["selectionStatus"])
+        self.assertEqual(unknown_digest, held["groupedSelectionRequestDigest"])
+        self.assertEqual(unknown_digest, held["groupedUnresolvedPaidRequest"]["requestDigest"])
+        self.assertEqual({original_digest, unknown_digest}, {r["requestDigest"] for r in held["receipts"]})
+        self.assertEqual(1, result["selectedRounds"])
+        self.assertEqual(3, len(resumed.requests))
+        self.assertNotIn(unknown_digest, {base.digest(raw) for raw in resumed.requests})
+        for name, sha in old_files.items():
+            self.assertEqual(sha, base.digest((self.output / "calls" / name).read_bytes()))
 
 
 if __name__ == "__main__":

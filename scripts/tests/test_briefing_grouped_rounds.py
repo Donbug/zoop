@@ -513,6 +513,52 @@ class GroupedRoundTests(unittest.TestCase):
                 self.assertEqual(95, len(base.strict_load(request["input"])["issues"]))
             self.assertEqual(2, len(client.receipts()))
 
+    def test_hold_unknown_checks_request_digest_model_stage_and_bytes_before_disposition(self):
+        for mutation in ("requestDigest", "model", "stage", "request_bytes", "pending_json"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "private"
+                first = grouped.GroupedSimulationClient(output, CorrectionTransport(unknown=True))
+                candidates = self.candidates()
+                with self.assertRaises(grouped.ReplayError):
+                    grouped.attempt_grouped_selection(first, candidates, {}, "identity")
+                digest = next(first.calls.glob("*.pending.json")).name.removesuffix(".pending.json")
+                reservation_path = first.calls / (digest + ".pending.json")
+                if mutation == "request_bytes":
+                    (first.calls / (digest + ".request.json")).write_bytes(b"{}")
+                elif mutation == "pending_json":
+                    reservation_path.write_bytes(b"{invalid")
+                else:
+                    reservation = base.strict_load(reservation_path.read_bytes())
+                    reservation[mutation] = "invalid-binding"
+                    reservation_path.write_bytes(base.canonical(reservation))
+                transport = AuthoredTransport()
+                resumed = grouped.GroupedSimulationClient(output, transport, hold_unresolved_requests=True)
+                with self.assertRaises(grouped.ReplayError) as caught:
+                    grouped.attempt_grouped_selection(resumed, candidates, {}, "identity")
+                self.assertNotIsInstance(caught.exception, grouped.HeldPaidRequest)
+                self.assertTrue(resumed.stopped.is_set())
+                self.assertEqual([], transport.requests)
+
+    def test_holding_old_unknown_preserves_its_budget_slot_and_new_unknown_still_stops(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "private"
+            first = grouped.GroupedSimulationClient(output, CorrectionTransport(unknown=True), max_calls=1)
+            candidates = self.candidates()
+            with self.assertRaises(grouped.ReplayError):
+                grouped.attempt_grouped_selection(first, candidates, {}, "first")
+            before = {p.name: p.read_bytes() for p in first.calls.iterdir() if p.is_file()}
+            transport = AuthoredTransport()
+            resumed = grouped.GroupedSimulationClient(output, transport, max_calls=1, hold_unresolved_requests=True)
+            with self.assertRaises(grouped.HeldPaidRequest):
+                grouped.attempt_grouped_selection(resumed, candidates, {}, "first")
+            self.assertFalse(resumed.stopped.is_set())
+            self.assertEqual(before, {p.name: p.read_bytes() for p in resumed.calls.iterdir() if p.is_file()})
+            with self.assertRaisesRegex(grouped.ReplayError, "paid_call_budget_exhausted"):
+                grouped.attempt_grouped_selection(resumed, candidates, {"newRequest": True}, "second")
+            self.assertTrue(resumed.stopped.is_set())
+            self.assertEqual([], transport.requests)
+            self.assertEqual(1, len(list(resumed.calls.glob("*.pending.json"))))
+
 
 if __name__ == "__main__":
     unittest.main()
