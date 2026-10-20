@@ -61,6 +61,102 @@ zoop-ai-ingest run --state-dir STATE --sources registry.json --fixture-manifest 
 - **지원/미지원**: 지원은 명시된 `text/html`·`application/pdf` URL의 단발 수집뿐입니다(`text/plain` 등은 없음). 검색·RSS·DART/OpenDART 같은 API·인증·스케줄링·주기 갱신·시간 창 coverage 주장은 구현하지 않았으며 수집은 `coverageThrough`를 비웁니다. 실제 사이트에 대한 수집은 이 변경에서 실행하지 않았습니다.
 - **HTTPS 인증서 검증**은 끌 수 없고, 연결 IP가 아니라 원래 요청 호스트를 Host·SNI·인증서 이름으로 사용합니다. 공개 회귀 시험의 HTTP 루프백만으로 TLS의 신뢰 체인과 이름 검증까지 증명할 수 없으므로, TLS 변경 시 별도 신뢰된 로컬 테스트 CA/잘못된 이름/신뢰되지 않은 CA 검증이 필요합니다.
 
+### 수령자용 최단 레시피: 명시한 URL → 준비된 문서 export (모델·PoC·DB 서버·클라우드 없음)
+
+필요한 것은 `make pipeline-install`로 만든 `ai/pipeline/.venv`뿐이다. Neo4j·PostgreSQL·OpenAI/TypeSafe 키·네트워크 계정은 필요 없다(네트워크는 `zoop-ai-collect`가 **요청에 적은 URL**에만 연다). 저장소 checkout 안의 `.venv`를 쓰면 앱/S1 상태 루트가 자동 파악된다. checkout 밖에 설치한 패키지는 `ZOOP_STATE_DIR`·`ZOOP_AI_WORKER_STATE_DIR`(절대 경로)를 지정해야 하고 없으면 거부한다. 두 모드는 **같은 명령, 다른 입력**이다. 합성 시연이 외부 문서가 아님은 export의 `observation.collection.network`가 `synthetic_loopback`인지로 구분하며, 실제 모드의 값은 `external`이다.
+
+**A. 합성 시연(외부 접속 없음, 바로 실행).** 임시 `127.0.0.1` 서버가 합성 HTML 1건·PDF 1건을 내주고 실제 CLI 세 개(collect → ingest run → ingest export)를 subprocess로 돌린 뒤 파일을 **남긴다**(기본 smoke는 모두 지운다). 출력 디렉터리는 없거나 비어 있어야 한다.
+
+```sh
+ai/pipeline/.venv/bin/python ai/pipeline/scripts/collection_smoke.py --output-dir /tmp/zoop-collection-demo
+# 남는 파일: sources.json, policy.json, collect-request.json, ingest-run-request.json (이 시연의 전체 유효 설정/요청),
+#            inputs/collections/demo-collect-1/ (원본 bytes·receipt·manifest), state/ingestion.sqlite3, exports/n1.json, exports/d1.json
+```
+
+서버는 종료됐으므로 남은 URL·포트는 재실행용이 아니라 형식 참고용이다. 이 파일들은 합성 문서이며 근거 자료나 실제 수집물이 아니다. 아래 B의 JSON은 같은 스키마의 실제 모드 버전이다.
+
+**B. 실제 모드: 사용자가 권리를 확인한 URL만.** 아래 `news.example.com`, `evidence`, `userAgent`, `targets`는 반드시 자기 값으로 바꾼다. `evidence`에는 이 URL들의 수집·저장·인용 표시를 허락한다는 **실제 근거**(계약·약관·서면 허락)를 적는다. 공개 URL이라는 사실이나 robots 허용은 근거가 아니다. 근거 없이 임의의 사이트를 넣지 않는다. 한 번에 최대 50건이며 모든 값이 필수라 기본값이 없다.
+
+```sh
+BIN="$PWD/ai/pipeline/.venv/bin"
+WORK="$HOME/zoop-collection-work"      # 새 디렉터리. 저장소 안이나 앱/S1/worker 상태 디렉터리 안에 두지 않는다
+mkdir -p "$WORK/inputs"
+
+cat > "$WORK/sources.json" <<EOF
+{"schemaVersion":"zoop-ingestion-s2-1","revision":"operator-1","sources":[{
+  "sourceId":"my-source","adapter":"collected-http","inputRoot":"$WORK/inputs","allowedHosts":["news.example.com"],
+  "scopes":[{"scopeId":"body","selection":"operator-listed URLs, one-off","initialCursor":null,"articleXPath":null,
+             "timestampLimitations":["one-off explicit URL list; no discovery or time-window coverage"]}],
+  "grant":{"grantId":"my-grant","revision":"rights-1","sourceId":"my-source","enabled":true,"rights":"known",
+           "allowedOperations":["read","store","quote-display"],"recipients":[],"purposes":[],
+           "evidence":["<수집·저장·인용 표시를 허락한 계약/약관/서면 근거를 여기에 적는다>"],"expiresAt":null}}]}
+EOF
+
+cat > "$WORK/policy.json" <<'EOF'
+{"schemaVersion":"zoop-collection-policy-1","userAgent":"ZoopCollector/1.0 (+mailto:operator@example.com)","timeoutSeconds":20,
+ "maxTotalSeconds":300,"maxRedirects":3,"maxRequests":20,"maxResponseBytes":5000000,"maxTotalBytes":50000000,"minIntervalSeconds":1,
+ "allowedMediaTypes":["text/html","application/pdf"],"syntheticLoopback":false}
+EOF
+
+cat > "$WORK/collect-request.json" <<'EOF'
+{"schemaVersion":"zoop-collection-1","collectionId":"my-collect-1","sourceId":"my-source","scopeId":"body","targets":[
+  {"candidateId":"n1","url":"https://news.example.com/articles/1","title":"기사 제목(운영자가 선언)","documentKind":"news",
+   "publishedAt":"2026-10-14","supplierDocumentId":null,"modifiedAt":null,"sourceRevision":null},
+  {"candidateId":"d1","url":"https://news.example.com/filings/2.pdf","title":"공시 제목","documentKind":"disclosure",
+   "publishedAt":"2026-10-14T09:00:00+09:00","supplierDocumentId":"filing-2","modifiedAt":null,"sourceRevision":null}]}
+EOF
+
+# 1) 수집. 종료 0은 모든 URL 수집 완료일 때만이다. 2면 collect-result.json의 targets[].code와 error.code를 읽는다.
+"$BIN/zoop-ai-collect" run --sources "$WORK/sources.json" --policy "$WORK/policy.json" < "$WORK/collect-request.json" > "$WORK/collect-result.json"
+
+# 2) 수집 manifest를 ingestion 요청으로 연결한다(fixtureManifestHash = collect-result.json의 manifest.sha256).
+"$BIN/python" - "$WORK" <<'PY'
+import json, sys
+work = sys.argv[1]
+result = json.load(open(f"{work}/collect-result.json"))
+json.dump({"schemaVersion": "zoop-ingestion-s2-1", "roundId": "my-round-1", "sourceId": result["sourceId"], "scopeId": result["scopeId"], "window": None,
+           "checkpointRevision": 0, "fixtureManifestHash": result["manifest"]["sha256"], "cleanerVersion": "exact-copy-1"}, open(f"{work}/ingest-run.json", "w"))
+open(f"{work}/manifest-path.txt", "w").write(result["manifestPath"])
+PY
+"$BIN/zoop-ai-ingest" run --state-dir "$WORK/state" --sources "$WORK/sources.json" --fixture-manifest "$(cat "$WORK/manifest-path.txt")" < "$WORK/ingest-run.json" > "$WORK/ingest-result.json"
+
+# 3) 준비된 문서 하나당 export 하나. state는 읽기 전용으로 열리며 --require-store는 export 순간 grant에 `store`까지 있어야 통과시킨다.
+mkdir -p "$WORK/selectors" "$WORK/exports"
+"$BIN/python" - "$WORK" <<'PY'
+import json, sys
+work = sys.argv[1]
+result = json.load(open(f"{work}/ingest-result.json"))
+assert result["state"] == "complete", result   # incomplete는 부분·실패 수집이다. 성공한 0건으로 취급하지 않는다
+for ref in result["documentRefs"]:
+    if ref["documentVersion"] is None:         # hold/error 문서는 export 대상이 아니다(ingest-result.json의 hold/error를 읽는다)
+        continue
+    selector = {"schemaVersion": "zoop-ingestion-s2-1", "roundId": result["roundId"], "sourceId": result["sourceId"],
+                **{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")}}
+    json.dump(selector, open(f"{work}/selectors/{ref['page']}-{ref['ordinal']}.json", "w"))
+PY
+for selector in "$WORK"/selectors/*.json; do
+  "$BIN/zoop-ai-ingest" export --state-dir "$WORK/state" --sources "$WORK/sources.json" --require-store < "$selector" > "$WORK/exports/$(basename "$selector")"
+done
+```
+
+`collectionId`·`roundId`는 불변이다. 같은 id로 입력이 다르면 `collection_input_conflict`/`round_input_conflict`이므로 다시 돌릴 때는 새 id를 쓴다. `$WORK/exports/*.json`이 수령자가 읽는 산출물이다.
+
+**export가 담는 것과 담지 않는 것(인수 시 읽을 출처·한계).**
+
+| 수령자가 보존할 값 | 위치 | 비고 |
+| --- | --- | --- |
+| 문서·버전 식별 | `observation.documentId`·`rawVersion`·`documentVersion` | source-local ID다. 같은 URL의 본문이 바뀌면 `documentVersion`이 새로 생기고 문서 ID는 유지된다 |
+| 실제 수집 시각 | `observation.collection.fetchedAt`(UTC offset 포함 instant), 원본은 `receipts/<sha256>.json` | 페이지 `Date`·발행 시각이 아니라 이 프로세스가 받은 시각이다 |
+| 게시 시각과 정밀도 | `observation.collection.published{raw,precision,date,basis}` | 운영자가 요청에 선언한 값뿐이다(페이지에서 긁지 않음). `day`는 날짜만 남고 자정으로 바뀌지 않으며, 오프셋 없는 시각은 `unresolved`, 미선언은 `unknown`. `observation.publishedAt`은 `instant`일 때만 채워진다 |
+| 수집 경로·분류 | `observation.provenance`(`collected_http`), `collection.network`, `collection.documentKind`, `finalUrl`, `httpStatus`, `contentType`, `bodySha256` | `network`가 `synthetic_loopback`이면 시험 서버 bytes이지 외부 문서가 아니다 |
+| 권리 | `grant.grantId`·`grant.revision` | export에는 권리 **내용**(rights·evidence·operations)이 없다. 내용은 `sources.json`의 grant가 정본이며 수령자는 grant id/revision과 함께 보관해야 한다 |
+| 본문 | `document.text`(준비된 텍스트), `document.rawLocators`, `locatorMetadata.rawHash` | 텍스트는 정리된 사본이고 원본 bytes가 아니다. HTML은 DOM text 좌표, PDF는 page 추출 텍스트 좌표다 |
+
+- **원본 bytes는 export에 들어 있지 않다.** 원본은 `inputRoot/collections/<collectionId>/bodies/<sha256>.bin`과 `ingestion.sqlite3`의 raw BLOB에 있다. 수령자에게 원본이 필요하면 `locatorMetadata.rawHash`·`collection.bodySha256`과 일치하는 파일을 별도로 전달하고, 그 전달도 `read`·`store` 권리가 있는 경우에만 한다.
+- **export는 그 순간의 권한 확인 결과**다. 이후 grant가 철회·만료되면 같은 export 명령은 본문 없이 `source_unauthorized`만 낸다. 이미 파일로 복사된 export는 이 CLI가 회수하지 못한다.
+- title·kind·게시/수정 시각은 운영자 선언이며 검증된 사실이 아니다. 공개·게시 승인, 요약·감성·기업 연결, 앱 Dataset 등록, 완전성·커버리지 주장은 이 출력에 없다.
+- 합성 시연(A)과 실제 모드(B)는 같은 형식이지만 A의 파일을 실제 수집 결과로 인용하면 안 된다. 이 절의 B 명령은 외부 사이트를 대상으로 실행되지 않았다.
+
 
 `zoop_ai_pipeline.ingestion_cli`의 `run/resume/inspect`는 BFF의 admin `ingest-run`과 **다른 내부 실행 경계**다. 네이티브 URL/HTML/PDF 준비(`ingestion_url`·`ingestion_parsers`·`ingestion_pdf`, lxml·pypdf, 같은 공개 의존성)만 쓰며 private PoC를 import하지 않고 네트워크·모델·PoC 원장·앱/S1 DB에는 연결하지 않는다(네트워크는 위 `zoop-ai-collect`만 연다). 이전 pinned-PoC parser 프로필(`pocCommit`)로 만든 round는 새 프로필(`parser: zoop-native-parsers-1`)과 달라 `resume`이 `parser_profile_changed`로 거부하며, 그 round의 저장된 version과 export는 그대로 읽힌다(재해석하지 않음). 새 프로필의 version은 같은 raw bytes여도 새 preparation key/version id를 가진다. 명시한 전용 `--state-dir`의 private `ingestion.sqlite3`에 원래 response/raw BLOB, source-local 문서 ID, raw/text version, HTML node/PDF page span과 연속 checkpoint를 저장한다. 현재 operator `--sources`는 매번 완전한 snapshot으로 읽고, fixture manifest는 hash-pinned 파일 입력일 뿐 권한을 발급하지 않는다. 수집한 관찰의 `export`는 `observation`에 `provenance: "collected_http"`와 `collection`(실제 수집 시각, 최종 URL, HTTP 상태, 본문 sha256, 문서 종류, `network`, 선언된 게시 시각의 원문·정밀도)을 **추가로** 돌려주며 license를 주장하지 않는다. authored 관찰의 export는 이전과 같은 닫힌 키 집합 그대로다(Java `IngestionExportParser`가 두 형태의 정확한 키 집합을 고정하며, 같은 집합을 `tests/test_collection.py`가 고정한다). run/inspect 결과의 최상위 `provenance`는 두 경우 모두 있다.
 

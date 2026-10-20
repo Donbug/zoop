@@ -2,6 +2,8 @@
 
 세 개의 독립 Python 프로젝트(각자 `pyproject.toml`·`uv.lock`·`.venv`)가 있습니다. workspace가 아니며 서로의 소스를 import하지 않습니다.
 
+원장 CLI는 `fcntl` 파일 잠금과 POSIX 파일 권한을 사용하므로 macOS/Linux에서 실행합니다. Windows에서는 WSL의 Linux 파일시스템과 그 안에 설치한 Python 환경을 사용하세요(Windows 네이티브 Python은 지원하지 않음). 아래 예시는 POSIX 셸 기준이며 WSL 실행 자체는 별도 검증 대상입니다. Java 그래프 fixture 실행은 [API 안내](../api/README.md)를 따르며 이 Python 파이프라인을 요구하지 않습니다.
+
 | 프로젝트 | 패키지 | 의존성 | 하는 일 | 실행 |
 | --- | --- | --- | --- | --- |
 | [`worker/`](worker/README.md) | `zoop_ai` | 공개 패키지만(pydantic, httpx). **토큰 불필요** | S1 문서 요약·감성·의미 검증·briefing-outlook의 영속 JSON CLI | `zoop-ai` |
@@ -11,7 +13,7 @@
 공통 규칙
 - worker·pipeline의 프로세스 경계는 stdin JSON → stdout canonical JSON(성공 0, 오류/보류 2)입니다. 이들 CLI는 HTTP 서버가 아니며 `.env`를 읽지 않습니다. HTTP는 별도 프로젝트 `service/`가 맡고 worker CLI와 S2 `zoop-ai-extract`·S3 `zoop-ai-relation` CLI를 감싸는 얇은 층일 뿐입니다(S2는 `/internal/v1/extraction-jobs` 별도 가족, 기본 꺼짐, 제출·상태·결과·취소·복구, 호출자는 서버가 사전 승인한 요청의 digest만 참조하며 스냅샷·카탈로그·fixture를 보낼 수 없음. S3는 `/internal/v1/relation-jobs` 별도 가족, 기본 꺼짐, 제출·상태·결과·취소·복구와 HOLD 검수(allow/reject)·큐에 넣는 재검증·operation 조회·복구, 목록 없음. 검수 값 `sourceVersion`·`sourceRevision`은 런타임 원천 값이며 앱 revision이 아닙니다). live 모델 호출은 S1에서만 명시 opt-in이고 S2/S3는 replay 전용입니다. S2-2의 `submit`은 운영자 소유 `--replay` 파일을 요구하므로 서버 소유 승인 파일이 정확한 요청과 fixture digest를 고정한 경우에만 HTTP로 열고, S2-1 수집은 운영자 파일 입력이라 열지 않습니다. S3 HTTP는 운영자가 준비한 S2 job을 서버 소유 allowlist로 principal별로 허용한 upstream으로만 씁니다. `zoop-ai-dependents`는 세 원장을 읽기 전용으로만 여는 조회 명령이며 HTTP·앱 상태와 연결하지 않았습니다.
 - `--state-dir`는 항상 명시해야 하고, 앱(`prototype/bff/var`, 향후 `api/var`)·worker(`ai/worker/var`) 상태 루트와 겹치면 거부합니다. pipeline의 세 원장(ingestion/extraction/relation)은 서로 다른 디렉터리이고, `zoop-ai-graph`의 `graph.sqlite3`도 별도 디렉터리여야 하며 세 원천 원장과 겹치면 거부합니다. 설치된 pipeline 패키지는 저장소 위치를 추측하지 않으므로 `ZOOP_STATE_DIR`·`ZOOP_AI_WORKER_STATE_DIR`(절대 경로)를 명시해야 하고, 없으면 `state_ownership_unconfigured`로 닫힙니다.
-- pipeline 명령 중 `zoop-ai-graph`만 네트워크를 연다: 한 원장에 묶인 loopback(또는 인증서 검증 TLS) Neo4j 한 곳이며 pipeline이 그 유일한 writer입니다. 쓰는 것은 완료된 S3 job 하나의 **비공개** 불변 version stage뿐입니다(FS080 일부. 출력 `publication`은 항상 `not-published`이고 활성 공개 상태·앱 등록·HTTP·FS081 철회·영향 라벨 projection은 없습니다). `ai/service`는 이 CLI를 감싸지 않고(HTTP 없음) Spring도 Neo4j write 자격을 갖지 않으며, PoC Neo4j와 PoC의 변경 writer는 쓰지 않습니다. 자격은 환경에서만 읽고 출력에 싣지 않습니다.
+- 네트워크 경로는 목적별로 나뉩니다. `zoop-ai-collect`는 권한과 호스트 범위가 확인된 명시 URL을 수집하고, `zoop-ai-graph`는 한 원장에 묶인 Neo4j로 접속합니다. `zoop-ai-handoff`는 Neo4j 없이 로컬 원장과 운영자 파일로 인계 묶음을 생성·검증합니다. Neo4j writer는 비공개 불변 version을 저장하며 공개 활성화를 수행하지 않습니다. `ai/service`에는 선택적인 비공개 graph 읽기와 별도의 handoff 읽기 HTTP가 있지만, Spring의 공개 그래프는 앱 스냅샷을 읽으므로 Neo4j 자격이 필요하지 않습니다. 인계·실행 범위는 [그래프 인계 안내](../api/docs/GRAPH_READ_HANDOFF.md)를 참고하세요.
 - BFF는 worker를 설치된 CLI(`ai/worker/.venv/bin/zoop-ai`)로만 호출합니다. `service/`도 같은 설치된 CLI만 호출하고 worker 상태 DB를 열거나 `zoop_ai`를 import하지 않으며, 서비스 상태 루트(`ZOOP_AI_SERVICE_STATE_DIR`)는 worker·앱 상태 루트와 겹치면 시작을 거부합니다. BFF·pipeline·service는 서로의 런타임을 import하지 않습니다. pipeline과 service는 worker를 **test 의존성**으로만 설치합니다.
 - 공개 계약은 `docs/api/ai-contract.schema.json`(worker `scripts/export_schema.py`가 생성)입니다. 포터블 fixture(`worker/fixtures/contracts`)는 BFF/PoC 입력이 필요해 BFF 소유 도구 `prototype/bff/scripts/export_contracts.py`가 생성합니다. 내부 HTTP 계약은 `docs/api/internal-ai-openapi.{json,yaml}`(service 소유 `scripts/export_openapi.py`가 생성)이며 위 schema를 **참조**하고 복제하지 않습니다.
 
