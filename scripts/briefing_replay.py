@@ -111,7 +111,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def authenticated_transport(key_file: Path):
+def authenticated_transport(key_file: Path, timeout=180):
     key = read_key(key_file)
     opener = urllib.request.build_opener(NoRedirect())
 
@@ -119,7 +119,7 @@ def authenticated_transport(key_file: Path):
         request = urllib.request.Request(ENDPOINT, data=body, method="POST", headers={
             "Authorization": "Bearer " + key, "Content-Type": "application/json"})
         try:
-            with opener.open(request, timeout=180) as reply:
+            with opener.open(request, timeout=timeout) as reply:
                 value = reply.read(MAX_RESPONSE_BYTES + 1)
                 if len(value) > MAX_RESPONSE_BYTES:
                     raise ReplayError("provider_response_too_large_unknown_usage")

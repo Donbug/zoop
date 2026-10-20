@@ -247,18 +247,33 @@ def freeze_grouped_selection(reply, candidates, identity_sha, previous_selected=
 
 
 class GroupedSimulationClient(sim.SimulationClient):
-    """Use the grouped prompt only for selection; reuse original generation checks."""
+    """Keep original stages/schemas and add grouping-aware prompt semantics."""
     def request(self, stage, data, prompt_name, schema_name, max_output=12000, schema_override=None):
-        if stage != SELECTION_STAGE:
+        schema_root = sim.PROMPTS
+        if stage == SELECTION_STAGE:
+            require(prompt_name == "selection.md" and schema_name == "selection.schema.json", "grouped_selection_prompt_name_invalid")
+            resource_name, schema_root = prompt_name, PROMPTS
+        elif stage in {"round_simulation_" + edition + "_" + phase
+                       for edition in ("morning", "evening") for phase in ("generation", "verification")}:
+            edition = data.get("edition")
+            phase = "verification" if stage.endswith("_verification") else "generation"
+            require(edition in {"morning", "evening"} and stage == "round_simulation_" + edition + "_" + phase,
+                    "grouped_generation_stage_edition_mismatch")
+            resource_name = "verification.md" if phase == "verification" else "generation-" + edition + ".md"
+            allowed_names = {resource_name} if phase == "verification" else {resource_name, "generation-v2-" + edition + ".md"}
+            require(prompt_name in allowed_names and schema_name == phase + ".schema.json", "grouped_generation_prompt_name_invalid")
+        else:
             return super().request(stage, data, prompt_name, schema_name, max_output, schema_override)
-        require(prompt_name == "selection.md" and schema_name == "selection.schema.json", "grouped_selection_prompt_name_invalid")
-        instructions = base.regular(PROMPTS / prompt_name).decode("utf-8")
+        instructions = base.regular(PROMPTS / resource_name).decode("utf-8")
         identity = data.get("context", {})
-        expected = identity.get("groupedPromptSha256") or identity.get("promptArtifacts", {}).get("grouped-selection.md")
+        expected = identity.get("promptArtifacts", {}).get("grouped-" + resource_name)
+        if stage == SELECTION_STAGE:
+            expected = identity.get("groupedPromptSha256") or expected
         require(expected is None or expected == base.digest(instructions.encode()), "grouped_prompt_changed_after_input_freeze")
-        output_schema = copied(schema_override) if schema_override is not None else base.strict_load(base.regular(PROMPTS / schema_name))
-        expected_schema = identity.get("promptArtifacts", {}).get("grouped-selection.schema.json")
-        require(expected_schema is None or expected_schema == base.digest(base.regular(PROMPTS / schema_name)),
+        output_schema = copied(schema_override) if schema_override is not None else base.strict_load(base.regular(schema_root / schema_name))
+        schema_artifact = ("grouped-" if stage == SELECTION_STAGE else "") + schema_name
+        expected_schema = identity.get("promptArtifacts", {}).get(schema_artifact)
+        require(expected_schema is None or expected_schema == base.digest(base.regular(schema_root / schema_name)),
                 "grouped_schema_changed_after_input_freeze")
         request = {"model": base.MODEL, "store": False, "max_output_tokens": max_output, "instructions": instructions,
             "input": base.canonical(data).decode("utf-8"), "reasoning": {"effort": "low"},

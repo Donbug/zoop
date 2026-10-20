@@ -157,7 +157,7 @@ class BriefingRoundReplayPostgresTest {
             ObjectNode identity = (ObjectNode) round.path("identity");
             identity.set("previous", previous.deepCopy()); identity.put("groupArchiveSha256", ArtifactFileStore.sha256(bytes));
             ObjectNode prompts = (ObjectNode) identity.path("promptArtifacts");
-            for (String name : List.of("selection.md", "selection.schema.json")) {
+            for (String name : List.of("selection.md", "selection.schema.json", "generation-morning.md", "generation-evening.md", "verification.md")) {
                 try (var stream = BriefingRoundReplayPostgresTest.class.getResourceAsStream("/briefing/prompts/grouped-issues/" + name)) {
                     if (stream == null) throw new IllegalStateException("Missing grouped prompt resource");
                     prompts.put("grouped-" + name, ArtifactFileStore.sha256(stream.readAllBytes()));

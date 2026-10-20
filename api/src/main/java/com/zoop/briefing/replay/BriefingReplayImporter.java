@@ -184,7 +184,7 @@ public final class BriefingReplayImporter {
                 ? BriefingGroupedSimulationRules.archive(bundle, settings.bundle().getParent(), sourceNodes, clocks) : null;
         List<StrictJson.Obj> definitions = bundle.objects("rounds"); require(definitions.size() == 14, "simulation_fourteen_rounds");
         boolean qualityV2 = simulationQualityV2(definitions.getFirst().object("identity"));
-        ArrayNode noveltyHistory = StrictJson.newArray();
+        ArrayNode noveltyHistory = StrictJson.newArray(), groupedHistory = StrictJson.newArray();
         String namespace = "brf-sim-" + Canonical.sha256(run).substring(0, 16);
         Map<String, Source> documents = new LinkedHashMap<>(); Map<String, Citation> citations = new LinkedHashMap<>();
         Map<String, Blob> blobs = new LinkedHashMap<>(); List<Round> publications = new ArrayList<>();
@@ -221,7 +221,7 @@ public final class BriefingReplayImporter {
             for (var receipt : receipts.entrySet()) require(receipt.getValue().equals(allReceipts.get(receipt.getKey()))
                     && accounted.add(receipt.getKey()), "simulation_round_receipt_owner");
             Map<String, Issue> selected = selections(definition, inputs, true);
-            if (grouped) BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent());
+            if (grouped) BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
             if (qualityV2) {
                 validateSimulationNovelty(definition, noveltyHistory, receipts);
                 if (definition.has("noveltyAudit") && definition.object("noveltyAudit").bool("modelCalled"))
@@ -307,12 +307,25 @@ public final class BriefingReplayImporter {
                 }
                 priorId = selected.isEmpty() ? null : id; priorSha = selected.isEmpty() ? null : definition.string("resultSha256");
                 if (qualityV2 && "SELECTED".equals(state)) appendSimulationNoveltyHistory(noveltyHistory, definition);
+                if (grouped && "SELECTED".equals(state)) for (StrictJson.Obj item : definition.objects("selected")) {
+                    ObjectNode previousIssue = groupedHistory.addObject().put("issueId", item.string("issueId")).put("title", item.string("title"));
+                    previousIssue.set("sources", item.array("sources").deepCopy());
+                }
             }
             ids.add(id);
         }
         require(accounted.equals(allReceipts.keySet()), "simulation_unowned_paid_receipt");
         if (grouped) {
             blobs.put(namespace + "-grouped-issues", blob("briefing_input", groupedArchive.bytes()));
+            for (BriefingGroupedSimulationRules.UnknownCall call : groupedArchive.unknownCalls()) {
+                rejectCredentialFields(StrictJson.parseObject(call.request()).node());
+                blobs.put(namespace + "-request-" + call.digest(), blob("ai_submit", call.request()));
+                blobs.put(namespace + "-reservation-" + call.digest(), blob("briefing_input", call.reservation()));
+            }
+            ObjectNode accounting = StrictJson.newObject().put("unknownGroupingCalls", groupedArchive.unknownCalls().size())
+                    .put("allGroupingUsageKnown", groupedArchive.root().objects("receipts").stream().allMatch(r -> r.bool("usageKnown")));
+            accounting.put("meaning", "Unknown reservations retain no fabricated usage or provider response and are never selected evidence.");
+            blobs.put(namespace + "-grouping-accounting", blob("verification_receipt", StrictJson.write(accounting)));
             for (var receipt : simulationReceiptLedger(bundle.objects("groupingReceipts")).entrySet())
                 require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "grouped_receipt_ownership");
         }
@@ -858,7 +871,8 @@ public final class BriefingReplayImporter {
         if (simulationQualityV2(identity)) names.addAll(List.of("selection-v2.md", "selection-v2.schema.json",
                 "generation-v2-morning.md", "generation-v2-evening.md", "novelty.md", "novelty.schema.json", "novelty-verification.md"));
         boolean grouped = BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"));
-        if (grouped) names.addAll(List.of("grouped-selection.md", "grouped-selection.schema.json"));
+        if (grouped) names.addAll(List.of("grouped-selection.md", "grouped-selection.schema.json",
+                "grouped-generation-morning.md", "grouped-generation-evening.md", "grouped-verification.md"));
         StrictJson.Obj prompts = identity.object("promptArtifacts"); prompts.exactly(Set.copyOf(names));
         for (String name : names) {
             String resource = name.startsWith("grouped-") ? "/briefing/prompts/grouped-issues/" + name.substring("grouped-".length())

@@ -17,7 +17,8 @@ def prompt_artifacts():
     names = ["importance.md", "importance.schema.json", "selection.md", "selection.schema.json",
              "generation-morning.md", "generation-evening.md", "generation.schema.json", "verification.md", "verification.schema.json"]
     result = {n:base.digest(base.regular(sim.PROMPTS/n)) for n in names}
-    result.update({"grouped-"+n:base.digest(base.regular(grouped.PROMPTS/n)) for n in ["selection.md","selection.schema.json"]})
+    result.update({"grouped-"+n:base.digest(base.regular(grouped.PROMPTS/n)) for n in
+                   ["selection.md","selection.schema.json","generation-morning.md","generation-evening.md","verification.md"]})
     return result
 
 
@@ -71,6 +72,8 @@ def run(args, transport=None):
             if record["selectionStatus"]=="SELECTED":published_history.extend(record["selected"])
             continue
         context=sim.model_context(identity,identity_sha,previous_result)
+        context["priorSelectedIssues"]=[{"issueId":item["issueId"],"title":item["title"],"sources":item["sources"]}
+                                        for item in published_history]
         record={"roundId":round_id,**spec,"identity":identity,"identitySha256":identity_sha,
                 "inputSources":inputs,"clockRefs":clocks,"sourceCoverage":coverage,"discardedDuplicateBodies":duplicates,
                 "previous":previous,"selected":[],"result":None,"resultSha256":None,"receipts":[],

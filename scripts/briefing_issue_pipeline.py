@@ -44,10 +44,37 @@ def strings():
     return {"type": "string"}
 
 
+class HeldPaidRequest(Error):
+    """An operator explicitly withheld a previously unresolved paid reservation."""
+    def __init__(self, request_digest, stage):
+        super().__init__("operator_held_unresolved_paid_request")
+        self.request_digest = request_digest
+        self.stage = stage
+
+
 class IssueClient(base.ResponsesClient):
-    def __init__(self, output, transport, prompts, max_calls):
+    def __init__(self, output, transport, prompts, max_calls, hold_unresolved_requests=False):
         super().__init__(output, transport, max_calls)
         self.prompts = prompts
+        # Only reservations unresolved before this process started can be held.
+        # A new transport failure still stops every queued sibling normally.
+        self.held_at_start = {p.name.removesuffix(".pending.json") for p in self.calls.glob("*.pending.json")
+            if not (self.calls / (p.name.removesuffix(".pending.json") + ".complete.json")).exists()} if hold_unresolved_requests else set()
+
+    def call(self, stage, data, prompt_name, schema_name, max_output=8000, schema_override=None):
+        encoded, _, _ = self.request(stage, data, prompt_name, schema_name, max_output, schema_override)
+        key = digest(encoded)
+        if key in self.held_at_start and not self.stopped.is_set():
+            pending = base.strict_load(base.regular(self.calls / (key + ".pending.json")))
+            if pending.get("requestDigest") != key or pending.get("stage") != stage or pending.get("model") != base.MODEL \
+                    or digest(base.regular(self.calls / (key + ".request.json"))) != key:
+                self.stopped.set()
+                raise Error("held_paid_reservation_identity_mismatch")
+            if not (self.calls / (key + ".complete.json")).exists():
+                # Deliberately outside ResponsesClient.call: this disposition is
+                # neither a successful receipt nor a new global transport failure.
+                raise HeldPaidRequest(key, stage)
+        return super().call(stage, data, prompt_name, schema_name, max_output, schema_override)
 
     def request(self, stage, data, prompt_name, schema_name, max_output=12000, schema_override=None):
         instructions = self.prompts[stage]
@@ -62,6 +89,12 @@ class IssueClient(base.ResponsesClient):
 
     def ask(self, stage, data, schema, max_output=14000):
         return self.call(stage, data, stage, stage, max_output, schema)
+
+
+def unresolved_hold(error):
+    return {"reason": "operator_held_unresolved_paid_request", "requestDigest": error.request_digest,
+            "stage": error.stage, "usageKnown": False, "inputTokens": None, "outputTokens": None,
+            "actualCostKnown": False, "actualCost": None, "operatorDisposition": "hold_without_retransmission"}
 
 
 def resolve_quotes(value, articles):
@@ -331,14 +364,18 @@ def run(args, transport=None):
         if saved["identitySha256"] != plan["identitySha256"]:
             raise Error("issue_archive_identity_changed")
         return {**plan, "status": "REUSED", "newPaidCalls": 0, "counts": saved["counts"], "archiveSha256": digest(base.regular(archive))}
-    client = IssueClient(output, transport or base.authenticated_transport(Path(args.key_file)), instructions, args.max_calls)
+    client = IssueClient(output, transport or base.authenticated_transport(Path(args.key_file), timeout=600), instructions, args.max_calls,
+                         hold_unresolved_requests=getattr(args, "hold_unresolved_requests", False))
     lock = output / ".issue-run.lock"
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600); os.close(fd)
     try:
         extracted, held = [], []
         batches = [rows[i:i+args.batch_size] for i in range(0, len(rows), args.batch_size)]
         def extract(batch):
-            result = extraction_batch(client, rules, prompts, catalogue, batch, authorization)
+            try:
+                result = extraction_batch(client, rules, prompts, catalogue, batch, authorization)
+            except HeldPaidRequest as error:
+                result = ([], [{"articleId": row["documentId"], **unresolved_hold(error)} for row in batch])
             print(json.dumps({"stage": "extraction", "documents": len(batch), "accepted": len(result[0]), "held": len(result[1])}), flush=True)
             return result
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
@@ -348,7 +385,15 @@ def run(args, transport=None):
         decisions, aliases = [], {}
         for index in range(0, len(extracted), args.comparison_batch_size):
             batch = extracted[index:index+args.comparison_batch_size]
-            comparisons = compare_batch(client, rules, prompts, batch, issues, authorization)
+            try:
+                comparisons = compare_batch(client, rules, prompts, batch, issues, authorization)
+            except HeldPaidRequest as error:
+                for value in batch:
+                    decision = {"mentionId": value["key"], "articleId": value["article"].article_id,
+                        "status": "HOLD", "issueId": None, "holdReason": "operator_held_unresolved_paid_request",
+                        "sameTargets": [], "follows": [], "comparisons": [], "approved": False, **unresolved_hold(error)}
+                    decisions.append(decision); held.append(decision)
+                continue
             for value in batch:
                 article, mention = value["article"], value["mention"]
                 checked = []
@@ -410,6 +455,8 @@ def parser():
         p.add_argument("--" + field, required=True)
     p.add_argument("--key-file")
     p.add_argument("--execute-authorized", action="store_true")
+    p.add_argument("--hold-unresolved-requests", action="store_true",
+        help="Explicitly HOLD batches with paid reservations unresolved before this process; never resend them or invent usage.")
     p.add_argument("--batch-size", type=int, choices=range(1,17), default=6)
     p.add_argument("--comparison-batch-size", type=int, choices=range(1,13), default=6)
     p.add_argument("--workers", type=int, choices=range(1,4), default=3)

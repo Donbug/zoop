@@ -98,6 +98,13 @@ class GroupedRunTest(unittest.TestCase):
         self.assertEqual(14, result["selectedIssues"])
         self.assertEqual(42, result["newPaidCalls"])
         self.assertEqual(42, len(transport.requests))
+        for index, encoded in enumerate(transport.requests):
+            data = base.strict_load(base.strict_load(encoded)["input"])
+            expected = index // 3
+            self.assertEqual(expected, len(data["priorSelectedIssues"]))
+            for prior in data["priorSelectedIssues"]:
+                self.assertEqual({"issueId", "title", "sources"}, set(prior))
+                self.assertTrue(prior["sources"])
         self.assertEqual(14, len(bundle["rounds"]))
         self.assertEqual("zoop-briefing-grouped-simulation-v1", bundle["schemaVersion"])
         self.assertFalse(bundle["authorization"]["productionAuthorized"])

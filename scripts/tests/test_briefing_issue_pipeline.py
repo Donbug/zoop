@@ -13,6 +13,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("issue_pipeline_tests_target", HERE / "briefing_issue_pipeline.py")
@@ -303,6 +304,125 @@ class IssuePipelineTest(unittest.TestCase):
         self.assertEqual("HOLD", third["comparisons"][0]["effective"]["relation"])
         self.assertEqual(3, len(transport.comparison_pairs))
         self.assertEqual(1, result["counts"]["holds"])
+
+    def test_fifty_six_cached_calls_and_one_unresolved_reservation_are_never_resent(self):
+        output = self.root / "recovery-cache"
+        prompts = {"cache_stage": "authored cache accounting test"}
+        schema = pipeline.obj({"value": pipeline.strings()})
+        def authored(raw):
+            request = pipeline.base.strict_load(raw)
+            data = pipeline.base.strict_load(request["input"])
+            if data["index"] == 56:
+                raise OSError("authored unknown receive")
+            return clock_fixture.response({"value": str(data["index"])}, raw)
+        client = pipeline.IssueClient(output, authored, prompts, 57)
+        for index in range(56):
+            self.assertEqual({"value": str(index)}, client.ask("cache_stage", {"index": index}, schema))
+        with self.assertRaisesRegex(pipeline.Error, "transport_unknown"):
+            client.ask("cache_stage", {"index": 56}, schema)
+        before = {p.name: p.read_bytes() for p in client.calls.glob("*")}
+        calls = []
+        def deny(raw):
+            calls.append(raw)
+            raise AssertionError("recovery must not resend paid reservations")
+        default = pipeline.IssueClient(output, deny, prompts, 57)
+        with self.assertRaisesRegex(pipeline.Error, "unresolved_paid_reservation"):
+            default.ask("cache_stage", {"index": 56}, schema)
+        self.assertTrue(default.stopped.is_set())
+        recovered = pipeline.IssueClient(output, deny, prompts, 57, hold_unresolved_requests=True)
+        for index in range(56):
+            self.assertEqual({"value": str(index)}, recovered.ask("cache_stage", {"index": index}, schema))
+        with self.assertRaises(pipeline.HeldPaidRequest):
+            recovered.ask("cache_stage", {"index": 56}, schema)
+        self.assertFalse(recovered.stopped.is_set())
+        receipts = recovered.receipts()
+        self.assertEqual(56, sum(r["usageKnown"] for r in receipts))
+        unknown = next(r for r in receipts if not r["usageKnown"])
+        self.assertIsNone(unknown["inputTokens"])
+        self.assertIsNone(unknown["outputTokens"])
+        self.assertEqual([], calls)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in client.calls.glob("*")})
+        with self.assertRaisesRegex(pipeline.Error, "paid_call_budget_exhausted"):
+            recovered.ask("cache_stage", {"index": 57}, schema)
+        self.assertEqual([], calls)
+
+    def test_explicit_recovery_holds_six_documents_and_reuses_all_other_calls(self):
+        self.prepared(self.same_event_rows(12))
+        args = self.args(True)
+        args.batch_size = 6
+        args.comparison_batch_size = 6
+        normal = AuthoredIssueTransport()
+        def fail_second_batch(raw):
+            request = pipeline.base.strict_load(raw)
+            data = pipeline.base.strict_load(request["input"])
+            if request["text"]["format"]["name"] == "issue_extraction" \
+                    and any(d["article"]["article_id"] == "same-report-6" for d in data["documents"]):
+                raise OSError("authored unknown extraction response")
+            return normal(raw)
+        captured = []
+        original_client = pipeline.IssueClient
+        def capture(*values, **kwargs):
+            value = original_client(*values, **kwargs)
+            captured.append(value)
+            return value
+        with patch.object(pipeline, "IssueClient", side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(pipeline.Error, "transport_unknown"):
+                pipeline.run(args, fail_second_batch)
+        identity = pipeline.base.strict_load((self.root / "output/identity.json").read_bytes())
+        rows, _, _ = pipeline.sim.load_inputs(self.clocks.sources, self.clocks.clocks)
+        rows.sort(key=lambda r: (r["clockTime"], r["documentId"]))
+        # Complete the known six-document comparison as an authored prior receipt.
+        # The later recovery must then need zero new transport calls at any stage.
+        prefill = original_client(self.root / "output", AuthoredIssueTransport(), captured[0].prompts, args.max_calls)
+        accepted, held = pipeline.extraction_batch(prefill, self.rules, self.prompts,
+            pipeline.load_catalogue(self.companies), rows[:6], identity["authorization"])
+        self.assertEqual([], held)
+        pipeline.compare_batch(prefill, self.rules, self.prompts, accepted, {}, identity["authorization"])
+        before = {p.name: p.read_bytes() for p in prefill.calls.glob("*")}
+        args.hold_unresolved_requests = True
+        def deny(_):
+            raise AssertionError("all completed calls must reuse; unknown extraction must be held")
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = pipeline.run(args, deny)
+        archive = pipeline.base.strict_load((self.root / "output/grouped-issues.json").read_bytes())
+        self.assertEqual("COMPLETE", result["status"])
+        self.assertEqual(0, result["newPaidCalls"])
+        self.assertEqual({"NEW": 6, "MERGE": 0, "HOLD": 0}, result["assignmentCounts"])
+        withheld = [h for h in archive["held"] if h["reason"] == "operator_held_unresolved_paid_request"]
+        self.assertEqual({"same-report-" + str(i) for i in range(6, 12)}, {h["articleId"] for h in withheld})
+        self.assertEqual(1, len({h["requestDigest"] for h in withheld}))
+        self.assertTrue(all(h["usageKnown"] is False and h["inputTokens"] is None and h["outputTokens"] is None for h in withheld))
+        self.assertEqual(6, result["counts"]["mentions"])
+        self.assertEqual(6, result["counts"]["holds"])
+        self.assertEqual(1, sum(not r["usageKnown"] for r in archive["receipts"]))
+        self.assertEqual(before, {p.name: p.read_bytes() for p in prefill.calls.glob("*")})
+
+    def test_unresolved_comparison_holds_batch_without_new_or_merge(self):
+        self.prepared(self.same_event_rows(3))
+        args = self.args(True)
+        args.batch_size = 3
+        args.comparison_batch_size = 3
+        normal = AuthoredIssueTransport()
+        def fail_comparison(raw):
+            request = pipeline.base.strict_load(raw)
+            if request["text"]["format"]["name"] == "issue_comparison":
+                raise OSError("authored unknown comparison response")
+            return normal(raw)
+        with contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(pipeline.Error, "transport_unknown"):
+                pipeline.run(args, fail_comparison)
+        args.hold_unresolved_requests = True
+        def deny(_):
+            raise AssertionError("comparison recovery must not send a request")
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = pipeline.run(args, deny)
+        archive = pipeline.base.strict_load((self.root / "output/grouped-issues.json").read_bytes())
+        self.assertEqual(0, result["newPaidCalls"])
+        self.assertEqual({"NEW": 0, "MERGE": 0, "HOLD": 3}, result["assignmentCounts"])
+        self.assertEqual([], archive["issues"])
+        self.assertTrue(all(d["issueId"] is None and not d["approved"] for d in archive["decisions"]))
+        self.assertEqual({"issue_comparison"}, {h["stage"] for h in archive["held"]})
+        self.assertEqual(1, sum(not r["usageKnown"] for r in archive["receipts"]))
 
     def test_offline_plan_never_calls_provider_or_creates_output(self):
         self.prepared()

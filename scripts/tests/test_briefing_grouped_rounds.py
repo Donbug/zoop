@@ -61,8 +61,9 @@ def selection(candidates, indexes=None):
 
 
 class AuthoredTransport:
-    def __init__(self):
+    def __init__(self, semantic_repeat=False):
         self.requests = []
+        self.semantic_repeat = semantic_repeat
 
     def __call__(self, raw):
         self.requests.append(raw)
@@ -84,6 +85,13 @@ class AuthoredTransport:
             value = {"checks": {target: {"targetId": target, "verdict": "SUPPORTED", "typeAppropriate": True,
                 "temporalAppropriate": True, "noUnsupportedNumbers": True, "noInvestmentAdvice": True,
                 "reason": "합성 근거와 일치"} for target in targets}}
+            if self.semantic_repeat:
+                assert data["priorSelectedIssues"]
+                assert "의미상 재보도이면" in request["instructions"]
+                assert "실질 변화" in request["instructions"]
+                for target in targets[:2]:
+                    value["checks"][target].update(verdict="UNSUPPORTED", temporalAppropriate=False,
+                        reason="같은 계약 체결 사실을 다른 문구로 재보도했으며 실질 변화는 없습니다.")
         return 200, base.canonical({"id": "authored-" + base.digest(raw)[:16], "status": "completed",
             "usage": {"input_tokens": 100, "output_tokens": 50},
             "output": [{"type": "message", "content": [{"type": "output_text", "text": base.canonical(value).decode()}]}]})
@@ -253,6 +261,58 @@ class GroupedRoundTests(unittest.TestCase):
             data = {"context": {"promptArtifacts": {"grouped-selection.schema.json": "bad"}}}
             with self.assertRaisesRegex(grouped.ReplayError, "schema_changed"):
                 client.request(grouped.SELECTION_STAGE, data, "selection.md", "selection.schema.json")
+
+    def test_grouped_generation_preserves_strict_original_and_checks_each_prompt_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", AuthoredTransport())
+            for edition in ("morning", "evening"):
+                stage = "round_simulation_" + edition + "_generation"
+                data = {"context": {}, "edition": edition}
+                raw, schema, _ = client.request(stage, data, "generation-" + edition + ".md", "generation.schema.json")
+                request = base.strict_load(raw)
+                original = base.regular(grouped.sim.PROMPTS / ("generation-v2-" + edition + ".md")).decode()
+                self.assertTrue(request["instructions"].startswith(original))
+                self.assertIn("companyLinks", request["instructions"])
+                self.assertIn("deltaEvidenceIds", request["instructions"])
+                self.assertIn("수혜·주가 영향을 추측하지 않는다", request["instructions"])
+                self.assertEqual(stage, request["text"]["format"]["name"])
+                self.assertEqual(grouped.sim.schema("generation"), schema)
+                data["context"]["promptArtifacts"] = {"grouped-generation-" + edition + ".md": "bad"}
+                with self.assertRaisesRegex(grouped.ReplayError, "prompt_changed"):
+                    client.request(stage, data, "generation-" + edition + ".md", "generation.schema.json")
+            data = {"context": {}, "edition": "morning"}
+            raw, schema, _ = client.request("round_simulation_morning_verification", data,
+                "verification.md", "verification.schema.json")
+            self.assertTrue(base.strict_load(raw)["instructions"].startswith(base.regular(grouped.sim.PROMPTS / "verification.md").decode()))
+            self.assertEqual(grouped.sim.schema("verification"), schema)
+            data["context"]["promptArtifacts"] = {"grouped-verification.md": "bad"}
+            with self.assertRaisesRegex(grouped.ReplayError, "prompt_changed"):
+                client.request("round_simulation_morning_verification", data, "verification.md", "verification.schema.json")
+
+    def test_rephrased_same_event_can_pass_string_guard_but_semantic_verifier_withholds(self):
+        original = self.candidates()
+        prior = grouped.freeze_grouped_selection(selection(original), original, "original")
+        later = {"date": "2026-10-07", "edition": "evening", "window": {"from": round_spec()["window"]["to"],
+            "to": "2026-10-07T17:30:00+09:00", "openStart": False}}
+        doc = document("doc-rephrased", "2026-10-07T12:00:00+09:00",
+            "합성 기업은 건물 관리 기술의 적용 계약 체결 사실을 보도자료에서 다시 알렸습니다.")
+        candidates = grouped.build_grouped_candidates(archive(("issue-stable", [(doc, mention(doc, "rephrased"))])), later)
+        reply = selection(candidates)
+        reply["selected"][0].update(novelty="MATERIAL_UPDATE", deltaEvidenceIds=["ev-rephrased"])
+        selected = grouped.freeze_grouped_selection(reply, candidates, "later", prior)
+        with tempfile.TemporaryDirectory() as directory:
+            transport = AuthoredTransport(semantic_repeat=True)
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", transport)
+            context = {"context": {"mode": grouped.sim.MODE, "roundId": "later", "window": later["window"]},
+                       "contextSha256": "later", "qualityPolicy": grouped.sim.QUALITY_V2,
+                       "priorSelectedIssues": prior}
+            result = grouped.sim.generate_round(client, selected, "evening", context, 0)
+            self.assertEqual("WITHHELD", result["verification"]["status"])
+            self.assertEqual(2, len(transport.requests))
+            self.assertEqual(["round_simulation_evening_generation", "round_simulation_evening_verification"],
+                [base.strict_load(raw)["text"]["format"]["name"] for raw in transport.requests])
+            self.assertEqual(prior, base.strict_load(base.strict_load(transport.requests[-1])["input"])["priorSelectedIssues"])
+            self.assertEqual(2, len(client.receipts()))
 
 
 if __name__ == "__main__":

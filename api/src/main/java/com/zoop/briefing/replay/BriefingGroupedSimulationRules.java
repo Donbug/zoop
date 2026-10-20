@@ -23,8 +23,9 @@ final class BriefingGroupedSimulationRules {
     static final String SELECTION_STAGE = "grouped_issue_selection";
     private static final int LIMIT = 128 * 1024 * 1024;
 
+    record UnknownCall(String digest, byte[] request, byte[] reservation) { }
     record Archive(byte[] bytes, StrictJson.Obj root, Map<String, StrictJson.Obj> issues,
-            Map<String, JsonNode> sources, PublicationClockRegistry clocks) { }
+            Map<String, JsonNode> sources, PublicationClockRegistry clocks, List<UnknownCall> unknownCalls) { }
 
     static Archive archive(StrictJson.Obj bundle, Path output, Map<String, JsonNode> sources,
             PublicationClockRegistry clocks) {
@@ -52,8 +53,50 @@ final class BriefingGroupedSimulationRules {
             }
         }
         require(archive.array("receipts").equals(bundle.array("groupingReceipts")), "archive_receipt_ownership");
-        for (StrictJson.Obj receipt : archive.objects("receipts")) recording(receipt, output, false);
-        return new Archive(bytes, archive, issues, sources, clocks);
+        List<UnknownCall> unknownCalls = new ArrayList<>(); Set<String> usedDocuments = new HashSet<>();
+        issues.values().forEach(issue -> issue.objects("mentions").forEach(m -> usedDocuments.add(m.string("articleId"))));
+        for (StrictJson.Obj receipt : archive.objects("receipts")) {
+            recording(receipt, output, false);
+            if ("unknown".equals(receipt.string("status"))) unknownCalls.add(unknown(receipt, archive, usedDocuments, output));
+        }
+        return new Archive(bytes, archive, issues, sources, clocks, List.copyOf(unknownCalls));
+    }
+
+    /** An unanswered paid reservation is audit material. Its affected incoming documents stay outside accepted issues. */
+    private static UnknownCall unknown(StrictJson.Obj receipt, StrictJson.Obj archive, Set<String> usedDocuments, Path output) {
+        require(!receipt.bool("usageKnown") && receipt.isNull("inputTokens") && receipt.isNull("outputTokens")
+                && receipt.isNull("responseId") && (!receipt.has("responseSha256") || receipt.isNull("responseSha256"))
+                && (!receipt.has("httpStatus") || receipt.isNull("httpStatus"))
+                && (!receipt.has("actualCostKnown") || !receipt.bool("actualCostKnown"))
+                && (!receipt.has("actualCost") || receipt.isNull("actualCost")), "unknown_receipt_cannot_claim_response_or_usage");
+        String digest = receipt.string("requestDigest");
+        byte[] requestBytes = read(output.resolve("calls").resolve(digest + ".request.json"));
+        byte[] reservationBytes = read(output.resolve("calls").resolve(digest + ".pending.json"));
+        StrictJson.Obj request = StrictJson.parseObject(requestBytes), reservation = StrictJson.parseObject(reservationBytes);
+        require(!Files.exists(output.resolve("calls").resolve(digest + ".complete.json"), LinkOption.NOFOLLOW_LINKS)
+                && !Files.exists(output.resolve("calls").resolve(digest + ".response.json"), LinkOption.NOFOLLOW_LINKS)
+                && digest.equals(Canonical.sha256(requestBytes)) && digest.equals(reservation.string("requestDigest"))
+                && receipt.string("stage").equals(reservation.string("stage")) && receipt.string("model").equals(reservation.string("model"))
+                && Canonical.sha256(request.string("instructions")).equals(reservation.string("promptSha256"))
+                && Canonical.digest(request.object("text").object("format").object("schema").node()).equals(reservation.string("schemaSha256"))
+                && request.count("max_output_tokens") == reservation.count("maxOutputTokens")
+                && reservation.count("reservedInputTokenBound") > 0, "unknown_reservation_binding");
+        StrictJson.Obj input = StrictJson.parseObject(request.string("input")); Set<String> affected = new HashSet<>();
+        switch (receipt.string("stage")) {
+            case "issue_extraction" -> input.objects("documents").forEach(d -> affected.add(d.object("article").string("article_id")));
+            case "issue_grounding" -> input.objects("articles").forEach(a -> affected.add(a.string("article_id")));
+            case "issue_comparison" -> input.object("pairs").node().propertyNames().forEach(key ->
+                    affected.add(input.object("pairs").object(key).object("input").object("mention").string("article_id")));
+            default -> require(false, "unknown_grouping_stage");
+        }
+        require(!affected.isEmpty() && affected.stream().noneMatch(usedDocuments::contains), "unknown_documents_cannot_support_accepted_issues");
+        Set<String> held = new HashSet<>();
+        for (StrictJson.Obj hold : archive.objects("held")) if (hold.has("requestDigest") && digest.equals(hold.string("requestDigest"))) {
+            require(!hold.bool("usageKnown") && receipt.string("stage").equals(hold.string("stage")), "unknown_hold_binding");
+            held.add(hold.string("articleId"));
+        }
+        require(held.containsAll(affected), "unknown_documents_require_explicit_hold");
+        return new UnknownCall(digest, requestBytes, reservationBytes);
     }
 
     private static void exact(StrictJson.Obj evidence, StrictJson.Obj mention, JsonNode source) {
@@ -65,7 +108,7 @@ final class BriefingGroupedSimulationRules {
     }
 
     static void round(StrictJson.Obj bundle, StrictJson.Obj round, Archive archive,
-            Map<String, JsonNode> receipts, Path output) {
+            Map<String, JsonNode> receipts, Path output, ArrayNode history) {
         require(bundle.string("groupArchiveSha256").equals(round.object("identity").string("groupArchiveSha256")), "identity_archive");
         Set<String> stages = Set.of(SELECTION_STAGE, "round_simulation_" + round.string("edition") + "_generation",
                 "round_simulation_" + round.string("edition") + "_verification");
@@ -83,6 +126,7 @@ final class BriefingGroupedSimulationRules {
         require(SELECTION_STAGE.equals(receipt.string("stage")), "selection_stage");
         Recording selected = recording(receipt, output, true);
         StrictJson.Obj request = selected.input(); context(request, round);
+        require(request.array("previousSelectedIssues").equals(history) && request.array("priorSelectedIssues").equals(history), "selection_previous_history");
         require(request.count("maximumIssues") == 3 && !request.bool("operationalCollectionGate")
                 && !request.bool("historicalBodyUnchangedProven"), "selection_scope");
         Map<String, StrictJson.Obj> candidates = new LinkedHashMap<>();
@@ -113,6 +157,18 @@ final class BriefingGroupedSimulationRules {
                     && candidate.string("asOfSnapshotSha256").equals(item.string("groupedIssueSnapshotSha256")), "selected_snapshot");
             StrictJson.Obj choice = answer.objects("selected").stream().filter(c -> id.equals(c.string("issueId"))).findFirst().orElseThrow();
             StrictJson.Obj assessment = answer.object("assessments").object(id);
+            List<StrictJson.Obj> previousItems = new ArrayList<>();
+            for (JsonNode previousNode : history) if (id.equals(StrictJson.Obj.of(previousNode).string("issueId"))) previousItems.add(StrictJson.Obj.of(previousNode));
+            List<String> delta = choice.strings("deltaEvidenceIds");
+            require(new HashSet<>(delta).size() == delta.size() && choice.strings("evidenceIds").containsAll(delta)
+                    && candidate.strings("newEvidenceIds").containsAll(delta), "material_update_delta_binding");
+            if (!previousItems.isEmpty()) {
+                require("MATERIAL_UPDATE".equals(choice.string("novelty")) && !delta.isEmpty(), "repeat_requires_material_update");
+                Map<String, StrictJson.Obj> deltaEvidence = evidence(candidate, "newMentions");
+                require(delta.stream().anyMatch(e -> deltaEvidence.containsKey(e) && previousItems.stream()
+                        .flatMap(old -> old.objects("sources").stream()).noneMatch(old -> e.equals(old.string("evidenceId"))
+                                || deltaEvidence.get(e).string("quote").equals(old.string("quote")))), "repeat_requires_new_fact_evidence");
+            }
             require(choice.string("title").equals(item.string("title")) && assessment.string("reason").equals(item.string("reason"))
                     && assessment.count("importance") == item.count("importance") && assessment.count("priority") == item.count("score"), "selected_answer");
             Set<String> evidenceIds = new HashSet<>(); Map<String, StrictJson.Obj> evidence = evidence(candidate, "newMentions");
@@ -150,6 +206,7 @@ final class BriefingGroupedSimulationRules {
         Recording verified = phase(receipts, result.string("verificationRequestDigest"), verification, output);
         for (Recording call : List.of(generated, verified)) {
             context(call.input(), round);
+            require(call.input().array("priorSelectedIssues").equals(history), "generation_previous_history");
             require(call.input().array("selected").equals(round.array("selected")) && round.string("edition").equals(call.input().string("edition")), "generation_selected_binding");
         }
         JsonNode items = normalize(generated.answer().raw("items"), round.objects("selected").stream().map(i -> i.string("issueId")).toList());
@@ -176,6 +233,10 @@ final class BriefingGroupedSimulationRules {
     private static void context(StrictJson.Obj input, StrictJson.Obj round) {
         require(round.string("identitySha256").equals(input.string("contextSha256"))
                 && round.object("identity").node().equals(input.object("context").node()), "request_context_binding");
+        StrictJson.Obj previous = round.object("previous");
+        if ("available".equals(previous.string("status"))) require(!input.isNull("simulatedPreviousOutput")
+                && previous.string("resultSha256").equals(Canonical.digest(input.object("simulatedPreviousOutput").node())), "request_previous_result_binding");
+        else require(input.isNull("simulatedPreviousOutput"), "request_previous_result_unavailable");
     }
 
     private static void snapshot(StrictJson.Obj candidate, StrictJson.Obj issue, StrictJson.Obj round, Archive archive) {
@@ -268,7 +329,7 @@ final class BriefingGroupedSimulationRules {
         StrictJson.Obj input = StrictJson.parseObject(request.string("input"));
         String stage = receipt.string("stage");
         String prompt = SELECTION_STAGE.equals(stage) ? "grouped-selection.md"
-                : stage.endsWith("_verification") ? "verification.md" : "generation-" + input.string("edition") + ".md";
+                : stage.endsWith("_verification") ? "grouped-verification.md" : "grouped-generation-" + input.string("edition") + ".md";
         require(Canonical.sha256(request.string("instructions")).equals(input.object("context").object("promptArtifacts").string(prompt)), "request_prompt_binding");
         return new Recording(input, StrictJson.parseObject(text.getFirst()));
     }
