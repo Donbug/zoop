@@ -6,7 +6,9 @@
 
 context의 단 한 회차 (from,to]를 평가한다. newMentions는 이번 회차에 새로 확인된 자료이고 backgroundMentions는 cutoff까지 공개된 기존 배경이다. 전체 issue.title이나 저장 개수는 중요도 근거가 아니다. background만 있는 사건은 입력되지 않는다. 새로운 기사라는 이유만으로 새 사건·새 사실이라고 간주하지 않는다. 전일 기사 재송고, 같은 발표의 제목 변경, 이미 전달한 수치를 표현만 바꾼 재보도는 REPEAT로 제외한다.
 
-previousSelectedIssues는 과거 시뮬레이션에서 이미 전달한 사건/인용이며 원문 사실의 새 근거가 아니다. 같은 issueId를 다시 선정하려면 새로운 단계의 확정·실제 이행·계약 변경·정정 등 실질 변화가 이번 newMentions의 exact evidence에 있어야 한다. novelty=MATERIAL_UPDATE와 그 변화를 입증하는 deltaEvidenceIds를 작성한다. 이전 문장을 새 표현으로 바꾼 것뿐이면 REPEAT이고 selected에 넣지 않는다. 처음 전달하는 이슈는 NEW_EVENT, 기존 이슈의 실질 변화는 MATERIAL_UPDATE다. MATERIAL_UPDATE의 제목과 이후 브리핑은 추가 변화에 집중할 수 있게 작성한다.
+previousSelectedIssues는 과거 시뮬레이션에서 이미 전달한 사건/인용이며 원문 사실의 새 근거가 아니다. 같은 issueId만 보지 말고 previousSelectedIssues 전체의 제목과 인용에 담긴 사건 의미를 비교한다. 제한된 검색으로 같은 사건이 서로 다른 issueId에 저장됐을 수 있으므로 ID가 다르다는 것은 신규성의 증거가 아니다. 기업·행위·대상·계약/발표·사건 시점을 함께 대조해 이미 전달한 동일 사건의 재보도이면 REPEAT로 제외한다. 같은 기술 테마라는 이유만으로 별개 사건을 반복으로 오인하지 않는다. 이번 selected 안에서도 ID가 다른 같은 사건을 중복 선정하지 않는다.
+
+기존에 전달한 동일 사건을 다시 선정하려면 issueId가 같든 다르든 새로운 단계의 확정·실제 이행·계약 변경·정정 등 실질 변화가 이번 newMentions의 exact evidence에 있어야 한다. 이때만 novelty=MATERIAL_UPDATE와 그 변화를 입증하는 deltaEvidenceIds를 작성한다. 이전 문장을 새 표현으로 바꾼 것뿐이면 REPEAT이고 selected에 넣지 않는다. NEW_EVENT는 전체 이전 목록에서 의미상 같은 사건이 없을 때만 사용한다. MATERIAL_UPDATE의 제목과 이후 브리핑은 추가 변화에 집중할 수 있게 작성한다. 반복을 찾았다고 저장된 그룹 ID를 임의로 재작성하거나 합치지 말고 이번 중복 브리핑 선정만 차단한다.
 
 SELECTABLE이면서 importance>=2인 서로 다른 사건을 중요도 내림차순, 같은 중요도는 priority 내림차순으로 최대 3개 선정한다. 수를 채우기 위한 선정은 금지하고 0개도 허용한다. selected에는 원래 issueId, 한국어 title, evidenceIds, companyIds, novelty, deltaEvidenceIds, limitations만 작성한다. 한 문서를 여러 핵심 이슈에 중복 사용하지 않는다. evidenceIds는 그 issue의 newMentions.evidence/newEvidenceIds에 이미 있는 ID 중 실제 제목과 2~3개 원자적 문장을 입증할 충분한 인용을 선택한다. backgroundMentions는 중요도·변화 비교에 참고할 배경이고 이번 브리핑 사실 인용으로 직접 출력하지 않는다. 관련 회사는 companyId로만 고르고 그 회사 연결을 직접 뒷받침하는 이번 회차 evidenceIds도 반드시 함께 선택한다. 다른 이슈의 인용·없는 ID·외부 회사·모델 상식·추측을 사용하지 않는다. 기술을 설명하더라도 해당 기술과 실제 기업/사업 연결을 입증하는 인용이 필요하다.
 

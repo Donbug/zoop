@@ -314,6 +314,42 @@ class GroupedRoundTests(unittest.TestCase):
             self.assertEqual(prior, base.strict_load(base.strict_load(transport.requests[-1])["input"])["priorSelectedIssues"])
             self.assertEqual(2, len(client.receipts()))
 
+    def test_different_issue_id_new_event_still_reaches_full_history_semantic_guard(self):
+        original = self.candidates()
+        prior = grouped.freeze_grouped_selection(selection(original), original, "original")
+        later = {"date": "2026-10-07", "edition": "evening", "window": {"from": round_spec()["window"]["to"],
+            "to": "2026-10-07T17:30:00+09:00", "openStart": False}}
+        doc = document("doc-split", "2026-10-07T12:00:00+09:00",
+            "합성 기업의 건물 관리 기술 적용 계약 체결 사실이 다른 보도에서 다시 소개됐습니다.")
+        candidates = grouped.build_grouped_candidates(archive(("issue-split-id", [(doc, mention(doc, "split"))])), later)
+        selected = grouped.freeze_grouped_selection(selection(candidates), candidates, "later", prior)
+        self.assertEqual("NEW_EVENT", selected[0]["novelty"][0]["decision"])
+        self.assertNotEqual(prior[0]["issueId"], selected[0]["issueId"])
+        with tempfile.TemporaryDirectory() as directory:
+            transport = AuthoredTransport(semantic_repeat=True)
+            client = grouped.GroupedSimulationClient(Path(directory) / "private", transport)
+            context = {"context": {"mode": grouped.sim.MODE, "roundId": "split", "window": later["window"]},
+                "contextSha256": "later", "priorSelectedIssues": prior}
+            result = grouped.sim.generate_round(client, selected, "evening", context, 0)
+            self.assertEqual("WITHHELD", result["verification"]["status"])
+            self.assertEqual(2, len(transport.requests))
+            verifier = base.strict_load(transport.requests[-1])
+            self.assertIn("NEW_EVENT로 잘못 선정됐을 수도 있다", verifier["instructions"])
+            self.assertIn("다른 issueId", verifier["instructions"])
+            self.assertEqual("issue-split-id", selected[0]["issueId"])
+            self.assertEqual("issue-stable", prior[0]["issueId"])
+
+    def test_all_grouped_prompts_compare_other_ids_without_rewriting_archive_ids(self):
+        for name in ("selection.md", "generation-morning.md", "generation-evening.md", "verification.md"):
+            with self.subTest(prompt=name):
+                text = base.regular(grouped.PROMPTS / name).decode()
+                self.assertIn("전체", text)
+                self.assertIn("다른 issueId", text)
+                self.assertIn("NEW_EVENT", text)
+                self.assertIn("MATERIAL_UPDATE", text)
+                self.assertIn("deltaEvidenceIds", text)
+                self.assertIn("중복 브리핑", text)
+
 
 if __name__ == "__main__":
     unittest.main()

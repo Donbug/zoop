@@ -24,3 +24,10 @@ selected.novelty의 MATERIAL_UPDATE는 같은 사건의 근거 있는 추가 변
 이번 입력은 원문을 처음부터 다시 사건으로 분류하는 단계가 아니다. selected.issueId는 저장된 사건 묶음의 식별자이며, companyLinks는 정확한 인용에 연결된 기업 역할이다. frozenGroupedIssueSnapshot.newMentions의 keywords/action/target는 설명할 기술·사건의 단서이며 사실을 입증하는 출처가 아니다. 기술이 원문의 중심이라면 그 기술의 실제 적용·계약·제품·사업과 companyLinks의 기업 역할을 2~3개 원자적 문장 안에서 구체적으로 설명한다. 모든 기술 설명·기업 역할은 해당 title/claim에 지정한 이번 sources의 exact quote로 직접 입증돼야 한다. 관계가 확인되지 않은 기업을 단순한 테마·산업·브랜드 유사성으로 추가하거나 기술 수혜·주가 영향을 추측하지 않는다. 같은 기술을 다룬 서로 다른 사건을 하나의 사건이라고 주장하지 않는다.
 
 selected.novelty.decision=MATERIAL_UPDATE인 이슈는 priorSelectedIssues의 같은 issueId에 대해 이미 전달한 인용과 이번 deltaEvidenceIds의 인용을 비교한다. 제목과 첫 claim에는 실제 새로 확인된 변화가 드러나야 하며, 그 제목과 첫 claim의 evidenceIds에는 변화를 입증하는 deltaEvidenceIds를 연결한다. 재송고·표현 변경·같은 계약이나 발표의 다른 요약·이미 말한 수치의 재계산만으로는 실질 변화가 아니다. 새 ID/새 기사/새 인용이라는 이유만으로 새로운 사실이라고 쓰지 않는다. 명확한 사건 단계의 변화·추가 확정 사실·정정·계약 변경을 이번 원문에서 확인할 수 없거나, 이전 인용과의 비교가 불가능하면 해당 항목 claims=[]로 보류한다. 이전 문장은 새 사실의 근거가 아니며 원래의 과거 시뮬레이션·시장 전망 금지·원자적 문장·수치와 조건 보존 규칙을 모두 유지한다.
+
+
+## 서로 다른 저장 ID 사이의 반복 방지
+
+같은 issueId만 비교하지 않고 priorSelectedIssues(또는 context.priorSelectedIssues) 전체의 제목과 sources를 이번 사건과 의미로 비교한다. 제한된 검색 때문에 동일 사건이 다른 issueId로 저장됐을 수 있으며, NEW_EVENT라는 선정 판정도 신규성의 증명이 아니다. 기업·행위·대상·계약/발표·사건 시점을 함께 대조한다. 다른 ID의 기존 동일 사건을 새 기사·다른 제목·새 인용·표현 변경으로 다시 설명하는 것뿐이면 해당 필수 항목의 claims=[]로 보류한다. 같은 기술 테마에 속할 뿐인 별개 사건은 반복으로 오인하지 않는다.
+
+이전 같은 사건에서 실질 변화가 있을 때만 MATERIAL_UPDATE와 이번 deltaEvidenceIds를 근거로 그 변화를 설명한다. ID가 달라도 이 조건은 같다. 선정이 NEW_EVENT인데 이전 같은 사건과의 실질 변화/delta가 입증되지 않으면 새 사건인 것처럼 작성하지 않는다. 이번 selected 안에서도 다른 ID의 같은 사건을 중복 설명하지 않는다. 저장된 issueId를 다시 쓰거나 그룹을 임의로 합치지 않고 중복 브리핑만 차단한다. 시장 전망 범위와 기존 검증 규칙은 확대하지 않는다.
