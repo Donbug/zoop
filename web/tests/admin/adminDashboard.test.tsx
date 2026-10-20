@@ -37,11 +37,13 @@ const signedIn: AdminSession = {
 function dashboard(overrides: Partial<Dashboard> = {}): Dashboard {
   return {
     generatedAt: '2026-10-06T03:43:56Z',
+    metadata: { partial: false, failures: [] },
     ledger: { status: 'connected', error: null },
     graph: {
       activeVersionId: 'v1',
       activatedAt: '2026-10-01T11:27:00Z',
       versionCount: 1,
+      activeVersion: null,
       reviewRevision: 11,
       reviewDecisions: 13,
       rules: [
@@ -100,6 +102,7 @@ function dashboard(overrides: Partial<Dashboard> = {}): Dashboard {
       registered: 3,
       activeMemberSessions: 8,
       activeGuestSessions: 0,
+      source: 'zoop-db',
     },
     audit: { last24h: 3 },
     ...overrides,
@@ -224,7 +227,7 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
             error: { code: 'SOURCE_UNAVAILABLE', message: '원장 응답 없음' },
           },
           candidates: null,
-          graph: { ...dashboard().graph, graphDb: null },
+          graph: { ...dashboard().graph!, graphDb: null },
         }),
       ),
     );
@@ -237,6 +240,36 @@ describe('A-ADM-01 운영 대시보드 (FS072)', () => {
     ).toBeTruthy();
     expect(screen.getByText('원장에 연결하지 못했어요')).toBeTruthy();
     expect(screen.getByText('확인 불가')).toBeTruthy();
+  });
+
+  test('최신 API의 부분 응답은 누락 영역을 0으로 꾸미거나 렌더링에 실패하지 않는다', async () => {
+    server.on('GET', DASHBOARD, () =>
+      json(
+        dashboard({
+          metadata: {
+            partial: true,
+            failures: [
+              {
+                source: 'jobs',
+                code: 'SOURCE_UNAVAILABLE',
+                message: 'not connected',
+              },
+            ],
+          },
+          jobs: null,
+          ai: null,
+          briefings: null,
+          members: null,
+          audit: null,
+        }),
+      ),
+    );
+    openDashboard();
+
+    expect(await screen.findByText('작업 원장을 읽지 못했어요.')).toBeTruthy();
+    expect(screen.getByText('AI 요청 원장을 읽지 못했어요.')).toBeTruthy();
+    expect(screen.getByText('브리핑 원장을 읽지 못했어요.')).toBeTruthy();
+    expect(screen.getAllByText('–').length).toBeGreaterThan(0);
   });
 
   test('조회에 실패하면 다시 시도할 수 있다', async () => {
