@@ -8,11 +8,21 @@
 - 화면 추적: `A-ADM-05`
 - 화면 구현은 포함하지 않는다. API는 정상·빈 결과·부분 미제공·권한 오류·충돌·재전송을 구분한다.
 
+## 활동 조회 정책 결정
+
+2026-10-20 요청자 결정으로 FS069-01의 구현 범위를 다음과 같이 고정한다. 관리자는 회원 조회와 차단·해제 관리 목적으로만 이 정보를 사용한다.
+
+- 제공 항목: 회원가입일, 최근 로그인 시각, 세션 수, 관심종목 수, 계좌 연결 여부, 차단·해제 이력.
+- 세션 수는 `[member.createdAt, metadata.asOf)`에 생성된 `kind=member` 세션 수다. 회원 가입 시각과 같은 시각의 세션은 포함하고, 그보다 이른 기록은 제외한다. 만료·회수 여부와 관계없이 포함한다.
+- 정상적인 집계 결과가 없으면 수치형 count는 `0`, 계좌 미연결은 `false`로 표현한다. 최근 로그인처럼 시각 자체가 없는 값은 `null`로 표현한다.
+- 아직 수집하지 않는 지표는 `null`과 `metadata.failures`의 미제공 사유로 표시한다. 이 경우 `retryable=false`다. 원천 조회 장애는 조회 실패로 구분하며 정상적인 `0`이나 미제공으로 가장하지 않는다.
+- 차단·해제 이력은 성공한 회원 차단·해제 감사 기록만 제공한다. 대화·AI 결과·브리핑 원문은 조회하지 않는다.
+
 ## 조회 계약
 
 - 회원 ID는 가입 시 발급한 난수 기반 `members.id`를 가명 ID로 사용한다. `analytics_key`, 비밀번호, 세션 토큰은 반환하지 않는다.
 - 이메일 검색은 가명 ID 또는 정규화된 전체 이메일의 정확 일치이고, 응답은 로컬 부분의 첫 글자만 남겨 마스킹한다. 검색어 원문은 로그와 cursor에 넣지 않는다.
-- 활동 기간은 `[member.createdAt, metadata.asOf)`이다. `sessions`는 이 기간에 생성된 `kind=member` 세션 수이며 만료·회수된 세션도 포함한다.
+- 활동 기간은 `[member.createdAt, metadata.asOf)`이다. 위에서 정한 활동 지표에 같은 기간 경계를 적용한다.
 - 현재 API migration에 실제 원천이 있는 회원·세션·관심종목·가상계좌 연결·감사 이력만 조회한다. `graphSelections`, `aiQuestions`, `briefingViews`, `holdingCount`, `feedbackUp`, `feedbackDown`은 `null`이고 `metadata.failures`에 `SOURCE_UNAVAILABLE`을 남긴다. 정상적인 0건을 미제공으로 바꾸지 않는다.
 - 목록 cursor는 `(created_at DESC, id DESC)` 키셋, 필터 digest, limit, `asOf`를 포함한다. 새 회원은 첫 페이지의 `asOf` 이후 페이지에 끼어들지 않는다. 상태가 페이지 사이에 바뀌면 각 페이지 읽기 시점의 상태를 반영하는 weak consistency다.
 - 상세·목록 조회는 회원 상태, revision, 세션, 감사 이력을 변경하지 않으며 대화·AI 결과·브리핑 원문을 읽지 않는다.

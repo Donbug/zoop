@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 public class AdminMemberQueryService {
     private static final int DEFAULT_LIMIT = 50;
     private static final int MAX_LIMIT = 100;
-    private static final String UNAVAILABLE = "이 활동 지표의 저장 원천을 아직 조회할 수 없습니다.";
+    private static final String UNAVAILABLE = "이 활동 지표는 현재 수집하지 않아 제공되지 않습니다.";
 
     private final AdminMemberRepository repository;
     private final ObjectMapper mapper;

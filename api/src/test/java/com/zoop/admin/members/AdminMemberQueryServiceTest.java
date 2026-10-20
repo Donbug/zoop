@@ -90,7 +90,8 @@ class AdminMemberQueryServiceTest {
         assertNull(detail.holdingCount());
         assertNull(detail.feedbackUp());
         assertTrue(detail.metadata().failures().stream()
-                .anyMatch(failure -> failure.section().equals("holdingCount")));
+                .anyMatch(failure -> failure.section().equals("holdingCount")
+                        && failure.message().contains("제공되지 않습니다") && !failure.retryable()));
     }
 
     @Test
