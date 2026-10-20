@@ -12,6 +12,8 @@ const canvas = vi.hoisted(() => ({
   draw: vi.fn(),
   setElementState: vi.fn(),
   focusElement: vi.fn(),
+  setSize: vi.fn(),
+  resizeCallbacks: [] as (() => void)[],
   handlers: new Map<string, (event: { target: { id: string } }) => void>(),
 }));
 vi.mock('@antv/g6', () => ({
@@ -24,7 +26,7 @@ vi.mock('@antv/g6', () => ({
       canvas.handlers.set(name, handler);
     }
     async render() {}
-    setSize() {}
+    setSize = canvas.setSize;
     setData = canvas.setData;
     draw = canvas.draw;
     setElementState = canvas.setElementState;
@@ -39,6 +41,7 @@ vi.mock('@antv/g6', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   canvas.handlers.clear();
+  canvas.resizeCallbacks.length = 0;
   Object.defineProperty(document, 'fonts', {
     configurable: true,
     value: { ready: Promise.resolve() },
@@ -46,12 +49,84 @@ beforeEach(() => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
+      constructor(callback: () => void) {
+        canvas.resizeCallbacks.push(callback);
+      }
       observe() {}
       disconnect() {}
     },
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('D-GRP-01 redraws at the current container size after resize and ignores a disposed observer', async () => {
+    const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const personal = createMockGraph({
+      mode: 'personal',
+      personalFilter: 'all',
+    });
+    const { rerender } = render(<GraphCanvas data={all} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 800 },
+    });
+    const draws = canvas.draw.mock.calls.length;
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() =>
+      expect(canvas.setSize).toHaveBeenLastCalledWith(1200, 800),
+    );
+    await waitFor(() =>
+      expect(canvas.draw.mock.calls.length).toBeGreaterThan(draws),
+    );
+    const oldObserver = canvas.resizeCallbacks[0];
+    rerender(<GraphCanvas data={personal} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));
+    canvas.setSize.mockClear();
+    act(() => oldObserver());
+    await act(async () => {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+    });
+    expect(canvas.setSize).not.toHaveBeenCalled();
+  });
+  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches and an semi-transparent legend', async () => {
+    const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const personal = createMockGraph({
+      mode: 'personal',
+      personalFilter: 'all',
+    });
+    const { rerender } = render(<GraphCanvas data={all} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    // G6 sets an inline position: relative on its container; the important utilities must win.
+    const host = screen.getByRole('img');
+    expect(host.className).toContain('absolute!');
+    expect(host.className).toContain('inset-0');
+    expect(screen.getByLabelText('그래프 범례').className).toContain(
+      'bg-zoop-map/60',
+    );
+    rerender(<GraphCanvas data={personal} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));
+    rerender(<GraphCanvas data={all} />);
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(3));
+    expect(screen.getByRole('img').className).toContain('absolute!');
+    expect(canvas.destroyed).toHaveBeenCalledTimes(2);
+  });
+  it('D-GRP-01 keeps the market title when a company is selected and omits the frame number', () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const { rerender } = render(
+      <GraphCanvas data={data} selectedId="KRX:005930" />,
+    );
+    expect(
+      screen.getByRole('heading', { name: '시장 전체 지도' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('(01)')).toBeNull();
+    rerender(<GraphCanvas data={data} selectedId="NASDAQ:NVDA" />);
+    expect(
+      screen.getByRole('heading', { name: '시장 전체 지도' }),
+    ).toBeTruthy();
+  });
   it('D-GRP-01 hover emphasizes incident nodes/edges without selecting or redrawing the viewport', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const onSelect = vi.fn();

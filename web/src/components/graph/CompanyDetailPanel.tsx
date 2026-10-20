@@ -1,3 +1,5 @@
+import { companyLogo } from '@/util/company-logo';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import type { EventContext } from '@/types/map/event';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -110,7 +112,10 @@ export default function CompanyDetailPanel(props: Props) {
   const prices = data?.prices?.status === 'available' ? data.prices : null;
   const metrics = data?.metrics?.status === 'available' ? data.metrics : null;
   const name = company?.name ?? props.fallback.label;
-  const logoUrl = company?.logoUrl ?? props.fallback.logoUrl;
+  const logoUrl = companyLogo(
+    props.fallback.id,
+    company?.logoUrl ?? props.fallback.logoUrl,
+  );
   const currency = quote?.quote.currency;
   const changePositive = (quote?.quote.change ?? 0) >= 0;
 
@@ -140,15 +145,11 @@ export default function CompanyDetailPanel(props: Props) {
           </button>
         </div>
         <div className="company-identity">
-          <span
-            className="company-logo"
-            style={{
-              background:
-                company?.brandColor ?? props.fallback.brandColor ?? '#1a1a1a',
-            }}
-          >
-            {logoUrl ? <img src={logoUrl} alt="" /> : name.slice(0, 1)}
-          </span>
+          <CompanyLogo
+            name={name}
+            logoUrl={logoUrl}
+            className="size-[30px] rounded-full border border-zoop-line bg-zoop-paper text-[11.4px] font-extrabold"
+          />
           <div className="company-identity-meta">
             <p>{company?.ticker ?? props.companyId.split(':')[1]}</p>
             <div className="company-statuses">

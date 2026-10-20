@@ -43,9 +43,6 @@ export default function GraphCanvas({
   const stats = graphSummary(data);
   const personal = data.metadata.mode === 'personal';
   const focusedNodes = focusNeighborhood(data, focusId, focusHops);
-  const center =
-    data.nodes.find((n) => n.id === selected && n.kind === 'company') ??
-    data.nodes.find((n) => n.isFocus);
   const selectedNode = data.nodes.find((n) => n.id === selected);
   // D-GRP-01: hover changes presentation only, never selection, layout or viewport.
   const syncVisualStates = useEffectEvent(
@@ -192,6 +189,7 @@ export default function GraphCanvas({
     let disposed = false;
     let graph: Graph | null = null;
     let observer: ResizeObserver | null = null;
+    let resizeFrame: number | null = null;
     const clearHover = () => hoverNode(null);
     host.addEventListener('pointerleave', clearHover);
     hovered.current = null;
@@ -269,8 +267,14 @@ export default function GraphCanvas({
       instance.current = graph;
       syncSelection();
       observer = new ResizeObserver(() => {
-        if (graph && !disposed)
+        if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = null;
+          if (!graph || disposed || graph.destroyed) return;
+          if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
           graph.setSize(host.clientWidth, host.clientHeight);
+          syncSelection();
+        });
       });
       observer.observe(host);
     }
@@ -281,6 +285,7 @@ export default function GraphCanvas({
       disposed = true;
       host.removeEventListener('pointerleave', clearHover);
       observer?.disconnect();
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       graph?.destroy();
       instance.current = null;
     };
@@ -306,18 +311,22 @@ export default function GraphCanvas({
     <div className="relationship-canvas" data-testid="graph-canvas">
       <div
         ref={container}
-        className="relationship-g6"
+        // G6 writes an inline position: relative on its container, which would size the host by
+        // its own canvas. Keep it pinned to the map surface so each new graph measures full size.
+        className="relationship-g6 absolute! inset-0"
         role="img"
         aria-label={`${personal ? '내 종목' : '시장 전체'} 관계 지도: 기업 ${stats.company}개, 사건 ${stats.issue}개. 드래그로 이동하고 휠로 확대합니다.`}
       />
       {!focusId && (
-        <aside className="relationship-legend" aria-label="그래프 범례">
+        <aside
+          className="relationship-legend z-10 bg-zoop-map/60 pb-3"
+          aria-label="그래프 범례"
+        >
           <div className="relationship-title">
-            <i>(01)</i>
-            <h1>{center?.label ?? '관계 지도'}</h1>
+            <h1>{personal ? '내 종목 지도' : '시장 전체 지도'}</h1>
           </div>
           <p className="relationship-subtitle">
-            (RELATIONSHIP MAP) · 중심 관계
+            (RELATIONSHIP MAP) · 기업·사건 관계
           </p>
           <p className="relationship-meta">
             {stats.company} COMPANIES · {stats.sharedIssues} SHARED EVENTS
