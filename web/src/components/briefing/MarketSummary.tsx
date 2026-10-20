@@ -34,7 +34,7 @@ const unavailableReasons: Record<string, string> = {
   immediate_previous_edition_missing:
     '직전 회차의 시장 분석이 없어 이전 전망을 비교하지 않습니다.',
   immediate_previous_summary_withheld:
-    '직전 회차의 시장 분석이 검증을 통과하지 못해 비교에 사용하지 않습니다.',
+    '직전 회차에 비교 가능한 검증된 시장 분석이 없어 사용하지 않습니다.',
 };
 const number = (value: number) =>
   value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });

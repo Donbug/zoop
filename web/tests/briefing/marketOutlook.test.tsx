@@ -228,7 +228,7 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
     value.forecastEvaluations = [];
     show(value);
     expect(
-      screen.getByText(/검증을 통과하지 못해 비교에 사용하지 않습니다/),
+      screen.getByText(/비교 가능한 검증된 시장 분석이 없어 사용하지 않습니다/),
     ).toBeTruthy();
     expect(
       screen.getByText(

@@ -68,6 +68,25 @@ class BriefingPresentationRulesTest {
         var failure = assertThrows(IllegalArgumentException.class, () -> BriefingPresentationRules.load(StrictJson.Obj.of(full), output, "inbox/authored.md"));
         assertTrue(failure.getMessage().contains("base_json_unchanged"));
     }
+    @Test void authoredBundleCannotRaiseTheDefaultLimitButApprovedImportRemainsBounded() throws Exception {
+        ObjectNode full = wrapper();
+        ((ObjectNode) full.path("presentationEnrichment")).put("maximumPaidCallsIncludingPrior", 415);
+        assertThrows(IllegalArgumentException.class, () -> BriefingPresentationRules.load(StrictJson.Obj.of(full), output, "inbox/authored.md"));
+        assertNotNull(BriefingPresentationRules.load(StrictJson.Obj.of(full), output, "inbox/authored.md", 415));
+        ((ObjectNode) full.path("presentationEnrichment")).put("maximumPaidCallsIncludingPrior", 416);
+        assertThrows(IllegalArgumentException.class, () -> BriefingPresentationRules.load(StrictJson.Obj.of(full), output, "inbox/authored.md", 415));
+    }
+    @Test void expandedRuntimeBudgetRequiresASeparateApprovalReferenceAndHardCeiling() throws Exception {
+        wrapper();
+        Path source = output.resolve("source.jsonl"), bundle = output.resolve("bundle.json"), artifacts = Files.createDirectory(output.resolve("artifacts"));
+        Files.writeString(source, "{}"); Files.writeString(bundle, "{}");
+        String sha = Canonical.sha256(Files.readAllBytes(source));
+        assertEquals(400, new BriefingReplaySettings(source, bundle, artifacts, output.resolve("grants.json"), output.resolve("manifest.json"), sha, "inbox/authored.md").maximumPaidCalls());
+        for (String ref : new String[] {null, "", "approval.txt"}) assertThrows(IllegalArgumentException.class, () ->
+                new BriefingReplaySettings(source, bundle, artifacts, output.resolve("grants.json"), output.resolve("manifest.json"), sha, "inbox/authored.md", null, 415, ref));
+        assertEquals(415, new BriefingReplaySettings(source, bundle, artifacts, output.resolve("grants.json"), output.resolve("manifest.json"), sha, "inbox/authored.md", null, 415, "inbox/budget-approved.md").maximumPaidCalls());
+        assertThrows(IllegalArgumentException.class, () -> new BriefingReplaySettings(source, bundle, artifacts, output.resolve("grants.json"), output.resolve("manifest.json"), sha, "inbox/authored.md", null, 513, "inbox/budget-approved.md"));
+    }
     @Test void detailsAreReconstructedFromPublishedClaimsAndUnicodeSourceSpans() {
         ObjectNode snapshot = StrictJson.newObject(), supplied = input("event"); byte[] bytes = StrictJson.write(supplied); details(supplied, snapshot);
         var detail = snapshot.path("itemDetails").path("event");

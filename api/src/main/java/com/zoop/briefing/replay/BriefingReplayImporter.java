@@ -167,7 +167,7 @@ public final class BriefingReplayImporter {
     /** Per-round simulation reuses the same document/evidence/round registries; no migration or operational writer. */
     private ImportResult importSimulation(byte[] sourceBytes, byte[] bundleBytes, StrictJson.Obj suppliedBundle) {
         String scope = "publication_clock_simulation", sourceSha = Canonical.sha256(sourceBytes), bundleSha = Canonical.sha256(bundleBytes);
-        BriefingPresentationRules.Layer presentation = BriefingPresentationRules.load(suppliedBundle, settings.bundle().getParent(), settings.userInboxRef());
+        BriefingPresentationRules.Layer presentation = BriefingPresentationRules.load(suppliedBundle, settings.bundle().getParent(), settings.userInboxRef(), settings.maximumPaidCalls());
         StrictJson.Obj bundle = presentation == null ? suppliedBundle : presentation.baseBundle();
         boolean grouped = BriefingGroupedSimulationRules.SCHEMA.equals(bundle.string("schemaVersion"));
         String recoveryInbox = presentation == null ? settings.userInboxRef() : bundle.object("briefingRecovery").object("authorization").string("userInboxRef");
@@ -609,6 +609,8 @@ public final class BriefingReplayImporter {
             ObjectNode manifest = StrictJson.newObject().put("schemaVersion", "zoop-briefing-replay-manifest-v1").put("scope", scope)
                     .put("runId", effectiveRun).put("sourceFileSha256", sourceSha).put("clockFileSha256", clockSha).put("bundleSha256", bundleSha)
                     .put("userInboxRef", settings.userInboxRef()).put("grantsSha256", Canonical.sha256(grantBytes));
+            if (settings.maximumPaidCalls() > 400) manifest.putObject("budgetAuthorization")
+                    .put("maximumPaidCalls", settings.maximumPaidCalls()).put("approvalRef", settings.budgetApprovalRef());
             ArrayNode summaries = manifest.putArray("rounds");
             for (String id : ids) {
                 Round published = publications.stream().filter(row -> row.id().equals(id)).findFirst().orElse(null);

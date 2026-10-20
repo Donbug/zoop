@@ -27,6 +27,10 @@ final class BriefingPresentationRules {
     record Previous(ObjectNode payload, String publishedAt, String cutoff) { }
 
     static Layer load(StrictJson.Obj bundle, Path output, String inbox) {
+        return load(bundle, output, inbox, 400);
+    }
+
+    static Layer load(StrictJson.Obj bundle, Path output, String inbox, int maximumPaidCalls) {
         if (!bundle.has("presentationEnrichment")) return null;
         StrictJson.Obj layer = bundle.object("presentationEnrichment");
         require(SCHEMA.equals(layer.string("schemaVersion")) && inbox.equals(layer.string("userInboxRef"))
@@ -39,7 +43,8 @@ final class BriefingPresentationRules {
         require(base.has("briefingRecovery") && !layer.string("runId").equals(base.path("briefingRecovery").path("runId").stringValue()), "recovery_base_required");
         Map<String, StrictJson.Obj> rounds = new LinkedHashMap<>();
         for (StrictJson.Obj row : layer.objects("rounds")) require(rounds.putIfAbsent(row.string("roundId"), row) == null, "duplicate_round");
-        if (layer.has("maximumPaidCallsIncludingPrior")) require(layer.count("maximumPaidCallsIncludingPrior") <= 400, "reservation_limit");
+        require(maximumPaidCalls >= 1 && maximumPaidCalls <= 512, "reservation_limit");
+        if (layer.has("maximumPaidCallsIncludingPrior")) require(layer.count("maximumPaidCallsIncludingPrior") <= maximumPaidCalls, "reservation_limit");
         return new Layer(bytes, StrictJson.Obj.of(base), layer, rounds);
     }
 
