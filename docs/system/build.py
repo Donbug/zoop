@@ -101,7 +101,7 @@ def detail_authority(specs: dict, links: dict, api: dict, requirements: dict, fi
             invalid(sheet["file"], "이력 시트 또는 대체 시트가 현재 고정본 상세에 없다.")
         if sheet.get("sourceCapture"):
             # 원본에서 삭제된 이력 탭은 선언한 이전 고정본에서만 읽어야 한다. 다른 수집본의 같은 이름 파일로 바뀌지 않게 한다.
-            paths = {str(Path(d["source"]["path"]).parent) for rec in specs.values() for d in rec["definitions"]
+            paths = {Path(d["source"]["path"]).parent.as_posix() for rec in specs.values() for d in rec["definitions"]
                      if definition_file(d) == sheet["file"]}
             if paths != {sheet["sourceCapture"]}:
                 invalid(sheet["file"], f"이력 시트의 출처 고정본이 선언({sheet['sourceCapture']})과 다르다: {sorted(paths)}")

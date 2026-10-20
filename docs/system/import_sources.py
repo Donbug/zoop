@@ -20,9 +20,9 @@ VALID_ID = re.compile(r"(?:NFS|FS)\d{3}(?:-\d{2})?")
 
 def relative(path: Path) -> str:
     try:
-        return str(path.resolve().relative_to(ROOT))
+        return path.resolve().relative_to(ROOT).as_posix()
     except ValueError:
-        return str(path.resolve())
+        return path.resolve().as_posix()
 
 
 def csv_rows(path: Path) -> list[list[str]]:

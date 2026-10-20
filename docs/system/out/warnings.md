@@ -4,13 +4,6 @@
 
 | 분류 | 수준 | 대상 ID | 경고 내용 | 출처 |
 | --- | --- | --- | --- | --- |
-| SOURCE_CHANGED | error | docs/evidence/raw/functional-spec_2026-10-18/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
-| SOURCE_CHANGED | error | docs/evidence/raw/requirements-sheet_2026-10-06/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
-| SOURCE_CHANGED | error | docs/evidence/raw/wbs_2026-10-12/_collection-manifest.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
-| SOURCE_CHANGED | error | docs/evidence/spec-v1.2-gap.md | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
-| SOURCE_CHANGED | error | docs/screen-plan/captures/slide-index.json | 가져오기 이후 원본이 바뀌었다. 동일 명령으로 다시 가져와야 한다. |  |
-| DETAIL_AUTHORITY_INVALID | error | 03-메인-그래프.csv | 이력 시트의 출처 고정본이 선언(docs/evidence/raw/functional-spec_2026-10-12)과 다르다: ['docs\\evidence\\raw\\functional-spec_2026-10-12'] |  |
-| DETAIL_AUTHORITY_INVALID | error | 07-AI-챗봇.csv | 이력 시트의 출처 고정본이 선언(docs/evidence/raw/functional-spec_2026-10-12)과 다르다: ['docs\\evidence\\raw\\functional-spec_2026-10-12'] |  |
 | SPEC_NOT_IN_INDEX | warning | FS050-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:79 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS050-02 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:93 (xlsx-row) |
 | SPEC_NOT_IN_INDEX | warning | FS052-01 | 상세 시트에만 있는 ID를 원문 그대로 보존했다. | docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:121 (xlsx-row) |
