@@ -255,7 +255,21 @@ class GraphHandoffImporterTest {
         String versionId = built.versionId();
 
         JsonNode receipt = HandoffFixtures.parse(Files.readAllBytes(receiptFile(versionId)));
-        assertEquals("zoop-graph-handoff-bundle-2", receipt.get("bundle").get("schemaVersion").stringValue());
+        assertEquals("zoop-graph-handoff-bundle-3", receipt.get("bundle").get("schemaVersion").stringValue());
+        // The hand-written expectation of the issue's field provenance: the one unanimous mention states every value, and the
+        // receipt says so without claiming any value was verified (selection, not fact verification).
+        JsonNode provenance = receipt.get("bundle").get("issues").get(0).get("fieldProvenance");
+        assertEquals(built.bundle().get("issues").get(0).get("fieldProvenance"), provenance);
+        assertEquals("unanimous", provenance.get("selection").stringValue());
+        assertEquals("none", provenance.get("verification").stringValue());
+        assertEquals(6, provenance.get("sameValueMentions").size());
+        for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+            JsonNode list = provenance.get("sameValueMentions").get(field);
+            assertEquals(1, list.size(), field);
+            assertEquals(ARTICLE_ID, list.get(0).get("documentId").stringValue(), field);
+            assertEquals(ARTICLE_VERSION, list.get(0).get("documentVersion").stringValue(), field);
+            assertEquals("m-1", list.get(0).get("mentionId").stringValue(), field);
+        }
         JsonNode mentions = receipt.get("bundle").get("issues").get(0).get("mentions");
         assertEquals(built.bundle().get("issues").get(0).get("mentions"), mentions);
         // The hand-written expectation of the fixture's one original mention: its own S2 values, never verified, and the
@@ -289,32 +303,39 @@ class GraphHandoffImporterTest {
         assertEquals(1, snapshot.issues().get(0).mentions().size());
         assertEquals(ARTICLE_ID, snapshot.issues().get(0).mentions().get(0).articleId());
         String snapshotText = new String(snapshotBytes, StandardCharsets.UTF_8);
-        for (String original : List.of("participants", "sourceCompanyId", "s2-co-a", "미등록 협력사", "이름만 있는 참가자", "공급자")) {
+        for (String original : List.of("participants", "sourceCompanyId", "s2-co-a", "미등록 협력사", "이름만 있는 참가자", "공급자",
+                "fieldProvenance", "sameValueMentions")) {
             assertFalse(snapshotText.contains(original), original);
         }
     }
 
     @Test
-    void anExportOfTheEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
-        InMemoryGraphHandoffRepository.State graphBefore = graph.state();
-        InMemoryDocumentRegistry.State registryBefore = registry.state();
-        long filesBefore = fileCount();
-        ObjectNode envelope = built.envelope().deepCopy();
-        ObjectNode bundle = (ObjectNode) envelope.get("bundle");
-        bundle.put("schemaVersion", "zoop-graph-handoff-bundle-1");
-        ((ObjectNode) bundle.get("issues").get(0)).remove("mentions");
-        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
-        ((ObjectNode) envelope.get("receipt")).put("bundleSchema", "zoop-graph-handoff-bundle-1");
-        handoff.envelope = Canonical.bytes(envelope);
-        GraphHandoffRequest request = new GraphHandoffRequest(HANDOFF_ID, built.manifestDigest(),
-                Canonical.sha256(Canonical.bytes(bundle)), "operator-a");
+    void anExportOfAnEarlierBundleSchemaIsAnInvalidBundleAndNothingIsWritten() throws Exception {
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2")) {
+            InMemoryGraphHandoffRepository.State graphBefore = graph.state();
+            InMemoryDocumentRegistry.State registryBefore = registry.state();
+            long filesBefore = fileCount();
+            ObjectNode envelope = built.envelope().deepCopy();
+            ObjectNode bundle = (ObjectNode) envelope.get("bundle");
+            bundle.put("schemaVersion", schema);
+            ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
+            issue.remove("fieldProvenance");
+            if (schema.endsWith("-1")) {
+                issue.remove("mentions");
+            }
+            ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+            ((ObjectNode) envelope.get("receipt")).put("bundleSchema", schema);
+            handoff.envelope = Canonical.bytes(envelope);
+            GraphHandoffRequest request = new GraphHandoffRequest(HANDOFF_ID, built.manifestDigest(),
+                    Canonical.sha256(Canonical.bytes(bundle)), "operator-a");
 
-        GraphHandoffException failure = failure(importer.run(request));
+            GraphHandoffException failure = failure(importer.run(request));
 
-        assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure());
-        assertEquals(0, ingestion.calls.get());
-        assertEquals(0, graph.writes());
-        assertNothingWritten(graphBefore, registryBefore, filesBefore);
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure(), schema);
+            assertEquals(0, ingestion.calls.get(), schema);
+            assertEquals(0, graph.writes(), schema);
+            assertNothingWritten(graphBefore, registryBefore, filesBefore);
+        }
     }
 
     @Test

@@ -19,7 +19,7 @@ from .ingestion_contracts import Wire, canonical, digest, timestamp
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-3"
 DECISIONS_SCHEMA = "zoop-public-decisions-1"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
@@ -34,6 +34,11 @@ MENTION_VERIFICATION = "none"             # S2 candidate or operator-frozen snap
 MENTION_KEYS = ("documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification", "title", "action", "target", "eventTime",
                 "timePrecision", "period", "assertionStatus", "background", "participants", "evidenceIds")
 PARTICIPANT_KEYS = ("sourceCompanyId", "companyId", "name", "role")
+MENTION_IDENTITY = ("documentId", "documentVersion", "mentionId")     # what names one original mention (a local mention id is unique only within one document version)
+# The six headline values of an issue, as (S2 mention field, bundle wire name). The planner reads them from the chosen source (the operator's representative, or any
+# member when all agree) and the validator checks them against the original mentions that state exactly the same value: ONE list, never two copies.
+ISSUE_FIELDS = (("title", "title"), ("action", "action"), ("target", "target"), ("event_time", "eventTime"), ("period", "period"),
+                ("assertion_status", "assertionStatus"))
 
 MAX_COMMAND = 65_536
 MAX_OPERATOR_FILE = 4_000_000
@@ -404,6 +409,32 @@ def _source_event(value, at: str, upstreams: set) -> None:
           f"{at}.documentClosure")
 
 
+def _field_provenance(issue: dict, mentions: list) -> None:
+    """`issue.fieldProvenance`: how the issue's six headline values were SELECTED and which original mentions state exactly each of them. It is a selection record,
+    never a verification: `verification` is `none`, and listing a mention says only that it states the same string (or the same absence), not that anything is
+    supported, approved or true. Every list must equal, in the mentions' own order, the identities of the mentions whose value equals the issue's value by exact JSON
+    equality (`null` equals `null`; no trimming, no time normalisation), so order, uniqueness and closure need no separate rule. It must be non-empty (an issue
+    value no mention states is refused), equal to ALL mentions when no representative exists (`unanimous`) and contain the representative's mention in every field
+    when the operator named one (`operator-representative`). Called after the mentions and the representative are closed."""
+    at = "issue.fieldProvenance"
+    provenance = _keys(issue["fieldProvenance"], ("selection", "verification", "sameValueMentions"), at)
+    representative = issue["representative"]
+    _need(provenance["selection"] == ("unanimous" if representative is None else "operator-representative"), f"{at}.selection")
+    _need(provenance["verification"] == MENTION_VERIFICATION, f"{at}.verification")
+    same = _keys(provenance["sameValueMentions"], tuple(wire for _, wire in ISSUE_FIELDS), f"{at}.sameValueMentions")
+    identities = [{key: m[key] for key in MENTION_IDENTITY} for m in mentions]
+    for _, wire in ISSUE_FIELDS:
+        listed = _list(same[wire], f"{at}.{wire}", MAX_MENTIONS)
+        for ref in listed:
+            _keys(ref, MENTION_IDENTITY, f"{at}.{wire}")
+        _need(listed == [identity for identity, m in zip(identities, mentions) if m[wire] == issue[wire]], f"{at}.{wire}.exact")
+        _need(bool(listed), f"{at}.{wire}.nonEmpty")
+        if representative is None:
+            _need(listed == identities, f"{at}.{wire}.unanimous")
+        else:
+            _need({key: representative[key] for key in MENTION_IDENTITY} in listed, f"{at}.{wire}.representative")
+
+
 def validate_bundle(bundle: dict) -> None:
     """Strict, closed validation of a bundle: exact key sets, types, patterns, referential closure, id formulas, counts and the content digest. Anything
     else is `handoff_bundle_invalid` (a damaged or hand-edited artifact), never a partial read."""
@@ -581,7 +612,7 @@ def validate_bundle(bundle: dict) -> None:
     issues = {}
     for i in _list(bundle["issues"], "issues", MAX_ISSUES):
         _keys(i, ("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
-                  "sourceEvents", "decisionRef", "representative", "mentions"), "issue")
+                  "sourceEvents", "decisionRef", "representative", "fieldProvenance", "mentions"), "issue")
         _text(i["id"], "issue.id", ID)
         _text(i["canonicalId"], "issue", ID)
         _text(i["decisionRef"], "issue", ID)
@@ -631,6 +662,7 @@ def validate_bundle(bundle: dict) -> None:
         _need({(m["documentId"], m["documentVersion"], m["mentionId"]) for m in mentions} ==
               {(s["documentId"], s["documentVersion"], s["mentionId"]) for s in source_events}, "issue.mentions.sourceClosure")
         _need(set(i["evidenceIds"]) == mentioned, "issue.evidenceClosure")
+        _field_provenance(i, mentions)
         _need(i["id"] not in issues and i["id"] not in companies, "issues.unique")
         issues[i["id"]] = i
 
@@ -745,7 +777,7 @@ def validate_bundle(bundle: dict) -> None:
                 detail = _keys(item["detail"], ("fields",), "exclusion.detail")
                 fields = _strings(detail["fields"], "exclusion.detail.fields")
                 _need(bool(fields) and len(fields) == len(set(fields)) and set(fields) <=
-                      {"title", "action", "target", "eventTime", "period", "assertionStatus"}, "exclusion.detail.fields")
+                      {wire for _, wire in ISSUE_FIELDS}, "exclusion.detail.fields")
             elif item["code"] == "applicability_binding_mismatch":
                 detail = _keys(item["detail"], ("expectedBindingDigest",), "exclusion.detail")
                 _text(detail["expectedBindingDigest"], "exclusion.detail.expectedBindingDigest", HASH)

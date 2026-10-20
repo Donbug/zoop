@@ -47,13 +47,15 @@ import tools.jackson.databind.node.ObjectNode;
  * always gives the same ids. The representative event resolves to its article version the same way, and is written as
  * {@code null} when that mention is not among the written ones, never as a mention the snapshot lacks. A document identity that
  * matches more than one bundle article is genuinely ambiguous and refused ({@link GraphHandoffFailure#MENTION_ARTICLE_AMBIGUOUS});
- * the verifier of {@code zoop-graph-handoff-bundle-2} already requires exactly one article per mention document version, and every
+ * the verifier of {@code zoop-graph-handoff-bundle-3} already requires exactly one article per mention document version, and every
  * original mention cites evidence of its own article, so under that schema the references cover every mention of an issue. The
  * snapshot does not carry the mention values (title, action, time, assertion status, background, participants): they are the
  * producer's S2 candidate or snapshot values ({@code verification: "none"}) and stay only in the receipt, which keeps the whole
  * bundle, the producer's own mention ids and decisions, source references and each producer field the snapshot has no place for.
  * Any later reader of receipt mentions must check {@code receipt.bundle.schemaVersion}: for {@code zoop-graph-handoff-bundle-1}
- * the mention values are unavailable, never empty and never copied from the issue.
+ * the mention values are unavailable, never empty and never copied from the issue, and for {@code -1} and {@code -2} the issue's
+ * {@code fieldProvenance} (which mentions state each headline value; a selection record, not a verification) is absent, never
+ * rebuilt as {@code unanimous} from a null representative. The snapshot carries no field provenance either.
  *
  * <p>{@code validUntil} is the last valid day (inclusive) and {@code null} is unknown, never "forever": days are written verbatim
  * or not at all ({@link HandoffTime#dayOrNull}); no midnight and no extra day is ever added.

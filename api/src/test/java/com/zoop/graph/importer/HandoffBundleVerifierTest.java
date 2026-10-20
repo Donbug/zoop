@@ -70,6 +70,43 @@ class HandoffBundleVerifierTest {
     }
 
     @Test
+    void aRealProducerExportCarriesTheHandWrittenFieldProvenanceAndAnyEditOfItIsRefused() throws Exception {
+        // expected-field-provenance.json is written by hand in graph_handoff_smoke.py (never derived from the planner): per export file,
+        // per issue id, the field provenance the authored world implies.
+        JsonNode expected = HandoffFixtures.parse(resource("expected-field-provenance.json"));
+        for (String name : List.of("export-valid.json", "export-collision.json")) {
+            byte[] export = resource(name);
+            new HandoffExportParser().parse(export, pinning(export));
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            assertEquals(expected.get(name).size(), bundle.get("issues").size(), name);
+            boolean shared = false;
+            for (JsonNode issue : bundle.get("issues")) {
+                String id = issue.get("id").stringValue();
+                assertEquals(expected.get(name).get(id), issue.get("fieldProvenance"), name + " " + id);
+                assertEquals("none", issue.get("fieldProvenance").get("verification").stringValue(), name + " " + id);
+                if (issue.get("representative").isNull()) {
+                    continue;
+                }
+                // An operator-chosen representative: a mention that states the issue's action too may not be left out of the list.
+                assertEquals("operator-representative", issue.get("fieldProvenance").get("selection").stringValue(), name + " " + id);
+                ArrayNode action = (ArrayNode) issue.get("fieldProvenance").get("sameValueMentions").get("action");
+                if (action.size() > 1) {
+                    shared = true;
+                    ObjectNode edited = (ObjectNode) bundle.deepCopy();
+                    for (JsonNode candidate : edited.get("issues").values()) {
+                        if (candidate.get("id").stringValue().equals(id)) {
+                            ((ArrayNode) candidate.get("fieldProvenance").get("sameValueMentions").get("action")).remove(action.size() - 1);
+                        }
+                    }
+                    ((ObjectNode) edited.get("digests")).put("content", HandoffBundleVerifier.contentDigest(edited));
+                    assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(edited), name + " " + id);
+                }
+            }
+            assertTrue(shared, name + ": no representative issue with a second mention stating the same action");
+        }
+    }
+
+    @Test
     void theProducersOwnNegativeFixturesAreRefused() throws Exception {
         for (String name : List.of("bundle-forged-evidence-id.json", "bundle-missing-geography.json",
                 "bundle-dangling-endpoint.json", "bundle-wrong-article-version.json", "bundle-shares-issue-edge.json")) {
@@ -123,8 +160,9 @@ class HandoffBundleVerifierTest {
         assertRefused("unknown top-level key", b -> b.put("operatorPath", "/private/x"));
         assertRefused("unknown nested key", b -> ((ObjectNode) b.get("provenance")).put("extra", "x"));
         assertRefused("missing key", b -> b.remove("readiness"));
-        assertRefused("the earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-1"));
-        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
+        assertRefused("the first schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-1"));
+        assertRefused("the earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-2"));
+        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-4"));
         assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
         assertRefused("an actual-model run is not producible", b -> ((ObjectNode) b.get("provenance")).put("executionMode", "live"));
         assertRefused("declared and observed kind differ", b -> ((ObjectNode) b.get("provenance")).put("observedSourceKind", "actual"));
@@ -290,6 +328,20 @@ class HandoffBundleVerifierTest {
         second.putArray("evidenceIds").add(evidenceId);
         ((ArrayNode) issue.get("mentions")).add(second);
 
+        // The operator chose document a's event as the representative: the issue keeps its values and every one of them is stated
+        // by the first mention, so only the action (copied into the second mention) is stated by both.
+        issue.set("representative", ((ObjectNode) issue.get("sourceEvents").get(0)).deepCopy());
+        ObjectNode provenance = issue.putObject("fieldProvenance");
+        provenance.put("selection", "operator-representative");
+        provenance.put("verification", "none");
+        ObjectNode same = provenance.putObject("sameValueMentions");
+        for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+            ArrayNode list = same.putArray(field);
+            list.add(reference(b, 0));
+            if (field.equals("action")) {
+                list.add(reference(b, 1));
+            }
+        }
         addEvidenceId(issue, evidenceId);
         ((ObjectNode) b.get("counts")).put("evidence", 4).put("articles", 2);
         return evidenceId;
@@ -379,8 +431,22 @@ class HandoffBundleVerifierTest {
     }
 
     @Test
-    void mentionValuesAreTheOriginalOnesAndNeverCopiedFromTheMergedIssue() {
-        HandoffBundle bundle = HandoffBundleVerifier.verify(mutated(b -> {
+    void anIssueValueIsAlwaysStatedByAnOriginalMentionAndNeverCopiedFromTheMergedIssue() {
+        // Two documents: the operator's representative (document a) states every issue value; document b differs in all but the
+        // action. The mentions keep their own values and the issue keeps the representative's, never b's.
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        addSecondDocument(copy);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        HandoffBundle bundle = HandoffBundleVerifier.verify(copy);
+
+        HandoffBundle.Issue issue = bundle.issues().get(0);
+        assertEquals("합성 공급 계약", issue.title());
+        assertEquals("2026-09-30", issue.eventTime());
+        assertEquals("announced", issue.assertionStatus());
+        assertEquals("planned", mention(copy, 1).get("assertionStatus").stringValue());
+
+        // A single mention that differs from the issue in every field supports none of them: no issue value is invented.
+        assertRefused("an issue value that no mention states", b -> {
             ObjectNode m = mention(b, 0);
             m.put("title", "원문 제목");
             m.put("action", "다른 행위");
@@ -391,13 +457,188 @@ class HandoffBundleVerifierTest {
             m.put("assertionStatus", "forecast");
             m.put("background", true);
             m.putArray("participants");
-        }));
+        });
+    }
 
-        HandoffBundle.Issue issue = bundle.issues().get(0);
-        assertEquals("합성 공급 계약", issue.title());
-        assertEquals("2026-09-30", issue.eventTime());
-        assertEquals("announced", issue.assertionStatus());
-        assertEquals("합성 공급 계약", BUILT.bundle().get("issues").get(0).get("title").stringValue());
+    // ------------------------------------------------------------------------------------------------ field provenance ----
+
+    private static ObjectNode issueOf(ObjectNode bundle) {
+        return (ObjectNode) bundle.get("issues").get(0);
+    }
+
+    private static ObjectNode provenance(ObjectNode bundle) {
+        return (ObjectNode) issueOf(bundle).get("fieldProvenance");
+    }
+
+    private static ArrayNode listOf(ObjectNode bundle, String field) {
+        return (ArrayNode) provenance(bundle).get("sameValueMentions").get(field);
+    }
+
+    /** The mention identity of the issue's {@code index}-th mention, in the form a provenance list holds it. */
+    private static ObjectNode reference(ObjectNode bundle, int index) {
+        ObjectNode mention = mention(bundle, index);
+        ObjectNode identity = StrictJson.newObject();
+        identity.put("documentId", mention.get("documentId").stringValue());
+        identity.put("documentVersion", mention.get("documentVersion").stringValue());
+        identity.put("mentionId", mention.get("mentionId").stringValue());
+        return identity;
+    }
+
+    /** Replaces one provenance list by the identities of the given mentions (indexes into the issue's mentions). */
+    private static void setList(ObjectNode bundle, String field, int... indexes) {
+        ArrayNode list = ((ObjectNode) provenance(bundle).get("sameValueMentions")).putArray(field);
+        for (int index : indexes) {
+            list.add(reference(bundle, index));
+        }
+    }
+
+    @Test
+    void aTruthfulFieldProvenanceIsAcceptedForUnanimousAndRepresentativeIssues() {
+        // Unanimous, one mention: every list is that mention (the synthetic bundle itself).
+        HandoffBundleVerifier.verify(BUILT.bundle());
+
+        // Representative with a differing second mention: only the action is stated by both, in mention order.
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        addSecondDocument(copy);
+        for (String field : List.of("title", "target", "eventTime", "period", "assertionStatus")) {
+            assertEquals(1, listOf(copy, field).size(), field);
+            assertEquals(reference(copy, 0), listOf(copy, field).get(0), field);
+        }
+        assertEquals(List.of(reference(copy, 0), reference(copy, 1)), List.copyOf(listOf(copy, "action").values()));
+        assertEquals("operator-representative", provenance(copy).get("selection").stringValue());
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        HandoffBundleVerifier.verify(copy);
+
+        // Representative with all values agreeing: still operator-representative, and both identities appear in every list.
+        ObjectNode agreeing = BUILT.bundle().deepCopy();
+        addSecondDocument(agreeing);
+        ObjectNode second = mention(agreeing, 1);
+        ObjectNode first = mention(agreeing, 0);
+        second.put("timePrecision", first.get("timePrecision").stringValue());
+        for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+            second.set(field, first.get(field).deepCopy());
+            setList(agreeing, field, 0, 1);
+        }
+        ((ObjectNode) agreeing.get("digests")).put("content", HandoffBundleVerifier.contentDigest(agreeing));
+        HandoffBundleVerifier.verify(agreeing);
+
+        // Unanimous with two agreeing mentions and no representative.
+        ObjectNode unanimous = agreeing.deepCopy();
+        issueOf(unanimous).putNull("representative");
+        provenance(unanimous).put("selection", "unanimous");
+        ((ObjectNode) unanimous.get("digests")).put("content", HandoffBundleVerifier.contentDigest(unanimous));
+        HandoffBundleVerifier.verify(unanimous);
+    }
+
+    @Test
+    void everyFieldProvenanceRuleIsEnforced() {
+        assertRefused("an issue without its provenance", b -> issueOf(b).remove("fieldProvenance"));
+        assertRefused("provenance that is not an object", b -> issueOf(b).put("fieldProvenance", "x"));
+        assertRefused("a null provenance", b -> issueOf(b).putNull("fieldProvenance"));
+        assertRefused("an unknown provenance key", b -> provenance(b).put("approval", "none"));
+        assertRefused("field decisions are no provenance key", b -> provenance(b).putObject("fieldDecisions"));
+        assertRefused("field decisions are no issue key", b -> issueOf(b).putObject("fieldDecisions"));
+        for (String key : List.of("selection", "verification", "sameValueMentions")) {
+            assertRefused("provenance without " + key, b -> provenance(b).remove(key));
+        }
+        assertRefused("an unknown selection", b -> provenance(b).put("selection", "consensus"));
+        assertRefused("a null selection", b -> provenance(b).putNull("selection"));
+        assertRefused("representative selection without a representative", b -> provenance(b).put("selection", "operator-representative"));
+        assertRefused("a verified provenance", b -> provenance(b).put("verification", "verified"));
+        assertRefused("a null verification", b -> provenance(b).putNull("verification"));
+        assertRefused("an unknown field list", b -> ((ObjectNode) provenance(b).get("sameValueMentions")).putArray("geography"));
+        assertRefused("a derived time precision list", b -> ((ObjectNode) provenance(b).get("sameValueMentions")).putArray("timePrecision"));
+        for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+            assertRefused("a missing " + field + " list", b -> ((ObjectNode) provenance(b).get("sameValueMentions")).remove(field));
+            assertRefused("a non-array " + field + " list", b -> ((ObjectNode) provenance(b).get("sameValueMentions")).put(field, "x"));
+            assertRefused("an empty " + field + " list", b -> listOf(b, field).removeAll());
+            assertRefused("a duplicated " + field + " identity", b -> listOf(b, field).add(reference(b, 0)));
+            assertRefused("a null " + field + " item", b -> listOf(b, field).addNull());
+            assertRefused("a " + field + " reference that is not a mention", b -> ((ObjectNode) listOf(b, field).get(0)).put("mentionId", "m-9"));
+            assertRefused("a " + field + " reference of another document version",
+                    b -> ((ObjectNode) listOf(b, field).get(0)).put("documentVersion", "9".repeat(64)));
+            assertRefused("a " + field + " reference of another document", b -> ((ObjectNode) listOf(b, field).get(0)).put("documentId", "doc-" + "9".repeat(64)));
+            assertRefused("an unknown key in a " + field + " reference", b -> ((ObjectNode) listOf(b, field).get(0)).put("articleId", "x"));
+            assertRefused("a " + field + " reference without its mention id", b -> ((ObjectNode) listOf(b, field).get(0)).remove("mentionId"));
+        }
+    }
+
+    @Test
+    void theProvenanceListsAreExactlyTheMentionsThatStateTheIssueValue() {
+        // Both mentions listed for a field only the first states: an included differing mention.
+        assertRefusedWithTwoDocuments("an included mention whose title differs", b -> setList(b, "title", 0, 1));
+        assertRefusedWithTwoDocuments("an included mention whose assertion status differs", b -> setList(b, "assertionStatus", 0, 1));
+        // The second mention states the same action but is omitted.
+        assertRefusedWithTwoDocuments("an omitted equal-value mention", b -> setList(b, "action", 0));
+        assertRefusedWithTwoDocuments("an out-of-order list", b -> setList(b, "action", 1, 0));
+        assertRefusedWithTwoDocuments("a list of the other mention only", b -> setList(b, "action", 1));
+        assertRefusedWithTwoDocuments("a list that holds only the other mention", b -> setList(b, "title", 1));
+        // The same list with the right content is accepted once the content digest is recomputed.
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        addSecondDocument(copy);
+        setList(copy, "action", 0, 1);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        HandoffBundleVerifier.verify(copy);
+    }
+
+    @Test
+    void theSelectionIsTheOperatorsOnlyWhenARepresentativeIsSet() {
+        assertRefusedWithTwoDocuments("a representative issue calling itself unanimous", b -> provenance(b).put("selection", "unanimous"));
+        assertRefusedWithTwoDocuments("a no-representative issue whose mentions differ", b -> {
+            issueOf(b).putNull("representative");
+            provenance(b).put("selection", "unanimous");
+        });
+        assertRefusedWithTwoDocuments("a no-representative issue calling itself the operator's", b -> issueOf(b).putNull("representative"));
+        assertRefusedWithTwoDocuments("a representative that is not a source event of the issue", b -> {
+            ObjectNode foreign = ((ObjectNode) issueOf(b).get("representative")).deepCopy().put("mentionId", "m-9");
+            issueOf(b).set("representative", foreign);
+        });
+        // The unanimous rule: a list that leaves out a mention is refused even though each listed mention does state the value.
+        assertRefusedWithTwoDocuments("an incomplete unanimous list", b -> {
+            issueOf(b).putNull("representative");
+            provenance(b).put("selection", "unanimous");
+            for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+                mention(b, 1).set(field, mention(b, 0).get(field).deepCopy());
+                setList(b, field, 0);
+            }
+            mention(b, 1).put("timePrecision", mention(b, 0).get("timePrecision").stringValue());
+        });
+    }
+
+    @Test
+    void theRepresentativeMustBeInEveryListAndValuesAreComparedExactly() {
+        // The representative's own values are what the issue states: a different second mention cannot stand in for it.
+        assertRefusedWithTwoDocuments("the representative changed to the differing mention while the issue keeps its values", b ->
+                issueOf(b).set("representative", issueOf(b).get("sourceEvents").get(1).deepCopy()));
+        // No normalisation: the same instant spelled differently is a different value, and null matches only null.
+        assertRefused("a time spelled differently", b -> {
+            mention(b, 0).put("eventTime", "2026-09-30T00:00:00+09:00");
+            mention(b, 0).put("timePrecision", "datetime");
+        });
+        assertRefused("an empty string is not null", b -> {
+            issueOf(b).putNull("period");
+            mention(b, 0).put("period", "");
+        });
+        assertRefused("a trailing space is another title", b -> mention(b, 0).put("title", "합성 공급 계약 "));
+        HandoffBundleVerifier.verify(mutated(b -> {
+            issueOf(b).putNull("target");
+            mention(b, 0).putNull("target");
+            issueOf(b).putNull("period");
+            mention(b, 0).putNull("period");
+        }));
+    }
+
+    @Test
+    void aNullIssueValueIsMatchedByANullMentionValueAndListedLikeAnyOther() {
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        addSecondDocument(copy);
+        // The issue (and its representative, document a) states no target; the second mention states none either, so null
+        // matches null and the list holds both identities.
+        issueOf(copy).putNull("target");
+        mention(copy, 0).putNull("target");
+        setList(copy, "target", 0, 1);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        HandoffBundleVerifier.verify(copy);
     }
 
     @Test
@@ -487,27 +728,36 @@ class HandoffBundleVerifierTest {
             })), String.join("|", String.valueOf(time[0]), time[1]));
             assertEquals(GraphHandoffFailure.TEMPORAL_UNSUPPORTED, failure.failure());
         }
+        // The issue states the same time, so the one mention still agrees with it and the provenance stays exact.
         HandoffBundleVerifier.verify(mutated(b -> {
             mention(b, 0).put("eventTime", "2026-09-30T09:00:00+09:00");
             mention(b, 0).put("timePrecision", "datetime");
+            ((ObjectNode) b.get("issues").get(0)).put("eventTime", "2026-09-30T09:00:00+09:00");
         }));
     }
 
     @Test
-    void anExportOfTheEarlierBundleSchemaIsRefusedAsAnInvalidBundleBeforeAnyWrite() {
-        byte[] earlier = HandoffFixtures.envelopeAfter(BUILT, root -> {
-            ObjectNode bundle = (ObjectNode) root.get("bundle");
-            bundle.put("schemaVersion", "zoop-graph-handoff-bundle-1");
-            ((ObjectNode) bundle.get("issues").get(0)).remove("mentions");
-            ((ObjectNode) root.get("receipt")).put("bundleSchema", "zoop-graph-handoff-bundle-1");
-        });
-        JsonNode root = HandoffFixtures.parse(earlier);
+    void anExportOfAnEarlierBundleSchemaIsRefusedAsAnInvalidBundleBeforeAnyWrite() {
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2")) {
+            byte[] earlier = HandoffFixtures.envelopeAfter(BUILT, root -> {
+                ObjectNode bundle = (ObjectNode) root.get("bundle");
+                bundle.put("schemaVersion", schema);
+                ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
+                issue.remove("fieldProvenance");
+                if (schema.endsWith("-1")) {
+                    issue.remove("mentions");
+                }
+                ((ObjectNode) root.get("receipt")).put("bundleSchema", schema);
+            });
+            JsonNode root = HandoffFixtures.parse(earlier);
 
-        GraphHandoffException failure = assertThrows(GraphHandoffException.class,
-                () -> new HandoffExportParser().parse(earlier, new GraphHandoffRequest(root.get("handoffId").stringValue(),
-                        Canonical.digest(root.get("manifest")), Canonical.sha256(Canonical.bytes(root.get("bundle"))), "operator-a")));
+            GraphHandoffException failure = assertThrows(GraphHandoffException.class,
+                    () -> new HandoffExportParser().parse(earlier, new GraphHandoffRequest(root.get("handoffId").stringValue(),
+                            Canonical.digest(root.get("manifest")), Canonical.sha256(Canonical.bytes(root.get("bundle"))), "operator-a")),
+                    schema);
 
-        assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure());
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failure.failure(), schema);
+        }
     }
 
     @Test

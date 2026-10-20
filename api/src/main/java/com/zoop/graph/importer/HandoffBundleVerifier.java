@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-2} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-3} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -39,7 +39,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-3";
     static final String POLICY = "zoop-public-projection-policy-1";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
@@ -80,6 +80,10 @@ final class HandoffBundleVerifier {
             "articleVersion", "verification", "title", "action", "target", "eventTime", "timePrecision", "period",
             "assertionStatus", "background", "participants", "evidenceIds");
     private static final Set<String> PARTICIPANT_KEYS = Set.of("sourceCompanyId", "companyId", "name", "role");
+    /** The issue's wire field names whose original-mention agreement {@code fieldProvenance} records, in the producer's order. */
+    private static final List<String> PROVENANCE_FIELDS = List.of("title", "action", "target", "eventTime", "period",
+            "assertionStatus");
+    private static final Set<String> MENTION_REF_KEYS = Set.of("documentId", "documentVersion", "mentionId");
     private static final Set<String> ASSERTION_STATUSES = Set.of("occurred", "announced", "planned", "forecast",
             "cancelled", "unknown");
     private static final int MAX_MENTIONS = 1_000;
@@ -337,7 +341,7 @@ final class HandoffBundleVerifier {
         for (Obj i : issueNodes) {
             i.exactly(Set.of("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period",
                     "assertionStatus", "geography", "evidenceIds", "sourceEvents", "mentions", "decisionRef",
-                    "representative"));
+                    "representative", "fieldProvenance"));
             String id = text(i, "id", ID);
             text(i, "canonicalId", ID);
             text(i, "decisionRef", ID);
@@ -394,6 +398,7 @@ final class HandoffBundleVerifier {
                 sourceEvent(representative, upstreams);
                 need(eventKeys.contains(Canonical.write(representative.node())));
             }
+            fieldProvenance(i, i.isNull("representative") ? null : i.object("representative"));
             need(!issues.containsKey(id) && !companies.containsKey(id));
             issues.put(id, new Issue(id, title, action, target, eventTime, timePrecision, assertionStatus,
                     geographyValue, geographyPolicy, geographyEvidence, evidenceIds));
@@ -688,6 +693,45 @@ final class HandoffBundleVerifier {
         }
         need(carried.equals(new HashSet<>(keys)));
         return union;
+    }
+
+    /**
+     * The issue's {@code fieldProvenance}, recomputed from the original mentions and the issue's own values: {@code selection}
+     * is {@code operator-representative} exactly when a representative is set and {@code unanimous} otherwise; each of the six
+     * field lists is exactly the identities, in mention order, of the mentions whose value equals the issue's (JSON equality:
+     * {@code null} matches {@code null}, no normalisation), non-empty; a unanimous issue's lists are all mentions and a
+     * representative is in every list. It records which mentions state the issue's value, never that the value is verified.
+     */
+    private static void fieldProvenance(Obj issue, Obj representative) {
+        Obj provenance = issue.object("fieldProvenance").exactly(Set.of("selection", "verification", "sameValueMentions"));
+        need(provenance.string("selection").equals(representative != null ? "operator-representative" : "unanimous"));
+        need("none".equals(provenance.string("verification")));
+        Obj same = provenance.object("sameValueMentions").exactly(new HashSet<>(PROVENANCE_FIELDS));
+        List<Obj> mentions = issue.objects("mentions");
+        List<String> everyone = new ArrayList<>();
+        for (Obj mention : mentions) {
+            everyone.add(mentionKey(mention.string("documentId"), mention.string("documentVersion"), mention.string("mentionId")));
+        }
+        String chosen = representative == null ? null : mentionKey(representative.string("documentId"),
+                representative.string("documentVersion"), representative.string("mentionId"));
+        for (String field : PROVENANCE_FIELDS) {
+            List<String> expected = new ArrayList<>();
+            for (int index = 0; index < mentions.size(); index++) {
+                if (mentions.get(index).raw(field).equals(issue.raw(field))) {
+                    expected.add(everyone.get(index));
+                }
+            }
+            List<Obj> references = same.objects(field);
+            need(references.size() <= MAX_MENTIONS);
+            List<String> actual = new ArrayList<>();
+            for (Obj reference : references) {
+                reference.exactly(MENTION_REF_KEYS);
+                actual.add(mentionKey(reference.string("documentId"), reference.string("documentVersion"),
+                        reference.string("mentionId")));
+            }
+            need(!expected.isEmpty() && actual.equals(expected));
+            need(chosen == null ? expected.equals(everyone) : expected.contains(chosen));
+        }
     }
 
     /** The canonical JSON of the S2 mention identity: the document version and the document-local mention id. */

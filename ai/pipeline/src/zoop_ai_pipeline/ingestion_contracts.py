@@ -5,11 +5,12 @@ import hashlib
 import json
 import os
 import stat
+import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, model_serializer, model_validator
 from pydantic.alias_generators import to_camel
 
 SCHEMA = "zoop-ingestion-s2-1"
@@ -84,6 +85,36 @@ class Wire(BaseModel):
 
     def wire(self):
         return self.model_dump(by_alias=True, mode="json")
+
+
+def _declared_publisher(value: str) -> str:
+    """An operator-declared outlet name, stored exactly as written: no trimming and no Unicode normalization.
+
+    Rejected: a lone surrogate, any Unicode control character (category Cc, which includes NUL, tab and newline) and a value made
+    only of separator characters (category Z*), because none of them can name an outlet. The application importer applies the same rule."""
+    if any(unicodedata.category(c) == "Cc" or 0xD800 <= ord(c) <= 0xDFFF for c in value) or all(unicodedata.category(c).startswith("Z") for c in value):
+        raise ValueError("publisher must be a printable outlet name")
+    return value
+
+
+Publisher = Annotated[str, StringConstraints(min_length=1, max_length=200), AfterValidator(_declared_publisher)]
+
+
+class Declared(Wire):
+    """A request/item model with an optional operator-declared publishing outlet.
+
+    Unspecified is the key's absence, never an explicit null: the key is dropped from every dump, including a dump nested in a parent
+    model (`Request.wire()` does not call `Target.wire()`, so a `wire()` override would not reach it), and ONLY this key is dropped.
+    Every existing nullable key keeps serializing as null, so no earlier request digest, page, metadata or raw version changes.
+    A present publisher is identity: it enters the metadata hash, so it yields a new raw/document version of the same document."""
+    publisher: Publisher | None = None
+
+    @model_serializer(mode="wrap")
+    def _without_unspecified_publisher(self, handler):
+        dumped = handler(self)
+        if self.publisher is None:
+            dumped.pop("publisher", None)
+        return dumped
 
 
 class Window(Wire):
@@ -327,7 +358,7 @@ class Receipt(Wire):
         return self
 
 
-class Item(Wire):
+class Item(Declared):
     candidate_id: str = Field(min_length=1, max_length=200)
     supplier_document_id: str | None = Field(default=None, min_length=1, max_length=500)
     url: str = Field(min_length=1, max_length=4000)
@@ -352,6 +383,7 @@ class Item(Wire):
 
     def metadata(self):
         # Collection facts describe one observation; they are not part of the immutable raw-version identity.
+        # A present publisher stays in this metadata (it is raw-version identity); an unspecified one has no key at all.
         return {k: v for k, v in self.wire().items() if k not in {"candidateId", "bodyRef", "url", "supplierDocumentId", "collection"}}
 
 

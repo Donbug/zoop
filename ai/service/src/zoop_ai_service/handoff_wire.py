@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-2` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-3` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -29,7 +29,7 @@ from .wire import ErrorBody, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-3"
 POLICY = "zoop-public-projection-policy-1"
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
@@ -216,6 +216,35 @@ class BMention(Bx):
     evidence_ids: Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(min_length=1, max_length=MAX_EVIDENCE)]
 
 
+class BMentionRef(Bx):
+    """The identity of one original mention of the same issue (a reference, never a copy of its values)."""
+    document_id: Id
+    document_version: Hash
+    mention_id: Name
+
+
+SameValueList = Annotated[list[BMentionRef], Field(min_length=1, max_length=1000)]
+
+
+class BSameValueMentions(Bx):
+    """Per headline field, the mentions whose own value equals the issue's value exactly (null equals null, no normalisation). Shape only: the producer owns the
+    exactness, order and closure of these lists."""
+    title: SameValueList
+    action: SameValueList
+    target: SameValueList
+    event_time: SameValueList
+    period: SameValueList
+    assertion_status: SameValueList
+
+
+class BFieldProvenance(Bx):
+    """How the producer chose the issue's six headline values: `unanimous` (every mention states them) or `operator-representative` (the operator's single
+    representative decision). `verification` is always `none`: this is the actual selection, never a verification, support or approval of any value."""
+    selection: Literal["unanimous", "operator-representative"]
+    verification: Literal["none"]
+    same_value_mentions: BSameValueMentions
+
+
 class BIssue(Bx):
     id: Id
     canonical_id: Id
@@ -232,6 +261,7 @@ class BIssue(Bx):
     mentions: Annotated[list[BMention], Field(max_length=1000)]
     decision_ref: Id
     representative: BSourceEvent | None
+    field_provenance: BFieldProvenance
 
 
 class BSourceRef(Bx):
@@ -411,7 +441,7 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-2"]
+    schema_version: Literal["zoop-graph-handoff-bundle-3"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
@@ -516,7 +546,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-2"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-3"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)
