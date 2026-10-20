@@ -9,6 +9,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /** Enforces current administrator identity and the configured admin-all permission at the HTTP boundary. */
@@ -23,6 +24,9 @@ public class AdminAuthorizationInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (CorsUtils.isPreFlightRequest(request)) {
+            return true;
+        }
         String token = AdminSessionCookie.token(request);
         AdminPrincipal principal = sessions.requireAdmin(token);
         if (!AdminPermissions.can(principal.role(), requiredPermission(request))) {

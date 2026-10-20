@@ -150,6 +150,8 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" DB_URL=… DB_USERNAME=… DB_PASSWORD=�
 
 **설정(운영 플래그와 독립, 기본 미설정).** `ZOOP_DOCUMENT_READ_GRANTS`(= `zoop.document-read.grants`)는 operator의 flat S1 registry 파일(`zoop-ai-s1-1`, 분석과 같은 파일)로 요청마다 새로 읽고 캐시하지 않습니다. 미설정이면 모든 `getEvidence`가 503 `SOURCE_UNAVAILABLE`이고, 설정했는데 정규화된 절대 경로가 아니거나 없는 파일이면 **기동이 실패**하며 메시지는 설정 이름만 말합니다. `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT`(= `zoop.document-read.artifact-root`)는 **캐시로 돌려준 요약의 exact receipt 파일 한 건**을 읽을 때만 필요합니다. 미설정이면 그 경우만 503이고 나머지는 영향이 없으며, 설정은 `ArtifactFileStore.at`으로 루트만 검사하고 **아무것도 만들지 않습니다**. 웹 프로세스는 artifact 루트 소유자와 같은 OS 사용자·같은 호스트여야 합니다(파일이 0600).
 
+> **2026-10-20: graph 본문 근거 분기.** 이 절은 S1 요약 근거의 규칙입니다. 저장된 행의 검증 artifact가 graph import `verification_receipt`이면 같은 `GET /api/v1/evidence/{id}`가 graph 경로(고정된 공개 snapshot, 선택된 버전의 receipt, S2-1 source registry)로 응답하며 이 절의 S1 grant 규칙·`ZOOP_DOCUMENT_READ_GRANTS`를 쓰지 않습니다. S1 행의 동작과 오류는 그대로이고, 행 조회가 S1 registry 읽기보다 먼저라 모르는 id는 S1 grant가 없어도 404이며 `graphVersion`·`asOf`가 있어도 id가 없으면 404입니다(`round`는 여전히 조회 전 409). 규칙은 [GRAPH_READ_HANDOFF.md](GRAPH_READ_HANDOFF.md#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시).
+
 **판정(앞에서부터, 하나라도 아니면 404 `EVIDENCE_UNAVAILABLE`이고 이유는 로그에만 남습니다; `request id`와 증거 id, 이유 토큰, 내용·경로 없음).**
 
 1. 검증 쿼리: 빈 값이나 offset 없는 `asOf`는 422 `INVALID_REQUEST`. `round`·`graphVersion`·`asOf` 중 하나라도 있으면 **409 `VERSION_UNAVAILABLE`**(그래프·회차 스냅샷이 없어 최신으로 대체하지 않음, DB 접근 없음). id가 `ev-<64 hex>`가 아니거나 행이 없으면 404 `RESOURCE_NOT_FOUND`. registry를 읽지 못하면 503.

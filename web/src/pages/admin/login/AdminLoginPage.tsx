@@ -161,7 +161,7 @@ export default function AdminLoginPage() {
           {missing && (
             <p
               role="alert"
-              className="text-[11px] leading-relaxed text-[#b42318]"
+              className="text-[11px] leading-relaxed text-zoop-alert"
             >
               관리자 이메일과 비밀번호를 모두 입력해 주세요.
             </p>
@@ -169,7 +169,7 @@ export default function AdminLoginPage() {
           {error && (
             <p
               role="alert"
-              className="text-[11px] leading-relaxed text-[#b42318]"
+              className="text-[11px] leading-relaxed text-zoop-alert"
             >
               {error}
             </p>
