@@ -34,6 +34,7 @@ import {
   bucketKey,
   impactEdges,
   number,
+  requestTime,
 } from './detail-model';
 
 const workspaceClasses =
@@ -205,7 +206,7 @@ export default function CompanyWorkspace() {
     )
       updateQuery(
         {
-          asOf: latest,
+          asOf: requestTime(latest),
           ...(latest === company.data.metadata.asOf
             ? { graphVersion: currentVersion }
             : {}),

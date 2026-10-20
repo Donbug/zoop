@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import {
   bucketKey,
   impactEdges,
+  requestTime,
   timeRange,
 } from '@/components/company/detail-model';
 import {
@@ -1232,4 +1233,13 @@ test('without a published graph version the page does not pin a reference time (
       .calls('GET', '/api/v1/companies/:id')
       .every((call) => !call.query.has('asOf')),
   ).toBe(true);
+});
+
+test('price bar times without seconds become RFC 3339 request times for asOf', () => {
+  // Toss bars arrive as 2026-10-20T00:00+09:00; company and graph APIs reject that (422).
+  expect(requestTime('2026-10-20T00:00+09:00')).toBe('2026-10-19T15:00:00Z');
+  expect(requestTime('2026-10-20T17:40+09:00')).toBe('2026-10-20T08:40:00Z');
+  expect(requestTime('2026-10-20T06:03:38.413Z')).toBe(
+    '2026-10-20T06:03:38.413Z',
+  );
 });

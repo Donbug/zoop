@@ -17,6 +17,12 @@ export const exactTime = (value: string | null | undefined) =>
   !!value &&
   /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value));
+/**
+ * 요청에 쓸 RFC 3339 시각(초 포함, UTC). 토스 가격 봉은 초 없는 시각(2026-10-20T00:00+09:00)을 주는데,
+ * 기업·그래프 API는 이를 422로 거절하므로 기준 시점(asOf)으로 쓸 때 바꾼다.
+ */
+export const requestTime = (value: string) =>
+  new Date(value).toISOString().replace(/\.000Z$/, 'Z');
 export function bucketKey(
   event: Pick<Event, 'eventTime' | 'timePrecision'>,
   period: ChartPeriod,
