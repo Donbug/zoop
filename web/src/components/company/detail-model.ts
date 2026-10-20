@@ -58,7 +58,22 @@ export function bucketKey(
   }
   return day;
 }
+export function timeRange(asOf: string, period: '1d'): { to: string };
+export function timeRange(
+  asOf: string,
+  period: Exclude<ChartPeriod, '1d'>,
+): { from: string; to: string };
+export function timeRange(
+  asOf: string,
+  period: ChartPeriod,
+): { to: string } | { from: string; to: string };
 export function timeRange(asOf: string, period: ChartPeriod) {
+  if (period === '1d') return { to: new Date(asOf).toISOString() };
+  return legacyTimeRange(asOf, period);
+}
+
+/** Deployment fallback only; the exchange session is determined by the server. */
+export function legacyTimeRange(asOf: string, period: ChartPeriod) {
   // Calendar periods follow the API's Asia/Seoul date boundary, even at KST midnight.
   const kstOffset = 9 * 60 * 60 * 1000;
   const end = new Date(asOf),
