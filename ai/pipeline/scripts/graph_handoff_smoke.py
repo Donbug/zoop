@@ -2,11 +2,20 @@
 """Actual ingestion + S2 + S3 world -> installed `zoop-ai-handoff` subprocesses (no Neo4j: the handoff does not read the private graph).
 
     ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_handoff_smoke.py [--write-fixture DIR]
+    ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_handoff_smoke.py --write-package DIR        # retained operator package (see below)
+    ai/pipeline/.venv/bin/python ai/pipeline/scripts/graph_handoff_smoke.py --verify-package DIR [--export-out FILE]
 
 Two S2 jobs (two events, one frozen snapshot event with two documents) and two S3 jobs are authored replay: no model, no provider, no original PoC state,
 no network (every CLI subprocess runs under a socket audit hook). Expectations are written by hand from the authored world, never derived from the
 planner under test. `--write-fixture DIR` additionally writes the valid export envelope and negative fixtures the backend import can be tested with.
-Fresh owned state is always removed; the source ledgers must be byte-identical after every command.
+Without `--write-package` fresh owned state is always removed; the source ledgers must be byte-identical after every command.
+
+`--write-package DIR` builds the same authored world (synthetic company ids SYNTH:000001/SYNTH:000002) directly in the NEW directory DIR, freezes ONE handoff
+through the installed CLI, checks the export against the hand-written expectation and KEEPS the world: source ledgers, the operator files, the pins and the
+inputs of the document import and of the graph handoff import. DIR must not exist (nothing is ever overwritten; a failed build removes what it created) and its
+parent must be a real, non-symlinked directory. The package is bound to the absolute path it was built at (the S2-1 ledger pins `inputRoot` of `sources.json`):
+to deliver it elsewhere, run `--write-package` there. `--verify-package DIR` re-exports it in fresh processes through the installed `zoop-ai-handoff` and
+`zoop-ai-ingest` and compares the result with the pins in PACKAGE.json; `--export-out FILE` also stores the current export envelope in a new file.
 """
 from __future__ import annotations
 
@@ -37,7 +46,26 @@ EVT_A2 = "합성기업이 3분기 공급 계약 체결을 공개했다."
 QB = "합성기업은 4분기 신규 공장 착공을 알렸다."
 GEO_B = "착공은 미국에서 이뤄진다."
 QB3 = "합성투자는 해외 합작 공장 지분을 인수했다."
-VALID2 = "공급 계약은 2026년 1월 1일부터 2026년 12월 31일까지 유효하다."
+
+
+def korean_date(day: str) -> str:
+    year, month, date = (int(part) for part in day.split("-"))
+    return f"{year}년 {month}월 {date}일"
+
+
+def validity_sentence(valid_from: str | None, valid_until: str | None) -> str | None:
+    """The one sentence of document b that proves a validity window. It states the end as the LAST VALID DAY ("through D"; FS042: `validFrom <= time <=
+    validUntil`), so the S3 value `validUntil` is exactly the day the source names: nothing is shifted by a day and no midnight is added."""
+    if valid_from and valid_until:
+        return f"공급 계약은 {korean_date(valid_from)}부터 {korean_date(valid_until)}까지 유효하다."
+    if valid_from:
+        return f"공급 계약은 {korean_date(valid_from)}부터 유효하며 종료일은 밝혀지지 않았다."
+    if valid_until:
+        return f"공급 계약은 {korean_date(valid_until)}까지 유효하며 시작일은 밝혀지지 않았다."
+    return None
+
+
+VALID2 = validity_sentence("2026-01-01", "2026-12-31")
 EVT_IN = "합성기업은 2026년 10월 신규 투자 계획을 밝혔다."
 EVT_Y = "합성기업은 2026년 9월 해외 공급 계약을 체결했다."
 GEO_Y = "계약은 국내 시장 중심이다."
@@ -51,20 +79,23 @@ REVIEWER = "reviewer-a"                                                         
 
 # ---------------------------------------------------------------- the authored world (also used by the unit tests) -----------------
 
-def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False) -> SimpleNamespace:
+def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
+                valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30") -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
-    dated: rel-b also holds an eligible SUPPLIES basis whose validity dates are proven ONLY by a sentence in another document (b)."""
+    dated: rel-b also holds an eligible SUPPLIES basis whose validity dates are proven ONLY by a sentence in another document (b); `valid_from`/`valid_until`
+    (None = unknown, no sentence, no citation) are that basis's validity and `event_time` is the supply issue's event time in BOTH of its documents."""
     kit = RelKit(root)
+    valid_text = validity_sentence(valid_from, valid_until) if dated else None
     d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A)},
                                      {"supplier": "supplier-a2", "html": page(EVT_A2)},
-                                     {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((VALID2,) if dated else ())), "published": None}])
+                                     {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}])
     refs = {"a": d1, "a2": d2, "b": d3}
     art = {name: kit.article(ref) for name, ref in refs.items()}
-    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time="2026-09-30"), "countries": ["KR"]}
+    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": ["KR"]}
     second = {} if a2_differs else {"title": "합성 공급 계약"}
-    m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time="2026-09-30",
+    m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time=event_time,
                           **({"title": "합성 공급 계약 체결 공개"} | second)), "countries": list(a2_countries)}
     m_b = {**kit.mention(art["b"], "m-b", [kit.evidence(art["b"], QB)], period="2026Q4", title="합성 공장 착공", action="공장 착공 알림", event_time="2026-11-15"),
            "countries": ["US"]}
@@ -96,10 +127,10 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
             proposal("PARTICIPATES_IN", co("SYNTH-2"), ev(evc["b"]), [cite(wb, "b", QB)]),
             proposal("PARTICIPATES_IN", co("SYNTH-1"), ev(evc["b3"]), [cite(wb, "b", QB3)]),
             *([proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cite(wb, "a", SUP)], product="배터리 부품",
-                        validity={"from": "2026-01-01", "until": "2026-12-31", "citations": [cite(wb, "b", VALID2)]})] if dated else [])])}
+                        validity={"from": valid_from, "until": valid_until, "citations": [cite(wb, "b", valid_text)] if valid_text else []})] if dated else [])])}
     for name, out in jobs.items():
         assert out["state"] == "ready", (name, out.get("failure"))
-    world.jobs, world.dated = jobs, dated
+    world.jobs, world.dated, world.valid_text, world.event_time = jobs, dated, valid_text, event_time
     return world
 
 
@@ -147,7 +178,7 @@ def source_events(world) -> list:
 def structural_binding(world, *, decision_version: str = "v1", job: str = "rel-a") -> str:
     """Hand-written copy of the attestation preimage the operator reviewed (issue source events, basis relation with its S3 revision, decision version)."""
     r = find(world.jobs[job], "SUPPLIES", "SYNTH-3", "SYNTH-1")
-    return digest({"policy": POLICY, "issue": "issue:supply", "company": "co:synth-3", "decisionVersion": decision_version, "eventTime": "2026-09-30",
+    return digest({"policy": POLICY, "issue": "issue:supply", "company": "co:synth-3", "decisionVersion": decision_version, "eventTime": getattr(world, "event_time", "2026-09-30"),
                    "geography": "domestic", "sourceEvents": source_events(world),
                    "basis": [{"jobId": job, "relationCandidateId": r["relationCandidateId"], "relationKey": r["relationKey"], "type": "SUPPLIES",
                               "revision": r["eligibility"]["revision"]}]})
@@ -257,8 +288,9 @@ def evidence_id(world, name: str, quote: str) -> str:
     return app_evidence_id(s["documentId"], s["documentVersion"], s["start"], s["end"])
 
 
-def expected(world) -> dict:
-    """Hand-written expectation of the full handoff over the authored world and operator documents above."""
+def expected(world, public_ids: dict | None = None) -> dict:
+    """Hand-written expectation of the full handoff over the authored world and operator documents above (`public_ids` maps the authored public company ids)."""
+    pub = lambda company: (public_ids or {}).get(company, company)  # noqa: E731
     e = {"EVT_A": evidence_id(world, "a", EVT_A), "GEO_A": evidence_id(world, "a", GEO_A), "SUP": evidence_id(world, "a", SUP),
          "EVT_A2": evidence_id(world, "a2", EVT_A2), "QB": evidence_id(world, "b", QB), "GEO_B": evidence_id(world, "b", GEO_B)}
     return {
@@ -267,18 +299,18 @@ def expected(world) -> dict:
                                            "geography": "domestic", "evidenceIds": sorted([e["EVT_A"], e["EVT_A2"], e["GEO_A"]])},
                    "issue:factory-2026q4": {"canonicalId": "issue:factory", "title": "합성 공장 착공", "eventTime": "2026-11-15", "timePrecision": "day",
                                             "geography": "international", "evidenceIds": sorted([e["QB"], e["GEO_B"]])}},
-        "relations": {("INVOLVES", "issue:supply-2026q3", "KRX:005930"): sorted([e["EVT_A"], e["EVT_A2"]]),
-                      ("INVOLVES", "issue:factory-2026q4", "KRX:005930"): [e["QB"]],
-                      ("STRUCTURALLY_RELATED_TO", "issue:supply-2026q3", "KRX:000660"): sorted([e["EVT_A"], e["EVT_A2"]]),
+        "relations": {("INVOLVES", "issue:supply-2026q3", pub("KRX:005930")): sorted([e["EVT_A"], e["EVT_A2"]]),
+                      ("INVOLVES", "issue:factory-2026q4", pub("KRX:005930")): [e["QB"]],
+                      ("STRUCTURALLY_RELATED_TO", "issue:supply-2026q3", pub("KRX:000660")): sorted([e["EVT_A"], e["EVT_A2"]]),
                       ("FOLLOWS", "issue:factory-2026q4", "issue:supply-2026q3"): sorted([e["QB"], e["EVT_A"]])},
         "basisEvidence": [e["SUP"]],
         "exclusions": {"geography_unproven": 1, "company_unmapped": 1, "issue_not_public": 1},
         "counts": {"companies": 2, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1}, "evidence": 6, "articles": 3, "exclusions": 3}}
 
 
-def check_export(world, out: dict) -> None:
+def check_export(world, out: dict, public_ids: dict | None = None) -> None:
     """The exported envelope equals the hand-written expectation exactly."""
-    want, bundle = expected(world), out["bundle"]
+    want, bundle = expected(world, public_ids), out["bundle"]
     assert out["delivery"]["status"] == "current" and out["publication"] == "not-published" and out["state"] == "ready", out["delivery"]
     assert [x["id"] for x in bundle["evidence"]] == want["evidence"], [x["id"] for x in bundle["evidence"]]
     assert {i["id"]: {"canonicalId": i["canonicalId"], "title": i["title"], "eventTime": i["eventTime"], "timePrecision": i["timePrecision"],
@@ -290,7 +322,7 @@ def check_export(world, out: dict) -> None:
     assert bundle["exclusions"]["counts"] == want["exclusions"] and bundle["counts"] == want["counts"], (bundle["exclusions"], bundle["counts"])
     assert bundle["provenance"] == {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
     assert bundle["readiness"] == {"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none", "graphDb": "none"}
-    assert [c["id"] for c in bundle["companies"]] == ["KRX:000660", "KRX:005930"]
+    assert [c["id"] for c in bundle["companies"]] == sorted((public_ids or {}).get(c, c) for c in ("KRX:000660", "KRX:005930"))
     assert [a["articleId"] for a in bundle["articles"]] == sorted(r["documentId"] for r in world.refs.values())
     manifest = out["manifest"]
     assert set(manifest) == {"schemaVersion", "handoffId", "sourceKind", "policyVersion", "sources", "files"} and set(manifest["files"]) == {"canonical", "decisions", "bindings"}
@@ -335,6 +367,48 @@ class Operator:
 
     def sel(self, handoff_id: str) -> dict:
         return {"schemaVersion": "zoop-ai-handoff-1", "handoffId": handoff_id}
+
+
+def validity_end_inclusive(root: Path) -> str:
+    """FS042 `validFrom <= time <= validUntil` through the installed CLI: the supply issue's event time is 2026-09-30. A basis whose last valid day is BEFORE that
+    day is excluded visibly; one whose last valid day IS that day, or later, is exported unchanged (`validUntil` verbatim, nothing shifted)."""
+    for name, valid_until in (("end-before-event-day", "2026-09-29"), ("end-on-event-day", "2026-09-30"), ("end-after-event-day", "2026-10-01")):
+        world = build_world(root.parent / f"validity-{name}", dated=True, valid_until=valid_until)
+        write_operator(world)
+        operator = Operator(world)
+        operator.cli("freeze", manifest_doc(world, "validity-1", file_hashes(world.root)))
+        out = operator.cli("export", operator.sel("validity-1"))
+        assert out["delivery"]["status"] == "current", (name, out["delivery"])
+        bundle = out["bundle"]
+        structural = [r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"]
+        items = {(i["kind"], i["id"]): i["code"] for i in bundle["exclusions"]["items"]}
+        if name == "end-before-event-day":
+            assert not structural and items[("structural", "issue:supply>co:synth-3")] == "basis_validity_outside_event_time", (name, items)
+        else:
+            assert len(structural) == 1 and structural[0]["basis"][0]["validUntil"] == valid_until, (name, structural)
+            assert ("structural", "issue:supply>co:synth-3") not in items, (name, items)
+    return "FS042 end-inclusive validity via CLI: a basis whose last valid day is before the event day is excluded (basis_validity_outside_event_time), one whose last valid day is the event day or later is exported with validUntil verbatim"
+
+
+def collision_export(root: Path, public_ids: dict | None = None) -> tuple[SimpleNamespace, dict]:
+    """The real export of the LEGAL collision world through the installed CLI: documents `a` and `a2` of one issue both use the local mention id `m-a` (S2 scopes
+    member identity by documentVersion + mentionId). Both source members and the second document's evidence must survive, and the issue keeps the operator's
+    representative (the member of document `a`). The backend maps such a handoff by (article id, article version, local mention id), never by the local id alone.
+    `public_ids` maps the authored public company ids to others (an importer smoke's own catalog)."""
+    world = build_world(root, collide=True, a2_differs=False)
+    decisions = decisions_doc(world)
+    for company in decisions["companies"]:
+        company["publicId"] = (public_ids or {}).get(company["publicId"], company["publicId"])
+    write_operator(world, decisions=decisions)
+    operator = Operator(world)
+    operator.cli("freeze", manifest_doc(world, "handoff-collision-1", file_hashes(world.root)))
+    out = operator.cli("export", operator.sel("handoff-collision-1"))
+    assert out["delivery"]["status"] == "current" and out["state"] == "ready", out["delivery"]
+    supply = next(i for i in out["bundle"]["issues"] if i["id"] == "issue:supply-2026q3")
+    assert {(e["documentId"], e["mentionId"]) for e in supply["sourceEvents"]} == {(world.refs[name]["documentId"], "m-a") for name in ("a", "a2")}, supply["sourceEvents"]
+    assert supply["representative"]["mentionId"] == "m-a" and supply["representative"]["documentId"] == world.refs["a"]["documentId"], supply["representative"]
+    assert evidence_id(world, "a2", EVT_A2) in supply["evidenceIds"], "the second document's evidence was dropped"
+    return world, out
 
 
 def smoke(root: Path, fixture: Path | None) -> dict:
@@ -407,19 +481,23 @@ def smoke(root: Path, fixture: Path | None) -> dict:
 
     assert {name: tree(root / name) for name in ("ingestion", "extraction", "relation")} == sources_before
     checks.append("source ledgers byte/mode/mtime identical after every command")
+    checks.append(validity_end_inclusive(root))
+    collision_world, collision = collision_export(root.parent / "collision")
+    checks.append("legal local mentionId collision (documents a and a2 both use `m-a`): both source members and the second document's evidence survive, the representative is kept")
 
     if fixture is not None:
-        write_fixture(fixture, exported, withheld)
+        write_fixture(fixture, exported, withheld, collision)
         checks.append(f"fixtures written to {fixture}")
     return {"status": "passed", "providerCalls": 0, "modelCalls": 0, "checks": checks}
 
 
-def write_fixture(directory: Path, valid: dict, withheld: dict) -> None:
-    """The valid export envelope plus negative bundles (each MUST be refused by an importer) and the withheld envelope (no bundle at all)."""
-    directory.mkdir(parents=True, exist_ok=True)
+def write_fixture(directory: Path, valid: dict, withheld: dict, collision: dict) -> None:
+    """The valid export envelope, the real export of the legal local-mentionId collision world, negative bundles (each MUST be refused by an importer) and the withheld envelope (no bundle at all)."""
+    directory.mkdir()                                                    # the caller proved it does not exist: a fixture directory is never reused or overwritten
     write = lambda name, value: (directory / name).write_bytes(json_bytes(value) + b"\n")  # noqa: E731
     write("export-valid.json", valid)
     write("export-withheld.json", withheld)
+    write("export-collision.json", collision)
     bundle = valid["bundle"]
 
     def mutate(name: str, change) -> None:
@@ -454,13 +532,150 @@ def write_fixture(directory: Path, valid: dict, withheld: dict) -> None:
     write("export-missing-manifest.json", {key: value for key, value in valid.items() if key != "manifest"})
 
 
+# ---------------------------------------------------------------- retained operator package ----------------------------------------
+
+PACKAGE_SCHEMA = "zoop-handoff-package-1"
+PACKAGE_HANDOFF_ID = "synthetic-handoff-1"
+PACKAGE_OPERATOR = "package-operator"
+SYNTH_PUBLIC_IDS = {"KRX:005930": "SYNTH:000001", "KRX:000660": "SYNTH:000002"}   # the app catalog's seeded ids are never reused
+LEDGERS = ("ingestion", "extraction", "relation", "handoff")
+OPERATOR_FILES = ("sources", "canonical", "decisions", "bindings")
+
+
+def new_output(path: Path, *, real_parent: bool = False) -> Path:
+    """The absolute, not yet existing output path. Nothing is ever overwritten. A world's parent must be a real directory: a symlinked parent (macOS
+    /tmp -> /private/tmp) is refused by every pipeline ledger."""
+    given = Path(os.path.abspath(path))
+    if os.path.lexists(given):
+        raise SystemExit(f"refusing to overwrite: {given} already exists")
+    if not given.parent.is_dir() or (real_parent and Path(os.path.realpath(given.parent)) != given.parent):
+        raise SystemExit(f"the parent of {given} must be an existing directory" + (" without a symlink component (use the real path)" if real_parent else ""))
+    return given
+
+
+def put_new(path: Path, value) -> None:
+    with open(path, "xb") as handle:
+        handle.write(json_bytes(value) + b"\n")
+
+
+def file_sha(path: Path) -> str:
+    return digest_text_bytes(path.read_bytes())
+
+
+def digest_text_bytes(raw: bytes) -> str:
+    import hashlib
+    return hashlib.sha256(raw).hexdigest()
+
+
+def write_package(directory: Path) -> dict:
+    """Builds the authored world IN `directory` (a new path), freezes and exports one handoff through the installed CLI and keeps everything the recipient needs."""
+    directory.mkdir(mode=0o700)
+    try:
+        return build_package(directory)
+    except BaseException:
+        shutil.rmtree(directory, ignore_errors=True)               # only what this run created: the directory did not exist before
+        raise
+
+
+def build_package(root: Path) -> dict:
+    world = build_world(root)
+    decisions = decisions_doc(world)
+    for company in decisions["companies"]:
+        company["publicId"] = SYNTH_PUBLIC_IDS[company["publicId"]]
+    write_operator(world, decisions=decisions)
+    operator = Operator(world)
+    sources_before = {name: tree(root / name) for name in ("ingestion", "extraction", "relation")}
+    manifest = manifest_doc(world, PACKAGE_HANDOFF_ID, file_hashes(root))
+    frozen = operator.cli("freeze", manifest)
+    assert frozen["state"] == "ready" and frozen["publication"] == "not-published" and frozen["usage"] == {"providerCalls": 0, "modelCalls": 0}, frozen
+    out = operator.cli("export", operator.sel(PACKAGE_HANDOFF_ID))
+    check_export(world, out, SYNTH_PUBLIC_IDS)
+    receipt, bundle = frozen["receipt"], out["bundle"]
+    pins = {"manifestDigest": digest(manifest), "bundleDigest": digest_text_bytes(canonical(bundle).encode("utf-8")), "contentDigest": receipt["contentDigest"]}
+    assert pins["manifestDigest"] == receipt["manifestDigest"] and pins["bundleDigest"] == receipt["bundleDigest"] == out["receipt"]["bundleDigest"], "pins are not the canonical hashes"
+    assert {name: tree(root / name) for name in ("ingestion", "extraction", "relation")} == sources_before, "a source ledger changed"
+    observations = [{key: ref[key] for key in ("roundId", "sourceId", "page", "ordinal", "documentId", "rawVersion", "documentVersion")} for ref in world.refs.values()]
+    put_new(root / "export-request.json", operator.sel(PACKAGE_HANDOFF_ID))
+    put_new(root / "document-import-request.json", {"schemaVersion": "zoop-document-import-1", "items": [{"kind": "news", "observation": o} for o in observations]})
+    put_new(root / "graph-handoff-import-request.json", {"schemaVersion": "zoop-graph-handoff-import-1", "handoffId": PACKAGE_HANDOFF_ID, "expectedManifestDigest": pins["manifestDigest"],
+                                                         "expectedBundleDigest": pins["bundleDigest"], "operator": PACKAGE_OPERATOR})
+    put_new(root / "export-valid.json", out)
+    summary = {"schemaVersion": PACKAGE_SCHEMA, "handoffId": PACKAGE_HANDOFF_ID, "sourceKind": "synthetic", "provenance": bundle["provenance"], "pins": pins,
+               "operatorFiles": {name: file_sha(root / f"{name}.json") for name in OPERATOR_FILES}, "ledgers": list(LEDGERS), "counts": bundle["counts"],
+               "companies": [{"id": c["id"], "label": c["label"]} for c in bundle["companies"]], "documents": len(observations), "locationBound": True,
+               "publication": "not-published", "activation": "none", "providerCalls": 0, "modelCalls": 0}
+    put_new(root / "PACKAGE.json", summary)
+    return summary
+
+
+def installed(name: str) -> Path:
+    """The console script of the interpreter's own environment (the installed, non-editable CLI)."""
+    path = Path(sys.executable).parent / name
+    if not (path.is_file() and os.access(path, os.X_OK)):
+        raise SystemExit(f"{name} is not installed next to {sys.executable} (run `make pipeline-install`)")
+    return path
+
+
+def verify_package(directory: Path, export_out: Path | None) -> dict:
+    """Fresh-process re-export of a package through the installed CLIs; the current pins must be the ones recorded at generation."""
+    root = Path(os.path.abspath(directory))
+    if Path(os.path.realpath(root)) != root or not root.is_dir():
+        raise SystemExit("the package must be given by its real, non-symlinked directory path")
+    package = json.loads((root / "PACKAGE.json").read_bytes())
+    assert package.get("schemaVersion") == PACKAGE_SCHEMA, "not a zoop-handoff-package-1 directory"
+    for name in OPERATOR_FILES:
+        assert file_sha(root / f"{name}.json") == package["operatorFiles"][name], f"{name}.json differs from PACKAGE.json"
+    registry = json.loads((root / "sources.json").read_bytes())
+    if any(source["inputRoot"] != str(root / "inputs") for source in registry["sources"]):
+        raise SystemExit("the package was moved or copied: the S2-1 ledger pins the absolute path it was generated at. Run --write-package at the new location.")
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
+    before = {name: tree(root / name) for name in ("ingestion", "extraction", "relation")}
+    request = (root / "export-request.json").read_bytes()
+    argv = [str(installed("zoop-ai-handoff")), "export", "--state-dir", str(root / "handoff"), "--relation-state-dir", str(root / "relation"),
+            "--extraction-state-dir", str(root / "extraction"), "--ingestion-state-dir", str(root / "ingestion"), "--sources", str(root / "sources.json"),
+            "--canonical", str(root / "canonical.json"), "--decisions", str(root / "decisions.json"), "--bindings", str(root / "bindings.json")]
+    child = subprocess.run(argv, input=request, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=root, timeout=300)
+    assert child.returncode == 0, ("export", child.returncode, child.stdout.decode()[:2000], child.stderr.decode()[-2000:])
+    out = json.loads(child.stdout)
+    assert out["delivery"]["status"] == "current" and out["publication"] == "not-published" and out["handoffId"] == package["handoffId"], out["delivery"]
+    pins = {"manifestDigest": digest(out["manifest"]), "bundleDigest": digest_text_bytes(canonical(out["bundle"]).encode("utf-8")),
+            "contentDigest": out["receipt"]["contentDigest"]}
+    assert pins == package["pins"] == {"manifestDigest": out["receipt"]["manifestDigest"], "bundleDigest": out["receipt"]["bundleDigest"],
+                                       "contentDigest": out["bundle"]["digests"]["content"]}, ("pins differ", pins, package["pins"])
+    documents = json.loads((root / "document-import-request.json").read_bytes())["items"]
+    for item in documents:
+        done = subprocess.run([str(installed("zoop-ai-ingest")), "export", "--state-dir", str(root / "ingestion"), "--sources", str(root / "sources.json"), "--require-store"],
+                              input=json_bytes({"schemaVersion": "zoop-ingestion-s2-1", **item["observation"]}), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                              cwd=root, timeout=120)
+        assert done.returncode == 0 and isinstance(json.loads(done.stdout), dict), ("ingestion export", item["observation"]["documentId"], done.returncode, done.stdout.decode()[:500])
+    assert {name: tree(root / name) for name in ("ingestion", "extraction", "relation")} == before, "a source ledger changed"
+    if export_out is not None:
+        with open(export_out, "xb") as handle:
+            handle.write(child.stdout)
+    return {"status": "passed", "handoffId": package["handoffId"], "pins": pins, "pinsEqualPackage": True, "documentsExported": len(documents),
+            "exportOut": export_out is not None, "providerCalls": 0, "modelCalls": 0}
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--write-fixture", type=Path)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--write-fixture", type=Path, help="run the full smoke and write the importer fixtures into this NEW directory")
+    parser.add_argument("--write-package", type=Path, help="build the retained operator package in this NEW directory (no smoke, nothing temporary)")
+    parser.add_argument("--verify-package", type=Path, help="re-export an existing package in fresh processes and compare with its pins")
+    parser.add_argument("--export-out", type=Path, help="with --verify-package: write the current export envelope to this NEW file")
     args = parser.parse_args()
+    modes = [name for name in ("write_fixture", "write_package", "verify_package") if getattr(args, name) is not None]
+    if len(modes) > 1 or (args.export_out is not None and args.verify_package is None):
+        parser.error("--write-fixture, --write-package and --verify-package are exclusive; --export-out needs --verify-package")
+    if args.verify_package is not None:
+        print(json.dumps(verify_package(args.verify_package, new_output(args.export_out) if args.export_out else None), ensure_ascii=False, indent=1))
+        return 0
+    if args.write_package is not None:
+        print(json.dumps(write_package(new_output(args.write_package, real_parent=True)), ensure_ascii=False, indent=1))
+        return 0
+    fixture = new_output(args.write_fixture) if args.write_fixture else None
     root = Path(tempfile.mkdtemp(prefix="zoop-handoff-smoke-")).resolve()      # a symlinked parent (macOS /tmp -> /private/tmp) is refused by every pipeline ledger
     try:
-        print(json.dumps(smoke(root / "owned", args.write_fixture), ensure_ascii=False, indent=1))
+        print(json.dumps(smoke(root / "owned", fixture), ensure_ascii=False, indent=1))
     finally:
         shutil.rmtree(root, ignore_errors=True)
     return 0

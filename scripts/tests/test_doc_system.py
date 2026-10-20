@@ -272,5 +272,22 @@ class GeneratedProjectionTests(unittest.TestCase):
             self.assertEqual((row["detailAuthority"], row["effectiveSpecIds"]), ("current", [item["effectiveSpecId"]]))
 
 
+class DashboardOpenApiDescriptionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.build = load_build()
+        cls.api = cls.build.load(ROOT / "docs/api/openapi.yaml")
+
+    def test_dashboard_snapshot_description_is_on_dashboard_metadata_only(self):
+        schemas = self.api["components"]["schemas"]
+        dashboard_metadata = schemas["Dashboard"]["properties"]["metadata"].get("description", "")
+        chat_metadata = schemas["ChatResult"]["properties"]["metadata"].get("description", "")
+
+        self.assertIn("generatedAt", dashboard_metadata)
+        self.assertIn("graphVersion", dashboard_metadata)
+        self.assertNotIn("generatedAt", chat_metadata)
+        self.assertNotIn("graphVersion은 null", chat_metadata)
+
+
 if __name__ == "__main__":
     unittest.main()

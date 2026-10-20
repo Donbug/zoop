@@ -38,6 +38,50 @@ class GraphSnapshotFilterTest {
     }
 
     @Test
+    void structuralBasisIsVisibleOnceVerifiedWhateverItsValidityDates() {
+        Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
+        assertTrue(GraphSnapshotFilter.verifiedBy(basis("2026-09-29T00:00:00Z", "2026-09-01", null), asOf));
+        assertFalse(GraphSnapshotFilter.verifiedBy(basis("2026-10-06T00:00:00Z", "2026-09-01", null), asOf));
+
+        // FS042: a business relation not started yet (validFrom later) or already ended (validUntil earlier) is still
+        // shown at asOf; its status, not its visibility, tells them apart.
+        for (var dates : List.of(List.of("2026-11-01", ""), List.of("2026-01-01", "2026-03-31"))) {
+            var shifted = new PublicGraphSnapshot(v2.snapshotFormat(), v2.versionId(), v2.sourceBundleId(), v2.companies(),
+                    v2.issues(), v2.relations().stream().map(r -> r.basis().isEmpty() ? r : new Relation(r.relationId(),
+                            r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(),
+                            r.basis().stream().map(x -> new PublicGraphSnapshot.Basis(x.basisId(), x.relationType(),
+                                    x.verifiedAt(), dates.get(0), dates.get(1).isEmpty() ? null : dates.get(1),
+                                    x.countries(), x.articles())).toList())).toList(),
+                    v2.articles(), v2.evidence());
+            var visible = GraphSnapshotFilter.apply(shifted, Instant.parse("2026-10-12T00:00:00Z"), DisclosureExclusions.NONE);
+            assertTrue(visible.relations().stream().anyMatch(r -> r.relationId().equals("rel-fixture-04")), dates.toString());
+        }
+    }
+
+    @Test
+    void asOfDropsStructuralBasesVerifiedLaterButKeepsTheRelation() {
+        var early = basis("2026-09-01T00:00:00Z", "2026-01-01", "2026-03-31");
+        var late = new PublicGraphSnapshot.Basis("b-late", "INVESTS", "2026-10-20T00:00:00Z", "2026-09-01", null,
+                List.of(), List.of());
+        var s = new PublicGraphSnapshot(v2.snapshotFormat(), v2.versionId(), v2.sourceBundleId(), v2.companies(),
+                v2.issues(), v2.relations().stream().map(r -> r.basis().isEmpty() ? r : new Relation(r.relationId(),
+                        r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(), r.evidenceIds(),
+                        List.of(early, late))).toList(), v2.articles(), v2.evidence());
+
+        var past = GraphSnapshotFilter.apply(s, Instant.parse("2026-10-12T00:00:00Z"), DisclosureExclusions.NONE);
+        var rel = past.relations().stream().filter(r -> r.relationId().equals("rel-fixture-04")).findFirst().orElseThrow();
+        assertEquals(List.of(early), rel.basis());
+
+        var now = GraphSnapshotFilter.apply(s, null, DisclosureExclusions.NONE);
+        assertEquals(2, now.relations().stream().filter(r -> r.relationId().equals("rel-fixture-04")).findFirst()
+                .orElseThrow().basis().size());
+    }
+
+    private static PublicGraphSnapshot.Basis basis(String verifiedAt, String validFrom, String validUntil) {
+        return new PublicGraphSnapshot.Basis("b", "SUPPLIES", verifiedAt, validFrom, validUntil, List.of(), List.of());
+    }
+
+    @Test
     void asOfKeepsOnlyWhatWasPublishedInsideThePinnedVersion() {
         PublicGraphSnapshot early = GraphSnapshotFilter.apply(v2, Instant.parse("2026-10-01T00:00:00Z"), DisclosureExclusions.NONE);
         assertFalse(issueIds(early).contains(AI_ACCEL));

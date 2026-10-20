@@ -44,6 +44,10 @@ export type DashboardRule = {
 
 export type Dashboard = {
   generatedAt: string;
+  metadata: {
+    partial: boolean;
+    failures: { source: string; code: string; message: string }[];
+  };
   ledger: {
     status: 'connected' | 'unavailable';
     error: { code: string; message: string } | null;
@@ -52,14 +56,25 @@ export type Dashboard = {
     activeVersionId: string | null;
     activatedAt: string | null;
     versionCount: number;
-    reviewRevision: number;
-    reviewDecisions: number;
-    rules: DashboardRule[];
+    activeVersion: {
+      id: string;
+      sequence: number;
+      kind: string;
+      sourceLabel: string;
+      createdAt: string;
+      activatedAt: string | null;
+      issueCount: number;
+      relationCount: number;
+      articleCount: number;
+    } | null;
+    reviewRevision: number | null;
+    reviewDecisions: number | null;
+    rules: DashboardRule[] | null;
     graphDb: {
       status: DashboardGraphDbStatus;
       pendingJobs: number | null;
     } | null;
-  };
+  } | null;
   /** 원장에 연결하지 못하면 null */
   candidates: {
     allow: number;
@@ -73,7 +88,7 @@ export type Dashboard = {
     queued: number;
     failed24h: number;
     recent: DashboardJob[];
-  };
+  } | null;
   ai: {
     window: string;
     requests: number;
@@ -85,12 +100,13 @@ export type Dashboard = {
       requests: number;
       failed: number;
     }[];
-  };
-  briefings: { latest: DashboardRound[]; delayedOrFailed: number };
+  } | null;
+  briefings: { latest: DashboardRound[]; delayedOrFailed: number } | null;
   members: {
     registered: number;
     activeMemberSessions: number;
     activeGuestSessions: number;
-  };
-  audit: { last24h: number };
+    source: 'zoop-db';
+  } | null;
+  audit: { last24h: number } | null;
 };

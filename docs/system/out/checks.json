@@ -466,49 +466,49 @@
       "code": "TEAM_DECISION_REQUIRED",
       "target": "createConversation",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다.",
+      "message": "대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "getConversation",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.",
+      "message": "대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "getCurrentConversation",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.",
+      "message": "최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "submitQuestion",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다.",
+      "message": "대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다. / Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "getQuestionJob",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다.",
+      "message": "작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "retryQuestionJob",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다.",
+      "message": "실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다.",
       "source": ""
     },
     {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "cancelQuestionJob",
       "severity": "warning",
-      "message": "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다.",
+      "message": "취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다.",
       "source": ""
     },
     {
@@ -1726,7 +1726,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getGraph",
       "severity": "difference",
-      "message": "목표만 158 · BFF만 27 · 형식/필수/권한 변경 9",
+      "message": "목표만 161 · BFF만 27 · 형식/필수/권한 변경 9",
       "source": ""
     },
     {
@@ -1740,7 +1740,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyRelation",
       "severity": "difference",
-      "message": "목표만 118 · BFF만 43 · 형식/필수/권한 변경 6",
+      "message": "목표만 135 · BFF만 43 · 형식/필수/권한 변경 6",
       "source": ""
     },
     {
@@ -1768,7 +1768,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompany",
       "severity": "difference",
-      "message": "목표만 143 · BFF만 48 · 형식/필수/권한 변경 7",
+      "message": "목표만 147 · BFF만 48 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -1936,7 +1936,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getConversation",
       "severity": "difference",
-      "message": "목표만 136 · BFF만 32 · 형식/필수/권한 변경 14",
+      "message": "목표만 140 · BFF만 32 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -1950,7 +1950,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCurrentConversation",
       "severity": "difference",
-      "message": "목표만 136 · BFF만 32 · 형식/필수/권한 변경 14",
+      "message": "목표만 140 · BFF만 32 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -1964,7 +1964,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "submitQuestion",
       "severity": "difference",
-      "message": "목표만 211 · BFF만 34 · 형식/필수/권한 변경 24",
+      "message": "목표만 219 · BFF만 34 · 형식/필수/권한 변경 38",
       "source": ""
     },
     {
@@ -1978,7 +1978,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getQuestionJob",
       "severity": "difference",
-      "message": "목표만 153 · BFF만 23 · 형식/필수/권한 변경 14",
+      "message": "목표만 157 · BFF만 23 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -1992,7 +1992,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "retryQuestionJob",
       "severity": "difference",
-      "message": "목표만 207 · BFF만 34 · 형식/필수/권한 변경 21",
+      "message": "목표만 215 · BFF만 34 · 형식/필수/권한 변경 35",
       "source": ""
     },
     {
@@ -2006,7 +2006,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "cancelQuestionJob",
       "severity": "difference",
-      "message": "목표만 184 · BFF만 23 · 형식/필수/권한 변경 14",
+      "message": "목표만 188 · BFF만 23 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -2062,7 +2062,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getAdminDashboard",
       "severity": "difference",
-      "message": "목표만 114 · BFF만 59 · 형식/필수/권한 변경 31",
+      "message": "목표만 695 · BFF만 633 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {
@@ -2601,7 +2601,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getCompanyGraphAsOf",
       "severity": "difference",
-      "message": "목표만 121 · BFF만 41 · 형식/필수/권한 변경 7",
+      "message": "목표만 124 · BFF만 41 · 형식/필수/권한 변경 7",
       "source": ""
     },
     {

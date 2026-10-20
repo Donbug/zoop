@@ -56,6 +56,30 @@ final class GraphSelection {
         return new Result(nodes, truncated);
     }
 
+    /**
+     * getCompanyGraphAsOf depth: literal edge hops from the company over the selected nodes (prototype
+     * {@code company_neighborhood}), so 1 is the company and its issues. Derived SHARES_ISSUE edges are not walked.
+     */
+    static Result neighbourhood(DisplayGraph g, Result selected, String companyId, int hops) {
+        Set<String> seen = new LinkedHashSet<>(List.of(companyId));
+        Set<String> frontier = Set.of(companyId);
+        for (int hop = 0; hop < hops; hop++) {
+            Set<String> fresh = new LinkedHashSet<>();
+            for (DisplayGraph.Edge e : g.edges.values()) {
+                if (e.derived() || !selected.nodes().containsKey(e.source()) || !selected.nodes().containsKey(e.target())) continue;
+                if (frontier.contains(e.source()) && !seen.contains(e.target())) fresh.add(e.target());
+                if (frontier.contains(e.target()) && !seen.contains(e.source())) fresh.add(e.source());
+            }
+            seen.addAll(fresh);
+            frontier = fresh;
+        }
+        Map<String, Kind> nodes = new LinkedHashMap<>();
+        selected.nodes().forEach((id, kind) -> {
+            if (seen.contains(id)) nodes.put(id, kind);
+        });
+        return new Result(nodes, selected.truncated());
+    }
+
     private static List<Issue> egoIssues(DisplayGraph g, List<String> focus, Integer depth) {
         Map<String, Issue> ordered = new LinkedHashMap<>();
         Set<String> seen = new LinkedHashSet<>(focus);

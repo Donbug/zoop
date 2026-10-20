@@ -37,29 +37,33 @@ function Overview({ data }: { data: Dashboard }) {
       />
       <Metric
         label="사용자에게 보이는 그래프"
-        value={graph.activeVersionId ?? '–'}
+        value={graph?.activeVersionId ?? '–'}
         detail={
-          graph.activeVersionId ? (
+          graph?.activeVersionId ? (
             <>
               {formatKst(graph.activatedAt)} 게시 · 검수{' '}
-              {count(graph.reviewDecisions)}건 반영
-              {graph.rules.map((rule) => (
+              {graph.reviewDecisions == null
+                ? '확인 불가'
+                : `${count(graph.reviewDecisions)}건 반영`}
+              {graph.rules?.map((rule) => (
                 <span key={rule.id} className="block">
                   자동 검수 규칙 {rule.id} {rule.enabled ? '켜짐' : '꺼짐'} ·
                   게시 사건 {count(rule.publishedEvents)}건
                 </span>
               ))}
             </>
-          ) : (
+          ) : graph ? (
             '게시된 그래프 버전이 없어요'
+          ) : (
+            '그래프 현황을 읽지 못했어요'
           )
         }
       />
       <Metric
         label="GraphDB 반영"
-        value={graphDbStatusLabel[graph.graphDb?.status ?? 'unavailable']}
+        value={graphDbStatusLabel[graph?.graphDb?.status ?? 'unavailable']}
         detail={
-          graph.graphDb?.pendingJobs != null
+          graph?.graphDb?.pendingJobs != null
             ? `대기 작업 ${count(graph.graphDb.pendingJobs)}건`
             : undefined
         }
@@ -68,28 +72,40 @@ function Overview({ data }: { data: Dashboard }) {
         label="작업"
         value={
           <span className="whitespace-nowrap">
-            실행 {count(jobs.running)} · 대기 {count(jobs.queued)}
+            {jobs
+              ? `실행 ${count(jobs.running)} · 대기 ${count(jobs.queued)}`
+              : '–'}
           </span>
         }
-        detail={`24시간 실패 ${count(jobs.failed24h)}건`}
+        detail={
+          jobs
+            ? `24시간 실패 ${count(jobs.failed24h)}건`
+            : '작업 원장을 읽지 못했어요'
+        }
       />
       <Metric
         label="AI 요청(7일)"
-        value={`${count(ai.requests)}건`}
-        detail={`성공 ${count(ai.succeeded)} · 실패 ${count(ai.failed)}`}
+        value={ai ? `${count(ai.requests)}건` : '–'}
+        detail={
+          ai
+            ? `성공 ${count(ai.succeeded)} · 실패 ${count(ai.failed)}`
+            : 'AI 요청 원장을 읽지 못했어요'
+        }
       />
     </dl>
   );
 }
 
 function Briefings({ data }: { data: Dashboard }) {
-  const { latest, delayedOrFailed } = data.briefings;
+  const briefing = data.briefings;
   return (
     <Section
       title="최근 브리핑 회차"
       link={[{ to: '/admin/briefings', label: '브리핑 운영' }]}
     >
-      {latest.length === 0 ? (
+      {!briefing ? (
+        <Empty>브리핑 원장을 읽지 못했어요.</Empty>
+      ) : briefing.latest.length === 0 ? (
         <Empty>아직 브리핑 회차가 없어요.</Empty>
       ) : (
         <Table caption="브리핑 회차 목록">
@@ -101,7 +117,7 @@ function Briefings({ data }: { data: Dashboard }) {
             </tr>
           </thead>
           <tbody>
-            {latest.map((round) => (
+            {briefing.latest.map((round) => (
               <tr key={round.id}>
                 <td className={`${TD} whitespace-nowrap tabular-nums`}>
                   {round.date} {editionLabel[round.edition]}
@@ -117,9 +133,10 @@ function Briefings({ data }: { data: Dashboard }) {
           </tbody>
         </Table>
       )}
-      {delayedOrFailed > 0 && (
+      {briefing && briefing.delayedOrFailed > 0 && (
         <p className="text-[11px] text-zoop-alert">
-          늦게 발행됐거나 실패한 회차가 {count(delayedOrFailed)}건 있어요.
+          늦게 발행됐거나 실패한 회차가 {count(briefing.delayedOrFailed)}건
+          있어요.
         </p>
       )}
     </Section>
@@ -127,13 +144,15 @@ function Briefings({ data }: { data: Dashboard }) {
 }
 
 function Jobs({ data }: { data: Dashboard }) {
-  const { recent } = data.jobs;
+  const jobs = data.jobs;
   return (
     <Section
       title="최근 작업"
       link={[{ to: '/admin/pipeline', label: '작업 관제' }]}
     >
-      {recent.length === 0 ? (
+      {!jobs ? (
+        <Empty>작업 원장을 읽지 못했어요.</Empty>
+      ) : jobs.recent.length === 0 ? (
         <Empty>아직 실행한 작업이 없어요.</Empty>
       ) : (
         <Table caption="최근 작업 목록">
@@ -145,7 +164,7 @@ function Jobs({ data }: { data: Dashboard }) {
             </tr>
           </thead>
           <tbody>
-            {recent.map((job) => (
+            {jobs.recent.map((job) => (
               <tr key={job.id}>
                 <td className={TD}>{jobKindLabel[job.kind] ?? job.label}</td>
                 <td className={`${TD} font-semibold`}>
@@ -164,13 +183,15 @@ function Jobs({ data }: { data: Dashboard }) {
 }
 
 function AiFeatures({ data }: { data: Dashboard }) {
-  const { features } = data.ai;
+  const ai = data.ai;
   return (
     <Section
       title="AI 기능별 요청(7일)"
       link={[{ to: '/admin/ai', label: 'AI 운영' }]}
     >
-      {features.length === 0 ? (
+      {!ai ? (
+        <Empty>AI 요청 원장을 읽지 못했어요.</Empty>
+      ) : ai.features.length === 0 ? (
         <Empty>최근 7일 동안 AI 요청이 없어요.</Empty>
       ) : (
         <Table caption="AI 기능별 요청">
@@ -182,7 +203,7 @@ function AiFeatures({ data }: { data: Dashboard }) {
             </tr>
           </thead>
           <tbody>
-            {features.map((feature) => (
+            {ai.features.map((feature) => (
               <tr key={feature.feature}>
                 <td className={TD}>{feature.label}</td>
                 <td className={`${TD} text-right tabular-nums`}>
@@ -208,13 +229,23 @@ function Usage({ data }: { data: Dashboard }) {
       link={[{ to: '/admin/audit', label: '감사 로그' }]}
     >
       <dl className="grid grid-cols-3 gap-6 py-2">
-        <Metric label="등록 회원" value={count(members.registered)} />
+        <Metric
+          label="등록 회원"
+          value={members ? count(members.registered) : '–'}
+        />
         <Metric
           label="회원 접속 세션"
-          value={count(members.activeMemberSessions)}
-          detail={`비회원 ${count(members.activeGuestSessions)}`}
+          value={members ? count(members.activeMemberSessions) : '–'}
+          detail={
+            members
+              ? `비회원 ${count(members.activeGuestSessions)}`
+              : '회원 원장을 읽지 못했어요'
+          }
         />
-        <Metric label="감사 기록(24시간)" value={count(audit.last24h)} />
+        <Metric
+          label="감사 기록(24시간)"
+          value={audit ? count(audit.last24h) : '–'}
+        />
       </dl>
     </Section>
   );

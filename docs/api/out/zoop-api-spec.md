@@ -1147,7 +1147,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getBriefing · 공개 브리핑 회차 조회
 
-발행 당시 자료와 그래프 버전·시장 지표·outlook·문서별 기업 판정을 읽는다. 발행 후 재판정하거나 최신 값으로 대체하지 않는다. 출근 07:40/퇴근 18:10 KST, 핵심 이슈 최대 3개는 기존 요구사항 확정값이며 부족하면 채우지 않는다. 시장 요약은 근거와 검증을 갖춘 실제 생성 결과만 제공한다.
+발행 당시 자료와 그래프 버전·시장 지표·outlook·문서별 기업 판정을 읽는다. 발행 후 재판정하거나 최신 값으로 대체하지 않는다. 생성 시작 출근 09:20/퇴근 17:30 KST, 핵심 이슈 최대 3개는 기존 요구사항 확정값이며 부족하면 채우지 않는다. 시장 요약은 근거와 검증을 갖춘 실제 생성 결과만 제공한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1244,7 +1244,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |
 
 ### 요청 필드
 
@@ -1272,7 +1272,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.6, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/{id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |
 
 ### 요청 필드
 
@@ -1299,7 +1299,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.8, 6.9.10, 6.9.11, 6.9.14 |
 | 프로토타입 대응 | /api/chat/sessions/current |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 최신 대화 복원의 보존 기간과 계정 삭제·로그아웃 뒤 cache 폐기 운영값을 출시 전에 등록해야 한다. |
 
 ### 요청 필드
 
@@ -1311,7 +1311,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1325,7 +1325,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다., 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -1356,7 +1356,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.4, 6.9.5, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id} |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 작업 결과·실패·도구 호출 영수증의 실제 보존 기간을 출시 전에 등록해야 한다. 조회는 새 모델 실행을 만들지 않는 확정 계약이다. |
 
 ### 요청 필드
 
@@ -1383,7 +1383,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/retry |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |
+| 팀 확인 필요 | 실패 kind별 retry는 ChatFailure.retry가 권위이며 출력 검증 실패 자동 재생성은 금지한다. 운영 재시도 횟수 경보값만 출시 전에 등록한다. |
 
 ### 요청 필드
 
@@ -1412,7 +1412,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.9.7, 6.9.9, 6.9.13, 6.9.14 |
 | 프로토타입 대응 | /api/chat/jobs/{job_id}/cancel |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다., AI v2(08 시트)가 현행 상세다. 옛 FS046 권한·중복 작업 통제는 현 목차에 단일 FS가 없어 aiJobs 공통 규칙과 NFS001/003으로 보존했다. v2 상세가 대화 소유·동시 접수 하나·최초 요청 고정을 명시할지 AI 명세 담당자가 확인해야 한다. |
+| 팀 확인 필요 | 취소 뒤 늦은 worker 완료와 신규 도구 호출 차단은 확정 계약이다. provider 결과·과금이 불명확한 호출의 운영 조정 담당자를 출시 전에 등록한다. |
 
 ### 요청 필드
 
@@ -1508,7 +1508,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getAdminDashboard · 운영 대시보드 조회
 
-운영 대시보드 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+운영 대시보드 조회. 영역별로 독립 집계하며 일부 영역을 조회할 수 없으면 성공 영역을 유지하고 metadata.partial/failures에 미조회 영역을 기록한다. metadata.asOf는 generatedAt과 같으며 metadata.graphVersion은 null이다. members.registered는 차단 회원을 포함한 전체 가입 회원 수, activeMemberSessions는 기준 시각에 계정 상태가 active이고 세션이 유효한 회원 세션 수, activeGuestSessions는 기준 시각에 유효한 비회원 세션 수다. ai.requests는 7일 동안 접수된 사용자 요청 수이며 모델 실행 시도 수가 아니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2679,7 +2679,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## getCompanyGraphAsOf · 기업·기준 시점 중심 관계 그래프 조회
 
-타임라인에서 고른 시각을 asOf로 명시하고 그 시점 이전에 공개된 기업·이슈 관계만 조회한다. 응답은 실제 사용한 공개 버전을 고정한다. 이후 공개된 문서나 관계를 섞지 않으며 자료 미상·미제공·조회 장애를 구분한다. depth는 실제 연결선의 hop 수다.
+타임라인에서 고른 시각을 asOf로 명시하고 그 시점까지 검증·공개된 기업·이슈 관계만 조회한다(검증 시각·근거 공개 시각 ≤ asOf, 현재 공개 제외 아님). 사업 관계의 유효기간은 표시 여부를 정하지 않고 validity(예정·유효·종료·기간 미상)로 구분한다(FS042). 응답은 실제 사용한 공개 버전을 고정한다. 이후 공개된 문서나 관계를 섞지 않으며 자료 미상·미제공·조회 장애를 구분한다. depth는 실제 연결선의 hop 수다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2903,9 +2903,10 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | relationType | 필수 | string |  |
 | sourceUrl | 필수 | string / null |  |
 | verifiedAt | 필수 | string (date-time) / null |  |
-| validFrom | 필수 | string / null |  |
-| validUntil | 필수 | string / null |  |
+| validFrom | 필수 | string / null | 사업 관계가 효력을 갖기 시작한 날(YYYY-MM-DD, 시간대 없음). null이면 시작일 미상이다. |
+| validUntil | 필수 | string / null | 사업 관계의 마지막 유효일(YYYY-MM-DD, 그날 포함). null이면 종료 시점 미상이며 종료로 판단하지 않는다. |
 | countries | 필수 | string[] |  |
+| validity | 필수 | string {scheduled, active, ended, unknown} | 응답 metadata.asOf(asOf를 주지 않으면 조회 시각)의 Asia/Seoul 날짜 D 기준 사업 관계 상태(FS042): D < validFrom이면 scheduled, validFrom ≤ D ≤ validUntil이면 active, D > validUntil이면 ended, validFrom이 없고 종료가 아니면 unknown. 날짜끼리만 비교하며 원문 날짜에 시각을 붙이지 않는다. 표시 여부를 정하지 않는다. |
 
 <a id="schema-briefingcorrection"></a>
 
@@ -3372,6 +3373,7 @@ What the answer was actually built on.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | label | 필수 | string |  |
+| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. |
 
 <a id="schema-chatcontextitem"></a>
 
@@ -3393,8 +3395,8 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| contextIds | 선택 | string[] | Company, issue, edge or evidence ids |
-| evidenceIds | 선택 | string[] | Narrows the evidence to these references |
+| contextIds | 선택 | string[] (uniqueItems) | Company, issue, edge or evidence ids |
+| evidenceIds | 선택 | string[] (uniqueItems) | Narrows the evidence to these references |
 | period | 선택 | [ChatPeriod](#schema-chatperiod) / null | Explicit period of the selection; the question's own period wins |
 | asOf | 선택 | string, null (date-time) |  |
 | graphVersion | 선택 | string, null |  |
@@ -3428,7 +3430,7 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, permission_denied, internal} |  |
+| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} |  |
 | reason | 필수 | string / null |  |
 | message | 필수 | string |  |
 | retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. |
@@ -3504,12 +3506,13 @@ The selection frozen when the question was first received.
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
 | answer | 필수 | string |  |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다. |
 | reason | 필수 | string / null |  |
-| sources | 필수 | string[] |  |
+| sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
 | graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
-| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: companies the member can pick (each becomes a new question) |
+| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
@@ -3836,15 +3839,16 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| generatedAt | 필수 | string (date-time) |  |
+| generatedAt | 필수 | string (date-time) | 대시보드 집계 기준 시각. 모든 기간 집계는 이 시각을 기준으로 계산한다. |
+| metadata | 필수 | [Metadata](#schema-metadata) | 이 대시보드 응답의 metadata.asOf는 generatedAt과 같고, 그래프 버전 자체를 조회 기준으로 사용하지 않으므로 graphVersion은 null이다. |
 | ledger | 필수 | [DashboardLedger](#schema-dashboardledger) |  |
-| graph | 필수 | [DashboardGraph](#schema-dashboardgraph) |  |
-| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null |  |
-| jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) |  |
-| ai | 필수 | [DashboardAi](#schema-dashboardai) |  |
-| briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) |  |
-| members | 필수 | [DashboardMembers](#schema-dashboardmembers) |  |
-| audit | 필수 | [DashboardAudit](#schema-dashboardaudit) |  |
+| graph | 필수 | [DashboardGraph](#schema-dashboardgraph) / null | null when the graph version summary could not be read; subarea failures are listed individually in metadata.failures. |
+| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null | null when candidate source is unavailable; an empty but successfully read source returns zero counts. |
+| jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) / null | null when the job source is unavailable; a successfully read source with no jobs returns zero counts and an empty recent list. |
+| ai | 필수 | [DashboardAi](#schema-dashboardai) / null | null when user-request records are unavailable; model execution attempts are not substituted. |
+| briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) / null | null when the briefing-round source is unavailable; no rounds in an available source returns an empty latest list. |
+| members | 필수 | [DashboardMembers](#schema-dashboardmembers) / null | null when member/session counts could not be read. |
+| audit | 필수 | [DashboardAudit](#schema-dashboardaudit) / null | null when the 24-hour audit count could not be read. |
 
 <a id="schema-dashboardai"></a>
 
@@ -3854,10 +3858,10 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| window | 필수 | string |  |
-| requests | 필수 | integer |  |
-| succeeded | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| window | 필수 | string | 생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt). |
+| requests | 필수 | integer | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
+| succeeded | 필수 | integer | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
+| failed | 필수 | integer | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
 | features | 필수 | [DashboardAiFeature](#schema-dashboardaifeature)[] |  |
 
 <a id="schema-dashboardaifeature"></a>
@@ -3870,8 +3874,8 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | feature | 필수 | string |  |
 | label | 필수 | string |  |
-| requests | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| requests | 필수 | integer | 해당 AI 기능에 접수된 사용자 요청 수. |
+| failed | 필수 | integer | 해당 기능에서 실패로 종료된 사용자 요청 수. |
 
 <a id="schema-dashboardaudit"></a>
 
@@ -3881,7 +3885,7 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| last24h | 필수 | integer |  |
+| last24h | 필수 | integer | [generatedAt-24h, generatedAt) 구간의 감사 기록 수. |
 
 <a id="schema-dashboardbriefings"></a>
 
@@ -3919,11 +3923,29 @@ The selection frozen when the question was first received.
 | activeVersionId | 필수 | string / null |  |
 | activatedAt | 필수 | string (date-time) / null |  |
 | versionCount | 필수 | integer |  |
-| activeVersion | 필수 | [GraphVersionOut](#schema-graphversionout) / null |  |
-| reviewRevision | 필수 | integer |  |
-| reviewDecisions | 필수 | integer |  |
-| rules | 필수 | [ReviewRuleOut](#schema-reviewruleout)[] |  |
+| activeVersion | 필수 | [DashboardActiveGraphVersion](#schema-dashboardactivegraphversion) / null |  |
+| reviewRevision | 필수 | integer / null | Latest decision revision when available; null when the review source has not been implemented or read. |
+| reviewDecisions | 필수 | integer / null | Current review decision count, or null when unavailable. |
+| rules | 필수 | [ReviewRuleOut](#schema-reviewruleout)[] / null | Current rules, or null when the review source is unavailable. An empty array means it was read and has no rules. |
 | graphDb | 필수 | [GraphDbStatus](#schema-graphdbstatus) / null |  |
+
+<a id="schema-dashboardactivegraphversion"></a>
+
+### DashboardActiveGraphVersion
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| sequence | 필수 | integer |  |
+| kind | 필수 | string | 그래프 저장소가 기록한 버전 종류. |
+| sourceLabel | 필수 | string |  |
+| createdAt | 필수 | string (date-time) |  |
+| activatedAt | 필수 | string (date-time) / null | Null if the active version has no activation record at the snapshot time. |
+| issueCount | 필수 | integer |  |
+| relationCount | 필수 | integer |  |
+| articleCount | 필수 | integer |  |
 
 <a id="schema-dashboardjobs"></a>
 
@@ -3958,10 +3980,10 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| registered | 필수 | integer |  |
-| activeMemberSessions | 필수 | integer |  |
-| activeGuestSessions | 필수 | integer |  |
-| source | 필수 | string |  |
+| registered | 필수 | integer | 차단 회원을 포함한 전체 가입 회원 수. |
+| activeMemberSessions | 필수 | integer | 기준 시각에 회원 계정이 active이며 만료되지 않고 폐기되지 않은 회원 세션 수. |
+| activeGuestSessions | 필수 | integer | 기준 시각에 만료되지 않고 폐기되지 않은 비회원 세션 수. |
+| source | 필수 | string | 집계 데이터 원천. |
 
 <a id="schema-datawindow"></a>
 
@@ -4081,6 +4103,7 @@ The selection frozen when the question was first received.
 | verification | 필수 | [Verification](#schema-verification) |  |
 | via | 필수 | [ViaIssue](#schema-viaissue)[] |  |
 | explanation | 필수 | string / null |  |
+| validity | 필수 | string {scheduled, active, ended, unknown} / null | 구조 관계 간선의 사업 관계 상태(metadata.asOf 기준). GraphEdge.validity와 같다. 현재 유효한 관계로 오해되지 않도록 basis별 validity와 함께 표시한다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-endpointref"></a>
@@ -4094,6 +4117,8 @@ The selection frozen when the question was first received.
 | id | 필수 | string |  |
 | kind | 필수 | string {company, issue} |  |
 | label | 필수 | string |  |
+| logoUrl | 필수 | string / null | 기업 끝점의 로고 경로(GraphNode.logoUrl과 같은 값). 기업 카탈로그에 없으면 null이고 사건 끝점은 항상 null이다. |
+| brandColor | 필수 | string / null | 기업 끝점의 브랜드 색(GraphNode.brandColor와 같은 값). 없으면 null이고 사건 끝점은 항상 null이다. |
 
 <a id="schema-errorbody"></a>
 
@@ -4477,6 +4502,7 @@ same request again never toggles anything.
 | derived | 필수 | boolean |  |
 | via | 필수 | string[] | Shared issue ids; derived edges only |
 | evidenceIds | 필수 | string[] | Evidence ids of the approved relations behind the edge (same as `GET /api/graph/edges/{id}` evidenceIds); empty for derived edges. |
+| validity | 필수 | string {scheduled, active, ended, unknown} / null | STRUCTURALLY_RELATED_TO 간선의 사업 관계 상태(metadata.asOf 기준, BasisOut.validity와 같은 규칙): 근거 중 하나라도 active면 active, 아니면 scheduled, 아니면 unknown, 모두 ended면 ended. 기간이 끝나도 이슈 발생 당시 유효했던 연결은 간선으로 남는다. 다른 관계 유형과 파생 간선은 null. |
 
 <a id="schema-graphmetadata"></a>
 
@@ -4929,7 +4955,7 @@ The three market indicators stored with a published round; never changed after p
 | --- | --- | --- | --- |
 | status | 필수 | string |  |
 | referenceAt | 필수 | string (date-time) | The round's scheduled time (KST) |
-| rateCutoffAt | 필수 | string (date-time) | Latest time an observation could have (morning 07:40, evening 18:05, KST) |
+| rateCutoffAt | 필수 | string (date-time) | Latest time an observation could have: at or before the stored round data-window end (KST). Generation starts at 09:20/17:30; this is not a market closing timestamp. |
 | collectedAt | 필수 | string (date-time) |  |
 | indicators | 필수 | [MarketIndicator](#schema-marketindicator)[] |  |
 
