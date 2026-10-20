@@ -252,7 +252,7 @@
 | BFF_PATH_DIFFERENCE | difference | getGraph | 목표 /api/v1/graph ↔ BFF /api/graph |  |
 | BFF_FIELD_DIFFERENCE | difference | getGraph | 목표만 161 · BFF만 27 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyRelation | 목표 /api/v1/graph/edges/{id} ↔ BFF /api/graph/edges/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 123 · BFF만 43 · 형식/필수/권한 변경 6 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyRelation | 목표만 135 · BFF만 43 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | searchCompanies | 목표 /api/v1/companies ↔ BFF /api/companies |  |
 | BFF_FIELD_DIFFERENCE | difference | searchCompanies | 목표만 108 · BFF만 50 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompany | 목표 /api/v1/companies/{id} ↔ BFF /api/companies/{id} |  |
