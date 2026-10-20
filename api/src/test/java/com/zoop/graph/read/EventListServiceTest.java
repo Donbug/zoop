@@ -79,8 +79,10 @@ class EventListServiceTest {
     }
 
     @Test
-    void anEarlierAsOfHidesEventsPublishedAfterIt() {
-        // FS040-3 / FS041-4: ai-accel's only article is published 2026-10-05T09:00Z, after this asOf.
+    void asOfPinsTheThenActiveVersionAndEchoesTheRequestedTime() {
+        // The 10-01 version is active at this asOf; ai-accel is not in it. That articles published after asOf are
+        // dropped (FS040-3 / FS041-4) is proven on the 10-08 snapshot by GraphSnapshotFilterTest, the filter this
+        // read goes through; these fixtures have no article published inside a version after an asOf that selects it.
         var r = service.list(null, null, null, null, null, null, null, "2026-10-05T00:00:00Z");
         assertFalse(ids(r.items()).contains(AI_ACCEL));
         assertEquals("2026-10-05T00:00:00Z", r.metadata().asOf());

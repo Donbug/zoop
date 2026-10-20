@@ -118,10 +118,9 @@ public class EventListService {
     }
 
     private static EventSummary summary(DisplayGraph graph, Issue issue, String companyId) {
-        List<String> relationTypes = companyId == null ? List.of() : graph.edges.values().stream()
-                .filter(e -> !e.derived() && DIRECT.contains(e.relationType()))
-                .filter(e -> e.source().equals(issue.issueId()) && e.target().equals(companyId))
-                .map(DisplayGraph.Edge::relationType).distinct().sorted().toList();
+        // Edges are keyed by (type, source, target), and derived edges are SHARES_ISSUE only, so a direct key lookup is exact.
+        List<String> relationTypes = companyId == null ? List.of() : DIRECT.stream().sorted()
+                .filter(type -> graph.edges.containsKey(DisplayGraph.edgeId(type, issue.issueId(), companyId))).toList();
         return new EventSummary(issue.label(), issue.issueId(), issue.action(), issue.target(), issue.eventTime(),
                 issue.timePrecision(), issue.period(), issue.assertionStatus(),
                 List.copyOf(new TreeSet<>(graph.issueCompanies.getOrDefault(issue.issueId(), Set.of()))), relationTypes,
