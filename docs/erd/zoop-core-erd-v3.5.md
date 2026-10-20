@@ -1637,7 +1637,7 @@ erDiagram
 | API | 원천·보관 정책 |
 | --- | --- |
 | getCompanyQuote | 공급자가 제공한 최신값. optional market_cache에 QuoteValues+QuoteSourceOut 전체 응답 저장 가능. previousClose/change/changeRate/dayHigh/dayLow/volume/52주 고저/marketCap/sharesOutstanding/derived까지 누락 없이 보존. 자료 없음은 NULL/정상 unavailable, 장애는 503. observed_at은 공급자 시각 또는 NULL. asOf/graphVersion 요청은 422. |
-| getCompanyPrices | 외부 가격 봉 조회가 기본. 필요 시 응답 캐시. period/interval은 1d=5m, 1w=1h, 1m=1d, 1y=1wk. 공급자에 없으면 200 no_data; 다른 해상도를 집계·보간해 채우지 않음. 캐시 키는 모든 응답 영향 조건을 포함. |
+| getCompanyPrices | 외부 가격 봉 조회가 기본. 필요 시 응답 캐시. period/interval은 1d=5m, 1w=1h, 1m=1d, 1y=1wk. 공급자에 없으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 구간으로 집계(보간·쪼개기 없음), 원천도 없으면 200 no_data. 캐시 키는 모든 응답 영향 조건을 포함. |
 | getCompanyMetrics | 외부 지표+자료 기준시각. 없는 값 0 대체 금지. 그래프/asOf 조건 적용 여부 등 실제 요청 계약과 일치하는 조회 키 사용. |
 | getCompanyFinancials | 공급자의 보고 기간별 값. 내부 이력이 필요하면 financial_values. source/period/accountingBasis/asOf 보존; 정정된 공시는 새 관측으로 기록. |
 
