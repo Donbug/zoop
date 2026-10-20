@@ -4098,6 +4098,8 @@ The selection frozen when the question was first received.
 | id | 필수 | string |  |
 | kind | 필수 | string {company, issue} |  |
 | label | 필수 | string |  |
+| logoUrl | 필수 | string / null | 기업 끝점의 로고 경로(GraphNode.logoUrl과 같은 값). 기업 카탈로그에 없으면 null이고 사건 끝점은 항상 null이다. |
+| brandColor | 필수 | string / null | 기업 끝점의 브랜드 색(GraphNode.brandColor와 같은 값). 없으면 null이고 사건 끝점은 항상 null이다. |
 
 <a id="schema-errorbody"></a>
 
