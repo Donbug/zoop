@@ -277,6 +277,7 @@ public final class BriefingReplayImporter {
                 failure(limitations, "graphVersion", "SOURCE_UNAVAILABLE", "운영 권한·공개 그래프 승인이 없는 localhost 과거 시뮬레이션입니다.");
                 failure(limitations, "marketVariables", "SOURCE_UNAVAILABLE", "당시 KOSPI·KOSDAQ·환율 및 실제 전망 성과를 제공하지 않습니다.");
                 ObjectNode snapshot = base.snapshot(); snapshot.set("replay", marker);
+                if (grouped) ((ObjectNode) snapshot.get("marketSummary")).put("reason", "이번 이슈 묶음 브리핑에서는 시장 요약을 새로 생성하지 않았습니다.");
                 marker.put("resultSha256", definition.string("resultSha256")).put("inputArtifactId", namespace + "-input-" + index)
                         .put("resultArtifactId", namespace + "-result-" + index).put("verificationArtifactId", namespace + "-verification-" + index);
                 blobs.put(namespace + "-result-" + index, blob("analysis_result", StrictJson.write(result.node())));
