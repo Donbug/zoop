@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:57 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:57 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/08-AI-챗봇-v2.csv) — 근거·관계 그래프 맥락 조회: 시스템은 확정된 질문 범위에 맞는 검증 완료 그래프 관계와 뉴스·공시 근거를 조회한다. 개인 보유·관심 종목은 본인 권한이 있을 때만 질문 맥락에 포함한다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv) — 질문 해석과 되묻기: 처음 질문을 받은 시점의 대화 내용·대상·기간·근거를 작업에 고정해야 한다. 최근·작년 같은 날짜 표현은 그 질문 시점의 실제 기간으로 해석해 기록해야 한다. 질문에 명시한 조건을 우선하며 대상이 불명확하면 확인 질문을 저장해 반환해야 한다. 보충 입력은 새 질문 작업으로 처리해야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/08-AI-챗봇-v2.csv) — 근거·관계 그래프 맥락 조회: 시스템은 확정된 질문 범위에 맞는 검증 완료 그래프 관계와 뉴스·공시 근거를 조회한다. 개인 보유·관심 종목은 본인 권한이 있을 때만 질문 맥락에 포함한다.
 
 ## 상세 권한과 의미 이행
 

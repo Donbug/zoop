@@ -53,18 +53,20 @@ flowchart LR
 
 ### 1. 고정본을 새 날짜 폴더에 저장한다
 
-현재 조합은 **명세 `functional-spec_2026-10-12`, WBS `wbs_2026-10-12`, 요구사항 `requirements-sheet_2026-10-06`**이다. [10-12 원문 갱신 기록](../evidence/doc-delta-2026-10-12.md)에서 2026-10-12 09:45(KST) 재수집한 명세·WBS 18탭 135,892셀을 10-10 고정본과 대조해 변경 47셀(명세 26·WBS 21)을 확인했다. 38셀은 작업자가 공유 시트에 기록한 수정이고 9셀(WBS 6.8.7 신규 기재와 6.8.8 가중치)은 기록에 없는 팀 변경이다. 요구사항은 다시 받지 않고 10-06 고정본을 유지한다. 10-10 입력(`functional-spec_2026-10-10`, `wbs_2026-10-10`)과 [10-10 기록](../evidence/doc-delta-2026-10-10.md), 10-08 입력과 [10-08 delta](../evidence/doc-delta-2026-10-08.md)는 역사 기록으로 유지한다. 원본은 수정하지 않는다. WBS는 173개이며 본문 A:J 헤더는 이전 고정본과 동일하고 6.8.7 공란이 채워진 점만 제목·역할 변화다. 표지 `6.5.13~20` vs 본문 `6.6.13~20` 충돌은 별도로 남는다.
+현재 조합은 **명세 `functional-spec_2026-10-18`, WBS `wbs_2026-10-12`, 요구사항 `requirements-sheet_2026-10-06`**이며, 원본에서 삭제된 이력 탭 두 개(`03-메인-그래프.csv`·`07-AI-챗봇.csv`)는 탭이 마지막으로 남아 있던 `functional-spec_2026-10-12` 고정본에서 읽는다([10-18 원문 갱신 기록](../evidence/doc-delta-2026-10-18.md)). [10-12 원문 갱신 기록](../evidence/doc-delta-2026-10-12.md)에서 2026-10-12 09:45(KST) 재수집한 명세·WBS 18탭 135,892셀을 10-10 고정본과 대조해 변경 47셀(명세 26·WBS 21)을 확인했다. 38셀은 작업자가 공유 시트에 기록한 수정이고 9셀(WBS 6.8.7 신규 기재와 6.8.8 가중치)은 기록에 없는 팀 변경이다. 요구사항은 다시 받지 않고 10-06 고정본을 유지한다. 10-10 입력(`functional-spec_2026-10-10`, `wbs_2026-10-10`)과 [10-10 기록](../evidence/doc-delta-2026-10-10.md), 10-08 입력과 [10-08 delta](../evidence/doc-delta-2026-10-08.md)는 역사 기록으로 유지한다. 원본은 수정하지 않는다. WBS는 173개이며 본문 A:J 헤더는 이전 고정본과 동일하고 6.8.7 공란이 채워진 점만 제목·역할 변화다. 표지 `6.5.13~20` vs 본문 `6.6.13~20` 충돌은 별도로 남는다.
 
 ### 2. 기계 추출 원본을 가져온다
 
 ```bash
 uv run --with pyyaml python docs/system/import_sources.py \
-  --spec-dir docs/evidence/raw/functional-spec_2026-10-12 \
+  --spec-dir docs/evidence/raw/functional-spec_2026-10-18 \
+  --historical-spec-file docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv \
+  --historical-spec-file docs/evidence/raw/functional-spec_2026-10-12/07-AI-챗봇.csv \
   --wbs-dir docs/evidence/raw/wbs_2026-10-12 \
   --requirements-dir docs/evidence/raw/requirements-sheet_2026-10-06
 ```
 
-세 디렉터리를 생략해도 위 최신 조합이 기본값이다. 기본 화면 인덱스는 `docs/screen-plan/captures/slide-index.json`, 구현 판정은 `docs/evidence/spec-v1.2-gap.md`다. `--spec-dir`, `--wbs-dir`, `--requirements-dir`, `--screens`, `--gap`으로 명시적 대안을 지정할 수 있다. 모든 CSV·보존 XLSX·수집 manifest와 두 입력 문서의 SHA-256을 기록한다. 상세 구획의 제목 행·메타 행과 WBS 표지/일정 요약의 비어 있지 않은 원문 행, 본문 열 헤더도 보존한다. 가져오기는 `catalog.yaml`만 교체한다. `scripts/repo_checks.py docs`는 importer의 암묵적 기본값이 아니라 catalog의 `sources`/`fingerprints`를 복사·명시 전달해 같은 고정본으로 재생성한다.
+세 디렉터리와 이력 탭 파일을 생략해도 위 최신 조합이 기본값이다. 기본 화면 인덱스는 `docs/screen-plan/captures/slide-index.json`, 구현 판정은 `docs/evidence/spec-v1.2-gap.md`다. `--spec-dir`, `--wbs-dir`, `--requirements-dir`, `--screens`, `--gap`으로 명시적 대안을 지정할 수 있다. 모든 CSV·보존 XLSX·수집 manifest와 두 입력 문서의 SHA-256을 기록한다. 상세 구획의 제목 행·메타 행과 WBS 표지/일정 요약의 비어 있지 않은 원문 행, 본문 열 헤더도 보존한다. 가져오기는 `catalog.yaml`만 교체한다. `scripts/repo_checks.py docs`는 importer의 암묵적 기본값이 아니라 catalog의 `sources`/`fingerprints`를 복사·명시 전달해 같은 고정본으로 재생성한다.
 
 ### 3. ID 연결과 목표 계약을 편집한다
 

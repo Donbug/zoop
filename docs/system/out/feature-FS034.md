@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:44 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:44 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv) — 중복 발행 방지: 시스템은 발행일과 출근·퇴근 구분을 기준으로 공통 브리핑의 회차를 식별하고, 같은 회차를 중복 발행하지 않아야 한다. 동일 회차의 생성 요청이 반복되거나 실패 후 재시도하더라도 중복 발행하지 않아야 하며, 이미 발행된 브리핑을 재실행 결과로 임의 교체해서는 안 된다.
+- [docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv:93 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv) — 중복 발행 방지: 시스템은 발행일과 출근·퇴근 구분을 기준으로 공통 브리핑의 회차를 식별하고, 같은 회차를 중복 발행하지 않아야 한다. 동일 회차의 생성 요청이 반복되거나 실패 후 재시도하더라도 중복 발행하지 않아야 하며, 이미 발행된 브리핑을 재실행 결과로 임의 교체해서는 안 된다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:218 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:106 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:106 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:252 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — GraphDB 노드·간선 upsert 및 공개 버전 반영: 기업·이슈 노드와 기업–기업·기업–이슈 간선을 GraphDB에 멱등 upsert하고 근거·분석 버전·검증 상태를 연결한다. 백엔드 B가 저장·트랜잭션·조회 반영을, AI가 분석 결과 계약과 검증 결과 제공을 담당한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:252 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — GraphDB 노드·간선 upsert 및 공개 버전 반영: 기업·이슈 노드와 기업–기업·기업–이슈 간선을 GraphDB에 멱등 upsert하고 근거·분석 버전·검증 상태를 연결한다. 백엔드 B가 저장·트랜잭션·조회 반영을, AI가 분석 결과 계약과 검증 결과 제공을 담당한다.
 
 재사용 근거(상세 수용 기준의 구현 완료 증거 아님): [FS055](feature-FS055.md) · [FS059](feature-FS059.md)
 

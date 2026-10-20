@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:34 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:34 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:112 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — 관계 근거 확인: 기업·이슈·관계 설명에 사용된 뉴스·공시 근거를 제공하고 사용자가 요약 내용의 근거 원문을 직접 확인할 수 있도록 한다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:107 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv) — 관계 근거 확인: 사용자가 그래프의 연결과 설명을 직접 확인할 수 있도록 기업·이슈·관계에 연결된 근거 자료를 제공한다. 근거 뉴스·공시의 제목, 출처, 발행 시각, 확보된 원문 구간과 원문 링크를 표시해야 한다. 원문 접근이 불가능하거나 근거가 충분하지 않은 경우 해당 상태를 안내하고, 문서 발행 시각과 관계 확인 시점을 구분해야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:112 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 관계 근거 확인: 기업·이슈·관계 설명에 사용된 뉴스·공시 근거를 제공하고 사용자가 요약 내용의 근거 원문을 직접 확인할 수 있도록 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:82 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

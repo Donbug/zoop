@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:52 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:52 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 시점 기반 관계 그래프 조회: 시스템은 기업 상세에서 선택한 기준 시점의 기업 관계 그래프를 제공한다. 기업의 비교적 고정적인 구조 관계와, 해당 시점까지 공개되어 유효한 이슈 기반 관계를 구분하여 함께 표시한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv:79 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv) — 시점 기반 관계 그래프 조회: 시스템은 기업 상세에서 선택한 기준 시점의 기업 관계 그래프를 제공한다. 기준 시점까지 검증·공개 가능한 구조 관계와 이슈 기반 관계를 구분하여 함께 표시하고, 각 사업 관계에는 조회 기준 시점의 상태(예정·유효·종료·기간 미상)를 함께 보여 준다.
 
 ## 상세 권한과 의미 이행
 

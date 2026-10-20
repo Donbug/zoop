@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:38 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:38 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv) — 출근 브리핑 생성: 시스템은 매일 07:40에 출근 브리핑을 자동 생성한다. 직전 퇴근 브리핑의 데이터 기준 시점 이후부터 이번 회차의 데이터 마감 시점까지 확보한 미국 증시·국제정세·국내 주요 뉴스를 바탕으로 시장 요약, 핵심 이슈, 관련 기업과 주요 시장 변수를 제공.
+- [docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv) — 출근 브리핑 생성: 시스템은 매일 09:20에 출근 브리핑을 자동 생성한다. 직전 퇴근 브리핑의 데이터 기준 시점 이후부터 이번 회차의 데이터 마감 시점까지 확보한 미국 증시·국제정세·국내 주요 뉴스를 바탕으로 시장 요약, 핵심 이슈, 관련 기업과 주요 시장 변수를 제공.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:212 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

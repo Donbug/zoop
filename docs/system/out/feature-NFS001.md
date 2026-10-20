@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:88 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:88 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/12-비기능-상세.csv) — 접근 통제: 회원의 개인 정보는 해당 회원에게만 제공해야 한다. 비회원은 로그인 하여야지만 관심종목 기능을 이용할 수 있어야 하며, 다른 사용자의 정보에는 접근할 수 없어야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/12-비기능-상세.csv) — 접근 통제: 회원의 개인 정보는 해당 회원에게만 제공해야 한다. 비회원은 로그인 하여야지만 관심종목 기능을 이용할 수 있어야 하며, 다른 사용자의 정보에는 접근할 수 없어야 한다.
 
 ## 상세 권한과 의미 이행
 

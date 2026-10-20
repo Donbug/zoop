@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:46 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:46 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/05-출퇴근-브리핑.csv) — 개인화 브리핑 조회: 사용자는 선택한 출근·퇴근 회차에서 자신의 보유 종목과 관심 종목을 기준으로 개인화 브리핑을 요청할 수 있어야 한다.보유 비중이 확보된 경우 분석에 활용하고, 어떤 종목과 기준 시점으로 작성된 결과인지 표시해야 한다. 보유 종목이 없으면 관심 종목을 기준으로 제공하며, 둘 다 없으면 종목 설정 또는 공통 브리핑 조회를 안내해야 한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv:121 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/05-출퇴근-브리핑.csv) — 개인화 브리핑 조회: 사용자는 선택한 출근·퇴근 회차에서 자신의 보유 종목과 관심 종목을 기준으로 개인화 브리핑을 요청할 수 있어야 한다.보유 비중이 확보된 경우 분석에 활용하고, 어떤 종목과 기준 시점으로 작성된 결과인지 표시해야 한다. 보유 종목이 없으면 관심 종목을 기준으로 제공하며, 둘 다 없으면 종목 설정 또는 공통 브리핑 조회를 안내해야 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:220 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
