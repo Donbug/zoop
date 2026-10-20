@@ -308,6 +308,15 @@ public final class BriefingReplayImporter {
         require(accounted.equals(allReceipts.keySet()), "simulation_unowned_paid_receipt");
         if (bundle.has("marketEnrichment")) for (var receipt : simulationReceiptLedger(bundle.object("marketEnrichment").objects("receipts")).entrySet())
             require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "market_enrichment_receipt_reuses_news_request");
+        if (bundle.has("marketEnrichment") && bundle.object("marketEnrichment").has("comparisonBaselineSha256")) {
+            StrictJson.Obj layer = bundle.object("marketEnrichment"); Path output = settings.bundle().getParent();
+            byte[] priorBytes = read(output.resolve("market/baselines/" + layer.string("comparisonBaselineSha256") + ".json"));
+            StrictJson.Obj prior = StrictJson.parseObject(priorBytes);
+            blobs.put(namespace + "-comparison-baseline", blob("briefing_input", priorBytes));
+            blobs.put(namespace + "-frozen-preview", blob("briefing_input", read(output.resolve("market/previews/" + layer.string("frozenPreviewSha256") + ".json"))));
+            for (var receipt : simulationReceiptLedger(prior.object("marketEnrichment").objects("receipts")).entrySet())
+                require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "comparison_receipt_duplicate");
+        }
         blobs.put(namespace + "-bundle", blob("ai_submit", bundleBytes));
         blobs.put(namespace + "-clocks", blob("verification_receipt", clocks.bytes));
         clocks.html.forEach((sha, content) -> blobs.put(namespace + "-html-" + sha.substring(0, 24), new Blob("raw_document", content, "text/html; charset=utf-8")));
@@ -427,12 +436,54 @@ public final class BriefingReplayImporter {
         Map<String, StrictJson.Obj> published = new LinkedHashMap<>();
         for (StrictJson.Obj round : bundle.objects("rounds")) if ("SELECTED".equals(round.string("selectionStatus")))
             require(published.putIfAbsent(round.string("roundId"), round) == null, "market_enrichment_duplicate_news_round");
+        List<StrictJson.Obj> comparison = layer.objects("rounds");
+        Map<String, StrictJson.Obj> prepared = new LinkedHashMap<>();
+        boolean frozen = layer.has("comparisonBaselineSha256");
+        if (frozen) {
+            String sha = layer.string("comparisonBaselineSha256"); require(sha.matches("[0-9a-f]{64}"), "comparison_baseline_sha");
+            byte[] raw = read(output.resolve("market/baselines/" + sha + ".json"));
+            StrictJson.Obj prior = StrictJson.parseObject(raw);
+            require(Canonical.sha256(raw).equals(sha) && prior.has("marketEnrichment")
+                    && !prior.object("marketEnrichment").has("comparisonBaselineSha256"), "comparison_baseline_artifact");
+            ObjectNode priorNews = (ObjectNode) prior.node().deepCopy(); priorNews.remove("marketEnrichment");
+            require(priorNews.equals(baseline), "comparison_baseline_news_binding");
+            // Validate the actual old model receipts/artifacts before using that exact previous version.
+            comparison = List.copyOf(validateMarketEnrichment(prior, prior.object("marketEnrichment").string("userInboxRef"), output).values());
+            String previewSha = layer.string("frozenPreviewSha256"); require(previewSha.matches("[0-9a-f]{64}"), "frozen_preview_sha");
+            byte[] previewRaw = read(output.resolve("market/previews/" + previewSha + ".json"));
+            StrictJson.Obj preview = StrictJson.parseObject(previewRaw);
+            require(Canonical.sha256(previewRaw).equals(previewSha) && sha.equals(preview.string("baselineBundleSha256"))
+                    && "zoop-market-context-preview-v1".equals(preview.string("schemaVersion"))
+                    && userInboxRef.equals(preview.string("userInboxRef"))
+                    && layer.string("executionAuthorizationRef").matches("inbox/[A-Za-z0-9_.-]+\\.md"), "frozen_preview_binding");
+            for (StrictJson.Obj row : preview.objects("rounds")) require(prepared.putIfAbsent(row.string("roundId"), row) == null, "frozen_preview_duplicate");
+            require(prepared.keySet().equals(published.keySet()), "frozen_preview_population");
+        }
         Map<String, JsonNode> all = simulationReceiptLedger(layer.objects("receipts")); Set<String> accounted = new HashSet<>();
         for (StrictJson.Obj record : layer.objects("rounds")) {
             String id = record.string("roundId"); StrictJson.Obj news = published.get(id);
             require(news != null && result.putIfAbsent(id, record) == null, "market_enrichment_round_scope");
             validateMarketRecord(record, news, userInboxRef, output);
-            if (record.has("marketContext")) BriefingMarketContextRules.previous(record, layer.objects("rounds"));
+            if (record.has("marketContext")) BriefingMarketContextRules.previous(record, comparison);
+            require(frozen == record.has("frozenExecution"), "frozen_execution_mode");
+            if (frozen) {
+                require(record.has("marketContext") && !record.isNull("summaryResult"), "frozen_context_required");
+                StrictJson.Obj binding = record.object("frozenExecution"), row = prepared.get(id), summary = record.object("summaryResult");
+                for (String field : List.of("comparisonBaselineSha256", "executionAuthorizationRef"))
+                    require(layer.string(field).equals(binding.string(field)), "frozen_execution_binding");
+                String digest = row.string("requestSha256");
+                require(layer.string("frozenPreviewSha256").equals(binding.string("previewSha256"))
+                        && digest.equals(binding.string("preparedRequestSha256"))
+                        && !summary.objects("attempts").isEmpty()
+                        && digest.equals(summary.objects("attempts").getFirst().string("generationRequestDigest"))
+                        && all.containsKey(digest) && "market_summary_generation".equals(StrictJson.Obj.of(all.get(digest)).string("stage")), "frozen_prepared_first_call");
+                byte[] request = read(output.resolve("calls/" + digest + ".request.json"));
+                require(Canonical.sha256(request).equals(digest) && request.length == row.count("requestBytes"), "frozen_prepared_request_bytes");
+                StrictJson.Obj first = StrictJson.parseObject(StrictJson.parseObject(request).string("input"));
+                require(first.object("marketContext").node().equals(record.object("marketContext").node())
+                        && first.object("context").node().equals(record.object("context").node())
+                        && first.string("frozenInputSha256").equals(summary.string("frozenInputSha256")), "frozen_prepared_input_binding");
+            }
             for (var receipt : simulationReceiptLedger(record.objects("receipts")).entrySet())
                 require(receipt.getValue().equals(all.get(receipt.getKey())) && accounted.add(receipt.getKey()), "market_enrichment_receipt_owner");
         }
@@ -742,6 +793,7 @@ public final class BriefingReplayImporter {
         ObjectNode lineage = snapshot.putObject("marketEnrichment").put("contextSha256", record.string("contextSha256"))
                 .put("marketSnapshotSha256", record.string("marketSnapshotSha256"));
         lineage.set("context", record.object("context").node().deepCopy());
+        if (record.has("frozenExecution")) lineage.set("frozenExecution", record.object("frozenExecution").node().deepCopy());
         if (record.has("marketContext")) {
             lineage.set("marketContext", record.object("marketContext").node().deepCopy());
             lineage.set("forecasts", record.object("summaryResult").array("forecasts").deepCopy());

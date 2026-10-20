@@ -87,3 +87,22 @@ python3 scripts/briefing_market_enrichment.py \
 ## 검증 경계
 
 Python 테스트는 미래자료 제외, 전체 입력 범위, 실제 인용, 이전 회차 보류, 출근 갱신, 퇴근 비교, 거래일·평가 조건, 입력 변조/재실행을 다룬다. `BriefingMarketContextPostgresTest`는 명시적으로 작성한 합성 원문·달력·모델 응답으로 실제 PostgreSQL과 Spring HTTP 저장/복원·재가져오기·변조·권한 철회를 검증한다. 이 테스트는 유료 AI 결과나 실제 예측 적중률 검증이 아니다.
+
+## 이미 고정한 요청을 그대로 실행
+
+`briefing_market_context_run.py`는 preview가 저장한 첫 생성 요청의 **바이트/SHA를 그대로** 사용한다. 위의 순차 생성 경로와 달리, 입력에 들어 있던 기존 이전 브리핑 버전을 새 결과로 교체하지 않는다. 따라서 이 실행의 퇴근 비교가 새로 생성한 출근 문안을 자동으로 비교한 것이라고 설명하면 안 된다. 비교 대상 roundId와 실제 요약 결과 SHA를 함께 확인한다.
+
+```sh
+python3 scripts/briefing_market_context_run.py \
+  --inputs /absolute/private/frozen-preview \
+  --market-bundle /absolute/private/prior-market/bundle-v2.json \
+  --sources /absolute/private/sources.jsonl --clocks /absolute/private/registry.json \
+  --output /absolute/private/new-fixed-run \
+  --user-inbox-ref inbox/execution-authorization.md \
+  --key-file /absolute/private/openai.env --workers 3 --max-calls 44 \
+  --execute-authorized-generation
+```
+
+실행 플래그가 없으면 전체 입력을 대조한 뒤 OFFLINE 계획만 반환한다. 준비 당시 inbox와 이번 실행 승인 inbox는 별도 보존한다. 생성·검증의 고정 근거는 동일하고, 검증 실패 시 같은 근거 내 1회 보완까지만 허용한다. 최종 실패는 시장 요약 unavailable이며 기존 뉴스 발행 상태를 임의로 성공/실패로 바꾸지 않는다. 완료 호출은 재사용하고 실패·사용량 불명 호출은 자동으로 재전송하지 않는다.
+
+`marketEnrichment.comparisonBaselineSha256/frozenPreviewSha256`와 회차별 `frozenExecution`이 원래 비교 bundle, 준비 manifest, 최초 요청 SHA와 실행 승인 기록을 묶는다. Java는 별도 보존한 기존 비교 bundle의 실제 요청/응답·검증·토큰 기록까지 검증한 뒤 그 버전과 비교한다. 비교 원본·preview·기존 영수증도 불변 artifact로 저장한다. 운영 발행이나 신규 공급원 수집을 승인하는 경로는 아니다.

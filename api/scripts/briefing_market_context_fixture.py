@@ -18,7 +18,7 @@ def load(name, relative):
     return value
 
 
-def create(directory):
+def create(directory, frozen=False):
     legacy = load("context_fixture_news", "scripts/tests/test_briefing_round_simulation.py")
     market = load("context_fixture_market", "scripts/tests/test_briefing_market_data.py")
     authored = load("context_fixture_summary", "scripts/tests/test_briefing_market_context.py")
@@ -66,7 +66,24 @@ def create(directory):
                 raw = enrichment.base.canonical(value)
             return status, raw
         with contextlib.redirect_stdout(io.StringIO()):
-            result = enrichment.run(enrichment.parser().parse_args(values), provider_shape, authored.ContextTransport())
+            if frozen:
+                old = load("context_fixture_old_summary", "scripts/tests/test_briefing_market_enrichment.py")
+                prior_values = values[:]
+                prior_values[prior_values.index("--output") + 1] = str(directory / "comparison-baseline")
+                prior_values.remove("--include-market-context")
+                position = prior_values.index("--session-calendar"); del prior_values[position:position + 2]
+                enrichment.run(enrichment.parser().parse_args(prior_values), provider_shape, old.AuthoredSummaryTransport())
+                runner = load("context_fixture_frozen_run", "scripts/briefing_market_context_run.py")
+                preview_args = runner.preview.parser().parse_args(["--market-bundle", str(directory / "comparison-baseline/bundle-v2.json"),
+                    "--sources", str(fixture.sources), "--clocks", str(fixture.clocks), "--user-inbox-ref", "inbox/authored-market-context.md",
+                    "--output", str(directory / "inputs"), "--write-inputs"])
+                runner.preview.run(preview_args)
+                run_args = runner.parser().parse_args(["--inputs", str(directory / "inputs"), "--market-bundle", preview_args.market_bundle,
+                    "--sources", str(fixture.sources), "--clocks", str(fixture.clocks), "--output", str(directory / "enriched"),
+                    "--user-inbox-ref", "inbox/authored-market-execution.md", "--execute-authorized-generation"])
+                result = runner.run(run_args, authored.ContextTransport())
+            else:
+                result = enrichment.run(enrichment.parser().parse_args(values), provider_shape, authored.ContextTransport())
         calls = result.pop("newPaidCalls"); result.pop("newHttpCalls")
         return {"sources": str(fixture.sources), "clocks": str(fixture.clocks), **result,
                 "authoredTransportCalls": calls, "realHttpCalls": 0, "realPaidCalls": 0}
@@ -75,4 +92,4 @@ def create(directory):
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1])))
+    print(create(Path(sys.argv[1]), "--frozen" in sys.argv))

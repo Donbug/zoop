@@ -128,6 +128,48 @@ class BriefingMarketContextPostgresTest {
         assertEquals(200, get("2026-10-02", "evening").statusCode());
     }
 
+    @Test void frozenExecutionRestoresActualComparisonVersionAndRejectsTamperedBaseline() throws Exception {
+        Path own = Files.createTempDirectory("zoop-authored-frozen-context-").toRealPath();
+        String schema = "frozen_context_" + UUID.randomUUID().toString().replace("-", "");
+        var ds = new DriverManagerDataSource(url().replace(SCHEMA, schema), username(), password());
+        var database = new JdbcTemplate(ds);
+        try {
+            var process = new ProcessBuilder("python3", Path.of("scripts/briefing_market_context_fixture.py").toAbsolutePath().toString(),
+                    own.toString(), "--frozen").redirectErrorStream(true).redirectOutput(own.resolve("fixture.log").toFile()).start();
+            assertEquals(0, process.waitFor(), () -> "Frozen fixture failed; inspect " + own.resolve("fixture.log"));
+            Flyway.configure().dataSource(ds).schemas(schema).defaultSchema(schema).load().migrate();
+            database.update("INSERT INTO companies(id,name) VALUES ('authored-context-company','시험 기업')");
+            var imported = new BriefingReplayImporter(database, new DataSourceTransactionManager(ds),
+                    new BriefingReplaySettings(own.resolve("sources.jsonl"), own.resolve("enriched/bundle-v2.json"),
+                            Files.createDirectory(own.resolve("artifacts")), own.resolve("grants.json"), own.resolve("manifest.json"),
+                            ArtifactFileStore.sha256(Files.readAllBytes(own.resolve("sources.jsonl"))),
+                            "inbox/authored-market-context.md", own.resolve("clocks.json")));
+            imported.importBundle();
+            JsonNode input = JSON.readTree(Files.readAllBytes(own.resolve("enriched/bundle-v2.json")));
+            JsonNode old = JSON.readTree(Files.readAllBytes(own.resolve("comparison-baseline/bundle-v2.json")));
+            JsonNode restored = JSON.readTree(database.queryForObject("SELECT public_snapshot::text FROM briefing_rounds WHERE round_date='2026-10-02' AND edition='evening'", String.class));
+            assertEquals(old.at("/marketEnrichment/rounds/0/summaryResult"), restored.at("/marketEnrichment/marketContext/previousPublication/summary"));
+            assertNotEquals(input.at("/marketEnrichment/rounds/0/summaryResult"), restored.at("/marketEnrichment/marketContext/previousPublication/summary"));
+            assertEquals("inbox/authored-market-execution.md", restored.at("/marketEnrichment/frozenExecution/executionAuthorizationRef").asText());
+            assertTrue(imported.importBundle().alreadyImported());
+            byte[] intact = Files.readAllBytes(own.resolve("enriched/bundle-v2.json"));
+            var stripped = (ObjectNode) JSON.readTree(intact);
+            ((ObjectNode) stripped.at("/marketEnrichment/rounds/0")).remove("marketContext");
+            Files.writeString(own.resolve("enriched/bundle-v2.json"), JSON.writeValueAsString(stripped));
+            assertThrows(RuntimeException.class, imported::importBundle);
+            Files.write(own.resolve("enriched/bundle-v2.json"), intact);
+            String sha = input.at("/marketEnrichment/comparisonBaselineSha256").asText();
+            Files.writeString(own.resolve("enriched/market/baselines/" + sha + ".json"), "{}");
+            assertThrows(RuntimeException.class, imported::importBundle);
+            assertEquals(14, database.queryForObject("SELECT count(*) FROM briefing_rounds", Integer.class));
+        } finally {
+            database.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+            try (var files = Files.walk(own)) {
+                for (Path p : files.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(p);
+            }
+        }
+    }
+
     private static JsonNode snapshot(String date, String edition) throws Exception {
         return JSON.readTree(jdbc.queryForObject("SELECT public_snapshot::text FROM briefing_rounds WHERE round_date=?::date AND edition=?",
                 String.class, date, edition));
