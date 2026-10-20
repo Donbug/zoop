@@ -68,6 +68,28 @@ Use `AccountMenu` from `@/components/common/AccountMenu` through `ServiceHeader`
 
 Click/tap, Enter/Space and arrow keys open the menu, with `aria-expanded` reflecting its state. Focus the logout item when opening; Escape closes and returns focus to the trigger, and outside pointer/Tab/focus departure close it. Disabling a focused action can cause a native browser blur, so keep pending/error UI visible and restore retry focus. Logout reuses cookie/CSRF transport, preserves the session on failure, prevents duplicate requests and ignores old responses after a member change. D-MY-01's page body no longer owns logout. Cover these behaviors with `tests/auth/account-menu.test.tsx` and `tests/auth/authJourney.test.tsx`.
 
+## Admin screen primitives (A-ADM-\*)
+
+Admin screens (`/admin/*`) are dense operation tables, not detail panels. They share Tailwind recipes and small components instead of `panelStyles`:
+
+```tsx
+import {
+  ErrorBox,
+  Loading,
+  PageHeader,
+  Section,
+  Segmented,
+  Table,
+} from '@/components/admin/common/AdminUi';
+import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
+```
+
+- `adminStyles.ts`: class recipes (`BUTTON`, `PRIMARY_BUTTON`, `TH`, `TD`, `LINK`, `SELECT`, `TEXTAREA`, `SEARCH_INPUT`, `FOCUS_RING`), `count`/`formatPercent`, and `adminErrorMessage`/`adminActionErrorMessage` for API failures.
+- `AdminUi.tsx`: `PageHeader`, `Section` (title + links to other admin screens), `Table` (caption + horizontal scroll), `Segmented` (period/status filters, `aria-pressed`), `Tabs`, `Metric`, `Loading`, `ErrorBox` (retry), `Empty`, `Note`, `MoreButton` (opaque-cursor paging with `useCursorPages`).
+- Colors use the `zoop-*` tokens in `src/index.css`; values match the `panel-*` tokens. Error text uses `text-zoop-alert`.
+- Admin writes (reprocess, correction, suspension, member block/unblock) take a required reason, send the admin CSRF token and an `Idempotency-Key` from `useIdempotencyKey` (the same key when an unanswered request is resent unchanged, a new key after an edit or a definite 4xx rejection), and show the result inline.
+- Unknown values from the API (`null`) render as `–`, never as `0`.
+
 ## Graph feature port
 
 D-GRP-01/01b uses `graph-view` for member/mode-scoped state and legend keys. G6 supplies the conditional desktop minimap. Saved zoom/pan is reused only when the map size is unchanged; otherwise the default layout opens. `MapDetailSheet` owns M-GRP-01 modal snaps and focus return; `IsolatedIssuesPanel` reuses the detail panel tokens.
