@@ -91,9 +91,11 @@ export default function LoginPage() {
   const [guestError, setGuestError] = useState(false);
   // 서버에 설정된 소셜 제공자. 불러오기 전·실패 시에는 소셜 버튼을 두지 않는다.
   const [providers, setProviders] = useState<SocialProvider[]>([]);
-  const socialResult = socialResultMessage(
-    new URLSearchParams(location.search).get('social'),
-  );
+  const params = new URLSearchParams(location.search);
+  const socialResult =
+    params.get('notice') === 'blocked'
+      ? '이용이 제한된 계정이라 로그아웃했어요. 고객센터로 문의해 주세요.'
+      : socialResultMessage(params.get('social'));
   useEffect(() => {
     let alive = true;
     listSocialProviders().then(
