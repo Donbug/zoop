@@ -1522,7 +1522,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.10.2, 6.10.14 |
 | 프로토타입 대응 | /api/admin/dashboard |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| 팀 확인 필요 | 담당자 확정: 공통 Metadata.partial/failures 사용, registered는 전체 가입 회원(차단 포함), ai.requests는 사용자 접수 요청 수, 부분 원천은 SOURCE_UNAVAILABLE로 표시, GraphDB는 기존 pipeline reader 재사용. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
 
 ### 요청 필드
 
@@ -3514,7 +3514,7 @@ The selection frozen when the question was first received.
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
 | choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
-| metadata | 필수 | [Metadata](#schema-metadata) |  |
+| metadata | 필수 | [Metadata](#schema-metadata) | 공통 부분 실패 정보. asOf는 generatedAt과 같고 graphVersion은 null이다. |
 
 <a id="schema-chatsessionresponse"></a>
 
@@ -3843,7 +3843,7 @@ The selection frozen when the question was first received.
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 | ledger | 필수 | [DashboardLedger](#schema-dashboardledger) |  |
 | graph | 필수 | [DashboardGraph](#schema-dashboardgraph) / null | null when the graph version summary could not be read; subarea failures are listed individually in metadata.failures. |
-| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null |  |
+| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null | null when candidate source is unavailable; an empty but successfully read source returns zero counts. |
 | jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) / null | null when the job source is unavailable; a successfully read source with no jobs returns zero counts and an empty recent list. |
 | ai | 필수 | [DashboardAi](#schema-dashboardai) / null | null when user-request records are unavailable; model execution attempts are not substituted. |
 | briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) / null | null when the briefing-round source is unavailable; no rounds in an available source returns an empty latest list. |
@@ -3982,8 +3982,8 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | registered | 필수 | integer | 차단 회원을 포함한 전체 가입 회원 수. |
 | activeMemberSessions | 필수 | integer | 기준 시각에 회원 계정이 active이며 만료되지 않고 폐기되지 않은 회원 세션 수. |
-| activeGuestSessions | 필수 | integer |  |
-| source | 필수 | string | 집계 데이터 원천: zoop-db. |
+| activeGuestSessions | 필수 | integer | 기준 시각에 만료되지 않고 폐기되지 않은 비회원 세션 수. |
+| source | 필수 | string | 집계 데이터 원천. |
 
 <a id="schema-datawindow"></a>
 

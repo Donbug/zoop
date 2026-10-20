@@ -7,6 +7,1401 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.ai<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.ai<anyOf:0>.failed": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai<anyOf:0>.failed:required": true,
+    "response:200:application/json.ai<anyOf:0>.features": {
+      "type": "array"
+    },
+    "response:200:application/json.ai<anyOf:0>.features:required": true,
+    "response:200:application/json.ai<anyOf:0>.features[]": {
+      "type": "object"
+    },
+    "response:200:application/json.ai<anyOf:0>.features[].failed": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai<anyOf:0>.features[].failed:required": true,
+    "response:200:application/json.ai<anyOf:0>.features[].feature": {
+      "type": "string"
+    },
+    "response:200:application/json.ai<anyOf:0>.features[].feature:required": true,
+    "response:200:application/json.ai<anyOf:0>.features[].label": {
+      "type": "string"
+    },
+    "response:200:application/json.ai<anyOf:0>.features[].label:required": true,
+    "response:200:application/json.ai<anyOf:0>.features[].requests": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai<anyOf:0>.features[].requests:required": true,
+    "response:200:application/json.ai<anyOf:0>.requests": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai<anyOf:0>.requests:required": true,
+    "response:200:application/json.ai<anyOf:0>.succeeded": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai<anyOf:0>.succeeded:required": true,
+    "response:200:application/json.ai<anyOf:0>.window": {
+      "type": "string",
+      "const": "7d"
+    },
+    "response:200:application/json.ai<anyOf:0>.window:required": true,
+    "response:200:application/json.ai<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.audit<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.audit<anyOf:0>.last24h": {
+      "type": "integer"
+    },
+    "response:200:application/json.audit<anyOf:0>.last24h:required": true,
+    "response:200:application/json.audit<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.delayedOrFailed": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings<anyOf:0>.delayedOrFailed:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest": {
+      "type": "array"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[]": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].attempts": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].attempts:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].blockedReason:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].blockedReason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].blockedReason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].correctionCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].correctionCount:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.end": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.end:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.openStart": {
+      "type": "boolean"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.openStart:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.start:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.start<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow.start<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].dataWindow:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].date": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].date:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].delayed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].delayed:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].edition:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].failureReason:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].failureReason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].failureReason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].generatedAt:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].generatedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].generatedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].graphVersion:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].graphVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].graphVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].id:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].itemCount:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].itemCount<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].itemCount<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].publishedAt:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].publishedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].publishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].reprocessable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].reprocessable:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].reviewRevision:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].reviewRevision<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].reviewRevision<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].scheduledAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].scheduledAt:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate.at:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate.at<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate.at<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate.status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate.status:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.generate:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish.at:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish.at<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish.at<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish.status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish.status:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.publish:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify.at:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify.at<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify.at<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify.status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify.status:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages.verify:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].stages:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].status": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "missing",
+        "generating",
+        "verifying",
+        "published",
+        "failed",
+        "suspended"
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].status:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>.adminEmail": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>.adminEmail:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>.at": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>.at:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:0>.reason:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].suspension<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].trigger:required": true,
+    "response:200:application/json.briefings<anyOf:0>.latest[].trigger<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "scheduler",
+        "admin"
+      ]
+    },
+    "response:200:application/json.briefings<anyOf:0>.latest[].trigger<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.activatedAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.activatedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.activatedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.activatedAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.activatedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.activatedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.articleCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.articleCount:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.createdAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.id": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.id:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.issueCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.issueCount:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.kind": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.kind:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.relationCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.relationCount:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.sequence": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.sequence:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.sourceLabel": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:0>.sourceLabel:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersionId:required": true,
+    "response:200:application/json.graph<anyOf:0>.activeVersionId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.activeVersionId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.checkedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.checkedAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.lastCompletedAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.lastCompletedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.lastCompletedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesInLedger": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesInLedger:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesProjected:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesProjected<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesProjected<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.missingIssueIds": {
+      "type": "array"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.missingIssueIds:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.missingIssueIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.staleIssueIds": {
+      "type": "array"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.staleIssueIds:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.staleIssueIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "reachable",
+        "unreachable"
+      ]
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:0>.status:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.neo4j<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.oldestPendingAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.oldestPendingAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.oldestPendingAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.pendingJobs:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.pendingJobs<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.pendingJobs<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "reflected",
+        "pending",
+        "mismatch",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:0>.status:required": true,
+    "response:200:application/json.graph<anyOf:0>.graphDb<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.reviewDecisions:required": true,
+    "response:200:application/json.graph<anyOf:0>.reviewDecisions<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.reviewDecisions<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.reviewRevision:required": true,
+    "response:200:application/json.graph<anyOf:0>.reviewRevision<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.reviewRevision<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>": {
+      "type": "array"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[]": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].changedAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].changedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].changedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].changedBy:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].changedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].changedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].defaultEnabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].defaultEnabled:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].eligible:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].enabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].enabled:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history": {
+      "type": "array"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[]": {
+      "type": "object"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].adminEmail": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].adminEmail:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].changedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].changedAt:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].enabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].enabled:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].id": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].id:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].history[].reason:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].id:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedCandidates:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedEvents": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].publishedEvents:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].reason:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].reason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].reason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].summary": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].summary:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:0>[].title:required": true,
+    "response:200:application/json.graph<anyOf:0>.rules<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph<anyOf:0>.versionCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph<anyOf:0>.versionCount:required": true,
+    "response:200:application/json.graph<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.cancelRequested": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.cancelRequested:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.durationSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.durationSeconds<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.durationSeconds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.error<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.finishedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.finishedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.finishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:0>.completedProjectionJobs": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.flush<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.id": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.id:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAdvanced": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "collected",
+        "empty",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ingest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.kind": {
+      "type": "string",
+      "enum": [
+        "ingest",
+        "revalidate",
+        "project"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.kind:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.label:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.ledgerBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.recovered": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.recovered:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.approved": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.collectionErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.errors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.held": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.pending": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.processed": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.rejected": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.runId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.runId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.skipped": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.report<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.requestedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.allowed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.allowed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.blockedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.blockedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.blockedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.code": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retry:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retryOf:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retryOf<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.retryOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.startedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.startedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.startedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:0>.status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.active<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.failed24h": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.failed24h:required": true,
+    "response:200:application/json.jobs<anyOf:0>.queued": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.queued:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].cancelRequested": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].cancelRequested:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].durationSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].durationSeconds<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].durationSeconds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].error:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].error<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].finishedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].finishedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].finishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].flush:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:0>.completedProjectionJobs": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].flush<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].id:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAdvanced": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.newArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.newArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.outcome<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "collected",
+        "empty",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:0>.outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ingest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].kind": {
+      "type": "string",
+      "enum": [
+        "ingest",
+        "revalidate",
+        "project"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].kind:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].label:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].ledgerBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].recovered": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].recovered:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.approved": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.collectionErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.errors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.executionMode<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.executionMode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.held": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.pending": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.processed": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.rejected": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.runId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.runId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.skipped": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].report<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].requestedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].requestedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].requestedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].requestedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.allowed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.allowed:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.blockedBy:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.blockedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.blockedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.code": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.code:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry.reason:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retry:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retryOf:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].retryOf<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].retryOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].startedAt:required": true,
+    "response:200:application/json.jobs<anyOf:0>.recent[].startedAt<anyOf:0>": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].startedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs<anyOf:0>.recent[].status:required": true,
+    "response:200:application/json.jobs<anyOf:0>.running": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs<anyOf:0>.running:required": true,
+    "response:200:application/json.jobs<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.members<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.members<anyOf:0>.activeGuestSessions": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.activeGuestSessions:required": true,
+    "response:200:application/json.members<anyOf:0>.activeMemberSessions": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.activeMemberSessions:required": true,
+    "response:200:application/json.members<anyOf:0>.registered": {
+      "type": "integer"
+    },
+    "response:200:application/json.members<anyOf:0>.registered:required": true,
+    "response:200:application/json.members<anyOf:0>.source": {
+      "type": "string",
+      "const": "zoop-db"
+    },
+    "response:200:application/json.members<anyOf:0>.source:required": true,
+    "response:200:application/json.members<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.metadata": {
+      "type": "object"
+    },
+    "response:200:application/json.metadata.asOf": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.metadata.asOf:required": true,
+    "response:200:application/json.metadata.failures": {
+      "type": "array"
+    },
+    "response:200:application/json.metadata.failures:required": true,
+    "response:200:application/json.metadata.failures[]": {
+      "type": "object"
+    },
+    "response:200:application/json.metadata.failures[].asOf": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "response:200:application/json.metadata.failures[].asOf:required": true,
+    "response:200:application/json.metadata.failures[].code": {
+      "type": "string"
+    },
+    "response:200:application/json.metadata.failures[].code:required": true,
+    "response:200:application/json.metadata.failures[].message": {
+      "type": "string"
+    },
+    "response:200:application/json.metadata.failures[].message:required": true,
+    "response:200:application/json.metadata.failures[].retryable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.metadata.failures[].retryable:required": true,
+    "response:200:application/json.metadata.failures[].section": {
+      "type": "string"
+    },
+    "response:200:application/json.metadata.failures[].section:required": true,
+    "response:200:application/json.metadata.graphVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.metadata.graphVersion:required": true,
+    "response:200:application/json.metadata.partial": {
+      "type": "boolean"
+    },
+    "response:200:application/json.metadata.partial:required": true,
+    "response:200:application/json.metadata.requestId": {
+      "type": "string"
+    },
+    "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.metadata.source": {
+      "type": "string"
+    },
+    "response:200:application/json.metadata.source:required": true,
+    "response:200:application/json.metadata:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -281,10 +1676,628 @@
     }
   },
   "bffOnly": {
+    "response:200:application/json.ai": {
+      "type": "object"
+    },
+    "response:200:application/json.ai.failed": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai.failed:required": true,
+    "response:200:application/json.ai.features": {
+      "type": "array"
+    },
+    "response:200:application/json.ai.features:required": true,
+    "response:200:application/json.ai.features[]": {
+      "type": "object"
+    },
+    "response:200:application/json.ai.features[].failed": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai.features[].failed:required": true,
+    "response:200:application/json.ai.features[].feature": {
+      "type": "string"
+    },
+    "response:200:application/json.ai.features[].feature:required": true,
+    "response:200:application/json.ai.features[].label": {
+      "type": "string"
+    },
+    "response:200:application/json.ai.features[].label:required": true,
+    "response:200:application/json.ai.features[].requests": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai.features[].requests:required": true,
+    "response:200:application/json.ai.requests": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai.requests:required": true,
+    "response:200:application/json.ai.succeeded": {
+      "type": "integer"
+    },
+    "response:200:application/json.ai.succeeded:required": true,
+    "response:200:application/json.ai.window": {
+      "type": "string"
+    },
+    "response:200:application/json.ai.window:required": true,
+    "response:200:application/json.audit": {
+      "type": "object"
+    },
+    "response:200:application/json.audit.last24h": {
+      "type": "integer"
+    },
+    "response:200:application/json.audit.last24h:required": true,
+    "response:200:application/json.briefings": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.delayedOrFailed": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings.delayedOrFailed:required": true,
+    "response:200:application/json.briefings.latest": {
+      "type": "array"
+    },
+    "response:200:application/json.briefings.latest:required": true,
+    "response:200:application/json.briefings.latest[]": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].attempts": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings.latest[].attempts:required": true,
+    "response:200:application/json.briefings.latest[].blockedReason:required": true,
+    "response:200:application/json.briefings.latest[].blockedReason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].blockedReason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].correctionCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings.latest[].correctionCount:required": true,
+    "response:200:application/json.briefings.latest[].dataWindow": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].dataWindow.end": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].dataWindow.end:required": true,
+    "response:200:application/json.briefings.latest[].dataWindow.openStart": {
+      "type": "boolean"
+    },
+    "response:200:application/json.briefings.latest[].dataWindow.openStart:required": true,
+    "response:200:application/json.briefings.latest[].dataWindow.start:required": true,
+    "response:200:application/json.briefings.latest[].dataWindow.start<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].dataWindow.start<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].dataWindow:required": true,
+    "response:200:application/json.briefings.latest[].date": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].date:required": true,
+    "response:200:application/json.briefings.latest[].delayed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.briefings.latest[].delayed:required": true,
+    "response:200:application/json.briefings.latest[].edition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.briefings.latest[].edition:required": true,
+    "response:200:application/json.briefings.latest[].failureReason:required": true,
+    "response:200:application/json.briefings.latest[].failureReason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].failureReason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].generatedAt:required": true,
+    "response:200:application/json.briefings.latest[].generatedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].generatedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].graphVersion:required": true,
+    "response:200:application/json.briefings.latest[].graphVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].graphVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].id:required": true,
+    "response:200:application/json.briefings.latest[].itemCount:required": true,
+    "response:200:application/json.briefings.latest[].itemCount<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings.latest[].itemCount<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].publishedAt:required": true,
+    "response:200:application/json.briefings.latest[].publishedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].publishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].reprocessable": {
+      "type": "boolean"
+    },
+    "response:200:application/json.briefings.latest[].reprocessable:required": true,
+    "response:200:application/json.briefings.latest[].reviewRevision:required": true,
+    "response:200:application/json.briefings.latest[].reviewRevision<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.briefings.latest[].reviewRevision<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].scheduledAt": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].scheduledAt:required": true,
+    "response:200:application/json.briefings.latest[].stages": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].stages.generate": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].stages.generate.at:required": true,
+    "response:200:application/json.briefings.latest[].stages.generate.at<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].stages.generate.at<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].stages.generate.status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ]
+    },
+    "response:200:application/json.briefings.latest[].stages.generate.status:required": true,
+    "response:200:application/json.briefings.latest[].stages.generate:required": true,
+    "response:200:application/json.briefings.latest[].stages.publish": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].stages.publish.at:required": true,
+    "response:200:application/json.briefings.latest[].stages.publish.at<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].stages.publish.at<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].stages.publish.status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ]
+    },
+    "response:200:application/json.briefings.latest[].stages.publish.status:required": true,
+    "response:200:application/json.briefings.latest[].stages.publish:required": true,
+    "response:200:application/json.briefings.latest[].stages.verify": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].stages.verify.at:required": true,
+    "response:200:application/json.briefings.latest[].stages.verify.at<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].stages.verify.at<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].stages.verify.status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "skipped"
+      ]
+    },
+    "response:200:application/json.briefings.latest[].stages.verify.status:required": true,
+    "response:200:application/json.briefings.latest[].stages.verify:required": true,
+    "response:200:application/json.briefings.latest[].stages:required": true,
+    "response:200:application/json.briefings.latest[].status": {
+      "type": "string",
+      "enum": [
+        "scheduled",
+        "missing",
+        "generating",
+        "verifying",
+        "published",
+        "failed",
+        "suspended"
+      ]
+    },
+    "response:200:application/json.briefings.latest[].status:required": true,
+    "response:200:application/json.briefings.latest[].suspension:required": true,
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>.adminEmail": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>.adminEmail:required": true,
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>.at": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>.at:required": true,
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.briefings.latest[].suspension<anyOf:0>.reason:required": true,
+    "response:200:application/json.briefings.latest[].suspension<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.briefings.latest[].trigger:required": true,
+    "response:200:application/json.briefings.latest[].trigger<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "scheduler",
+        "admin"
+      ]
+    },
+    "response:200:application/json.briefings.latest[].trigger<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.activatedAt:required": true,
+    "response:200:application/json.graph.activatedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activatedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.activatedAt:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.activatedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.activatedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.active": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.active:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.articleCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.articleCount:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.bytes": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.bytes:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.candidateCount:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.candidateCount<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.candidateCount<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.createdAt": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.createdAt:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.createdBy": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.createdBy:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.note:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.note<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.note<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.pendingJobsAtCreation:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.pendingJobsAtCreation<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.pendingJobsAtCreation<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.status": {
+      "type": "string",
+      "enum": [
+        "reflected",
+        "pending",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb.status:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.graphDb:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.id": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.id:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.issueCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.issueCount:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.kind": {
+      "type": "string",
+      "enum": [
+        "seed",
+        "ledger"
+      ]
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.kind:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.policyVersion:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.policyVersion<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.policyVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.reason:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.reason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.reason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.relationCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.relationCount:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.sequence": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.sequence:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.sha256": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.sha256:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:0>.sourceLabel": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersion<anyOf:0>.sourceLabel:required": true,
     "response:200:application/json.graph.activeVersion<anyOf:0>.synthetic": {
       "type": "boolean"
     },
     "response:200:application/json.graph.activeVersion<anyOf:0>.synthetic:required": true,
+    "response:200:application/json.graph.activeVersion<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.activeVersionId:required": true,
+    "response:200:application/json.graph.activeVersionId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.activeVersionId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.checkedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.checkedAt:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.lastCompletedAt:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.lastCompletedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.lastCompletedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.error<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesInLedger": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesInLedger:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesProjected:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesProjected<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.issuesProjected<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.missingIssueIds": {
+      "type": "array"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.missingIssueIds:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.missingIssueIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.staleIssueIds": {
+      "type": "array"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.staleIssueIds:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.staleIssueIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "reachable",
+        "unreachable"
+      ]
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:0>.status:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.neo4j<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.oldestPendingAt:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.oldestPendingAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.oldestPendingAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.pendingJobs:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:0>.pendingJobs<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.pendingJobs<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "reflected",
+        "pending",
+        "mismatch",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.graph.graphDb<anyOf:0>.status:required": true,
+    "response:200:application/json.graph.graphDb<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.reviewDecisions": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.reviewDecisions:required": true,
+    "response:200:application/json.graph.reviewRevision": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.reviewRevision:required": true,
+    "response:200:application/json.graph.rules": {
+      "type": "array"
+    },
+    "response:200:application/json.graph.rules:required": true,
+    "response:200:application/json.graph.rules[]": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.rules[].changedAt:required": true,
+    "response:200:application/json.graph.rules[].changedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].changedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.rules[].changedBy:required": true,
+    "response:200:application/json.graph.rules[].changedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].changedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.rules[].defaultEnabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph.rules[].defaultEnabled:required": true,
+    "response:200:application/json.graph.rules[].eligible": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.rules[].eligible:required": true,
+    "response:200:application/json.graph.rules[].enabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph.rules[].enabled:required": true,
+    "response:200:application/json.graph.rules[].history": {
+      "type": "array"
+    },
+    "response:200:application/json.graph.rules[].history:required": true,
+    "response:200:application/json.graph.rules[].history[]": {
+      "type": "object"
+    },
+    "response:200:application/json.graph.rules[].history[].adminEmail": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].history[].adminEmail:required": true,
+    "response:200:application/json.graph.rules[].history[].changedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].history[].changedAt:required": true,
+    "response:200:application/json.graph.rules[].history[].enabled": {
+      "type": "boolean"
+    },
+    "response:200:application/json.graph.rules[].history[].enabled:required": true,
+    "response:200:application/json.graph.rules[].history[].id": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.rules[].history[].id:required": true,
+    "response:200:application/json.graph.rules[].history[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].history[].reason:required": true,
+    "response:200:application/json.graph.rules[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].id:required": true,
+    "response:200:application/json.graph.rules[].publishedCandidates": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.rules[].publishedCandidates:required": true,
+    "response:200:application/json.graph.rules[].publishedEvents": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.rules[].publishedEvents:required": true,
+    "response:200:application/json.graph.rules[].reason:required": true,
+    "response:200:application/json.graph.rules[].reason<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].reason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.graph.rules[].summary": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].summary:required": true,
+    "response:200:application/json.graph.rules[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.graph.rules[].title:required": true,
+    "response:200:application/json.graph.versionCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.graph.versionCount:required": true,
+    "response:200:application/json.jobs": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.cancelRequested": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.cancelRequested:required": true,
     "response:200:application/json.jobs.active<anyOf:0>.command": {
       "type": "array"
     },
@@ -299,11 +2312,180 @@
     "response:200:application/json.jobs.active<anyOf:0>.dataset<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.jobs.active<anyOf:0>.durationSeconds:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.durationSeconds<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.durationSeconds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.error:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.error<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.jobs.active<anyOf:0>.exitCode:required": true,
     "response:200:application/json.jobs.active<anyOf:0>.exitCode<anyOf:0>": {
       "type": "integer"
     },
     "response:200:application/json.jobs.active<anyOf:0>.exitCode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.finishedAt:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.finishedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.finishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.flush:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.flush<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.flush<anyOf:0>.completedProjectionJobs": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.flush<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.id": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.id:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineAdvanced": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.newArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.newArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.outcome<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "collected",
+        "empty",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:0>.outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ingest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.kind": {
+      "type": "string",
+      "enum": [
+        "flush-graph",
+        "retry-model-errors",
+        "ingest-run"
+      ]
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.kind:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.label:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:1>": {
       "type": "null"
     },
     "response:200:application/json.jobs.active<anyOf:0>.logTail:required": true,
@@ -327,6 +2509,204 @@
       "type": "boolean"
     },
     "response:200:application/json.jobs.active<anyOf:0>.paid:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.reason:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.recovered": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.recovered:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.approved": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.collectionErrorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.collectionErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.collectionErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.errorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.errors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.errors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.executionMode<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.executionMode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.held": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.pending": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.processed": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.rejected": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.runId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.runId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.skipped": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.report<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.requestedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.requestedAt:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.requestedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.requestedBy:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retry": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retry.allowed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retry.allowed:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retry.blockedBy:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retry.blockedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retry.blockedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retry.code": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing"
+      ]
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retry.code:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retry.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retry.reason:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retry:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retryOf:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.retryOf<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.retryOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.startedAt:required": true,
+    "response:200:application/json.jobs.active<anyOf:0>.startedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.startedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs.active<anyOf:0>.status:required": true,
+    "response:200:application/json.jobs.active<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.failed24h": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.failed24h:required": true,
+    "response:200:application/json.jobs.queued": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.queued:required": true,
+    "response:200:application/json.jobs.recent": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs.recent:required": true,
+    "response:200:application/json.jobs.recent[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].cancelRequested": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.recent[].cancelRequested:required": true,
     "response:200:application/json.jobs.recent[].command": {
       "type": "array"
     },
@@ -341,11 +2721,180 @@
     "response:200:application/json.jobs.recent[].dataset<anyOf:1>": {
       "type": "null"
     },
+    "response:200:application/json.jobs.recent[].durationSeconds:required": true,
+    "response:200:application/json.jobs.recent[].durationSeconds<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.recent[].durationSeconds<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].error:required": true,
+    "response:200:application/json.jobs.recent[].error<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].error<anyOf:0>.code": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].error<anyOf:0>.code:required": true,
+    "response:200:application/json.jobs.recent[].error<anyOf:0>.message": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].error<anyOf:0>.message:required": true,
+    "response:200:application/json.jobs.recent[].error<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.jobs.recent[].exitCode:required": true,
     "response:200:application/json.jobs.recent[].exitCode<anyOf:0>": {
       "type": "integer"
     },
     "response:200:application/json.jobs.recent[].exitCode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].finishedAt:required": true,
+    "response:200:application/json.jobs.recent[].finishedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].finishedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].flush:required": true,
+    "response:200:application/json.jobs.recent[].flush<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].flush<anyOf:0>.completedProjectionJobs": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].flush<anyOf:0>.completedProjectionJobs:required": true,
+    "response:200:application/json.jobs.recent[].flush<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].id": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].id:required": true,
+    "response:200:application/json.jobs.recent[].ingest:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineAdvanced": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineAdvanced:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineAfter:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineAfter<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineBefore:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineBefore<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.baselineBefore<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.duplicateArticles:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.duplicateArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.duplicateArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.newArticles:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.newArticles<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.newArticles<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.outcome:required": true,
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.outcome<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "collected",
+        "empty",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:0>.outcome<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ingest<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].kind": {
+      "type": "string",
+      "enum": [
+        "flush-graph",
+        "retry-model-errors",
+        "ingest-run"
+      ]
+    },
+    "response:200:application/json.jobs.recent[].kind:required": true,
+    "response:200:application/json.jobs.recent[].label": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].label:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.capturedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore:required": true,
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.candidates": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.candidates:required": true,
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.capturedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.capturedAt:required": true,
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.issues": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.issues:required": true,
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.pendingProjections:required": true,
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.pendingProjections<anyOf:0>": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.pendingProjections<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.relations": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.relations:required": true,
+    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:1>": {
       "type": "null"
     },
     "response:200:application/json.jobs.recent[].logTail:required": true,
@@ -369,6 +2918,206 @@
       "type": "boolean"
     },
     "response:200:application/json.jobs.recent[].paid:required": true,
+    "response:200:application/json.jobs.recent[].reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].reason:required": true,
+    "response:200:application/json.jobs.recent[].recovered": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.recent[].recovered:required": true,
+    "response:200:application/json.jobs.recent[].report:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.approved": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.approved:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.collectionErrorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.collectionErrorCount:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.collectionErrors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.collectionErrors:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.collectionErrors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.elapsedSeconds:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.errorCount": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.errorCount:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.errors": {
+      "type": "array"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.errors:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.errors[]": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.executionMode:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.executionMode<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.executionMode<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.held": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.held:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.pending": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.pending:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.processed": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.processed:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.rejected": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.rejected:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.runId:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.runId<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.runId<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.skipped": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.skipped:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.calls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.calls:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.elapsedSeconds": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.elapsedSeconds:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.estimatedCost:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.estimatedCost<anyOf:0>": {
+      "type": "number"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.estimatedCost<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.inputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.inputTokens:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.outputTokens": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.outputTokens:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.replayCalls": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage.replayCalls:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:0>.usage:required": true,
+    "response:200:application/json.jobs.recent[].report<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].requestedAt": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].requestedAt:required": true,
+    "response:200:application/json.jobs.recent[].requestedBy": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].requestedBy:required": true,
+    "response:200:application/json.jobs.recent[].retry": {
+      "type": "object"
+    },
+    "response:200:application/json.jobs.recent[].retry.allowed": {
+      "type": "boolean"
+    },
+    "response:200:application/json.jobs.recent[].retry.allowed:required": true,
+    "response:200:application/json.jobs.recent[].retry.blockedBy:required": true,
+    "response:200:application/json.jobs.recent[].retry.blockedBy<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].retry.blockedBy<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].retry.code": {
+      "type": "string",
+      "enum": [
+        "allowed",
+        "succeeded",
+        "in_progress",
+        "superseded",
+        "newer_attempt",
+        "duplicate_running",
+        "other_running",
+        "dataset_missing"
+      ]
+    },
+    "response:200:application/json.jobs.recent[].retry.code:required": true,
+    "response:200:application/json.jobs.recent[].retry.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].retry.reason:required": true,
+    "response:200:application/json.jobs.recent[].retry:required": true,
+    "response:200:application/json.jobs.recent[].retryOf:required": true,
+    "response:200:application/json.jobs.recent[].retryOf<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].retryOf<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].startedAt:required": true,
+    "response:200:application/json.jobs.recent[].startedAt<anyOf:0>": {
+      "type": "string"
+    },
+    "response:200:application/json.jobs.recent[].startedAt<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.jobs.recent[].status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "response:200:application/json.jobs.recent[].status:required": true,
+    "response:200:application/json.jobs.running": {
+      "type": "integer"
+    },
+    "response:200:application/json.jobs.running:required": true,
+    "response:200:application/json.members": {
+      "type": "object"
+    },
+    "response:200:application/json.members.activeGuestSessions": {
+      "type": "integer"
+    },
+    "response:200:application/json.members.activeGuestSessions:required": true,
+    "response:200:application/json.members.activeMemberSessions": {
+      "type": "integer"
+    },
+    "response:200:application/json.members.activeMemberSessions:required": true,
+    "response:200:application/json.members.registered": {
+      "type": "integer"
+    },
+    "response:200:application/json.members.registered:required": true,
+    "response:200:application/json.members.source": {
+      "type": "string",
+      "const": "bff-mock"
+    },
+    "response:200:application/json.members.source:required": true,
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
@@ -424,241 +3173,7 @@
     }
   },
   "changed": {
-    "response:200:application/json.briefings.latest[].date": {
-      "target": {
-        "type": "string",
-        "format": "date"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.briefings.latest[].generatedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.briefings.latest[].publishedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.briefings.latest[].scheduledAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
     "response:200:application/json.generatedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.activatedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.activeVersion<anyOf:0>.activatedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.activeVersion<anyOf:0>.createdAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.graphDb<anyOf:0>.checkedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.graphDb<anyOf:0>.lastCompletedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.graphDb<anyOf:0>.oldestPendingAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.rules[].changedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.graph.rules[].history[].changedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.active<anyOf:0>.finishedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.active<anyOf:0>.kind": {
-      "target": {
-        "type": "string",
-        "enum": [
-          "ingest",
-          "revalidate",
-          "project"
-        ]
-      },
-      "bff": {
-        "type": "string",
-        "enum": [
-          "flush-graph",
-          "retry-model-errors",
-          "ingest-run"
-        ]
-      }
-    },
-    "response:200:application/json.jobs.active<anyOf:0>.ledgerAfter<anyOf:0>.capturedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.active<anyOf:0>.ledgerBefore<anyOf:0>.capturedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.active<anyOf:0>.requestedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.active<anyOf:0>.startedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.recent[].finishedAt<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.recent[].kind": {
-      "target": {
-        "type": "string",
-        "enum": [
-          "ingest",
-          "revalidate",
-          "project"
-        ]
-      },
-      "bff": {
-        "type": "string",
-        "enum": [
-          "flush-graph",
-          "retry-model-errors",
-          "ingest-run"
-        ]
-      }
-    },
-    "response:200:application/json.jobs.recent[].ledgerAfter<anyOf:0>.capturedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.recent[].ledgerBefore<anyOf:0>.capturedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.recent[].requestedAt": {
-      "target": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "bff": {
-        "type": "string"
-      }
-    },
-    "response:200:application/json.jobs.recent[].startedAt<anyOf:0>": {
       "target": {
         "type": "string",
         "format": "date-time"

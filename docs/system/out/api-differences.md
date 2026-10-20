@@ -49,7 +49,7 @@
 | getAdminSession | /api/v1/admin/auth/session | /api/admin/auth/session | 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | logInAdmin | /api/v1/admin/auth/login | /api/admin/auth/login | 목표만 198 · BFF만 6 · 형식/필수/권한 변경 5 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. |
 | logOutAdmin | /api/v1/admin/auth/logout | /api/admin/auth/logout | 목표만 162 · BFF만 0 · 형식/필수/권한 변경 1 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 모의 인증 제공자/개발용 동의 경로는 목표 계약에서 제외한다. 실제 제공자 검증이 필요하다. / 목표는 활성 관리자 세션의 Origin/조건부 CSRF 검증, 무세션 반복204 및 관리자/회원 쿠키 분리를 요구한다. 현재 BFF의 목표 보안 구현 완료를 뜻하지 않는다. |
-| getAdminDashboard | /api/v1/admin/dashboard | /api/admin/dashboard | 목표만 114 · BFF만 59 · 형식/필수/권한 변경 31 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| getAdminDashboard | /api/v1/admin/dashboard | /api/admin/dashboard | 목표만 695 · BFF만 633 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listAuditRecords | /api/v1/admin/audit-log | /api/admin/audit-log | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 11 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | getPipelineOverview | /api/v1/admin/pipeline/overview | /api/admin/pipeline/overview | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | listAnalysisCandidates | /api/v1/admin/pipeline/candidates | /api/admin/pipeline/candidates | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
