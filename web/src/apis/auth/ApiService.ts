@@ -23,6 +23,43 @@ type ErrorBody = {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+// 로그인·가입 화면은 차단 응답을 폼 안에서 안내한다. 관리자 세션은 회원 세션과 따로 처리한다.
+const INLINE_BLOCKED = new Set([
+  '/api/v1/auth/login',
+  '/api/v1/auth/signup',
+  '/api/v1/auth/social/signup',
+]);
+const BLOCKED_NOTICE_PATH = '/login?notice=blocked';
+
+/** 차단 안내로 이동한다. 새로 불러와 화면에 남은 개인 자료도 함께 비운다. 테스트에서 바꿔 끼운다. */
+export const sessionNavigation = {
+  toBlockedNotice: () => window.location.assign(BLOCKED_NOTICE_PATH),
+};
+
+let blockedHandling = false;
+
+function handlesBlocked(api: string) {
+  const path = api.split('?')[0];
+  return !INLINE_BLOCKED.has(path) && !path.startsWith('/api/v1/admin');
+}
+
+/** 사용 중 차단: 서버 세션을 끊고, 개인 상태를 비운 뒤 시작 화면에서 안내한다. */
+async function endBlockedSession() {
+  if (blockedHandling) return;
+  blockedHandling = true;
+  try {
+    // 차단된 세션은 모든 요청을 거절하므로 쿠키를 끊어 둔다. 실패해도 화면 정리는 계속한다.
+    await fetch(
+      `${API_BASE_URL}/api/v1/auth/logout`,
+      createRequestOptions('POST', undefined),
+    ).catch(() => undefined);
+    useAuthStore.getState().clearSession();
+    sessionNavigation.toBlockedNotice();
+  } finally {
+    blockedHandling = false;
+  }
+}
+
 /** 목표 계약의 오류 응답 `{ error: { code, message, details } }`를 담는다. */
 export class ApiError extends Error {
   readonly status: number;
@@ -115,6 +152,12 @@ export async function call<TResponse = unknown>(
   }
 
   if (!response.ok) {
+    const error = await toApiError(response);
+    // 차단은 CSRF가 남아 있을 때 서버 세션부터 끊어야 하므로 세션 만료 처리보다 먼저 한다.
+    if (error.code === 'MEMBER_BLOCKED' && handlesBlocked(api)) {
+      await endBlockedSession();
+      throw error;
+    }
     // 세션이 끝났으면 화면의 로그인 상태를 비운다. 이동은 보호 라우트가 맡는다.
     if (
       response.status === 401 &&
@@ -123,7 +166,7 @@ export async function call<TResponse = unknown>(
     ) {
       useAuthStore.getState().clearSession();
     }
-    throw await toApiError(response);
+    throw error;
   }
 
   if (response.status === 204) {
