@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:87 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:87 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:219 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — 관리자 인증 및 접근 제어: 서버에서 유효한 인증과 현재 승인된 관리자 권한을 확인한 계정만 허용된 관리자 화면·조회·변경 기능에 접근한다. 인증 만료 또는 현재 권한 상실이 확인되면 보호 정보와 관리 조치를 차단한다. 실제 지원할 인증 방식·권한 등급은 별도 확정한다.
+- [docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv:219 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv) — 관리자 인증 및 접근 제어: 서버에서 유효한 인증과 현재 승인된 관리자 권한을 확인한 계정만 허용된 관리자 화면·조회·변경 기능에 접근한다. 인증 만료 또는 현재 권한 상실이 확인되면 보호 정보와 관리 조치를 차단한다. 실제 지원할 인증 방식·권한 등급은 별도 확정한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:289 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

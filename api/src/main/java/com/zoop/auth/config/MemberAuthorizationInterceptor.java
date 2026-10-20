@@ -8,6 +8,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /** Enforces member identity at the HTTP boundary for personal and question endpoints. */
@@ -22,6 +23,15 @@ public class MemberAuthorizationInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (CorsUtils.isPreFlightRequest(request)) {
+            return true;
+        }
+        request.setAttribute(PRINCIPAL_ATTRIBUTE, sessions.requireMember(sessionToken(request)));
+        return true;
+    }
+
+    /** The single session cookie value, null when absent; two session cookies are refused as ambiguous. */
+    public static String sessionToken(HttpServletRequest request) {
         String token = null;
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
@@ -33,7 +43,6 @@ public class MemberAuthorizationInterceptor implements HandlerInterceptor {
                 }
             }
         }
-        request.setAttribute(PRINCIPAL_ATTRIBUTE, sessions.requireMember(token));
-        return true;
+        return token;
     }
 }

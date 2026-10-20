@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:47 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:47 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/06-기업-상세-타임라인.csv) — 종목 목록·검색 및 상세 진입: 사용자는 상단 메뉴의 종목을 선택해 MVP 분석 대상 종목 목록을 확인할 수 있어야 한다. 사용자는 기업명 또는 티커로 종목을 검색하고, 목록 또는 검색 결과에서 종목을 선택해 해당 기업 상세 페이지로 이동할 수 있어야 한다. 관심 종목 추가·해제를 할 수 있다.
+- [docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv:9 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/06-기업-상세-타임라인.csv) — 종목 목록·검색 및 상세 진입: 사용자는 상단 메뉴의 종목을 선택해 MVP 분석 대상 종목 목록을 확인할 수 있어야 한다. 사용자는 기업명 또는 티커로 종목을 검색하고, 목록 또는 검색 결과에서 종목을 선택해 해당 기업 상세 페이지로 이동할 수 있어야 한다. 관심 종목 추가·해제를 할 수 있다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:102 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

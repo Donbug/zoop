@@ -38,7 +38,7 @@ authority:
   ai: {sequence: "설계 먼저", additionalApiResearch: true, liveBudget: "미정", modelConfiguration: ".env", executionApproval: "별도"}
 detailAuthority:
   decisionId: "user-2026-10-10-feedback"
-  basis: "팀 보고: 목차의 FS017~027 영역이 메인그래프 v2로, AI 목차가 v2 FS045~051 7행으로 정리됐고 옛 AI 행 4개가 줄었다. 실제 관측: 목차 B27:B37=메인그래프 v2, AI 목차 7행·옛 ID 5개 삭제·FS050 신규, 목차 98개. 옛 `메인 그래프`/`AI 챗봇` 탭과 `변경 내역` 시트는 그대로 남았다. 10-12 재수집(functional-spec_2026-10-12 XLSX)에서도 옛 두 탭은 삭제되지 않고 숨김(sheet_state=hidden) 상태로 남아 있으며 이력 정의의 출처 파일·행은 10-10과 같다. 10-10 이후 상세 시트의 변경은 작업자가 공유 시트에 기록한 브리핑 B134·기업 상세 B56·변경 내역 A63:F66뿐이다."
+  basis: "팀 보고: 목차의 FS017~027 영역이 메인그래프 v2로, AI 목차가 v2 FS045~051 7행으로 정리됐고 옛 AI 행 4개가 줄었다. 실제 관측: 목차 B27:B37=메인그래프 v2, AI 목차 7행·옛 ID 5개 삭제·FS050 신규, 목차 98개. 옛 `메인 그래프`/`AI 챗봇` 탭과 `변경 내역` 시트는 그대로 남았다. 10-12 재수집(functional-spec_2026-10-12 XLSX)에서도 옛 두 탭은 삭제되지 않고 숨김(sheet_state=hidden) 상태로 남아 있으며 이력 정의의 출처 파일·행은 10-10과 같다. 10-10 이후 상세 시트의 변경은 작업자가 공유 시트에 기록한 브리핑 B134·기업 상세 B56·변경 내역 A63:F66뿐이다. 2026-10-18 22:04(KST) 재수집(functional-spec_2026-10-18)에서 옛 `메인 그래프`/`AI 챗봇` 두 탭은 공유 원본에서 삭제되어 시트 목록에 없다(팀 결정). 10-12까지 숨김 상태로 남아 있던 기록은 그대로 두고, 두 탭의 이력 정의와 의미 이행은 탭이 마지막으로 남아 있던 functional-spec_2026-10-12 고정본의 CSV에서 계속 읽는다(sourceCapture)."
   historicalSheets:
     - file: "03-메인-그래프.csv"
       sheet: "메인 그래프"
@@ -46,11 +46,19 @@ detailAuthority:
       sameIdMeaning: true
       specIds: ["FS017", "FS018", "FS019", "FS020", "FS021", "FS022", "FS023", "FS024", "FS025", "FS026", "FS027"]
       reason: "목차가 FS017~027의 영역을 `메인그래프 v2`로 가리키므로 04를 유효 상세로, 03을 보존된 이력 정의로 둔다. 원문 탭을 지우거나 수정하지 않는다."
+      sourceCapture: "docs/evidence/raw/functional-spec_2026-10-12"
+      sourceStates:
+        - {capture: "docs/evidence/raw/functional-spec_2026-10-12", state: "hidden", note: "sheet_state=hidden, 이력 정의 출처"}
+        - {capture: "docs/evidence/raw/functional-spec_2026-10-18", state: "deleted", observedAt: "2026-10-18T22:04:24+09:00", note: "공유 원본에서 탭 삭제(팀 결정). 이력 정의는 sourceCapture에서 읽는다."}
     - file: "07-AI-챗봇.csv"
       sheet: "AI 챗봇"
       supersededBy: "08-AI-챗봇-v2.csv"
       specIds: ["FS045", "FS046", "FS047", "FS048", "FS049", "FS050-01", "FS050-02", "FS051", "FS052-01", "FS052-02", "FS053"]
       reason: "목차의 AI 행이 v2 FS045~051 7개로 바뀌었다. ID 046~051은 옛 의미와 다르므로 번호 일치로 옛 정의를 현재 정의의 대체 증거로 쓰지 않는다. 옛 11개 정의는 의미별 이행표로 보존한다."
+      sourceCapture: "docs/evidence/raw/functional-spec_2026-10-12"
+      sourceStates:
+        - {capture: "docs/evidence/raw/functional-spec_2026-10-12", state: "hidden", note: "sheet_state=hidden, 이력 정의 출처"}
+        - {capture: "docs/evidence/raw/functional-spec_2026-10-18", state: "deleted", observedAt: "2026-10-18T22:04:24+09:00", note: "공유 원본에서 탭 삭제(팀 결정). 이력 정의는 sourceCapture에서 읽는다."}
   historicalOnlySpecIds: ["FS050-01", "FS050-02", "FS052-01", "FS052-02", "FS053"]
   rawIdCorrections: []
   resolvedRawIdCorrections:

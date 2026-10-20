@@ -99,6 +99,12 @@ def detail_authority(specs: dict, links: dict, api: dict, requirements: dict, fi
                         invalid(rid, f"이력 시트 {sheet['file']} {d['source']['row']}행의 정의에 의미 이행 항목(legacyAiMeaning)이 없다. 번호 일치로 현재 ID에 연결하지 않는다.")
         if sheet["file"] not in current_files or sheet["supersededBy"] not in current_files:
             invalid(sheet["file"], "이력 시트 또는 대체 시트가 현재 고정본 상세에 없다.")
+        if sheet.get("sourceCapture"):
+            # 원본에서 삭제된 이력 탭은 선언한 이전 고정본에서만 읽어야 한다. 다른 수집본의 같은 이름 파일로 바뀌지 않게 한다.
+            paths = {Path(d["source"]["path"]).parent.as_posix() for rec in specs.values() for d in rec["definitions"]
+                     if definition_file(d) == sheet["file"]}
+            if paths != {sheet["sourceCapture"]}:
+                invalid(sheet["file"], f"이력 시트의 출처 고정본이 선언({sheet['sourceCapture']})과 다르다: {sorted(paths)}")
         for rid in sheet["specIds"]:
             files = [definition_file(d) for d in specs[rid]["definitions"]] if rid in specs else []
             if sheet["file"] not in files:

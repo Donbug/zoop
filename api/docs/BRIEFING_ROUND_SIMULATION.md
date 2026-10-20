@@ -85,3 +85,12 @@ SHA는 UTF-8, 정렬된 JSON object key, 공백 없는 구분자, Unicode 원문
 ```sh
 python3 -m unittest discover -s scripts/tests -p test_briefing_round_simulation.py -v
 ```
+
+
+## 게시 전 기록 결속과 빈 회차 (2026-10-20)
+
+성공한 호출에는 해시가 일치하는 원 요청/응답과 알려진 usage가 필요하다. importer는 stage·model·회차 identity/context·직전 결과·응답 ID/usage를 대조하고, 최종 생성 items와 검증기에 제출한 draft/checks가 게시 결과와 일치해야 수용한다. 번들/직전 결과 해시만 재계산한 제목·문장·검증결과 치환은 거절한다. 실패/불명 호출은 원래 회계 기록으로 보존하며 성공 근거로 대체하지 않는다.
+
+`EMPTY_CONFIRMED`는 전체 원천의 시각 확인과 회차 커버리지가 확인됐고 선정 결과가 없는 상태다. producer의 `result=null`을 유지하고, importer는 빈 게시 스냅샷(`items=[]`, `emptyReason=no_issues_in_window`)과 커버리지/원천 권한을 보존한다. AI PASS 결과나 생성·검증 호출을 만들지 않는다. 빈 창과 자료가 있지만 미선정인 창 모두 실제 offline producer→PostgreSQL importer 테스트로 검증한다. 시각 미확인 원천이 있으면 빈 확정으로 승격하지 않는다.
+
+뉴스 전용 게시 시각은 최종 생성·검증 receipt 완료 시각 이상으로 결정한다. 시장 보강 시에도 뉴스 검증 시각보다 이르게 만들지 않는다. 동일 번들 재import는 저장된 게시 시각을 변경하지 않는다. 이 규칙은 기존 운영 DB를 자동 수정하는 migration이 아니다.

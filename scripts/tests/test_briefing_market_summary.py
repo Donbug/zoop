@@ -81,6 +81,26 @@ class MarketSummaryTests(unittest.TestCase):
     def client(self, transport):
         return summary.MarketSummaryClient(self.root, transport, max_calls=8)
 
+    def test_structurally_rejected_repair_clears_prior_claims_and_verifier_but_preserves_attempts(self):
+        generations = 0
+        def mutate(stage, result):
+            nonlocal generations
+            if stage == "market_summary_generation":
+                generations += 1
+                if generations == 2:
+                    for claim in result["claims"]:
+                        claim.update(evidenceIds=[], indicatorIds=["kospi"])
+        transport = Transport(fail=True, mutate=mutate)
+        result = summary.generate_market_summary(self.client(transport), data())
+        self.assertEqual("WITHHELD", result["verification"]["status"])
+        self.assertEqual([], result["claims"])
+        self.assertIsNone(result["verificationRequestDigest"])
+        self.assertIsNone(result["summary"])
+        self.assertEqual(2, len(result["attempts"]))
+        self.assertIn("verificationRequestDigest", result["attempts"][0])
+        self.assertEqual(3, len(result["usage"]))
+        self.assertEqual(3, len(transport.requests))
+
     def test_separate_model_verification_and_public_aggregation(self):
         transport = Transport()
         result = summary.generate_market_summary(self.client(transport), data())

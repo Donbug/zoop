@@ -55,3 +55,8 @@ python3 scripts/briefing_market_enrichment.py \
 ## 생성 Swagger의 union 스키마
 
 `BriefingResponse`의 JSON 스냅샷 필드에는 oneOf 참조가 사용된다. 실제 Springdoc 문서가 이 참조만 만들고 AnalysisSummary/MarketVariables/SinceMorning 본문을 누락하는 경우를 방지하기 위해 `BriefingOpenApiConfiguration`에서 문서용 모델과 하위 스키마를 명시적으로 등록한다. Swagger 활성화 정책은 변경하지 않는다. 통합 시험은 실제 `/v3/api-docs`의 reference enum과 모든 로컬 스키마 참조의 해소까지 검사한다.
+
+
+### 보완안의 구조 거절
+
+앞선 초안이 의미 검증에 실패하고 마지막 보완안도 구조 검증에서 거절되면, 최종 claims/checks는 비우고 최종 verificationRequestDigest는 null로 보존한다. 이전 초안·검증과 모든 실제 호출은 attempts/usage 및 원 요청/응답에 남는다. 실패한 마지막 생성안과 앞선 verifier를 하나의 최종 결과로 섞지 않으며, importer는 요약을 unavailable로 제공하고 정상 뉴스까지 보류시키지 않는다. 실제 offline producer→enrichment→PostgreSQL/HTTP 회귀가 이 전이를 검사한다.

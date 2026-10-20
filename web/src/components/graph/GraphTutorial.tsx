@@ -59,25 +59,31 @@ export default function GraphTutorial({
       data-screen-id={current.id}
       aria-label="관계 그래프 튜토리얼"
       aria-live="polite"
-      className="absolute inset-y-0 left-4 z-20 flex w-[274px] flex-col border border-panel-line bg-white font-panel text-panel-ink shadow-[0_12px_32px_rgb(0_0_0/0.08)]"
+      className="order-first flex w-[260px] shrink-0 flex-col self-start rounded-[6px] border border-panel-line bg-white p-4 font-panel text-panel-ink shadow-[0_0_0_0.5px_rgb(26_26_26/0.08)] max-sm:w-full"
     >
-      <div className="border-b border-panel-line px-5 py-4">
-        <p className="text-[11px] leading-[16.5px] text-panel-muted">
+      <div>
+        <p className="flex items-center gap-1.5 text-[11px] leading-[16.5px] text-panel-muted">
+          <img
+            src="/graph-assets/tutorial-help.svg"
+            width="13"
+            height="13"
+            alt=""
+          />
           튜토리얼 {step}/5
         </p>
         <h2 className="mt-1 text-[17px] leading-[25.5px] font-bold tracking-[-0.25px]">
           {current.title}
         </h2>
       </div>
-      <div className="flex flex-1 flex-col px-5 py-5">
+      <div className="mt-2 flex flex-col">
         <p className="text-[12px] leading-[19px] text-panel-secondary">
           {current.body}
         </p>
-        <p className="mt-4 border-l-2 border-panel-line pl-3 text-[11px] leading-[17px] text-panel-muted">
+        <p className="mt-2 text-[11px] leading-[17px] text-panel-muted">
           {current.tip}
         </p>
-        <div className="mt-auto" aria-label={`전체 5단계 중 ${step}단계`}>
-          <div className="mb-5 grid grid-cols-5 gap-1" aria-hidden="true">
+        <div className="mt-3" aria-label={`전체 5단계 중 ${step}단계`}>
+          <div className="mb-3 grid grid-cols-5 gap-1" aria-hidden="true">
             {steps.map((item, index) => (
               <span
                 key={item.id}
@@ -98,20 +104,18 @@ export default function GraphTutorial({
               )}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {step > 1 ? (
               <button
-                className="h-9 rounded-panel border border-panel-line text-[12px] font-semibold hover:bg-panel-soft"
+                className="h-8 rounded-panel border border-panel-line px-3 text-[12px] font-semibold hover:bg-panel-soft"
                 onClick={() => onStepChange((step - 1) as GraphTutorialStep)}
                 disabled={saving}
               >
                 이전
               </button>
-            ) : (
-              <span />
-            )}
+            ) : null}
             <button
-              className="h-9 rounded-panel bg-panel-ink text-[12px] font-semibold text-white disabled:bg-panel-muted"
+              className="h-8 rounded-panel bg-panel-ink px-3 text-[12px] font-semibold text-white disabled:bg-panel-muted"
               onClick={() =>
                 step === 5
                   ? onFinish()
@@ -121,14 +125,14 @@ export default function GraphTutorial({
             >
               {saving ? '저장 중…' : step === 5 ? '마치기' : '다음'}
             </button>
+            <button
+              className="ml-auto h-8 rounded-panel border border-panel-line px-2 text-[11px] font-semibold text-panel-secondary hover:bg-panel-soft"
+              onClick={onSkip}
+              disabled={saving}
+            >
+              튜토리얼 건너뛰기
+            </button>
           </div>
-          <button
-            className="mt-3 w-full py-2 text-[11px] font-semibold text-panel-secondary underline-offset-2 hover:underline"
-            onClick={onSkip}
-            disabled={saving}
-          >
-            튜토리얼 건너뛰기
-          </button>
         </div>
       </div>
     </aside>

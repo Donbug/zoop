@@ -51,11 +51,26 @@ public final class GraphSnapshotFilter {
                 .filter(r -> !exclusions.relationIds().contains(r.relationId()))
                 .filter(r -> kept.contains(r.source()) && (!"FOLLOWS".equals(r.relationType()) || kept.contains(r.target())))
                 .filter(r -> evidenceIds.containsAll(r.evidenceIds()))
-                .filter(r -> asOf == null || !"STRUCTURALLY_RELATED_TO".equals(r.relationType())
-                        || r.basis().stream().anyMatch(b -> !Instant.parse(b.verifiedAt()).isAfter(asOf)))
+                .map(r -> verifiedBasisOnly(r, asOf))
+                .filter(r -> !"STRUCTURALLY_RELATED_TO".equals(r.relationType()) || !r.basis().isEmpty())
                 .toList();
         return new PublicGraphSnapshot(s.snapshotFormat(), s.versionId(), s.sourceBundleId(), s.companies(), issues,
                 relations, s.articles().stream().filter(a -> articles.contains(articleKey(a))).toList(), evidence);
+    }
+
+    /**
+     * FS042 visibility: a structural basis counts once it was verified by asOf. Its validity dates never hide it; a
+     * not-yet-started or ended business relation stays visible and is told apart by its status, not removed.
+     */
+    /** At asOf a relation carries only the bases verified by then, so later bases never leak into details or status. */
+    private static Relation verifiedBasisOnly(Relation r, Instant asOf) {
+        if (asOf == null || !"STRUCTURALLY_RELATED_TO".equals(r.relationType())) return r;
+        return new Relation(r.relationId(), r.relationType(), r.source(), r.target(), r.role(), r.assertionStatus(),
+                r.evidenceIds(), r.basis().stream().filter(b -> verifiedBy(b, asOf)).toList());
+    }
+
+    static boolean verifiedBy(PublicGraphSnapshot.Basis b, Instant asOf) {
+        return !Instant.parse(b.verifiedAt()).isAfter(asOf);
     }
 
     /**
@@ -71,9 +86,11 @@ public final class GraphSnapshotFilter {
     }
 
     private static Issue withEvidence(Issue i, Set<String> evidenceIds) {
-        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.action(), i.target(), i.geography(),
-                i.geographyPolicyVersion(), i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(),
-                i.articleIds(), i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.latestPublishedAt());
+        return new Issue(i.issueId(), i.label(), i.eventTime(), i.timePrecision(), i.period(), i.assertionStatus(),
+                i.action(), i.target(), i.geography(), i.geographyPolicyVersion(),
+                i.geographyEvidenceIds().stream().filter(evidenceIds::contains).toList(), i.articleIds(),
+                i.evidenceIds().stream().filter(evidenceIds::contains).toList(), i.mentions(),
+                i.representativeMentionId(), i.latestPublishedAt());
     }
 
     private static String articleKey(Article a) {

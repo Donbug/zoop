@@ -249,6 +249,8 @@ def generate_market_summary(client, data, max_repairs=1):
             try:
                 claims = _validate_draft(draft, evidence, indicators)
             except MarketSummaryError as error:
+                # No final draft was structurally accepted in this attempt. Earlier paid attempts stay in attempts/usage.
+                claims, verification_key = [], None
                 last_validation = {"status": "WITHHELD", "checks": [], "reason": str(error)}
                 attempts.append({"attempt": attempt, "generationRequestDigest": generation_key, "verification": last_validation})
                 continue

@@ -18,9 +18,9 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:74 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:74 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
-- [docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/11-AI-평가-관리자.csv) — AI 기능별 선호도 조회: 관리자가 AI 답변·뉴스 요약·브리핑별로 현재 유효한 좋아요·싫어요 건수와 좋아요 비율을 조회한다. 결과는 평가에 참여한 회원의 해당 결과 버전별 선호도이며, 전체 이용자의 의견이나 모델의 사실 정확도·성능을 직접 나타내는 수치로 해석하지 않는다.
+- [docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv:37 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/11-AI-평가-관리자.csv) — AI 기능별 선호도 조회: 관리자가 AI 답변·뉴스 요약·브리핑별로 현재 유효한 좋아요·싫어요 건수와 좋아요 비율을 조회한다. 결과는 평가에 참여한 회원의 해당 결과 버전별 선호도이며, 전체 이용자의 의견이나 모델의 사실 정확도·성능을 직접 나타내는 수치로 해석하지 않는다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:50 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 

@@ -18,10 +18,10 @@
 
 ## 원본과 의미
 
-[docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv:30 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/00-명세-목차.csv)
+[docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv:30 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/00-명세-목차.csv)
 
+- [docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv:53 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-18/04-메인그래프-v2.csv) — 기업 노드 정보: 사용자가 기업 노드를 선택하면 해당 기업의 기본 정보, 시세, 주요 재무, AI 요약, 관련 이슈, 관련 기업을 정보 패널에 표시한다. 관련 이슈에는 국내·국제 속성을 표시하고 관련 뉴스 요약 및 근거 자료로 이동할 수 있도록 한다.
 - [이력 정의] [docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv:51 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/03-메인-그래프.csv) — 기업 노드 정보: 사용자가 선택한 기업의 현황과 관련 이슈를 빠르게 이해할 수 있도록 기업 정보 패널을 제공.기업의 기본 정보, 시세, 주요 재무 정보, AI 요약, 직접·간접 이슈 및 관련 기업을 표시하고, 상세 정보는 기업 상세페이지에서 확인할 수 있어야 한다.
-- [docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv:53 (xlsx-row)](../../../docs/evidence/raw/functional-spec_2026-10-12/04-메인그래프-v2.csv) — 기업 노드 정보: 사용자가 기업 노드를 선택하면 해당 기업의 기본 정보, 시세, 주요 재무, AI 요약, 관련 이슈, 관련 기업을 정보 패널에 표시한다. 관련 이슈에는 국내·국제 속성을 표시하고 관련 뉴스 요약 및 근거 자료로 이동할 수 있도록 한다.
 
 문서 판정 출처: [docs/evidence/spec-v1.2-gap.md:103 (text-line)](../../../docs/evidence/spec-v1.2-gap.md). 기준선에 반영 현황의 마지막 행을 적용한 판정이며 번호가 재사용된 AI ID는 의미 이행표가 정한 곳에만 적용한다. 이번 생성기의 실행 검증은 아니다.
 
