@@ -63,14 +63,14 @@
 
 ## 3. 완료 결과 표시
 
-`ChatResult.answerBasis`는 서버가 계획·검증 결과로 정하며 UI가 추측하지 않는다.
+`ChatResult.answerBasis`는 서버가 `sections`에서 계산하며 UI가 추측하지 않는다. 결과 상단 배지는 `answerBasis`, 본문은 `sections`를 순서대로 렌더링하고 각 구간에 아래 배지를 붙인다. `answer` 문자열을 잘라 구간을 추정하지 않는다.
 
-| answerBasis | 사용자 표시 |
+| answerBasis·구간 basis | 사용자 표시 |
 | --- | --- |
-| `general_knowledge` | “일반 개념” 배지와 `일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.` 안내. 출처 영역을 만들지 않음 |
+| `general_knowledge` | “일반 개념” 배지. 고정 안내 문장은 서버가 구간 text 맨 앞에 넣었으므로 UI가 다시 붙이지 않는다. 이 구간에는 인용·출처를 연결하지 않음 |
 | `zoop_documented` | “ZOOP 안내” 배지와 사용한 도움말·정책 버전 표시 |
 | `evidence_grounded` | “근거 확인됨” 배지, 기준 시점과 인용·원문 열기 제공 |
-| `mixed` | 일반 설명과 근거 기반 현재 사실의 경계를 본문에서 분리하고 사실 주장에만 인용 연결 |
+| `mixed` | 결과 배지만 해당한다. 본문은 구간별 배지로 일반 설명과 근거 기반 사실의 경계를 보여 주고, 인용은 각 구간의 `evidenceIds`에만 연결한다 |
 | `none` | 확인 질문·안내·근거 부족 결과. 근거 검증 배지를 표시하지 않음 |
 
 `sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. `limitations`가 비어 있지 않으면 본문 아래·인용 위에 “답하지 않은 부분” 영역을 두고 항목마다 `label`과 `message`를 표시한다. 투자 판단 거절, 전제 불충족, 조회 상한, 요구별 근거 부족을 본문 문장에서 추측해 만들지 않고 이 배열만 사용한다. `kind`는 아이콘·스타일 구분에만 쓰고 문구는 `message`를 그대로 쓴다.
@@ -100,9 +100,10 @@
 
 1. `D-AI-01`에서 선택 기업과 질문을 보내면 한 job만 생성되고 새로고침 뒤 `D-AI-02`가 같은 job을 회수한다.
 2. 모호한 “그 기업은 언제?”는 `D-AI-01b`에서 기업 선택을 요구하고, 선택하면 `resolves.choiceId`를 담은 새 job을 만든다. 새 job의 `context`는 원 job과 같고 원 job은 바뀌지 않는다.
-3. Q02 일반 개념은 `general_knowledge`, 고정 안내 문구, 빈 sources/citations로 표시한다.
+3. Q02 일반 개념만 물으면 `answerBasis=general_knowledge`와 구간 하나로 표시하고, 고정 안내 문구는 한 번만 보이며 sources/citations는 비어 있다.
 4. 근거 기반 답변은 모든 인용이 공개 문서 버전과 연결되고 철회 뒤 다시 열 때 노출되지 않는다.
 5. 대화 GET 503은 `D-AI-02b`로 표시되고 “다시 확인”이 새 AI 실행을 만들지 않는다.
 6. 검증 실패·예산 초과·도구 timeout은 부분 답변으로 바뀌지 않는다.
 7. 로그아웃 중 늦게 도착한 응답이 이전 회원 화면이나 cache에 남지 않는다.
 8. “HBM 설명과 지금 살 주식”은 `answered`로 HBM 설명을 표시하고, 매수 판단은 “답하지 않은 부분”에 `investment_advice` 항목의 `label`·`message`로 표시한다.
+9. “HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?”은 `answerBasis=mixed`로 “일반 개념” 구간(고정 안내 + 설명, 인용 없음)과 “근거 확인됨” 구간(뉴스, 인용 연결)을 나눠 표시한다.

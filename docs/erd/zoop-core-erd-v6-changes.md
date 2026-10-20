@@ -11,6 +11,7 @@
 - 테이블 수는 그대로 36개다. 챗봇 첫 migration에 함께 포함한다.
 - 정책 v0.8의 단계·체크포인트에 맞춰 `chat_jobs.route_summary`에 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계)를 저장하도록 내용을 넓혔다. 컬럼 변경은 없다.
 - API `ChatResult.limitations`(`ChatLimitation`)가 추가되어 `chat_jobs.result` JSONB에 함께 저장된다. 컬럼 변경은 없으며 완료 결과 불변 규칙을 그대로 적용한다.
+- API `ChatResult.sections`(`ChatAnswerSection`, 근거 수준별 본문 구간)도 `chat_jobs.result` JSONB에 함께 저장된다. `answerBasis`는 구간에서 계산된 값으로 저장하며 컬럼 변경은 없다.
 
 ## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
 

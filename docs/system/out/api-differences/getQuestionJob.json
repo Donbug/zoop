@@ -138,6 +138,37 @@
       "type": "string"
     },
     "response:200:application/json.result<anyOf:0>.metadata.requestId:required": true,
+    "response:200:application/json.result<anyOf:0>.sections": {
+      "type": "array",
+      "maxItems": 12
+    },
+    "response:200:application/json.result<anyOf:0>.sections:required": true,
+    "response:200:application/json.result<anyOf:0>.sections[]": {
+      "type": "object"
+    },
+    "response:200:application/json.result<anyOf:0>.sections[].basis": {
+      "type": "string",
+      "enum": [
+        "general_knowledge",
+        "zoop_documented",
+        "evidence_grounded"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.sections[].basis:required": true,
+    "response:200:application/json.result<anyOf:0>.sections[].evidenceIds": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true
+    },
+    "response:200:application/json.result<anyOf:0>.sections[].evidenceIds:required": true,
+    "response:200:application/json.result<anyOf:0>.sections[].evidenceIds[]": {
+      "type": "string"
+    },
+    "response:200:application/json.result<anyOf:0>.sections[].text": {
+      "type": "string",
+      "maxLength": 12000
+    },
+    "response:200:application/json.result<anyOf:0>.sections[].text:required": true,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

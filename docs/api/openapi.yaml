@@ -9654,6 +9654,31 @@ components:
       required:
         - "kind"
         - "label"
+    ChatAnswerSection:
+      properties:
+        basis:
+          type: "string"
+          enum:
+            - "general_knowledge"
+            - "zoop_documented"
+            - "evidence_grounded"
+          description: "이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다."
+        text:
+          type: "string"
+          maxLength: 12000
+        evidenceIds:
+          items:
+            type: "string"
+          type: "array"
+          maxItems: 20
+          uniqueItems: true
+          description: "이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다."
+      type: "object"
+      required:
+        - "basis"
+        - "text"
+        - "evidenceIds"
+      description: "answered 본문의 근거 수준별 구간."
     ChatApplied:
       properties:
         companies:
@@ -10069,6 +10094,13 @@ components:
         answer:
           type: "string"
           maxLength: 12000
+          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만든다."
+        sections:
+          items:
+            "$ref": "#/components/schemas/ChatAnswerSection"
+          type: "array"
+          maxItems: 12
+          description: "answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다."
         answerBasis:
           type: "string"
           enum:
@@ -10077,7 +10109,7 @@ components:
             - "evidence_grounded"
             - "mixed"
             - "none"
-          description: "사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다."
+          description: "사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다."
         reason:
           anyOf:
             -
@@ -10128,6 +10160,7 @@ components:
         - "outcome"
         - "messageId"
         - "answer"
+        - "sections"
         - "answerBasis"
         - "reason"
         - "sources"

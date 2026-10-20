@@ -280,17 +280,17 @@
 | BFF_PATH_DIFFERENCE | difference | createConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | createConversation | 목표만 161 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getConversation | 목표 /api/v1/chat/sessions/{id} ↔ BFF /api/chat/sessions/{id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 156 · BFF만 32 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | getConversation | 목표만 166 · BFF만 32 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | getCurrentConversation | 목표 /api/v1/chat/sessions/current ↔ BFF /api/chat/sessions/current |  |
-| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 156 · BFF만 32 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCurrentConversation | 목표만 166 · BFF만 32 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | submitQuestion | 목표 /api/v1/chat/sessions/{id}/jobs ↔ BFF /api/chat/sessions/{id}/jobs |  |
-| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 257 · BFF만 34 · 형식/필수/권한 변경 38 |  |
+| BFF_FIELD_DIFFERENCE | difference | submitQuestion | 목표만 277 · BFF만 34 · 형식/필수/권한 변경 38 |  |
 | BFF_PATH_DIFFERENCE | difference | getQuestionJob | 목표 /api/v1/chat/jobs/{job_id} ↔ BFF /api/chat/jobs/{job_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 173 · BFF만 23 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | getQuestionJob | 목표만 183 · BFF만 23 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | retryQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/retry ↔ BFF /api/chat/jobs/{job_id}/retry |  |
-| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 247 · BFF만 34 · 형식/필수/권한 변경 35 |  |
+| BFF_FIELD_DIFFERENCE | difference | retryQuestionJob | 목표만 267 · BFF만 34 · 형식/필수/권한 변경 35 |  |
 | BFF_PATH_DIFFERENCE | difference | cancelQuestionJob | 목표 /api/v1/chat/jobs/{job_id}/cancel ↔ BFF /api/chat/jobs/{job_id}/cancel |  |
-| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 204 · BFF만 23 · 형식/필수/권한 변경 21 |  |
+| BFF_FIELD_DIFFERENCE | difference | cancelQuestionJob | 목표만 214 · BFF만 23 · 형식/필수/권한 변경 21 |  |
 | BFF_PATH_DIFFERENCE | difference | getAdminSession | 목표 /api/v1/admin/auth/session ↔ BFF /api/admin/auth/session |  |
 | BFF_FIELD_DIFFERENCE | difference | getAdminSession | 목표만 110 · BFF만 2 · 형식/필수/권한 변경 1 |  |
 | BFF_PATH_DIFFERENCE | difference | logInAdmin | 목표 /api/v1/admin/auth/login ↔ BFF /api/admin/auth/login |  |

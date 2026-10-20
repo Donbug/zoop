@@ -3324,6 +3324,18 @@ A candidate a publication rule covers: whether it is on the user graph through t
 | kind | 필수 | string |  |
 | label | 필수 | string |  |
 
+<a id="schema-chatanswersection"></a>
+
+### ChatAnswerSection
+
+answered 본문의 근거 수준별 구간.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. |
+
 <a id="schema-chatapplied"></a>
 
 ### ChatApplied
@@ -3530,8 +3542,9 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string |  |
-| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다. |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만든다. |
+| sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
 | sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
