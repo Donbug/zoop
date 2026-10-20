@@ -7,7 +7,8 @@
 
 Two S2 jobs (two events, one frozen snapshot event with two documents) and two S3 jobs are authored replay: no model, no provider, no original PoC state,
 no network (every CLI subprocess runs under a socket audit hook). Expectations are written by hand from the authored world, never derived from the
-planner under test. `--write-fixture DIR` additionally writes the valid export envelope and negative fixtures the backend import can be tested with.
+planner under test. `--write-fixture DIR` additionally writes the valid export envelope, the hand-written expected original mentions (`expected-mentions.json`),
+the real withheld envelope of a handoff frozen under the earlier bundle schema and negative fixtures the backend import can be tested with.
 Without `--write-package` fresh owned state is always removed; the source ledgers must be byte-identical after every command.
 
 `--write-package DIR` builds the same authored world (synthetic company ids SYNTH:000001/SYNTH:000002) directly in the NEW directory DIR, freezes ONE handoff
@@ -23,6 +24,7 @@ import argparse
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -46,6 +48,14 @@ EVT_A2 = "합성기업이 3분기 공급 계약 체결을 공개했다."
 QB = "합성기업은 4분기 신규 공장 착공을 알렸다."
 GEO_B = "착공은 미국에서 이뤄진다."
 QB3 = "합성투자는 해외 합작 공장 지분을 인수했다."
+ACTION_SNAPSHOT = "공급 계약 재공지"         # what upstream b's snapshot says about document a's mention when the two upstreams disagree about it
+SAME = object()                                # `a2_event_time` default: the second document dates the event like the first one
+# The S2 participants of the authored mentions, each a different mapping case (the canonical registry and the public decisions below decide the rest).
+ISSUER = {"company_id": "SYNTH-1", "name": "합성기업", "role": "issuer"}          # every upstream maps it to co:synth-1 -> KRX:005930, which the bundle publishes
+SUPPLIER = {"company_id": "SYNTH-3", "name": "합성부품", "role": "supplier"}      # every upstream maps it to co:synth-3 -> KRX:000660, which the bundle publishes
+PARTNER = {"company_id": "SYNTH-2", "name": "합성협력", "role": "partner"}        # mapped to co:synth-2, which no public decision carries
+STRANGER = {"company_id": "SYNTH-9", "name": "미등록 법인", "role": "observer"}   # no canonical entry in any upstream
+UNKNOWN = {"company_id": None, "name": "미상 거래처", "role": "counterparty"}      # a name without any company id
 
 
 def korean_date(day: str) -> str:
@@ -80,12 +90,16 @@ REVIEWER = "reviewer-a"                                                         
 # ---------------------------------------------------------------- the authored world (also used by the unit tests) -----------------
 
 def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a2_countries: tuple = ("KR",), dated: bool = False,
-                valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30") -> SimpleNamespace:
+                valid_from: str | None = "2026-01-01", valid_until: str | None = "2026-12-31", event_time: str | None = "2026-09-30",
+                a2_event_time=SAME, snapshot_differs: bool = False) -> SimpleNamespace:
     """The authored world. Variants (each is a REAL ingestion + S2 + S3 world, used by the integrity regressions):
     collide: the two documents of snapshot event-a use the SAME local mention id (S2 scopes member identity by documentVersion + mentionId, so this is legal);
     a2_differs: the second member's title differs (a metadata conflict unless the operator picks a representative); a2_countries: its country field;
     dated: rel-b also holds an eligible SUPPLIES basis whose validity dates are proven ONLY by a sentence in another document (b); `valid_from`/`valid_until`
-    (None = unknown, no sentence, no citation) are that basis's validity and `event_time` is the supply issue's event time in BOTH of its documents."""
+    (None = unknown, no sentence, no citation) are that basis's validity and `event_time` is the supply issue's event time in BOTH of its documents;
+    a2_event_time: the second document's own event time for its mention (default: `event_time`);
+    snapshot_differs: the snapshot upstream b froze says another `action` for document a's mention (`m-a`) than upstream a's own extraction of it, i.e. ONE mention
+    identity carried by two upstreams with different values."""
     kit = RelKit(root)
     valid_text = validity_sentence(valid_from, valid_until) if dated else None
     d1, d2, d3 = kit.ingest("docs", [{"supplier": "supplier-a", "html": page(SUP, INV, EVT_A, GEO_A)},
@@ -93,17 +107,18 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
                                      {"supplier": "supplier-b", "html": page(QB, GEO_B, QB3, *((valid_text,) if valid_text else ())), "published": None}])
     refs = {"a": d1, "a2": d2, "b": d3}
     art = {name: kit.article(ref) for name, ref in refs.items()}
-    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": ["KR"]}
+    m_a = {**kit.mention(art["a"], "m-a", [kit.evidence(art["a"], EVT_A)], event_time=event_time), "countries": ["KR"], "participants": [ISSUER, SUPPLIER, UNKNOWN]}
     second = {} if a2_differs else {"title": "합성 공급 계약"}
-    m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time=event_time,
+    m_a2 = {**kit.mention(art["a2"], "m-a" if collide else "m-a2", [kit.evidence(art["a2"], EVT_A2)], event_time=event_time if a2_event_time is SAME else a2_event_time,
                           **({"title": "합성 공급 계약 체결 공개"} | second)), "countries": list(a2_countries)}
     m_b = {**kit.mention(art["b"], "m-b", [kit.evidence(art["b"], QB)], period="2026Q4", title="합성 공장 착공", action="공장 착공 알림", event_time="2026-11-15"),
-           "countries": ["US"]}
+           "countries": ["US"], "participants": [ISSUER, PARTNER, STRANGER]}
     m_b3 = {**kit.mention(art["b"], "m-b3", [kit.evidence(art["b"], QB3)], period="2026Q4", title="해외 합작 공장 지분 인수", action="지분 인수"), "countries": []}
     s2a = kit.job("run", kit.submit("s2-a", d1), replay=kit.replay("s2a").extract(art["a"], [m_a]).write())
     assert s2a["state"] == "ready", s2a.get("failure")
-    event_a = kit.event("event-a", [(d1, m_a), (d2, m_a2)])
-    members = [(d1, art["a"], m_a), (d2, art["a2"], m_a2)]
+    m_a_snapshot = {**m_a, "action": ACTION_SNAPSHOT} if snapshot_differs else m_a
+    event_a = kit.event("event-a", [(d1, m_a_snapshot), (d2, m_a2)])
+    members = [(d1, art["a"], m_a_snapshot), (d2, art["a2"], m_a2)]
     replay_b = (kit.replay("s2b").extract(art["b"], [m_b, m_b3])
                 .compare(m_b, "event-a", members, art["b"], "FOLLOWS", "후속 착공", [kit.evidence(art["b"], QB), kit.evidence(art["a"], EVT_A)])
                 .compare(m_b3, "event-a", members, art["b"], "DIFFERENT", "다른 사건", []).write())
@@ -112,7 +127,7 @@ def build_world(root: Path, *, collide: bool = False, a2_differs: bool = True, a
     evc = {"a": s2a["eventCandidates"][0]["eventCandidateId"],
            "b": next(c["eventCandidateId"] for c in s2b["eventCandidates"] if c["localMentionId"] == "m-b"),
            "b3": next(c["eventCandidateId"] for c in s2b["eventCandidates"] if c["localMentionId"] == "m-b3")}
-    world = SimpleNamespace(kit=kit, refs=refs, art=art, s2={"a": s2a, "b": s2b}, evc=evc, root=root, collide=collide)
+    world = SimpleNamespace(kit=kit, refs=refs, art=art, s2={"a": s2a, "b": s2b}, evc=evc, root=root, collide=collide, a2_differs=a2_differs)
     wa, wb = (SimpleNamespace(kit=kit, refs=refs, art=art, s2=s2) for s2 in (s2a, s2b))
     cite = lambda w, name, text: world_cite(w, name, text)  # noqa: E731
     jobs = {
@@ -140,10 +155,10 @@ def upstream(world, name: str) -> dict:
     return {"jobId": world.s2[name]["jobId"], "inputDigest": world.s2[name]["inputDigest"]}
 
 
-def canonical_doc(world) -> dict:
+def canonical_doc(world, *, b_supplier: str = "co:synth-3") -> dict:
     mapping = [("a", "company", "SYNTH-1", "co:synth-1"), ("a", "company", "SYNTH-3", "co:synth-3"), ("a", "company", "SYNTH-4", "co:synth-4"),
                ("a", "event", world.evc["a"], "issue:supply"),
-               ("b", "company", "SYNTH-1", "co:synth-1"), ("b", "company", "SYNTH-2", "co:synth-2"), ("b", "company", "SYNTH-3", "co:synth-3"),
+               ("b", "company", "SYNTH-1", "co:synth-1"), ("b", "company", "SYNTH-2", "co:synth-2"), ("b", "company", "SYNTH-3", b_supplier),
                ("b", "event", "event-a", "issue:supply"), ("b", "event", world.evc["b"], "issue:factory"), ("b", "event", world.evc["b3"], "issue:overseas")]
     return {"schemaVersion": "zoop-graph-canonical-1",
             "entries": [{"upstream": upstream(world, s2), "kind": kind, "ref": ref, "canonicalId": cid, "decisionRef": f"canon-2026-10-16:{kind}"} for s2, kind, ref, cid in mapping]}
@@ -308,6 +323,52 @@ def expected(world, public_ids: dict | None = None) -> dict:
         "counts": {"companies": 2, "issues": 2, "relations": {"INVOLVES": 2, "STRUCTURALLY_RELATED_TO": 1, "FOLLOWS": 1}, "evidence": 6, "articles": 3, "exclusions": 3}}
 
 
+def expected_mentions(world, public_ids: dict | None = None, *, suppliers_agree: bool = True) -> dict:
+    """Hand-written original mentions of each public issue of the authored world: the S2 values exactly as authored (never verified), the app article/evidence ids
+    the operator's bindings give, ascending by (document, version, local mention id). A participant's `companyId` is its public company ONLY where every upstream
+    carrying the mention maps it to that one company and the bundle publishes it: SYNTH-1 and SYNTH-3 (both upstreams, both published) are mapped; SYNTH-2 (no
+    public decision), SYNTH-9 (no canonical entry) and the participant without a company id are null. `suppliers_agree=False` is the world whose operator maps
+    upstream b's SYNTH-3 to another company than upstream a does: that one participant is then null as well."""
+    pub = lambda company: (public_ids or {}).get(company, company)  # noqa: E731
+    issuer = {"sourceCompanyId": "SYNTH-1", "companyId": pub("KRX:005930"), "name": "합성기업", "role": "issuer"}
+    supplier = {"sourceCompanyId": "SYNTH-3", "companyId": pub("KRX:000660") if suppliers_agree else None, "name": "합성부품", "role": "supplier"}
+    unknown = {"sourceCompanyId": None, "companyId": None, "name": "미상 거래처", "role": "counterparty"}
+    partner = {"sourceCompanyId": "SYNTH-2", "companyId": None, "name": "합성협력", "role": "partner"}
+    stranger = {"sourceCompanyId": "SYNTH-9", "companyId": None, "name": "미등록 법인", "role": "observer"}
+
+    def mention(name, mention_id, quote, *, title, action, event_time, period, participants):
+        ref = world.refs[name]
+        return {"documentId": ref["documentId"], "documentVersion": ref["documentVersion"], "mentionId": mention_id, "articleId": ref["documentId"],
+                "articleVersion": ref["documentVersion"], "verification": "none", "title": title, "action": action, "target": "공급 계약", "eventTime": event_time,
+                "timePrecision": "day", "period": period, "assertionStatus": "announced", "background": False, "participants": participants,
+                "evidenceIds": [evidence_id(world, name, quote)]}
+
+    order = lambda items: sorted(items, key=lambda m: (m["documentId"], m["documentVersion"], m["mentionId"]))  # noqa: E731
+    supply = [mention("a", "m-a", EVT_A, title="합성 공급 계약", action="공급 계약 발표", event_time="2026-09-30", period="2026Q3", participants=[issuer, supplier, unknown]),
+              mention("a2", "m-a" if world.collide else "m-a2", EVT_A2, title="합성 공급 계약 체결 공개" if world.a2_differs else "합성 공급 계약", action="공급 계약 발표",
+                      event_time="2026-09-30", period="2026Q3", participants=[issuer])]
+    factory = [mention("b", "m-b", QB, title="합성 공장 착공", action="공장 착공 알림", event_time="2026-11-15", period="2026Q4", participants=[issuer, partner, stranger])]
+    return {"issue:supply-2026q3": order(supply), "issue:factory-2026q4": order(factory)}
+
+
+def assert_mentions_reachable(bundle: dict) -> None:
+    """Every mention's article and evidence can be followed inside the bundle, each evidence is on that mention's own article, and an issue's evidence is exactly
+    the union of its mentions' evidence and its geography evidence."""
+    evidence = {e["id"]: e for e in bundle["evidence"]}
+    articles = {(a["articleId"], a["articleVersion"]): a for a in bundle["articles"]}
+    for issue in bundle["issues"]:
+        union = set(issue["geography"]["evidenceIds"])
+        assert issue["mentions"], issue["id"]
+        for m in issue["mentions"]:
+            article = articles[(m["articleId"], m["articleVersion"])]
+            assert (article["documentId"], article["documentVersion"]) == (m["documentId"], m["documentVersion"]), (issue["id"], m["mentionId"])
+            assert m["evidenceIds"], (issue["id"], m["mentionId"])
+            for ident in m["evidenceIds"]:
+                assert (evidence[ident]["articleId"], evidence[ident]["articleVersion"]) == (m["articleId"], m["articleVersion"]), (issue["id"], ident)
+                union.add(ident)
+        assert union == set(issue["evidenceIds"]), issue["id"]
+
+
 def check_export(world, out: dict, public_ids: dict | None = None) -> None:
     """The exported envelope equals the hand-written expectation exactly."""
     want, bundle = expected(world, public_ids), out["bundle"]
@@ -315,6 +376,8 @@ def check_export(world, out: dict, public_ids: dict | None = None) -> None:
     assert [x["id"] for x in bundle["evidence"]] == want["evidence"], [x["id"] for x in bundle["evidence"]]
     assert {i["id"]: {"canonicalId": i["canonicalId"], "title": i["title"], "eventTime": i["eventTime"], "timePrecision": i["timePrecision"],
                       "geography": i["geography"]["value"], "evidenceIds": i["evidenceIds"]} for i in bundle["issues"]} == want["issues"]
+    assert {i["id"]: i["mentions"] for i in bundle["issues"]} == expected_mentions(world, public_ids)
+    assert_mentions_reachable(bundle)
     assert {(r["type"], r["source"], r["target"]): r["evidenceIds"] for r in bundle["relations"]} == want["relations"]
     structural = next(r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO")
     assert [b["evidenceIds"] for b in structural["basis"]] == [want["basisEvidence"]] and structural["basis"][0]["relationType"] == "SUPPLIES"
@@ -350,14 +413,16 @@ class Operator:
         self.state = self.root / "handoff"
         self.outputs: list[str] = []
 
-    def cli(self, command: str, request: dict, *, expected: int = 0, hook: str | None = None, state: Path | None = None):
+    def cli(self, command: str, request: dict, *, expected: int = 0, hook: str | None = None, state: Path | None = None, absent: bool = False):
+        """`absent`: every source ledger, grant registry and operator file path names something that does not exist (a command that touches any of them fails)."""
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
         program = GUARD + (HOOKS[hook] if hook else "") + "runpy.run_module('zoop_ai_pipeline.handoff_cli', run_name='__main__')\n"
         argv = [sys.executable, "-c", program, command, "--state-dir", str(state or self.state)]
         if command in {"freeze", "export"}:
-            argv += ["--relation-state-dir", str(self.root / "relation"), "--extraction-state-dir", str(self.root / "extraction"),
-                     "--ingestion-state-dir", str(self.root / "ingestion"), "--sources", str(self.world.kit.registry_path),
-                     "--canonical", str(self.root / "canonical.json"), "--decisions", str(self.root / "decisions.json"), "--bindings", str(self.root / "bindings.json")]
+            base = self.root / "absent" if absent else self.root
+            argv += ["--relation-state-dir", str(base / "relation"), "--extraction-state-dir", str(base / "extraction"),
+                     "--ingestion-state-dir", str(base / "ingestion"), "--sources", str(base / "sources.json" if absent else self.world.kit.registry_path),
+                     "--canonical", str(base / "canonical.json"), "--decisions", str(base / "decisions.json"), "--bindings", str(base / "bindings.json")]
         child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=300)
         text = child.stdout.decode()
         self.outputs.append(text)
@@ -408,7 +473,169 @@ def collision_export(root: Path, public_ids: dict | None = None) -> tuple[Simple
     assert {(e["documentId"], e["mentionId"]) for e in supply["sourceEvents"]} == {(world.refs[name]["documentId"], "m-a") for name in ("a", "a2")}, supply["sourceEvents"]
     assert supply["representative"]["mentionId"] == "m-a" and supply["representative"]["documentId"] == world.refs["a"]["documentId"], supply["representative"]
     assert evidence_id(world, "a2", EVT_A2) in supply["evidenceIds"], "the second document's evidence was dropped"
+    assert {i["id"]: i["mentions"] for i in out["bundle"]["issues"]} == expected_mentions(world, public_ids)
+    assert sorted((m["documentId"], m["mentionId"]) for m in supply["mentions"]) == sorted((world.refs[name]["documentId"], "m-a") for name in ("a", "a2")), \
+        "three source events, two mention identities: the local id repeats, the (document, version, local id) identity does not"
+    assert_mentions_reachable(out["bundle"])
     return world, out
+
+
+def mention_exclusions(root: Path) -> str:
+    """Two mention defects exclude the WHOLE issue, visibly (code and id only), instead of publishing one of several values or guessing a time. Both worlds are real
+    ingestion + S2 + S3 worlds through the installed CLI: (1) ONE mention identity (document a, `m-a`) carried by two upstreams that disagree about its action: no value
+    is chosen, merged or overwritten; (2) another document's mention whose event time has no offset, which cannot be classified without guessing (the issue's own time,
+    the operator's representative's, is a clean day; the earlier bundle schema never looked at the other members' times)."""
+    for name, variant, code in (("mention-conflict", {"snapshot_differs": True}, "mention_values_conflict"),
+                                ("mention-time", {"a2_event_time": "2026-09-30T10:00:00"}, "mention_event_time_unsupported"),
+                                ("mention-week", {"event_time": "2026-W40-3"}, "mention_event_time_unsupported")):
+        world = build_world(root.parent / name, **variant)
+        write_operator(world)
+        operator = Operator(world)
+        operator.cli("freeze", manifest_doc(world, f"{name}-1", file_hashes(world.root)))
+        out = operator.cli("export", operator.sel(f"{name}-1"))
+        assert out["delivery"]["status"] == "current", (name, out["delivery"])
+        bundle = out["bundle"]
+        assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None, "code": code}], name
+        assert [i["id"] for i in bundle["issues"]] == ["issue:factory-2026q4"], name
+        assert {i["id"]: i["mentions"] for i in bundle["issues"]} == {"issue:factory-2026q4": expected_mentions(world)["issue:factory-2026q4"]}, name
+        assert {a["articleId"] for a in bundle["articles"]} == {world.refs["b"]["documentId"]}, f"{name}: a source of the excluded issue reached the bundle"
+        assert ACTION_SNAPSHOT not in canonical(out), f"{name}: a value of the conflicting mention reached the bundle"
+    return ("mention values: one identity carried by two upstreams with different actions -> issue excluded (mention_values_conflict), no value published; a member's offset-less "
+            "event time -> issue excluded (mention_event_time_unsupported), never widened or guessed")
+
+
+def participants_across_upstreams(world) -> str:
+    """In the collision world document a's mention `m-a` is carried by BOTH upstreams, and each maps company ids in its own namespace. When upstream b maps SYNTH-3 to
+    another public company than upstream a does, no single company can be claimed: that participant's `companyId` is null (the participant stays as extracted), while
+    SYNTH-1 (both agree) stays mapped; SYNTH-2, SYNTH-9 and the participant without a company id are null in either world."""
+    write_operator(world, canonical_document=canonical_doc(world, b_supplier="co:synth-1"))
+    operator = Operator(world)
+    operator.cli("freeze", manifest_doc(world, "handoff-disagree-1", file_hashes(world.root)))
+    out = operator.cli("export", operator.sel("handoff-disagree-1"))
+    assert out["delivery"]["status"] == "current", out["delivery"]
+    assert {i["id"]: i["mentions"] for i in out["bundle"]["issues"]} == expected_mentions(world, suppliers_agree=False)
+    assert_mentions_reachable(out["bundle"])
+    return "participants: a company id mapped by every carrying upstream to one published company is public; unmapped, unknown, unpublished or upstream-disagreeing ids are null and the participant is kept"
+
+
+# ---------------------------------------------------------------- handoffs frozen under the earlier bundle schema ----------------------
+
+LEGACY_SCHEMA = "zoop-graph-handoff-bundle-1"
+LEGACY_AT = "2026-10-15T00:00:00+00:00"
+LEGACY_CODE = "handoff_contract_changed"
+
+
+def legacy_bundle(bundle: dict, manifest: dict) -> dict:
+    """The bundle the build BEFORE original mentions froze for this manifest: today's export without the issues' `mentions`, under the earlier schema string."""
+    old = json.loads(json.dumps(bundle))
+    for issue in old["issues"]:
+        del issue["mentions"]
+    old.update(schemaVersion=LEGACY_SCHEMA, handoffId=manifest["handoffId"], manifestDigest=digest(manifest))
+    old["digests"]["content"] = digest({key: old[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+    return old
+
+
+KILLED_WRITER = ("import json, os, sqlite3, sys\n"
+                 "spec = json.load(sys.stdin)\n"
+                 "db = sqlite3.connect(spec['database'], isolation_level=None)\n"
+                 "db.execute('BEGIN IMMEDIATE')\n"
+                 "for statement, args in spec['statements']:\n"
+                 "    db.execute(statement, args)\n"
+                 "db.execute('COMMIT')\n"
+                 "os._exit(9)\n")          # no close, no checkpoint: the committed rows stay ONLY in the write-ahead log
+
+
+def plant_legacy_handoff(state: Path, manifest: dict, bundle: dict, *, row_state: str = "ready", artifact: str = "written", schema: str | None = LEGACY_SCHEMA,
+                         wal: bool = False) -> dict:
+    """Adds ONE row of the earlier build to an existing handoff ledger with the ledger's own INSERT statements (schema, triggers and every other row stay as they
+    are). `artifact`: `written` (the earlier bundle's exact bytes), `missing` or `garbage` (a file that is no bundle at all: the row must never be judged by it);
+    `schema` None leaves the receipt without a bundle schema (damaged state, not history). `wal`: the rows are committed by a writer process that dies without closing
+    the ledger, so they exist ONLY in a non-empty `handoff.sqlite3-wal` (a stale `-shm` stays beside it), exactly what a killed pre-cutover writer leaves behind."""
+    import hashlib
+    import sqlite3
+    old = legacy_bundle(bundle, manifest)
+    raw = canonical(old).encode("utf-8")
+    bundle_digest = hashlib.sha256(raw).hexdigest()
+    receipt = {"handoffId": manifest["handoffId"], "manifestDigest": digest(manifest), "bundleSchema": schema, "bundleDigest": bundle_digest,
+               "contentDigest": old["digests"]["content"], "bundleBytes": len(raw), "provenance": old["provenance"],
+               "sources": [{"relation": s["relation"], "upstream": s["upstream"], "reviewDigest": s["reviewDigest"]} for s in old["sources"]],
+               "files": manifest["files"], "counts": old["counts"], "exclusionCodes": old["exclusions"]["counts"], "checks": old["checks"], "frozenAt": LEGACY_AT}
+    if schema is None:
+        del receipt["bundleSchema"]
+    failure = "handoff_artifact_missing" if row_state == "failed" else None
+    attempts = {"reserved": [], "ready": [(1, "freeze", "written", None)], "failed": [(1, "recover", "artifact-missing", failure)]}[row_state]
+    statements = [("INSERT INTO handoffs(handoff_id,input_digest,manifest,bundle_digest,content_digest,bundle_bytes,receipt,state,failure,created_at,updated_at) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?)", [manifest["handoffId"], digest(manifest), canonical(manifest), bundle_digest, old["digests"]["content"], len(raw),
+                                                     canonical(receipt), row_state, failure, LEGACY_AT, LEGACY_AT])]
+    statements += [("INSERT INTO attempts VALUES(?,?,?,?,?,?)", [manifest["handoffId"], n, kind, outcome, code, LEGACY_AT]) for n, kind, outcome, code in attempts]
+    if wal:
+        child = subprocess.run([sys.executable, "-c", KILLED_WRITER], input=json_bytes({"database": str(state / "handoff.sqlite3"), "statements": statements}),
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        assert child.returncode == 9 and not child.stderr, (child.returncode, child.stderr.decode()[-1000:])
+        assert (state / "handoff.sqlite3-wal").stat().st_size > 0, "the killed writer left no write-ahead log"
+    else:
+        db = sqlite3.connect(state / "handoff.sqlite3")
+        try:
+            for statement, args in statements:
+                db.execute(statement, args)
+            db.commit()
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            db.close()
+    path = state / "bundles" / f"{bundle_digest}.json"
+    if artifact != "missing":
+        path.write_bytes(raw if artifact == "written" else b"{this is not a bundle")
+    return {"receipt": receipt, "artifact": path, "state": row_state, "attempts": [{"n": n, "kind": k, "outcome": o, "code": c} for n, k, o, c in attempts], "failure": failure}
+
+
+def ledger_snapshot(state: Path) -> dict:
+    """Everything a handoff ledger directory holds: mode, mtime, size and content hash of every file and directory."""
+    import hashlib
+    found = {}
+    for path in [state, *sorted(state.rglob("*"))]:
+        info = path.stat()
+        found[str(path.relative_to(state))] = (stat.S_IMODE(info.st_mode), info.st_mtime_ns,
+                                               None if path.is_dir() else (info.st_size, hashlib.sha256(path.read_bytes()).hexdigest()))
+    return found
+
+
+def legacy_history(world, exported: dict) -> tuple[str, dict]:
+    """Rows frozen by the earlier build (bundle `-1`, no mentions) are immutable HISTORY through the installed CLI. The ledger is a real current one into which three
+    earlier rows are planted (ready with its bundle, reserved without its file, failed with a garbage file) and which a writer would visibly re-permission: every
+    command below answers from the ledger alone (the source ledgers, grant registry and operator files do not even exist for it) and leaves every byte, mode, mtime
+    and file as it was, while a NEW handoff id in the same ledger still freezes and exports and the history stays as it was. Returns the check text and the real
+    withheld envelope of the ready legacy row."""
+    operator = Operator(world)
+    state = world.root / "handoff-legacy"
+    files = file_hashes(world.root)
+    operator.cli("freeze", manifest_doc(world, "current-0", files), state=state)
+    planted = {name: plant_legacy_handoff(state, manifest_doc(world, name, files), exported["bundle"], row_state=row_state, artifact=artifact)
+               for name, row_state, artifact in (("legacy-ready", "ready", "written"), ("legacy-reserved", "reserved", "missing"), ("legacy-failed", "failed", "garbage"))}
+    os.chmod(state, 0o755)
+    for path in (state / "bundles", *(state / "bundles").iterdir(), state / "handoff.sqlite3", state / "handoff.lock"):
+        os.chmod(path, 0o755 if path.is_dir() else 0o644)
+    before, artifacts = ledger_snapshot(state), {n: (p["artifact"].read_bytes() if p["artifact"].exists() else None) for n, p in planted.items()}
+    withheld = None
+    for name, row in planted.items():
+        seen = operator.cli("inspect", operator.sel(name), expected=2, state=state)
+        assert seen["state"] == row["state"] and seen["next"] is None and seen["delivery"] == {"status": "withheld", "code": LEGACY_CODE}, seen
+        assert seen["receipt"] == row["receipt"] and seen["attempts"] == row["attempts"] and seen["failure"] == ({"code": row["failure"]} if row["failure"] else None), seen
+        gone = operator.cli("export", operator.sel(name), expected=2, state=state, absent=True)
+        assert gone == {"schemaVersion": "zoop-ai-handoff-1", "handoffId": name, "state": row["state"], "publication": "not-published",
+                        "delivery": {"status": "withheld", "code": LEGACY_CODE}, "usage": {"providerCalls": 0, "modelCalls": 0}}, gone
+        assert operator.cli("recover", operator.sel(name), expected=2, state=state)["error"]["code"] == LEGACY_CODE
+        for manifest in (manifest_doc(world, name, files), {**manifest_doc(world, name, files), "sourceKind": "actual"}):
+            assert operator.cli("freeze", manifest, expected=2, state=state, absent=True)["error"]["code"] == LEGACY_CODE
+        withheld = gone if name == "legacy-ready" else withheld
+    assert ledger_snapshot(state) == before, "a legacy command changed the ledger directory"
+    operator.cli("freeze", manifest_doc(world, "current-1", files), state=state)
+    assert operator.cli("export", operator.sel("current-1"), state=state)["delivery"]["status"] == "current"
+    assert {n: (p["artifact"].read_bytes() if p["artifact"].exists() else None) for n, p in planted.items()} == artifacts
+    for name, row in planted.items():
+        seen = operator.cli("inspect", operator.sel(name), expected=2, state=state)
+        assert seen["receipt"] == row["receipt"] and seen["attempts"] == row["attempts"] and seen["state"] == row["state"], seen
+    return ("earlier-schema history: inspect shows the stored receipt and attempts (next null, withheld handoff_contract_changed), export is withheld, recover and a same-id "
+            "freeze are refused, all from the ledger alone with no source/operator file/artifact read; bytes, modes and mtimes unchanged; a new handoff id still freezes and exports"), withheld
 
 
 def smoke(root: Path, fixture: Path | None) -> dict:
@@ -483,21 +710,32 @@ def smoke(root: Path, fixture: Path | None) -> dict:
     checks.append("source ledgers byte/mode/mtime identical after every command")
     checks.append(validity_end_inclusive(root))
     collision_world, collision = collision_export(root.parent / "collision")
-    checks.append("legal local mentionId collision (documents a and a2 both use `m-a`): both source members and the second document's evidence survive, the representative is kept")
+    checks.append("legal local mentionId collision (documents a and a2 both use `m-a`): both source members and the second document's evidence survive, the representative is kept; "
+                  "three source events give two mentions, identified by (document, version, local id)")
+    checks.append("original mentions: every public issue carries its hand-written S2 mentions (fields as extracted, verification none, one record per identity although a "
+                  "mention is carried by two upstreams), every mention evidence reachable on its own article, issue evidence = mentions' + geography evidence")
+    checks.append(mention_exclusions(root))
+    checks.append(participants_across_upstreams(collision_world))
+    legacy_check, legacy_withheld = legacy_history(world, exported)
+    checks.append(legacy_check)
 
     if fixture is not None:
-        write_fixture(fixture, exported, withheld, collision)
+        write_fixture(fixture, world, exported, withheld, legacy_withheld, collision_world, collision)
         checks.append(f"fixtures written to {fixture}")
     return {"status": "passed", "providerCalls": 0, "modelCalls": 0, "checks": checks}
 
 
-def write_fixture(directory: Path, valid: dict, withheld: dict, collision: dict) -> None:
-    """The valid export envelope, the real export of the legal local-mentionId collision world, negative bundles (each MUST be refused by an importer) and the withheld envelope (no bundle at all)."""
+def write_fixture(directory: Path, world, valid: dict, withheld: dict, legacy_withheld: dict, collision_world, collision: dict) -> None:
+    """The valid export envelope, the real export of the legal local-mentionId collision world, the hand-written expected original mentions of both, negative bundles (each
+    MUST be refused by an importer) and the two withheld envelopes (no bundle at all): drift (`export-withheld`) and a handoff frozen under the earlier bundle schema
+    (`export-withheld-legacy`)."""
     directory.mkdir()                                                    # the caller proved it does not exist: a fixture directory is never reused or overwritten
     write = lambda name, value: (directory / name).write_bytes(json_bytes(value) + b"\n")  # noqa: E731
     write("export-valid.json", valid)
     write("export-withheld.json", withheld)
+    write("export-withheld-legacy.json", legacy_withheld)
     write("export-collision.json", collision)
+    write("expected-mentions.json", {"export-valid.json": expected_mentions(world), "export-collision.json": expected_mentions(collision_world)})
     bundle = valid["bundle"]
 
     def mutate(name: str, change) -> None:

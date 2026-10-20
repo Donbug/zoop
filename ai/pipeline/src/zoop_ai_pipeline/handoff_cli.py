@@ -3,6 +3,9 @@
 stdin: one JSON object (<= 65,536 bytes): the manifest for `freeze`, `{schemaVersion, handoffId}` for the others. stdout: one canonical JSON object.
 Exit 0 for a ledger result or a current export; exit 2 for an error or a withheld export (`delivery.status=withheld`, no content). No network, model or
 provider call; no source ledger is written. No credential, path or message is ever printed.
+
+A handoff stored under an older bundle contract is history: it is recognised from the ledger alone, before any operator file, source ledger, grant, artifact or
+writable ledger is touched, and is answered read-only (`inspect` history, `export` withheld, `recover`/`freeze` refused: `handoff_contract_changed`).
 """
 from __future__ import annotations
 
@@ -14,7 +17,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .handoff import Handoff, HandoffPaths, Store
+from .handoff import Handoff, HandoffPaths, Store, open_legacy_history
 from .handoff_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Manifest, Selector, canonical
 from .ingestion_contracts import IngestionFailure
 
@@ -53,7 +56,8 @@ def main() -> int:
         request = (Manifest if args.command == "freeze" else Selector).model_validate(json.loads(raw))
         paths = HandoffPaths(*flags) if sourced else None
         roots = (paths.relation, paths.extraction, paths.ingestion) if paths else ()
-        store = Store(args.state_dir, *roots, mode=WRITERS.get(args.command, "read"))
+        legacy = open_legacy_history(args.state_dir, *roots, handoff_id=request.handoff_id)
+        store = legacy if legacy is not None else Store(args.state_dir, *roots, mode=WRITERS.get(args.command, "read"))
         handoff = Handoff(store, paths)
         if args.command == "export":
             result, line = handoff.export(request, serialized=True)

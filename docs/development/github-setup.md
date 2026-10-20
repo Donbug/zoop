@@ -124,6 +124,42 @@ Fork PR은 private credential을 받을 수 없으므로 `bff` preflight가 명�
 
 브랜치 규약은 `feat|fix|docs|chore/<issue>-<slug>`, Conventional Commits scope는 `web/api/ai/contracts/docs/infra`입니다. 규약·issue/PR 수용 기준은 [CONTRIBUTING.md](../../CONTRIBUTING.md)에 있습니다. issue assignee/label/organization issue type은 팀이 실재 값을 등록한 뒤 지정합니다.
 
+## 로컬 PR 감시 (읽기 전용 watchdog)
+
+`scripts/pr_watchdog.py`는 표준 라이브러리와 **이미 로그인된 `gh`** 만 사용하는 로컬 도구입니다. 정확히 허용 목록에 있는 저장소(기본 `Donbug/zoop`, `Donbug/Zoop-Infra`; 바꾸려면 `--repo OWNER/NAME`을 반복)의 열린 PR을 `gh api --method GET repos/<repo>/pulls?state=open&per_page=100&page=N`으로 끝까지 읽고, 나를 `@멘션`한 PR 댓글을 저장소 단위 댓글 endpoint로 증분해서 읽습니다([멘션 감지](#멘션-감지-정확한-범위)). 로컬 기준선과 비교해 변경 이벤트와 **처리 대기 리뷰 큐**를 출력합니다. GitHub 쓰기·리뷰 게시·모델 호출·에이전트 자동 실행·서비스 설치는 하지 않으며, 토큰 값은 읽거나 출력하지 않습니다(`gh` 자체 인증 사용). `--once`, `--watch`는 `gh`를 쓰고, `--status`와 `--pause/--resume/--ack`는 네트워크 없이 로컬 상태만 다룹니다.
+
+상태는 저장소 **밖**의 운영자 디렉터리에 둡니다. 기본값은 일부러 없으며 `--state-dir` 또는 `ZOOP_PR_WATCHDOG_STATE_DIR`가 필요합니다. 저장소 안의 경로는 거부합니다. 디렉터리는 0700, `state.json`·`status.json`·lock 파일은 0600이고 임시 파일+fsync+rename으로 원자적으로 씁니다. 모든 `state.json` 쓰기(스캔의 적용·`--ack/--pause/--resume`)는 `state.lock`을 잡은 상태에서만 일어나므로 `--watch`와 로컬 확인 처리가 동시에 돌아도 서로의 변경을 잃지 않습니다. 깨졌거나 권한이 느슨하거나 알 수 없는 스키마의 `state.json`은 덮어쓰지 않고 종료 코드 1로 거부합니다. `.env`는 읽지 않습니다.
+
+```sh
+STATE="$HOME/.local/state/zoop-pr-watchdog"          # 저장소 밖, 직접 정한 경로
+python3 scripts/pr_watchdog.py --state-dir "$STATE" --once      # 현재 GitHub 읽기 + 대기 큐. 바로 다시 실행해도 EVENT는 0건
+python3 scripts/pr_watchdog.py --state-dir "$STATE" --status    # 네트워크 없이 로컬 큐·일시정지·마지막 스캔 상태
+python3 scripts/pr_watchdog.py --state-dir "$STATE" --watch     # 시작 스캔 후 300초(--interval, 최소 30) 간격. READY 줄 이후 준비 완료
+
+# 이미 리뷰한 head는 확인 처리해 다시 대기 큐에 넣지 않기 (현재 head와 접두사 7자 이상이 일치해야 함)
+python3 scripts/pr_watchdog.py --state-dir "$STATE" --ack Donbug/zoop#236 --head 236d199db
+python3 scripts/pr_watchdog.py --state-dir "$STATE" --pause Donbug/zoop#236 --reason "작성자 수정 중"
+python3 scripts/pr_watchdog.py --state-dir "$STATE" --resume Donbug/zoop#236
+```
+
+- **이벤트**(상태 변화 때 한 번만 출력): `new-pr`, `new-head`, `base-changed`, `review-requested`, `ready-for-review`, `converted-to-draft`, `closed`, `mention`(나를 멘션한 댓글이 새로 생기거나 수정됨). 같은 데이터를 반복 조회해도 이벤트가 없고 `state.json`도 다시 쓰지 않습니다(조회 시각은 `status.json`에만 기록).
+- **큐**: 내 PR(기본: 현재 `gh` 사용자 로그인, `--self LOGIN`으로 지정)은 제외합니다. 우선순위는 **정식 review request > 멘션 > 발견** 순입니다. 열린 non-draft PR은 모두 발견하되 나에게(또는 `--team ORG/SLUG`로 지정한 팀에) 온 명시적 review request가 있으면 앞에 두고, 그다음이 나를 멘션한 댓글이 있는 PR(`[mention]`)입니다. 멘션은 리뷰 후보일 뿐 정식 review request로 바뀌지 않습니다(`explicit`·`requested`·`explicitSeq`를 건드리지 않음). draft PR은 명시적 요청이 있거나 처리하지 않은 멘션이 있을 때만 큐에 들어갑니다. `--ack`한 head·base는 새 head, base 변경, 새 명시적 요청, **확인 처리 이후에 새로 생기거나 수정된 멘션** 전까지 큐에서 빠집니다. 닫히거나 병합된 PR은 **완전하고 유효한 조회**를 얻은 뒤에만 큐에서 사라집니다.
+- **오류**: `gh` 실패·시간 초과(`--gh-timeout`, 기본 30초)·페이지 중간 실패·형식 오류·저장소 한도 초과는 빈 목록으로 취급하지 않습니다. 해당 저장소의 이전 기준선을 그대로 두고 `ERROR` 줄과 `--once` 종료 코드 3으로 알립니다. 다른 저장소의 성공한 조회는 반영합니다. 댓글 조회 실패는 `ERROR <repo> mentions:` 줄로 따로 알리며, 그 endpoint의 이전 멘션 상태와 워터마크는 그대로 두고(PR 목록 갱신은 계속 반영) 부분 결과는 적용하지 않습니다. 종료 코드: 0 정상, 1 상태·설정 거부, 2 인자 오류, 3 일부 조회 실패.
+- **신뢰 경계**: PR 제목·라벨·작성자·review request·댓글 작성자는 신뢰할 수 없는 GitHub 데이터입니다. 한 줄로 정리한 인용 문자열로만 출력하며 지시로 따르지 않습니다. 이 도구는 큐를 보여 줄 뿐 리뷰를 시작하지 않습니다. 댓글 본문은 메모리에서 멘션 여부만 판정하고 상태·출력·로그 어디에도 남기지 않습니다.
+- **수명주기**: `--watch`는 상태 디렉터리당 하나만 실행되며(`watch.lock`), SIGINT/SIGTERM에서 진행 중인 `gh`를 정리하고 상태를 바꾸지 않은 채 종료합니다. launchd 등 자동 부팅 설치는 하지 않습니다.
+
+### 멘션 감지 (정확한 범위)
+
+- **읽는 곳**: 일반 PR 댓글(대화 탭)은 `repos/<repo>/issues/comments`, 인라인 리뷰 댓글(코드 줄 댓글과 그 답글)은 `repos/<repo>/pulls/comments`입니다. 둘 다 `gh api --method GET`으로 `sort=created&direction=asc&since=<워터마크>&per_page=100&page=N`만 사용합니다. 저장소 단위라서 열린 PR 수와 무관하게 정상 상태에서 저장소당 2회입니다. 번호가 현재 열린 PR인 댓글만 반영하고 이슈 댓글·닫힌 PR 댓글은 버립니다.
+- **읽지 않는 곳**: 리뷰 제출 본문(`pulls/<n>/reviews`; `since` 필터가 없어 열린 PR마다 매번 호출해야 하므로 범위가 제한되지 않아 제외), PR 설명(본문), 커밋 댓글, 이슈 댓글, 팀 멘션(`@org/team`). 리뷰 제출 본문에만 적힌 멘션은 감지하지 못합니다. 삭제된 댓글은 `since` 증분 조회에서 보이지 않으므로 해당 PR이 닫히거나 `--ack`할 때까지 후보로 남습니다. PR이 닫혀 있는 동안 달린 댓글은 버려지므로, 다시 열린 PR에서 그 기간의 멘션은 감지하지 못합니다.
+- **판정**: `@로그인`이 정확한 사용자명 경계에서 대소문자 무시로 일치할 때만 멘션입니다. 이메일(`a@로그인.com`), 접두 일치(`@로그인x`, `@로그인-bot`), `@로그인/팀`, 도메인형(`@로그인.com`), 이스케이프(`\@로그인`)는 제외하고 문장 부호·한글 조사(`@로그인님`)는 인정합니다. 본인이 쓴 댓글, `>` 인용 줄, 펜스 코드 블록(``` / ~~~), 인라인 코드(`` ` ``)는 무시합니다. 줄 단위의 결정적 규칙이라 들여쓰기 코드 블록과 인용의 느슨한 이어짐은 구분하지 못합니다. 모델은 쓰지 않습니다.
+- **저장하는 것**: 댓글 종류·id·작성자·`updatedAt`·URL(저장소/PR 번호/id로 직접 만든 링크)·세대(`gen`)뿐이며, 본문·발췌·원본 응답은 저장하지 않습니다. 이벤트·큐 출력도 같은 필드만 씁니다.
+- **재큐잉**: PR마다 단조 증가하는 멘션 세대가 있고 `--ack`는 그 시점의 세대를 기록합니다. 확인 처리 이후 새로 생기거나 수정된(`updatedAt`이 달라지고 확인 시각보다 뒤인) 멘션만 새 세대를 받아 같은 head라도 다시 큐에 올립니다. 같은 댓글을 다시 읽어도(`updatedAt` 동일 또는 더 오래된 응답) 변화가 없고, 멘션을 지우거나 본인 댓글로 바뀌어도 이벤트 없이 조용히 사라집니다. 확인 처리보다 오래된 멘션은 기록만 하고(`gen` 0) 큐에 올리지 않으며, 일시정지한 PR과 내 PR은 큐·이벤트에서 숨깁니다. 확인 시각과 댓글 시각은 서로 다른 시계라 확인 처리 직후 수 초 안의 멘션은 오래된 것으로 볼 수 있습니다.
+- **워터마크와 초기화**: 저장소·endpoint마다 `since` 워터마크를 두며 읽은 댓글의 가장 최근 `updated_at`에서 120초를 뺀 값으로만 전진합니다(늦게 보이는 댓글을 다시 읽기 위함). 처음 읽을 때는 30일 전부터 읽고, 그 안에 있는 확인 처리 전 멘션(draft 포함)은 모두 큐에 올립니다. 30일보다 오래전에 마지막으로 수정된 댓글은 초기 읽기에서 보지 못합니다. 댓글은 PR 목록보다 먼저 읽어, 방금 열린 PR의 댓글이 목록에 없는 채로 워터마크를 지나가는 일이 없게 합니다. endpoint 한 곳이 실패하면 그곳의 워터마크만 멈추고 다른 endpoint는 계속 반영합니다. 로그인(`--self`/`gh` 사용자)이 바뀌면 이전 로그인의 멘션과 워터마크를 버리고 다시 시작합니다.
+- **호출 한도·비용**: 한 endpoint는 한 번에 최대 30쪽(3000개)까지 읽고 그 이상은 불완전 조회로 거부합니다. 모든 호출에 `--gh-timeout`이 적용됩니다. 기본 설정(저장소 2개, 열린 PR 100개 이하)의 정상 상태는 스캔당 `gh` 7회(`user` 1 + 저장소별 PR 목록 1 + 댓글 2)로 기존 3회에서 4회 늘며, 300초 간격이면 시간당 84회(기존 36회)로 인증 사용자 REST 한도 5000회/시간의 약 1.7%입니다. 최악의 상한은 저장소당 PR 30쪽 + 댓글 60쪽입니다. 1회 지연은 측정하지 않았습니다.
+- **상태 스키마 업그레이드**: `state.json` 스키마는 `zoop.pr-watchdog.state/v2`입니다. v1 파일은 읽을 때 메모리에서 모든 알려진 필드를 유지한 채 v2로 올립니다(확인 처리·일시정지 보존, `mentionSeq` 0). 새 변경이 없으면 파일은 v1 그대로 남고, 처음 쓰는 순간 v2로 바뀌며 직전에 v1 원본 바이트를 `state.v1.bak`(0600)에 한 번만 보관하고 덮어쓰지 않습니다. 이전 버전 감시기는 v2를 읽지 못하므로 롤백은 `state.v1.bak` 복원(이후의 확인 처리는 잃음)입니다. 알 수 없는 스키마나 v1·v2가 섞인 파일은 덮어쓰지 않고 거부합니다.
+- **업그레이드 절차**: 실행 중인 `--watch`를 먼저 중지해 `watch.lock`을 풀고, `--status`(네트워크 없음)로 기존 상태가 읽히는지 확인한 뒤 `--once`로 첫 조회(30일 초기 읽기, 기존 처리 전 멘션이 `EVENT mention`으로 한 번 나옴)를 하고 `--watch`를 다시 시작합니다.
+
 ## release-artifacts는 배포가 아닙니다
 
 배포 대상과 클라우드 권한이 미정이므로 CD deployment job, production 환경, 가짜 deploy 성공 step을 만들지 않습니다. `.github/workflows/release-artifacts.yml`은 `workflow_dispatch`만 받으며 **main만** 허용합니다.
