@@ -102,8 +102,8 @@ flowchart LR
 | 1 | Q02 일반 개념 | 도구 없음 | Luna 제한 답변을 `general_knowledge` 구간으로 저장, 서버 고정 안내·근거 없음·정책 검사 |
 | 2 | Q01 서비스 안내 | `help.search`, `screenSpec.read`, `zoopPolicy.read` | 승인된 제품 문서 registry와 버전·철회 상태가 필요 |
 | 3 | Q03 기업·사건 | `company.read`, `document.search`, `issue.read`, `evidence.resolve` | 기업·문서·evidence 기반 일부 존재. 공개 이슈 조회와 철회 전파 보완 |
-| 4 | Q04 관계·경로 | `graph.path.read` | 내부 graph read 기반 일부 존재. 고정 graphVersion·간선별 evidence 종단 검증 필요 |
-| 5 | Q05 기간 비교 | `period.compare`, `graph.version.diff` | 버전 diff 계약·어댑터 추가 필요 |
+| 4 | Q04 관계·경로 | `graph.path.read` | 앱 `PublicGraphReader`(버전 고정·스냅샷·asOf·공개 제외 결정) 재사용. 그 위에 기업 간 관계 hop 기준 최대 3-hop 경로 탐색·노드/간선 50개 절단을 추가하고 간선별 evidence 종단 검증 필요. Neo4j·AI 내부 그래프 API는 호출하지 않음 |
+| 5 | Q05 기간 비교 | `period.compare`, `graph.version.diff` | 두 `graph_versions` 스냅샷을 `PublicGraphReader`로 각각 읽어 서버가 diff 계산. 버전 diff 계약·어댑터 추가 필요 |
 | 6 | Q06 브리핑 | `briefing.read`, `briefing.evidence` | briefing migration·발행 조회·회차 고정 구현 필요 |
 | 7 | Q07 내 종목 | `portfolio.scope.read` + Q03/Q04 | watchlist·portfolio 기반 존재. 인증 서버 문맥 주입과 범위 전파 필요 |
 | 8 | Q08 선정 근거 | `selectionRule.read` + evidence | 실제 적용 rule revision·입력 요인 조회 구현 필요 |
@@ -181,6 +181,7 @@ flowchart LR
 | 계획 | 미등록 도구, 중복 제거, 의존·병렬 순서, 12회·4동시·3단계·fan-out 5·보충 1라운드 한도 |
 | 체크포인트 | `exactly(2)`에 0개(잘림 없음/잘림/오류)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
+| 그래프 | 챗봇 경로가 같은 graphVersion의 `/api/v1/graph` 결과와 일치, 공개 제외 결정 반영 후 철회 간선 미노출, 비활성·미게시 버전 미사용, 기업 간 hop 1·2·3과 4 거부, 노드·간선 50개 절단 시 `truncated`, graphTargets가 지도에서 열림, Neo4j·AI 내부 그래프 API 호출 0회 |
 | 결과 | answerBasis를 sections에서 계산(단일·mixed·none), Q02 단독은 general_knowledge 구간 하나와 빈 sources·citations, Q02+Q03은 mixed와 구간별 인용, 일반 개념 구간의 근거 연결·최신 사실 거부, 고정 안내 중복 없음, clarification 새 job, no PARTIAL |
 | 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |
