@@ -18,7 +18,11 @@ export function graphUrl(request: GraphRequest) {
   if (request.graphVersion) query.set('graphVersion', request.graphVersion);
   if (request.mode === 'personal')
     query.set('personalFilter', request.personalFilter);
-  if (request.companyId) query.set('companyId', request.companyId);
+  if (request.companyId) {
+    query.set('companyId', request.companyId);
+    // depth를 빼면 서버는 연결된 전체 묶음을 돌려준다. 화면에서 고른 1·2단계를 그대로 보낸다.
+    if (request.depth) query.set('depth', String(request.depth));
+  }
   if (request.round) query.set('round', request.round);
   return `/api/v1/graph?${query}`;
 }

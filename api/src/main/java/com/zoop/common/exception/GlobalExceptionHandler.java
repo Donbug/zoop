@@ -25,7 +25,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustom(CustomException exception, HttpServletRequest request) {
-        return response(exception.getErrorCode(), request);
+        ErrorCode code = exception.getErrorCode();
+        return ResponseEntity.status(code.getStatus()).body(
+                ErrorResponse.of(code, RequestIdFilter.currentId(request), exception.isRetryable()));
     }
 
     @ExceptionHandler(MarketDataException.class)

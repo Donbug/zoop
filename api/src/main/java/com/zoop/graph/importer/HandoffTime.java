@@ -7,6 +7,8 @@ import java.time.OffsetDateTime;
 import java.time.Year;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Exact time handling of the import. A value is written to the snapshot only with the precision the bundle states: an instant
@@ -82,6 +84,71 @@ final class HandoffTime {
         } catch (DateTimeException | NullPointerException error) {
             throw unsupported();
         }
+    }
+
+    private static final Pattern MENTION_TIME = Pattern.compile(
+            "([0-9]{4})(?:-([0-9]{2})(?:-([0-9]{2})(?:T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\\.[0-9]{1,9})?)?(Z|[+-][0-9]{2}:[0-9]{2}))?)?)?");
+
+    /**
+     * Checks the {@code eventTime} of an ORIGINAL mention against the precision it states, and never rewrites it. The grammar is the
+     * one the producer's {@code mention_time_precision} implements by hand (shared vectors:
+     * {@code graph-handoff/mention-time-vectors.json}): ASCII {@code YYYY}, {@code YYYY-MM}, {@code YYYY-MM-DD} and
+     * {@code YYYY-MM-DDTHH:MM[:SS[.f{1,9}]](Z|+HH:MM|-HH:MM)} with an uppercase {@code T} and {@code Z} and an offset required. It is the
+     * set both sides already accepted: no library parser decides, so a form only one side takes (ISO week, ordinal or compact dates,
+     * an offset without a colon, a comma fraction) is {@code temporal_unsupported}. Offset hours stop at 18 (the {@code ZoneOffset}
+     * range) and year {@code 0000} is a bare year only (a calendar date needs year 1 or later). A null value is {@code unknown} only.
+     *
+     * @throws GraphHandoffException {@code temporal_unsupported} for anything else, or when the stated precision is not the one the
+     *         format has
+     */
+    static void mentionEventTime(String value, String precision) {
+        if (value == null) {
+            if (!"unknown".equals(precision)) {
+                throw unsupported();
+            }
+            return;
+        }
+        Matcher found = MENTION_TIME.matcher(value);
+        if (!found.matches()) {
+            throw unsupported();
+        }
+        if (!mentionPrecision(found).equals(precision)) {
+            throw unsupported();
+        }
+    }
+
+    private static String mentionPrecision(Matcher found) {
+        String year = found.group(1);
+        if (found.group(2) == null) {
+            return "year";
+        }
+        int month = Integer.parseInt(found.group(2));
+        if (year.equals("0000") || month < 1 || month > 12) {
+            throw unsupported();
+        }
+        if (found.group(3) == null) {
+            return "month";
+        }
+        int dayOfMonth = Integer.parseInt(found.group(3));
+        if (dayOfMonth < 1 || dayOfMonth > YearMonth.of(Integer.parseInt(year), month).lengthOfMonth()) {
+            throw unsupported();
+        }
+        if (found.group(4) == null) {
+            return "day";
+        }
+        if (Integer.parseInt(found.group(4)) > 23 || Integer.parseInt(found.group(5)) > 59
+                || (found.group(6) != null && Integer.parseInt(found.group(6)) > 59)) {
+            throw unsupported();
+        }
+        String offset = found.group(7);
+        if (!offset.equals("Z")) {
+            int hours = Integer.parseInt(offset.substring(1, 3));
+            int minutes = Integer.parseInt(offset.substring(4, 6));
+            if (minutes > 59 || hours * 60 + minutes > 18 * 60) {
+                throw unsupported();
+            }
+        }
+        return "datetime";
     }
 
     /**

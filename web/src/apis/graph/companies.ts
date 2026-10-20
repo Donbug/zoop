@@ -49,7 +49,17 @@ export async function getCompany(
     return fixture(async () =>
       (await import('@/mocks/company/fixture')).mockCompany(id),
     );
-  return read(companyUrl(id));
+  // 지도가 보여 주는 공개 버전·기준 시점과 같은 기업 관련 사건을 읽는다(#217).
+  const company = await read<
+    CompanyDetail & {
+      metadata?: { graphVersion?: string | null; asOf?: string };
+    }
+  >(snapshotUrl(companyUrl(id), context));
+  if (company.id !== id)
+    throw new Error('요청한 기업과 응답이 일치하지 않습니다.');
+  // 그래프 버전이 없으면(스냅샷 미게시) 관련 사건 섹션이 실패로 오므로 버전 일치는 확인하지 않는다.
+  if (company.metadata?.graphVersion) assertSnapshot(company.metadata, context);
+  return company;
 }
 
 export async function getCompanyQuote(id: string): Promise<CompanyQuote> {

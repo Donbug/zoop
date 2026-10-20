@@ -127,7 +127,7 @@
 
     **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
     family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-    (`zoop-graph-handoff-bundle-1`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+    (`zoop-graph-handoff-bundle-2`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
     writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
     path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
     `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -143,10 +143,18 @@
     bytes of the bundle it received, requires the result to equal the producer's receipt **and** the operator's pins, parses it through a closed model (unknown
     fields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with
     `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
-    `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch` ...) and nothing else:
-    no `verification` (so no count, source id or digest) and no `bundle`. A withheld answer is not an error and not an empty bundle; do not import it and do not
-    treat it as "no data". The checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and nothing
-    recalls content a caller already received.
+    `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
+    `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
+    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+    A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
+    so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
+
+    **Original mentions.** Every `issues[].mentions[]` item is one S2 mention exactly as extracted (`documentId`, `documentVersion` and the S2 local `mentionId`
+    identify it; a local id is unique only within one document version), with the app article it belongs to and the evidence ids of its own citations. Its
+    `verification` is always `none`: title, action, target, time, period, assertion status, background flag and participants are candidate or snapshot values of S2,
+    never verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the
+    S2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id
+    to the same company of this bundle, otherwise null.
 
     **The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical
     UTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python
@@ -6430,9 +6438,9 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "387a34a9afbd40213ed9380211565e01053af02a7a897a9cc6604446065fb43d"
-                      "contentDigest": "2524fbfddf15e4f4c1bc6e7cc112ac3cfc06cf6afca265043bbbd878d090ce0c"
-                      "bundleBytes": 6992
+                      "bundleDigest": "144231dd776203047c22891174c8f4e816d6b5882530fac23096da76a544d3a3"
+                      "contentDigest": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
+                      "bundleBytes": 7832
                       "counts":
                         "companies": 1
                         "issues": 1
@@ -6489,6 +6497,20 @@
                     "delivery":
                       "state": "withheld"
                       "reason": "handoff_not_ready"
+                      "checkedAt": null
+                    "verification": null
+                    "observedAt": "2026-10-16T03:00:00Z"
+                "legacyContract":
+                  "summary": "The handoff was frozen under the earlier bundle schema: withheld, never reinterpreted (freeze a new handoff id)"
+                  "value":
+                    "schemaVersion": "zoop-ai-internal-handoff-1"
+                    "handoffId": "handoff-synthetic-1"
+                    "state": "ready"
+                    "publication": "not-published"
+                    "appImport": "pending"
+                    "delivery":
+                      "state": "withheld"
+                      "reason": "handoff_contract_changed"
                       "checkedAt": null
                     "verification": null
                     "observedAt": "2026-10-16T03:00:00Z"
@@ -6699,9 +6721,9 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "387a34a9afbd40213ed9380211565e01053af02a7a897a9cc6604446065fb43d"
-                      "contentDigest": "2524fbfddf15e4f4c1bc6e7cc112ac3cfc06cf6afca265043bbbd878d090ce0c"
-                      "bundleBytes": 6992
+                      "bundleDigest": "144231dd776203047c22891174c8f4e816d6b5882530fac23096da76a544d3a3"
+                      "contentDigest": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
+                      "bundleBytes": 7832
                       "counts":
                         "companies": 1
                         "issues": 1
@@ -6738,7 +6760,7 @@
                         "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
                         "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
                     "bundle":
-                      "schemaVersion": "zoop-graph-handoff-bundle-1"
+                      "schemaVersion": "zoop-graph-handoff-bundle-2"
                       "handoffId": "handoff-synthetic-1"
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
                       "provenance":
@@ -6802,7 +6824,7 @@
                           "eventTime": "2026-09-30"
                           "timePrecision": "day"
                           "period": null
-                          "assertionStatus": null
+                          "assertionStatus": "announced"
                           "geography":
                             "value": "domestic"
                             "decisionRef": "geo-2026-10-16:1"
@@ -6851,6 +6873,32 @@
                                 "documentId": "synthetic-doc-1"
                                 "rawVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                                 "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                          "mentions":
+                            - "documentId": "synthetic-doc-1"
+                              "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                              "mentionId": "m-synthetic-1"
+                              "articleId": "doc-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                              "articleVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                              "verification": "none"
+                              "title": "합성 공급 계약"
+                              "action": "공급 계약 발표"
+                              "target": null
+                              "eventTime": "2026-09-30"
+                              "timePrecision": "day"
+                              "period": null
+                              "assertionStatus": "announced"
+                              "background": false
+                              "participants":
+                                - "sourceCompanyId": "synthetic-company-1"
+                                  "companyId": "KRX:005930"
+                                  "name": "합성기업"
+                                  "role": "공급자"
+                                - "sourceCompanyId": null
+                                  "companyId": null
+                                  "name": "합성 협력사"
+                                  "role": "수요자"
+                              "evidenceIds":
+                                - "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
                           "decisionRef": "issue-2026-10-16:1"
                           "representative": null
                       "relations":
@@ -6948,7 +6996,7 @@
                         "publicActivation": "none"
                         "graphDb": "none"
                       "digests":
-                        "content": "2524fbfddf15e4f4c1bc6e7cc112ac3cfc06cf6afca265043bbbd878d090ce0c"
+                        "content": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
                 "withheld":
                   "summary": "Source rights were revoked: no manifest, no bundle, no counts"
                   "value":
@@ -7840,6 +7888,12 @@
           "type": "array"
           "maxItems": 1000
           "title": "Sourceevents"
+        "mentions":
+          "items":
+            "$ref": "#/components/schemas/BMention"
+          "type": "array"
+          "maxItems": 1000
+          "title": "Mentions"
         "decisionRef":
           "type": "string"
           "pattern": "^[A-Za-z0-9._:-]{1,200}$"
@@ -7863,6 +7917,7 @@
         - "geography"
         - "evidenceIds"
         - "sourceEvents"
+        - "mentions"
         - "decisionRef"
         - "representative"
       "title": "BIssue"
@@ -7882,6 +7937,118 @@
         - "jobId"
         - "inputDigest"
       "title": "BJob"
+    "BMention":
+      "properties":
+        "documentId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Documentid"
+        "documentVersion":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Documentversion"
+        "mentionId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Mentionid"
+        "articleId":
+          "type": "string"
+          "pattern": "^doc-[a-f0-9]{64}$"
+          "title": "Articleid"
+        "articleVersion":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Articleversion"
+        "verification":
+          "type": "string"
+          "const": "none"
+          "title": "Verification"
+        "title":
+          "type": "string"
+          "maxLength": 6291456
+          "title": "Title"
+        "action":
+          "type": "string"
+          "maxLength": 6291456
+          "title": "Action"
+        "target":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 6291456
+            - "type": "null"
+          "title": "Target"
+        "eventTime":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 100
+            - "type": "null"
+          "title": "Eventtime"
+        "timePrecision":
+          "type": "string"
+          "enum":
+            - "year"
+            - "month"
+            - "day"
+            - "datetime"
+            - "unknown"
+          "title": "Timeprecision"
+        "period":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 6291456
+            - "type": "null"
+          "title": "Period"
+        "assertionStatus":
+          "type": "string"
+          "enum":
+            - "occurred"
+            - "announced"
+            - "planned"
+            - "forecast"
+            - "cancelled"
+            - "unknown"
+          "title": "Assertionstatus"
+        "background":
+          "type": "boolean"
+          "title": "Background"
+        "participants":
+          "items":
+            "$ref": "#/components/schemas/BParticipant"
+          "type": "array"
+          "maxItems": 1000
+          "title": "Participants"
+        "evidenceIds":
+          "items":
+            "type": "string"
+            "pattern": "^ev-[a-f0-9]{64}$"
+          "type": "array"
+          "maxItems": 20000
+          "minItems": 1
+          "title": "Evidenceids"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "documentId"
+        - "documentVersion"
+        - "mentionId"
+        - "articleId"
+        - "articleVersion"
+        - "verification"
+        - "title"
+        - "action"
+        - "target"
+        - "eventTime"
+        - "timePrecision"
+        - "period"
+        - "assertionStatus"
+        - "background"
+        - "participants"
+        - "evidenceIds"
+      "title": "BMention"
+      "description": |-
+        One original S2 mention of the issue, identified by its source document version and S2 local id (a local id is unique only within one document version).
+        `verification` is always `none`: these are S2 candidate or snapshot values, never verified, decided or approved fields.
     "BObservation":
       "properties":
         "roundId":
@@ -7962,6 +8129,39 @@
         - "rawVersion"
         - "documentVersion"
       "title": "BObservationRef"
+    "BParticipant":
+      "properties":
+        "sourceCompanyId":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 6291456
+            - "type": "null"
+          "title": "Sourcecompanyid"
+        "companyId":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+            - "type": "null"
+          "title": "Companyid"
+        "name":
+          "type": "string"
+          "maxLength": 6291456
+          "title": "Name"
+        "role":
+          "type": "string"
+          "maxLength": 6291456
+          "title": "Role"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "sourceCompanyId"
+        - "companyId"
+        - "name"
+        - "role"
+      "title": "BParticipant"
+      "description": |-
+        A participant exactly as the S2 mention states it. `role` is the S2 text, never a confirmed role; `company_id` is the public company id only where every
+        carrying upstream mapped `source_company_id` to the same company of this bundle, otherwise null.
     "BPolicy":
       "properties":
         "version":
@@ -8455,7 +8655,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-graph-handoff-bundle-1"
+          "const": "zoop-graph-handoff-bundle-2"
           "title": "Schemaversion"
         "handoffId":
           "type": "string"

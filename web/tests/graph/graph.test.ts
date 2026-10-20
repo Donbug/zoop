@@ -144,4 +144,17 @@ describe('WBS 6.6.21 · D-GRP-01/01b mock/API contract', () => {
       '/api/v1/graph?mode=personal&personalFilter=watchlist',
     );
   });
+  it('sends the chosen depth only with a company focus', () => {
+    expect(
+      graphUrl({
+        mode: 'all',
+        personalFilter: 'watchlist',
+        companyId: 'KRX:005930',
+        depth: 2,
+      }),
+    ).toBe('/api/v1/graph?mode=all&companyId=KRX%3A005930&depth=2');
+    expect(
+      graphUrl({ mode: 'all', personalFilter: 'watchlist', depth: 2 }),
+    ).toBe('/api/v1/graph?mode=all');
+  });
 });
