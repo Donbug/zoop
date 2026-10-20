@@ -1,0 +1,190 @@
+package com.zoop.briefing.replay;
+
+import com.zoop.common.json.Canonical;
+import com.zoop.common.json.StrictJson;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
+
+/** Internal historical context contract; never turns simulated predecessors into operating publications. */
+final class BriefingMarketContextRules {
+    static final String POLICY = "market_context_prior_briefing_v2";
+    private BriefingMarketContextRules() { }
+
+    static boolean contextual(StrictJson.Obj summary) {
+        return summary.has("policy") && POLICY.equals(summary.string("policy"));
+    }
+
+    static Set<String> evidence(StrictJson.Obj context) {
+        Set<String> result = new HashSet<>();
+        for (StrictJson.Obj document : context.objects("documents")) for (StrictJson.Obj citation : document.objects("sources"))
+            check(result.add(citation.string("evidenceId")), "duplicate_evidence");
+        return result;
+    }
+
+    static void previous(StrictJson.Obj record, List<StrictJson.Obj> records) {
+        StrictJson.Obj context = record.object("marketContext"), prior = context.object("previousPublication");
+        check("simulated_previous_output".equals(prior.string("kind")), "previous_kind");
+        Instant from = Instant.parse(context.object("window").string("from"));
+        String expected = "morning".equals(record.string("edition")) ? "evening" : "morning";
+        List<StrictJson.Obj> matches = records.stream().filter(r -> expected.equals(r.string("edition"))
+                && from.equals(Instant.parse(r.string("cutoff")))).toList();
+        check(matches.size() <= 1, "previous_ambiguous");
+        boolean available = !matches.isEmpty() && !matches.getFirst().isNull("summaryResult")
+                && "PASS".equals(matches.getFirst().object("summaryResult").object("verification").string("status"));
+        check(available == "available".equals(prior.string("status")), "previous_availability");
+        if (available) {
+            StrictJson.Obj old = matches.getFirst();
+            check(old.string("roundId").equals(prior.string("roundId"))
+                    && old.string("date").equals(prior.string("date")) && old.string("edition").equals(prior.string("edition"))
+                    && old.string("summaryResultSha256").equals(prior.string("summaryResultSha256"))
+                    && old.object("summaryResult").node().equals(prior.object("summary").node())
+                    && Instant.parse(prior.string("cutoff")).equals(from), "previous_original_binding");
+        } else check(!prior.string("reason").isBlank(), "previous_unavailable_reason");
+    }
+
+    static Map<String, StrictJson.Obj> priorForecasts(StrictJson.Obj context) {
+        Map<String, StrictJson.Obj> result = new LinkedHashMap<>();
+        StrictJson.Obj prior = context.object("previousPublication");
+        if (!"available".equals(prior.string("status"))) return result;
+        StrictJson.Obj summary = prior.object("summary");
+        if (summary.has("forecasts")) for (StrictJson.Obj forecast : summary.objects("forecasts"))
+            check(result.putIfAbsent(forecast.string("forecastId"), forecast) == null, "previous_forecast_duplicate");
+        return result;
+    }
+
+    static void targetsAndEvaluations(StrictJson.Obj context, StrictJson.Obj snapshot) {
+        Map<String, StrictJson.Obj> indicators = new HashMap<>();
+        snapshot.object("marketVariables").objects("indicators").forEach(i -> indicators.put(i.string("id"), i));
+        Map<String, StrictJson.Obj> targets = new LinkedHashMap<>();
+        for (StrictJson.Obj target : context.objects("forecastTargets")) {
+            check(!context.isNull("sessionCalendar"), "target_without_calendar");
+            StrictJson.Obj indicator = indicators.get(target.string("indicatorId"));
+            check(Set.of("kospi", "kosdaq").contains(target.string("indicatorId")) && indicator != null
+                    && Set.of("ok", "delayed").contains(indicator.string("status"))
+                    && "close".equals(target.string("valueKind")) && "close".equals(indicator.string("valueKind"))
+                    && "close_vs_baseline_v1".equals(target.string("rule"))
+                    && target.string("baselineDate").equals(indicator.string("observedDate"))
+                    && target.raw("baselineValue").decimalValue().compareTo(indicator.raw("value").decimalValue()) == 0
+                    && Instant.parse(target.string("targetEnd")).isAfter(Instant.parse(snapshot.object("round").string("cutoff"))),
+                    "forecast_target_basis");
+            check(targets.putIfAbsent(target.string("targetId"), target) == null, "target_duplicate");
+            ObjectNode value = (ObjectNode) target.node().deepCopy(); value.remove("targetId");
+            check(("market-target-" + identityDigest(value).substring(0, 32)).equals(target.string("targetId")), "target_id");
+            StrictJson.Obj calendar = context.object("sessionCalendar");
+            check("zoop-market-session-calendar-v1".equals(calendar.string("schemaVersion")), "calendar_schema");
+            List<StrictJson.Obj> days = calendar.objects("sessions");
+            for (StrictJson.Obj day : days) check(!Instant.parse(day.string("availableAt"))
+                    .isAfter(Instant.parse(snapshot.object("round").string("cutoff"))), "calendar_asof");
+            List<StrictJson.Obj> current = days.stream().filter(d -> context.string("date").equals(d.string("date"))).toList();
+            check(current.size() == 1 && current.getFirst().bool("tradingDay"), "calendar_current_day");
+            String expected = "morning".equals(context.string("edition")) ? context.string("date") : current.getFirst().string("nextTradingDate");
+            List<StrictJson.Obj> end = days.stream().filter(d -> target.string("targetDate").equals(d.string("date"))).toList();
+            check(expected.equals(target.string("targetDate")) && end.size() == 1 && end.getFirst().bool("tradingDay")
+                    && target.string("targetEnd").equals(end.getFirst().string("closeAt"))
+                    && target.string("calendarRef").equals(end.getFirst().string("sourceRef")), "calendar_target");
+        }
+        Map<String, StrictJson.Obj> prior = priorForecasts(context);
+        Set<String> accounted = new HashSet<>();
+        for (StrictJson.Obj evaluation : context.objects("forecastEvaluations")) {
+            String id = evaluation.string("forecastId"); StrictJson.Obj forecast = prior.get(id);
+            check(forecast != null && accounted.add(id), "evaluation_owner");
+            StrictJson.Obj target = forecast.object("target");
+            check(target.node().equals(evaluation.object("target").node()) && target.string("rule").equals(evaluation.string("rule")), "evaluation_target");
+            StrictJson.Obj observed = indicators.get(target.string("indicatorId"));
+            String reason = !forecast.strings("conditions").isEmpty() ? "condition_outcomes_not_observed"
+                    : "uncertain".equals(forecast.string("direction")) ? "direction_not_testable"
+                    : Instant.parse(target.string("targetEnd")).isAfter(Instant.parse(snapshot.object("round").string("cutoff"))) ? "target_period_not_finished"
+                    : observed == null || !Set.of("ok", "delayed").contains(observed.string("status"))
+                        || !target.string("valueKind").equals(observed.string("valueKind"))
+                        || !target.string("targetDate").equals(observed.string("observedDate")) ? "exact_target_observation_missing" : null;
+            if (reason != null) check("unavailable".equals(evaluation.string("status")) && reason.equals(evaluation.string("reason"))
+                    && evaluation.isNull("actualValue") && evaluation.isNull("actualDirection") && evaluation.isNull("directionMatched"), "evaluation_unavailable");
+            else {
+                BigDecimal actual = observed.raw("value").decimalValue(), baseline = target.raw("baselineValue").decimalValue();
+                int sign = actual.compareTo(baseline); String direction = sign > 0 ? "up" : sign < 0 ? "down" : "flat";
+                check("evaluated".equals(evaluation.string("status")) && evaluation.isNull("reason")
+                        && actual.compareTo(evaluation.raw("actualValue").decimalValue()) == 0
+                        && direction.equals(evaluation.string("actualDirection"))
+                        && evaluation.bool("directionMatched") == direction.equals(forecast.string("direction")), "evaluation_result");
+            }
+            ObjectNode value = (ObjectNode) evaluation.node().deepCopy(); value.remove("evaluationId");
+            check(("market-evaluation-" + identityDigest(value).substring(0, 32)).equals(evaluation.string("evaluationId")), "evaluation_id");
+        }
+        check(accounted.equals(prior.keySet()), "evaluation_coverage");
+    }
+
+    static void claims(StrictJson.Obj summary, StrictJson.Obj context) {
+        Map<String, StrictJson.Obj> prior = priorForecasts(context), targets = new HashMap<>(), evaluations = new HashMap<>();
+        context.objects("forecastTargets").forEach(t -> targets.put(t.string("targetId"), t));
+        context.objects("forecastEvaluations").forEach(e -> evaluations.put(e.string("evaluationId"), e));
+        for (StrictJson.Obj claim : summary.objects("claims")) {
+            String kind = claim.string("kind");
+            check(Set.of("fact", "interpretation", "forecast", "forecast_update", "result_comparison").contains(kind), "claim_kind");
+            StrictJson.Obj publication = context.object("previousPublication");
+            Set<String> publications = "available".equals(publication.string("status")) ? Set.of(publication.string("roundId")) : Set.of();
+            check(publications.containsAll(claim.strings("previousPublicationIds")), "claim_publication_reference");
+            check(prior.keySet().containsAll(claim.strings("previousForecastIds"))
+                    && evaluations.keySet().containsAll(claim.strings("evaluationIds")), "claim_previous_reference");
+            for (String id : claim.strings("evaluationIds"))
+                check(claim.strings("previousForecastIds").contains(evaluations.get(id).string("forecastId")), "claim_evaluation_owner");
+            if ("forecast".equals(kind)) check(targets.containsKey(claim.string("targetId"))
+                    && Set.of("up", "down", "flat", "uncertain").contains(claim.string("direction"))
+                    && !claim.strings("evidenceIds").isEmpty() && !claim.strings("counterFactors").isEmpty(), "claim_forecast_basis");
+            else check(claim.isNull("targetId") && claim.isNull("direction") && claim.strings("conditions").isEmpty()
+                    && claim.strings("counterFactors").isEmpty(), "claim_nonforecast_target");
+            if ("forecast_update".equals(kind)) check("morning".equals(context.string("edition"))
+                    && !claim.strings("previousForecastIds").isEmpty()
+                    && (!claim.strings("evidenceIds").isEmpty() || !claim.strings("indicatorIds").isEmpty())
+                    && Set.of("maintain", "strengthen", "weaken", "withdraw").contains(claim.string("updateAction")), "claim_update");
+            else check(claim.isNull("updateAction"), "claim_update_action");
+            if ("result_comparison".equals(kind)) check("evening".equals(context.string("edition"))
+                    && (!claim.strings("previousForecastIds").isEmpty() || !claim.strings("previousPublicationIds").isEmpty()), "claim_comparison");
+        }
+        for (StrictJson.Obj check : summary.object("verification").objects("checks"))
+            if ("PASS".equals(summary.object("verification").string("status")))
+                check(check.bool("comparisonAppropriate") && check.bool("forecastAppropriate"), "comparison_forecast_verification");
+        check(summary.array("forecastEvaluations").equals(context.array("forecastEvaluations")), "saved_evaluations");
+        List<StrictJson.Obj> expected = summary.objects("claims").stream().filter(c -> "forecast".equals(c.string("kind"))).toList();
+        List<StrictJson.Obj> forecasts = summary.objects("forecasts");
+        boolean passed = "PASS".equals(summary.object("verification").string("status"));
+        check(forecasts.size() == (passed ? expected.size() : 0), "saved_forecast_count");
+        for (int index = 0; index < forecasts.size(); index++) {
+            StrictJson.Obj forecast = forecasts.get(index), claim = expected.get(index);
+            check(forecast.object("target").node().equals(targets.get(claim.string("targetId")).node()), "saved_forecast_target");
+            for (String field : List.of("text", "direction", "conditions", "counterFactors", "evidenceIds", "indicatorIds"))
+                check(forecast.raw(field).equals(claim.raw(field)), "saved_forecast_content");
+            ObjectNode value = (ObjectNode) forecast.node().deepCopy(); value.remove("forecastId");
+            ObjectNode identity = StrictJson.newObject().put("version", summary.string("resultVersion")); identity.set("value", value);
+            check(("market-forecast-" + identityDigest(identity).substring(0, 32)).equals(forecast.string("forecastId")), "saved_forecast_id");
+        }
+    }
+
+    private static String identityDigest(JsonNode node) {
+        return Canonical.digest(numericText(node));
+    }
+
+    private static JsonNode numericText(JsonNode node) {
+        if (node.isObject()) {
+            ObjectNode result = StrictJson.newObject();
+            for (String name : node.propertyNames()) result.set(name, numericText(node.get(name)));
+            return result;
+        }
+        if (node.isArray()) {
+            var result = StrictJson.newArray(); for (JsonNode value : node) result.add(numericText(value)); return result;
+        }
+        if (node.isNumber()) return new tools.jackson.databind.node.StringNode(node.decimalValue().stripTrailingZeros().toPlainString());
+        return node;
+    }
+
+    private static void check(boolean condition, String reason) {
+        if (!condition) throw new IllegalArgumentException("market_context_" + reason);
+    }
+}

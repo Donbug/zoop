@@ -27,17 +27,26 @@ class MarketSummaryError(base.ReplayError):
 class MarketSummaryClient(base.ResponsesClient):
     """Dedicated prompts; keep model/store/schema/immutable-call accounting explicit."""
 
+    def __init__(self, *args, prompt_root=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prompt_root = prompt_root
+
     def request(self, stage, data, prompt_name, schema_name, max_output=8000, schema_override=None):
-        instructions = base.regular(PROMPTS / prompt_name).decode("utf-8")
-        schema = base.strict_load(base.canonical(schema_override)) if schema_override is not None \
-            else base.strict_load(base.regular(PROMPTS / schema_name))
-        request = {"model": MODEL, "store": False, "max_output_tokens": max_output, "instructions": instructions,
-                   "input": base.canonical(data).decode("utf-8"), "reasoning": {"effort": "low"},
-                   "text": {"format": {"type": "json_schema", "name": stage, "strict": True, "schema": schema}}}
-        encoded = base.canonical(request)
-        if len(encoded) > 2 * 1024 * 1024:
-            raise MarketSummaryError("market_summary_request_size_exceeded")
-        return encoded, schema, base.digest(instructions.encode())
+        return prepare_market_request(self.prompt_root or PROMPTS, stage, data, prompt_name, schema_name,
+                                      max_output=max_output, schema_override=schema_override)
+
+
+def prepare_market_request(root, stage, data, prompt_name, schema_name, max_output=8000, schema_override=None):
+    instructions = base.regular(root / prompt_name).decode("utf-8")
+    schema = base.strict_load(base.canonical(schema_override)) if schema_override is not None \
+        else base.strict_load(base.regular(root / schema_name))
+    request = {"model": MODEL, "store": False, "max_output_tokens": max_output, "instructions": instructions,
+               "input": base.canonical(data).decode("utf-8"), "reasoning": {"effort": "low"},
+               "text": {"format": {"type": "json_schema", "name": stage, "strict": True, "schema": schema}}}
+    encoded = base.canonical(request)
+    if len(encoded) > 2 * 1024 * 1024:
+        raise MarketSummaryError("market_summary_request_size_exceeded")
+    return encoded, schema, base.digest(instructions.encode())
 
 
 def _aware(value):

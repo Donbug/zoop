@@ -273,6 +273,22 @@ public final class BriefingReplayImporter {
                 Instant published = generated;
                 if (marketRounds.containsKey(id)) {
                     StrictJson.Obj enrichment = marketRounds.get(id);
+                    if (enrichment.has("marketContext")) {
+                        List<Citation> extra = marketContextSources(enrichment, definition, pool, clocks);
+                        Set<String> referenced = new HashSet<>(); for (JsonNode ref : payload.path("references").path("evidenceIds")) referenced.add(ref.stringValue());
+                        Set<String> bound = new HashSet<>(); for (JsonNode binding : snapshot.path("sourceBindings")) bound.add(binding.path("documentId").stringValue());
+                        for (Citation citation : extra) {
+                            Citation previousCitation = citations.putIfAbsent(citation.id(), citation);
+                            require(previousCitation == null || previousCitation.equals(citation), "market_context_evidence_conflict");
+                            Source source = citation.source(); documents.putIfAbsent(source.key(), source);
+                            if (referenced.add(citation.id())) ((ArrayNode) payload.path("references").path("evidenceIds")).add(citation.id());
+                            if (bound.add(source.id())) {
+                                ObjectNode binding = ((ArrayNode) snapshot.path("sourceBindings")).addObject().put("documentId", source.id())
+                                        .put("documentVersion", source.version()).put("grantId", grantId(run, source)).put("grantRevision", sourceSha);
+                                binding.putArray("recipients").add("openai");
+                            }
+                        }
+                    }
                     applyMarketEnrichment(payload, snapshot, enrichment);
                     registerMarketBlobs(namespace + "-market-" + index, enrichment, blobs);
                     MarketPublicationTimes times = marketPublicationTimes(generated, enrichment);
@@ -337,6 +353,67 @@ public final class BriefingReplayImporter {
         }
     }
 
+    /** Independently restore every broad-input span from the source/clock registry before any DB write. */
+    private static List<Citation> marketContextSources(StrictJson.Obj record, StrictJson.Obj definition,
+            Map<String, Source> pool, PublicationClockRegistry clocks) {
+        StrictJson.Obj context = record.object("marketContext");
+        require("zoop-briefing-market-context-v1".equals(context.string("schemaVersion"))
+                && "publication_clock_simulation".equals(context.string("scope")) && !context.bool("operationalCollectionGate")
+                && context.object("window").node().equals(definition.object("window").node()), "market_context_schema_window");
+        for (String field : List.of("roundId", "date", "edition"))
+            require(context.string(field).equals(definition.string(field)), "market_context_round");
+        Instant from = Instant.parse(definition.object("window").string("from")), cutoff = Instant.parse(record.string("cutoff"));
+        Map<String, Source> expected = new LinkedHashMap<>(); Set<String> bodies = new HashSet<>();
+        for (PublicationClockRegistry.Clock clock : clocks.verified.values().stream()
+                .sorted(java.util.Comparator.comparing(PublicationClockRegistry.Clock::documentId)).toList()) {
+            if (clock.publishedAt().isAfter(cutoff)) continue;
+            String role = clock.publishedAt().isAfter(from) ? "new" : "background";
+            if (bodies.add(role + "\u0000" + clock.bodySha256())) expected.put(clock.documentId(), pool.get(clock.key()));
+        }
+        require(expected.size() <= 1000, "market_context_population");
+        Set<String> actual = new HashSet<>(), companyNames = new java.util.TreeSet<>(); List<Citation> citations = new ArrayList<>();
+        int fresh = 0;
+        for (StrictJson.Obj card : context.objects("documents")) {
+            String document = text(card, "documentId"); Source source = expected.get(document);
+            require(actual.add(document) && source != null && source.version().equals(card.string("documentVersion"))
+                    && source.bodySha().equals(card.string("bodySha256")), "market_context_source_binding");
+            PublicationClockRegistry.Clock clock = clocks.verified.get(source.key());
+            String role = clock.publishedAt().isAfter(from) ? "new" : "background";
+            require(role.equals(card.string("role")), "market_context_source_role"); if ("new".equals(role)) fresh++;
+            Set<String> names = new java.util.TreeSet<>();
+            if (source.row().has("companyAssociations")) for (JsonNode value : source.row().array("companyAssociations"))
+                if (value.isObject() && value.path("companyName").isString() && !value.path("companyName").stringValue().isBlank())
+                    names.add(value.path("companyName").stringValue());
+            if (source.row().has("companyName") && !source.row().isNull("companyName")) {
+                String name = source.row().string("companyName"); if (!name.isBlank()) names.add(name);
+            }
+            require(card.strings("companyNames").equals(List.copyOf(names)), "market_context_company_binding"); companyNames.addAll(names);
+            int length = source.body().codePointCount(0, source.body().length());
+            List<StrictJson.Obj> spans = card.objects("sources"); require(spans.size() == (length > 900 ? 2 : 1), "market_context_span_coverage");
+            for (int index = 0; index < spans.size(); index++) {
+                StrictJson.Obj span = spans.get(index); int start = index == 0 ? 0 : length - 300;
+                int end = index == 0 ? Math.min(600, length) : length;
+                String exact = source.body().substring(source.body().offsetByCodePoints(0, start), source.body().offsetByCodePoints(0, end));
+                require(document.equals(span.string("documentId")) && source.version().equals(span.string("documentVersion"))
+                        && source.bodySha().equals(span.string("bodySha256")) && start == span.count("start") && end == span.count("end")
+                        && "unicode_code_point".equals(span.string("offsetUnit")) && exact.equals(span.string("quote"))
+                        && clock.publishedAt().equals(Instant.parse(span.string("publishedAt"))), "market_context_exact_span");
+                ObjectNode identity = StrictJson.newObject().put("documentId", document).put("bodySha256", source.bodySha()).put("start", start).put("end", end);
+                require(("market-evidence-" + Canonical.digest(identity).substring(0, 32)).equals(span.string("evidenceId")), "market_context_evidence_id");
+                citations.add(new Citation(span.string("evidenceId"), source, exact, start, end));
+            }
+        }
+        require(actual.equals(expected.keySet()), "market_context_complete_source_coverage");
+        StrictJson.Obj coverage = context.object("coverage");
+        require(coverage.count("documents") == actual.size() && coverage.count("newDocuments") == fresh
+                && coverage.count("backgroundDocuments") == actual.size() - fresh
+                && coverage.strings("companyNames").equals(List.copyOf(companyNames))
+                && coverage.count("unconfirmedTotal") == definition.object("sourceCoverage").count("unconfirmedTotal")
+                && !coverage.bool("sectorPriceFeedAvailable") && !coverage.bool("marketRepresentative")
+                && !coverage.bool("historicalBodyUnchangedProven") && "exact_prefix600_suffix300".equals(coverage.string("bodyScope")), "market_context_coverage");
+        return citations;
+    }
+
     /** Add-on artifacts preserve every original news identity/result and are imported into a separate replay DB. */
     static Map<String, StrictJson.Obj> validateMarketEnrichment(StrictJson.Obj bundle, String userInboxRef, Path output) {
         Map<String, StrictJson.Obj> result = new LinkedHashMap<>();
@@ -355,6 +432,7 @@ public final class BriefingReplayImporter {
             String id = record.string("roundId"); StrictJson.Obj news = published.get(id);
             require(news != null && result.putIfAbsent(id, record) == null, "market_enrichment_round_scope");
             validateMarketRecord(record, news, userInboxRef, output);
+            if (record.has("marketContext")) BriefingMarketContextRules.previous(record, layer.objects("rounds"));
             for (var receipt : simulationReceiptLedger(record.objects("receipts")).entrySet())
                 require(receipt.getValue().equals(all.get(receipt.getKey())) && accounted.add(receipt.getKey()), "market_enrichment_receipt_owner");
         }
@@ -371,11 +449,12 @@ public final class BriefingReplayImporter {
         marketArtifact(output, "snapshots", record.string("marketSnapshotSha256"), snapshot.node());
         validateMarketSnapshot(snapshot, record);
         validateMarketRawValues(snapshot, output);
-        StrictJson.Obj context = record.object("context").keys(Set.of("roundId", "date", "edition", "cutoff", "newsResultSha256", "marketSnapshotSha256", "userInboxRef"), Set.of("promptArtifacts"));
+        StrictJson.Obj context = record.object("context").keys(Set.of("roundId", "date", "edition", "cutoff", "newsResultSha256", "marketSnapshotSha256", "userInboxRef"), Set.of("promptArtifacts", "marketContextSha256", "summaryPromptVersion"));
         require(Canonical.digest(context.node()).equals(record.string("contextSha256")) && inbox.equals(context.string("userInboxRef")), "market_enrichment_context_hash");
         if (context.has("promptArtifacts")) {
             StrictJson.Obj prompts = context.object("promptArtifacts").exactly(Set.of("generation.md", "generation.schema.json", "verification.md", "verification.schema.json"));
-            for (String name : prompts.node().propertyNames()) try (var stream = BriefingReplayImporter.class.getResourceAsStream("/briefing/prompts/market-summary/" + name)) {
+            String folder = record.has("marketContext") ? "market-context" : "market-summary";
+            for (String name : prompts.node().propertyNames()) try (var stream = BriefingReplayImporter.class.getResourceAsStream("/briefing/prompts/" + folder + "/" + name)) {
                 require(stream != null && Canonical.sha256(stream.readAllBytes()).equals(prompts.string(name)), "market_enrichment_prompt_hash");
             } catch (IOException error) { throw new IllegalArgumentException("Market summary prompt unavailable", error); }
         }
@@ -396,7 +475,17 @@ public final class BriefingReplayImporter {
         }
         StrictJson.Obj summary = record.object("summaryResult");
         marketArtifact(output, "summaries", record.string("summaryResultSha256"), summary.node());
-        validateMarketSummary(summary, news, snapshot);
+        if (record.has("marketContext")) {
+            StrictJson.Obj broad = record.object("marketContext");
+            require(BriefingMarketContextRules.contextual(summary) && "market-context-v2".equals(context.string("summaryPromptVersion"))
+                    && context.string("marketContextSha256").equals(summary.string("marketContextSha256")), "market_context_digest_binding");
+            marketArtifact(output, "contexts", context.string("marketContextSha256"), broad.node());
+            BriefingMarketContextRules.targetsAndEvaluations(broad, snapshot);
+            validateMarketSummary(summary, news, snapshot, broad);
+        } else {
+            require(!BriefingMarketContextRules.contextual(summary), "market_context_result_without_input");
+            validateMarketSummary(summary, news, snapshot);
+        }
         if (!summary.objects("claims").isEmpty()) validateMarketSummaryRecordings(record, news, receipts, output);
     }
 
@@ -522,11 +611,17 @@ public final class BriefingReplayImporter {
     }
 
     static void validateMarketSummary(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj snapshot) {
+        validateMarketSummary(summary, news, snapshot, null);
+    }
+
+    static void validateMarketSummary(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj snapshot, StrictJson.Obj broad) {
+        boolean contextual = broad != null;
         Instant.parse(summary.string("generatedAt")); text(summary, "scopeNote");
         Set<String> evidence = new HashSet<>(); for (StrictJson.Obj selected : news.objects("selected"))
             for (StrictJson.Obj source : selected.objects("sources")) evidence.add(source.string("evidenceId"));
         Set<String> indicators = new HashSet<>(); for (StrictJson.Obj indicator : snapshot.object("marketVariables").objects("indicators"))
             if (Set.of("ok", "delayed").contains(indicator.string("status"))) indicators.add(indicator.string("id"));
+        if (contextual) evidence.addAll(BriefingMarketContextRules.evidence(broad));
         List<String> texts = new ArrayList<>(); Set<String> targets = new HashSet<>(), citedNews = new HashSet<>();
         List<StrictJson.Obj> claims = summary.objects("claims");
         String status = summary.object("verification").string("status");
@@ -534,11 +629,12 @@ public final class BriefingReplayImporter {
         if (claims.isEmpty() && "WITHHELD".equals(status)) {
             require(summary.isNull("text") && summary.isNull("summary") && summary.isNull("resultVersion"), "market_summary_withheld_content"); return;
         }
-        require(claims.size() >= 2 && claims.size() <= 4, "market_summary_claim_count");
+        require(claims.size() >= 2 && claims.size() <= (contextual ? 8 : 4), "market_summary_claim_count");
         for (int index = 0; index < claims.size(); index++) {
             StrictJson.Obj claim = claims.get(index); texts.add(text(claim, "text"));
             List<String> refs = claim.strings("evidenceIds"), ids = claim.strings("indicatorIds");
-            require((!refs.isEmpty() || !ids.isEmpty()) && evidence.containsAll(refs) && indicators.containsAll(ids)
+            boolean previousBasis = contextual && (!claim.strings("previousForecastIds").isEmpty() || !claim.strings("evaluationIds").isEmpty() || !claim.strings("previousPublicationIds").isEmpty());
+            require((!refs.isEmpty() || !ids.isEmpty() || previousBasis) && evidence.containsAll(refs) && indicators.containsAll(ids)
                     && new HashSet<>(refs).size() == refs.size() && new HashSet<>(ids).size() == ids.size(), "market_summary_foreign_reference");
             String claimId = "market:claim:" + index; require(claimId.equals(claim.string("claimId")), "market_summary_claim_id");
             citedNews.addAll(refs); targets.add(claimId);
@@ -551,8 +647,10 @@ public final class BriefingReplayImporter {
         for (StrictJson.Obj check : verification.objects("checks")) {
             require(checked.add(text(check, "targetId")) && Set.of("SUPPORTED", "UNSUPPORTED", "UNCERTAIN").contains(check.string("verdict")), "market_summary_check_identity");
             supported &= "SUPPORTED".equals(check.string("verdict")) && check.bool("noUnsupportedNumbers")
-                    && check.bool("noUnsupportedCausality") && check.bool("temporalAppropriate") && check.bool("noInvestmentAdvice"); text(check, "reason");
+                    && check.bool("noUnsupportedCausality") && check.bool("temporalAppropriate") && check.bool("noInvestmentAdvice")
+                    && (!contextual || (check.bool("comparisonAppropriate") && check.bool("forecastAppropriate"))); text(check, "reason");
         }
+        if (contextual) BriefingMarketContextRules.claims(summary, broad);
         require(checked.equals(targets) && ("PASS".equals(status) == supported), "market_summary_verification_coverage");
         if ("PASS".equals(status)) require(!citedNews.isEmpty(), "market_summary_news_evidence_required");
     }
@@ -574,6 +672,13 @@ public final class BriefingReplayImporter {
                     && record.object("marketSnapshot").node().equals(data.object("marketSnapshot").node())
                     && news.array("selected").equals(data.array("selected"))
                     && news.object("result").array("items").equals(data.array("newsItems")), "market_summary_request_context");
+            if (record.has("marketContext")) {
+                require(record.object("marketContext").node().equals(data.object("marketContext").node())
+                        && summary.string("frozenInputSha256").equals(data.string("frozenInputSha256")), "market_context_recording_binding");
+                ObjectNode frozen = (ObjectNode) data.node().deepCopy();
+                frozen.remove(List.of("frozenInputSha256", "repairAttempt", "priorDraft", "priorValidation", "draft"));
+                marketArtifact(output, "frozen-inputs", summary.string("frozenInputSha256"), frozen);
+            }
             byte[] responseBytes = read(output.resolve("calls").resolve(digest + ".response.json"));
             require(Canonical.sha256(responseBytes).equals(receipt.string("responseSha256")), "market_summary_response_hash");
             StrictJson.Obj response = StrictJson.parseObject(responseBytes); List<String> texts = new ArrayList<>();
@@ -617,6 +722,15 @@ public final class BriefingReplayImporter {
         Path output = settings.bundle().getParent();
         blobs.put(namespace + "-snapshot", blob("briefing_input", marketArtifact(output, "snapshots", record.string("marketSnapshotSha256"), record.object("marketSnapshot").node())));
         blobs.put(namespace + "-context", blob("briefing_input", StrictJson.write(record.object("context").node())));
+        if (record.has("marketContext")) {
+            blobs.put(namespace + "-market-context", blob("briefing_input",
+                    marketArtifact(output, "contexts", record.object("context").string("marketContextSha256"), record.object("marketContext").node())));
+            StrictJson.Obj result = record.object("summaryResult");
+            String sha = result.string("frozenInputSha256");
+            byte[] bytes = read(output.resolve("market/frozen-inputs/" + sha + ".json"));
+            require(Canonical.sha256(bytes).equals(sha), "market_context_frozen_input_hash");
+            blobs.put(namespace + "-frozen-input", blob("briefing_input", bytes));
+        }
         if (!record.isNull("summaryResult")) blobs.put(namespace + "-summary", blob("analysis_result",
                 marketArtifact(output, "summaries", record.string("summaryResultSha256"), record.object("summaryResult").node())));
         for (StrictJson.Obj ref : record.object("marketSnapshot").objects("rawRefs")) blobs.put(namespace + "-raw-" + ref.string("sha256"),
@@ -628,6 +742,11 @@ public final class BriefingReplayImporter {
         ObjectNode lineage = snapshot.putObject("marketEnrichment").put("contextSha256", record.string("contextSha256"))
                 .put("marketSnapshotSha256", record.string("marketSnapshotSha256"));
         lineage.set("context", record.object("context").node().deepCopy());
+        if (record.has("marketContext")) {
+            lineage.set("marketContext", record.object("marketContext").node().deepCopy());
+            lineage.set("forecasts", record.object("summaryResult").array("forecasts").deepCopy());
+            lineage.set("forecastEvaluations", record.object("summaryResult").array("forecastEvaluations").deepCopy());
+        }
         ArrayNode failures = (ArrayNode) payload.path("metadata").path("failures");
         for (int index = failures.size() - 1; index >= 0; index--) if ("marketVariables".equals(failures.get(index).path("section").stringValue())) failures.remove(index);
         failure(failures, "marketVariables", "RETROSPECTIVE_DAILY_SNAPSHOT", "회차 마감 이전 일별 지표를 나중에 조회한 과거 시뮬레이션입니다. 당시 장중 관측값·개별 뉴스의 주가 영향 인과관계를 입증하지 않습니다.");

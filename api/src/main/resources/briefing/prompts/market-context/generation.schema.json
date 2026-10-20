@@ -1,0 +1,130 @@
+{
+  "type": "object",
+  "properties": {
+    "claims": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 350
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "interpretation",
+              "forecast",
+              "forecast_update",
+              "result_comparison"
+            ]
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8
+          },
+          "indicatorIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3
+          },
+          "previousForecastIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4
+          },
+          "evaluationIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4
+          },
+          "targetId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "up",
+              "down",
+              "flat",
+              "uncertain",
+              null
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4
+          },
+          "counterFactors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4
+          },
+          "updateAction": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "maintain",
+              "strengthen",
+              "weaken",
+              "withdraw",
+              null
+            ]
+          },
+          "previousPublicationIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1
+          }
+        },
+        "required": [
+          "text",
+          "kind",
+          "evidenceIds",
+          "indicatorIds",
+          "previousForecastIds",
+          "evaluationIds",
+          "targetId",
+          "direction",
+          "conditions",
+          "counterFactors",
+          "updateAction",
+          "previousPublicationIds"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "claims"
+  ],
+  "additionalProperties": false
+}
