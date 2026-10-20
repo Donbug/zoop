@@ -1150,3 +1150,31 @@ test('F05: quote outages offer retry only when the server says it may help', asy
     }),
   ).toBeTruthy();
 });
+
+test('without a published graph version the page does not pin a reference time (no 409 loop)', async () => {
+  server.on('GET', '/api/v1/companies/:id', (r) =>
+    json({
+      ...company,
+      id: r.params.id,
+      directIssues: [],
+      structuralIssues: [],
+      metadata: {
+        ...metadata,
+        graphVersion: null,
+        partial: true,
+        asOf: time,
+      },
+    }),
+  );
+  open();
+  await screen.findByRole('heading', { name: '합성 기업' });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const address = screen.getByTestId('address').textContent!;
+  expect(address).not.toContain('asOf=');
+  expect(address).not.toContain('graphVersion=');
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id')
+      .every((call) => !call.query.has('asOf')),
+  ).toBe(true);
+});
