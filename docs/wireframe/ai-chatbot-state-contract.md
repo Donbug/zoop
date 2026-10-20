@@ -50,12 +50,14 @@
 | API 상태 | UI 상태 |
 | --- | --- |
 | `queued` | “질문을 접수했어요”와 취소 동작 표시 |
-| `running` | “자료를 확인하고 있어요” 표시. 검증 전 답변 본문은 숨김 |
+| `running` | `phase`에 따라 진행 단계 표시(`planning` 질문 이해 → `retrieving` 자료 확인 → `writing` 답변 작성 → `verifying` 검증). 자료 조회가 없는 경로는 `retrieving`을 건너뛴다. 검증 전 답변 본문은 숨김 |
 | `completed` | 저장된 `ChatResult` 렌더링. polling 중단 |
 | `failed` | `ChatFailure.message`와 허용된 복구 동작만 표시 |
 | `cancelled` | 취소됨을 표시하고 같은 질문을 자동 재접수하지 않음 |
 
-`failure.retry=save_only`이면 “저장 다시 시도”, `rerun`이면 “질문 다시 처리”로 구분한다. `retry=null`이면 재시도 버튼을 만들지 않고 새 질문 또는 지원 안내만 제공한다. 출력 검증 실패는 자동 재생성하지 않는다.
+`failure.retry=save_only`이면 “저장 다시 시도”, `rerun`이면 “질문 다시 처리”로 구분한다. `retry=null`이면 재시도 버튼을 만들지 않고 새 질문 또는 지원 안내만 제공한다. 작업당 실행이 3회에 도달하면 서버가 `retry=null`을 내려주므로 UI가 횟수를 따로 세지 않는다. 출력 검증 실패는 자동 재생성하지 않는다.
+
+진행 단계는 `phase`만 사용하고 경과 시간으로 단계를 추정하지 않는다. 단계 표시는 `aria-live=polite`로 알리되 단계마다 포커스를 옮기지 않는다.
 
 ### D-AI-02b · 대화 조회 오류
 
@@ -84,8 +86,8 @@
 | `guidance` | 지원 범위와 가능한 다음 행동. action이 있을 때만 버튼 표시 |
 | `insufficient_evidence` | 실제 조회 범위와 부족한 근거 설명. “사건이 없다”로 바꾸지 않음 |
 | `validation_failed` | 결과 미표시, 자동 재생성 없음, 요청 ID와 허용된 복구 안내 |
-| `budget_exceeded` | 부분 답변 미표시, 범위를 줄여 새 질문하도록 안내 |
-| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공 |
+| `budget_exceeded` | 부분 답변 미표시, 재시도 버튼 없음. `reason`이 `context_too_large`면 대상·기간을 줄이도록, `output_limit`이면 질문을 나누도록 안내하고 새 질문을 유도 |
+| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공. `model_timeout`·`tool_timeout`·`deadline_guard`·`provider_error`는 “일시적으로 처리하지 못했어요” 계열 문구를 쓰고 “자료 없음”으로 표현하지 않음 |
 | `permission_denied` | 개인·원문 데이터 미표시, 로그인·권한 안내 |
 
 ## 5. 접근성·상태 보존

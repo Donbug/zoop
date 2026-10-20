@@ -22,6 +22,19 @@
       ]
     },
     "response:200:application/json.jobs[].context.graphVersion:required": true,
+    "response:200:application/json.jobs[].phase:required": true,
+    "response:200:application/json.jobs[].phase<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "retrieving",
+        "writing",
+        "verifying"
+      ]
+    },
+    "response:200:application/json.jobs[].phase<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.jobs[].resolves:required": true,
     "response:200:application/json.jobs[].resolves<anyOf:0>": {
       "type": "object"

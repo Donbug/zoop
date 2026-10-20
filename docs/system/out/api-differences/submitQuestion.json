@@ -63,6 +63,19 @@
       ]
     },
     "response:200:application/json.context.graphVersion:required": true,
+    "response:200:application/json.phase:required": true,
+    "response:200:application/json.phase<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "retrieving",
+        "writing",
+        "verifying"
+      ]
+    },
+    "response:200:application/json.phase<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.resolves:required": true,
     "response:200:application/json.resolves<anyOf:0>": {
       "type": "object"
@@ -228,6 +241,19 @@
       ]
     },
     "response:202:application/json.context.graphVersion:required": true,
+    "response:202:application/json.phase:required": true,
+    "response:202:application/json.phase<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "retrieving",
+        "writing",
+        "verifying"
+      ]
+    },
+    "response:202:application/json.phase<anyOf:1>": {
+      "type": "null"
+    },
     "response:202:application/json.resolves:required": true,
     "response:202:application/json.resolves<anyOf:0>": {
       "type": "object"

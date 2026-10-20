@@ -22,6 +22,19 @@
       ]
     },
     "response:200:application/json.conversation<anyOf:0>.jobs[].context.graphVersion:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].phase:required": true,
+    "response:200:application/json.conversation<anyOf:0>.jobs[].phase<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "retrieving",
+        "writing",
+        "verifying"
+      ]
+    },
+    "response:200:application/json.conversation<anyOf:0>.jobs[].phase<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.conversation<anyOf:0>.jobs[].resolves:required": true,
     "response:200:application/json.conversation<anyOf:0>.jobs[].resolves<anyOf:0>": {
       "type": "object"
