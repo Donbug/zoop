@@ -203,11 +203,15 @@ public class EventListService {
         }
     }
 
-    /** A bare date is that whole KST day (to: up to the next day); a date-time must carry its offset. */
-    private static Instant bound(String value, boolean end) {
+    /**
+     * A bare date is that whole KST day (to: up to the next day); a date-time must carry its offset. An exact to
+     * includes that instant, as in getCompanyPrices: the chart sends its asOf as to, and an event at asOf is on the graph.
+     */
+    static Instant bound(String value, boolean end) {
         try {
             if (value.length() == 10) return LocalDate.parse(value).plusDays(end ? 1 : 0).atStartOfDay(KST).toInstant();
-            return OffsetDateTime.parse(value).toInstant();
+            Instant at = OffsetDateTime.parse(value).toInstant();
+            return end ? at.plusNanos(1) : at;
         } catch (DateTimeParseException exception) {
             throw new CustomException(ErrorCode.INVALID_REQUEST, exception);
         }

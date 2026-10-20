@@ -152,6 +152,11 @@ class EventListServiceTest {
         assertFalse(EventListService.overlaps(issue("2025", "year", null), from, to));
         assertTrue(EventListService.overlaps(issue("2026-06-30T23:59:00Z", "datetime", null), from, to));
         assertFalse(EventListService.overlaps(issue("2026-07-01T00:00:00Z", "datetime", null), from, to));
+        // An exact to is inclusive (the chart's asOf); a date to runs to the next KST day.
+        Instant exactTo = EventListService.bound("2026-07-01T09:00:00+09:00", true);
+        assertTrue(EventListService.overlaps(issue("2026-07-01T00:00:00Z", "datetime", null), from, exactTo));
+        assertFalse(EventListService.overlaps(issue("2026-07-01T00:00:01Z", "datetime", null), from, exactTo));
+        assertEquals(Instant.parse("2026-07-01T15:00:00Z"), EventListService.bound("2026-07-01", true));
     }
 
     private static Issue issue(String eventTime, String precision, String publishedAt) {
