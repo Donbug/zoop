@@ -53,13 +53,16 @@ public class JdbcAdminDashboardRepository implements AdminDashboardRepository {
     public GraphSummary graphSummaryAt(Instant asOf) {
         long count = jdbc.queryForObject("SELECT count(*) FROM graph_versions", new MapSqlParameterSource(), Long.class);
         var active = jdbc.query("""
-                SELECT v.id, v.sequence, v.kind, v.source_label, v.created_at,
-                       (SELECT max(a.activated_at) FROM graph_activations a
-                         WHERE a.version_id = v.id AND a.pointer_changed AND a.activated_at <= :asOf)
-                           AS activated_at,
+                SELECT v.id, v.sequence, v.kind, v.source_label, v.created_at, activation.activated_at,
                        v.issue_count, v.relation_count, v.article_count
                 FROM graph_versions v
-                WHERE v.active
+                JOIN LATERAL (
+                    SELECT a.version_id, a.activated_at
+                    FROM graph_activations a
+                    WHERE a.pointer_changed AND a.activated_at <= :asOf
+                    ORDER BY a.activated_at DESC, a.id DESC
+                    LIMIT 1
+                ) activation ON activation.version_id = v.id
                 """, new MapSqlParameterSource("asOf", Timestamp.from(asOf)),
                 JdbcAdminDashboardRepository::activeVersion);
         return new GraphSummary(count, active.stream().findFirst());

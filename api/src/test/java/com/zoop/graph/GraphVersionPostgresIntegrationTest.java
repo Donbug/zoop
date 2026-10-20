@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.zoop.ZoopApplication;
+import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
 import com.zoop.graph.read.GraphQueryService;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
@@ -31,6 +32,7 @@ class GraphVersionPostgresIntegrationTest {
     private static JdbcGraphVersionRepository repository;
     private static GraphVersionSelector selector;
     private static FixtureGraphVersionSeeder seeder;
+    private static AdminDashboardRepository dashboardRepository;
 
     @BeforeAll
     static void start() {
@@ -51,6 +53,7 @@ class GraphVersionPostgresIntegrationTest {
         repository = context.getBean(JdbcGraphVersionRepository.class);
         selector = context.getBean(GraphVersionSelector.class);
         seeder = context.getBean(FixtureGraphVersionSeeder.class);
+        dashboardRepository = context.getBean(AdminDashboardRepository.class);
     }
 
     @AfterAll
@@ -87,6 +90,17 @@ class GraphVersionPostgresIntegrationTest {
         assertEquals("fixture-2026-10-01", past.version().id());
         assertEquals(3, context.getBean(GraphSnapshotStore.class).load(past.version()).issues().size());
         assertEquals("fixture-2026-10-08", selector.select(null, null, null).version().id());
+    }
+
+    @Test
+    void dashboardUsesTheLastGraphActivationAtOrBeforeItsAsOfTime() {
+        Instant asOf = Instant.parse("2026-10-05T00:00:00Z");
+
+        var summary = dashboardRepository.graphSummaryAt(asOf);
+
+        assertEquals("fixture-2026-10-01", summary.activeVersion().orElseThrow().id());
+        assertEquals(Instant.parse("2026-10-01T00:00:00Z"),
+                summary.activeVersion().orElseThrow().activatedAt());
     }
 
     @Test
