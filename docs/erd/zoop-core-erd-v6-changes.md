@@ -9,6 +9,7 @@
 - `chat_jobs`에 `resolves_job_id text? FK chat_jobs`, `resolves_choice_id text?`와 CHECK(choice가 있으면 job 필수)를 추가했다. 기존 계약에는 clarification 선택지(`ChatChoice.id`)를 새 질문에 돌려보낼 필드가 없어 원 질문과 선택을 서버가 결합할 근거가 없었다.
 - API `ChatJobRequest.resolves`·`ChatJob.resolves`(`ChatClarificationReply`)와 대응한다. 원 작업의 같은 대화·completed·clarification 여부와 choice 존재는 접수 트랜잭션에서 검사하며, 새 작업은 원 작업의 고정 문맥을 복사한다.
 - 테이블 수는 그대로 36개다. 챗봇 첫 migration에 함께 포함한다.
+- 정책 v0.8의 단계·체크포인트에 맞춰 `chat_jobs.route_summary`에 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계)를 저장하도록 내용을 넓혔다. 컬럼 변경은 없다.
 
 ## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
 

@@ -2,7 +2,7 @@
 
 기준일: 2026년 10월 17일
 
-기준 정책: `ZOOP-AIG-001 v0.7`
+기준 정책: `ZOOP-AIG-001 v0.8`
 
 화면 추적: `D-AI-01`, `D-AI-01b`, `D-AI-02`, `D-AI-02b`
 
@@ -79,9 +79,10 @@ flowchart LR
 1. 입력 정규화와 `requirementId` 분해를 구현한다. 질문에 명시된 대상·기간은 선택 문맥보다 우선한다.
 2. `route_summary`를 단계별로 쓰되 자유 형식 chain-of-thought는 저장하지 않는다.
 3. 계획 검증 전에는 도구 호출을 예약하지 않고, 확정 계획은 `chat_tool_calls(status=reserved)`로 원자 저장한다.
-4. 전체 30초, MCP 단계 10초, 개별 3초, 동시 4개, 최대 12회와 추가 조회 1라운드를 서버에서 강제한다.
+4. 의존 실행은 `stages[]`와 `checkpoint`로 선언하고, 단계가 끝날 때마다 서버가 개수 조건을 평가해 진행·`clarification`(초과)·제한 답변(미달)·없음 답변(0개, 잘림 없음)·근거 부족(0개, 잘림 또는 오류)으로 나눈다. 체크포인트에서 멈추면 남은 예약 호출을 취소하고 생성 stage를 호출하지 않는다.
+5. 전체 30초, MCP 단계 10초, 개별 3초, 동시 4개, 최대 12회, 의존 3단계·fan-out 5개와 보충 1라운드를 서버에서 강제한다. 예산은 체크포인트 조건의 최악의 경우로 계산한다.
 
-완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
+완료 조건: 예산 초과 계획은 도구 호출 0회와 clarification, 체크포인트 초과 시 다음 단계 호출 0회·생성 호출 0회와 실제 결과 기반 choices, 취소·lease 만료 뒤 신규 호출 0회, 병렬 호출도 최대 4개.
 
 ### 단계 3 — Jev router와 Luna coverage-verifier
 
@@ -144,7 +145,8 @@ flowchart LR
 | `ChatOrchestrationSubmit` | schemaVersion, jobId, attemptNo, question, frozenContext, requirements, policyVersion, registryVersion, budget, server-issued principal scope reference |
 | `ChatRouteDecision` | requirementId별 Q type·probability·required, capability 후보, model/prompt version, typed validation result |
 | `ChatCoverageDecision` | coveredRequirements, missingRequirements, unnecessaryCapabilities, requiresClarification, reasons as short machine codes |
-| `ChatToolPlan` | planRevision, ordered calls, dependencies, parallelGroup, capabilityId, registry tool binding, reserved budget |
+| `ChatToolPlan` | planRevision, stages(순서·의존 단계), stage별 calls·parallelGroup, checkpoint(sourceStage, cardinality, onZero, onUnder, onExcess), capabilityId, registry tool binding, 최악의 경우 reserved budget |
+| `ChatCheckpointResult` | stage, observed count, truncated, decision(continue/clarify/limit/none_found/insufficient), 생성한 choice id |
 | `ChatToolResult` | toolCallId, capabilityId, dataVersion, items, evidenceIds, truncated, nextAllowed, error |
 | `ChatGeneratedAnswer` | requirementId별 answer/limitation/insufficient, claims, citation refs, graph targets, proposed answerBasis |
 | `ChatValidationReport` | deterministic check IDs·pass/fail, failing requirement/claim/citation, final answerBasis, policyVersion |
@@ -172,7 +174,8 @@ flowchart LR
 | 멱등성 | 같은 키·본문 재전송, 같은 키·다른 본문 충돌, 처리 중 재전송 |
 | 동시성 | 대화당 활성 job 하나, 취소와 늦은 완료 경합, lease 만료 회수 |
 | 라우팅 | 8유형 단일·복합, 명시 요구 보존, 4개 이상 유형, 낮은 확률 필수 요구 |
-| 계획 | 미등록 도구, 중복 제거, 의존·병렬 순서, 12회·4동시·1추가 라운드 한도 |
+| 계획 | 미등록 도구, 중복 제거, 의존·병렬 순서, 12회·4동시·3단계·fan-out 5·보충 1라운드 한도 |
+| 체크포인트 | `exactly(2)`에 0개(잘림 없음/잘림/오류)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
 | 결과 | answerBasis 일치, Q02 빈 인용, clarification 새 job, no PARTIAL |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |

@@ -4,7 +4,7 @@
 
 기준 API: [`docs/api/openapi.yaml`](../api/openapi.yaml)의 `createConversation`, `getConversation`, `getCurrentConversation`, `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob`
 
-상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.7`](../ZOOP_AI_거버넌스_정책_v0.1.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
+상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.8`](../ZOOP_AI_거버넌스_정책_v0.1.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
 
 이 문서는 네 정적 와이어프레임이 증명하지 않는 로딩·오류·빈 상태·권한·복구 동작을 구현 계약으로 보완한다. 새 시각 디자인을 임의로 만들기보다 같은 드로어 안의 상태 변형으로 먼저 구현한다. 별도 화면 ID가 필요한 수준으로 구조가 바뀌면 manifest와 Figma 화면을 함께 갱신한다.
 
@@ -14,7 +14,7 @@
 - 질문 접수 시 화면 선택 문맥을 `contextIds`, `evidenceIds`, `period`, `asOf`, `graphVersion`으로 전송한다. 질문에 명시된 대상·기간이 화면 문맥보다 우선한다.
 - 생성 중인 미검증 본문은 스트리밍하지 않는다. `completed`이며 저장된 `result`만 사용자 답변으로 표시한다.
 - 같은 대화의 활성 작업은 하나다. 전송 버튼은 접수 성공 뒤 비활성화하고 중복 전송으로 새 job을 만들지 않는다.
-- `PARTIAL` 상태를 만들지 않는다. 필요한 범위가 예산을 넘거나 서로 다른 스냅샷을 동시에 요구하면 실행 전에 `clarification`을 보여준다.
+- `PARTIAL` 상태를 만들지 않는다. 필요한 범위가 예산을 넘거나 서로 다른 스냅샷을 동시에 요구하면 `clarification`을 보여준다. 조회 결과로 대상이 정해지는 질문(예: 오늘 뉴스가 있는 내 종목이 셋 이상)은 서버가 실제 조회된 대상으로 선택지를 만들어 답변 생성 전에 되묻는다. UI는 두 경우를 같은 D-AI-01b로 표시한다.
 - 브라우저 새로고침이나 재접속은 `getCurrentConversation`과 `getQuestionJob`으로 저장된 상태를 회수한다. 회수는 새 모델 호출이 아니다.
 
 ## 2. 화면별 상태
