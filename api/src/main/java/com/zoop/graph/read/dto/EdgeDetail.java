@@ -13,7 +13,8 @@ public record EdgeDetail(String id, String relationType, boolean derived, boolea
         List<String> evidenceIds, List<BasisOut> basis, List<String> relationIds, Verification verification,
         List<ViaIssue> via, String explanation, String validity, Metadata metadata) {
 
-    public record EndpointRef(String id, String kind, String label) { }
+    /** logoUrl and brandColor are set for a company end (null when the catalog has none) and null for an issue end. */
+    public record EndpointRef(String id, String kind, String label, String logoUrl, String brandColor) { }
 
     /** ALLOW for an approved public relation; not_applicable for a derived edge, which is never verified. */
     public record Verification(String status, String note) { }

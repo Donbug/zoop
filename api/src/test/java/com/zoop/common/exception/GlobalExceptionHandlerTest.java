@@ -70,6 +70,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void customExceptionCanOverrideRetryabilityForAClassifiedSourceFailure() throws Exception {
+        mvc.perform(get("/test/non-retryable-source"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("SOURCE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.error.retryable").value(false));
+    }
+
+    @Test
     void unexpectedExceptionDoesNotExposeInternalMessage() throws Exception {
         var result = mvc.perform(get("/test/failure"))
                 .andExpect(status().isInternalServerError())
@@ -113,6 +121,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/missing")
         String missing() {
             throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        @GetMapping("/non-retryable-source")
+        String nonRetryableSource() {
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, false);
         }
 
         @GetMapping("/failure")

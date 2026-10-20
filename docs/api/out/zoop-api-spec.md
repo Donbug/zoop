@@ -1147,7 +1147,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getBriefing · 공개 브리핑 회차 조회
 
-발행 당시 자료와 그래프 버전·시장 지표·outlook·문서별 기업 판정을 읽는다. 발행 후 재판정하거나 최신 값으로 대체하지 않는다. 출근 07:40/퇴근 18:10 KST, 핵심 이슈 최대 3개는 기존 요구사항 확정값이며 부족하면 채우지 않는다. 시장 요약은 근거와 검증을 갖춘 실제 생성 결과만 제공한다.
+발행 당시 자료와 그래프 버전·시장 지표·outlook·문서별 기업 판정을 읽는다. 발행 후 재판정하거나 최신 값으로 대체하지 않는다. 생성 시작 출근 09:20/퇴근 17:30 KST, 핵심 이슈 최대 3개는 기존 요구사항 확정값이며 부족하면 채우지 않는다. 시장 요약은 근거와 검증을 갖춘 실제 생성 결과만 제공한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1508,7 +1508,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getAdminDashboard · 운영 대시보드 조회
 
-운영 대시보드 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+운영 대시보드 조회. 영역별로 독립 집계하며 일부 영역을 조회할 수 없으면 성공 영역을 유지하고 metadata.partial/failures에 미조회 영역을 기록한다. metadata.asOf는 generatedAt과 같으며 metadata.graphVersion은 null이다. members.registered는 차단 회원을 포함한 전체 가입 회원 수, activeMemberSessions는 기준 시각에 계정 상태가 active이고 세션이 유효한 회원 세션 수, activeGuestSessions는 기준 시각에 유효한 비회원 세션 수다. ai.requests는 7일 동안 접수된 사용자 요청 수이며 모델 실행 시도 수가 아니다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3882,15 +3882,16 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| generatedAt | 필수 | string (date-time) |  |
+| generatedAt | 필수 | string (date-time) | 대시보드 집계 기준 시각. 모든 기간 집계는 이 시각을 기준으로 계산한다. |
+| metadata | 필수 | [Metadata](#schema-metadata) | 이 대시보드 응답의 metadata.asOf는 generatedAt과 같고, 그래프 버전 자체를 조회 기준으로 사용하지 않으므로 graphVersion은 null이다. |
 | ledger | 필수 | [DashboardLedger](#schema-dashboardledger) |  |
-| graph | 필수 | [DashboardGraph](#schema-dashboardgraph) |  |
-| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null |  |
-| jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) |  |
-| ai | 필수 | [DashboardAi](#schema-dashboardai) |  |
-| briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) |  |
-| members | 필수 | [DashboardMembers](#schema-dashboardmembers) |  |
-| audit | 필수 | [DashboardAudit](#schema-dashboardaudit) |  |
+| graph | 필수 | [DashboardGraph](#schema-dashboardgraph) / null | null when the graph version summary could not be read; subarea failures are listed individually in metadata.failures. |
+| candidates | 필수 | [DashboardCandidates](#schema-dashboardcandidates) / null | null when candidate source is unavailable; an empty but successfully read source returns zero counts. |
+| jobs | 필수 | [DashboardJobs](#schema-dashboardjobs) / null | null when the job source is unavailable; a successfully read source with no jobs returns zero counts and an empty recent list. |
+| ai | 필수 | [DashboardAi](#schema-dashboardai) / null | null when user-request records are unavailable; model execution attempts are not substituted. |
+| briefings | 필수 | [DashboardBriefings](#schema-dashboardbriefings) / null | null when the briefing-round source is unavailable; no rounds in an available source returns an empty latest list. |
+| members | 필수 | [DashboardMembers](#schema-dashboardmembers) / null | null when member/session counts could not be read. |
+| audit | 필수 | [DashboardAudit](#schema-dashboardaudit) / null | null when the 24-hour audit count could not be read. |
 
 <a id="schema-dashboardai"></a>
 
@@ -3900,10 +3901,10 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| window | 필수 | string |  |
-| requests | 필수 | integer |  |
-| succeeded | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| window | 필수 | string | 생성 시각 기준 직전 7일의 반개구간 [generatedAt-7d, generatedAt). |
+| requests | 필수 | integer | 기간 안에 접수된 사용자 요청 수. AI 공급자 실행 시도 횟수와 구분한다. |
+| succeeded | 필수 | integer | 기간 안에 접수되어 성공으로 종료된 사용자 요청 수. |
+| failed | 필수 | integer | 기간 안에 접수되어 실패로 종료된 사용자 요청 수. 재시도는 최초 사용자 요청 한 건으로 센다. 성공·실패가 미확정인 요청은 두 값에서 제외한다. |
 | features | 필수 | [DashboardAiFeature](#schema-dashboardaifeature)[] |  |
 
 <a id="schema-dashboardaifeature"></a>
@@ -3916,8 +3917,8 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | feature | 필수 | string |  |
 | label | 필수 | string |  |
-| requests | 필수 | integer |  |
-| failed | 필수 | integer |  |
+| requests | 필수 | integer | 해당 AI 기능에 접수된 사용자 요청 수. |
+| failed | 필수 | integer | 해당 기능에서 실패로 종료된 사용자 요청 수. |
 
 <a id="schema-dashboardaudit"></a>
 
@@ -3927,7 +3928,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| last24h | 필수 | integer |  |
+| last24h | 필수 | integer | [generatedAt-24h, generatedAt) 구간의 감사 기록 수. |
 
 <a id="schema-dashboardbriefings"></a>
 
@@ -3965,11 +3966,29 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | activeVersionId | 필수 | string / null |  |
 | activatedAt | 필수 | string (date-time) / null |  |
 | versionCount | 필수 | integer |  |
-| activeVersion | 필수 | [GraphVersionOut](#schema-graphversionout) / null |  |
-| reviewRevision | 필수 | integer |  |
-| reviewDecisions | 필수 | integer |  |
-| rules | 필수 | [ReviewRuleOut](#schema-reviewruleout)[] |  |
+| activeVersion | 필수 | [DashboardActiveGraphVersion](#schema-dashboardactivegraphversion) / null |  |
+| reviewRevision | 필수 | integer / null | Latest decision revision when available; null when the review source has not been implemented or read. |
+| reviewDecisions | 필수 | integer / null | Current review decision count, or null when unavailable. |
+| rules | 필수 | [ReviewRuleOut](#schema-reviewruleout)[] / null | Current rules, or null when the review source is unavailable. An empty array means it was read and has no rules. |
 | graphDb | 필수 | [GraphDbStatus](#schema-graphdbstatus) / null |  |
+
+<a id="schema-dashboardactivegraphversion"></a>
+
+### DashboardActiveGraphVersion
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| sequence | 필수 | integer |  |
+| kind | 필수 | string | 그래프 저장소가 기록한 버전 종류. |
+| sourceLabel | 필수 | string |  |
+| createdAt | 필수 | string (date-time) |  |
+| activatedAt | 필수 | string (date-time) / null | Null if the active version has no activation record at the snapshot time. |
+| issueCount | 필수 | integer |  |
+| relationCount | 필수 | integer |  |
+| articleCount | 필수 | integer |  |
 
 <a id="schema-dashboardjobs"></a>
 
@@ -4004,10 +4023,10 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| registered | 필수 | integer |  |
-| activeMemberSessions | 필수 | integer |  |
-| activeGuestSessions | 필수 | integer |  |
-| source | 필수 | string |  |
+| registered | 필수 | integer | 차단 회원을 포함한 전체 가입 회원 수. |
+| activeMemberSessions | 필수 | integer | 기준 시각에 회원 계정이 active이며 만료되지 않고 폐기되지 않은 회원 세션 수. |
+| activeGuestSessions | 필수 | integer | 기준 시각에 만료되지 않고 폐기되지 않은 비회원 세션 수. |
+| source | 필수 | string | 집계 데이터 원천. |
 
 <a id="schema-datawindow"></a>
 
@@ -4141,6 +4160,8 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | id | 필수 | string |  |
 | kind | 필수 | string {company, issue} |  |
 | label | 필수 | string |  |
+| logoUrl | 필수 | string / null | 기업 끝점의 로고 경로(GraphNode.logoUrl과 같은 값). 기업 카탈로그에 없으면 null이고 사건 끝점은 항상 null이다. |
+| brandColor | 필수 | string / null | 기업 끝점의 브랜드 색(GraphNode.brandColor와 같은 값). 없으면 null이고 사건 끝점은 항상 null이다. |
 
 <a id="schema-errorbody"></a>
 
@@ -4977,7 +4998,7 @@ The three market indicators stored with a published round; never changed after p
 | --- | --- | --- | --- |
 | status | 필수 | string |  |
 | referenceAt | 필수 | string (date-time) | The round's scheduled time (KST) |
-| rateCutoffAt | 필수 | string (date-time) | Latest time an observation could have (morning 07:40, evening 18:05, KST) |
+| rateCutoffAt | 필수 | string (date-time) | Latest time an observation could have: at or before the stored round data-window end (KST). Generation starts at 09:20/17:30; this is not a market closing timestamp. |
 | collectedAt | 필수 | string (date-time) |  |
 | indicators | 필수 | [MarketIndicator](#schema-marketindicator)[] |  |
 

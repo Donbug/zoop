@@ -52,10 +52,6 @@ public class SocialAuthSettings {
                 googleClientId, googleClientSecret, googleRedirectUri, "openid email");
         this.kakao = new ProviderSettings("kakao", "카카오", "https://kauth.kakao.com/oauth/authorize",
                 kakaoClientId, kakaoClientSecret, kakaoRedirectUri, "openid account_email");
-        if ((google.configured(allowInsecureLocalhost) || kakao.configured(allowInsecureLocalhost))
-                && this.frontendOrigin == null) {
-            throw new IllegalArgumentException("Social auth requires a valid frontend origin");
-        }
         if (this.allowedReturnPaths.isEmpty() || this.allowedReturnPaths.stream().anyMatch(path ->
                 !path.startsWith("/") || path.startsWith("//") || path.indexOf('\\') >= 0
                         || path.indexOf('?') >= 0 || path.indexOf('#') >= 0)) {
@@ -68,6 +64,7 @@ public class SocialAuthSettings {
     public int browserStartLimit() { return browserStartLimit; }
     public Set<String> allowedReturnPaths() { return allowedReturnPaths; }
     public boolean allowInsecureLocalhost() { return allowInsecureLocalhost; }
+    public boolean hasFrontendOrigin() { return frontendOrigin != null; }
     public String frontendLocation(String path, String result) {
         if (frontendOrigin == null) throw new IllegalStateException("Social auth frontend origin is not configured");
         var builder = UriComponentsBuilder.fromUri(frontendOrigin).path(path);
