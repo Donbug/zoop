@@ -58,7 +58,7 @@ flowchart LR
 
 ### 단계 0 — 계약 고정과 fixture
 
-1. `ChatResult.answerBasis`, `ChatChoice.kind`, 확인 질문 답 `resolves`(`ChatClarificationReply`), 입력·조회 상한과 `budget_exceeded`를 Java DTO·웹 타입·프로토타입 호환 fixture에 반영한다.
+1. `ChatResult.answerBasis`, `ChatChoice.kind`, 확인 질문 답 `resolves`(`ChatClarificationReply`), 답하지 않은 요구 `limitations`(`ChatLimitation`), 입력·조회 상한과 `budget_exceeded`를 Java DTO·웹 타입·프로토타입 호환 fixture에 반영한다.
 2. 내부 `ChatRouteSummary v1`, `ChatToolRequest v1`, `ChatToolResult v1` JSON Schema를 만든다.
 3. Q01~Q08, 논리 capability, MCP registry group을 코드 enum/registry로 한 곳에서 버전 관리한다.
 4. 실제 모델 없이도 전체 상태 머신을 시험할 deterministic fake router·coverage·tool·generator를 만든다.
@@ -114,7 +114,7 @@ flowchart LR
 
 1. `BranchContext`는 요구 ID별로 도구 결과·근거·버전·제한을 구조화하며 원문 전문을 무제한 합치지 않는다.
 2. Luna `answer-generator`는 1회만 호출하고 출력은 typed schema로 받는다.
-3. 서버 검증기는 요구 커버리지, citation offset·문서 버전·철회, 수치·통화·날짜, graph endpoint·hop, 회원 범위, 투자 판단, `answerBasis`를 검사한다.
+3. 서버 검증기는 요구 커버리지, citation offset·문서 버전·철회, 수치·통화·날짜, graph endpoint·hop, 회원 범위, 투자 판단, `answerBasis`를 검사한다. 요구 커버리지는 모든 필수 요구가 본문 답변과 `limitations` 항목 중 정확히 하나에 속하는지로 판정하고, `limitations`는 gate·체크포인트·`truncated`·citation 부재에서 서버가 만들며 `message`는 `kind`별 템플릿을 쓴다.
 4. 검증 실패는 `validation_failed`; 자동 재생성·부분 답변·근거 부족 성공으로 바꾸지 않는다.
 
 완료 조건: 모든 중요 사실 주장에 유효 근거, Q02 최신 사실 우회 0건, 철회 근거 노출 0건, 다른 회원 종목 노출 0건.
@@ -124,7 +124,7 @@ flowchart LR
 1. 목표 OpenAPI에서 웹 타입을 생성할 전용 seam을 만든다. 현재 `prototype/web/src/api/schema.d.ts`는 BFF 관측본이므로 루트 웹에 그대로 복사하지 않는다.
 2. 세션 생성·최신 대화 복원·job 접수·polling·취소·허용 재시도를 query 계층에 구현한다.
 3. [화면 상태 계약](../wireframe/ai-chatbot-state-contract.md)에 따라 D-AI-01~02b를 구현한다.
-4. `answerBasis`, citations, applied 범위, clarification choices, guidance action, failure retry를 각각 렌더링한다.
+4. `answerBasis`, citations, applied 범위, `limitations`, clarification choices, guidance action, failure retry를 각각 렌더링한다.
 5. 로그아웃·회원 변경 시 query cache와 late response를 폐기한다.
 
 완료 조건: 새로고침 복구, GET 재확인이 모델을 재호출하지 않음, 키보드·aria-live, 모바일 동일 정보, 401/403에서 질문 미전송.
@@ -149,7 +149,7 @@ flowchart LR
 | `ChatCheckpointResult` | stage, observed count, truncated, decision(continue/clarify/limit/none_found/insufficient), 생성한 choice id |
 | `ChatToolResult` | toolCallId, capabilityId, dataVersion, items, evidenceIds, truncated, nextAllowed, error |
 | `ChatGeneratedAnswer` | requirementId별 answer/limitation/insufficient, claims, citation refs, graph targets, proposed answerBasis |
-| `ChatValidationReport` | deterministic check IDs·pass/fail, failing requirement/claim/citation, final answerBasis, policyVersion |
+| `ChatValidationReport` | deterministic check IDs·pass/fail, failing requirement/claim/citation, requirementId별 answered/limited 판정과 limitation 결정 근거, final answerBasis, final limitations, policyVersion |
 
 내부 응답에는 provider 원문 응답·비밀·자유 형식 추론을 넣지 않는다. 앱 completed는 AI 서비스가 ready를 반환한 시점이 아니라 Java가 artifact·영수증·도구 호출·검증 결과를 확인하고 DB에 원자 저장한 뒤에만 전이한다.
 
@@ -178,6 +178,7 @@ flowchart LR
 | 체크포인트 | `exactly(2)`에 0개(잘림 없음/잘림/오류)·1개·2개·3개 이상, 조합 6개 초과 시 자유 입력, 초과 시 다음 단계·생성 호출 0회, 선택 후 새 job이 같은 asOf로 같은 결과 재현, fan-out 상한 초과 |
 | 데이터 | graphVersion 고정, 문서 철회, citation offset, 브리핑 회차, 기간 경계 |
 | 결과 | answerBasis 일치, Q02 빈 인용, clarification 새 job, no PARTIAL |
+| 제한 | 투자 판단 혼합 질문의 `investment_advice`, 체크포인트 미달 `precondition_unmet`, 문서 20개 잘림 `results_truncated`, 한 요구만 근거 부족, 요구 누락·중복 소속·본문의 제한 요구 답변 시 `validation_failed`, 모델이 근거 없이 제안한 제한 거부, 도구 timeout이 limitation이 아닌 failed, answered 외 outcome의 빈 배열 |
 | 확인 답 | 선택지 답·자유 입력 답, 없는 choiceId·clarification 아닌 원 작업·다른 대화 원 작업 422/404, resolves+context 422, 원 고정 문맥 복사, 원 작업 불변, 같은 확인 질문 재답변 |
 | 장애 | Jev/Luna/MCP timeout, unknown 호출, 저장 실패, result_lost, save_only |
 | UI | 새로고침 복구, 조회 오류 재확인, late response 폐기, 접근성·모바일 |

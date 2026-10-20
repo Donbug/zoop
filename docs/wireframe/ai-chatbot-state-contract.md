@@ -73,13 +73,13 @@
 | `mixed` | 일반 설명과 근거 기반 현재 사실의 경계를 본문에서 분리하고 사실 주장에만 인용 연결 |
 | `none` | 확인 질문·안내·근거 부족 결과. 근거 검증 배지를 표시하지 않음 |
 
-`sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. 투자 판단 제한이 섞인 답변은 허용한 내용과 제한한 요청·이유를 같은 결과 안에서 구분한다.
+`sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. `limitations`가 비어 있지 않으면 본문 아래·인용 위에 “답하지 않은 부분” 영역을 두고 항목마다 `label`과 `message`를 표시한다. 투자 판단 거절, 전제 불충족, 조회 상한, 요구별 근거 부족을 본문 문장에서 추측해 만들지 않고 이 배열만 사용한다. `kind`는 아이콘·스타일 구분에만 쓰고 문구는 `message`를 그대로 쓴다.
 
 ## 4. 결과·오류별 렌더링
 
 | 결과 | 필수 UI |
 | --- | --- |
-| `answered` | 답변, answerBasis, 적용 범위, 해당 시 인용·그래프 대상, 피드백 |
+| `answered` | 답변, answerBasis, 적용 범위, 해당 시 답하지 않은 부분(`limitations`)·인용·그래프 대상, 피드백 |
 | `clarification` | 확인 이유, choices 또는 자유 입력, 새 job 생성 안내 |
 | `guidance` | 지원 범위와 가능한 다음 행동. action이 있을 때만 버튼 표시 |
 | `insufficient_evidence` | 실제 조회 범위와 부족한 근거 설명. “사건이 없다”로 바꾸지 않음 |
@@ -105,3 +105,4 @@
 5. 대화 GET 503은 `D-AI-02b`로 표시되고 “다시 확인”이 새 AI 실행을 만들지 않는다.
 6. 검증 실패·예산 초과·도구 timeout은 부분 답변으로 바뀌지 않는다.
 7. 로그아웃 중 늦게 도착한 응답이 이전 회원 화면이나 cache에 남지 않는다.
+8. “HBM 설명과 지금 살 주식”은 `answered`로 HBM 설명을 표시하고, 매수 판단은 “답하지 않은 부분”에 `investment_advice` 항목의 `label`·`message`로 표시한다.

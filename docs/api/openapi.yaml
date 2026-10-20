@@ -10017,6 +10017,31 @@ components:
       required:
         - "jobId"
         - "question"
+    ChatLimitation:
+      properties:
+        kind:
+          type: "string"
+          enum:
+            - "investment_advice"
+            - "precondition_unmet"
+            - "results_truncated"
+            - "evidence_insufficient"
+            - "out_of_scope"
+          description: "investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다."
+        label:
+          type: "string"
+          maxLength: 200
+          description: "해당 요구를 회원 질문의 표현으로 나타낸 문구"
+        message:
+          type: "string"
+          maxLength: 500
+          description: "kind별 서버 템플릿으로 만든 안내 문장"
+      type: "object"
+      required:
+        - "kind"
+        - "label"
+        - "message"
+      description: "answered 결과에서 답하지 않은 요구 하나와 그 이유."
     ChatPeriod:
       properties:
         start:
@@ -10090,6 +10115,12 @@ components:
             -
               type: "null"
           description: "guidance: what the member can do to meet the missing condition"
+        limitations:
+          items:
+            "$ref": "#/components/schemas/ChatLimitation"
+          type: "array"
+          maxItems: 8
+          description: "answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 도구 장애·timeout은 항목이 아니라 failed다."
         metadata:
           "$ref": "#/components/schemas/Metadata"
       type: "object"
@@ -10105,6 +10136,7 @@ components:
         - "applied"
         - "choices"
         - "action"
+        - "limitations"
         - "metadata"
     ChatSessionResponse:
       properties:

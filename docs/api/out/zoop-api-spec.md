@@ -3497,6 +3497,18 @@ The selection frozen when the question was first received.
 | context | 선택 | [ChatContextRequest](#schema-chatcontextrequest) |  |
 | resolves | 선택 | [ChatClarificationReply](#schema-chatclarificationreply) |  |
 
+<a id="schema-chatlimitation"></a>
+
+### ChatLimitation
+
+answered 결과에서 답하지 않은 요구 하나와 그 이유.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
+| label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
+| message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
+
 <a id="schema-chatperiod"></a>
 
 ### ChatPeriod
@@ -3527,6 +3539,7 @@ The selection frozen when the question was first received.
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
 | choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 resolves.choiceId를 담은 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
+| limitations | 필수 | [ChatLimitation](#schema-chatlimitation)[] | answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 도구 장애·timeout은 항목이 아니라 failed다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-chatsessionresponse"></a>
