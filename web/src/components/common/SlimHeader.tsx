@@ -23,6 +23,7 @@ export default function SlimHeader() {
             width="16"
             height="16"
             alt=""
+            data-icon
           />
         </span>
         <span className="grid size-8 place-items-center" aria-hidden="true">
@@ -31,6 +32,7 @@ export default function SlimHeader() {
             width="16"
             height="16"
             alt=""
+            data-icon
           />
         </span>
         <span className="grid size-8 place-items-center" aria-hidden="true">
@@ -39,6 +41,7 @@ export default function SlimHeader() {
             width="16"
             height="16"
             alt=""
+            data-icon
           />
         </span>
       </div>

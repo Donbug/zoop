@@ -26,6 +26,42 @@
   --radius-panel: 4px;
 }
 
+/* 다크 테마. 같은 토큰 이름에 어두운 값을 준다(헤더 달 버튼, ?theme=dark|light).
+   따뜻한 회갈색 계열이며 완전한 검정은 쓰지 않는다: 카드 #3d3937, 페이지 #444343, 지도 #383432.
+   Tailwind 기본 흰색·회색 단계도 뒤집어, 아직 토큰으로 옮기지 않은 화면도 함께 어두워지게 한다. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-zoop-ink: #ffffff;
+  --color-zoop-muted: #f1efec;
+  --color-zoop-faint: #e2dfdb;
+  --color-zoop-line: #625f5d;
+  --color-zoop-paper: #3d3937;
+  --color-zoop-wash: #444343;
+  --color-zoop-soft: #47413f;
+  --color-zoop-map: #383432;
+  --color-zoop-up: #ffc4bf;
+  --color-zoop-down: #d2e1ff;
+  --color-zoop-alert: #ffd0cb;
+  --color-panel-ink: #ffffff;
+  --color-panel-secondary: #f1efec;
+  --color-panel-muted: #e2dfdb;
+  --color-panel-line: #625f5d;
+  --color-panel-control: #625f5d;
+  --color-panel-soft: #47413f;
+  --color-white: #3d3937;
+  --color-gray-50: #423d3b;
+  --color-gray-100: #47413f;
+  --color-gray-200: #514b48;
+  --color-gray-300: #625f5d;
+  --color-gray-400: #8f8b88;
+  --color-gray-500: #cfccc8;
+  --color-gray-600: #e2dfdb;
+  --color-gray-700: #ece9e6;
+  --color-gray-800: #f3f1ee;
+  --color-gray-900: #f8f7f5;
+  --color-gray-950: #ffffff;
+}
+
 /* 기본 규칙은 base 레이어에 둔다. 레이어 밖에 두면 Tailwind 유틸리티(text-xs 등)보다
    항상 우선해서 버튼·입력의 글자 크기 클래스가 무시된다. */
 @layer base {
@@ -43,8 +79,8 @@
 
   body {
     margin: 0;
-    background: #f5f5f5;
-    color: #111827;
+    background: var(--color-zoop-wash);
+    color: var(--color-zoop-ink);
     font-family:
       Inter,
       Pretendard,
@@ -62,5 +98,10 @@
 
   #root {
     width: 100%;
+  }
+
+  /* 검은 선 아이콘(graph-assets)은 다크에서 밝게 뒤집는다. 기업 로고는 뒤집지 않는다. */
+  :root[data-theme='dark'] [data-icon] {
+    filter: invert(0.92);
   }
 }

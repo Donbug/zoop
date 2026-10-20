@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { themeColor } from '@/util/theme-color';
 import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
@@ -356,7 +357,7 @@ export default function GraphCanvas({
                 ...edge,
                 style: {
                   ...edge.style,
-                  stroke: connectionPath ? '#1a1a1a' : '#b75b00',
+                  stroke: connectionPath ? themeColor('ink') : '#b75b00',
                   strokeOpacity: 1,
                   lineWidth: connectionPath ? 2 : 4,
                 },
@@ -375,8 +376,8 @@ export default function GraphCanvas({
               x: host.clientWidth - 65,
               y: host.clientHeight / 2,
               size: 48,
-              fill: '#dfdfdc',
-              stroke: '#1a1a1a',
+              fill: themeColor('soft'),
+              stroke: themeColor('ink'),
               labelText: `연결 없는 사건 ${stats.disconnected}건`,
               labelPlacement: 'bottom',
               iconText: String(stats.disconnected),
@@ -555,27 +556,39 @@ export default function GraphCanvas({
         zoomRange: [0.01, 4],
         edge: {
           state: {
-            related: { lineWidth: 2, stroke: '#1a1a1a', strokeOpacity: 1 },
+            related: {
+              lineWidth: 2,
+              stroke: themeColor('ink'),
+              strokeOpacity: 1,
+            },
             inactive: { strokeOpacity: 0.2 },
-            selected: { lineWidth: 2, stroke: '#1a1a1a', strokeOpacity: 1 },
+            selected: {
+              lineWidth: 2,
+              stroke: themeColor('ink'),
+              strokeOpacity: 1,
+            },
           },
         },
         node: {
           state: {
-            related: { opacity: 1, lineWidth: 1.4, labelFill: '#1a1a1a' },
+            related: {
+              opacity: 1,
+              lineWidth: 1.4,
+              labelFill: themeColor('ink'),
+            },
             inactive: { opacity: 0.35 },
             hovered: {
               opacity: 1,
               lineWidth: 2,
               halo: true,
-              haloStroke: '#1a1a1a',
+              haloStroke: themeColor('ink'),
               haloFill: 'transparent',
-              labelFill: '#1a1a1a',
+              labelFill: themeColor('ink'),
             },
             selected: {
               lineWidth: 2,
               halo: true,
-              haloStroke: '#1a1a1a',
+              haloStroke: themeColor('ink'),
               haloFill: 'transparent',
             },
           },
