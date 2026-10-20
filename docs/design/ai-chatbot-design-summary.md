@@ -40,12 +40,20 @@ flowchart LR
     coverage --> decision{계획이 명확하고 예산 내인가?}
     decision -->|아니오| clarify[clarification 또는 guidance]
     decision -->|예| gate[서버 allowlist·권한·스키마 검사]
-    gate --> tools[선택된 읽기 전용 MCP만 실행]
-    tools --> context[구조화된 BranchContext]
-    context --> luna[Luna 하위 답변 생성·통합]
-    luna --> validate[인용·수치·버전·권한·정책 검증]
-    validate --> save[ChatResult 저장 후 전달]
+    gate --> tools[stage별 읽기 전용 MCP 실행]
+    tools --> checkpoint{체크포인트 조건}
+    checkpoint -->|초과| clarify
+    checkpoint -->|다음 stage| tools
+    checkpoint -->|충족·미달·0개| context[구조화된 BranchContext]
+    context --> luna[Luna 구간별 답변 생성]
+    luna --> det[1층 결정론적 검사]
+    det -->|실패| failed[validation_failed]
+    det -->|통과| sem[2층 Jev 의미 검증]
+    sem -->|contradicted·금지 조언| failed
+    sem -->|hold 요구 제외·통과| save[ChatResult 저장 후 전달]
 ```
+
+기한 검사는 각 모델 단계 시작 전에 수행하며, 이후 남은 필수 단계의 상한 합보다 기한이 부족하면 호출하지 않고 `transient`(`deadline_guard`)로 끝낸다(5.1절).
 
 독립적인 MCP 조회는 병렬 실행하고, 앞 단계 결과가 다음 단계 입력일 때만 순차 실행한다. 순차 실행은 계획에 단계(stage)로 선언하고, 결과 개수에 따라 진행이 달라지면 서버가 평가하는 체크포인트를 붙인다(5.2절). 1차 조회 결과가 부족하면 승인된 예산 안에서만 보충 라운드를 실행한다.
 
@@ -123,10 +131,11 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | MCP 호출·동시 실행 | 최대 12회·동시 4회 |
 | 의존 단계·fan-out | 계획당 최대 3단계, 단계별 앞 단계 결과 대상 최대 5개 |
 | 보충 라운드 | 계획된 단계 뒤 최대 1라운드 |
-| 시간 | 단계별 잠정 상한(Jev 라우터 4초, Luna 커버리지 회당 8초, MCP 단계 10초·개별 3초, Luna 생성 25초, Jev 의미 검증 6초, 서버 처리 3초). ChatJob 기한은 계획한 단계 상한의 합이며 최대 60초 |
+| 시간 | 단계별 잠정 상한(Jev 라우터 4초, Luna 커버리지 회당 6초, MCP 단계 10초·개별 3초, Luna 생성 25초, Jev 의미 검증 6초, 서버 처리 3초). ChatJob 기한은 계획한 단계 상한의 합이며 최대 60초 |
 | 조회량 | 문서 최대 20개, 그래프 최대 3-hop·노드 50개·간선 50개 |
 | Luna context·답변 | 입력 24,000 토큰·출력 2,000 토큰 |
-| 모델 호출 | 라우터 Jev 1회, 커버리지 Luna 최대 2회, 생성 Luna 1회, 필요한 의미 검증 Jev 1회 |
+| 모델 호출 | 라우터 Jev 1회, 커버리지 Luna 최대 2회, 생성 Luna 1회, 의미 검증 Jev 1회 |
+| 명시적 요구 | 질문당 최대 6개. 넘으면 MCP 호출 전 `clarification`(`limitations` 8개·`sections` 12개·claim 20개 상한의 기준) |
 
 단계는 계획에 미리 선언한 의존 실행이고, 보충 라운드는 결과가 부족할 때 계획에 없던 조회다. 둘 다 MCP 호출 12회에 포함하며 예산은 체크포인트 조건이 허용하는 최악의 경우로 계산한다. 계획 단계에서 상한을 넘으면 도구를 일부만 조용히 호출하지 않고 범위를 좁히는 `clarification`을 반환한다. 실행 도중 timeout이나 공급자 장애가 발생하면 불완전한 자료를 완전한 답변처럼 제공하지 않고 실제 실패 상태로 종료한다.
 
@@ -134,11 +143,12 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 
 | 경로 | 실행 단계 | 기한 |
 | --- | --- | --- |
-| Q02 단독 | 라우터 4 + 커버리지 8 + 생성 25 + 서버 3 | 40초 |
-| 단순 근거 조회 | 위 + MCP 10 + 의미 검증 6 | 56초 |
-| 복합(커버리지 재확인) | 전부 | 60초 |
+| Q02 단독 | 라우터 4 + 커버리지 6 + 생성 25 + 의미 검증 6 + 서버 3 | 44초 |
+| 단순 근거 조회 | 위 + MCP 10 | 54초 |
+| 복합(커버리지 재확인) | 라우터 4 + 커버리지 6×2 + MCP 10 + 생성 25 + 의미 검증 6 + 서버 3 | 60초 |
 
-- 각 모델 단계를 시작하기 전에 남은 기한이 그 단계 상한보다 적으면 호출하지 않고 종료한다(비용을 쓴 뒤 버리지 않음).
+- 모든 경로의 단계 상한 합은 60초를 넘지 않게 정한다.
+- 각 모델 단계를 시작하기 전에 남은 기한이 **그 단계와 이후 남은 필수 단계 상한의 합**보다 적으면 호출하지 않고 종료한다. 다음 단계 하나만 보면 생성 비용을 쓴 뒤 의미 검증 직전에 기한이 끝날 수 있다. 커버리지 재확인도 이 조건을 만족할 때만 실행한다.
 - 시간 상한은 실측 근거 없는 잠정값이다. 출시 전 단계별 p95를 측정해 상한을 p95의 1.5배로 다시 정하고, Luna 커버리지 reasoning effort 하향을 함께 검토한다.
 - 진행 중에는 공개 `ChatJob.phase`(`planning` → `retrieving` → `writing` → `verifying`)로 현재 단계를 보여 준다. 검증 전 본문은 노출하지 않는다.
 
@@ -151,7 +161,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | 단계 상한 초과·잔여 기한 부족·공급자 오류 | `transient`(`model_timeout`, `tool_timeout`, `deadline_guard`, `provider_error`) | `rerun` |
 | 압축 후에도 입력 24k 초과, 출력 2k 상한 도달로 미완성 | `budget_exceeded`(`context_too_large`, `output_limit`) | 없음, 범위를 좁힌 새 질문 안내 |
 
-`rerun`은 작업당 실행 3회까지이며 이후 `retry=null`이다.
+`rerun`은 작업당 실행 3회까지이며 이후 `retry=null`이다. 모델을 호출하지 않는 `save_only`는 이 횟수에 포함하지 않는다.
 
 ### 5.2 단계와 체크포인트
 
@@ -211,7 +221,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | `investment_advice` | 투자 판단 요청 | 투자 판단 gate |
 | `precondition_unmet` | 체크포인트 미달로 의존 요구 수행 불가 | 체크포인트 판정 |
 | `results_truncated` | 조회 상한에 걸려 일부 자료만 확인 | 도구 결과 `truncated` |
-| `evidence_insufficient` | 조회는 성공했지만 이 요구의 근거 부족 | 해당 요구의 유효 citation 부재 |
+| `evidence_insufficient` | 조회는 성공했지만 이 요구의 근거 부족 | 해당 요구의 유효 citation 부재, 또는 Jev 의미 검증 hold로 제외된 요구 |
 | `out_of_scope` | 지원하지 않는 하위 요구 | 서버 지원 범위 |
 
 - 제한 여부와 `message`는 서버가 정한다. 모델이 요구를 스스로 제한으로 돌려 빠져나갈 수 없다.
@@ -223,7 +233,7 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 
 외부 API 장애를 `insufficient_evidence`나 “관련 뉴스 없음”으로 바꾸지 않는다. 검증 실패도 성공 outcome으로 바꾸지 않으며 자동 재생성하지 않는다.
 
-`answered` 본문은 근거 수준별 구간 `ChatResult.sections`(`basis`, `text`, `evidenceIds`)로 구성하고, 서버가 구간 text를 순서대로 이어 `answer`를 만든다. 구간 `basis`는 일반 LLM 개념 설명 `general_knowledge`, 승인된 ZOOP 문서 `zoop_documented`, 공개 근거 기반 사실 `evidence_grounded` 중 하나다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다.
+`answered` 본문은 근거 수준별 구간 `ChatResult.sections`(`basis`, `text`, `evidenceIds`)로 구성하고, 서버가 구간 text를 순서대로 이어 `answer`(전체 12,000자 이하)를 만든다. 구간 `basis`는 일반 LLM 개념 설명 `general_knowledge`, 승인된 ZOOP 문서 `zoop_documented`, 공개 근거 기반 사실 `evidence_grounded` 중 하나다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다.
 
 공개 `ChatResult.answerBasis`는 서버가 구간에서 계산한다. basis가 한 종류면 그 값, 두 종류 이상이면 `mixed`, 구간이 없는 확인·안내·근거 부족은 `none`이다. UI는 결과 배지에 `answerBasis`를, 구간 배지와 인용 연결에 `sections`를 사용하며 자체 추측하지 않는다.
 
@@ -250,18 +260,18 @@ Jev는 자유 문장 대신 정해진 질문에 typed 판정을 돌려주는 모
 | 요구 커버리지 | 각 필수 요구가 본문 구간과 `limitations` 항목 중 정확히 하나에 속하는지, 각 limitation이 서버 결정 근거와 일치하는지, 본문이 제한된 요구를 답한 것처럼 쓰지 않았는지 |
 | 인용 실재 | `evidenceId`가 이번 job의 도구 결과에 실제로 있었는지 |
 | 인용 원문 일치 | `quote`가 고정 문서 버전의 `[start,end)` 원문과 정확히 같은지, 철회·비공개가 아닌지 |
-| 구간 규칙 | 일반 개념 구간에 근거가 없는지, 근거 구간의 인용이 자기 구간 `evidenceIds` 안에 있는지, 모든 `evidenceIds`가 `citations`에 있는지 |
+| 구간 규칙 | 일반 개념 구간에 근거가 없는지, 근거 구간의 인용이 자기 구간 `evidenceIds` 안에 있는지, 모든 `evidenceIds`가 `citations`에 있는지, `zoop_documented` 구간은 `sourceKind=zoop_doc`·`evidence_grounded` 구간은 `sourceKind=article` 인용만 쓰는지, 이어 붙인 `answer`가 12,000자 이하인지 |
 | 수치·날짜 | 주장의 숫자·날짜·통화·기간이 인용 원문 또는 도구의 구조화 데이터와 같은지 |
 | 그래프 | 관계 endpoint·유형·방향·hop 수와 간선별 근거가 `graph.path.read` 결과와 같은지, `graphTargets`가 같은 `graphVersion`의 지도(`/api/v1/graph`의 companyId·depth)에서 열리는지 |
 | 버전·범위 | graphVersion·dataAsOf·브리핑 회차가 고정 문맥과 같은지, Q07 종목이 본인 범위 안인지, 개인정보가 없는지 |
-| 투자 표현 | 매수·매도 권유 표현을 어휘·패턴 규칙으로 1차 검사 |
+| 투자 표현 | 매수·매도 권유 표현을 어휘·패턴 규칙으로 1차 검사(2층 Jev `prohibitedAdvice`가 모든 구간에 2차 적용) |
 
 **2층 — Jev 의미 검증 (1층 통과 시에만, 최대 1회)**
 
 1층은 인용이 진짜이고 원문이 정확하다는 것까지 보장하지만, 원문이 주장을 실제로 뒷받침하는지는 판단하지 못한다(예: 주장 “공급한다” ↔ 원문 “공급을 협의 중”).
 
-- 대상: `evidence_grounded`·`zoop_documented` 구간의 claim과 인용 원문(최대 20개, 한 번의 호출). `general_knowledge` 구간은 대상이 아니며 일반 개념만 답한 결과는 Jev를 호출하지 않는다.
-- 판정: claim마다 `supported / contradicted / insufficient`와 Noul(`prohibitedAdvice`, `unsupportedCausality`).
+- 대상: `evidence_grounded`·`zoop_documented` 구간의 claim과 인용 원문(최대 20개)과 `general_knowledge` 구간 전체를 한 번의 호출로 보낸다. `answered`이면 일반 개념만 답한 경우에도 호출한다.
+- 판정: 근거 구간 claim마다 `supported / contradicted / insufficient`와 Noul(`prohibitedAdvice`, `unsupportedCausality`). `general_knowledge` 구간은 권위 자료가 없으므로 사실 판정(Choice) 없이 Noul `prohibitedAdvice`만 판정하며, 이 결과를 사실 검증 통과로 기록하지 않는다. 우회적인 투자 권유가 일반 설명에 섞이는 것을 어휘 규칙만으로는 막기 어렵기 때문이다.
 
 | 판정 | 처리 | 결과 |
 | --- | --- | --- |
@@ -314,7 +324,9 @@ Q02 일반 개념은 권위 자료가 없으므로 두 번째 모델의 동의�
 - MVP에는 `PARTIAL`을 추가하지 않는다. 서로 다른 스냅샷이나 독립 실패를 구조적으로 표시해야 하면 먼저 범위를 확인한다.
 - 의존 실행은 단계와 서버 평가 체크포인트로 선언하고, `clarification`은 답변 생성 전(계획 시점 또는 체크포인트)까지만 허용한다.
 - ChatJob 기한은 계획 경로별 단계 상한의 합(최대 60초)이며 실측 p95로 보정한다. 시간 초과는 `transient`(rerun 3회까지), 같은 입력에서 반복되는 크기 초과는 `budget_exceeded`(rerun 없음)다.
-- Q02 일반 개념은 `general_knowledge` 구간에만 담는다. 구간 첫 문장 `일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.`는 서버가 붙이고, 구간 `evidenceIds`는 빈 배열이며 최신 사실·전망·개인 투자 판단을 포함하지 않는다. 일반 개념만 답한 결과는 `sources`·`citations`도 빈 배열이다. 근거 구간과 함께 있으면 `answerBasis=mixed`다.
+- Q02 일반 개념은 `general_knowledge` 구간에만 담는다. 구간 첫 문장 `일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.`는 서버가 붙이고, 구간 `evidenceIds`는 빈 배열이며 최신 사실·전망·개인 투자 판단을 포함하지 않는다. 일반 개념만 답한 결과는 `sources`·`citations`도 빈 배열이다. 근거 구간과 함께 있으면 `answerBasis=mixed`다. 이 구간은 Jev `prohibitedAdvice` 판정만 받는다.
+- ZOOP 도움말·정책 인용은 `Citation.sourceKind=zoop_doc`(docId·docVersion·구간)으로 뉴스·공시 인용과 같은 형식을 쓴다.
+- 한 질문의 명시적 요구는 최대 6개이며 넘으면 계획 시점 `clarification`이다.
 
 남은 일은 제품 선택이 아니라 구현과 출시 증명이다. 실제 MCP별 세부 스키마·소유 서비스, 배포 모델의 정확한 버전과 외부 전송 승인, 담당자 실명, 보관 기간, 비용 경보액, 종단 연동 시험 결과는 출시 전에 등록해야 한다.
 

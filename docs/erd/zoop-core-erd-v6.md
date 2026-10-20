@@ -366,7 +366,7 @@ UNIQUE(session_id) WHERE status IN ('queued', 'running')
 CHECK(resolves_choice_id IS NULL OR resolves_job_id IS NOT NULL)
 ```
 
-`phase`는 API `ChatJob.phase`(planning/retrieving/writing/verifying)이며 running에서만 값을 갖고 queued·종료 상태에서는 NULL이다. 실행 중인 attempt의 owner token 조건부 UPDATE로만 갱신한다. `deadline_at`은 현재 실행의 기한(시작 시각 + 계획 경로별 단계 상한 합, 최대 60초)이며 lease_until은 이보다 여유 시간만큼 뒤다. 모델 단계 시작 전 잔여 기한 검사의 기준이고 rerun마다 새로 정한다. runs는 3을 넘지 않는다.
+`phase`는 API `ChatJob.phase`(planning/retrieving/writing/verifying)이며 running에서만 값을 갖고 queued·종료 상태에서는 NULL이다. 실행 중인 attempt의 owner token 조건부 UPDATE로만 갱신한다. `deadline_at`은 현재 실행의 기한(시작 시각 + 계획 경로별 단계 상한 합, 최대 60초)이며 lease_until은 이보다 여유 시간만큼 뒤다. 모델 단계 시작 전 잔여 기한 검사의 기준이고 rerun마다 새로 정한다. runs는 모델을 호출한 실행(최초·rerun)만 세며 3을 넘지 않는다. save_only 시도는 attempts에는 기록하지만 runs에 더하지 않는다.
 
 `resolves_job_id`/`resolves_choice_id`는 확인 질문(clarification)에 대한 답을 원 작업과 연결하며 API `ChatJob.resolves`(`ChatClarificationReply`)와 같은 값이다. 둘 다 최초 접수 때 고정하고 request_hash에 포함한다. 접수 트랜잭션에서 원 작업이 같은 session_id이고 status=completed·outcome=clarification인지, resolves_choice_id가 원 작업 `result.choices[].id`에 있는지 검사한다(JSON 항목 FK 대체). choice가 NULL이면 question이 자유 입력 답이다. 새 작업의 frozen_context·context_company_ids·graph_version_id는 요청 context가 아니라 원 작업에서 복사한다. 같은 원 작업에 여러 답 작업을 허용하므로 resolves_job_id에 UNIQUE를 두지 않고, 원 작업 조회용 인덱스 `(resolves_job_id) WHERE resolves_job_id IS NOT NULL`을 둔다.
 

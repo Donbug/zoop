@@ -70,12 +70,12 @@
 | answerBasis·구간 basis | 사용자 표시 |
 | --- | --- |
 | `general_knowledge` | “일반 개념” 배지. 고정 안내 문장은 서버가 구간 text 맨 앞에 넣었으므로 UI가 다시 붙이지 않는다. 이 구간에는 인용·출처를 연결하지 않음 |
-| `zoop_documented` | “ZOOP 안내” 배지와 사용한 도움말·정책 버전 표시 |
+| `zoop_documented` | “ZOOP 안내” 배지와 사용한 도움말·정책의 제목·버전 표시(`citations`의 `sourceKind=zoop_doc` 항목의 `articleTitle`·`docVersion`) |
 | `evidence_grounded` | “근거 확인됨” 배지, 기준 시점과 인용·원문 열기 제공 |
 | `mixed` | 결과 배지만 해당한다. 본문은 구간별 배지로 일반 설명과 근거 기반 사실의 경계를 보여 주고, 인용은 각 구간의 `evidenceIds`에만 연결한다 |
 | `none` | 확인 질문·안내·근거 부족 결과. 근거 검증 배지를 표시하지 않음 |
 
-`sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. `limitations`가 비어 있지 않으면 본문 아래·인용 위에 “답하지 않은 부분” 영역을 두고 항목마다 `label`과 `message`를 표시한다. 투자 판단 거절, 전제 불충족, 조회 상한, 요구별 근거 부족을 본문 문장에서 추측해 만들지 않고 이 배열만 사용한다. `kind`는 아이콘·스타일 구분에만 쓰고 문구는 `message`를 그대로 쓴다.
+`sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `sourceKind=article`이면 원문 기사·공시 열기를, `zoop_doc`이면 해당 도움말·정책 문서 열기를 제공한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. `limitations`가 비어 있지 않으면 본문 아래·인용 위에 “답하지 않은 부분” 영역을 두고 항목마다 `label`과 `message`를 표시한다. 투자 판단 거절, 전제 불충족, 조회 상한, 요구별 근거 부족을 본문 문장에서 추측해 만들지 않고 이 배열만 사용한다. `kind`는 아이콘·스타일 구분에만 쓰고 문구는 `message`를 그대로 쓴다.
 
 ## 4. 결과·오류별 렌더링
 

@@ -3334,7 +3334,7 @@ answered 본문의 근거 수준별 구간.
 | --- | --- | --- | --- |
 | basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
 | text | 필수 | string |  |
-| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다. |
 
 <a id="schema-chatapplied"></a>
 
@@ -3492,7 +3492,7 @@ The selection frozen when the question was first received.
 | resolves | 필수 | [ChatClarificationReply](#schema-chatclarificationreply) / null | 이 작업이 답한 확인 질문. 최초 접수 때 고정되며 확인 질문 답이 아니면 null이다. |
 | failure | 필수 | [ChatFailure](#schema-chatfailure) / null |  |
 | result | 필수 | [ChatResult](#schema-chatresult) / null | Only a saved result; null until the job is completed |
-| runs | 필수 | integer | Executions started so far (a retry starts another). 최대 3이다. |
+| runs | 필수 | integer | Executions started so far (a rerun starts another). 모델을 호출한 실행만 세며 최대 3이다. save_only는 세지 않는다. |
 | createdAt | 필수 | string (date-time) |  |
 | updatedAt | 필수 | string (date-time) |  |
 | finishedAt | 필수 | string (date-time) / null |  |
@@ -3543,7 +3543,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만든다. |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. |
 | sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
 | answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
@@ -3576,11 +3576,14 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| evidenceId | 필수 | string |  |
+| sourceKind | 필수 | string {article, zoop_doc} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다. |
+| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
 | quote | 필수 | string |  |
-| articleId | 필수 | string |  |
-| articleVersion | 필수 | string |  |
-| start | 필수 | integer |  |
+| articleId | 필수 | string, null |  |
+| articleVersion | 필수 | string, null |  |
+| docId | 필수 | string, null |  |
+| docVersion | 필수 | string, null |  |
+| start | 필수 | integer | 고정 원문 버전의 Unicode code point 기준 [start,end) 시작 |
 | end | 필수 | integer |  |
 | articleTitle | 필수 | string / null |  |
 | publisher | 필수 | string / null |  |

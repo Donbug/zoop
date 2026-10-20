@@ -13,7 +13,8 @@
 - API `ChatResult.limitations`(`ChatLimitation`)가 추가되어 `chat_jobs.result` JSONB에 함께 저장된다. 컬럼 변경은 없으며 완료 결과 불변 규칙을 그대로 적용한다.
 - API `ChatResult.sections`(`ChatAnswerSection`, 근거 수준별 본문 구간)도 `chat_jobs.result` JSONB에 함께 저장된다. `answerBasis`는 구간에서 계산된 값으로 저장하며 컬럼 변경은 없다.
 - 챗봇 출력 검증의 결정론적 check 결과와 Jev 의미 검증 요약(호출 여부·전체 판정·hold로 제외한 요구)을 `route_summary`에 저장한다. claim별 분포와 원문 응답은 `ai_executions(feature=chatbot, stage=semantic-verification)`의 영수증 artifact에 둔다. 컬럼 변경은 없다.
-- `chat_jobs`에 `phase text?`(API `ChatJob.phase`, running에서만 값)와 `deadline_at timestamptz?`(계획 경로별 실행 기한, 최대 60초)를 추가했다. 정책 v0.8에서 ChatJob 30초 고정을 단계별 상한 합으로 바꾸고 진행 단계를 공개했기 때문이다. `runs`는 3 이하로 제한한다.
+- `chat_jobs`에 `phase text?`(API `ChatJob.phase`, running에서만 값)와 `deadline_at timestamptz?`(계획 경로별 실행 기한, 최대 60초)를 추가했다. 정책 v0.8에서 ChatJob 30초 고정을 단계별 상한 합으로 바꾸고 진행 단계를 공개했기 때문이다. `runs`는 3 이하로 제한하며, 모델을 호출하지 않는 save_only 시도는 attempts에만 기록하고 runs에 더하지 않는다.
+- API `ChatResult.citations`(`Citation`)에 `sourceKind`(article·zoop_doc)와 `docId`·`docVersion`이 추가되어 ZOOP 도움말·정책 인용도 `chat_jobs.result` JSONB에 같은 형식으로 저장된다. 컬럼 변경은 없다.
 
 ## 2026-10-17 추가 변경 — 챗봇 동적 라우팅·도구 호출 관측
 

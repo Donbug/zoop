@@ -9672,7 +9672,7 @@ components:
           type: "array"
           maxItems: 20
           uniqueItems: true
-          description: "이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다."
+          description: "이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다."
       type: "object"
       required:
         - "basis"
@@ -10005,7 +10005,7 @@ components:
           description: "Only a saved result; null until the job is completed"
         runs:
           type: "integer"
-          description: "Executions started so far (a retry starts another). 최대 3이다."
+          description: "Executions started so far (a rerun starts another). 모델을 호출한 실행만 세며 최대 3이다. save_only는 세지 않는다."
         createdAt:
           type: "string"
           format: "date-time"
@@ -10109,7 +10109,7 @@ components:
         answer:
           type: "string"
           maxLength: 12000
-          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만든다."
+          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다."
         sections:
           items:
             "$ref": "#/components/schemas/ChatAnswerSection"
@@ -10203,16 +10203,36 @@ components:
         - "jobs"
     Citation:
       properties:
+        sourceKind:
+          type: "string"
+          enum:
+            - "article"
+            - "zoop_doc"
+          description: "article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다."
         evidenceId:
           type: "string"
+          description: "인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다."
         quote:
           type: "string"
         articleId:
-          type: "string"
+          type:
+            - "string"
+            - "null"
         articleVersion:
-          type: "string"
+          type:
+            - "string"
+            - "null"
+        docId:
+          type:
+            - "string"
+            - "null"
+        docVersion:
+          type:
+            - "string"
+            - "null"
         start:
           type: "integer"
+          description: "고정 원문 버전의 Unicode code point 기준 [start,end) 시작"
         end:
           type: "integer"
         articleTitle:
@@ -10242,10 +10262,13 @@ components:
               type: "null"
       type: "object"
       required:
+        - "sourceKind"
         - "evidenceId"
         - "quote"
         - "articleId"
         - "articleVersion"
+        - "docId"
+        - "docVersion"
         - "start"
         - "end"
         - "articleTitle"

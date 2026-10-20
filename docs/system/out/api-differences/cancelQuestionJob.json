@@ -86,6 +86,28 @@
       ]
     },
     "response:200:application/json.result<anyOf:0>.choices[].kind:required": true,
+    "response:200:application/json.result<anyOf:0>.citations[].docId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.citations[].docId:required": true,
+    "response:200:application/json.result<anyOf:0>.citations[].docVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.citations[].docVersion:required": true,
+    "response:200:application/json.result<anyOf:0>.citations[].sourceKind": {
+      "type": "string",
+      "enum": [
+        "article",
+        "zoop_doc"
+      ]
+    },
+    "response:200:application/json.result<anyOf:0>.citations[].sourceKind:required": true,
     "response:200:application/json.result<anyOf:0>.limitations": {
       "type": "array",
       "maxItems": 8
@@ -757,6 +779,28 @@
       },
       "bff": {
         "type": "array"
+      }
+    },
+    "response:200:application/json.result<anyOf:0>.citations[].articleId": {
+      "target": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
+    "response:200:application/json.result<anyOf:0>.citations[].articleVersion": {
+      "target": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "string"
       }
     },
     "response:200:application/json.result<anyOf:0>.citations[].publishedAt<anyOf:0>": {
