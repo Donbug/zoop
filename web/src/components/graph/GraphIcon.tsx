@@ -12,6 +12,7 @@ export default function GraphIcon({
       height={size}
       alt=""
       aria-hidden="true"
+      data-icon
       draggable={false}
     />
   );

@@ -3,6 +3,7 @@ import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
 import { companyLogo } from '@/util/company-logo';
+import { themeColor } from '@/util/theme-color';
 import { separateNodes, shortTitle } from './graph-geometry';
 
 export function graphSummary(data: GraphResponse) {
@@ -205,7 +206,7 @@ export function toG6Data(
               {
                 text: `ϟ${summary.folded.get(n.id)}`,
                 placement: 'right-top' as const,
-                fill: '#55554f',
+                fill: themeColor('muted'),
                 background: false,
                 fontSize: 7.178 * scale,
                 fontFamily: 'JetBrains Mono Variable',
@@ -220,8 +221,8 @@ export function toG6Data(
                   .join('·'),
                 placement: 'bottom' as const,
                 offsetY: 12,
-                fill: '#1a1a1a',
-                backgroundFill: '#f2f2f0',
+                fill: themeColor('ink'),
+                backgroundFill: themeColor('soft'),
                 fontSize: 8,
               },
             ]
@@ -237,11 +238,11 @@ export function toG6Data(
           x: x * sx,
           y: y * sy,
           size,
-          fill: company ? '#ffffff' : '#1a1a1a',
-          stroke: '#1a1a1a',
+          fill: company ? themeColor('paper') : themeColor('ink'),
+          stroke: themeColor('ink'),
           lineWidth: n.isFocus ? 1.4 : 0.667,
           halo: n.isFocus,
-          haloStroke: '#1a1a1a',
+          haloStroke: themeColor('ink'),
           haloLineWidth: 0.667,
           haloFill: 'transparent',
           haloStrokeOpacity: 1,
@@ -254,17 +255,17 @@ export function toG6Data(
           iconFontSize: size * 0.34,
           iconFontFamily: 'Inter Variable',
           iconFontWeight: 700,
-          iconFill: n.brandColor ?? '#1a1a1a',
+          iconFill: n.brandColor ?? themeColor('ink'),
           labelText: company ? n.label : shortTitle(n.label, 13 * scale),
           labelPlacement: company ? 'bottom' : 'top',
           labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
           labelFontSize: (company ? 17.2 : 13) * scale,
           labelFontWeight: company ? 500 : 700,
-          labelFill: company ? '#55554f' : '#1a1a1a',
+          labelFill: company ? themeColor('muted') : themeColor('ink'),
           labelOffsetY: company ? (n.holding || n.watch ? 28 : 10) : -5,
           labelBackground: !company,
-          labelBackgroundFill: '#ffffff',
-          labelBackgroundStroke: '#1a1a1a',
+          labelBackgroundFill: themeColor('paper'),
+          labelBackgroundStroke: themeColor('ink'),
           labelBackgroundLineWidth: 0.5,
           labelBackgroundRadius: 8,
           labelPadding: [2, 7],
@@ -285,7 +286,8 @@ export function toG6Data(
           source: e.source,
           target: e.target,
           style: {
-            stroke: e.relationType === 'FOLLOWS' ? '#c0362c' : '#94948f',
+            stroke:
+              e.relationType === 'FOLLOWS' ? '#c0362c' : themeColor('faint'),
             lineWidth: 0.65,
             strokeOpacity: dimmed
               ? 0.08

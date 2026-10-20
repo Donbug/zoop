@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { toggleTheme } from '@/util/theme-color';
 import GraphIcon from '@/components/graph/GraphIcon';
 import AccountMenu from './AccountMenu';
 import './service-shell.css';
@@ -38,9 +39,14 @@ export default function ServiceHeader({
         {['ai', 'moon', 'bell'].map((icon, i) => (
           <button
             key={icon}
-            disabled
+            disabled={icon !== 'moon'}
             aria-label={['AI 기능', '화면 모드', '알림'][i]}
-            title="현재 담당 구현 범위 밖 기능"
+            title={
+              icon === 'moon'
+                ? '라이트·다크 화면 전환'
+                : '현재 담당 구현 범위 밖 기능'
+            }
+            onClick={icon === 'moon' ? toggleTheme : undefined}
           >
             <GraphIcon name={icon} size={16} />
           </button>
