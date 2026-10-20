@@ -46,9 +46,32 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
 | `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
 | `ZOOP_DOCUMENT_READ_GRANTS` `ZOOP_DOCUMENT_READ_ARTIFACT_ROOT` | 선택. 공개 `GET /api/v1/evidence/{id}`(운영 플래그와 독립, 읽기 전용). `GRANTS`는 operator의 flat S1 grant registry 파일로 요청마다 읽으며 미설정이면 그 읽기는 503, `ARTIFACT_ROOT`는 캐시로 돌려준 요약의 exact receipt 한 건을 읽을 때만 필요합니다(미설정이면 그 경우만 503). 값이 있는데 정규화된 절대 경로가 아니거나 없으면 기동 실패. 규칙은 [문서 분석 § 근거 읽기](docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현) |
-| `ZOOP_GRAPH_SNAPSHOT_SOURCE` | 선택. 공개 그래프 스냅샷을 어디서 읽을지 정합니다. 기본 `none`: 등록된 버전이 있어도 스냅샷 읽기는 503 `SOURCE_UNAVAILABLE`이고, 버전이 없으면 409 `VERSION_UNAVAILABLE`입니다(빈 그래프로 대체하지 않음). `fixture`: **local/dev 전용**이며, 기동 시 `src/main/resources/graph-fixtures/`의 합성 스냅샷 2개를 `graph_versions`에 등록·활성화합니다(제목 `[합성]`, 실제 뉴스 아님). 이미 가져온(non-fixture) 버전이 있는 DB에서는 기동을 거절합니다. AI 인계 묶음을 수입한 실제 스냅샷 source는 후속입니다. 규칙은 [그래프 조회 계약 결정](../docs/api/graph-read-contract-proposal.md) §0 |
+| `ZOOP_GRAPH_SNAPSHOT_SOURCE` `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT` | 선택. 공개 그래프 스냅샷을 어디서 읽을지 정합니다. 기본 `none`: 등록된 버전이 있어도 스냅샷 읽기는 503 `SOURCE_UNAVAILABLE`이고, 버전이 없으면 409 `VERSION_UNAVAILABLE`입니다(빈 그래프로 대체하지 않음). `fixture`: **local/dev 전용**이며, 기동 시 `src/main/resources/graph-fixtures/`의 합성 스냅샷 2개를 `graph_versions`에 등록·활성화합니다(제목 `[합성]`, 실제 뉴스 아님). 이미 가져온(non-fixture) 버전이 있는 DB에서는 기동을 거절합니다. `artifact`: `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(정규화된 절대 경로)의 스냅샷 파일을 레지스트리 hash·크기로 검증해 읽기 전용으로 읽고, 이미 등록된 fixture 버전(classpath 위치)은 기존 fixture 읽기 경로가 그대로 읽어 기존 읽기가 달라지지 않습니다(아래 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import)). 어떤 버전을 공개로 보여 줄지는 여전히 선택기와 활성 포인터가 정하며 `artifact`가 등록·활성화하지 않습니다. 규칙은 [그래프 조회 계약 결정](../docs/api/graph-read-contract-proposal.md) §0 |
+| `ZOOP_GRAPH_HANDOFF_IMPORT_*` `ZOOP_HANDOFF_*` `ZOOP_RELATION_STATE_DIR` `ZOOP_EXTRACTION_STATE_DIR` | 선택. operator 전용 비웹 그래프 handoff 스테이징 import(기본 비활성, 설정 없이도 기동). 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import·분석, `fixture` 소스와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [그래프 handoff 스테이징 import](#그래프-handoff-스테이징-import) |
 
 `DB_PORT`나 `DB_NAME`을 바꾸면 `DB_URL`도 일치하게 수정하세요. `.env.example`의 비밀번호는 로컬 전용 예시이며 운영용이 아닙니다. 실제 `.env`는 Git에서 제외됩니다. 이미 초기화된 DB 볼륨의 계정·비밀번호는 환경변수만 바꿔도 변경되지 않습니다.
+
+### 그래프 읽기 로컬 빠른 시작 (합성 fixture, 일회용)
+
+백엔드 그래프 읽기(`GET /api/v1/graph`, `asOf`, `GET /api/v1/graph/edges/{id}`)를 AWS·Neo4j·AI 모델·`api/.env` 없이 개발할 때 쓰는 **명시적 옵트인** 런처입니다. 일회용 PostgreSQL 컨테이너 하나와 **빌드된 jar**를 띄우고, 앱의 기존 `ZOOP_GRAPH_SNAPSHOT_SOURCE=fixture`로 jar에 들어 있는 합성 스냅샷 2개(`fixture-2026-10-01`, `fixture-2026-10-08`, 제목 `[합성]`)를 등록·활성화합니다. 실제 뉴스나 AI handoff import가 아니라 **임시 개발용 합성 데이터**이며, 멈추면 DB째 사라집니다. 그래프 handoff import(`com.zoop.graph.importer`)와는 별개이고, `fixture` 소스는 import된 버전이 있는 DB를 거절하므로 이 런처는 매번 새 DB만 씁니다.
+
+```sh
+make api-build      # jar가 없을 때만. 런처는 빌드·pull을 하지 않습니다
+make api-graph-dev  # 준비되면 URL을 출력하고 Ctrl-C까지 실행
+```
+
+준비 완료는 로그의 `Started`가 아니라 **실제 HTTP 읽기**로 판정합니다(fixture 등록은 `Started` 뒤에 끝납니다). 기본 그래프, `asOf=2026-10-05T00:00:00Z`(옛 버전 `fixture-2026-10-01`), 간선 상세가 모두 200이어야 `READY`와 URL을 출력합니다. 다른 터미널에서 바로 확인할 수 있습니다.
+
+```sh
+curl -s http://127.0.0.1:<출력된 포트>/api/v1/graph
+curl -s 'http://127.0.0.1:<출력된 포트>/api/v1/graph?asOf=2026-10-05T00:00:00Z'
+```
+
+- 격리: DB는 고유 이름·`127.0.0.1`의 임의 포트·실행마다 새로 만든 합성 계정(tmpfs, 볼륨 없음)입니다. 앱은 상속 환경변수 없이 최소 환경과 빈 임시 작업 디렉터리에서 뜨므로 AWS·모델 키나 `api/.env`, 내 DB를 읽거나 쓰지 않고, CSRF 서명 키·DB 비밀번호는 실행마다 새로 만들어 출력하지 않습니다.
+- 필요 조건: JDK 21(`JAVA_HOME`), 실행 중인 Docker, 로컬에 이미 있는 PostgreSQL 이미지(기본 `postgres:16.13-alpine`, `compose.local.yaml`·CI와 같음), 빌드된 jar. 없으면 이유를 밝히고 실패하며 자동으로 pull하지 않습니다.
+- 옵션: `make api-graph-dev LOCAL_GRAPH_DEV_PORT=8080 LOCAL_GRAPH_DEV_IMAGE=<이미 받은 이미지>`. 포트 기본값 0은 빈 포트를 고릅니다. 프론트에서 고정 포트가 필요하면 지정하세요(로컬 프로필이라 `http://localhost:3000` CORS가 허용됩니다).
+- 종료: Ctrl-C(SIGINT)나 SIGTERM/SIGHUP이면 앱을 멈추고 컨테이너(`docker rm -f -v`)와 임시 디렉터리를 지웁니다. 정상적인 Ctrl-C는 남는 자원이 없습니다. `make`로 실행했다면 Ctrl-C 뒤 make가 interrupt 오류(예: `Error 130`)와 non-zero 상태를 보고할 수 있으며, 이는 make 자신의 중단 상태이고 정리 실패가 아닙니다(런처는 이를 가리지 않습니다). 정리 결과는 런처의 `database container … removed` 로그와 `docker ps -a --filter label=com.zoop.local-graph-dev=1`(빈 출력)로 확인하세요. SIGKILL로 죽이면 정리하지 못하므로 같은 명령으로 찾아 `docker rm -f -v <이름>` 하세요.
+- Windows PowerShell(make 없이): `python api\scripts\local_graph_dev.py [--server-port 8080] [--image <이미지>] [--jar <jar>] [--java <java.exe>]`. 도움말은 `python api/scripts/local_graph_dev.py --help`입니다.
 
 ### 로컬 HTTP 브라우저 테스트
 
@@ -123,7 +146,10 @@ make api-test                        # ./api/gradlew -p api test
 make api-build                       # ./api/gradlew -p api assemble
 make service-install api-ai-smoke    # 실제 Java -> ai/service -> zoop-ai replay gate (./gradlew aiContractTest)
 make pipeline-install service-install api-ai-pipeline-smoke   # 실제 Java -> ai/service -> zoop-ai-extract/-relation 종단 gate (./gradlew aiPipelineContractTest)
+make pipeline-install api-build api-graph-handoff-import-smoke   # 실제 zoop-ai-handoff/-ingest -> 빌드된 jar -> PostgreSQL 그래프 handoff import smoke (14단계; DB_URL·DB_USERNAME·DB_PASSWORD 필요)
 ```
+
+`api-graph-handoff-import-smoke`는 합성 데이터만 쓰고 유료 모델·외부 호출과 그래프 활성화(activation)를 하지 않습니다. `DB_URL`(loopback)·`DB_USERNAME`·`DB_PASSWORD`로 **전용 빈 일회용 데이터베이스**를 지정해야 하며(기본값 없음, 문서·그래프 행이 이미 있으면 거절하고 정리하지 않음), 선택적으로 `GRAPH_IMPORT_PSQL_CONTAINER`(docker exec psql), `GRAPH_IMPORT_DB_USER`, `GRAPH_IMPORT_DB_NAME`을 지정합니다. `pipeline-install`·`api-build`는 자동 실행되지 않으며 없으면 실패합니다. 저장된 스냅샷이 형식 3인지와 이슈 period·assertionStatus·mention 참조·대표 mention, 구조 근거의 `basisId`·유형·국가·출처 기사, 미상 유효기간이 `null`로 남는지를 합성 세계에서 손으로 쓴 값과 대조하고, 두 문서가 같은 로컬 mentionId를 쓰는 합법적 생산자 세계(별도 handoff)가 서로 다른 앱 mention id와 올바른 대표 mention으로 등록되고 재시도에도 같은 id·바이트인지 확인하며, 기존 fixture 읽기의 현재 구조 근거(시작 있음·끝 미상)가 `active`로 읽히는지도 확인합니다. 스냅샷 형식이 바뀌면 함께 갱신해야 합니다. CI `api` 잡은 같은 PostgreSQL 서비스에 별도 빈 `zoop_graph_import_smoke` DB를 만들어 실행하며, 기존 `companyIntegrationTest`의 공유 DB는 건드리지 않습니다.
 
 `aiContractTest`와 `aiPipelineContractTest`는 기본 `test`에서 제외되며 각각 `make api-ai-smoke`, `api/scripts/ai_pipeline_gate.py`(`make api-ai-pipeline-smoke`)가 서비스를 띄워 매니페스트를 넘길 때만 통과합니다. 매니페스트가 없으면 skip이 아니라 실패합니다. 후자는 새 합성 운영자 세계와 설치된 pipeline이 필요합니다(`make pipeline-install service-install`; 없으면 실패).
 
@@ -186,6 +212,18 @@ console.log(response.status); // 활성 회원 세션이 정상 폐기되면 204
 `com.zoop.document.analysis`는 등록된 문서 버전 하나를 S1 AI 서비스로 요약·기업 판정하고 검증된 결과를 `document_analyses`·`evidence`·`ai_executions`와 artifact 파일에 저장하는 **operator 전용 비웹 실행**입니다(`V20261014130000`). `prepare`는 AI 서비스를 부르지 않고 새 AI jobId와 불변 `ai_submit`을 커밋하며, `advance`는 status를 먼저 읽고(submit·recover 직전에는 현재 grant·article을 다시 확인), 결과를 입력 결속·digest 재계산·검증자가 본 claim 대조·코드 포인트 인용 검사·현재 grant 재평가를 거쳐 한 transaction으로 정산하며, 그 transaction이 article·행 잠금을 얻은 뒤 grant를 한 번 더 평가합니다. 이 실행에는 HTTP 경로·`analysis_jobs`·live 실행이 없습니다(저장된 요약의 인용을 읽는 공개 경로는 아래 `getEvidence` 한 건뿐). 입력 스키마, 결과 파일, 실패 코드, 권리·크래시 규칙과 smoke(`api/scripts/document_analysis_smoke.py`)는 [문서 분석](docs/DOCUMENT_ANALYSIS.md)에 있습니다.
 
 `GET /api/v1/evidence/{id}`(`getEvidence`, 공개 `security: []`)는 저장된 S1 요약의 본문 인용 한 건을 읽는 **부분 구현**입니다(`com.zoop.document.evidence`). 모델·AI 서비스를 호출하지 않고 DB·파일을 쓰지 않으며 요청마다 현재 문서 상태와 현재 grant registry로 다시 판정합니다. 그래프가 없어 `eventIds`는 실패 구역·`graphVersion=null`·`sentiment=null`인 200 부분 응답이고 고정 `round`·`graphVersion`·`asOf`는 409입니다. 규칙·오류·캐시 적중 증명·한계는 [문서 분석 § 근거 읽기](docs/DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)에 있고 `listCompanyDocuments`·GraphDB·승인은 아직 없습니다.
+
+## 그래프 handoff 스테이징 import
+
+`com.zoop.graph.importer`는 AI `zoop-ai-handoff`가 동결한 handoff 하나를 **비활성** 그래프 버전으로 올리는 **operator 전용 비웹 실행**입니다(`--spring.main.web-application-type=none`, `ZOOP_GRAPH_HANDOFF_IMPORT_ENABLED=true`). HTTP 경로가 없고 평소 기동은 달라지지 않으며, 문서 import·분석(같은 artifact 잠금)이나 활성화하는 `fixture` 소스와 한 프로세스에서 켜면 기동이 거절됩니다. 실행은 `graph_activations`를 쓰지 않고 `graph_versions.active`와 article의 `current_version`을 바꾸지 않으므로 공개 API는 이 버전을 읽을 수 없습니다(명시 `graphVersion`은 409 `VERSION_UNAVAILABLE`, 기본·asOf 읽기는 기존 활성 포인터 그대로). **활성화 경로는 아직 없습니다**(결과의 `nextActivation=unsupported`).
+
+요청(`zoop-graph-handoff-import-1`, 닫힌 스키마)은 `handoffId`, 운영자가 고정한 `expectedManifestDigest`·`expectedBundleDigest`(둘 다 필수), `operator`입니다(`created_by=operator:<operator>`, AI 검수 revision이 아닙니다). 실행은 ① 설치된 `zoop-ai-handoff export`의 **현재** 결과(저장 파일이 아님)를 받아 canonical hash 두 개를 직접 다시 계산해 핀과 대조하고, 생산자 `validate_bundle`의 Java 이식으로 bundle 전체(닫힌 스키마·참조 폐쇄·`ev-`/`edge-` 공식·개수·content digest)와 manifest 일치를 검증하며, ② bundle이 기록한 **모든 관측**마다 `zoop-ai-ingest export --require-store`를 새로 실행해(같은 registry·같은 S2-1 원장, `store` 권리 포함) 권리·grant·관측 시각·제목·URL·게시 시각을 대조하고, ③ 한 transaction에서 앱 쪽(article version의 제목·URL·게시 시각 정밀도, 앱 텍스트와 export 텍스트의 byte 일치, 회사 ID·이름)을 검증해 불변 스냅샷·receipt 파일, `artifacts`(`graph_snapshot`·`verification_receipt`), `evidence`, `graph_versions`(inactive, `review_revision` 0, `published_at` 없음)를 등록하고 **commit 직전에 ①②를 다시 실행**합니다(권리가 바뀌면 rollback). id는 `gv-`+SHA-256(handoffId)로 결정되며 같은 핀의 재실행은 `unchanged`, 같은 id의 다른 핀은 `version_conflict`입니다.
+
+스냅샷은 앱의 현재 읽기 형식인 **`snapshotFormat 3`**(`PublicGraphSnapshot`)이며 읽기 투영일 뿐입니다. 이슈에는 생산자의 `period`·이슈 단위 `assertionStatus`(값 그대로, 없으면 null)·`mentions`(mention id와 article id·version)·`representativeMentionId`를, 구조 근거(basis)에는 `basisId`(생산자 `relationKey`)·사업 관계 유형(`SUPPLIES`)·`countries`·`articles`(출처 기사 버전 전부, 없을 수도 있음)·검증 시각·`validFrom`/`validUntil`을 담습니다. `validUntil`은 **마지막 유효일(그날 포함)**이고 `null`은 영구 유효가 아니라 미상이며, 원문 날짜에 자정이나 하루를 더하지 않고 일 단위가 아닌 값은 `temporal_unsupported`로 거절합니다. 공개 조회는 검증 시각이 asOf 이하인 구조 근거를 보이고, 끝난 근거도 지우지 않고 상태(`ended` 등, asOf 또는 요청 시각의 Asia/Seoul 날짜 비교)로 구분합니다. **mention 참조는 전체 source event 목록이 아닙니다.** source event는 그 문서 버전(documentId·documentVersion·rawVersion·관측 위치)이 이슈 자신의 근거가 인용하는 기사 버전일 때만 mention이 되며, 같은 기사 버전·같은 생산자 mentionId를 가진 여러 event(S2 후보와 S2 스냅샷이 함께 담는 경우)는 한 mention입니다. 생산자의 `mentionId`는 문서 버전 안에서만 유일해 서로 다른 문서가 같은 값을 합법적으로 쓰므로, 스냅샷의 mention id는 앱이 `mention-`+SHA-256(canonical JSON `{articleId, articleVersion, sourceMentionId}`, 키는 ASCII 정렬)로 정합니다. 같은 값이 다른 문서에 있어도 두 mention이 따로 남고 같은 입력은 언제나 같은 id를 냅니다. 대표 event도 자신이 속한 기사 버전으로 풀어 같은 식으로 바꾸며 그 mention이 스냅샷에 없으면 `representativeMentionId`는 null입니다. 한 문서 신원이 둘 이상의 bundle 기사와 맞는 경우만 추측하지 않고 `mention_article_ambiguous`로 import 전체를 거절합니다. 스냅샷에 둘 수 없는 source event, 결정, source ref 같은 생산자 필드와 생산자의 원래 mention id는 버리지 않고 `verification_receipt`(원본 manifest·bundle 전체와 앱이 검증한 항목)에 그대로 남습니다. 증거 id는 AI가 제안한 `ev-`+digest 공식을 앱 규칙으로 채택하고(충돌은 `evidence_collision`), 인용은 앱 텍스트의 **코드 포인트** 구간이며 그 UTF-8 SHA-256이 bundle의 `quoteSha256`과 같아야 합니다. `quote_verified`는 이 **인용 무결성**만 뜻하며(의미 검증 아님) 검증 artifact는 receipt입니다. 정밀도를 지키며 쓸 수 없는 시각은 만들어 내지 않고 `temporal_unsupported`로 거절합니다. `getEvidence`는 graph 근거를 읽지 않고(미등록 취급) 공개 제외 오버레이도 이 실행의 범위가 아닙니다. 스테이징된 버전이 있는 DB에서 `fixture` 소스는 기동을 거절합니다.
+
+동시성·재시도 규칙: import의 transaction은 첫 문장으로 회사 카탈로그 테이블 잠금(`LOCK TABLE companies IN SHARE MODE`)을 잡고 commit까지 유지하므로, 한 번 읽은 회사 이름과 "이슈 ID가 카탈로그 회사 ID가 아님" 확인이 commit 시점에도 참입니다. 카탈로그 import도 같은 순서(테이블 잠금 다음 행 잠금)로 잡아 서로를 기다리며 교착하지 않고, 이 대기에는 자체 시간 제한이 없어 상대 transaction이 끝나거나 DB 오류(`database_unavailable`)로 끝납니다. import는 transaction 안에서 사용하는 article 행을 `FOR UPDATE`로 잠그고(`access_status`가 `private`·`deleted`이면 거절) commit 직전 재검사 뒤 같은 잠금 아래에서 상태를 다시 확인하므로, 동시에 들어온 공개 철회는 import의 commit을 기다린 뒤에 적용됩니다. 이미 있는 증거 행은 내용(article·version·텍스트 artifact·인용·구간·locator)과 의미(`input_kind=body`, `offset_unit=unicode_code_point`, 요약 연결 없음, `quote_verified=TRUE`이고 검증 artifact가 graph `verification_receipt`)가 모두 같을 때만 재사용하며 그 밖의 같은 id는 `evidence_collision`입니다(행을 UPDATE로 고치지 않음; 앞선 handoff의 receipt를 검증 artifact로 가진 행은 정상 재사용). 스냅샷의 회사 노드는 bundle이 말하는 `companyId`·`label`만 담고 `brandColor`·`logoUrl`은 선택 외형이므로 카탈로그에서 복사하지도 만들어 내지도 않습니다. 스냅샷 바이트는 검증된 bundle만으로 정해지므로 commit 결과가 불명확했던 시도 뒤의 같은 핀 재시도는 남은 파일을 그대로 채택합니다.
+
+설정은 `application.yml`의 `zoop.graph-handoff-import.*`(요청·결과 파일, `zoop-ai-handoff`·`zoop-ai-ingest` 실행 파일, handoff·relation·extraction·S2-1 상태 디렉터리, **하나의** source registry, 동결에 쓴 canonical·decisions·bindings 파일, artifact root)이며 값이 틀리면 설정 이름만 알리고 기동을 거절합니다. 하위 CLI에는 DB 자격이 전달되지 않습니다. 결과 파일(`0600`, 이미 있으면 덮어쓰지 않음)에는 경로·본문·비밀이 없고 실패 시 프로세스는 0이 아닌 코드로 끝납니다. 스테이징된 스냅샷을 읽으려면 `ZOOP_GRAPH_SNAPSHOT_SOURCE=artifact`와 `ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT`(같은 root)를 씁니다. 실제 CLI·PostgreSQL smoke는 `api/scripts/graph_handoff_import_smoke.py`(파이프라인 venv의 Python으로 실행, 사용법은 파일 머리말)이고 PostgreSQL 통합 시험은 `companyIntegrationTest`에 포함됩니다.
 
 ## 기본 기업 카탈로그 적재
 
