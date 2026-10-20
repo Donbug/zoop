@@ -13,6 +13,22 @@ import {
   sameViewport,
 } from './graph-view';
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
+import { freeViewport, nodeRect, type Rect } from './graph-geometry';
+
+/** 범례 항목에 마우스를 올리면 보이는 설명(D-GRP-01). 연결선 정의는 openapi 관계 유형을 따른다. */
+const LEGEND_HELP: Record<LegendKey, string> = {
+  company: '기업 노드입니다. 원 크기는 연결된 사건 수(활동량)를 나타냅니다.',
+  issue:
+    '사건 노드입니다. 공시·기사에서 확인된 사건이며 여러 기업이 함께 연결될 수 있습니다.',
+  INVOLVES:
+    '직접 관련: 기업이 사건의 당사자입니다. 계약 당사자나 공시 주체처럼 기사·공시에 행위자로 나옵니다.',
+  STRUCTURALLY_RELATED_TO:
+    '구조적 관련: 사건의 당사자는 아니지만 공급망·지분·고객 관계 같은 구조로 영향이 닿는 기업입니다. 관계에 유효 기간이 있을 수 있습니다.',
+  SHARES_ISSUE:
+    '사건 공유: 두 기업이 같은 사건에 각각 직접 또는 구조적으로 연결되어 있을 때 그리는 선입니다. 두 기업 사이의 관계를 기사가 따로 말한 것은 아니며, 근거는 공유한 사건의 근거를 따릅니다.',
+  FOLLOWS:
+    '후속 사건: 앞 사건 다음에 이어서 일어난 사건을 잇는 선입니다. 뒤 사건이 아직 일어나지 않았으면 나타나지 않습니다.',
+};
 
 export default function GraphCanvas({
   data,
@@ -77,6 +93,10 @@ export default function GraphCanvas({
   const drawing = useRef(Promise.resolve());
   const lastFocused = useRef<string | null>(null);
   const hovered = useRef<string | null>(null);
+  const [hoveredIssue, setHoveredIssue] = useState<string | null>(null);
+  const fitPending = useRef(false);
+  const followFit = useRef(true);
+  const minimapShown = useRef(false);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const selectNode = useEffectEvent((id: string | null) =>
     id === '__isolated__' ? onOpenIsolated?.() : onSelect?.(id),
@@ -147,6 +167,10 @@ export default function GraphCanvas({
   const hoverNode = useEffectEvent((id: string | null) => {
     if (hovered.current === id) return;
     hovered.current = id;
+    setHoveredIssue(
+      data.nodes.find((node) => node.id === id && node.kind === 'issue')
+        ?.label ?? null,
+    );
     const graph = instance.current;
     if (!graph) return;
     drawing.current = drawing.current
@@ -170,6 +194,105 @@ export default function GraphCanvas({
   const retainFocus = useEffectEvent(() => {
     lastFocused.current = focusId;
   });
+  async function fitVisibleGraph(graph: Graph) {
+    const host = container.current;
+    if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
+      return;
+    const hostRect = host.getBoundingClientRect();
+    const root = host.parentElement;
+    const overlays = [
+      ...(root?.querySelectorAll<HTMLElement>(
+        '.relationship-legend,.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview',
+      ) ?? []),
+      ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
+    ];
+    const obstacles: Rect[] = overlays
+      .filter((el) => el.getClientRects().length && !el.closest('.hidden'))
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          x: r.left - hostRect.left,
+          y: r.top - hostRect.top,
+          width: r.width,
+          height: r.height,
+        };
+      });
+    // The plugin creates its DOM asynchronously. Reserve its known geometry
+    // on the first fit as well, before it has a measurable container.
+    if (minimapShown.current)
+      obstacles.push({
+        x: host.clientWidth - 192,
+        y: host.clientHeight - 64 - 128,
+        width: 192,
+        height: 128,
+      });
+    // Desktop layouts can be wider than the browser. Reserve the clipped
+    // portion too, rather than fitting nodes behind horizontal page overflow.
+    const viewportWidth = document.documentElement.clientWidth;
+    const viewportHeight = document.documentElement.clientHeight;
+    if (viewportWidth > 0 && hostRect.right > viewportWidth)
+      obstacles.push({
+        x: viewportWidth - hostRect.left,
+        y: 0,
+        width: hostRect.right - viewportWidth,
+        height: host.clientHeight,
+      });
+    if (viewportHeight > 0 && hostRect.bottom > viewportHeight)
+      obstacles.push({
+        x: 0,
+        y: viewportHeight - hostRect.top,
+        width: host.clientWidth,
+        height: hostRect.bottom - viewportHeight,
+      });
+    if (hostRect.left < 0)
+      obstacles.push({
+        x: 0,
+        y: 0,
+        width: -hostRect.left,
+        height: host.clientHeight,
+      });
+    if (hostRect.top < 0)
+      obstacles.push({
+        x: 0,
+        y: 0,
+        width: host.clientWidth,
+        height: -hostRect.top,
+      });
+    const safe = freeViewport(host.clientWidth, host.clientHeight, obstacles);
+    if (safe.width < 40 || safe.height < 40) return;
+    const rects = graph
+      .getNodeData()
+      .filter((node) => node.style?.visibility !== 'hidden')
+      .map(nodeRect);
+    if (!rects.length) return;
+    const left = Math.min(...rects.map((r) => r.x)),
+      top = Math.min(...rects.map((r) => r.y));
+    const right = Math.max(...rects.map((r) => r.x + r.width)),
+      bottom = Math.max(...rects.map((r) => r.y + r.height));
+    await graph.zoomTo(
+      Math.max(
+        0.01,
+        Math.min(
+          1.5,
+          safe.width / Math.max(1, right - left),
+          safe.height / Math.max(1, bottom - top),
+        ),
+      ),
+      false,
+    );
+    if (graph.destroyed) return;
+    const center = graph.getViewportByCanvas([
+      (left + right) / 2,
+      (top + bottom) / 2,
+    ]);
+    await graph.translateBy(
+      [
+        safe.x + safe.width / 2 - center[0],
+        safe.y + safe.height / 2 - center[1],
+      ],
+      false,
+    );
+  }
   const syncSelection = useEffectEvent(() => {
     const graph = instance.current;
     const host = container.current;
@@ -267,16 +390,17 @@ export default function GraphCanvas({
         const visibleCount =
           rendered.nodes?.filter((node) => node.style?.visibility !== 'hidden')
             .length ?? 0;
+        minimapShown.current = visibleCount > 60 && host.clientWidth >= 768;
         graph.setPlugins(
-          visibleCount > 60 && host.clientWidth >= 768
+          minimapShown.current
             ? [
                 {
                   type: 'minimap',
                   key: 'graph-overview',
                   size: [192, 128],
                   position: 'right-bottom',
-                  className:
-                    'hidden md:block rounded-panel border border-panel-line bg-white shadow-lg',
+                  // G6 passes this value to classList.add: it must be one token.
+                  className: 'graph-overview',
                   filter: (id: string, kind: string) =>
                     kind === 'node'
                       ? !hiddenNodes.has(id)
@@ -299,6 +423,10 @@ export default function GraphCanvas({
         )
           await graph.focusElement(focusId, false);
         lastFocused.current = focusId;
+        if (fitPending.current) {
+          fitPending.current = false;
+          await fitVisibleGraph(graph);
+        }
       })
       .catch(() => {
         if (!graph.destroyed) setRenderError(true);
@@ -323,7 +451,38 @@ export default function GraphCanvas({
     let observer: ResizeObserver | null = null;
     let resizeFrame: number | null = null;
     const clearHover = () => hoverNode(null);
+    let pointerStart: { x: number; y: number } | null = null;
+    const pointerDown = (event: PointerEvent) => {
+      pointerStart = { x: event.clientX, y: event.clientY };
+    };
+    const pointerMove = (event: PointerEvent) => {
+      if (
+        pointerStart &&
+        Math.hypot(
+          event.clientX - pointerStart.x,
+          event.clientY - pointerStart.y,
+        ) > 4
+      )
+        followFit.current = false;
+    };
+    const pointerUp = () => {
+      pointerStart = null;
+    };
+    const stopFollowing = () => {
+      followFit.current = false;
+    };
+    const viewportChanged = () => {
+      if (followFit.current) {
+        fitPending.current = true;
+        syncSelection();
+      }
+    };
     host.addEventListener('pointerleave', clearHover);
+    host.addEventListener('pointerdown', pointerDown);
+    host.addEventListener('pointermove', pointerMove);
+    window.addEventListener('pointerup', pointerUp);
+    host.addEventListener('wheel', stopFollowing, { passive: true });
+    window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
     renderedData.current = null;
     const graphMode = data.metadata.mode;
@@ -357,7 +516,7 @@ export default function GraphCanvas({
         animation: false,
         data: toG6Data(data, host.clientWidth, host.clientHeight),
         behaviors: ['drag-canvas', 'zoom-canvas'],
-        zoomRange: [0.25, 4],
+        zoomRange: [0.01, 4],
         edge: {
           state: {
             related: { lineWidth: 2, stroke: '#1a1a1a', strokeOpacity: 1 },
@@ -415,12 +574,15 @@ export default function GraphCanvas({
         if (!disposed) setRenderError(true);
       }
       if (disposed) return;
-      const camera = readModeEntry(memoryOwner, graphMode)?.view.camera;
-      // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 기본 배치로 연다.
-      if (
-        camera &&
-        sameViewport(camera.size, host.clientWidth, host.clientHeight)
-      ) {
+      const saved = readModeEntry(memoryOwner, graphMode)?.view.camera;
+      // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 화면에 맞춰 연다.
+      const camera =
+        saved && sameViewport(saved.size, host.clientWidth, host.clientHeight)
+          ? saved
+          : null;
+      followFit.current = !camera;
+      fitPending.current = !camera;
+      if (camera) {
         retainFocus();
         await graph.zoomTo(camera.zoom, false);
         await graph.translateTo(camera.position, false);
@@ -434,10 +596,13 @@ export default function GraphCanvas({
           if (!graph || disposed || graph.destroyed) return;
           if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
           graph.setSize(host.clientWidth, host.clientHeight);
+          if (followFit.current) fitPending.current = true;
           syncSelection();
         });
       });
       observer.observe(host);
+      const legend = host.parentElement?.querySelector('.relationship-legend');
+      if (legend) observer.observe(legend);
     }
     void mount().catch(() => {
       if (!disposed) setRenderError(true);
@@ -446,6 +611,11 @@ export default function GraphCanvas({
       rememberCamera();
       disposed = true;
       host.removeEventListener('pointerleave', clearHover);
+      host.removeEventListener('pointerdown', pointerDown);
+      host.removeEventListener('pointermove', pointerMove);
+      window.removeEventListener('pointerup', pointerUp);
+      host.removeEventListener('wheel', stopFollowing);
+      window.removeEventListener('zoop:graph-viewport-change', viewportChanged);
       observer?.disconnect();
       if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       graph?.destroy();
@@ -456,21 +626,30 @@ export default function GraphCanvas({
     const graph = instance.current;
     if (!graph || graph.destroyed) return;
     try {
-      if (action === 'fit') await graph.fitView({ when: 'always' }, false);
-      else
+      if (action === 'fit') {
+        followFit.current = true;
+        await drawing.current;
+        if (!graph.destroyed && instance.current === graph)
+          await fitVisibleGraph(graph);
+      } else {
+        followFit.current = false;
         await graph.zoomTo(
           Math.max(
-            0.25,
+            0.01,
             Math.min(4, graph.getZoom() * (action === 'in' ? 1.2 : 1 / 1.2)),
           ),
           false,
         );
+      }
     } catch {
       setRenderError(true);
     }
   }
   return (
-    <div className="relationship-canvas" data-testid="graph-canvas">
+    <div
+      className="relationship-canvas [&_.graph-overview]:rounded-panel [&_.graph-overview]:border [&_.graph-overview]:border-panel-line [&_.graph-overview]:bg-zoop-paper [&_.graph-overview]:shadow-lg [&_.graph-overview]:bottom-16! [&_.graph-overview]:top-auto!"
+      data-testid="graph-canvas"
+    >
       <div
         ref={container}
         // G6 writes an inline position: relative on its container, which would size the host by
@@ -479,6 +658,14 @@ export default function GraphCanvas({
         role="img"
         aria-label={`${personal ? '내 종목' : '시장 전체'} 관계 지도: 기업 ${stats.company}개, 사건 ${stats.issue}개. 드래그로 이동하고 휠로 확대합니다.`}
       />
+      {hoveredIssue && (
+        <p
+          role="tooltip"
+          className="pointer-events-none absolute top-3 right-3 z-20 max-w-[min(22rem,65%)] rounded border border-panel-line bg-zoop-paper px-3 py-2 font-panel text-sm text-panel-ink shadow-sm break-words"
+        >
+          {hoveredIssue}
+        </p>
+      )}
       {!focusId && (
         <aside
           className="relationship-legend z-10 bg-zoop-map/60 pb-3"
@@ -513,6 +700,8 @@ export default function GraphCanvas({
                   type="button"
                   className="pointer-events-auto rounded border border-zoop-line px-1 py-1 text-left text-[10px] aria-pressed:bg-white aria-pressed:font-bold focus-visible:outline-2"
                   aria-pressed={!view.hidden.includes(key)}
+                  title={LEGEND_HELP[key]}
+                  aria-description={LEGEND_HELP[key]}
                   disabled={
                     (key === 'company' || key === 'issue') &&
                     !view.hidden.includes(key) &&

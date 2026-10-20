@@ -31,6 +31,14 @@ export default function MapDetailSheet({
   const gesture = useRef<{ y: number; last: number } | null>(null);
   const dragged = useRef(false);
   useEffect(() => {
+    // The sheet is portaled outside the canvas; its snap changes need an
+    // explicit notification so an active whole-graph fit reserves its area.
+    const tick = requestAnimationFrame(() =>
+      window.dispatchEvent(new Event('zoop:graph-viewport-change')),
+    );
+    return () => cancelAnimationFrame(tick);
+  }, [mobile, open, full, suspended]);
+  useEffect(() => {
     if (!mobile || !open || suspended) return;
     const opener =
       document.activeElement instanceof HTMLElement

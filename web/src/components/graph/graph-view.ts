@@ -40,7 +40,7 @@ export function readModeEntry(owner: string, mode: MapMode): ModeEntry | null {
         ),
         ...(camera &&
         Number.isFinite(camera.zoom) &&
-        camera.zoom >= 0.25 &&
+        camera.zoom >= 0.01 &&
         camera.zoom <= 4 &&
         Array.isArray(camera.position) &&
         camera.position.length === 2 &&

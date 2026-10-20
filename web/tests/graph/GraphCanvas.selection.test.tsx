@@ -18,6 +18,7 @@ const canvas = vi.hoisted(() => ({
   setPlugins: vi.fn(),
   zoomTo: vi.fn(),
   translateTo: vi.fn(),
+  translateBy: vi.fn(),
   getZoom: vi.fn(() => 1),
   getPosition: vi.fn(() => [0, 0]),
   setSize: vi.fn(),
@@ -42,6 +43,10 @@ vi.mock('@antv/g6', () => ({
     getPosition = canvas.getPosition;
     zoomTo = canvas.zoomTo;
     translateTo = canvas.translateTo;
+    translateBy = canvas.translateBy;
+    getViewportByCanvas(point: number[]) {
+      return point;
+    }
     getNodeData() {
       return canvas.setData.mock.lastCall?.[0]?.nodes ?? [];
     }
@@ -80,6 +85,72 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it('shows the full API issue title on hover and clears it on leave', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const issue = data.nodes.find((node) => node.kind === 'issue')!;
+    issue.label = 'API 사건의 긴 제목 전체가 호버 안내에 표시되어야 합니다';
+    render(<GraphCanvas data={data} />);
+    await waitFor(() =>
+      expect(canvas.handlers.has('node:pointerenter')).toBe(true),
+    );
+    act(() =>
+      canvas.handlers.get('node:pointerenter')!({ target: { id: issue.id } }),
+    );
+    expect(screen.getByRole('tooltip').textContent).toBe(issue.label);
+    act(() =>
+      canvas.handlers.get('node:pointerleave')!({ target: { id: issue.id } }),
+    );
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+  it('fits the graph inside a measured legend-free region without recreating it', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { value: 1200, configurable: true },
+      clientHeight: { value: 800, configurable: true },
+    });
+    const legend = screen.getByLabelText('그래프 범례');
+    const box = {
+      x: 20,
+      y: 16,
+      left: 20,
+      top: 16,
+      right: 260,
+      bottom: 400,
+      width: 240,
+      height: 384,
+    };
+    vi.spyOn(legend, 'getClientRects').mockReturnValue([
+      box,
+    ] as unknown as DOMRectList);
+    vi.spyOn(legend, 'getBoundingClientRect').mockReturnValue({
+      ...box,
+      toJSON() {},
+    });
+    canvas.zoomTo.mockClear();
+    await userEvent.click(
+      screen.getByRole('button', { name: '전체 그래프 맞춤' }),
+    );
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    expect(canvas.zoomTo.mock.lastCall?.[0]).toBeGreaterThan(0);
+    expect(canvas.created).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('explains each legend item in its tooltip', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    render(<GraphCanvas data={data} />);
+    const shared = await screen.findByRole('button', { name: /^■ 사건 공유/ });
+    expect(shared.getAttribute('title')).toContain(
+      '같은 사건에 각각 직접 또는 구조적으로 연결',
+    );
+    expect(
+      screen
+        .getByRole('button', { name: /^■ 후속 사건/ })
+        .getAttribute('title'),
+    ).toContain('앞 사건 다음에');
+  });
   it('ports legend filters without moving nodes and keeps at least one node kind visible', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
