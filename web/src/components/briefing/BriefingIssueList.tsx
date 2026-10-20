@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { BriefingItem } from '@/types/briefing';
+import BriefingItemDetails from './BriefingItemDetails';
 import {
   BODY,
   EMPTY,
@@ -14,11 +15,16 @@ import {
 export default function BriefingIssueList({
   items,
   graphHref,
+  roundId,
+  graphVersion = null,
   renderExtra,
 }: {
   items?: BriefingItem[];
   /** D-BRF-04 이 회차 기준 지도 주소. 발행 회차에만 준다. */
   graphHref?: string;
+  /** 상세·근거는 이 발행 회차의 저장본만 조회한다. */
+  roundId?: string;
+  graphVersion?: string | null;
   /** 이슈마다 덧붙일 영역(회차 지도 링크·평가). 발행 회차에만 준다. */
   renderExtra?: (item: BriefingItem) => ReactNode;
 }) {
@@ -82,6 +88,14 @@ export default function BriefingIssueList({
               <p className={NOTE}>
                 선정 이유: {item.reason} · 근거 {item.evidenceCount}건
               </p>
+              {roundId && (
+                <BriefingItemDetails
+                  key={`${roundId}:${item.eventId}:${graphVersion}`}
+                  roundId={roundId}
+                  graphVersion={graphVersion}
+                  item={item}
+                />
+              )}
               {renderExtra?.(item)}
             </li>
           ))}

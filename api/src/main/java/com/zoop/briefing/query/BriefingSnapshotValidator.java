@@ -78,6 +78,8 @@ final class BriefingSnapshotValidator {
         if (!market.isNull()) market(market, row.windowTo());
         if ("morning".equals(row.edition())) check(row.comparisonSnapshot() == null || row.comparisonSnapshot().isNull());
         else comparison(row.comparisonSnapshot());
+        JsonNode previous = snapshot.get("previousComparison");
+        if (previous != null && !previous.isNull()) previousComparison(previous, row);
     }
 
     private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {
@@ -162,6 +164,28 @@ final class BriefingSnapshotValidator {
             choice(item, "change", Set.of("new", "continuing", "dropped"));
             integer(item, "rank", true); integer(item, "morningRank", true);
             integer(item, "evidenceCount", true); integer(item, "morningEvidenceCount", true);
+        }
+    }
+
+    private static void previousComparison(JsonNode value, BriefingRound row) {
+        object(value);
+        if ("unavailable".equals(text(value, "status"))) { text(value, "reason"); return; }
+        same(text(value, "status"), "available"); check(!row.id().equals(text(value, "previousRoundId")));
+        // Receipt wall clocks need not follow historical replay order; authority checks the stored prior timestamp.
+        timestamp(value, "previousPublishedAt");
+        check(timestamp(value, "previousDataAsOf").isBefore(row.windowTo()));
+        same(text(value, "comparisonBasis"), "event_identity");
+        JsonNode evaluation = object(field(value, "forecastEvaluation"));
+        same(text(evaluation, "status"), "unavailable"); text(evaluation, "reason");
+        Set<String> events = new HashSet<>();
+        for (JsonNode item : array(value, "items")) {
+            object(item); text(item, "title"); check(events.add(text(item, "eventId"))); nullableText(item, "eventTime");
+            choice(item, "timePrecision", PRECISIONS); nullableReportedAt(item, "reportedAt"); stringValues(item, "companyNames");
+            String change = choice(item, "change", Set.of("new", "continuing", "dropped"));
+            int rank = integer(item, "rank", true), oldRank = integer(item, "previousRank", true);
+            int count = integer(item, "evidenceCount", true), oldCount = integer(item, "previousEvidenceCount", true);
+            check("dropped".equals(change) ? rank == -1 && count == -1 : rank > 0 && count >= 0);
+            check("new".equals(change) ? oldRank == -1 && oldCount == -1 : oldRank > 0 && oldCount >= 0);
         }
     }
 

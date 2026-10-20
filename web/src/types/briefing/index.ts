@@ -16,6 +16,47 @@ export type BriefingItem = Pick<
   evidenceCount: number;
   matchedCompanyIds?: string[];
 };
+
+/** D-BRF-01·02: 선택한 발행 회차에 고정된 문안·근거. 최신 사건/문서 조회로 대체하지 않는다. */
+export type BriefingItemDetail = {
+  roundId: string;
+  eventId: string;
+  title: string;
+  summary: EventDetail['summary'];
+  selectionReason: string;
+  claims: {
+    text: string;
+    type: 'fact' | 'plan' | 'outlook';
+    evidenceIds: string[];
+  }[];
+  companies: EventDetail['companies'];
+  evidence: BriefingItemEvidence[];
+  limitations: string[];
+  metadata: EventDetail['metadata'];
+};
+
+export type BriefingItemEvidence = {
+  id: string;
+  quote: string;
+  documentId: string;
+  documentVersion: string;
+  title: string;
+  publisher: string;
+  url: string | null;
+  publishedAt: string | null;
+  quoteVerified: true;
+  sourceKind: 'news' | 'disclosure';
+  bodySha256: string;
+  /** 원문 전체 기준 Unicode code point 구간. end/quoteEnd는 끝 글자를 포함하지 않는다. */
+  bodyContext: {
+    text: string;
+    start: number;
+    end: number;
+    quoteStart: number;
+    quoteEnd: number;
+    offsetUnit: 'unicode_code_point';
+  } | null;
+};
 export type MarketIndicator = {
   id: 'kospi' | 'kosdaq' | 'usdkrw';
   label: string;
@@ -56,6 +97,26 @@ export type SinceMorning =
       items: SinceMorningItem[];
     }
   | { status: 'unavailable'; reason: string };
+
+/** 출근 회차와 직전 발행 퇴근 회차의 고정 선정 목록 비교. 성과 평가는 별도다. */
+export type PreviousBriefingComparisonItem = Omit<
+  SinceMorningItem,
+  'morningRank' | 'morningEvidenceCount'
+> & {
+  previousRank: number | null;
+  previousEvidenceCount: number | null;
+};
+export type PreviousBriefingComparison =
+  | {
+      status: 'available';
+      previousRoundId: string;
+      previousPublishedAt: string | null;
+      previousDataAsOf: string;
+      comparisonBasis: 'event_identity';
+      forecastEvaluation: { status: 'unavailable'; reason: string };
+      items: PreviousBriefingComparisonItem[];
+    }
+  | { status: 'unavailable'; reason: string };
 /** Consumer fields of getBriefing; publication snapshots are never recalculated. */
 export type BriefingResponse = {
   id: string;
@@ -74,6 +135,8 @@ export type BriefingResponse = {
     | { status: 'unavailable'; reason: string };
   /** 퇴근 회차만 값이 있다. 출근 회차는 null */
   sinceMorning: SinceMorning | null;
+  /** 출근 회차의 직전 퇴근 대비. 과거 응답에는 없을 수 있다. */
+  previousComparison?: PreviousBriefingComparison | null;
   emptyReason: 'no_issues_in_window' | null;
   notice: {
     kind: string;

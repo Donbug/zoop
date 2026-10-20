@@ -157,6 +157,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getEvidence](#getevidence) | GET | /api/v1/evidence/{id} | 공개 | P1 |
 | [getBriefing](#getbriefing) | GET | /api/v1/briefings | 공개 | P1 |
 | [listBriefingRounds](#listbriefingrounds) | GET | /api/v1/briefings/rounds | 공개 | P1 |
+| [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
 | [getConversation](#getconversation) | GET | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
@@ -1196,6 +1197,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+
+<a id="getbriefingitemdetail"></a>
+
+## getBriefingItemDetail · 회차에 고정된 브리핑 항목과 근거 조회
+
+발행 당시 저장된 주장·선정 근거·정확 인용·동일 버전 원문 문맥을 복원한다. 현재 원문 권한과 버전을 재검증하며 재생성·최신 원문 대체를 하지 않는다. 다른 회차의 항목 또는 상세 미저장은 404, 제공 중단·권한 철회·검증 실패는 503이다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{roundId}/items/{eventId}` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingItemDetail](#schema-briefingitemdetail), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS030](../../system/out/feature-FS030.md) · [FS033](../../system/out/feature-FS033.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.1, 6.8.2, 6.8.3, 6.8.4, 6.8.6, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.5.3 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 기존 BFF 대응 작업 없이 Spring API와 root web을 직접 연결한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| roundId | path | 필수 | string |  |
+| eventId | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getbriefinggraphbasis"></a>
 
@@ -2970,6 +2999,109 @@ answer from that state, never from the newest graph. Any status but ``available`
 | documentSentiments[].articleId | 필수 | string |  |
 | documentSentiments[].sentiment | 필수 | [DocumentSentiment](#schema-documentsentiment) |  |
 
+<a id="schema-briefingitemdetail"></a>
+
+### BriefingItemDetail
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| eventId | 필수 | string |  |
+| title | 필수 | string |  |
+| summary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
+| selectionReason | 필수 | string |  |
+| claims | 필수 | [BriefingClaim](#schema-briefingclaim)[] |  |
+| companies | 필수 | [CompanyLink](#schema-companylink)[] |  |
+| evidence | 필수 | [BriefingItemEvidence](#schema-briefingitemevidence)[] |  |
+| limitations | 필수 | string[] |  |
+| metadata | 필수 | [BriefingMetadata](#schema-briefingmetadata) |  |
+
+<a id="schema-briefingclaim"></a>
+
+### BriefingClaim
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| type | 필수 | string {fact, plan, outlook} |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-briefingitemevidence"></a>
+
+### BriefingItemEvidence
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| quote | 필수 | string |  |
+| documentId | 필수 | string |  |
+| documentVersion | 필수 | string |  |
+| title | 필수 | string |  |
+| publisher | 필수 | string |  |
+| url | 필수 | string |  |
+| publishedAt | 필수 | string (date-time) / null |  |
+| quoteVerified | 필수 | boolean |  |
+| sourceKind | 필수 | string {news, disclosure} |  |
+| bodySha256 | 필수 | string |  |
+| bodyContext | 필수 | [BriefingBodyContext](#schema-briefingbodycontext) / null |  |
+
+<a id="schema-briefingbodycontext"></a>
+
+### BriefingBodyContext
+
+동일 버전 원문에서 보존한 인용 주변 본문. 모든 위치는 원문 전체 기준 Unicode code point이며 끝 위치는 제외한다. 문맥이 없는 원문은 bodyContext=null이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| start | 필수 | integer |  |
+| end | 필수 | integer |  |
+| quoteStart | 필수 | integer |  |
+| quoteEnd | 필수 | integer |  |
+| offsetUnit | 필수 | string {unicode_code_point} |  |
+
+<a id="schema-previouscomparison"></a>
+
+### PreviousComparison
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available} |  |
+| previousRoundId | 필수 | string |  |
+| previousPublishedAt | 필수 | string (date-time) |  |
+| previousDataAsOf | 필수 | string (date-time) |  |
+| comparisonBasis | 필수 | string {event_identity} |  |
+| forecastEvaluation | 필수 | [Unavailable](#schema-unavailable) |  |
+| items | 필수 | [PreviousComparisonItem](#schema-previouscomparisonitem)[] |  |
+
+<a id="schema-previouscomparisonitem"></a>
+
+### PreviousComparisonItem
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| title | 필수 | string |  |
+| eventId | 필수 | string |  |
+| eventTime | 필수 | string, null |  |
+| timePrecision | 필수 | string {year, month, day, datetime, unknown} |  |
+| reportedAt | 필수 | string, null |  |
+| companyNames | 필수 | string[] |  |
+| change | 필수 | string {new, continuing, dropped} |  |
+| rank | 필수 | integer, null |  |
+| previousRank | 필수 | integer, null |  |
+| evidenceCount | 필수 | integer, null |  |
+| previousEvidenceCount | 필수 | integer, null |  |
+
 <a id="schema-briefingmetadata"></a>
 
 ### BriefingMetadata
@@ -3059,6 +3191,7 @@ The immutable published original of a round (what users saw before any correctio
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
 | marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) | KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none |
 | sinceMorning | 필수 | [SinceMorning](#schema-sincemorning) / [Unavailable](#schema-unavailable) / null | Evening rounds only: key issues compared with the same day's published morning round; null for morning rounds |
+| previousComparison | 필수 | [PreviousComparison](#schema-previouscomparison) / [Unavailable](#schema-unavailable) / null | 직전 발행 회차와 사건 ID 기준 포함 여부 비교. current grant를 이전 원문에도 적용한다. 전망 정확도 평가는 unavailable이며 기존 sinceMorning은 동일 날짜 아침 대비를 유지한다. |
 | emptyReason | 필수 | string / null |  |
 | corrections | 필수 | [BriefingCorrection](#schema-briefingcorrection)[] |  |
 | notice | 필수 | [BriefingNotice](#schema-briefingnotice) / null |  |

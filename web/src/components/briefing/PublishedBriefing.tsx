@@ -13,6 +13,7 @@ import MarketIndicators from './MarketIndicators';
 import BriefingIssueList from './BriefingIssueList';
 import BriefingComparison from './BriefingComparison';
 import PersonalBasisNotice from './PersonalBasisNotice';
+import { hasOnlyKnownLimitations } from './briefingLimitations';
 import {
   BODY,
   CARD,
@@ -232,7 +233,9 @@ export default function PublishedBriefing({
             <>
               {result.metadata.partial && (
                 <div role="status" className={`${EMPTY} mt-4`}>
-                  일부 정보를 불러오지 못했어요.
+                  {hasOnlyKnownLimitations(result.metadata.failures)
+                    ? '이 회차 자료의 확인 범위'
+                    : '일부 정보를 불러오지 못했어요.'}
                   {result.metadata.failures.map((failure) => (
                     <p key={failure.section}>{failure.message}</p>
                   ))}
@@ -270,6 +273,8 @@ export default function PublishedBriefing({
               )}
               <BriefingIssueList
                 items={(personalBriefing ?? result).items}
+                roundId={result.id}
+                graphVersion={result.graphVersion}
                 graphHref={`/?round=${encodeURIComponent(result.id)}`}
                 renderExtra={(item) => (
                   <div className="mt-1 flex flex-col gap-2">
@@ -298,6 +303,13 @@ export default function PublishedBriefing({
               {result.edition === 'evening' && (
                 <BriefingComparison
                   since={result.sinceMorning}
+                  roundDate={result.date}
+                />
+              )}
+              {result.edition === 'morning' && (
+                <BriefingComparison
+                  basis="previous"
+                  previous={result.previousComparison ?? null}
                   roundDate={result.date}
                 />
               )}

@@ -456,6 +456,27 @@
       "source": ""
     },
     {
+      "code": "API_WBS_MEANING_MISMATCH",
+      "target": "getBriefingItemDetail",
+      "severity": "error",
+      "message": "6.8.1: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다.",
+      "source": ""
+    },
+    {
+      "code": "API_WBS_MEANING_MISMATCH",
+      "target": "getBriefingItemDetail",
+      "severity": "error",
+      "message": "6.8.2: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다.",
+      "source": ""
+    },
+    {
+      "code": "API_WBS_MEANING_MISMATCH",
+      "target": "getBriefingItemDetail",
+      "severity": "error",
+      "message": "6.8.4: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다.",
+      "source": ""
+    },
+    {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "getBriefingGraphBasis",
       "severity": "warning",
@@ -1880,7 +1901,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "getBriefing",
       "severity": "difference",
-      "message": "목표만 128 · BFF만 60 · 형식/필수/권한 변경 21",
+      "message": "목표만 178 · BFF만 60 · 형식/필수/권한 변경 21",
       "source": ""
     },
     {
@@ -1895,6 +1916,13 @@
       "target": "listBriefingRounds",
       "severity": "difference",
       "message": "목표만 84 · BFF만 39 · 형식/필수/권한 변경 6",
+      "source": ""
+    },
+    {
+      "code": "TARGET_ONLY_API",
+      "target": "getBriefingItemDetail",
+      "severity": "difference",
+      "message": "GET /api/v1/briefings/{roundId}/items/{eventId}: 직접 대응 BFF 없음",
       "source": ""
     },
     {
@@ -2637,6 +2665,7 @@
     "INDEX_DETAIL_RANGE_STALE": 17,
     "INDEX_REQUIREMENT_META_MISMATCH": 4,
     "TEAM_DECISION_REQUIRED": 37,
+    "API_WBS_MEANING_MISMATCH": 3,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
@@ -2647,28 +2676,29 @@
     "BFF_CACHED_OBSERVATION": 1,
     "BFF_PATH_DIFFERENCE": 81,
     "BFF_FIELD_DIFFERENCE": 81,
-    "TARGET_ONLY_API": 5,
+    "TARGET_ONLY_API": 6,
     "PROTOTYPE_ONLY_API": 3
   },
   "severityCounts": {
     "warning": 205,
-    "difference": 170
+    "error": 3,
+    "difference": 171
   },
   "xlsxReadback": {
     "status": "passed",
     "sheetDataRows": {
-      "추적표": 643,
-      "화면→기능→API": 1394,
+      "추적표": 652,
+      "화면→기능→API": 1421,
       "기능→WBS→구현 상태": 500,
-      "API 목록": 86,
+      "API 목록": 87,
       "오류 코드": 28,
-      "경고": 375,
+      "경고": 379,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 47428
+    "cells": 47949
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2713,15 +2743,15 @@
       "BE": 82,
       "FE": 33
     },
-    "targetOperations": 86
+    "targetOperations": 87
   },
   "sheetDataRows": {
-    "추적표": 643,
-    "화면→기능→API": 1394,
+    "추적표": 652,
+    "화면→기능→API": 1421,
     "기능→WBS→구현 상태": 500,
-    "API 목록": 86,
+    "API 목록": 87,
     "오류 코드": 28,
-    "경고": 375,
+    "경고": 379,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,

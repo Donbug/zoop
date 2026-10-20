@@ -122,6 +122,150 @@
       "type": "string"
     },
     "response:200:application/json.metadata.requestId:required": true,
+    "response:200:application/json.previousComparison:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.comparisonBasis": {
+      "type": "string",
+      "enum": [
+        "event_identity"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.comparisonBasis:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.reason:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation.status:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.forecastEvaluation:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items": {
+      "type": "array"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[]": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].change": {
+      "type": "string",
+      "enum": [
+        "new",
+        "continuing",
+        "dropped"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].change:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].companyNames": {
+      "type": "array"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].companyNames:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].companyNames[]": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventId": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventId:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventTime": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].eventTime:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].evidenceCount": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].evidenceCount:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousEvidenceCount": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousEvidenceCount:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousRank": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].previousRank:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].rank": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].rank:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].reportedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].reportedAt:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].timePrecision": {
+      "type": "string",
+      "enum": [
+        "year",
+        "month",
+        "day",
+        "datetime",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].timePrecision:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.items[].title": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.items[].title:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousDataAsOf": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousDataAsOf:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousPublishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousPublishedAt:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousRoundId": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousRoundId:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.status": {
+      "type": "string",
+      "enum": [
+        "available"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.status:required": true,
+    "response:200:application/json.previousComparison<anyOf:1>": {
+      "type": "object"
+    },
+    "response:200:application/json.previousComparison<anyOf:1>.reason": {
+      "type": "string"
+    },
+    "response:200:application/json.previousComparison<anyOf:1>.reason:required": true,
+    "response:200:application/json.previousComparison<anyOf:1>.status": {
+      "type": "string",
+      "const": "unavailable"
+    },
+    "response:200:application/json.previousComparison<anyOf:1>.status:required": true,
+    "response:200:application/json.previousComparison<anyOf:2>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },

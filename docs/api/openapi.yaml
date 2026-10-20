@@ -3328,6 +3328,85 @@ paths:
             - "목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다."
         teamQuestions:
           - "핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다."
+  "/api/v1/briefings/{roundId}/items/{eventId}":
+    get:
+      tags: ["briefings"]
+      summary: "회차에 고정된 브리핑 항목과 근거 조회"
+      description: "발행 당시 저장된 주장·선정 근거·정확 인용·동일 버전 원문 문맥을 복원한다. 현재 원문 권한과 버전을 재검증하며 재생성·최신 원문 대체를 하지 않는다. 다른 회차의 항목 또는 상세 미저장은 404, 제공 중단·권한 철회·검증 실패는 503이다."
+      operationId: "getBriefingItemDetail"
+      parameters:
+        - name: "roundId"
+          in: "path"
+          required: true
+          schema: {type: "string", minLength: 1, maxLength: 256}
+        - name: "eventId"
+          in: "path"
+          required: true
+          schema: {type: "string", minLength: 1, maxLength: 256}
+        - "$ref": "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "회차에 고정된 항목 상세"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BriefingItemDetail"
+          headers:
+            X-Request-ID:
+              description: "실제 사용한 전송별 요청 ID"
+              schema: {type: "string"}
+        "404":
+          "$ref": "#/components/responses/Error404"
+        "422":
+          "$ref": "#/components/responses/Error422"
+        "500":
+          "$ref": "#/components/responses/Error500"
+        "503":
+          "$ref": "#/components/responses/Error503"
+      security: []
+      x-zoop:
+        fsIds:
+        - FS030
+        - FS033
+        - FS035
+        nfsIds:
+        - NFS001
+        - NFS002
+        - NFS004
+        - NFS008
+        - NFS005
+        - NFS006
+        screenIds:
+        - D-BRF-01
+        - D-BRF-02
+        - M-BRF-01
+        wbsIds:
+        - 6.1.2
+        - 6.11.1
+        - 6.8.1
+        - 6.8.2
+        - 6.8.3
+        - 6.8.4
+        - 6.8.6
+        - 6.8.8
+        - 6.8.11
+        - 6.8.12
+        - 6.8.13
+        - 6.5.3
+        priority: P1
+        authority: 공개
+        errorCodes:
+        - INVALID_REQUEST
+        - RESOURCE_NOT_FOUND
+        - SOURCE_UNAVAILABLE
+        - INTERNAL_ERROR
+        prototype:
+          method: GET
+          path: null
+          operationId: null
+          differences:
+            - "기존 BFF 대응 작업 없이 Spring API와 root web을 직접 연결한다."
+        teamQuestions: []
   "/api/v1/briefings/{id}/graph":
     get:
       tags:
@@ -8755,6 +8834,103 @@ components:
         - "summary"
         - "reportedAt"
         - "documentSentiments"
+    BriefingItemDetail:
+      type: "object"
+      required: ["roundId", "eventId", "title", "summary", "selectionReason", "claims", "companies", "evidence", "limitations", "metadata"]
+      properties:
+        roundId: {type: "string"}
+        eventId: {type: "string"}
+        title: {type: "string"}
+        summary:
+          anyOf:
+            - "$ref": "#/components/schemas/AnalysisSummary"
+            - "$ref": "#/components/schemas/Unavailable"
+        selectionReason: {type: "string"}
+        claims:
+          type: "array"
+          items: {"$ref": "#/components/schemas/BriefingClaim"}
+        companies:
+          type: "array"
+          items: {"$ref": "#/components/schemas/CompanyLink"}
+        evidence:
+          type: "array"
+          items: {"$ref": "#/components/schemas/BriefingItemEvidence"}
+        limitations:
+          type: "array"
+          items: {type: "string"}
+        metadata: {"$ref": "#/components/schemas/BriefingMetadata"}
+    BriefingClaim:
+      type: "object"
+      required: ["text", "type", "evidenceIds"]
+      properties:
+        text: {type: "string"}
+        type: {type: "string", enum: ["fact", "plan", "outlook"]}
+        evidenceIds:
+          type: "array"
+          items: {type: "string"}
+    BriefingItemEvidence:
+      type: "object"
+      required: ["id", "quote", "documentId", "documentVersion", "title", "publisher", "url", "publishedAt", "quoteVerified", "sourceKind", "bodySha256", "bodyContext"]
+      properties:
+        id: {type: "string"}
+        quote: {type: "string"}
+        documentId: {type: "string"}
+        documentVersion: {type: "string"}
+        title: {type: "string"}
+        publisher: {type: "string"}
+        url: {type: "string"}
+        publishedAt:
+          anyOf:
+            - {type: "string", format: "date-time"}
+            - {type: "null"}
+        quoteVerified: {type: "boolean", const: true}
+        sourceKind: {type: "string", enum: ["news", "disclosure"]}
+        bodySha256: {type: "string", pattern: "^[0-9a-f]{64}$"}
+        bodyContext:
+          anyOf:
+            - {"$ref": "#/components/schemas/BriefingBodyContext"}
+            - {type: "null"}
+    BriefingBodyContext:
+      type: "object"
+      description: "동일 버전 원문에서 보존한 인용 주변 본문. 모든 위치는 원문 전체 기준 Unicode code point이며 끝 위치는 제외한다. 문맥이 없는 원문은 bodyContext=null이다."
+      required: ["text", "start", "end", "quoteStart", "quoteEnd", "offsetUnit"]
+      properties:
+        text: {type: "string"}
+        start: {type: "integer", minimum: 0}
+        end: {type: "integer", minimum: 1}
+        quoteStart: {type: "integer", minimum: 0}
+        quoteEnd: {type: "integer", minimum: 1}
+        offsetUnit: {type: "string", enum: ["unicode_code_point"]}
+    PreviousComparison:
+      type: "object"
+      required: ["status", "previousRoundId", "previousPublishedAt", "previousDataAsOf", "comparisonBasis", "forecastEvaluation", "items"]
+      properties:
+        status: {type: "string", enum: ["available"]}
+        previousRoundId: {type: "string"}
+        previousPublishedAt: {type: "string", format: "date-time"}
+        previousDataAsOf: {type: "string", format: "date-time"}
+        comparisonBasis: {type: "string", enum: ["event_identity"]}
+        forecastEvaluation: {"$ref": "#/components/schemas/Unavailable"}
+        items:
+          type: "array"
+          items: {"$ref": "#/components/schemas/PreviousComparisonItem"}
+    PreviousComparisonItem:
+      type: "object"
+      required: ["title", "eventId", "eventTime", "timePrecision", "reportedAt", "companyNames", "change", "rank", "previousRank", "evidenceCount", "previousEvidenceCount"]
+      properties:
+        title: {type: "string"}
+        eventId: {type: "string"}
+        eventTime: {type: ["string", "null"]}
+        timePrecision: {type: "string", enum: ["year", "month", "day", "datetime", "unknown"]}
+        reportedAt: {type: ["string", "null"]}
+        companyNames:
+          type: "array"
+          items: {type: "string"}
+        change: {type: "string", enum: ["new", "continuing", "dropped"]}
+        rank: {type: ["integer", "null"]}
+        previousRank: {type: ["integer", "null"]}
+        evidenceCount: {type: ["integer", "null"]}
+        previousEvidenceCount: {type: ["integer", "null"]}
     BriefingMetadata:
       properties:
         source:
@@ -9015,6 +9191,12 @@ components:
             -
               type: "null"
           description: "Evening rounds only: key issues compared with the same day's published morning round; null for morning rounds"
+        previousComparison:
+          anyOf:
+            - {"$ref": "#/components/schemas/PreviousComparison"}
+            - {"$ref": "#/components/schemas/Unavailable"}
+            - {type: "null"}
+          description: "직전 발행 회차와 사건 ID 기준 포함 여부 비교. current grant를 이전 원문에도 적용한다. 전망 정확도 평가는 unavailable이며 기존 sinceMorning은 동일 날짜 아침 대비를 유지한다."
         emptyReason:
           anyOf:
             -
@@ -9058,6 +9240,7 @@ components:
         - "marketSummary"
         - "marketVariables"
         - "sinceMorning"
+        - "previousComparison"
         - "emptyReason"
         - "corrections"
         - "notice"

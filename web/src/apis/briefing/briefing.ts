@@ -2,6 +2,7 @@ import { call } from '@/apis/auth/ApiService';
 import type {
   BriefingEdition,
   BriefingGraphBasis,
+  BriefingItemDetail,
   BriefingResponse,
   BriefingRoundsResponse,
 } from '@/types/briefing';
@@ -42,6 +43,28 @@ export async function getBriefingGraphBasis(roundId: string) {
   if (basis.roundId !== roundId)
     throw new Error('요청한 브리핑 회차와 응답이 일치하지 않습니다.');
   return basis;
+}
+
+/** D-BRF-01·02: 회차의 고정 문안·정확 인용·원문 맥락을 버튼을 펼칠 때 조회한다. */
+export async function getBriefingItemDetail(
+  roundId: string,
+  eventId: string,
+  expectedGraphVersion?: string | null,
+) {
+  const detail = await call<BriefingItemDetail>(
+    `/api/v1/briefings/${encodeURIComponent(roundId)}/items/${encodeURIComponent(eventId)}`,
+    'GET',
+    undefined,
+    { skipAuth: true },
+  );
+  if (
+    detail.roundId !== roundId ||
+    detail.eventId !== eventId ||
+    (expectedGraphVersion !== undefined &&
+      detail.metadata.graphVersion !== expectedGraphVersion)
+  )
+    throw new Error('요청한 브리핑 회차·이슈·버전과 응답이 일치하지 않습니다.');
+  return detail;
 }
 
 /** getPersonalizedBriefing (FS036): 같은 발행본에 본인 기준 기업과 겹치는 기업(matchedCompanyIds)을 표시한다. 회원 본인만. */

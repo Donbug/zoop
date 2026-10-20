@@ -13,7 +13,7 @@ public final class BriefingHttpSchemas {
 
     @Schema(name = "BriefingResponse", requiredProperties = {"id", "date", "edition", "status", "scheduledAt", "publishedAt",
             "generatedAt", "dataWindow", "dataAsOf", "graphVersion", "items", "marketSummary", "marketVariables",
-            "sinceMorning", "emptyReason", "corrections", "notice", "references", "metadata", "outlook"})
+            "sinceMorning", "previousComparison", "emptyReason", "corrections", "notice", "references", "metadata", "outlook"})
     public record BriefingResponse(String id, LocalDate date,
             @Schema(allowableValues = {"morning", "evening"}) String edition,
             @Schema(allowableValues = {"published", "not_ready", "generating", "failed", "suspended"}) String status,
@@ -23,6 +23,8 @@ public final class BriefingHttpSchemas {
             @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode marketSummary,
             @Schema(oneOf = {MarketVariables.class, Unavailable.class}) JsonNode marketVariables,
             @Schema(nullable = true, oneOf = {SinceMorning.class, Unavailable.class}) JsonNode sinceMorning,
+            @Schema(nullable = true, oneOf = {PreviousComparison.class, Unavailable.class},
+                    description = "직전 발행 회차와 사건 ID 기준 포함 여부 비교입니다. 전망 정확도 평가는 제공하지 않습니다.") JsonNode previousComparison,
             @Schema(nullable = true, allowableValues = {"no_issues_in_window"}) String emptyReason,
             List<BriefingCorrection> corrections, @Schema(nullable = true) BriefingNotice notice,
             BriefingReferences references, BriefingMetadata metadata, @Schema(nullable = true) BriefingOutlook outlook) { }
@@ -49,6 +51,29 @@ public final class BriefingHttpSchemas {
             List<String> matchedCompanyIds, int rank, String reason, List<String> evidenceIds,
             @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode summary,
             @Schema(nullable = true) String reportedAt, List<DocumentSentimentRef> documentSentiments) { }
+
+    @Schema(name = "BriefingItemDetail", requiredProperties = {"roundId", "eventId", "title", "summary", "selectionReason",
+            "claims", "companies", "evidence", "limitations", "metadata"})
+    public record BriefingItemDetail(String roundId, String eventId, String title,
+            @Schema(oneOf = {AnalysisSummary.class, Unavailable.class}) JsonNode summary, String selectionReason,
+            List<BriefingClaim> claims, List<CompanyLink> companies, List<BriefingItemEvidence> evidence,
+            List<String> limitations, BriefingMetadata metadata) { }
+
+    @Schema(name = "BriefingClaim", requiredProperties = {"text", "type", "evidenceIds"})
+    public record BriefingClaim(String text, @Schema(allowableValues = {"fact", "plan", "outlook"}) String type,
+            List<String> evidenceIds) { }
+
+    @Schema(name = "BriefingItemEvidence", requiredProperties = {"id", "quote", "documentId", "documentVersion", "title",
+            "publisher", "url", "publishedAt", "quoteVerified", "sourceKind", "bodySha256", "bodyContext"})
+    public record BriefingItemEvidence(String id, String quote, String documentId, String documentVersion, String title,
+            String publisher, String url, @Schema(nullable = true) Instant publishedAt, boolean quoteVerified,
+            @Schema(allowableValues = {"news", "disclosure"}) String sourceKind, String bodySha256,
+            @Schema(nullable = true) BriefingBodyContext bodyContext) { }
+
+    @Schema(name = "BriefingBodyContext", requiredProperties = {"text", "start", "end", "quoteStart", "quoteEnd", "offsetUnit"},
+            description = "동일 버전 원문에서 보존한 인용 주변 문맥입니다. 모든 위치는 원문 전체 기준 Unicode code point이며 끝 위치는 제외합니다.")
+    public record BriefingBodyContext(String text, int start, int end, int quoteStart, int quoteEnd,
+            @Schema(allowableValues = {"unicode_code_point"}) String offsetUnit) { }
 
     @Schema(name = "CompanyLink")
     public record CompanyLink(String id, String name, @Schema(nullable = true) String role, boolean roleUnconfirmed,
@@ -114,4 +139,17 @@ public final class BriefingHttpSchemas {
             @Schema(allowableValues = {"new", "continuing", "dropped"}) String change,
             @Schema(nullable = true) Integer rank, @Schema(nullable = true) Integer morningRank,
             @Schema(nullable = true) Integer evidenceCount, @Schema(nullable = true) Integer morningEvidenceCount) { }
+
+    @Schema(name = "PreviousComparison")
+    public record PreviousComparison(@Schema(allowableValues = {"available"}) String status, String previousRoundId,
+            Instant previousPublishedAt, Instant previousDataAsOf,
+            @Schema(allowableValues = {"event_identity"}) String comparisonBasis, Unavailable forecastEvaluation,
+            List<PreviousComparisonItem> items) { }
+
+    @Schema(name = "PreviousComparisonItem")
+    public record PreviousComparisonItem(String title, String eventId, @Schema(nullable = true) String eventTime,
+            String timePrecision, @Schema(nullable = true) String reportedAt, List<String> companyNames,
+            @Schema(allowableValues = {"new", "continuing", "dropped"}) String change,
+            @Schema(nullable = true) Integer rank, @Schema(nullable = true) Integer previousRank,
+            @Schema(nullable = true) Integer evidenceCount, @Schema(nullable = true) Integer previousEvidenceCount) { }
 }

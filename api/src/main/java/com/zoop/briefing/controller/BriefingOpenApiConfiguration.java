@@ -17,7 +17,8 @@ public class BriefingOpenApiConfiguration {
             if (openApi.getComponents() == null) openApi.setComponents(new Components());
             boolean version31 = openApi.getOpenapi() != null && openApi.getOpenapi().startsWith("3.1");
             for (Class<?> type : List.of(BriefingHttpSchemas.AnalysisSummary.class,
-                    BriefingHttpSchemas.MarketVariables.class, BriefingHttpSchemas.SinceMorning.class)) {
+                    BriefingHttpSchemas.MarketVariables.class, BriefingHttpSchemas.SinceMorning.class,
+                    BriefingHttpSchemas.PreviousComparison.class)) {
                 ModelConverters.getInstance(version31).readAll(type).forEach(openApi.getComponents()::addSchemas);
             }
         };
