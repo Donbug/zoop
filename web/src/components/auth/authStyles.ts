@@ -1,7 +1,7 @@
 // D-AUT-01·02 인증 화면이 함께 쓰는 Tailwind 클래스(팀 규칙: 스타일은 Tailwind CSS 4).
 // 색은 #169 시각 기준의 zoop 토큰(src/index.css @theme)만 쓴다.
 
-const focusRing =
+export const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zoop-ink';
 
 export const authHeading = 'text-2xl font-bold text-zoop-ink';

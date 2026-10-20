@@ -13,6 +13,8 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import { acceptMemberSession, loadSession } from '@/apis/auth/member-session';
 import AuthFrame from '@/components/auth/AuthFrame';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import ServiceIntro from '@/components/auth/ServiceIntro';
 import SessionStatus from '@/components/auth/SessionStatus';
 import {
   authAlert,
@@ -20,7 +22,7 @@ import {
   authLabel,
   authNote,
   authPrimaryButton,
-  authSecondaryButton,
+  focusRing,
 } from '@/components/auth/authStyles';
 import type { LoginLocationState } from '@/types/auth';
 
@@ -29,6 +31,80 @@ const SOCIAL_LABEL: Record<string, string> = {
   google: '구글 로그인',
   kakao: '카카오톡 로그인',
 };
+const SOCIAL_CAPTION: Record<string, string> = {
+  google: '구글',
+  kakao: '카카오',
+};
+
+// 원형 버튼 아래에 짧은 이름을 붙인다. 보조 기술에는 aria-label의 전체 문구를 읽힌다.
+const startCircle = `group flex! flex-col items-center gap-1.5 rounded-[3px] bg-transparent disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${focusRing}`;
+const startCaption = 'text-[11px] text-zoop-muted';
+
+/** 시작 방법별 원형 아이콘(제공자 상표 색). 이름은 아래 캡션과 aria-label이 맡는다. */
+function StartIcon({ id }: { id: string }) {
+  const circle =
+    'grid size-12 place-items-center rounded-full transition-transform group-hover:scale-105';
+  if (id === 'google')
+    return (
+      <span
+        aria-hidden="true"
+        className={`${circle} border-[0.667px] border-zoop-line bg-zoop-paper`}
+      >
+        <svg viewBox="0 0 48 48" className="size-5">
+          <path
+            fill="#EA4335"
+            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+          />
+          <path
+            fill="#4285F4"
+            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+          />
+          <path
+            fill="#34A853"
+            d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+          />
+        </svg>
+      </span>
+    );
+  if (id === 'kakao')
+    return (
+      <span aria-hidden="true" className={`${circle} bg-[#FEE500]`}>
+        <svg viewBox="0 0 24 24" className="size-6">
+          <path
+            fill="#191919"
+            d="M12 3.6c-4.97 0-9 3.13-9 7 0 2.5 1.68 4.69 4.2 5.93l-.86 3.13c-.08.28.24.5.48.34l3.73-2.47c.47.05.95.07 1.45.07 4.97 0 9-3.13 9-7s-4.03-7-9-7z"
+          />
+        </svg>
+      </span>
+    );
+  if (id === 'guest')
+    return (
+      <span aria-hidden="true" className={`${circle} bg-zoop-ink`}>
+        <svg
+          viewBox="0 0 24 24"
+          className="size-5 fill-none stroke-zoop-paper"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </span>
+    );
+  return (
+    <span
+      aria-hidden="true"
+      className={`${circle} border-[0.667px] border-zoop-line bg-zoop-paper text-sm font-bold`}
+    >
+      {id.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
 
 /** 소셜 인증 콜백이 /login?social=... 로 돌려준 결과 안내 */
 function socialResultMessage(result: string | null) {
@@ -89,6 +165,7 @@ export default function LoginPage() {
   const [pending, setPending] = useState<'login' | 'guest' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [guestError, setGuestError] = useState(false);
+  const [guestConfirm, setGuestConfirm] = useState(false);
   // 서버에 설정된 소셜 제공자. 불러오기 전·실패 시에는 소셜 버튼을 두지 않는다.
   const [providers, setProviders] = useState<SocialProvider[]>([]);
   const socialResult = socialResultMessage(
@@ -160,6 +237,7 @@ export default function LoginPage() {
       navigate('/?mode=all', { replace: true });
     } catch {
       if (active.current) {
+        setGuestConfirm(false);
         setGuestError(true);
         setPending(null);
       }
@@ -176,15 +254,8 @@ export default function LoginPage() {
         ? loginErrorMessage(new ApiError(0, flow.error, flow.error))
         : null);
   return (
-    <AuthFrame screen="D-AUT-01">
+    <AuthFrame screen="D-AUT-01" aside={<ServiceIntro />}>
       <section className="flex w-full max-w-[400px] flex-col gap-6 text-zoop-ink">
-        <div>
-          <p className="text-[28px] font-[750] tracking-[-0.045em]">줍</p>
-          <p className="mt-1.5 text-xs text-zoop-muted">
-            내 종목 주변의 사건과 근거를 탐색해요
-          </p>
-        </div>
-
         {socialResult && (
           <p role="alert" className={authAlert}>
             {socialResult}
@@ -264,53 +335,105 @@ export default function LoginPage() {
                 {flow.busy ? '로그인하고 있어요' : '로그인'}
               </button>
             )}
+            <p className="mt-3 text-center text-[12px] text-zoop-muted">
+              처음이세요?{' '}
+              <Link
+                to="/signup"
+                aria-disabled={busy}
+                className="font-semibold text-zoop-ink underline underline-offset-2"
+                onClick={(event) => busy && event.preventDefault()}
+              >
+                이메일로 회원가입
+              </Link>
+            </p>
           </form>
         )}
 
         <div className="flex flex-col gap-2.5">
-          <p className="text-[11px] text-zoop-muted">
-            처음이거나 다른 방법으로 시작하기
+          <div className="flex items-center gap-3 text-[11px] text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
+            또는
+          </div>
+          <p className="text-center text-[13px] font-bold">
+            다른 방법으로 시작하기
           </p>
-          <Link
-            to="/signup"
-            aria-disabled={busy}
-            className={authSecondaryButton}
-            onClick={(event) => busy && event.preventDefault()}
-          >
-            이메일로 회원가입
-          </Link>
-          {providers.map((provider) => (
-            <a
-              key={provider.id}
-              // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
-              href={socialLoginUrl(provider.id, '/login')}
-              aria-disabled={busy}
-              className={authSecondaryButton}
-              onClick={(event) => busy && event.preventDefault()}
-            >
-              {SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`}
-            </a>
-          ))}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void startAsGuest()}
-            className={authSecondaryButton}
-          >
-            {pending === 'guest' ? '시작하고 있어요' : '로그인 없이 둘러보기'}
-          </button>
+          <ul className="m-0 flex list-none justify-center gap-6 p-0">
+            {providers.map((provider) => (
+              <li key={provider.id}>
+                <a
+                  // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
+                  href={socialLoginUrl(provider.id, '/login')}
+                  aria-disabled={busy}
+                  aria-label={
+                    SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`
+                  }
+                  className={startCircle}
+                  onClick={(event) => busy && event.preventDefault()}
+                >
+                  <StartIcon id={provider.id} />
+                  <span className={startCaption}>
+                    {SOCIAL_CAPTION[provider.id] ?? provider.name}
+                  </span>
+                </a>
+              </li>
+            ))}
+            <li>
+              <button
+                type="button"
+                disabled={busy}
+                aria-label={
+                  pending === 'guest'
+                    ? '시작하고 있어요'
+                    : '로그인 없이 둘러보기'
+                }
+                onClick={() => {
+                  setGuestError(false);
+                  setGuestConfirm(true);
+                }}
+                className={startCircle}
+              >
+                <StartIcon id="guest" />
+                <span className={startCaption}>로그인 없이 둘러보기</span>
+              </button>
+            </li>
+          </ul>
           {guestError && (
             <p role="alert" className={authAlert}>
               비회원으로 시작하지 못했어요. 다시 시도해 주세요.
             </p>
           )}
-          <p className={authNote}>
-            로그인 없이도 시장 전체 지도와 공개 브리핑을 볼 수 있어요. 계좌
-            연결·관심 종목·AI 질문은 로그인 후 이용할 수 있어요.
-          </p>
           <p className={authNote}>본 서비스는 투자 권유를 제공하지 않아요.</p>
         </div>
       </section>
+      {guestConfirm && (
+        <ConfirmDialog
+          title="로그인 없이 둘러볼까요?"
+          confirmLabel={
+            pending === 'guest' ? '시작하고 있어요' : '둘러보기 시작'
+          }
+          cancelLabel="취소"
+          pending={pending === 'guest'}
+          onConfirm={() => void startAsGuest()}
+          onCancel={() => setGuestConfirm(false)}
+        >
+          <dl className="m-0 flex flex-col gap-3 text-[13px] leading-relaxed">
+            <div>
+              <dt className="font-bold text-zoop-ink">바로 볼 수 있어요</dt>
+              <dd className="m-0 text-zoop-muted">
+                시장 전체 지도, 공개 브리핑, 기업 정보
+              </dd>
+            </div>
+            <div>
+              <dt className="font-bold text-zoop-ink">로그인이 필요해요</dt>
+              <dd className="m-0 text-zoop-muted">
+                관심 종목 설정, 가상 계좌 연결, 내 종목 지도, AI 질문
+              </dd>
+            </div>
+          </dl>
+          <p className={authNote}>
+            둘러보다가 언제든 로그인하거나 가입하면 모든 기능을 쓸 수 있어요.
+          </p>
+        </ConfirmDialog>
+      )}
     </AuthFrame>
   );
 }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -282,6 +282,14 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: '로그인 없이 둘러보기' }),
     );
+    expect(
+      within(
+        screen.getByRole('dialog', { name: '로그인 없이 둘러볼까요?' }),
+      ).getByText('관심 종목 설정, 가상 계좌 연결, 내 종목 지도, AI 질문'),
+    ).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole('button', { name: '둘러보기 시작' }),
+    );
 
     expect((await screen.findByTestId('destination')).textContent).toBe(
       '/?mode=all',
@@ -297,6 +305,14 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
     renderApp();
     await userEvent.click(
       await screen.findByRole('button', { name: '로그인 없이 둘러보기' }),
+    );
+    expect(
+      within(
+        screen.getByRole('dialog', { name: '로그인 없이 둘러볼까요?' }),
+      ).getByText('관심 종목 설정, 가상 계좌 연결, 내 종목 지도, AI 질문'),
+    ).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole('button', { name: '둘러보기 시작' }),
     );
 
     expect(
