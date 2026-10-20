@@ -10,4 +10,8 @@ public interface AdminAuditRepository {
 
     void recordAdminAction(String adminId, String email, String action,
             String targetId, String requestId, Instant occurredAt);
+
+    void recordMemberStatusAction(String adminId, String email, String action,
+            String memberId, String reason, String beforeStatus, String afterStatus,
+            long beforeRevision, long afterRevision, String requestId, Instant occurredAt);
 }

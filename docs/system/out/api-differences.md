@@ -82,10 +82,10 @@
 | listDislikedResults | /api/v1/admin/feedback/dislikes | /api/admin/feedback/dislikes | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 7 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
 | listMaskedTranscripts | /api/v1/admin/transcripts | /api/admin/transcripts | 목표만 117 · BFF만 23 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. / BFF에 별도 열람 권한·purpose 필수·기록 실패 차단 계약이 부족하다. |
 | getMaskedTranscript | /api/v1/admin/transcripts/{session_id} | /api/admin/transcripts/{session_id} | 목표만 116 · BFF만 21 · 형식/필수/권한 변경 8 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / BFF에 별도 열람 권한·purpose 필수·기록 실패 차단 계약이 부족하다. |
-| listMembers | /api/v1/admin/members | /api/admin/members | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
-| getMemberActivity | /api/v1/admin/members/{member_id} | /api/admin/members/{member_id} | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| blockMember | /api/v1/admin/members/{member_id}/block | /api/admin/members/{member_id}/block | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 11 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
-| unblockMember | /api/v1/admin/members/{member_id}/unblock | /api/admin/members/{member_id}/unblock | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 11 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| listMembers | /api/v1/admin/members | /api/admin/members | 목표만 148 · BFF만 26 · 형식/필수/권한 변경 11 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. / 목표는 불투명 커서·limit/nextCursor. BFF의 전체 목록·정수 offset/limit와 다를 수 있다. |
+| getMemberActivity | /api/v1/admin/members/{member_id} | /api/admin/members/{member_id} | 목표만 153 · BFF만 27 · 형식/필수/권한 변경 10 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| blockMember | /api/v1/admin/members/{member_id}/block | /api/admin/members/{member_id}/block | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
+| unblockMember | /api/v1/admin/members/{member_id}/unblock | /api/admin/members/{member_id}/unblock | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용. |
 | getCompanyFinancials | /api/v1/companies/{id}/financials | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getCompanyIssueImpact | /api/v1/companies/{id}/issues/{issueId}/impact | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
 | getPersonalizedBriefing | /api/v1/briefings/{id}/personalized | 없음 | 직접 대응 BFF 작업 없음 | 목표 API만 있음 |
