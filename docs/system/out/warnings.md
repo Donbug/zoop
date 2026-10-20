@@ -69,9 +69,6 @@
 | TEAM_DECISION_REQUIRED | warning | getEvidence | 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getBriefing | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. / 긍정/부정 명칭은 사용자 결정 완료이며 혼재/판단 보류도 유지한다. 모델·추론 수준은 .env 설정, 예산/실행 승인·재판정/운영 정책·이슈 수준 종합 방향과 퍼센트 충돌은 별도 팀 최종 결정 대상이다. 실제 판정 없으면 null을 반환한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listBriefingRounds | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
-| API_WBS_MEANING_MISMATCH | error | getBriefingItemDetail | 6.8.1: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다. |  |
-| API_WBS_MEANING_MISMATCH | error | getBriefingItemDetail | 6.8.2: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다. |  |
-| API_WBS_MEANING_MISMATCH | error | getBriefingItemDetail | 6.8.4: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다. |  |
 | TEAM_DECISION_REQUIRED | warning | getBriefingGraphBasis | 핵심 이슈 선정·동점 규칙, 자료/대화/작업/멱등성 키 보존 기간, 오류별 재시도 범위와 판정 수치를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | createConversation | 대화·작업·멱등성 키의 실제 보존 기간과 운영 담당자를 출시 전에 등록해야 한다. 대화 소유권·활성 작업 하나·최초 요청 고정은 확정 계약이다. |  |
 | TEAM_DECISION_REQUIRED | warning | getConversation | 대화·작업의 실제 보존 기간과 마스킹·철회 전파 운영값을 출시 전에 등록해야 한다. |  |

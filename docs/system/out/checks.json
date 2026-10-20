@@ -456,27 +456,6 @@
       "source": ""
     },
     {
-      "code": "API_WBS_MEANING_MISMATCH",
-      "target": "getBriefingItemDetail",
-      "severity": "error",
-      "message": "6.8.1: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다.",
-      "source": ""
-    },
-    {
-      "code": "API_WBS_MEANING_MISMATCH",
-      "target": "getBriefingItemDetail",
-      "severity": "error",
-      "message": "6.8.2: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다.",
-      "source": ""
-    },
-    {
-      "code": "API_WBS_MEANING_MISMATCH",
-      "target": "getBriefingItemDetail",
-      "severity": "error",
-      "message": "6.8.4: 현재 제목/역할 기반 편집 연결과 API 기능 의미가 대응하지 않는다.",
-      "source": ""
-    },
-    {
       "code": "TEAM_DECISION_REQUIRED",
       "target": "getBriefingGraphBasis",
       "severity": "warning",
@@ -2665,7 +2644,6 @@
     "INDEX_DETAIL_RANGE_STALE": 17,
     "INDEX_REQUIREMENT_META_MISMATCH": 4,
     "TEAM_DECISION_REQUIRED": 37,
-    "API_WBS_MEANING_MISMATCH": 3,
     "REQUIREMENT_TITLE_REVIEW": 42,
     "REQUIREMENT_BINDING_BY_MEANING": 12,
     "CONTRACT_UNDECIDED": 1,
@@ -2681,7 +2659,6 @@
   },
   "severityCounts": {
     "warning": 205,
-    "error": 3,
     "difference": 171
   },
   "xlsxReadback": {
@@ -2692,13 +2669,13 @@
       "기능→WBS→구현 상태": 500,
       "API 목록": 87,
       "오류 코드": 28,
-      "경고": 379,
+      "경고": 376,
       "원문 WBS": 173,
       "원문 제안·유효 기준": 8,
       "범위 예외·상세 권한": 34,
       "수용 기준": 121
     },
-    "cells": 47949
+    "cells": 47934
   },
   "acceptanceCoverage": {
     "status": "passed",
@@ -2751,7 +2728,7 @@
     "기능→WBS→구현 상태": 500,
     "API 목록": 87,
     "오류 코드": 28,
-    "경고": 379,
+    "경고": 376,
     "원문 WBS": 173,
     "원문 제안·유효 기준": 8,
     "범위 예외·상세 권한": 34,
