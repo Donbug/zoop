@@ -100,6 +100,8 @@ export default function GraphCanvas({
   const fitPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
+  // 사이드바에서 고른 기업. 상세 패널이 열려 지도 크기가 바뀌어도 이 기업을 가운데에 둔다.
+  const centerTarget = useRef<string | null>(null);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
   const selectNode = useEffectEvent((id: string | null) =>
     id === '__isolated__' ? onOpenIsolated?.() : onSelect?.(id),
@@ -218,6 +220,7 @@ export default function GraphCanvas({
           return;
         // 사용자가 고른 위치이므로 자동 맞춤을 멈춘다.
         followFit.current = false;
+        centerTarget.current = centerRequest.id;
         await graph.focusElement(centerRequest.id, false);
       })
       .catch(() => {
@@ -492,14 +495,17 @@ export default function GraphCanvas({
           event.clientX - pointerStart.x,
           event.clientY - pointerStart.y,
         ) > 4
-      )
+      ) {
         followFit.current = false;
+        centerTarget.current = null;
+      }
     };
     const pointerUp = () => {
       pointerStart = null;
     };
     const stopFollowing = () => {
       followFit.current = false;
+      centerTarget.current = null;
     };
     const viewportChanged = () => {
       if (followFit.current) {
@@ -628,8 +634,17 @@ export default function GraphCanvas({
           if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
           const [width, height] = [host.clientWidth, host.clientHeight];
           graph.setSize(width, height);
-          // 사이드바·패널이 열려 지도 크기가 바뀌면, 사용자가 둔 위치는 화면 가운데를 유지한다.
+          // 사이드바·패널이 열려 지도 크기가 바뀌면, 사이드바에서 고른 기업은 다시 가운데에
+          // 두고, 그 밖에 사용자가 둔 위치는 화면 가운데를 유지한다.
+          const target = centerTarget.current;
           if (
+            target &&
+            renderedData.current?.nodes?.some(
+              (node) => String(node.id) === target,
+            )
+          )
+            void graph.focusElement(target, false);
+          else if (
             !followFit.current &&
             (width !== lastSize[0] || height !== lastSize[1])
           )
