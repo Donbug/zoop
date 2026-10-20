@@ -7,15 +7,6 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
-    "query.asOf": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "query.asOf:required": false,
-    "query.graphVersion": {
-      "type": "string"
-    },
-    "query.graphVersion:required": false,
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
