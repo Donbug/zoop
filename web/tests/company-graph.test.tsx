@@ -235,3 +235,20 @@ test('lost pointer capture stops panning until the next drag', () => {
   fireEvent.pointerMove(svg, { pointerId: 1, clientX: 100, clientY: 100 });
   expect(svg.getAttribute('viewBox')).toBe(panned);
 });
+
+test('empty reason codes from the API are shown as sentences, not raw codes', () => {
+  render(
+    <CompanyGraphPreview
+      data={{
+        ...graph,
+        nodes: [graph.nodes[0]],
+        edges: [],
+        metadata: { ...graph.metadata, emptyReason: 'no_related_issues' },
+      }}
+    />,
+  );
+  expect(
+    screen.getByText(/이 시점까지 공개된 관련 사건이 없어요/),
+  ).toBeTruthy();
+  expect(screen.queryByText(/no_related_issues/)).toBeNull();
+});

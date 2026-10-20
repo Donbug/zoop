@@ -51,7 +51,7 @@ make help projects available-checks
 | [추적 체계](docs/system/README.md) · [팀용 추적표](docs/system/out/zoop-trace.xlsx) · [내용 기반 WBS 이행](docs/system/out/wbs-migration.md) · [경고/차이](docs/system/out/warnings.md) | 화면→명세 정의→현재 WBS 역할→목표 API의 연결과 남은 충돌 |
 | [마이그레이션 가이드](docs/migration/README.md) · [계약 인계](docs/migration/contract-handoff.md) | FE·앱 백엔드·AI의 독립 선택, HTTP/JSON·근거·작업 상태·저장소 경계와 전환 기준 |
 | [화면계획서](docs/screen-plan/README.md) · [Figma 비교 근거](docs/evidence/wireframe-delta-2026-10-08.md) | Figma는 폰트 제외 최종 목표 디자인이며 SUIT를 유지합니다. `docs/design/`에는 토큰·그래프 UX 결정, `docs/research/`에는 조사 자료가 있습니다. |
-| [검증·배포 증거 절차](docs/development/release-verification.md) · [10/12 주 작업 계획](docs/share/seojin-work-plan-2026-10-12.md) | 실행한 검증과 배포 승인을 구분합니다. 작업 계획은 원본 WBS를 대체하지 않습니다. |
+| [검증·배포 증거 절차](docs/development/release-verification.md) · [윤서진 실행·인계 기준선](docs/share/seojin-execution-plan-2026-10-20.md) | 인계·기능 수용·운영 검증을 구분하고, 담당 이슈·소비자 의존성·증거·다음 작업을 관리합니다. 팀 WBS의 일정·담당을 대체하지 않습니다. |
 | [GitHub 설정 안내](docs/development/github-setup.md) | 기존 CI, private PoC credential trust 승인, 보호 규칙의 수동 등록과 아티팩트 준비 범위 |
 
 일정은 **WBS**를 따릅니다. 옛 Notion 일정은 비권위이고 갱신된 회의·API 결정은 사례별 증거입니다. FS074~FS081을 포함한 모든 명세/WBS 내용은 설계·구현 계획의 대상이며 오래된 `검토 전` 표기와 완료·실행 승인을 구분합니다. 추천 종목·산업·테마는 활성 기능에서 제외하되 `listRecommendations` 계약은 유보하고, 재무·실적 요구는 폐기하지 않았습니다.

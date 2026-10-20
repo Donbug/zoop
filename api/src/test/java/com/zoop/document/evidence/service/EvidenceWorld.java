@@ -237,8 +237,16 @@ final class EvidenceWorld {
     }
 
     EvidenceService service(Path grantsPath, ArtifactFileStore artifactStore) {
-        return new EvidenceService(read, registry, new DocumentReadGrants(grantsPath), new EvidenceArtifactReader(artifactStore),
-                Clock.fixed(NOW, ZoneOffset.UTC), TransactionOperations.withoutTransaction());
+        return service(grantsPath, null, artifactStore, (version, asOf, id) -> {
+            throw new AssertionError("an S1 evidence read must not touch the graph");
+        });
+    }
+
+    EvidenceService service(Path grantsPath, Path sourcesPath, ArtifactFileStore artifactStore,
+            com.zoop.document.evidence.graph.GraphEvidenceReader graph) {
+        return new EvidenceService(read, registry, new DocumentReadGrants(grantsPath), new DocumentReadSources(sourcesPath), graph,
+                new EvidenceArtifactReader(artifactStore), Clock.fixed(NOW, ZoneOffset.UTC),
+                TransactionOperations.withoutTransaction());
     }
 
     static byte[] bytes(String text) {

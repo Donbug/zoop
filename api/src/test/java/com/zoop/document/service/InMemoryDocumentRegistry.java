@@ -93,6 +93,16 @@ public final class InMemoryDocumentRegistry implements DocumentRegistryRepositor
         return true;
     }
 
+    /** Test setup only (not a repository operation, not counted as a write): the row of an id as a test needs it to be. */
+    public void replaceArtifact(ArtifactRow row) {
+        artifacts.put(row.id(), row);
+    }
+
+    /** Test setup only: the id is no longer registered. */
+    public void removeArtifact(String id) {
+        artifacts.remove(id);
+    }
+
     @Override
     public Optional<ArtifactRow> findArtifact(String id) {
         return Optional.ofNullable(artifacts.get(id));

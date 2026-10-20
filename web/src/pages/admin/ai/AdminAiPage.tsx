@@ -1,10 +1,10 @@
-import PageShell from '@/components/common/PageShell';
 import AiUsageOverview from '@/components/admin/ai/AiUsageOverview';
 
+// A-ADM-04b AI 사용량·오류 (/admin/ai)
 export default function AdminAiPage() {
   return (
-    <PageShell title="AI 운영">
+    <div data-screen-id="A-ADM-04b">
       <AiUsageOverview />
-    </PageShell>
+    </div>
   );
 }

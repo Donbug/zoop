@@ -205,6 +205,108 @@ class AdminAuthPostgresTest {
         mvc.perform(post("/api/v1/admin/auth/logout")).andExpect(status().isNoContent());
     }
 
+    @Test
+    void dashboardRequiresAdminSessionAndReturnsAConsistentPartialSnapshot() throws Exception {
+        mvc.perform(get("/api/v1/admin/dashboard"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
+
+        String suffix = UUID.randomUUID().toString();
+        String email = "dashboard-" + suffix + "@example.com";
+        String adminId = provisioning.provision(email, "Dashboard Admin", PASSWORD, "provision-dashboard-" + suffix);
+        var login = mvc.perform(post("/api/v1/admin/auth/login").header("Origin", ORIGIN)
+                        .contentType("application/json")
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        var cookie = login.getResponse().getCookie(AdminSessionCookie.NAME);
+
+        Instant fixtureAt = Instant.now().minusSeconds(30);
+        String activeMemberId = "dashboard-active-" + suffix;
+        String blockedMemberId = "dashboard-blocked-" + suffix;
+        insertDashboardMember(activeMemberId, "active-" + suffix, "active", fixtureAt);
+        insertDashboardMember(blockedMemberId, "blocked-" + suffix, "blocked", fixtureAt);
+        insertDashboardMemberSession("dashboard-member-session-" + suffix, activeMemberId,
+                "member", null, fixtureAt);
+        insertDashboardMemberSession("dashboard-guest-session-" + suffix, null,
+                "guest", "guest-analytics-" + suffix, fixtureAt);
+        jdbc.update("""
+                INSERT INTO audit_logs
+                  (actor_kind, admin_id, actor_id, actor_email_snapshot, action, target_type, target_id,
+                   outcome, request_id, detail, occurred_at)
+                VALUES ('admin', ?, ?, ?, 'dashboard.fixture', 'dashboard-fixture', ?,
+                        'succeeded', ?, '{}'::jsonb, ?)
+                """, adminId, adminId, email, suffix, "dashboard-fixture-" + suffix,
+                java.sql.Timestamp.from(fixtureAt));
+
+        var dashboard = mvc.perform(get("/api/v1/admin/dashboard").cookie(cookie)
+                        .header("X-Request-ID", "dashboard-read-" + suffix))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Request-ID", "dashboard-read-" + suffix))
+                .andExpect(jsonPath("$.metadata.requestId").value("dashboard-read-" + suffix))
+                .andExpect(jsonPath("$.metadata.partial").value(true))
+                .andExpect(jsonPath("$.metadata.asOf").isNotEmpty())
+                .andExpect(jsonPath("$.members.source").value("zoop-db"))
+                .andExpect(jsonPath("$.audit.last24h").isNumber())
+                .andExpect(jsonPath("$.jobs").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+
+        Instant asOf = Instant.parse(com.jayway.jsonpath.JsonPath.read(
+                dashboard.getResponse().getContentAsString(), "$.generatedAt"));
+        String dashboardBody = dashboard.getResponse().getContentAsString();
+        assertEquals(asOf.toString(), com.jayway.jsonpath.JsonPath.read(dashboardBody, "$.metadata.asOf"));
+        assertEquals(jdbc.queryForObject("SELECT count(*) FROM members", Long.class),
+                jsonLong(dashboardBody, "$.members.registered"));
+        assertEquals(jdbc.queryForObject("""
+                SELECT count(*) FROM member_sessions s JOIN members m ON m.id = s.member_id
+                WHERE s.kind = 'member' AND m.status = 'active' AND s.revoked_at IS NULL
+                  AND s.created_at <= ? AND s.expires_at > ?
+                """, Long.class, java.sql.Timestamp.from(asOf), java.sql.Timestamp.from(asOf)),
+                jsonLong(dashboardBody, "$.members.activeMemberSessions"));
+        assertEquals(jdbc.queryForObject("""
+                SELECT count(*) FROM member_sessions
+                WHERE kind = 'guest' AND revoked_at IS NULL AND created_at <= ? AND expires_at > ?
+                """, Long.class, java.sql.Timestamp.from(asOf), java.sql.Timestamp.from(asOf)),
+                jsonLong(dashboardBody, "$.members.activeGuestSessions"));
+        assertEquals(jdbc.queryForObject("""
+                SELECT count(*) FROM audit_logs WHERE occurred_at >= ? AND occurred_at < ?
+                """, Long.class, java.sql.Timestamp.from(asOf.minus(24, ChronoUnit.HOURS)), java.sql.Timestamp.from(asOf)),
+                jsonLong(dashboardBody, "$.audit.last24h"));
+
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_logs
+                WHERE admin_id = ? AND action = 'admin.dashboard.read'
+                """, Integer.class, adminId));
+    }
+
+    private void insertDashboardMember(String id, String suffix, String status, Instant createdAt) {
+        String email = suffix + "@example.test";
+        jdbc.update("""
+                INSERT INTO members
+                  (id, analytics_key, email, email_key, display_name, signup_method, status, created_at, blocked_at,
+                   password_hash, mode, investor, completed, tutorial_completed, settings_version, updated_at)
+                VALUES (?, ?, ?, ?, 'Dashboard fixture', 'google', ?, ?, ?, NULL, 'watchlist', NULL,
+                        false, false, 1, ?)
+                """, id, "analytics-" + id, email, email, status, java.sql.Timestamp.from(createdAt),
+                "blocked".equals(status) ? java.sql.Timestamp.from(createdAt) : null,
+                java.sql.Timestamp.from(createdAt));
+    }
+
+    private static long jsonLong(String document, String path) {
+        return ((Number) com.jayway.jsonpath.JsonPath.read(document, path)).longValue();
+    }
+
+    private void insertDashboardMemberSession(String id, String memberId, String kind,
+            String analyticsKey, Instant createdAt) {
+        jdbc.update("""
+                INSERT INTO member_sessions
+                  (id, member_id, kind, analytics_key, token_hash, csrf_key_id, csrf_version,
+                   tutorial_completed, created_at, expires_at, revoked_at, auth_flow)
+                VALUES (?, ?, ?, ?, ?, 'test', 1, false, ?, ?, NULL, NULL)
+                """, id, memberId, kind, analyticsKey, java.util.UUID.randomUUID().toString().replace("-", "").repeat(2),
+                java.sql.Timestamp.from(createdAt), java.sql.Timestamp.from(createdAt.plus(2, ChronoUnit.HOURS)));
+    }
+
     private static String rateSubjectHash(String scope, String subject) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
