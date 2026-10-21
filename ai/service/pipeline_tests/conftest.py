@@ -7,7 +7,7 @@ import pytest
 
 from extraction_support import ExtractionService, ExtractionWorkspace, make_service, terminate_extraction
 from relation_support import RelationService, RelationWorkspace, World, build_world, terminate_relation, tree
-from real_handoff_support import HandoffWorld, RealWorkspace, build_handoff_world
+from real_handoff_support import BUILD_VERDICT_HANDOFF_WORLD, HandoffWorld, RealWorkspace, build_handoff_world
 from support import ServiceProcess, remove_tree
 
 
@@ -100,15 +100,20 @@ def handoff_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
     return build_handoff_world(tmp_path_factory.mktemp("handoff-world"))
 
 
-@pytest.fixture
-def start_handoff(tmp_path: Path, handoff_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
-    """Factory for services over the real `zoop-ai-handoff`. The shared ledgers are checked byte for byte after every test: the service only reads them."""
-    before = handoff_world.ledgers()
+@pytest.fixture(scope="session")
+def verdict_world(tmp_path_factory: pytest.TempPathFactory) -> HandoffWorld:
+    """One fresh actual two-S3-job world whose operator decisions carry SYNTHETIC per-field eventTime/period verdicts, with ONE handoff frozen and exported through the
+    installed CLI by the pipeline's interpreter. `expect` holds the pipeline smoke's hand-written expectations."""
+    return build_handoff_world(tmp_path_factory.mktemp("verdict-world"), BUILD_VERDICT_HANDOFF_WORLD)
+
+
+def _handoff_services(tmp_path: Path, world: HandoffWorld):
+    before = world.ledgers()
     started: list[ServiceProcess] = []
 
     def factory(exports: list[dict], *, env: dict[str, str | None] | None = None, launcher_env: dict[str, str] | None = None) -> tuple[RealWorkspace, ServiceProcess]:
         root = tmp_path / f"hws{len(started)}"
-        workspace = RealWorkspace(root, handoff_world, exports)
+        workspace = RealWorkspace(root, world, exports)
         service = ServiceProcess(workspace, env=workspace.env(**(env or {})), launcher=bool(launcher_env), launcher_env=launcher_env)
         started.append(service)
         return workspace, service.start()
@@ -118,4 +123,16 @@ def start_handoff(tmp_path: Path, handoff_world: HandoffWorld) -> Callable[..., 
         service.close()
     for service in started:
         remove_tree(service.workspace.root)
-    assert handoff_world.ledgers() == before, "a read-only handoff door changed an operator ledger"
+    assert world.ledgers() == before, "a read-only handoff door changed an operator ledger"
+
+
+@pytest.fixture
+def start_handoff(tmp_path: Path, handoff_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """Factory for services over the real `zoop-ai-handoff`. The shared ledgers are checked byte for byte after every test: the service only reads them."""
+    yield from _handoff_services(tmp_path, handoff_world)
+
+
+@pytest.fixture
+def start_verdict_handoff(tmp_path: Path, verdict_world: HandoffWorld) -> Callable[..., tuple[RealWorkspace, ServiceProcess]]:
+    """The same factory over the reviewed (verdict) world and its own ledgers."""
+    yield from _handoff_services(tmp_path, verdict_world)

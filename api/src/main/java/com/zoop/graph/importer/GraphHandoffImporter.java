@@ -323,9 +323,10 @@ public final class GraphHandoffImporter {
             ArtifactRow text = registry.findArtifact(version.textArtifactId()).orElseThrow(
                     () -> new GraphHandoffException(GraphHandoffFailure.ARTICLE_MISMATCH));
             // The app's own stored text must be byte-for-byte the text the current export proved (hash and size equal, and the
-            // file itself is read back and verified against the registry).
+            // file itself is read back and verified against the registry), and its hash is the textSha256 the bundle's exact-text
+            // sourceSupport was computed from: a bundle whose lineage rests on another text is refused.
             if (!"extracted_text".equals(text.kind()) || !text.sha256().equals(facts.textSha256())
-                    || text.bytes() != facts.textBytes()) {
+                    || !text.sha256().equals(article.textSha256()) || text.bytes() != facts.textBytes()) {
                 throw new GraphHandoffException(GraphHandoffFailure.TEXT_MISMATCH);
             }
             texts.put(key, decode(readRegistered(session, text)));
@@ -495,11 +496,15 @@ public final class GraphHandoffImporter {
         for (Relation relation : bundle.relations()) {
             origins.merge(relation.origin(), 1, Integer::sum);
         }
+        Map<String, Integer> approvalBases = new TreeMap<>();
+        for (HandoffBundle.Approval approval : bundle.approvals()) {
+            approvalBases.merge(approval.kind(), 1, Integer::sum);
+        }
         VerifiedHandoff handoff = checked.handoff();
         return new Staged(bundle.handoffId(), HandoffSnapshotWriter.versionId(bundle.handoffId()), outcome,
                 handoff.manifestDigest(), handoff.bundleDigest(), handoff.contentDigest(), bundle.sourceKind(),
-                bundle.executionMode(), bundle.recordingKind(), origins, bundle.companies().size(), bundle.issues().size(),
-                bundle.relations().size(), bundle.articles().size(), bundle.evidence().size(), evidenceCounts[0],
-                evidenceCounts[1], Objects.requireNonNull(snapshot), Objects.requireNonNull(receipt));
+                bundle.executionMode(), bundle.recordingKind(), origins, approvalBases, bundle.companies().size(),
+                bundle.issues().size(), bundle.relations().size(), bundle.articles().size(), bundle.evidence().size(),
+                evidenceCounts[0], evidenceCounts[1], Objects.requireNonNull(snapshot), Objects.requireNonNull(receipt));
     }
 }

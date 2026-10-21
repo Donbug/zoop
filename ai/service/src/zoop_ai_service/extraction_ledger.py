@@ -18,8 +18,9 @@ it); the job id is spent on the pins it was reserved under.
 Dispatch: the initial intent is one `pending` row that a dispatcher claims once. Every later dispatch is an explicit `recover`. A row left `in_flight`
 by a dead process is never made `pending` again: it ends `idle` as `service_restarted`, because whether its child already ran is unknown.
 
-Schema `zoop-ai-extraction-jobs-ledger-1`; the ledger is bound to the realpath of the extraction state directory, and any other schema or binding is
-refused at start.
+Schema `zoop-ai-extraction-jobs-ledger-2`; the ledger is bound to the realpath of the extraction state directory, and any other schema or binding is
+refused at start. A `-1` ledger gains its new columns in place (ALTER ADD COLUMN: a live-runtime pin per job, whose absence reads as a replay job,
+and an `explicit` mark per dispatch, whose absence reads as the automatic initial dispatch); no row is rewritten or removed.
 """
 from __future__ import annotations
 
@@ -37,7 +38,8 @@ from .config import ConfigError
 from .ledger import stamp
 from .relation_ledger import DispatchRow, Update
 
-LEDGER_SCHEMA = "zoop-ai-extraction-jobs-ledger-1"
+LEDGER_SCHEMA = "zoop-ai-extraction-jobs-ledger-2"
+MIGRATES_FROM = ("zoop-ai-extraction-jobs-ledger-1",)
 FILE = "extraction-jobs.sqlite3"
 
 DDL = """
@@ -54,14 +56,8 @@ CREATE TABLE IF NOT EXISTS extraction_jobs (
  submit_attempts INTEGER NOT NULL DEFAULT 0,
  reserved_at TEXT NOT NULL,
  accepted_at TEXT,
+ live_binding TEXT,
  CHECK ((state='reserved' AND accepted_at IS NULL) OR (state='accepted' AND accepted_at IS NOT NULL)));
-CREATE TRIGGER IF NOT EXISTS extraction_jobs_immutable BEFORE UPDATE ON extraction_jobs
- WHEN NOT (OLD.job_id=NEW.job_id AND OLD.owner=NEW.owner AND OLD.request_digest=NEW.request_digest
-       AND OLD.approved_digest=NEW.approved_digest AND OLD.producer_digest=NEW.producer_digest AND OLD.topic_digest IS NEW.topic_digest
-       AND OLD.input_digest=NEW.input_digest AND OLD.reserved_at=NEW.reserved_at AND OLD.state='reserved'
-       AND ((NEW.state='reserved' AND NEW.submit_attempts=OLD.submit_attempts+1)
-         OR (NEW.state='accepted' AND NEW.submit_attempts=OLD.submit_attempts)))
- BEGIN SELECT RAISE(ABORT,'immutable'); END;
 CREATE TRIGGER IF NOT EXISTS extraction_jobs_release_only BEFORE DELETE ON extraction_jobs
  WHEN OLD.state<>'reserved'
  BEGIN SELECT RAISE(ABORT,'immutable'); END;
@@ -74,6 +70,7 @@ CREATE TABLE IF NOT EXISTS extraction_dispatch (
  not_before REAL,
  last_outcome TEXT,
  last_runtime_code TEXT,
+ explicit INTEGER NOT NULL DEFAULT 0 CHECK (explicit IN (0,1)),
  updated_at TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS extraction_dispatch_undeletable BEFORE DELETE ON extraction_dispatch
  BEGIN SELECT RAISE(ABORT,'immutable'); END;
@@ -82,18 +79,32 @@ CREATE TRIGGER IF NOT EXISTS extraction_dispatch_undeletable BEFORE DELETE ON ex
 NEXT_SEQ = "(SELECT COALESCE(MAX(seq),0)+1 FROM extraction_dispatch)"
 ACTIVE = "(SELECT COUNT(*) FROM extraction_dispatch WHERE state IN ('pending','in_flight'))"
 
+ADDED_COLUMNS = (("extraction_jobs", "live_binding", "TEXT"),
+                 ("extraction_dispatch", "explicit", "INTEGER NOT NULL DEFAULT 0 CHECK (explicit IN (0,1))"))
+# The pinned identity of a reservation is immutable, the live runtime pin included. Created (replaced) at every start so an older ledger gets it too.
+JOBS_IMMUTABLE = """CREATE TRIGGER extraction_jobs_immutable BEFORE UPDATE ON extraction_jobs
+ WHEN NOT (OLD.job_id=NEW.job_id AND OLD.owner=NEW.owner AND OLD.request_digest=NEW.request_digest
+       AND OLD.approved_digest=NEW.approved_digest AND OLD.producer_digest=NEW.producer_digest AND OLD.topic_digest IS NEW.topic_digest
+       AND OLD.live_binding IS NEW.live_binding
+       AND OLD.input_digest=NEW.input_digest AND OLD.reserved_at=NEW.reserved_at AND OLD.state='reserved'
+       AND ((NEW.state='reserved' AND NEW.submit_attempts=OLD.submit_attempts+1)
+         OR (NEW.state='accepted' AND NEW.submit_attempts=OLD.submit_attempts)))
+ BEGIN SELECT RAISE(ABORT,'immutable'); END"""
+
 
 @dataclass(frozen=True)
 class Pins:
-    """What a reservation froze. Compared as a whole against the current approval; never rewritten."""
+    """What a reservation froze. Compared as a whole against the current approval; never rewritten. A live job has no producer fixture
+    (`producer_digest` None, stored as the empty string) and pins the live runtime identity instead."""
     approved_digest: str
-    producer_digest: str
+    producer_digest: str | None
     topic_digest: str | None
     input_digest: str
+    live_binding: str | None = None
 
     @property
-    def approval(self) -> tuple[str, str, str | None]:
-        return (self.approved_digest, self.producer_digest, self.topic_digest)
+    def approval(self) -> tuple[str, str | None, str | None, str | None]:
+        return (self.approved_digest, self.producer_digest, self.topic_digest, self.live_binding)
 
 
 @dataclass(frozen=True)
@@ -117,6 +128,7 @@ class Claim:
     owner: str
     pins: Pins
     busy_count: int
+    explicit: bool = False
 
 
 class ExtractionLedger:
@@ -136,6 +148,14 @@ class ExtractionLedger:
         except sqlite3.Error:
             raise ConfigError("ZOOP_AI_SERVICE_STATE_DIR", "extraction_ledger_unavailable") from None
 
+    def _added_columns(self) -> None:
+        """Bring an older ledger up to the current columns in place and install the current job-identity trigger. Inside the caller's transaction."""
+        for table, name, definition in ADDED_COLUMNS:
+            if name not in [row["name"] for row in self._db.execute(f"PRAGMA table_info({table})")]:
+                self._db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+        self._db.execute("DROP TRIGGER IF EXISTS extraction_jobs_immutable")
+        self._db.execute(JOBS_IMMUTABLE)
+
     def _bind(self, extraction_state_dir: Path) -> None:
         binding = hashlib.sha256(os.path.realpath(extraction_state_dir).encode("utf-8")).hexdigest()
         with self._guard:
@@ -146,8 +166,12 @@ class ExtractionLedger:
                     if row is None:
                         self._db.execute("INSERT INTO meta VALUES (?,?)", (key, value))
                     elif row["value"] != value:
+                        if key == "schema" and row["value"] in MIGRATES_FROM:
+                            self._db.execute("UPDATE meta SET value=? WHERE key='schema'", (value,))  # forward only
+                            continue
                         raise ConfigError("ZOOP_AI_EXTRACTION_STATE_DIR" if key == "extractionLedger" else "ZOOP_AI_SERVICE_STATE_DIR",
                                           "extraction_ledger_binding_mismatch" if key == "extractionLedger" else "extraction_ledger_schema_mismatch")
+                self._added_columns()
             except BaseException:
                 self._db.execute("ROLLBACK")
                 raise
@@ -172,9 +196,7 @@ class ExtractionLedger:
 
     @staticmethod
     def _row(row: sqlite3.Row) -> ExtractionRow:
-        return ExtractionRow(row["job_id"], row["owner"], row["request_digest"],
-                             Pins(row["approved_digest"], row["producer_digest"], row["topic_digest"], row["input_digest"]),
-                             row["state"], row["submit_attempts"], row["accepted_at"])
+        return ExtractionRow(row["job_id"], row["owner"], row["request_digest"], _pins(row), row["state"], row["submit_attempts"], row["accepted_at"])
 
     def job(self, job_id: str) -> ExtractionRow | None:
         with self._guard:
@@ -184,9 +206,9 @@ class ExtractionLedger:
     def reserve(self, job_id: str, owner: str, request_digest: str, pins: Pins) -> ExtractionRow:
         with self._tx() as db:
             db.execute("INSERT OR IGNORE INTO extraction_jobs(job_id,owner,request_digest,approved_digest,producer_digest,topic_digest,input_digest,"
-                       "state,reserved_at) VALUES (?,?,?,?,?,?,?,'reserved',?)",
-                       (job_id, owner, request_digest, pins.approved_digest, pins.producer_digest, pins.topic_digest, pins.input_digest,
-                        stamp(self._clock())))
+                       "state,reserved_at,live_binding) VALUES (?,?,?,?,?,?,?,'reserved',?,?)",
+                       (job_id, owner, request_digest, pins.approved_digest, pins.producer_digest or "", pins.topic_digest, pins.input_digest,
+                        stamp(self._clock()), pins.live_binding))
         row = self.job(job_id)
         assert row is not None
         return row
@@ -235,14 +257,13 @@ class ExtractionLedger:
         """The pending dispatch with the lowest sequence, or None."""
         now = self._clock()
         with self._tx() as db:
-            row = db.execute("SELECT d.job_id, d.busy_count, j.* FROM extraction_dispatch d JOIN extraction_jobs j ON j.job_id=d.job_id "
+            row = db.execute("SELECT d.job_id, d.busy_count, d.explicit, j.* FROM extraction_dispatch d JOIN extraction_jobs j ON j.job_id=d.job_id "
                              "WHERE d.state='pending' AND (d.not_before IS NULL OR d.not_before<=?) ORDER BY d.seq LIMIT 1", (now,)).fetchone()
             if row is None:
                 return None
             db.execute("UPDATE extraction_dispatch SET state='in_flight', dispatch_count=dispatch_count+1, not_before=NULL, updated_at=? WHERE job_id=?",
                        (stamp(now), row["job_id"]))
-            return Claim(row["job_id"], row["owner"], Pins(row["approved_digest"], row["producer_digest"], row["topic_digest"], row["input_digest"]),
-                         row["busy_count"])
+            return Claim(row["job_id"], row["owner"], _pins(row), row["busy_count"], bool(row["explicit"]))
 
     def finish(self, job_id: str, update: Update) -> bool:
         now = self._clock()
@@ -259,7 +280,7 @@ class ExtractionLedger:
         against the cap, checked in the same transaction. Returns "enqueued", "coalesced" or "full"."""
         with self._tx() as db:
             cursor = db.execute(
-                f"UPDATE extraction_dispatch SET state='pending', seq={NEXT_SEQ}, not_before=NULL, busy_count=0, "
+                f"UPDATE extraction_dispatch SET state='pending', seq={NEXT_SEQ}, not_before=NULL, busy_count=0, explicit=1, "
                 f"updated_at=? WHERE job_id=? AND state='idle' AND {ACTIVE}<?",
                 (stamp(self._clock()), job_id, limit))
             if cursor.rowcount == 1:
@@ -278,3 +299,8 @@ class ExtractionLedger:
         with self._tx() as db:
             return db.execute("UPDATE extraction_dispatch SET state='idle', not_before=NULL, last_outcome='service_restarted', last_runtime_code=NULL, "
                               "updated_at=? WHERE state='in_flight'", (stamp(self._clock()),)).rowcount
+
+
+def _pins(row: sqlite3.Row) -> Pins:
+    """The frozen identity of a job row. A live job stores no fixture digest (the empty string), which reads back as None."""
+    return Pins(row["approved_digest"], row["producer_digest"] or None, row["topic_digest"], row["input_digest"], row["live_binding"])

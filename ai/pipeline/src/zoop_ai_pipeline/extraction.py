@@ -1,8 +1,10 @@
-"""Independent offline S2-2 candidate ledger and recovery. No application, S1, PoC repository or ingestion-cursor writer.
+"""Independent S2-2 candidate ledger and recovery. No application, S1, PoC repository or ingestion-cursor writer.
 
 Flow: freeze exact authorized observations (+ whole-event snapshot) -> extraction receipt -> per-whole-event comparison
 receipts -> optional separate topic-producer receipt. Every stage commits its candidates and completion marker atomically.
-Replay is authored-response replay, not independent AI inference; candidates are never ALLOW/published.
+Replay is authored-response replay, not independent AI inference. A live job (provenance executionMode live) is answered by the native provider
+runtime instead: one reserved attempt per call slot, the raw receipt durable before any parsing, current model-send rights and frozen config at
+reserve/send/receipt, and never an automatic resend. Candidates are never ALLOW/published in either mode.
 """
 from __future__ import annotations
 
@@ -13,16 +15,20 @@ import sqlite3
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from . import extraction_replay as analysis
 from . import extraction_topic as topics
+from . import live_prompts
 from .dependency_contracts import array, cites, invalid
-from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS, SCHEMA, Article, CitationFailure,
-    ExtractionFailure, Mention, ObservationRef, ReplyInvalid, Submit, canonical, digest)
+from .extraction_contracts import (ADAPTER_VERSION, CANDIDATE_VERSION, LEDGER_VERSION, LIVE_ADAPTER_VERSION, MAX_COMPARISONS, MAX_DOCUMENTS, SCHEMA, Article,
+    CitationFailure, ExtractionFailure, Mention, ObservationRef, ProviderResponseUnknown, ReplyInvalid, Submit, canonical, digest)
 from .ingestion import Ingestor
 from .ingestion import Store as IngestionStore
 from .ingestion_contracts import Authority, Export, IngestionFailure, Inspect, byte_hash, now, reserved_state_roots
+from .live_runtime import LiveFailure, LiveRuntime
+
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -169,13 +175,15 @@ class Sources:
     def __init__(self, directory: Path, authority: Authority):
         self.directory, self.authority = directory, authority
 
-    def _run(self, call):
+    def _run(self, call, send=None):
+        if send is not None and self.authority is None:
+            raise ExtractionFailure("source_unauthorized")
         try:
             store = IngestionStore(self.directory, existing=True)
         except IngestionFailure as exc:
             raise ExtractionFailure(exc.code) from exc
         try:
-            return call(Ingestor(store, self.authority))
+            return call(Ingestor(store, self.authority if send is None else self.authority.sending(*send)))
         except IngestionFailure as exc:
             if exc.code in _CITATION_CODES:
                 raise CitationFailure(exc.code) from exc
@@ -183,8 +191,13 @@ class Sources:
         finally:
             store.close()
 
-    def export(self, ref: ObservationRef) -> dict:
-        return self._run(lambda ingestor: ingestor.export(Export.model_validate(ref.export_wire())))
+    def export(self, ref: ObservationRef, *, send: tuple[str, str] | None = None) -> dict:
+        """The exact observation under current read + quote-display authority. `send=(purpose, recipient)` makes it the live model-send check for this one
+        document: it additionally needs `model-send` and that exact purpose and recipient currently granted. The export is the same either way."""
+        return self._run(lambda ingestor: ingestor.export(Export.model_validate(ref.export_wire())), send)
+
+    def authorize_model_send(self, ref: ObservationRef, purpose: str, recipient: str) -> None:
+        self.export(ref, send=(purpose, recipient))
 
     def resolve(self, ref: ObservationRef, locator_id: str, start: int, end: int) -> dict:
         request = Inspect.model_validate({"schemaVersion": ref.export_wire()["schemaVersion"], "roundId": ref.round_id, "sourceId": ref.source_id,
@@ -221,6 +234,32 @@ class Fixtures:
         if self.topic_raw is None:
             raise ExtractionFailure("topic_replay_required")
         return topics.ReplayProducer(self.topic_raw, synthetic)
+
+
+class LiveAccess:
+    """Lazy, process-local access to the live runtime. Replay, inspect, cancel, export and the decode of a stored receipt never read the environment
+    or a key: `config` (current environment, no secrets) is built only to freeze a new live job, `sender` (environment + keys + budget) only at the
+    first real send, and `frozen` rebuilds a decoder from the job's own stored binding. A refusal of the runtime surfaces as its stable code."""
+
+    def __init__(self, from_env=LiveRuntime.from_env, from_binding=LiveRuntime.from_binding):
+        self._from_env, self._from_binding, self._built = from_env, from_binding, {}
+
+    def _get(self, key, make):
+        if key not in self._built:
+            try:
+                self._built[key] = make()
+            except LiveFailure as exc:
+                raise ExtractionFailure(exc.code) from exc
+        return self._built[key]
+
+    def config(self) -> LiveRuntime:
+        return self._get("config", lambda: self._from_env(need_send=False))
+
+    def sender(self) -> LiveRuntime:
+        return self._get("send", lambda: self._from_env(need_send=True))
+
+    def frozen(self, binding: dict) -> LiveRuntime:
+        return self._get(("frozen", binding["identity"]), lambda: self._from_binding(binding))
 
 
 @dataclass
@@ -265,10 +304,58 @@ def doc_key(ref: ObservationRef) -> str:
 
 
 def current(binding: dict) -> bool:
-    """A job is native only when its frozen adapter is this build's. Anything else (ledger rows written before the native
+    """A job is native only when its frozen adapter is this build's (replay or live). Anything else (ledger rows written before the native
     cutover) stays readable as history but is never resumed, delivered or re-analysed: its analysis contract cannot be reproduced."""
     adapter = binding.get("adapter")
-    return isinstance(adapter, dict) and adapter.get("version") == ADAPTER_VERSION
+    version = adapter.get("version") if isinstance(adapter, dict) else None
+    return version == ADAPTER_VERSION or (version == LIVE_ADAPTER_VERSION and "live" in binding)
+
+
+def is_live(binding: dict) -> bool:
+    """A live job's binding carries the frozen runtime under `live`; a replay job's carries its fixture identity under `replay`, never both."""
+    return "live" in binding
+
+
+def analysis_version(binding: dict) -> str:
+    return (binding["live"] if is_live(binding) else binding["replay"])["analysisVersion"]
+
+
+def _receipt_total(receipts: list[dict], group: str, name: str):
+    values = [(r.get(group) or {}).get(name) for r in receipts]
+    return sum(values) if all(type(v) is int for v in values) else None
+
+
+def _usd_total(receipts: list[dict], name: str) -> str | None:
+    try:
+        return format(sum((Decimal(r["cost"][name]) for r in receipts), Decimal(0)), "f")
+    except (KeyError, TypeError, ValueError, InvalidOperation):
+        return None
+
+
+def live_usage(job_id: str, calls) -> dict:
+    """Truthful live counts from the stored receipts alone (no runtime, environment or key). `providerCalls` counts every attempt that was or may have
+    been transmitted; the token/USD totals are over received receipts and are null (unknown, never zero) when any value is unreported OR when a
+    transmitted call has no receipt, whose real usage this ledger cannot know."""
+    receipts = [json.loads(c["response"]) for c in calls if c["state"] == "received"]
+    unreceipted = sum(c["state"] == "started" for c in calls)
+    totals = {} if unreceipted else {"inputTokens": _receipt_total(receipts, "usage", "inputTokens"), "outputTokens": _receipt_total(receipts, "usage", "outputTokens"),
+                                     "reasoningTokens": _receipt_total(receipts, "usage", "reasoningTokens"), "estimatedUsd": _usd_total(receipts, "estimatedUsd"),
+                                     "chargedUsd": _usd_total(receipts, "chargedUsd")}
+    return {"executionMode": "live", "replayCalls": 0, "providerCalls": len(receipts) + unreceipted, "receivedCalls": len(receipts),
+            "startedWithoutReceipt": unreceipted, "unsentCalls": sum(c["state"] == "unsent" for c in calls),
+            "paidModelCalls": sum(any(type((r.get("usage") or {}).get(n)) is int and r["usage"][n] > 0 for n in ("inputTokens", "outputTokens")) for r in receipts),
+            **{name: totals.get(name) for name in ("inputTokens", "outputTokens", "reasoningTokens", "estimatedUsd", "chargedUsd")}, "creatorJobId": job_id}
+
+
+def live_call(binding: dict, call) -> dict:
+    """One stored call as delivered: purpose/recipient come from the frozen binding, outcome facts from the stored receipt (null when there is none)."""
+    stage = binding["live"]["runtime"]["stages"][call["stage"]]
+    receipt = json.loads(call["response"]) if call["state"] == "received" else {}
+    cost = receipt.get("cost")
+    return {"stage": call["stage"], "state": call["state"], "requestDigest": call["request_digest"], "fixtureHash": None, "responseDigest": call["response_digest"],
+            "verdict": call["verdict"], "attemptId": call["attempt_id"], "recipient": stage["recipient"], "purpose": stage["purpose"],
+            "httpStatus": (receipt.get("http") or {}).get("status"), "model": (receipt.get("model") or {}).get("reported"), "usage": receipt.get("usage"),
+            "cost": {k: cost.get(k) for k in ("usageKnown", "estimatedUsd", "chargedUsd")} if isinstance(cost, dict) else None}
 
 
 def open_legacy_history(root: Path, ingestion_root: Path, job_id: str) -> "Store | None":
@@ -314,8 +401,9 @@ def cite_exact(sources: "Sources", ref: ObservationRef, export: dict, start: int
 
 
 class Extractor:
-    def __init__(self, store: Store, sources: Sources):
+    def __init__(self, store: Store, sources: Sources, live: "LiveAccess | None" = None):
         self.store, self.sources = store, sources
+        self.live = live or LiveAccess()
         self.db = store.db
 
     # ------------------------------------------------------------------ freeze / verify ---------------------------------
@@ -355,21 +443,29 @@ class Extractor:
         snapshot_digest = digest({"revision": request.snapshot.revision, "events": sorted([g.event_id, g.revision, g.digest] for g in groups)})
         return Context(request, synthetic, docs, incoming, groups, snapshot_digest)
 
-    def _binding(self, ctx: Context, replay: dict) -> dict:
-        identity = {k: replay[k] for k in ("format", "synthetic", "recordingKind", "promptVersion", "analysisVersion")}
+    def _binding(self, ctx: Context, source: dict, live: bool = False) -> dict:
+        """The immutable job binding. `source` is the replay identity (+fixtureHash) or, for `live`, the frozen runtime block; the two never share a key."""
         request = ctx.request
-        return {"adapter": {"version": ADAPTER_VERSION, "candidate": CANDIDATE_VERSION, "fingerprint": analysis.fingerprint(identity, request.catalogue)},
-                "replay": replay,
+        if live:
+            adapter = {"version": LIVE_ADAPTER_VERSION, "candidate": CANDIDATE_VERSION, "fingerprint": analysis.fingerprint(source, request.catalogue, LIVE_ADAPTER_VERSION)}
+            mode = {"live": source}
+        else:
+            identity = {k: source[k] for k in ("format", "synthetic", "recordingKind", "promptVersion", "analysisVersion")}
+            adapter = {"version": ADAPTER_VERSION, "candidate": CANDIDATE_VERSION, "fingerprint": analysis.fingerprint(identity, request.catalogue)}
+            mode = {"replay": source}
+        return {"adapter": adapter,
+                **mode,
                 "catalogue": {"revision": request.catalogue.revision, "digest": digest(request.catalogue.wire())},
                 "incoming": ctx.incoming, "documents": {k: ctx.docs[k].binding for k in sorted(ctx.docs)},
                 "snapshot": {"revision": request.snapshot.revision, "digest": ctx.snapshot_digest,
                              "events": [{"eventId": g.event_id, "revision": g.revision, "digest": g.digest} for g in ctx.groups]},
                 "topic": request.topic.wire() if request.topic else None}
 
-    def _verify(self, ctx: Context) -> None:
-        """Current read/store/quote authority and exact immutable binding for every document, now."""
-        for doc in ctx.docs.values():
-            export = self.sources.export(doc.ref)
+    def _verify(self, ctx: Context, send: tuple | None = None) -> None:
+        """Current read/store/quote authority and exact immutable binding for every document, now. For a live call, `send` is (purpose, recipient,
+        document keys): every document in it must also currently allow model-send for exactly that purpose and recipient."""
+        for key, doc in ctx.docs.items():
+            export = self.sources.export(doc.ref, send=(send[0], send[1]) if send is not None and key in send[2] else None)
             bound = analysis.bind(export, analysis.article(export, ctx.synthetic))
             if bound["grant"] != doc.binding["grant"]:
                 raise ExtractionFailure("grant_revision_changed")
@@ -390,7 +486,7 @@ class Extractor:
         stored = json.loads(row["binding"])
         if not current(stored):
             raise ExtractionFailure("analysis_contract_changed")
-        fresh = self._binding(ctx, stored["replay"])
+        fresh = self._binding(ctx, stored["live"], live=True) if is_live(stored) else self._binding(ctx, stored["replay"])
         if fresh == stored:
             return
         for key, binding in stored["documents"].items():
@@ -414,17 +510,28 @@ class Extractor:
             raise ExtractionFailure("job_binding_changed")
 
     def freeze(self, request: Submit, fixtures: Fixtures) -> None:
-        """The only registration path: durably freeze the exact bound input as `queued`, with no replay lookup, call or candidate effect.
+        """The only registration path: durably freeze the exact bound input as `queued`, with no provider/replay call or candidate effect.
 
-        The replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here, but only its header is
-        read; its records are validated by the first lookup. A job that already exists is not touched at all: same input returns without re-freezing,
+        A replay job's replay file is part of the frozen input (its hash is in the input digest and the binding), so it is required here, but only its
+        header is read; its records are validated by the first lookup. A live job freezes the complete secret-free runtime binding instead (current
+        environment, no network, no key) and takes no fixture. A job that already exists is not touched at all: same input returns without re-freezing,
         resuming, resetting a stopped job or reading authority; another input is `job_input_conflict` with nothing written. Execution is `resume`'s business."""
         existing = self.store.one("SELECT binding FROM jobs WHERE job_id=?", (request.job_id,))
         if existing is not None and not current(json.loads(existing["binding"])):
             # A stored legacy job is history: say so before its fixture bytes (old format or none) are looked at.
             raise ExtractionFailure("analysis_contract_changed")
-        identity = analysis.identity(fixtures.require(), request.provenance, request.prompt_version)
-        input_digest = digest({"request": request.wire(), "replayFixtureHash": fixtures.replay_hash})
+        live = request.provenance.execution_mode == "live"
+        if live:
+            if fixtures.replay_hash is not None or fixtures.topic_raw is not None:
+                raise ExtractionFailure("fixture_not_allowed")
+            runtime = self.live.config().binding()
+            identity = {"promptVersion": request.prompt_version, "analysisVersion": "live-" + runtime["identity"]}
+            input_digest = digest({"request": request.wire(), "liveBindingDigest": runtime["identity"]})
+            frozen_hash = runtime["identity"]  # stored in the immutable `replay_hash` column: the external contract this job is bound to
+        else:
+            identity = analysis.identity(fixtures.require(), request.provenance, request.prompt_version)
+            input_digest = digest({"request": request.wire(), "replayFixtureHash": fixtures.replay_hash})
+            frozen_hash = fixtures.replay_hash
         row = self.store.one("SELECT * FROM jobs WHERE job_id=?", (request.job_id,))
         if row is not None:
             if row["input_digest"] != input_digest:
@@ -432,26 +539,47 @@ class Extractor:
             return
         ctx = self._context(request)
         self._ground_members(ctx)
-        binding = self._binding(ctx, {**identity, "fixtureHash": fixtures.replay_hash})
-        # The exact binding is durable before any replay call; nothing below can change it.
+        if live:
+            binding = self._binding(ctx, {**identity, "runtime": runtime, "bindingDigest": runtime["identity"]}, live=True)
+        else:
+            binding = self._binding(ctx, {**identity, "fixtureHash": fixtures.replay_hash})
+        # The exact binding is durable before any replay/provider call; nothing below can change it.
         with self.store.transaction(lambda: self._verify(ctx)):
             self.db.execute("INSERT INTO jobs(job_id,input_digest,request,binding,replay_hash,state,phase,resume_mode,created_at,updated_at) VALUES(?,?,?,?,?,'queued','extract','resume',?,?)",
-                (request.job_id, input_digest, canonical(request.wire()), canonical(binding), fixtures.replay_hash, now(), now()))
+                (request.job_id, input_digest, canonical(request.wire()), canonical(binding), frozen_hash, now(), now()))
 
-    def run(self, request: Submit, fixtures: Fixtures) -> dict:
+    def run(self, request: Submit, fixtures: Fixtures, *, initial_only: bool = False) -> dict:
         """Convenience: `freeze` then `resume` the same job."""
         self.freeze(request, fixtures)
-        return self.resume(request.job_id, fixtures)
+        return self.resume(request.job_id, fixtures, initial_only=initial_only)
 
-    def resume(self, job_id: str, fixtures: Fixtures) -> dict:
+    def resume(self, job_id: str, fixtures: Fixtures, *, initial_only: bool = False) -> dict:
         row = self._job(job_id)
-        if not current(json.loads(row["binding"])):
+        binding = json.loads(row["binding"])
+        if not current(binding):
             # A job frozen under another analysis contract is history: refuse before any fixture, source, authority or state access.
             raise ExtractionFailure("analysis_contract_changed")
-        if fixtures.replay_hash is not None and fixtures.replay_hash != row["replay_hash"]:
+        if is_live(binding):
+            if fixtures.replay_hash is not None or fixtures.topic_raw is not None:
+                raise ExtractionFailure("fixture_not_allowed")  # a live job is answered by the provider, never by an authored file
+        elif fixtures.replay_hash is not None and fixtures.replay_hash != row["replay_hash"]:
             raise ExtractionFailure("replay_fixture_changed")
+        if initial_only:
+            self._take_initial_dispatch(job_id)
         self._execute(row, fixtures)
         return self.result(job_id)
+
+    def _take_initial_dispatch(self, job_id: str) -> None:
+        """Under the writer lock, atomically: the automatic (service) dispatch of a job may happen once and only for a job nothing has touched.
+        A mark, a started call or any state beyond `queued` means a previous dispatch already ran (or an operator did): refuse with no effect.
+        Explicit operator recovery is plain `resume`, which never consults the mark."""
+        mark = "initial-dispatch:" + job_id
+        with self.store.transaction():
+            row = self._job(job_id)
+            if (row["state"] != "queued" or self.db.execute("SELECT 1 FROM meta WHERE key=?", (mark,)).fetchone()
+                    or self.db.execute("SELECT 1 FROM calls WHERE job_id=? LIMIT 1", (job_id,)).fetchone()):
+                raise ExtractionFailure("initial_dispatch_taken")
+            self.db.execute("INSERT INTO meta VALUES(?,?)", (mark, now()))
 
     def inspect(self, job_id: str) -> dict:
         self._job(job_id)
@@ -492,7 +620,8 @@ class Extractor:
             return
         if self.store.one("SELECT 1 FROM calls WHERE job_id=? AND state='started' AND response IS NULL", (job_id,)):
             # Holding the lock proves the previous process stopped, not that its call was never sent: never auto-resend.
-            self._status(job_id, fence, "reconciling", row["phase"], "replay_response_unknown", "reconcile_only")
+            code = "live_response_unknown" if is_live(json.loads(row["binding"])) else "replay_response_unknown"
+            self._status(job_id, fence, "reconciling", row["phase"], code, "reconcile_only")
             return
         request = Submit.model_validate_json(row["request"])
         stage = row["phase"] if row["phase"] in {"extract", "compare", "topic"} else "extract"
@@ -505,18 +634,21 @@ class Extractor:
                     self._status(job_id, fence, "running", stage)
                     run(row, ctx, fixtures, fence)
             self._status(job_id, fence, "ready", "complete", resume="none")
+        except ProviderResponseUnknown as exc:
+            self._status(job_id, fence, "reconciling", stage, exc.code, "reconcile_only")
         except ExtractionFailure as exc:
             self._status(job_id, fence, "stopped", stage, exc.code, detail=exc.detail)
         except (sqlite3.Error, OSError):
             self._status(job_id, fence, "stopped", stage, "persistence_failed")
 
-    def _persist(self, row, ctx: Context, fence: int, stage: str, write) -> None:
-        """Candidates and the stage completion marker commit together, under the current fence and rights."""
+    def _persist(self, row, ctx: Context, fence: int, stage: str, write, send=None) -> None:
+        """Candidates and the stage completion marker commit together, under the current fence and rights (and, for a live stage, the model-send
+        rights of every document that was sent)."""
         job_id = row["job_id"]
 
         def guard():
             self._guard(job_id, fence)
-            self._verify(ctx)
+            self._verify(ctx, send)
 
         with self.store.transaction(guard):
             summary = write()
@@ -580,6 +712,101 @@ class Extractor:
                 raise
         return result
 
+    # ------------------------------------------------------------------ live provider call ---------------------------------
+
+    def _sending(self, stored: dict, stage: str, keys) -> tuple | None:
+        """(purpose, recipient, document keys) of the outbound live call of `stage`, from the FROZEN runtime. None for replay, which sends nothing anywhere."""
+        if not is_live(stored):
+            return None
+        decoder = self.live.frozen(stored["live"]["runtime"])
+        return decoder.purpose(stage), decoder.recipient(stage), frozenset(keys)
+
+    def _unsent(self, attempt: str, code: str) -> None:
+        """The reservation never reached the provider (authority/config/budget refused before the single send): terminal for this call slot."""
+        self.db.execute("UPDATE calls SET state='unsent',verdict=? WHERE attempt_id=? AND state='started' AND response IS NULL", (code, attempt))
+
+    def _reject(self, attempt: str, code: str) -> None:
+        self.db.execute("UPDATE calls SET verdict=? WHERE attempt_id=? AND verdict IS NULL", (code, attempt))
+
+    def _live_receipted(self, row, ctx: Context, fence: int, stage: str, ref: str, key: str, payload: dict, keys: list, parse, check=None):
+        """One provider attempt, in the only safe order: pure prepare -> current config + model-send rights -> durable reservation -> ONE send ->
+        durable raw receipt -> strict decode -> exact parse/grounding -> rights again. `keys` are the documents whose text is in `payload`.
+
+        A call slot (job, stage, ref) has exactly one attempt: a reservation without a receipt is a possibly-sent request and is never resent
+        (reconciling), a reservation refused before the send is terminal `unsent`, and a received reply that cannot be used keeps its verdict and is
+        never repaired by another call. A stored receipt is decoded from the FROZEN binding, so recovery needs neither the environment nor a key."""
+        job_id = row["job_id"]
+        live = json.loads(row["binding"])["live"]
+        frozen = live["runtime"]
+        decoder = self.live.frozen(frozen)
+        send = (decoder.purpose(stage), decoder.recipient(stage), frozenset(keys))
+        call = self.store.one("SELECT * FROM calls WHERE job_id=? AND stage=? AND ref=?", (job_id, stage, ref))
+        if call is None:
+            sender = self.live.sender()
+            if not sender.accepts(frozen):
+                raise ExtractionFailure("live_config_changed")
+            try:
+                prepared = sender.prepare(stage, payload)
+            except LiveFailure as exc:
+                raise ExtractionFailure(exc.code) from exc
+            if (prepared["purpose"], prepared["recipient"]) != send[:2]:
+                raise ExtractionFailure("live_prepared_invalid")
+            self._verify(ctx, send)
+            attempt = self._reserve(job_id, fence, stage, ref, key, live["bindingDigest"])
+
+            def authorize():
+                # Runs inside send(), immediately before the one request: config, fence/cancel and every sent document's current rights.
+                if not sender.accepts(frozen):
+                    raise ExtractionFailure("live_config_changed")
+                self._guard(job_id, fence)
+                self._verify(ctx, send)
+
+            try:
+                receipt = sender.send(prepared, attempt_id=attempt, authorize=authorize)
+            except ExtractionFailure as exc:
+                self._unsent(attempt, exc.code)
+                raise
+            except LiveFailure as exc:
+                if exc.uncertain:
+                    # The request may have reached the provider: the reservation stays `started` and charged; never resent.
+                    raise ProviderResponseUnknown(exc.code) from exc
+                self._unsent(attempt, exc.code)
+                raise ExtractionFailure(exc.code) from exc
+            self._receive(attempt, receipt)  # durable BEFORE any parsing, for every HTTP answer
+        else:
+            if call["request_digest"] != key:
+                raise ExtractionFailure("receipt_request_mismatch")
+            if call["state"] == "unsent":
+                raise ExtractionFailure(call["verdict"])
+            if call["state"] != "received":
+                raise ProviderResponseUnknown("live_response_unknown")
+            if call["verdict"]:
+                raise ExtractionFailure(call["verdict"])
+            receipt = json.loads(call["response"])
+            if digest(receipt) != call["response_digest"]:
+                raise ExtractionFailure("receipt_integrity_failed")
+            attempt = call["attempt_id"]
+            if (receipt.get("attemptId"), receipt.get("stage"), receipt.get("bindingIdentity")) != (attempt, stage, live["bindingDigest"]):
+                raise ExtractionFailure("receipt_binding_mismatch")
+        try:
+            answer = decoder.answer(stage, receipt)
+        except LiveFailure as exc:
+            self._reject(attempt, exc.code)
+            raise ReplyInvalid(exc.code) from exc
+        try:
+            result = parse(answer)
+        except ReplyInvalid as exc:
+            self._reject(attempt, exc.code)
+            raise
+        self._verify(ctx, send)
+        if check is not None:
+            try:
+                result = check(result)
+            except ReplyInvalid as exc:
+                self._reject(attempt, exc.code)
+                raise
+        return result
+
     # ------------------------------------------------------------------ stages -----------------------------------------
 
     def _cite(self, ctx: Context, doc: Doc, start: int, end: int, quote: str) -> dict:
@@ -588,18 +815,23 @@ class Extractor:
 
     def _extract(self, row, ctx: Context, fixtures: Fixtures, fence: int) -> None:
         stored = json.loads(row["binding"])
-        identity, incoming = stored["replay"], ctx.docs[ctx.incoming]
+        incoming = ctx.docs[ctx.incoming]
         request_input = analysis.extract_input(incoming.article, ctx.request.prompt_version, ctx.request.catalogue)
-        key = analysis.request_digest("extract", request_input, identity["analysisVersion"])
+        key = analysis.request_digest("extract", request_input, analysis_version(stored))
 
-        def lookup():
-            found = fixtures.index().get(("extract", key))  # the whole fixture (duplicates, shape) is valid before any call is reserved
-            if found is None:
-                raise ExtractionFailure("replay_response_missing")
-            return found
+        def parse(raw):
+            return analysis.parse_extraction(raw, incoming.article)
 
-        extraction = self._receipted(row, ctx, fence, "extract", "incoming", key, lambda: fixtures.replay_hash, lookup,
-            lambda raw: analysis.parse_extraction(raw, incoming.article), lambda raw: analysis.parse_extraction(raw, incoming.article))
+        if is_live(stored):
+            extraction = self._live_receipted(row, ctx, fence, "extract", "incoming", key, request_input, [ctx.incoming], parse)
+        else:
+            def lookup():
+                found = fixtures.index().get(("extract", key))  # the whole fixture (duplicates, shape) is valid before any call is reserved
+                if found is None:
+                    raise ExtractionFailure("replay_response_missing")
+                return found
+
+            extraction = self._receipted(row, ctx, fence, "extract", "incoming", key, lambda: fixtures.replay_hash, lookup, parse, parse)
         rows = []
         for mention in extraction.mentions:
             mention_candidate = analysis.mention_candidate_id(incoming.binding, key, stored["adapter"]["fingerprint"], mention.mention_id)
@@ -617,43 +849,50 @@ class Extractor:
                     (row["job_id"], event, mention_candidate, incoming.ref.document_id, incoming.ref.document_version, incoming.ref.raw_version, local, state, reason, payload))
             return {"mentions": len(rows), "candidates": sum(r[3] == "candidate" for r in rows), "rejected": sum(r[3] == "rejected" for r in rows)}
 
-        self._persist(row, ctx, fence, "extract", write)
+        self._persist(row, ctx, fence, "extract", write, self._sending(stored, "extract", [ctx.incoming]))
         self._stage_saved("extract")
 
     def _compare(self, row, ctx: Context, fixtures: Fixtures, fence: int) -> None:
         job_id = row["job_id"]
-        identity = json.loads(row["binding"])["replay"]
+        stored = json.loads(row["binding"])
+        version = analysis_version(stored)
+        live = is_live(stored)
         incoming = ctx.docs[ctx.incoming]
         candidates = self.store.all("SELECT * FROM event_candidates WHERE job_id=? AND state='candidate' ORDER BY event_candidate_id", (job_id,))
         if len(candidates) * len(ctx.groups) > MAX_COMPARISONS:
             raise ExtractionFailure("comparison_limit_exceeded")
-        comparisons, dispositions = [], []
+        comparisons, dispositions, sent = [], [], set()
         for candidate in candidates:
             mention = Mention.model_validate(json.loads(candidate["payload"])["mention"])
             decided = []
             for group in ctx.groups:
                 request_input = analysis.compare_input(mention, group.event_id, [m for _, m in group.members], group.articles, incoming.article)
-                key = analysis.request_digest("compare", request_input, identity["analysisVersion"])
-
-                def lookup(key=key):
-                    found = fixtures.index().get(("compare", key))  # the whole fixture (duplicates, shape) is valid before any call is reserved
-                    if found is None:
-                        raise ExtractionFailure("replay_response_missing")
-                    return found
+                key = analysis.request_digest("compare", request_input, version)
+                ref = f"{candidate['event_candidate_id']}|{group.event_id}|{group.revision}"
 
                 def parse(raw, m=mention, g=group):
                     return analysis.parse_comparison(raw, m, incoming.article, g.articles)
 
-                decision = self._receipted(row, ctx, fence, "compare", f"{candidate['event_candidate_id']}|{group.event_id}|{group.revision}", key,
-                    lambda: fixtures.replay_hash, lookup, parse, parse)
+                if live:
+                    # The outbound payload carries the incoming article and every article of this whole event: each needs model-send rights.
+                    sent.update([ctx.incoming, *group.documents])
+                    decision = self._live_receipted(row, ctx, fence, "compare", ref, key, request_input, [ctx.incoming, *group.documents], parse)
+                else:
+                    def lookup(key=key):
+                        found = fixtures.index().get(("compare", key))  # the whole fixture (duplicates, shape) is valid before any call is reserved
+                        if found is None:
+                            raise ExtractionFailure("replay_response_missing")
+                        return found
+
+                    decision = self._receipted(row, ctx, fence, "compare", ref, key, lambda: fixtures.replay_hash, lookup, parse, parse)
                 sources = [(incoming.ref.document_version, incoming.article), *((ctx.docs[k].ref.document_version, ctx.docs[k].article) for k in group.documents)]
                 effective = analysis.effective(mention, [m for _, m in group.members], incoming.article, decision, sources)
                 citations = []
-                for evidence, version in zip(decision.evidence, effective["evidenceDocuments"]):
-                    if version is None:
+                for evidence, version_ in zip(decision.evidence, effective["evidenceDocuments"]):
+                    if version_ is None:
                         continue
                     try:
-                        citations.append(self._cite(ctx, ctx.by_version(version), evidence.start, evidence.end, evidence.quote))
+                        citations.append(self._cite(ctx, ctx.by_version(version_), evidence.start, evidence.end, evidence.quote))
                     except CitationFailure as exc:
                         if effective["relation"] in {"SAME", "FOLLOWS"}:
                             effective = {"relation": "HOLD", "reason": "evidence citation is not an exact mapped source interval", "rule": exc.code, "evidenceDocuments": []}
@@ -674,11 +913,12 @@ class Extractor:
                 self.db.execute("INSERT OR IGNORE INTO dispositions VALUES(?,?,?)", (job_id, event, payload))
             return {"candidates": len(candidates), "snapshotEvents": len(ctx.groups), "comparisons": len(comparisons)}
 
-        self._persist(row, ctx, fence, "compare", write)
+        self._persist(row, ctx, fence, "compare", write, self._sending(stored, "compare", sent) if sent else None)
         self._stage_saved("compare")
 
     def _topic(self, row, ctx: Context, fixtures: Fixtures, fence: int) -> None:
         job_id = row["job_id"]
+        stored = json.loads(row["binding"])
         if ctx.request.topic is None:
             self._persist(row, ctx, fence, "topic", lambda: {"status": "not-requested"})
             return
@@ -702,29 +942,40 @@ class Extractor:
         request = topics.build_request(events, documents)
         key = topics.request_digest(request)
 
-        def lookup():
-            if fixtures.topic_raw is None:
-                raise ExtractionFailure("topic_replay_required", {"topicRequestDigest": key})
-            found = fixtures.producer(ctx.synthetic).response(key)
-            if found is None:
-                raise ExtractionFailure("topic_replay_missing", {"topicRequestDigest": key})
-            return found
-
         def cite(document_id, version, start, end, quote):
             doc = ctx.by_document(document_id, version)
             if doc is None:
                 raise ReplyInvalid("topic_citation_unbound")
             return self._cite(ctx, doc, start, end, quote)
 
-        found = self._receipted(row, ctx, fence, "topic", "topic", key, lambda: fixtures.producer(ctx.synthetic).hash, lookup,
-            topics.parse, topics.parse, lambda response: topics.candidates(request, response, cite))
+        def membership(response):
+            return topics.candidates(request, response, cite)
+
+        if is_live(stored):
+            # The model can only quote what it is shown: the LIVE payload adds each sent document's prepared text (the replay request and its digest
+            # stay as they are). Offsets the model leaves null are resolved from a unique literal quote of the cited document, never repaired otherwise.
+            texts = {(d["documentId"], d["documentVersion"]): ctx.by_document(d["documentId"], d["documentVersion"]).export["document"]["text"] for d in documents}
+            payload = {**request, "documents": [{**d, "text": texts[(d["documentId"], d["documentVersion"])]} for d in documents]}
+            found = self._live_receipted(row, ctx, fence, "topic", "topic", key, payload, sorted(doc_keys),
+                                         lambda raw: topics.parse(live_prompts.resolve_citations(raw, texts)), membership)
+        else:
+            def lookup():
+                if fixtures.topic_raw is None:
+                    raise ExtractionFailure("topic_replay_required", {"topicRequestDigest": key})
+                found = fixtures.producer(ctx.synthetic).response(key)
+                if found is None:
+                    raise ExtractionFailure("topic_replay_missing", {"topicRequestDigest": key})
+                return found
+
+            found = self._receipted(row, ctx, fence, "topic", "topic", key, lambda: fixtures.producer(ctx.synthetic).hash, lookup,
+                topics.parse, topics.parse, membership)
 
         def write():
             for topic in found:
                 self.db.execute("INSERT OR IGNORE INTO topic_candidates VALUES(?,?,?)", (job_id, topic["topicCandidateId"], canonical(topic)))
             return {"status": "complete", "topics": len(found), "requestDigest": key}
 
-        self._persist(row, ctx, fence, "topic", write)
+        self._persist(row, ctx, fence, "topic", write, self._sending(stored, "topic", doc_keys))
         self._stage_saved("topic")
 
     def _stage_saved(self, stage: str) -> None:
@@ -736,6 +987,7 @@ class Extractor:
         row = self._job(job_id)
         request = Submit.model_validate_json(row["request"])
         binding = json.loads(row["binding"])
+        live = is_live(binding)
         stages = {s["stage"]: json.loads(s["summary"]) for s in self.store.all("SELECT * FROM stages WHERE job_id=?", (job_id,))}
         calls = self.store.all("SELECT * FROM calls WHERE job_id=? ORDER BY started_at,attempt_id", (job_id,))
         events, comparisons, dispositions, topic_rows = candidate_rows(self.store, job_id)
@@ -752,10 +1004,12 @@ class Extractor:
                        "eventCandidates": {"total": len(events), "candidate": sum(e["state"] == "candidate" for e in events), "rejected": sum(e["state"] == "rejected" for e in events)},
                        "comparisons": len(comparisons), "effectiveRelations": {r: sum(c["effective"]["relation"] == r for c in comparisons) for r in _RELATIONS},
                        "dispositions": statuses, "topicCandidates": len(topic_rows)},
-            "usage": {"executionMode": "replay", "replayCalls": sum(c["state"] == "received" for c in calls), "startedWithoutReceipt": sum(c["state"] == "started" for c in calls),
-                      "providerCalls": 0, "paidModelCalls": 0, "creatorJobId": job_id},
-            "calls": [{"stage": c["stage"], "state": c["state"], "requestDigest": c["request_digest"], "fixtureHash": c["fixture_hash"],
-                       "responseDigest": c["response_digest"], "verdict": c["verdict"]} for c in calls]}
+            "usage": live_usage(job_id, calls) if live else
+            {"executionMode": "replay", "replayCalls": sum(c["state"] == "received" for c in calls), "startedWithoutReceipt": sum(c["state"] == "started" for c in calls),
+             "providerCalls": 0, "paidModelCalls": 0, "creatorJobId": job_id},
+            "calls": [live_call(binding, c) for c in calls] if live else
+            [{"stage": c["stage"], "state": c["state"], "requestDigest": c["request_digest"], "fixtureHash": c["fixture_hash"],
+              "responseDigest": c["response_digest"], "verdict": c["verdict"]} for c in calls]}
         if row["state"] == "cancelled":
             result["delivery"] = {"status": "withheld", "code": "job_cancelled"}
             return result

@@ -31,8 +31,10 @@ public interface RelationClient {
     RelationAcknowledgement recover(String jobId);
 
     /**
-     * {@code POST .../{jobId}/reviews}, {@code Idempotency-Key = request.operationId()}: records one allow or reject of a relation
-     * candidate if and only if {@code expectedSourceVersion} and {@code expectedSourceRevision} still match the runtime; a mismatch
+     * {@code POST .../{jobId}/reviews}, {@code Idempotency-Key = request.operationId()}: records one decision on a relation candidate
+     * that is on HOLD if and only if {@code expectedSourceVersion} and {@code expectedSourceRevision} still match the runtime. An
+     * {@code ALLOW} is the operator's FINAL approval (terminal: no revalidation, no model call) and a {@code REJECT} an exclusion; the
+     * pipeline re-runs its deterministic checks and current-rights checks, so a human decision never overrides them. A mismatch
      * ({@code source_version_conflict}, {@code source_revision_conflict}) records nothing and releases the operation id. After an
      * ambiguous outcome call {@link #operation} with the same key first, then repeat the same request. Scope {@code relation.review}.
      */
@@ -40,7 +42,4 @@ public interface RelationClient {
 
     /** {@code GET .../{jobId}/reviews/{operationId}}: the operation by its exact key, from the service ledger. Scope {@code relation.read}. */
     RelationOperationStatus operation(String jobId, String operationId);
-
-    /** {@code POST .../{jobId}/reviews/{operationId}/recover}: re-queue the revalidation of an accepted allow, idempotent. Scope {@code relation.recover}. */
-    RelationOperationAcknowledgement recoverOperation(String jobId, String operationId);
 }

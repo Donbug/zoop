@@ -550,7 +550,7 @@
       "code": "TEAM_DECISION_REQUIRED",
       "target": "decideAnalysisCandidate",
       "severity": "warning",
-      "message": "대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다.",
+      "message": "대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. / allow=HOLD 최종 승인(재검증 아님)은 2026-10-21 사용자 정책이다. 원문 FS067-02의 '재검증' 문구와 팀 합의로 확인되지 않았으므로 팀이 원문 정정 또는 확정을 해야 한다.",
       "source": ""
     },
     {
@@ -2132,7 +2132,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "decideAnalysisCandidate",
       "severity": "difference",
-      "message": "목표만 176 · BFF만 38 · 형식/필수/권한 변경 11",
+      "message": "목표만 174 · BFF만 38 · 형식/필수/권한 변경 11",
       "source": ""
     },
     {

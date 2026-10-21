@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Function;
 
+import com.zoop.ai.ExecutionMode;
 import com.zoop.ai.PipelineJob;
 import com.zoop.ai.http.WireJson.Malformed;
 import com.zoop.ai.http.WireJson.Obj;
@@ -49,13 +50,14 @@ final class PipelineWire {
         return jobId;
     }
 
-    /** Only replay with an authored recording exists in these families; anything else is a contract violation. */
-    static PipelineJob.SourceKind provenance(Obj provenance) {
-        if (!"replay".equals(provenance.string("executionMode", Obj.PRINTABLE))
-                || !"authored-test".equals(provenance.string("recordingKind", Obj.PRINTABLE))) {
+    /** Replay with an authored recording, or live with a provider recording; any other pair is a contract violation. */
+    static PipelineJob.Provenance provenance(Obj provenance) {
+        ExecutionMode mode = provenance.choice("executionMode", value -> ExecutionMode.fromWire(value));
+        String recording = provenance.string("recordingKind", Obj.PRINTABLE);
+        if (!("authored-test".equals(recording) && mode == ExecutionMode.REPLAY) && !("provider".equals(recording) && mode == ExecutionMode.LIVE)) {
             throw new Malformed(provenance.path() + ".executionMode");
         }
-        return provenance.choice("sourceKind", parser(PipelineJob.SourceKind.class));
+        return new PipelineJob.Provenance(provenance.choice("sourceKind", parser(PipelineJob.SourceKind.class)), mode);
     }
 
     static Optional<PipelineJob.Failure> failure(Obj root) {

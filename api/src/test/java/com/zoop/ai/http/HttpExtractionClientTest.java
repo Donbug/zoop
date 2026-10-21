@@ -50,7 +50,7 @@ class HttpExtractionClientTest {
     }
 
     private static ExtractionSubmission submission() {
-        return new ExtractionSubmission(JOB, APPROVED);
+        return new ExtractionSubmission(JOB, APPROVED, com.zoop.ai.ExecutionMode.REPLAY);
     }
 
     private static Reply status(int http, String state, String next, String approved) {
@@ -82,6 +82,24 @@ class HttpExtractionClientTest {
         server.respond(status(200, "queued", "wait", APPROVED));
         assertEquals(PipelineJob.Disposition.ALREADY_ACCEPTED, client.submit(submission()).disposition());
         assertEquals(2, server.requests.size(), "one request per call, no retry");
+    }
+
+    @Test
+    void theExpectedExecutionModeIsNeverSentAndAnAnswerOfAnotherModeIsNeverAccepted() {
+        String live = PipelineJson.extractionStatus(JOB, "queued", "wait", APPROVED, "job_not_ready")
+                .replace("\"executionMode\":\"replay\",\"recordingKind\":\"authored-test\"", "\"executionMode\":\"live\",\"recordingKind\":\"provider\"");
+        assertFalse(live.contains("authored-test"));
+        ExtractionSubmission expectsLive = new ExtractionSubmission(JOB, APPROVED, com.zoop.ai.ExecutionMode.LIVE);
+        server.respond(Reply.json(202, live));
+        assertEquals(com.zoop.ai.ExecutionMode.LIVE, client.submit(expectsLive).status().executionMode());
+        // the body is identical for both modes: the operator's approval, not the caller, decides what runs
+        assertEquals("{\"schemaVersion\":\"zoop-extraction-s2-2\",\"jobId\":\"" + JOB + "\",\"approvedRequestDigest\":\"" + APPROVED + "\"}",
+                server.requests.get(server.requests.size() - 1).body());
+        // a replay approval answering a live expectation, and a live answer to a replay expectation, are both refused
+        server.respond(status(202, "queued", "wait", APPROVED));
+        assertTrue(malformed(() -> client.submit(expectsLive)).requestMaybeProcessed());
+        server.respond(Reply.json(202, live));
+        assertTrue(malformed(() -> client.submit(submission())).requestMaybeProcessed());
     }
 
     @Test

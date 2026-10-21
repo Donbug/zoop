@@ -5,10 +5,10 @@ operator world (actual ingestion + a READY S2 job + authored S3 replay fixtures)
 Parts: submit -> status -> result equal to the pipeline's own `inspect`; idempotency, ownership, upstream allowlist and request strictness;
 delivery withheld when the source grant or the allowlist entry goes away; a child killed after reserving a call is never resent and ends
 `reconciling`; a stored stage is reused after an explicit recover; the initial dispatch runs once across a service kill/restart; cancel
-refuses a ready job. Review: allow -> queued revalidation -> verdict -> a new runtime source revision (one verifier call, nothing
-regenerated, never published), reject, stale sourceVersion/sourceRevision recording nothing, duplicate key, another principal, revoked access, a
-crash after the pipeline appended the review and before the service recorded it (one event, adopted by marker), and a child killed after saving
-the verifier receipt (finished from the receipt with no fixture and no extra call). 0 model/provider calls; the operator's ingestion and
+refuses a ready job. Review: allow = the operator's FINAL approval of a HOLD relation (terminal 200, source revision 1->2, approvalBasis
+operator-final-approval, no verifier/producer/impact call, nothing dispatched, never published), reject, stale sourceVersion/sourceRevision recording
+nothing, duplicate key, another principal, revoked access, and a crash after the pipeline appended the review and before the service recorded it (one
+event, adopted by marker; the lost reply never replays the approval). 0 model/provider calls; the operator's ingestion and
 extraction directories are proven byte-identical afterwards.
 Needs the installed pipeline (`make pipeline-install`) and the service environment: `make service-pipeline-smoke`.
 """
@@ -23,8 +23,8 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "pipeline_tests"))
 
-from relation_support import (CRASH_AFTER_FIRST_RECEIPT, CRASH_AFTER_RELATION_STAGE, CRASH_UNKNOWN, JOB, MARKER, OPERATION_PRIVATE,  # noqa: E402
-                              PRIVATE_KEYS, RelationService, RelationWorkspace, World, build_world, direct_relation, inspect_direct,
+from relation_support import (CRASH_AFTER_RELATION_STAGE, CRASH_UNKNOWN, JOB, MARKER, OPERATION_PRIVATE,  # noqa: E402
+                              PRIVATE_KEYS, RelationService, RelationWorkspace, World, build_world, delivered_keys, direct_relation, inspect_direct,
                               ledger_rows, review_into_an_orphan, terminate_relation, tree, walk_keys)
 from support import remove_tree  # noqa: E402
 
@@ -63,7 +63,7 @@ def flow_part(root: Path, world: World, started: list[RelationService]) -> str:
     job = envelope["job"]
     check(envelope["delivery"]["state"] == "available" and job["counts"] == world.counts, "result counts equal the authored reference")
     check({r["relationCandidateId"]: r["eligibility"]["status"] for r in job["relations"]} == world.relations, "relation identities and eligibility")
-    check(not set(walk_keys(envelope)) & PRIVATE_KEYS, "no private pipeline field is relayed")
+    check(not set(delivered_keys(envelope)) & PRIVATE_KEYS, "no private pipeline field is relayed (approvalBasis alone may name the approving principal)")
     code, direct = inspect_direct(workspace, JOB)
     check(code == 0 and job["counts"] == direct["counts"] and direct["usage"]["providerCalls"] == 0, "result equals the pipeline's own inspect")
     check(service.rsubmit().status_code == 200, "idempotent replay is 200")
@@ -153,32 +153,34 @@ def review_flow_part(root: Path, world: World, started: list[RelationService]) -
     check(direct_relation(workspace, world.held) == before and service.rstatus().json()["dispatch"]["dispatchCount"] == 1, "a refusal appends nothing")
     # Another principal sees nothing of it.
     check(service.rreview("k-beta", world.held, as_="beta", version=version).status_code == 404, "another principal's job is invisible to a review")
-    # allow -> queued revalidation -> verdict -> a new source revision. Acceptance, verification and publication are separate.
+    # allow = final approval: terminal, no revalidation, no call. Acceptance, approval basis and publication are separate.
     accepted = service.rreview(KEY, world.held)
     body = accepted.json()
-    check(accepted.status_code == 202 and body["reviewer"] == "alpha" and body["review"]["resultingSourceRevision"] == "2", "an allow is accepted with 202")
+    check(accepted.status_code == 200 and body["reviewer"] == "alpha" and body["review"]["resultingSourceRevision"] == "2", "an allow is recorded with 200")
+    check(body["revalidation"]["state"] == "not_requested" and body["next"] == "none" and body["limitation"] is None, "terminal: nothing to wait for")
     check(body["publication"] == {"state": "not_published"} and not set(walk_keys(body)) & OPERATION_PRIVATE, "nothing is published and nothing private is relayed")
-    done = service.rowait(KEY, {"verified"})
-    check(done["revalidation"]["verdict"] == "eligible" and done["revalidation"]["resultingSourceRevision"] == "3", "the revalidation produced a new source revision")
+    quiet = service.stay(JOB, 2.0)
+    check(quiet["dispatch"]["dispatchCount"] == 1 and quiet["state"] == "ready", "nothing was dispatched for the approval")
     relation = service.result_relation(world.held)
-    check(relation["sourceRevision"] == "3" and relation["eligibility"]["status"] == "eligible" and relation["approved"] is False, "eligible is not approved")
-    after = stages(service)
-    check(after["verify-relation"] == calls["verify-relation"] + 1 and after["relation"] == calls["relation"] == 1, "one verifier call, nothing regenerated")
+    basis = relation["eligibility"]["approvalBasis"]
+    check(relation["sourceRevision"] == "2" and relation["eligibility"]["status"] == "eligible" and relation["approved"] is False, "eligible is not published")
+    check(basis["kind"] == "operator-final-approval" and basis["reviewer"] == "alpha" and basis["revision"] == 2, "the approval basis names the operator")
+    check(stages(service) == calls, "no verifier, producer or impact call")
     chain = direct_relation(workspace, world.held)["history"]
-    check([e["kind"] for e in chain] == ["verdict", "review", "verdict"] and (chain[1]["reviewer"], chain[1]["note"]) == ("alpha", MARKER + KEY),
+    check([e["kind"] for e in chain] == ["verdict", "review"] and (chain[1]["reviewer"], chain[1]["note"], chain[1]["effect"]) == ("alpha", MARKER + KEY, "approved"),
           "one review event, written by the principal with the operation marker")
     # Duplicate key: the existing operation, although the relation has moved since; another body is a conflict.
     replay = service.rreview(KEY, world.held)
-    check(replay.status_code == 200 and replay.json()["revalidation"]["state"] == "verified", "the same key and body return the operation")
+    check(replay.status_code == 200 and replay.json()["revalidation"]["state"] == "not_requested", "the same key and body return the operation")
     check(service.rreview(KEY, world.held, decision="reject").status_code == 409, "the same key with another body is a conflict")
-    check(service.roperation(KEY, as_="beta").status_code == 404 and service.roprecover(KEY, as_="beta").status_code == 404, "an operation is invisible to another principal")
+    check(service.roperation(KEY, as_="beta").status_code == 404, "an operation is invisible to another principal")
     # Revoked access.
     both = [(name, world.upstream["jobId"], world.upstream["inputDigest"]) for name in ("alpha", "beta")]
     workspace.write_upstreams([entry for entry in both if entry[0] == "beta"])
-    check(service.rreview("k-unlisted", world.held, revision=3, version=version).status_code == 403, "an unlisted upstream refuses a review")
+    check(service.rreview("k-unlisted", world.held, revision=2, version=version).status_code == 403, "an unlisted upstream refuses a review")
     workspace.write_upstreams(both)
     workspace.revoke_source(False)
-    check(service.rreview("k-revoked", world.held, revision=3, version=version).status_code == 409, "a revoked source grant refuses a review")
+    check(service.rreview("k-revoked", world.held, revision=2, version=version).status_code == 409, "a revoked source grant refuses a review")
     workspace.revoke_source(True)
     check(service.roperation("k-unlisted").status_code == 404 and service.roperation("k-revoked").status_code == 404, "refusals create no operation")
     log = service.logs()
@@ -190,8 +192,8 @@ def review_flow_part(root: Path, world: World, started: list[RelationService]) -
     rejected = other.rreview("smoke-decision-reject-0001", world.held, decision="reject")
     check(rejected.status_code == 200 and rejected.json()["revalidation"]["state"] == "not_requested", "a reject is recorded without a revalidation")
     closed = other.result_relation(world.held)
-    check(closed["eligibility"]["status"] == "reject" and closed["sourceRevision"] == "2" and stages(other)["verify-relation"] == calls["verify-relation"], "a reject closes the relation and calls nothing")
-    return ["review: status=passed, sourceRevision=1->2->3, verifierCalls=1, published=false",
+    check(closed["eligibility"]["status"] == "reject" and closed["sourceRevision"] == "2" and stages(other) == calls, "a reject closes the relation and calls nothing")
+    return ["review: status=passed, sourceRevision=1->2, approvalBasis=operator-final-approval, modelCalls=0, published=false",
             "review refusals: status=passed, recorded=0 (stale version, stale revision, another principal, unlisted upstream, revoked grant)",
             "review idempotency: status=passed, same key replays, other body conflicts", "review reject: status=passed, revalidations=0"]
 
@@ -212,31 +214,13 @@ def review_crash_part(root: Path, world: World, started: list[RelationService]) 
     check(found["review"]["state"] == "unconfirmed" and found["next"] == "retry_review" and found["expectedSourceVersion"] == status["inputDigest"], "the operation is found, unproven")
     check(service.rreview("k-other", world.held).status_code == 409, "another key cannot adopt the unproven event")
     retried = service.rreview(KEY, world.held)
-    check(retried.status_code == 202 and retried.json()["review"]["state"] == "applied", "the same request adopts the event by its marker")
-    done = service.rowait(KEY, {"verified"})
-    check(done["revalidation"]["dispatchCount"] == 1, "one revalidation")
+    check(retried.status_code == 200 and retried.json()["review"]["state"] == "applied" and retried.json()["next"] == "none", "the same request adopts the event by its marker")
+    check(service.stay(JOB, 2.0)["dispatch"]["dispatchCount"] == 1, "the approval dispatched nothing")
     service.close()
     chain = direct_relation(crashing.workspace, world.held)["history"]
-    check([e["kind"] for e in chain] == ["verdict", "review", "verdict"] and [e["note"] for e in chain if e["kind"] == "review"] == [MARKER + KEY], "exactly one review event")
+    check([e["kind"] for e in chain] == ["verdict", "review"] and [e["note"] for e in chain if e["kind"] == "review"] == [MARKER + KEY], "exactly one review event")
+    return ["review crash after append: status=passed, reviewEvents=1, adopted=by-marker"]
 
-    receipt = launch(root, "crash-receipt", world, wrapper=CRASH_AFTER_FIRST_RECEIPT)
-    started.append(receipt)
-    ready(receipt)
-    base = stages(receipt)
-    receipt.workspace.arm()
-    check(receipt.rreview(KEY, world.held).status_code == 202, "an allow is accepted")
-    interrupted = receipt.rowait(KEY, {"interrupted"})
-    check(interrupted["revalidation"]["lastOutcome"] == "transport_unknown" and interrupted["next"] == "recover", "a dead child is ambiguous and waits for recover")
-    usage = receipt.rstatus().json()["usage"]
-    check(usage["startedWithoutReceipt"] == 0 and usage["replayCalls"] == world.replay_calls + 1, "the verifier receipt is stored")
-    receipt.workspace.use_fixtures(world.producer, world.empty_verifier)
-    check(receipt.stay(JOB, 2.5)["usage"] == usage, "nothing continues on its own")
-    check(receipt.roprecover(KEY).status_code == 202, "explicit recover")
-    finished = receipt.rowait(KEY, {"verified"})
-    check(finished["revalidation"]["verdict"] == "eligible" and stages(receipt)["verify-relation"] == base["verify-relation"] + 1,
-          "finished from the saved receipt with no fixture and no extra call")
-    return ["review crash after append: status=passed, reviewEvents=1, adopted=by-marker",
-            "review crash after receipt: status=passed, verifierCalls=1, fixtureNeeded=false"]
 
 
 def review_orphan_part(root: Path, world: World, started: list[RelationService]) -> list[str]:
@@ -255,14 +239,13 @@ def review_orphan_part(root: Path, world: World, started: list[RelationService])
     check(service.roperation(KEY).json()["review"]["state"] == "unconfirmed", "the operation is found, unproven")
     workspace.release_orphan_before_next_review()
     retried = service.rreview(KEY, world.held, version=version)
-    check(retried.status_code == 202 and retried.json()["review"]["state"] == "applied", "the retry adopts the orphan's exact event")
+    check(retried.status_code == 200 and retried.json()["review"]["state"] == "applied", "the retry adopts the orphan's exact event")
     check(workspace.orphan_done(), "the orphan finished and appended before the retry's own child ran")
-    done = service.rowait(KEY, {"verified"})
-    check(done["revalidation"]["dispatchCount"] == 1, "one revalidation")
+    check(service.stay(JOB, 2.0)["dispatch"]["dispatchCount"] == 1, "the approval dispatched nothing")
     service.close()
     check(pid > 0 and '"code":"review_revision_conflict"' in service.logs("out"), "the retry's own child was refused: the race was exercised")
     chain = direct_relation(workspace, world.held)["history"]
-    check([e["kind"] for e in chain] == ["verdict", "review", "verdict"] and [e["note"] for e in chain if e["kind"] == "review"] == [MARKER + KEY],
+    check([e["kind"] for e in chain] == ["verdict", "review"] and [e["note"] for e in chain if e["kind"] == "review"] == [MARKER + KEY],
           "exactly one review event, the orphan's")
 
     crashing = launch(root, "foreign", world, review_gate=True, crash="after_review_reserve")
@@ -281,9 +264,10 @@ def review_orphan_part(root: Path, world: World, started: list[RelationService])
     check(other.roperation(KEY).status_code == 404 and ledger_rows(crashing.workspace, "SELECT COUNT(*) FROM relation_operations") == [(0,)],
           "the reservation is released")
     reused = other.rreview(KEY, world.held, decision="reject", revision=2, version=foreign_version)
-    check(reused.status_code == 200 and reused.json()["review"]["resultingSourceRevision"] == "3", "the key is reusable at the current revision")
+    check(reused.status_code == 409 and reused.json()["error"]["code"] == "review_target_not_hold" and other.roperation(KEY).status_code == 404,
+          "the key is free again and the relation (approved by the operator) takes no reversal")
     return ["review orphan: status=passed, orphanAppendedAfterRetryRead=true, adopted=by-marker, reviewEvents=1",
-            "review foreign control: status=passed, released=true, reusedAtRevision=2"]
+            "review foreign control: status=passed, released=true"]
 
 
 def main() -> int:

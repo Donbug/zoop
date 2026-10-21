@@ -34,7 +34,8 @@ sys.path.insert(0, str(SERVICE / "tests"))
 sys.path.insert(0, str(SERVICE / "pipeline_tests"))
 
 from handoff_support import bundle_url, status_url  # noqa: E402
-from real_handoff_support import HANDOFF_CLI, HandoffWorld, RealWorkspace, build_handoff_world, digest_of, pin_entry, producer_accepts, require_handoff_pipeline  # noqa: E402
+from real_handoff_support import (BUILD_VERDICT_HANDOFF_WORLD, HANDOFF_CLI, VERDICT_HANDOFF, HandoffWorld, RealWorkspace, build_handoff_world, digest_of, pin_entry,
+                                  producer_accepts, require_handoff_pipeline, verdict_problems)
 from relation_support import PIPELINE_PYTHON  # noqa: E402
 from support import ServiceProcess, canonical, remove_tree  # noqa: E402
 
@@ -146,11 +147,18 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
     check(producer_accepts(response.content), "the producer's own validator accepts the bundle the service delivered")
     fields = ("title", "action", "target", "eventTime", "period", "assertionStatus")
     identity = lambda item: {k: item[k] for k in ("documentId", "documentVersion", "mentionId")}  # noqa: E731
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-3" and all(
-        set(i["fieldProvenance"]) == {"selection", "verification", "sameValueMentions"} and i["fieldProvenance"]["verification"] == "none"
-        and i["fieldProvenance"]["selection"] == ("operator-representative" if i["representative"] is not None else "unanimous")
-        and all(i["fieldProvenance"]["sameValueMentions"][f] == [identity(m) for m in i["mentions"] if m[f] == i[f]] != [] for f in fields) for i in bundle["issues"]),
-        "every issue states its actual field selection: exact same-value mention lists, never a verdict")
+    def truthful(i: dict) -> bool:
+        p, ids = i["fieldProvenance"], lambda m: canonical(identity(m))  # noqa: E731
+        basis = [m for m in i["mentions"] if ids(m) == ids(i["representative"])] if i["representative"] is not None else list(i["mentions"])
+        suppressed = [f for f in ("eventTime", "period") if any(v["field"] == f and v["decision"] != "ALLOW" and ids(v) in {ids(m) for m in basis} for v in i["fieldVerdicts"])]
+        return (set(p) == {"selection", "verification", "withheld", "sameValueMentions"} and p["verification"] == "none" and p["withheld"] == suppressed
+                and p["selection"] == ("operator-representative" if i["representative"] is not None else "unanimous")
+                and all(v["verification"] == "operator-field-verdict" and set(v) >= {"evidenceIds", "reviewer", "decisionRef"} and "evidence" not in v and "note" not in v
+                        for v in i["fieldVerdicts"])
+                and all(p["sameValueMentions"][f] == [identity(m) for m in i["mentions"] if m[f] == basis[0][f]] != []
+                        and i[f] == (None if f in suppressed else basis[0][f]) for f in fields))
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-4" and all(truthful(i) for i in bundle["issues"]),
+          "every issue states its actual field selection and any operator field verdict: exact same-value lists, withheld recomputed, never an inferred verdict")
     check(smoke.js_digest(response.content) == pins1["bundleDigest"], "another language recomputes the pinned SHA-256 after a plain JSON round trip")
     manifest = wire["manifest"]
     check(manifest == oracle["manifest"] and canonical(manifest) == canonical(oracle["manifest"]), "HTTP manifest equals the CLI export manifest (the ledger's frozen request)")
@@ -286,6 +294,62 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
     return lines
 
 
+def run_verdicts(smoke: Smoke, world: HandoffWorld) -> list[str]:
+    """The reviewed (verdict) world: the installed CLI exports operator field verdicts, the HTTP service relays them byte for byte (not an empty default world), the suppressed
+    headline values stay null while the original mentions keep theirs, and the verdicts follow the current rights and the pinned decisions file. Expectations are the
+    pipeline smoke's own hand-written ones (`world.expect`), the child is the REAL command (no stand-in echo)."""
+    before = world.ledgers()
+    pins = world.handoffs[VERDICT_HANDOFF]
+    ws = RealWorkspace(smoke.root / "verdict-svc", world, listed(world, VERDICT_HANDOFF))
+    service = smoke.launch(ws)
+    smoke.root_secrets = [*ws.private_strings(), *world.private]
+    code, oracle, _ = ws.direct(VERDICT_HANDOFF)
+    check(code == 0 and oracle["delivery"]["status"] == "current", f"verdict oracle export: {oracle.get('delivery')}")
+    response = smoke.get(service, bundle_url(VERDICT_HANDOFF))
+    wire = response.json()
+    check(response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300])
+    bundle = wire["bundle"]
+    check(bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and digest_of(bundle) == pins["bundleDigest"] == wire["verification"]["bundleDigest"],
+          "the verdict bundle equals the CLI export and hashes to the operator's pin")
+    delivered = [v for issue in bundle["issues"] for v in issue["fieldVerdicts"]]
+    check(len(delivered) == 5 and {v["decision"] for v in delivered} == {"ALLOW", "HOLD", "REJECT"}, f"non-empty verdicts of every decision were delivered: {len(delivered)}")
+    problems = verdict_problems(bundle, world)
+    check(not problems and producer_accepts(response.content), f"delivered verdicts, suppressed headlines, withheld lists and original mentions equal the hand-written expectation: {problems}")
+    check(smoke.js_digest(response.content) == pins["bundleDigest"], "another language recomputes the pinned digest of the verdict bundle")
+    status = smoke.get(service, status_url(VERDICT_HANDOFF))
+    check(status.status_code == 200 and "fieldVerdicts" not in status.text and "operator-field-verdict" not in status.text, "the status carries no verdict")
+    lines = [f"field verdicts: status=passed, delivered={len(delivered)} (ALLOW/HOLD/REJECT), withheld headline fields={sum(len(v) for v in world.expect['withheld'].values())} null with "
+             "original mentions unchanged, equals the CLI export and the hand-written expectation, producer validator accepts"]
+    refs = {v["decisionRef"] for entries in world.expect["verdicts"].values() for v in entries}
+    leaking = ("operator-field-verdict", "fieldVerdicts", "contradicted", *refs)
+    registry = json.loads(ws.originals["sources"])
+    registry["sources"][0]["grant"]["enabled"] = False
+    for name, change, reason in (("source", lambda: ws.sources.write_text(canonical(registry), encoding="utf-8"), None),
+                                 ("decisions", lambda: ws.decisions.write_bytes(ws.originals["decisions"] + b"\n"), "decisions_changed")):
+        change()
+        try:
+            code, oracle_w, _ = ws.direct(VERDICT_HANDOFF)
+            check(code == 2 and oracle_w["delivery"]["status"] == "withheld" and (reason is None or oracle_w["delivery"]["code"] == reason), f"{name}: the CLI withholds")
+            for route in (bundle_url(VERDICT_HANDOFF), status_url(VERDICT_HANDOFF)):
+                answer = smoke.get(service, route)
+                body = answer.json()
+                check(answer.status_code == 200 and body["delivery"]["state"] == "withheld" and body["delivery"]["reason"] == oracle_w["delivery"]["code"]
+                      and body.get("bundle") is None and body["verification"] is None and not [t for t in leaking if t in answer.text], f"{name}: withheld without any verdict content")
+        finally:
+            ws.restore("sources" if name == "source" else "decisions")
+    restored = smoke.get(service, bundle_url(VERDICT_HANDOFF)).json()
+    check(restored["delivery"]["state"] == "current" and canonical(restored["bundle"]) == canonical(bundle), "restoring the exact inputs delivers the same verdicts again")
+    lines.append("field verdict rights: status=passed, a revoked source and a changed pinned decisions file withhold every verdict (no content), the exact restore returns the same bundle")
+    for service_process in smoke.started:
+        service_process.stop()
+    logs = "\n".join(service_process.logs() for service_process in smoke.started)
+    forbidden = [*smoke.root_secrets, str(world.root), str(smoke.root)]
+    leaked = [s for s in forbidden if s in logs or any(s in answer for answer in smoke.answers)]
+    check(not leaked and world.ledgers() == before, "no private string reached a response or log and the verdict world's ledgers are byte-identical")
+    lines.append(f"verdict privacy: status=passed, strings checked={len(forbidden)}, ledgers unchanged")
+    return lines
+
+
 def main() -> int:
     try:
         require_handoff_pipeline()
@@ -294,11 +358,13 @@ def main() -> int:
         return 1
     root = Path(tempfile.mkdtemp(prefix="zoop-ai-handoff-service-smoke-")).resolve()    # a symlinked parent (macOS /tmp -> /private/tmp) is refused by every pipeline ledger
     smoke = Smoke(root)
+    verdict_smoke = Smoke(root)
     failure: str | None = None
     lines: list[str] = []
     try:
         world = build_handoff_world(root / "world")
         lines = run(smoke, world)
+        lines += run_verdicts(verdict_smoke, build_handoff_world(root / "verdict-world", BUILD_VERDICT_HANDOFF_WORLD))
     except SmokeFailure as error:
         failure = str(error)
     except AssertionError as error:
@@ -306,7 +372,7 @@ def main() -> int:
     except Exception as error:  # noqa: BLE001 - report the class only: a subprocess message must not carry a path or a secret
         failure = f"unexpected {type(error).__name__}"
     finally:
-        for service in smoke.started:
+        for service in [*smoke.started, *verdict_smoke.started]:
             service.close()
         if failure is None:
             remove_tree(root)
