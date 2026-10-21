@@ -75,7 +75,7 @@ def prepare(args):
     presentation = bundle.get("presentationEnrichment")
     context.require(presentation and presentation.get("schemaVersion") == "zoop-briefing-presentation-enrichment-v1",
                     "outlook_presentation_baseline_required")
-    ancestry = history_chain(baseline, bundle)
+    ancestry = history_chain(baseline, bundle, max_depth=7)  # new output adds the eighth layer
     context.require(base.digest(base.regular(Path(args.sources))) == bundle["sourceFileSha256"]
                     and base.digest(base.regular(Path(args.clocks))) == bundle["clockFileSha256"],
                     "outlook_source_or_clock_mismatch")
