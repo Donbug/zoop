@@ -27,7 +27,7 @@ not cleaned):
 
 (the Make target runs this script with --jar/--handoff-cli/--ingest-cli; the direct python invocation with those flags and
 --psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217) and carries no original mention value:
-the retained receipt keeps the complete `zoop-graph-handoff-bundle-4` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
+the retained receipt keeps the complete `zoop-graph-handoff-bundle-5` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
 `issues[].fieldProvenance` (which mentions state each selected headline value, whether the operator's representative or unanimity selected it, and which of
 `eventTime`/`period` an operator verdict withheld; never a verification) it compares with hand-written selection facts and whose `issues[].fieldVerdicts` it compares
 with hand-written operator verdicts.
@@ -42,6 +42,13 @@ operator's FINAL approval of an S3 HOLD beside automatic verdicts, and operator-
 (an operator approval never reads as the independent verifier on the INVOLVES or structural literal, `verifiedAt` is the deciding event's time), every article's
 `textSha256` equals the stored text's hash, and each issue's `sourceSupport` equals the hand-written lineage groups (`knownLineageCount` counts groups, not articles)
 and exact-text duplicate groups; none of it is in the staged snapshot or any public read (a THIRD TEST-HARNESS activation serves it through the real graph and evidence routes).
+A fifth, producer-authored STRUCTURAL-PATH world (`build_world(chain=True)`, SYNTHETIC; three handoffs `path-{private,known,unmapped}-1`, built LAST) is imported after the others: a complete
+two-relation path through a mapped but unpublished middle company (a private `pathCompanies` entry, catalogue-checked with an equal label under the import's lock: a renamed one is
+`company_mismatch` with nothing written), through a published middle, and an unavailable path through an unmapped middle. The staged snapshots carry no path, no path company and no scope
+text; the receipts keep the complete bundle, the `structural_path_closed_over_involves_basis_and_catalog` check and the operator-mapped-chain note. With the evidence-read phase a FOURTH
+TEST-HARNESS activation (BACK-DATED to just after the last activation, so an asOf can fall before the structural basis was verified) serves the private-middle version: the spans only a
+structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article,
+tampered receipt bytes or another version, and no public body names the private company. Disclosure exclusions have no store in the built application, so they are proven by the Java tests.
 
 On success the last stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls": 0, ...}; any failed
 
@@ -379,7 +386,9 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         publishers_read: dict = {}
         for eid, fact in expected.items():
             if not fact["events"]:
-                continue    # cited only by a relation: visible only while that relation is, not asserted here
+                # Cited by no issue and no relation: only the structural basis rests on it. A BASIS-ONLY span is served when the selected version's
+                # receipt proves exactly that relation's basis cites it, and carries no eventIds.
+                check((fact["name"], fact["quote"]) == ("a", hs.SUP), f"an unexpected evidence cited by nothing: {fact['name']} {fact['quote']!r}")
             code, body = get(web, eid)
             span = fact["span"]
             check(code == 200 and body["id"] == eid and body["quote"] == fact["quote"] and body["start"] == span["start"]
@@ -655,7 +664,7 @@ def approved_world_phase(args, db, layout, scratch: Path) -> dict:
           and result["provenance"]["recordingKind"] == "authored-test" and result["provenance"]["approvalBases"] == kinds
           and result["provenance"]["structuralRelationOrigin"] == "manual-operator-review", f"provenance: {result['provenance']}")
     receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
-    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-4", "the approved receipt does not retain the producer's bundle")
+    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5", "the approved receipt does not retain the producer's bundle")
     check(receipt["appVerification"]["approvalBasis"] == "audit-metadata-not-a-verifier-verdict", "the receipt overclaims what an approval basis is")
     used = {(source["relation"]["jobId"], use["relationCandidateId"]): use for source in bundle["sources"] for use in source["reviewUsed"]}
     check(set(used) == set(approvals), f"the used reviews differ from the hand-written approvals: {sorted(used)} vs {sorted(approvals)}")
@@ -770,6 +779,266 @@ def approved_read_phase(approved: dict, db, layout, previous: str) -> dict:
         step("approved world over real HTTP (ONE more test-harness activation): the staged version is unreadable before it, then the public graph serves its issues and "
              "GET /api/v1/evidence serves two spans from the receipt that now holds approval bases, origins, text digests and sourceSupport; no public body carries any of them")
     return {"harnessActivations": 1, "evidenceReads": evidence_reads}
+
+
+
+PATH_IDS = {**PUBLIC_IDS, "KRX:000999": "SYNTH:000003"}      # the chain world's tail company is a third synthetic catalog company
+PATH_TAIL = ("SYNTH:000003", "합성투자")
+PATH_MIDDLES = ("private", "known", "unmapped")
+# What must never reach a public body or the snapshot in ANY mode: the receipt-only path structure and S3 scope keys. The private middle company's id is separate (PATH_MIDDLE_ID):
+# the `known` world legitimately publishes it as a company.
+PATH_LEAKS = ("structuralPath", "pathCompanies", "businessScope", "productScope", "supplierCompanyId", "customerCompanyId")
+PATH_MIDDLE_ID = "SYNTH:000002"
+PATH_COUNTS = {"private": {"companies": 2, "issues": 2, "relations": 4, "articles": 3, "evidence": 7},
+               "known": {"companies": 3, "issues": 2, "relations": 5, "articles": 3, "evidence": 7},
+               "unmapped": {"companies": 2, "issues": 2, "relations": 4, "articles": 3, "evidence": 7}}
+
+
+def path_world_phase(args, db, layout, scratch: Path) -> dict:
+    """Structural paths over real processes: the producer's `chain` world (SYNTHETIC; rel-a also holds SYNTH-4 -> SYNTH-3 -> SYNTH-1) frozen three times by the installed
+    `zoop-ai-handoff`, once per middle company: `private` (SYNTH-3 mapped but unpublished: a private pathCompany, never a public node), `known` (SYNTH-3 is public too: a one- and
+    a two-relation edge) and `unmapped` (the operator did not map SYNTH-3: the two-relation path is unavailable, never invented). Every expectation is hand-written in
+    `hs.expected_chain`; nothing is read back from the importer or the verifier under test.
+
+    A catalogue company the path names only privately must still exist with an equal label (renamed: `company_mismatch`, nothing written); the staged snapshot carries NO path
+    data, path company or scope text; the retained receipt keeps the complete bundle and the new check and `structuralPath` note."""
+    # The back-dated path activation (path_read_phase) needs this world's S3 relations to become eligible clearly AFTER the last activation, whose timestamp is the real clock of
+    # the earlier harness (the world is built within milliseconds of it otherwise): a fixed margin, not a race.
+    time.sleep(2)
+    world = hs.build_world(scratch / "chain", chain=True)
+    layout6 = Layout(world, args.ingest_cli)
+    layout6.artifacts = layout.artifacts
+    smoke6 = Smoke(args, db, layout6)
+    status, result, _ = smoke6.jar.run("documents-paths", [base.item(ref) for ref in world.refs.values()], artifact_root=layout.artifacts)
+    check(status == 0 and result and result["status"] == "succeeded", f"the path world's document import failed: {result}")
+    db.run(f"INSERT INTO companies (id, name, name_key, search_text) VALUES ('{PATH_TAIL[0]}', '{PATH_TAIL[1]}', '', '')")
+    operator = hs.Operator(world)
+    exports = {}
+    decision_docs = {}      # per mode: the operator's decisions file each handoff was frozen over
+    for middle in PATH_MIDDLES:
+        decisions = hs.chain_decisions(world, middle)
+        for company in decisions["companies"]:
+            company["publicId"] = PATH_IDS.get(company["publicId"], company["publicId"])
+        decision_docs[middle] = decisions
+        exports[middle] = hs.freeze_export(operator, world, f"path-{middle}-1", decisions)
+        want, bundle = hs.expected_chain(middle, PATH_IDS), exports[middle]["bundle"]
+        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5", f"{middle}: the producer's bundle is not schema 5")
+        check([c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"],
+              f"{middle}: companies {[c['id'] for c in bundle['companies']]} / path companies {bundle['pathCompanies']} are not the hand-written ones")
+        paths = {r["target"]: r["structuralPath"] for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
+        check(paths == want["paths"], f"{middle}: structural paths {paths} are not the hand-written ones {want['paths']}")
+        check(all(r["structuralPath"] is None for r in bundle["relations"] if r["type"] != "STRUCTURALLY_RELATED_TO"), f"{middle}: a non-structural edge carries a path")
+    ledgers_before = {name: fingerprint(path) for name, path in layout6.ledgers.items()}
+    versions = {middle: version_id(f"path-{middle}-1") for middle in PATH_MIDDLES}
+    pins = {middle: (hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))) for middle, env in exports.items()}
+    step(f"the chain world frozen three times by the installed zoop-ai-handoff ({', '.join(PATH_MIDDLES)} middle): companies, private path companies and every edge's path "
+         "equal the hand-written expectation")
+
+    # a path company that is not in the catalogue with an equal label: refused whole, nothing written --------------------------------------
+    before = smoke6.table_fingerprint()
+    db.run("UPDATE companies SET name = '다른 이름' WHERE id = 'SYNTH:000002'")
+    hs.write_operator(world, decisions=decision_docs["private"])
+    status, result, output = smoke6.graph_import("path-private-renamed", smoke6.request("path-private-1", *pins["private"]))
+    db.run("UPDATE companies SET name = '합성부품' WHERE id = 'SYNTH:000002'")
+    check(status != 0 and result and result["status"] == "failed" and result["failure"]["code"] == "company_mismatch",
+          f"a renamed private path company was not refused as company_mismatch: {result} {output[-500:]}")
+    check(smoke6.table_fingerprint() == before and not (layout.artifacts / "graph_snapshot" / f"{versions['private']}.json").exists()
+          and not (layout.artifacts / "verification_receipt" / f"{versions['private']}.json").exists(), "a refused path import left rows or files behind")
+
+    imported = {}
+    for middle in PATH_MIDDLES:
+        env, vid = exports[middle], versions[middle]
+        hs.write_operator(world, decisions=decision_docs[middle])
+        status, result, output = smoke6.graph_import(f"path-{middle}", smoke6.request(f"path-{middle}-1", *pins[middle]))
+        check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid,
+              f"{middle}: the path handoff was not staged: {result} {output[-800:]}")
+        check(result["counts"] == PATH_COUNTS[middle] and sum(result["evidenceRows"].values()) == 7 and result["active"] is False
+              and result["activation"] == "not-activated" and "pathCompanies" not in json.dumps(result),
+              f"{middle}: result {result}")
+        want = hs.expected_chain(middle, PATH_IDS)
+        snapshot_bytes = (layout.artifacts / "graph_snapshot" / f"{vid}.json").read_bytes()
+        snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+        check(snapshot["snapshotFormat"] == 3 and sorted(c["companyId"] for c in snapshot["companies"]) == want["companies"],
+              f"{middle}: the snapshot's public companies are not the hand-written ones: {[c['companyId'] for c in snapshot['companies']]}")
+        # The middle company's id is a PUBLIC node only in the `known` world; in `private` and `unmapped` it must not appear in the snapshot at all. The receipt-only path
+        # keys and scope text are absent in every mode.
+        snapshot_text = snapshot_bytes.decode("utf-8")
+        leaked = [word for word in (*PATH_LEAKS, "소재 사업", "intermediate_company_unmapped", *((PATH_MIDDLE_ID,) if middle != "known" else ())) if word in snapshot_text]
+        check(not leaked, f"{middle}: path data reached the public snapshot: {leaked}")
+        receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
+        check(receipt["bundle"] == env["bundle"] and receipt["manifest"] == env["manifest"], f"{middle}: the receipt does not retain the original")
+        app = receipt["appVerification"]
+        check("structural_path_closed_over_involves_basis_and_catalog" in app["checks"]
+              and app["structuralPath"] == "operator-mapped-basis-chain-not-causality-or-price-direction" and app["semanticTruth"] == "not-verified"
+              and app["activation"] == "none", f"{middle}: the receipt's statement of the path: {app}")
+        hs.write_operator(world, decisions=decision_docs[middle])
+        status, again, _ = smoke6.graph_import(f"path-{middle}-again", smoke6.request(f"path-{middle}-1", *pins[middle]))
+        check(status == 0 and again and again["outcome"] == "unchanged" and (layout.artifacts / "graph_snapshot" / f"{vid}.json").read_bytes() == snapshot_bytes,
+              f"{middle}: retrying changed the staged bytes: {again}")
+        imported[middle] = {"snapshot": snapshot, "receipt": receipt}
+    check(db.scalar("SELECT count(*) FROM graph_versions WHERE active") == 1 and smoke6.table_fingerprint()["activations"] == before["activations"],
+          "a path import moved the pointer or wrote an activation")
+    check({name: fingerprint(path) for name, path in layout6.ledgers.items()} == ledgers_before, "the path world's ledgers changed")
+    step("path imports: a renamed private path company is company_mismatch with nothing written; private / known / unmapped stage with the hand-written public companies, "
+         "NO path company, path or scope text in any snapshot, the complete bundle plus the structural_path check and the operator-mapped note in the receipt; retries are no-ops")
+    return {"world": world, "layout": layout6, "smoke": smoke6, "vids": versions, "exports": exports, "imported": imported}
+
+
+def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
+    """The `private`-middle version over real HTTP: ONE more TEST-HARNESS activation (psql, like the others) BACK-DATED to just after the last activation, so that an asOf
+    between that activation and the moment the S3 relations became eligible selects this version while its structural bases are not yet verified.
+
+    A BASIS-ONLY span (SUP, and the second link's sentence) is cited by no issue and no relation, only by a structural basis: it is served (200, no eventIds) only when the
+    selected version's receipt proves exactly that relation's basis cites it, and every current rights / row / article / receipt gate still applies. Disclosure exclusions have
+    no store in the built application (nothing to drive over HTTP); the relation / issue / evidence exclusions are proven by the Java tests with the real pinned reader."""
+    import urllib.parse
+    from datetime import timezone
+    smoke, world, layout6, vid = paths["smoke"], paths["world"], paths["layout"], paths["vids"]["private"]
+    bundle = paths["exports"]["private"]["bundle"]
+    want = hs.expected_chain("private", PATH_IDS)
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout6.registry_path)}
+    bases = [b for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO" for b in r["basis"]]
+    verified = min(datetime.fromisoformat(b["verifiedAt"]) for b in bases)
+    last = db.scalar("SELECT to_char(max(activated_at) AT TIME ZONE 'UTC' + interval '1 second', 'YYYY-MM-DD\"T\"HH24:MI:SS.US') || '+00:00' FROM graph_activations")
+    t0 = datetime.fromisoformat(last)
+    # The first basis became eligible at `verified`. The harness activation sits one second after the last activation (t0) and the asOf "before verification" half a second
+    # before `verified`, to the microsecond, so t0 <= asOf < verified is only a question of the margin the sleep at the start of this phase guarantees (>= 2 s).
+    before_verification = (verified - timedelta(milliseconds=500)).astimezone(timezone.utc)
+    check(t0 <= before_verification < verified, f"the path world was not built at least 1.5 s after the last activation ({t0} vs the first basis verification {verified}): cannot place the harness activation")
+    iso = lambda moment: moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")   # noqa: E731
+
+    snapshot = paths["imported"]["private"]["snapshot"]
+    basis_only = [("a", hs.SUP), ("a", hs.CHAIN)]
+    spans = {hs.evidence_id(world, name, quote): (name, quote, hs.span(world, name, quote)) for name, quote in basis_only}
+    direct_id = hs.evidence_id(world, "a", hs.EVT_A)
+    direct_events = [i["issueId"] for i in snapshot["issues"] if direct_id in i["evidenceIds"] or direct_id in i["geographyEvidenceIds"]]
+    check(direct_events and all(not any(eid in i["evidenceIds"] or eid in i["geographyEvidenceIds"] for i in snapshot["issues"]) for eid in spans)
+          and all(eid not in r["evidenceIds"] for r in snapshot["relations"] for eid in spans), "the authored basis spans are cited directly by an issue or a relation")
+    reads, graph_reads = 0, 0
+    bodies: list[str] = []
+
+    def get(web, evidence_id: str, **params) -> tuple[int, dict]:
+        nonlocal reads
+        reads += 1
+        query = urllib.parse.urlencode(params)
+        code, text = web.get(f"/api/v1/evidence/{evidence_id}" + (f"?{query}" if query else ""))
+        bodies.append(text)
+        return code, (json.loads(text) if text.startswith("{") else {})
+
+    def code_of(body: dict) -> str:
+        return (body.get("error") or {}).get("code", "")
+
+    def served(web, evidence_id: str, label: str, **params) -> dict:
+        code, body = get(web, evidence_id, **params)
+        check(code == 200 and body["id"] == evidence_id and body["quoteVerified"] is True, f"{label}: {code} {str(body)[:300]}")
+        return body
+
+    def withheld(web, evidence_id: str, label: str, **params) -> None:
+        code, body = get(web, evidence_id, **params)
+        check(code == 404 and code_of(body) == "EVIDENCE_UNAVAILABLE", f"{label}: expected 404 EVIDENCE_UNAVAILABLE, got {code} {str(body)[:300]}")
+
+    with smoke.web(web_env) as web:
+        code, body = get(web, direct_id, graphVersion=vid)
+        check(code == 409 and code_of(body) == "VERSION_UNAVAILABLE", f"the staged path version was readable before activation: {code} {body}")
+        activations_before = db.scalar("SELECT count(*) FROM graph_activations")
+        check(activations_before == 5, "unexpected activation history before the path harness")
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid}', '{previous}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic path activation', '{t0.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid and db.scalar("SELECT count(*) FROM graph_activations") == activations_before + 1,
+              "the path harness activation did not apply")
+        harness_fingerprint = smoke.table_fingerprint()
+        artifact_tree, registry_bytes = fingerprint(layout.artifacts), layout6.registry_path.read_bytes()
+
+        # basis200: a span only a structural basis rests on is served without events; the directly cited one keeps its event ----------
+        for eid, (name, quote, span) in spans.items():
+            body = served(web, eid, f"basis-only evidence {quote!r}")
+            check(body["quote"] == quote and body["start"] == span["start"] and body["end"] == span["end"] and body["articleId"] == span["documentId"]
+                  and body["articleVersion"] == span["documentVersion"] and body["eventIds"] == [] and body["metadata"]["graphVersion"] == vid
+                  and body["metadata"]["partial"] is False and body["sentiment"] is None and body["documentSummary"] is None,
+                  f"basis-only evidence body {quote!r}: {str(body)[:300]}")
+        direct = served(web, direct_id, "direct evidence")
+        check(direct["eventIds"] == direct_events and direct["metadata"]["graphVersion"] == vid, f"direct evidence changed: {direct['eventIds']} vs {direct_events}")
+        step("basis-only evidence over HTTP: the two spans only a structural basis cites are 200 with eventIds [] from the receipt of the selected version; the directly cited span keeps its event")
+
+        # asOf: before the basis was verified, before the article was published, after both -------------------------------------------
+        for eid, (name, quote, span) in spans.items():
+            withheld(web, eid, f"asOf {iso(before_verification)} (before the basis was verified) must not show basis-only evidence {quote!r}", asOf=iso(before_verification))
+        body = served(web, direct_id, "direct evidence at the same asOf", asOf=iso(before_verification))
+        check(body["metadata"]["graphVersion"] == vid and body["eventIds"] == direct_events,
+              f"the asOf before verification did not select the path version or changed the direct evidence: {body['metadata']} {body['eventIds']}")
+        now = datetime.now(timezone.utc)
+        for eid, (name, quote, span) in spans.items():
+            body = served(web, eid, f"asOf now serves basis-only evidence {quote!r}", asOf=iso(now))
+            check(body["metadata"]["graphVersion"] == vid and body["eventIds"] == [], f"asOf now: {body['metadata']} {body['eventIds']}")
+        for eid in (*spans, direct_id):
+            withheld(web, eid, "asOf 2026-10-07 (before the article's publication and the version) must not show the evidence", asOf="2026-10-07T00:00:00Z")
+        step("asOf: before the structural basis was verified only the basis-only spans are 404 (the direct one stays 200 on this version); at the current time they are 200; "
+             "before the publication (an earlier version) every span is 404")
+
+        # a wrong selected version -----------------------------------------------------------------------------------------------------
+        for eid in (*spans, direct_id):
+            withheld(web, eid, "the approved version (active before) does not contain the path world's evidence", graphVersion=previous)
+        for other in (paths["vids"]["known"], paths["vids"]["unmapped"]):
+            code, body = get(web, next(iter(spans)), graphVersion=other)
+            check(code == 409 and code_of(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {other} {code}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step("wrong selected version: the previous active version withholds the evidence it never contained (404); never-activated versions are 409")
+
+        # current rights, article access and the receipt still decide ------------------------------------------------------------------
+        original = json.loads(registry_bytes.decode("utf-8"))["sources"][0]["grant"]
+        every = (*spans, direct_id)
+        for label, change in (("drop store", lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "store"]})),
+                              ("drop quote-display", lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "quote-display"]})),
+                              ("disabled", lambda g: g.update({"enabled": False})),
+                              ("revision", lambda g: g.update({"revision": g["revision"] + "-next"})),
+                              ("grant id", lambda g: g.update({"grantId": g["grantId"] + "-other"}))):
+            smoke.set_registry(change)
+            for eid in every:
+                withheld(web, eid, f"a revoked grant ({label}) must withhold {eid}")
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+            for eid in every:
+                served(web, eid, f"restoring the grant ({label}) must restore {eid}")
+        article_id = next(iter(spans.values()))[2]["documentId"]
+        db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{article_id}'")
+        for eid in every:
+            withheld(web, eid, f"a private article must withhold {eid}")
+        db.run(f"UPDATE articles SET access_status = 'available' WHERE id = '{article_id}'")
+        receipt_path = layout.artifacts / "verification_receipt" / f"{vid}.json"
+        receipt_info, receipt_original = receipt_path.stat(), receipt_path.read_bytes()
+        receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
+        check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
+        for eid in every:
+            withheld(web, eid, f"tampered receipt bytes must withhold {eid}")
+        receipt_path.write_bytes(receipt_original)
+        os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
+        for eid in every:
+            served(web, eid, f"restoring the receipt must restore {eid}")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout6.registry_path.read_bytes() == registry_bytes,
+              "a failure scenario was not restored exactly (artifact tree or registry file)")
+        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id), a private article and tampered receipt bytes are 404 for basis-only AND direct evidence; "
+             "each restored byte-for-byte and served again")
+
+        # no public node or path data in any public body ----------------------------------------------------------------------------
+        code, text = web.get(f"/api/v1/graph?graphVersion={vid}")
+        bodies.append(text)
+        graph_reads += 1
+        graph = json.loads(text) if code == 200 else {}
+        check(code == 200 and graph["metadata"]["graphVersion"] == vid, f"the path graph read: {code} {text[:300]}")
+        nodes = {n["id"] for n in graph["nodes"]}
+        check("SYNTH:000002" not in nodes and set(want["companies"]) <= nodes, f"the private middle company is a public node, or a public company is missing: {sorted(nodes)}")
+        leaked = [word for word in (*PATH_LEAKS, PATH_MIDDLE_ID) if any(word in text_ for text_ in bodies)]
+        check(not leaked, f"a private company id, a path or a scope reached a public body: {leaked}")
+        check("소재 사업" not in text, "an S3 business scope reached the public graph")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step("no public node for the private middle company; no path, scope or private company id in any public graph or evidence body")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 4, "the harness activation count is not exactly four")
+    return {"harnessActivations": 1, "evidenceReads": reads, "graphReads": graph_reads}
 
 
 
@@ -961,7 +1230,7 @@ def main() -> int:
     check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
         world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
           f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
-    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-4", "the retained bundle is not schema 4")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5", "the retained bundle is not schema 5")
     # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
     # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
     # value is a selection fact, never a verification (`verification` stays `none`).
@@ -1163,7 +1432,7 @@ def main() -> int:
           "a rejected or held value, or a verdict, reached the public snapshot")
     receipt4 = json.loads(receipt_file4.read_text("utf-8"))
     check(receipt4["bundle"] == verdict_env["bundle"] and receipt4["manifest"] == verdict_env["manifest"], "the verdict receipt does not retain the original")
-    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-4" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -4")
+    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -5")
     receipt_issues4 = {i["id"]: i for i in receipt4["bundle"]["issues"]}
     # The ORIGINAL mentions are untouched by every verdict: the withheld supply time and the held factory period are still stated by their mentions.
     check(receipt_issues4[supply_id]["mentions"] == expected_mentions(
@@ -1200,11 +1469,16 @@ def main() -> int:
     harness = {"harnessActivations": 0, "evidenceReads": 0}
     verdict_read = {"harnessActivations": 0, "evidenceReads": 0, "graphReads": 0}
     approved_read = {"harnessActivations": 0, "evidenceReads": 0}
+    path_read = {"harnessActivations": 0, "evidenceReads": 0, "graphReads": 0}
     approved = approved_world_phase(args, db, layout, scratch)
     if args.with_evidence_read:
         harness = evidence_read_phase(smoke, db, layout, world, vid2, (vid, vid3, vid4, approved["vid"]), active_before)
         verdict_read = verdict_read_phase(smoke4, db, layout, layout4, world4, vid4, vid2, ev4)
         approved_read = approved_read_phase(approved, db, layout, vid4)
+    # The path world is built LAST: its S3 relations became eligible after every earlier activation, which the back-dated path activation relies on.
+    paths = path_world_phase(args, db, layout, scratch)
+    if args.with_evidence_read:
+        path_read = path_read_phase(paths, db, layout, approved["vid"])
 
     # ledgers, logs --------------------------------------------------------------------------------------------------------
     check({name: fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before,
@@ -1217,12 +1491,14 @@ def main() -> int:
         check(text not in joined, "source or review text reached a process output")
     step("every ledger is byte/mode/mtime identical; no path, secret or source text in any output")
 
-    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 5,
-                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 5, "importActivationsWritten": 0,
-                      "harnessActivations": harness["harnessActivations"] + verdict_read["harnessActivations"] + approved_read["harnessActivations"],
-                      "evidenceReads": harness["evidenceReads"] + verdict_read["evidenceReads"] + approved_read["evidenceReads"],
+    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 5 + len(PATH_MIDDLES),
+                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 5 + len(PATH_MIDDLES), "importActivationsWritten": 0,
+                      "harnessActivations": harness["harnessActivations"] + verdict_read["harnessActivations"] + approved_read["harnessActivations"]
+                      + path_read["harnessActivations"],
+                      "evidenceReads": harness["evidenceReads"] + verdict_read["evidenceReads"] + approved_read["evidenceReads"] + path_read["evidenceReads"],
                       "verdictGraphReads": verdict_read["graphReads"], "approvedRelations": len(approved["approvals"]),
-                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs, "ledgerReadOnly": True}))
+                      "pathGraphReads": path_read["graphReads"], "pathVariants": list(PATH_MIDDLES),
+                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs, "ledgerReadOnly": True}))
     return 0
 
 

@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-4` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-5` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -29,7 +29,7 @@ from .wire import ErrorBody, Reviewer, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-4"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5"
 POLICY = "zoop-public-projection-policy-1"
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
@@ -372,16 +372,52 @@ class BSourceArticle(Bx):
     article_version: Hash
 
 
+MAX_SCOPE = 500
+Scope = Annotated[str, StringConstraints(max_length=MAX_SCOPE)] | None
+
+
 class BBasis(Bx):
     source_relation: BSourceRelation
     relation_key: Hash
     relation_type: Literal["SUPPLIES"]
+    business_scope: Scope
+    product_scope: Scope
     valid_from: Stamp | None
     valid_until: Stamp | None
     countries: Countries
     verified_at: Stamp
     source_articles: Annotated[list[BSourceArticle], Field(max_length=1000)]
     evidence_ids: EvidenceIds
+
+
+class BPathLink(Bx):
+    supplier_company_id: Id
+    customer_company_id: Id
+
+
+class BStructuralComplete(Bx):
+    """An ordered chain [participant, (mapped middle,) target] with one directed supplier→customer link per S3 basis. Operator-mapped basis chain only."""
+    status: Literal["complete"]
+    company_ids: Annotated[list[Id], Field(min_length=2, max_length=3)]
+    links: Annotated[list[BPathLink], Field(min_length=1, max_length=2)]
+
+    @model_validator(mode="after")
+    def chain_and_links_agree(self) -> BStructuralComplete:
+        ids = self.company_ids
+        if len(set(ids)) != len(ids) or len(self.links) != len(ids) - 1:
+            raise ValueError("companyIds must be distinct with exactly one link per adjacent pair")
+        for (left, right), link in zip(zip(ids, ids[1:]), self.links):
+            if {link.supplier_company_id, link.customer_company_id} != {left, right} or left == right:
+                raise ValueError("each link must join its adjacent companyIds")
+        return self
+
+
+class BStructuralUnavailable(Bx):
+    status: Literal["unavailable"]
+    reason: Literal["intermediate_company_unmapped"]
+
+
+StructuralPath = Annotated[Union[BStructuralComplete, BStructuralUnavailable], Field(discriminator="status")]
 
 
 class BInvolvesProvenance(Bx):
@@ -422,9 +458,22 @@ class BRelation(Bx):
     assertion_status: Text | None
     evidence_ids: EvidenceIds
     basis: Annotated[list[BBasis], Field(max_length=2)]
+    structural_path: StructuralPath | None
     provenance: Provenance
     decision_ref: Id | None
     source_refs: Annotated[list[BSourceRef], Field(max_length=MAX_RELATIONS)]
+
+    @model_validator(mode="after")
+    def path_only_for_a_structural_relation(self) -> BRelation:
+        path = self.structural_path
+        if (path is None) != (self.type != "STRUCTURALLY_RELATED_TO"):
+            raise ValueError("structuralPath is present exactly on STRUCTURALLY_RELATED_TO")
+        if isinstance(path, BStructuralComplete):
+            if len(path.links) != len(self.basis) or path.company_ids[-1] != self.target:
+                raise ValueError("a complete path has one link per basis and ends at the relation target")
+        elif path is not None and len(self.basis) != 2:
+            raise ValueError("an unavailable path is only possible for a two-basis relation")
+        return self
 
 
 class BEvidenceSource(Bx):
@@ -516,6 +565,7 @@ class BRelationCounts(Bx):
 
 class BCounts(Bx):
     companies: Count
+    path_companies: Count
     issues: Count
     relations: BRelationCounts
     evidence: Count
@@ -544,13 +594,14 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-4"]
+    schema_version: Literal["zoop-graph-handoff-bundle-5"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
     policy: BPolicy
     sources: Annotated[list[BSource], Field(min_length=1, max_length=MAX_SOURCES)]
     companies: Annotated[list[BCompany], Field(max_length=MAX_COMPANIES)]
+    path_companies: Annotated[list[BCompany], Field(max_length=MAX_COMPANIES)]
     issues: Annotated[list[BIssue], Field(max_length=MAX_ISSUES)]
     relations: Annotated[list[BRelation], Field(max_length=MAX_RELATIONS)]
     evidence: Annotated[list[BEvidence], Field(max_length=MAX_EVIDENCE)]
@@ -560,6 +611,32 @@ class Bundle(Bx):
     checks: BChecks
     readiness: BReadiness
     digests: BDigests
+
+    @model_validator(mode="after")
+    def private_path_companies_close_over_the_complete_paths(self) -> Bundle:
+        main = [c.id for c in self.companies]
+        private = [c.id for c in self.path_companies]
+        if private != sorted(set(private)) or set(private) & set(main) or set(private) & {i.id for i in self.issues}:
+            raise ValueError("pathCompanies are sorted, unique and disjoint from companies and issues")
+        participants: dict[str, set[str]] = {}
+        for relation in self.relations:
+            if relation.type == "INVOLVES":
+                participants.setdefault(relation.source, set()).add(relation.target)
+        used: set[str] = set()
+        for relation in self.relations:
+            path = relation.structural_path
+            if not isinstance(path, BStructuralComplete):
+                continue
+            ids = path.company_ids
+            here = participants.get(relation.source, set())
+            if ids[0] not in here or ids[-1] in here or not {ids[0], ids[-1]} <= set(main):
+                raise ValueError("a path starts at an INVOLVES participant of the same issue and ends at a non-participant main company")
+            used.update(ids[1:-1])
+        if used - set(main) != set(private):
+            raise ValueError("pathCompanies must equal the mapped middle companies of complete paths that are not main companies")
+        if self.counts.companies != len(main) or self.counts.path_companies != len(private):
+            raise ValueError("counts.companies and counts.pathCompanies must equal the list lengths")
+        return self
 
 
 class BmSource(Bx):
@@ -649,7 +726,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-4"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-5"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)

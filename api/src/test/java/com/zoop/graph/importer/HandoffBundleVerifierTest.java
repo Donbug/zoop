@@ -151,7 +151,7 @@ class HandoffBundleVerifierTest {
             byte[] export = resource(name);
             HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
             JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
-            assertEquals("zoop-graph-handoff-bundle-4", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals("zoop-graph-handoff-bundle-5", bundle.get("schemaVersion").stringValue(), name);
             assertEquals(headlines.get(name).size(), bundle.get("issues").size(), name);
             for (JsonNode issue : bundle.get("issues")) {
                 String id = issue.get("id").stringValue();
@@ -304,7 +304,8 @@ class HandoffBundleVerifierTest {
         assertRefused("the first schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-1"));
         assertRefused("an earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-2"));
         assertRefused("the schema version before field verdicts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
-        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-5"));
+        assertRefused("the schema version before structural paths", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-4"));
+        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-6"));
         assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
         assertRefused("live without a provider recording", b -> setMode(b, "live", "authored-test"));
         assertRefused("a provider recording of a replay", b -> setMode(b, "replay", "provider"));
@@ -1553,7 +1554,8 @@ class HandoffBundleVerifierTest {
 
     @Test
     void anExportOfAnEarlierBundleSchemaIsRefusedAsAnInvalidBundleBeforeAnyWrite() {
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3")) {
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
+                "zoop-graph-handoff-bundle-4")) {
             byte[] earlier = HandoffFixtures.envelopeAfter(BUILT, root -> {
                 ObjectNode bundle = (ObjectNode) root.get("bundle");
                 bundle.put("schemaVersion", schema);
@@ -1595,5 +1597,277 @@ class HandoffBundleVerifierTest {
         assertEquals("international", HandoffBundleVerifier.countriesClass(List.of("KR", "US")));
         assertEquals("invalid", HandoffBundleVerifier.countriesClass(List.of("kr")));
         assertEquals("unknown", HandoffBundleVerifier.countriesClass(List.of()));
+    }
+
+    @Test
+    void theProducersRealPathExportsAreAcceptedWithTheHandWrittenPathsAndCompanies() throws Exception {
+        // expected-structural-paths.json is written by hand in graph_handoff_smoke.py (expected_chain), never derived from the planner.
+        JsonNode expected = HandoffFixtures.parse(resource("expected-structural-paths.json"));
+        for (String name : List.of("export-path-known.json", "export-path-private.json", "export-path-unmapped.json")) {
+            byte[] export = resource(name);
+            HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            JsonNode want = expected.get(name);
+            assertEquals(want.get("companies").size(), verified.companies().size(), name);
+            for (int index = 0; index < want.get("companies").size(); index++) {
+                assertEquals(want.get("companies").get(index).stringValue(), verified.companies().get(index).id(), name);
+            }
+            assertEquals(want.get("pathCompanies").size(), verified.pathCompanies().size(), name);
+            for (int index = 0; index < want.get("pathCompanies").size(); index++) {
+                assertEquals(want.get("pathCompanies").get(index).get("id").stringValue(), verified.pathCompanies().get(index).id(), name);
+                assertEquals(want.get("pathCompanies").get(index).get("label").stringValue(), verified.pathCompanies().get(index).label(), name);
+            }
+            assertEquals(want.get("pathCompanies"), bundle.get("pathCompanies"), name);
+            for (JsonNode relation : bundle.get("relations").values()) {
+                if (relation.get("type").stringValue().equals("STRUCTURALLY_RELATED_TO")) {
+                    assertEquals(want.get("paths").get(relation.get("target").stringValue()), relation.get("structuralPath"), name);
+                } else {
+                    assertTrue(relation.get("structuralPath").isNull(), name);
+                }
+            }
+            assertEquals(want.get("pathCompanies").size(), bundle.get("counts").get("pathCompanies").intValue(), name);
+        }
+    }
+
+    @Test
+    void theProducersOwnPathNegativeFixturesAreRefusedWithTheirContentDigestRecomputed() throws Exception {
+        JsonNode expected = HandoffFixtures.parse(resource("expected-structural-paths.json"));
+        int refused = 0;
+        for (String name : expected.propertyNames()) {
+            if (!name.startsWith("bundle-path-")) {
+                continue;
+            }
+            byte[] export = resource(name);
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            assertEquals(HandoffBundleVerifier.contentDigest(bundle), bundle.get("digests").get("content").stringValue(), name);
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failureOf(export), name + ": " + expected.get(name).get("breaks").stringValue());
+            refused++;
+        }
+        assertEquals(22, refused);
+    }
+
+    // ------------------------------------------------------------------------------------------------ structural paths ---
+
+    private static final HandoffFixtures.Built PRIVATE_MIDDLE = HandoffFixtures.build(
+            HandoffFixtures.Spec.standard().withShape(HandoffFixtures.Shape.TWO_HOP_PRIVATE));
+    private static final HandoffFixtures.Built PUBLIC_MIDDLE = HandoffFixtures.build(
+            HandoffFixtures.Spec.standard().withShape(HandoffFixtures.Shape.TWO_HOP_PUBLIC));
+    private static final HandoffFixtures.Built UNMAPPED_MIDDLE = HandoffFixtures.build(
+            HandoffFixtures.Spec.standard().withShape(HandoffFixtures.Shape.TWO_HOP_UNMAPPED));
+
+    private static ObjectNode structuralOf(ObjectNode bundle) {
+        return relationOfType(bundle, "STRUCTURALLY_RELATED_TO");
+    }
+
+    private static ObjectNode pathOf(ObjectNode bundle) {
+        return (ObjectNode) structuralOf(bundle).get("structuralPath");
+    }
+
+    private static List<String> idsOf(HandoffBundle bundle, boolean path) {
+        return (path ? bundle.pathCompanies() : bundle.companies()).stream().map(HandoffBundle.Company::id).toList();
+    }
+
+    private static ObjectNode company(String id, String label) {
+        ObjectNode company = StrictJson.newObject();
+        company.put("id", id);
+        company.put("canonicalId", "co:" + id);
+        company.put("label", label);
+        company.put("decisionRef", "catalog-1");
+        return company;
+    }
+
+    @Test
+    void everyShapeOfStructuralPathIsAcceptedAndTypedWithItsPrivateCompaniesApart() {
+        HandoffBundle oneHop = HandoffBundleVerifier.verify(BUILT.bundle());
+        assertEquals(List.of(), oneHop.pathCompanies());
+        assertEquals(2, oneHop.companies().size());
+
+        HandoffBundle privateMiddle = HandoffBundleVerifier.verify(PRIVATE_MIDDLE.bundle());
+        assertEquals(List.of(HandoffFixtures.COMPANY_M), idsOf(privateMiddle, true));
+        assertEquals("합성중간", privateMiddle.pathCompanies().get(0).label());
+        assertEquals(2, privateMiddle.companies().size(), "a private path company is not a public company");
+        assertFalse(idsOf(privateMiddle, false).contains(HandoffFixtures.COMPANY_M));
+
+        HandoffBundle publicMiddle = HandoffBundleVerifier.verify(PUBLIC_MIDDLE.bundle());
+        assertEquals(List.of(), publicMiddle.pathCompanies(), "a middle that is already public needs no private reference");
+        assertTrue(idsOf(publicMiddle, false).contains(HandoffFixtures.COMPANY_M));
+
+        HandoffBundle unmapped = HandoffBundleVerifier.verify(UNMAPPED_MIDDLE.bundle());
+        assertEquals(List.of(), unmapped.pathCompanies(), "an unmapped middle is never fabricated");
+        assertEquals(2, unmapped.companies().size());
+    }
+
+    @Test
+    void theContentDigestCoversThePrivatePathCompanies() {
+        ObjectNode copy = PRIVATE_MIDDLE.bundle().deepCopy();
+        ((ObjectNode) copy.get("pathCompanies").get(0)).put("label", "바뀐 이름");
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(copy));
+    }
+
+    @Test
+    void aStructuralPathIsClosedAndMustBeWellFormedForItsOneHopEdge() {
+        assertRefusedFrom(BUILT, "no structuralPath key", b -> structuralOf(b).remove("structuralPath"));
+        assertRefusedFrom(BUILT, "a null path on a structural edge", b -> structuralOf(b).putNull("structuralPath"));
+        assertRefusedFrom(BUILT, "an unknown status", b -> pathOf(b).put("status", "partial"));
+        assertRefusedFrom(BUILT, "an unknown path key", b -> pathOf(b).put("note", "x"));
+        assertRefusedFrom(BUILT, "a one-hop edge can never be unavailable", b -> {
+            ObjectNode path = pathOf(b);
+            path.removeAll();
+            path.put("status", "unavailable").put("reason", HandoffBundleVerifier.UNMAPPED_MIDDLE);
+        });
+        assertRefusedFrom(BUILT, "a one-hop chain of three companies", b -> ((ArrayNode) pathOf(b).get("companyIds")).add("KRX:1"));
+        assertRefusedFrom(BUILT, "a chain of one company", b -> ((ArrayNode) pathOf(b).get("companyIds")).remove(0));
+        assertRefusedFrom(BUILT, "repeated company ids", b -> {
+            ArrayNode ids = (ArrayNode) pathOf(b).get("companyIds");
+            ids.removeAll();
+            ids.add(HandoffFixtures.COMPANY_A).add(HandoffFixtures.COMPANY_A);
+        });
+        assertRefusedFrom(BUILT, "a chain that does not start at a participant of the issue", b -> {
+            ArrayNode ids = (ArrayNode) pathOf(b).get("companyIds");
+            ids.removeAll();
+            ids.add(HandoffFixtures.COMPANY_B).add(HandoffFixtures.COMPANY_A);
+        });
+        assertRefusedFrom(BUILT, "a chain that does not end at the relation target", b -> {
+            ArrayNode ids = (ArrayNode) pathOf(b).get("companyIds");
+            ids.removeAll();
+            ids.add(HandoffFixtures.COMPANY_A).add(HandoffFixtures.COMPANY_M);
+        });
+        assertRefusedFrom(BUILT, "an invalid company id", b -> ((ArrayNode) pathOf(b).get("companyIds")).set(1, "bad id!"));
+        assertRefusedFrom(BUILT, "a link count that differs from the basis count", b -> {
+            ArrayNode links = (ArrayNode) pathOf(b).get("links");
+            links.add(links.get(0).deepCopy());
+        });
+        assertRefusedFrom(BUILT, "a missing link", b -> ((ArrayNode) pathOf(b).get("links")).removeAll());
+        assertRefusedFrom(BUILT, "a link of unrelated companies", b -> {
+            ObjectNode link = (ObjectNode) pathOf(b).get("links").get(0);
+            link.put("supplierCompanyId", HandoffFixtures.COMPANY_A).put("customerCompanyId", HandoffFixtures.COMPANY_A);
+        });
+        assertRefusedFrom(BUILT, "a link with an unknown key", b -> ((ObjectNode) pathOf(b).get("links").get(0)).put("price", "up"));
+        assertRefusedFrom(BUILT, "a link with a missing endpoint",
+                b -> ((ObjectNode) pathOf(b).get("links").get(0)).remove("customerCompanyId"));
+
+        // The direction of a link is the S3 supplier/customer fact: either direction of the same two companies is a closed chain.
+        HandoffBundleVerifier.verify(mutatedFrom(BUILT, b -> {
+            ObjectNode link = (ObjectNode) pathOf(b).get("links").get(0);
+            link.put("supplierCompanyId", HandoffFixtures.COMPANY_A).put("customerCompanyId", HandoffFixtures.COMPANY_B);
+        }));
+    }
+
+    @Test
+    void aNonStructuralRelationNeverCarriesAPath() {
+        assertRefusedFrom(BUILT, "a path on an INVOLVES edge", b -> {
+            ObjectNode path = relationOfType(b, "INVOLVES").putObject("structuralPath");
+            path.put("status", "unavailable").put("reason", HandoffBundleVerifier.UNMAPPED_MIDDLE);
+        });
+        assertRefusedFrom(BUILT, "no structuralPath key on an INVOLVES edge", b -> relationOfType(b, "INVOLVES").remove("structuralPath"));
+    }
+
+    @Test
+    void theTargetOfAPathIsNeverAParticipantOfTheIssue() {
+        assertRefusedFrom(BUILT, "the target is also a participant", b -> {
+            ObjectNode extra = relationOfType(b, "INVOLVES").deepCopy();
+            ObjectNode preimage = StrictJson.newObject();
+            preimage.put("type", "INVOLVES").put("source", HandoffFixtures.ISSUE).put("target", HandoffFixtures.COMPANY_B);
+            extra.put("target", HandoffFixtures.COMPANY_B);
+            extra.put("id", "edge-" + Canonical.digest(preimage));
+            ((ArrayNode) b.get("relations")).add(extra);
+            ((ObjectNode) b.get("counts").get("relations")).put("INVOLVES", 2);
+        });
+    }
+
+    @Test
+    void aTwoHopPathNeedsTheMappedMiddleAndEveryLinkAdjacentToItsNeighbours() {
+        assertRefusedFrom(PRIVATE_MIDDLE, "the middle is not a catalogue company of the bundle", b -> {
+            ((ArrayNode) pathOf(b).get("companyIds")).set(1, "SYNTH:999999");
+            ((ObjectNode) pathOf(b).get("links").get(0)).put("supplierCompanyId", "SYNTH:999999");
+            ((ObjectNode) pathOf(b).get("links").get(1)).put("customerCompanyId", "SYNTH:999999");
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "a second link that skips the middle", b -> {
+            ObjectNode link = (ObjectNode) pathOf(b).get("links").get(1);
+            link.put("supplierCompanyId", HandoffFixtures.COMPANY_B).put("customerCompanyId", HandoffFixtures.COMPANY_A);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "the links in the wrong order", b -> {
+            ArrayNode links = (ArrayNode) pathOf(b).get("links");
+            JsonNode first = links.remove(0);
+            links.add(first);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "a two-hop edge cut to its first hop", b -> ((ArrayNode) pathOf(b).get("companyIds")).remove(1));
+        assertRefusedFrom(PRIVATE_MIDDLE, "four companies", b -> ((ArrayNode) pathOf(b).get("companyIds")).add("SYNTH:000004"));
+        assertRefusedFrom(PRIVATE_MIDDLE, "the middle repeats the participant",
+                b -> ((ArrayNode) pathOf(b).get("companyIds")).set(1, HandoffFixtures.COMPANY_A));
+        assertRefusedFrom(UNMAPPED_MIDDLE, "an unavailable path with another reason", b -> pathOf(b).put("reason", "unknown"));
+        assertRefusedFrom(UNMAPPED_MIDDLE, "an unavailable path that also lists companies", b -> pathOf(b).putArray("companyIds"));
+        assertRefusedFrom(UNMAPPED_MIDDLE, "an unavailable path without a reason", b -> pathOf(b).remove("reason"));
+    }
+
+    @Test
+    void thePathCompaniesCloseExactlyOverTheMappedMiddlesOfCompletePathsMinusPublicCompanies() {
+        assertRefusedFrom(PRIVATE_MIDDLE, "an orphan path company no complete path uses", b -> {
+            ((ArrayNode) b.get("pathCompanies")).add(company("SYNTH:000009", "고아"));
+            ((ObjectNode) b.get("counts")).put("pathCompanies", 2);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "the mapped middle is missing from the path companies", b -> {
+            ((ArrayNode) b.get("pathCompanies")).removeAll();
+            ((ObjectNode) b.get("counts")).put("pathCompanies", 0);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "a path company that is also a public company", b -> {
+            ((ArrayNode) b.get("companies")).add(company(HandoffFixtures.COMPANY_M, "합성중간"));
+            ((ObjectNode) b.get("counts")).put("companies", 3);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "a path company with the id of an issue", b -> {
+            ((ObjectNode) b.get("pathCompanies").get(0)).put("id", HandoffFixtures.ISSUE);
+            ((ArrayNode) pathOf(b).get("companyIds")).set(1, HandoffFixtures.ISSUE);
+            ((ObjectNode) pathOf(b).get("links").get(0)).put("supplierCompanyId", HandoffFixtures.ISSUE);
+            ((ObjectNode) pathOf(b).get("links").get(1)).put("customerCompanyId", HandoffFixtures.ISSUE);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "an unavailable path leaves its former middle an orphan", b -> {
+            ObjectNode path = pathOf(b);
+            path.removeAll();
+            path.put("status", "unavailable").put("reason", HandoffBundleVerifier.UNMAPPED_MIDDLE);
+        });
+        assertRefusedFrom(UNMAPPED_MIDDLE, "a path company nothing uses", b -> {
+            ((ArrayNode) b.get("pathCompanies")).add(company(HandoffFixtures.COMPANY_M, "합성중간"));
+            ((ObjectNode) b.get("counts")).put("pathCompanies", 1);
+        });
+        assertRefusedFrom(PUBLIC_MIDDLE, "a public middle repeated as a private company", b -> {
+            ((ArrayNode) b.get("pathCompanies")).add(company(HandoffFixtures.COMPANY_M, "합성중간"));
+            ((ObjectNode) b.get("counts")).put("pathCompanies", 1);
+        });
+        assertRefusedFrom(PRIVATE_MIDDLE, "the exact private count", b -> ((ObjectNode) b.get("counts")).put("pathCompanies", 0));
+        assertRefusedFrom(BUILT, "a private count without a company", b -> ((ObjectNode) b.get("counts")).put("pathCompanies", 1));
+        assertRefusedFrom(PRIVATE_MIDDLE, "a path company with an unknown key",
+                b -> ((ObjectNode) b.get("pathCompanies").get(0)).put("brandColor", "#000000"));
+        assertRefusedFrom(PRIVATE_MIDDLE, "no pathCompanies key", b -> b.remove("pathCompanies"));
+    }
+
+    @Test
+    void aPrivatePathCompanyIsNeverAMentionParticipant() {
+        assertRefusedFrom(PRIVATE_MIDDLE, "a mention participant resolved to the private company", b -> {
+            ObjectNode participant = (ObjectNode) b.get("issues").get(0).get("mentions").get(0).get("participants").get(1);
+            participant.put("sourceCompanyId", "s2-co-m").put("companyId", HandoffFixtures.COMPANY_M);
+        });
+    }
+
+    @Test
+    void everyBasisCarriesItsScopesAsBoundedTextOrNull() {
+        HandoffBundle verified = HandoffBundleVerifier.verify(PRIVATE_MIDDLE.bundle());
+        assertEquals(2, verified.relations().stream().filter(r -> r.type().equals("STRUCTURALLY_RELATED_TO")).findFirst().orElseThrow()
+                .basis().size());
+
+        String emoji = "\uD83D\uDE00";
+        HandoffBundleVerifier.verify(mutatedFrom(BUILT, b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .put("businessScope", emoji.repeat(500))));
+        HandoffBundleVerifier.verify(mutatedFrom(BUILT, b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .putNull("businessScope").putNull("productScope")));
+        assertRefusedFrom(BUILT, "a business scope of 501 code points", b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .put("businessScope", emoji.repeat(501)));
+        assertRefusedFrom(BUILT, "a product scope of 501 code points", b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .put("productScope", "x".repeat(501)));
+        assertRefusedFrom(BUILT, "a scope that is not text", b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .put("productScope", 7));
+        assertRefusedFrom(BUILT, "a missing business scope", b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .remove("businessScope"));
+        assertRefusedFrom(BUILT, "a missing product scope", b -> ((ObjectNode) structuralOf(b).get("basis").get(0))
+                .remove("productScope"));
     }
 }

@@ -57,7 +57,7 @@ out = json.loads(done.stdout)
 canon = lambda v: json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 bundle = out["bundle"]
 bundle["policy"]["extraField"] = "nested-unknown"
-bundle["digests"]["content"] = hashlib.sha256(canon({k: bundle[k] for k in ("companies", "issues", "relations", "evidence", "articles")}).encode()).hexdigest()
+bundle["digests"]["content"] = hashlib.sha256(canon({k: bundle[k] for k in ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")}).encode()).hexdigest()
 data = canon(bundle).encode()
 out["receipt"].update(bundleDigest=hashlib.sha256(data).hexdigest(), bundleBytes=len(data), contentDigest=bundle["digests"]["content"])
 sys.stdout.write(canon(out) + "\\n")
@@ -157,8 +157,15 @@ def run(smoke: Smoke, world: HandoffWorld) -> list[str]:
                         for v in i["fieldVerdicts"])
                 and all(p["sameValueMentions"][f] == [identity(m) for m in i["mentions"] if m[f] == basis[0][f]] != []
                         and i[f] == (None if f in suppressed else basis[0][f]) for f in fields))
-    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-4" and all(truthful(i) for i in bundle["issues"]),
+    check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and all(truthful(i) for i in bundle["issues"]),
           "every issue states its actual field selection and any operator field verdict: exact same-value lists, withheld recomputed, never an inferred verdict")
+    main_ids = {c["id"] for c in bundle["companies"]}
+    middles = {m for r in bundle["relations"] if (r["structuralPath"] or {}).get("status") == "complete" for m in r["structuralPath"]["companyIds"][1:-1]}
+    check(all((r["structuralPath"] is None) == (r["type"] != "STRUCTURALLY_RELATED_TO") for r in bundle["relations"])
+          and all("businessScope" in b and "productScope" in b for r in bundle["relations"] for b in r["basis"])
+          and [c["id"] for c in bundle["pathCompanies"]] == sorted(middles - main_ids) and bundle["counts"]["pathCompanies"] == len(bundle["pathCompanies"])
+          and not {c["id"] for c in bundle["pathCompanies"]} & ({i["id"] for i in bundle["issues"]} | main_ids),
+          "structural paths are explicit, bases carry scopes, and the private path companies are exactly the unlisted mapped middles, disjoint from public nodes")
     check(smoke.js_digest(response.content) == pins1["bundleDigest"], "another language recomputes the pinned SHA-256 after a plain JSON round trip")
     manifest = wire["manifest"]
     check(manifest == oracle["manifest"] and canonical(manifest) == canonical(oracle["manifest"]), "HTTP manifest equals the CLI export manifest (the ledger's frozen request)")

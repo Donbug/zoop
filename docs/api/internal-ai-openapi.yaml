@@ -141,7 +141,7 @@
 
     **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
     family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-    (`zoop-graph-handoff-bundle-4`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+    (`zoop-graph-handoff-bundle-5`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
     writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
     path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
     `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -159,7 +159,7 @@
     `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
     `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
     `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2` or `-3`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2`, `-3` or `-4`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
     A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
     so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -6245,11 +6245,12 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "aa9ea768a493e70d9fd1512526352ef4ef093d45d05fd1302f828ba132d52347"
-                      "contentDigest": "9424b46c372d4f572afe60bd1993326f4025b447347ec7e1d000f959f6483d4c"
-                      "bundleBytes": 9931
+                      "bundleDigest": "07ef274989e54aebac48cbbb76adf659e7659f1cec5aa47a04bdbedef4e70e0d"
+                      "contentDigest": "cffe8dddd6a1cda33959c9e27faec0417e99d9ee99e5ec27dd5e106cdec57edb"
+                      "bundleBytes": 9990
                       "counts":
                         "companies": 1
+                        "pathCompanies": 0
                         "issues": 1
                         "relations":
                           "INVOLVES": 1
@@ -6528,11 +6529,12 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "aa9ea768a493e70d9fd1512526352ef4ef093d45d05fd1302f828ba132d52347"
-                      "contentDigest": "9424b46c372d4f572afe60bd1993326f4025b447347ec7e1d000f959f6483d4c"
-                      "bundleBytes": 9931
+                      "bundleDigest": "07ef274989e54aebac48cbbb76adf659e7659f1cec5aa47a04bdbedef4e70e0d"
+                      "contentDigest": "cffe8dddd6a1cda33959c9e27faec0417e99d9ee99e5ec27dd5e106cdec57edb"
+                      "bundleBytes": 9990
                       "counts":
                         "companies": 1
+                        "pathCompanies": 0
                         "issues": 1
                         "relations":
                           "INVOLVES": 1
@@ -6567,7 +6569,7 @@
                         "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
                         "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
                     "bundle":
-                      "schemaVersion": "zoop-graph-handoff-bundle-4"
+                      "schemaVersion": "zoop-graph-handoff-bundle-5"
                       "handoffId": "handoff-synthetic-1"
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
                       "provenance":
@@ -6632,6 +6634,7 @@
                           "canonicalId": "co:synth-1"
                           "label": "합성기업"
                           "decisionRef": "canon-2026-10-16:company"
+                      "pathCompanies": []
                       "issues":
                         - "id": "issue:synthetic-supply"
                           "canonicalId": "issue:supply"
@@ -6778,6 +6781,7 @@
                           "evidenceIds":
                             - "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
                           "basis": []
+                          "structuralPath": null
                           "provenance":
                             "origin": "s3-relation"
                             "s3SemanticValidation": "independent-verifier-supported-all-claims"
@@ -6830,6 +6834,7 @@
                         "items": []
                       "counts":
                         "companies": 1
+                        "pathCompanies": 0
                         "issues": 1
                         "relations":
                           "INVOLVES": 1
@@ -6865,7 +6870,7 @@
                         "publicActivation": "none"
                         "graphDb": "none"
                       "digests":
-                        "content": "9424b46c372d4f572afe60bd1993326f4025b447347ec7e1d000f959f6483d4c"
+                        "content": "cffe8dddd6a1cda33959c9e27faec0417e99d9ee99e5ec27dd5e106cdec57edb"
                 "withheld":
                   "summary": "Source rights were revoked: no manifest, no bundle, no counts"
                   "value":
@@ -7229,6 +7234,18 @@
           "type": "string"
           "const": "SUPPLIES"
           "title": "Relationtype"
+        "businessScope":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 500
+            - "type": "null"
+          "title": "Businessscope"
+        "productScope":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 500
+            - "type": "null"
+          "title": "Productscope"
         "validFrom":
           "anyOf":
             - "type": "string"
@@ -7271,6 +7288,8 @@
         - "sourceRelation"
         - "relationKey"
         - "relationType"
+        - "businessScope"
+        - "productScope"
         - "validFrom"
         - "validUntil"
         - "countries"
@@ -7364,6 +7383,10 @@
           "type": "integer"
           "minimum": 0.0
           "title": "Companies"
+        "pathCompanies":
+          "type": "integer"
+          "minimum": 0.0
+          "title": "Pathcompanies"
         "issues":
           "type": "integer"
           "minimum": 0.0
@@ -7386,6 +7409,7 @@
       "type": "object"
       "required":
         - "companies"
+        - "pathCompanies"
         - "issues"
         - "relations"
         - "evidence"
@@ -8260,6 +8284,22 @@
       "description": |-
         A participant exactly as the S2 mention states it. `role` is the S2 text, never a confirmed role; `company_id` is the public company id only where every
         carrying upstream mapped `source_company_id` to the same company of this bundle, otherwise null.
+    "BPathLink":
+      "properties":
+        "supplierCompanyId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Suppliercompanyid"
+        "customerCompanyId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Customercompanyid"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "supplierCompanyId"
+        - "customerCompanyId"
+      "title": "BPathLink"
     "BPolicy":
       "properties":
         "version":
@@ -8432,6 +8472,18 @@
           "type": "array"
           "maxItems": 2
           "title": "Basis"
+        "structuralPath":
+          "anyOf":
+            - "oneOf":
+                - "$ref": "#/components/schemas/BStructuralComplete"
+                - "$ref": "#/components/schemas/BStructuralUnavailable"
+              "discriminator":
+                "propertyName": "status"
+                "mapping":
+                  "complete": "#/components/schemas/BStructuralComplete"
+                  "unavailable": "#/components/schemas/BStructuralUnavailable"
+            - "type": "null"
+          "title": "Structuralpath"
         "provenance":
           "oneOf":
             - "$ref": "#/components/schemas/BInvolvesProvenance"
@@ -8467,6 +8519,7 @@
         - "assertionStatus"
         - "evidenceIds"
         - "basis"
+        - "structuralPath"
         - "provenance"
         - "decisionRef"
         - "sourceRefs"
@@ -8822,6 +8875,35 @@
         How many independent sources the issue's cited article versions represent. `knownLineageCount` counts lineage groups that have a declared origin
         (never articles), `duplicateGroups` are groups of articles whose prepared text is exactly equal (never transitive components) and
         `independentSourceCount` is null whenever an origin is missing or conflicting. Shape only: the producer owns every count.
+    "BStructuralComplete":
+      "properties":
+        "status":
+          "type": "string"
+          "const": "complete"
+          "title": "Status"
+        "companyIds":
+          "items":
+            "type": "string"
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "type": "array"
+          "maxItems": 3
+          "minItems": 2
+          "title": "Companyids"
+        "links":
+          "items":
+            "$ref": "#/components/schemas/BPathLink"
+          "type": "array"
+          "maxItems": 2
+          "minItems": 1
+          "title": "Links"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "status"
+        - "companyIds"
+        - "links"
+      "title": "BStructuralComplete"
+      "description": "An ordered chain [participant, (mapped middle,) target] with one directed supplier→customer link per S3 basis. Operator-mapped basis chain only."
     "BStructuralProvenance":
       "properties":
         "origin":
@@ -8870,6 +8952,22 @@
         - "bindingDigest"
         - "basisEligibility"
       "title": "BStructuralProvenance"
+    "BStructuralUnavailable":
+      "properties":
+        "status":
+          "type": "string"
+          "const": "unavailable"
+          "title": "Status"
+        "reason":
+          "type": "string"
+          "const": "intermediate_company_unmapped"
+          "title": "Reason"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "status"
+        - "reason"
+      "title": "BStructuralUnavailable"
     "BUpstream":
       "properties":
         "jobId":
@@ -8912,7 +9010,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-graph-handoff-bundle-4"
+          "const": "zoop-graph-handoff-bundle-5"
           "title": "Schemaversion"
         "handoffId":
           "type": "string"
@@ -8939,6 +9037,12 @@
           "type": "array"
           "maxItems": 20000
           "title": "Companies"
+        "pathCompanies":
+          "items":
+            "$ref": "#/components/schemas/BCompany"
+          "type": "array"
+          "maxItems": 20000
+          "title": "Pathcompanies"
         "issues":
           "items":
             "$ref": "#/components/schemas/BIssue"
@@ -8983,6 +9087,7 @@
         - "policy"
         - "sources"
         - "companies"
+        - "pathCompanies"
         - "issues"
         - "relations"
         - "evidence"

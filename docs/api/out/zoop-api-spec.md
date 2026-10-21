@@ -4271,7 +4271,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | eventTime | 필수 | string / null |  |
 | timePrecision | 필수 | string {year, month, day, datetime, unknown} |  |
 | period | 필수 | string / null |  |
-| assertionStatus | 필수 | string {occurred, announced, planned, forecast, cancelled, unknown} / null | AI 인계 묶음(zoop-graph-handoff-bundle-2) 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다. |
+| assertionStatus | 필수 | string {occurred, announced, planned, forecast, cancelled, unknown} / null | AI 인계 묶음 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다. |
 | companyIds | 필수 | string[] |  |
 | relationTypes | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO}[] (uniqueItems) | 이 응답의 요청 companyId와 사건 사이의 직접 승인 간선 유형만 포함한다. items/unknownTimeItems 모두 같은 공개 graphVersion/asOf를 사용한다. 두 유형이 함께 있으면 각각 한 번 포함한다. companyId 없음·직접 승인 간선 없음·간접 2-hop 전용 사건은 []다. companyIds 전체의 관계 합집합, 감성/영향 방향, 기업 간 공급/경쟁 유형이 아니다. |
 | articleCount | 필수 | integer |  |
