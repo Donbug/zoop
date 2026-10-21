@@ -204,7 +204,7 @@ class ChatExecutorPostgresTest {
 
     private String submit(String question) {
         String jobId = "job-" + suffix();
-        service.submit(member, session, jobId, new ChatJobRequest(jobId, question, null, null));
+        service.submit(member, session, jobId, new ChatJobRequest(jobId, question, null, null), "req-test");
         return jobId;
     }
 
