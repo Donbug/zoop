@@ -56,16 +56,19 @@ ACTION_PINS = {
     "actions/create-github-app-token": "fee1f7d63c2ff003460e3d139729b119787bc349",
     "astral-sh/setup-uv": "d0cc045d04ccac9d8b7881df0226f9e82c39688e",
     "pnpm/action-setup": "b906affcce14559ad1aafd4ab0e942779e9f58b1",
+    "gradle/actions/setup-gradle": "3f5f9adaf7d9fecd50b5935e54106014257a94e6",
 }
 # Curated from action.yml at the pinned revisions. actionlint is a separate CI gate.
 ACTION_INPUTS = {
     "actions/checkout": {"ref", "persist-credentials"},
-    "actions/setup-node": {"node-version"},
+    "actions/setup-node": {"node-version", "cache", "cache-dependency-path"},
     "actions/setup-python": {"python-version"},
     "actions/upload-artifact": {"name", "path", "if-no-files-found", "retention-days"},
     "actions/create-github-app-token": {"app-id", "private-key", "owner", "repositories", "permission-contents"},
-    "astral-sh/setup-uv": {"enable-cache"},
+    "astral-sh/setup-uv": {"enable-cache", "cache-dependency-glob", "cache-suffix"},
     "pnpm/action-setup": {"version", "run_install", "package_json_file"},
+    # Only the open-source basic provider is allowed; the default enhanced provider is proprietary.
+    "gradle/actions/setup-gradle": {"cache-provider"},
 }
 
 
