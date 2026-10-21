@@ -149,22 +149,12 @@ public class TossMarketClient {
         try {
             List<CompanyPriceResponse.Point> points = List.of();
             if ("1d".equals(period)) {
-                boolean krx = "KRX".equals(exchange);
-                java.time.LocalTime open = krx ? java.time.LocalTime.of(9, 0) : java.time.LocalTime.of(9, 30);
-                java.time.LocalTime close = krx ? java.time.LocalTime.of(15, 30) : java.time.LocalTime.of(16, 0);
-                var local = end.minusNanos(1).atZone(zone);
-                LocalDate day = local.toLocalTime().isBefore(open) ? local.toLocalDate().minusDays(1) : local.toLocalDate();
-                Instant until = end;
-                // An exchange holiday has no minute bars, so walk back to the last day that traded.
-                // shortcut: no exchange holiday calendar, 10 days covers the longest KRX/US closures.
-                for (int back = 0; back < 10 && points.isEmpty(); back++, day = day.minusDays(1)) {
-                    if (day.getDayOfWeek().getValue() >= 6) continue;
-                    start = day.atTime(open).atZone(zone).toInstant();
-                    Instant sessionClose = day.atTime(close).atZone(zone).toInstant();
-                    end = until.isBefore(sessionClose) ? until : sessionClose;
-                    sessionDate = day.toString();
-                    points = minuteBuckets(code, zone, start, end, 300);
-                }
+                Session session = session("KRX".equals(exchange), end.minusNanos(1).atZone(zone).toLocalDate(), end);
+                start = session.open();
+                end = end.isBefore(session.close()) ? end : session.close();
+                sessionDate = session.date();
+                // A session the calendar says was open but that has no bars is no_data, never the day before.
+                points = minuteBuckets(code, zone, start, end, 300);
             } else if ("1h".equals(interval)) {
                 points = minuteBuckets(code, zone, start, end, 3600);
             } else {
@@ -188,9 +178,10 @@ public class TossMarketClient {
             // Bars came back, so a missing stock row or currency is a provider format failure, not an absence of data.
             String currency = stock == null ? null : strictText(stock.get("currency"));
             if (currency == null) throw formatFailure();
-            // An exact to arrives as to + 1ns (inclusive); millis drop that nanosecond again.
-            var range = new CompanyPriceResponse.Range(start.atZone(zone).toOffsetDateTime().toString(),
-                    end.truncatedTo(java.time.temporal.ChronoUnit.MILLIS).atZone(zone).toOffsetDateTime().toString(), sessionDate);
+            // An exact to arrives as to + 1ns (inclusive); millis drop that nanosecond again. RFC 3339 always has seconds.
+            var rfc3339 = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+            var range = new CompanyPriceResponse.Range(start.atZone(zone).format(rfc3339),
+                    end.truncatedTo(java.time.temporal.ChronoUnit.MILLIS).atZone(zone).format(rfc3339), sessionDate);
             return CompanyPriceResponse.available(companyId, period,
                     new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, range, points);
         } catch (MarketDataException exception) {
@@ -202,6 +193,38 @@ public class TossMarketClient {
         } catch (Exception exception) {
             throw new MarketDataException(false);
         }
+    }
+
+    record Session(String date, Instant open, Instant close) { }
+
+    /**
+     * The regular session for 1d, taken from Toss's market calendar (exchange-local date in, previous/current/next business
+     * day out): the given day's session once it has opened, otherwise (before the open, a weekend or a holiday) the previous
+     * business day's whole session. The calendar decides closures and early closes; missing bars never move the session.
+     * KR is the calendar's integrated regular session, the union of KRX and NXT regular hours.
+     * shortcut: that union equals KRX regular hours only while NXT's main market (09:00:30–15:20) stays inside KRX's; read a
+     * KRX-only schedule if NXT ever trades outside KRX regular hours.
+     */
+    private Session session(boolean krx, LocalDate day, Instant at) {
+        JsonNode calendar = get("/api/v1/market-calendar/" + (krx ? "KR" : "US"), Map.of("date", day.toString())).path("result");
+        JsonNode today = calendar.path("today");
+        Session current = day.toString().equals(text(today.get("date"))) ? regular(krx, today) : null;
+        // at is the exclusive end (an exact to + 1ns): a to at the opening instant is still before the session.
+        if (current != null && current.open().isBefore(at.minusNanos(1))) return current;
+        Session previous = regular(krx, calendar.path("previousBusinessDay"));
+        if (previous == null) throw formatFailure(); // a business day always has a regular session
+        return previous;
+    }
+
+    /** A calendar day's regular session; null when the day has none (closed). */
+    private static Session regular(boolean krx, JsonNode marketDay) {
+        String date = text(marketDay.get("date"));
+        JsonNode regular = (krx ? marketDay.path("integrated") : marketDay).path("regularMarket");
+        if (date == null) throw formatFailure();
+        if (regular.isMissingNode() || regular.isNull()) return null;
+        Instant open = instant(text(regular.get("startTime"))), close = instant(text(regular.get("endTime")));
+        if (open == null || close == null || !open.isBefore(close)) throw formatFailure();
+        return new Session(date, open, close);
     }
 
     /** Minute bars over [start, end) in size-second buckets; every minute of the first and last bucket, so edge buckets are whole. */

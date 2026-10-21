@@ -38,6 +38,8 @@ class CompanyMarketClientsTest {
     private volatile boolean malformedCandle;
     /** NVDA daily candles around the 2026-03-08 US DST start, stamped at New York midnight shown in KST. */
     private volatile boolean dstDaily;
+    /** The calendar stub opens Friday 2026-10-16 (otherwise a holiday). */
+    private volatile boolean fridayOpen;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -252,14 +254,14 @@ class CompanyMarketClientsTest {
         // Toss stamps a minute bar with its end: 12:01 and 12:02 start in the 12:00 bucket, 12:06 in 12:05.
         assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0),
                 new CompanyPriceResponse.Point("2026-10-15T12:05+09:00", 104, 104, 103, 103, 1.0)), result.points());
-        // Today (10-16) has no bars yet in the stub, so the session is the last one that traded: all of 10-15.
-        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00+09:00", "2026-10-15T15:30+09:00", "2026-10-15"),
+        // Today (10-16) is a holiday on the calendar stub, so the session is the previous business day: all of 10-15.
+        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T15:30:00+09:00", "2026-10-15"),
                 result.range());
 
-        // Each day is read from its own end; the finished KST 10-15 is then kept and only today (10-16) is read again.
+        // The finished KST 10-15 is read once and then kept; the holiday is never read.
         client.prices("KRX:005930", "KRX", "005930", "1d", null, null);
         assertEquals(1, candleQueries.stream().filter(q -> q.contains("before=2026-10-15T15")).count());
-        assertEquals(2, candleQueries.stream().filter(q -> q.contains("before=2026-10-16T15")).count());
+        assertEquals(0, candleQueries.stream().filter(q -> q.contains("before=2026-10-16T15")).count());
     }
 
     @Test
@@ -273,28 +275,50 @@ class CompanyMarketClientsTest {
     }
 
     @Test
-    void dayIsTheExchangeSessionCutAtToAndSkipsDaysWithoutTrading() {
+    void dayIsTheCalendarSessionCutAtTo() {
         var client = tossClient("test-client", "test-secret");
         // During the session: from the open up to to; the bucket holding to stays whole.
         var open = client.prices("KRX:005930", "KRX", "005930", "1d", null,
                 java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1));
-        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00+09:00", "2026-10-15T12:00+09:00", "2026-10-15"),
+        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T12:00:00+09:00", "2026-10-15"),
                 open.range());
         assertEquals(List.of(new CompanyPriceResponse.Point("2026-10-15T12:00+09:00", 100, 105, 99, 104, 15.0)), open.points());
 
-        // Sunday before the open: Saturday and Sunday are skipped, Friday 10-16 has no bars (a holiday here), so 10-15.
+        // Sunday before the open: the calendar's previous business day (10-15; 10-16 is a holiday) as a whole session,
+        // ending at its close, not at the requested to. Weekend and holiday days are never read.
         var weekend = client.prices("KRX:005930", "KRX", "005930", "1d", null, java.time.Instant.parse("2026-10-18T00:00:00Z"));
-        // A past session is the whole session: it ends at that day's close, not at the requested to.
-        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00+09:00", "2026-10-15T15:30+09:00", "2026-10-15"),
+        assertEquals(new CompanyPriceResponse.Range("2026-10-15T09:00:00+09:00", "2026-10-15T15:30:00+09:00", "2026-10-15"),
                 weekend.range());
         assertEquals(2, weekend.points().size());
-        assertFalse(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-17T15") || q.contains("before=2026-10-18T15")));
+        assertFalse(candleQueries.stream().anyMatch(q -> q.matches(".*before=2026-10-1[678]T15.*")));
+    }
+
+    @Test
+    void anOpenSessionWithoutBarsIsNoDataNotThePreviousDay() {
+        // A trading halt or no trades on a day the calendar says was open: no_data, never 10-15's prices.
+        fridayOpen = true;
+        var halted = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-16T03:00:00Z").plusNanos(1));
+        assertEquals("unavailable", halted.status());
+        assertEquals("no_data", halted.reasonCode());
+        assertEquals(0, candleQueries.stream().filter(q -> q.contains("before=2026-10-15T15")).count());
+    }
+
+    @Test
+    void aUsEarlyCloseEndsTheSessionAtTheCalendarClose() {
+        // 2026-11-27 closes at 13:00 ET; a 14:00 ET request ends there and drops the 13:30 ET bar.
+        var result = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1d", null,
+                java.time.Instant.parse("2026-11-27T19:00:00Z").plusNanos(1));
+        assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T13:00:00-05:00", "2026-11-27"),
+                result.range());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T12:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
     }
 
     @Test
     void otherPeriodsReportTheirRangeWithoutASessionDate() {
         var result = tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1w", null, null);
-        assertEquals(new CompanyPriceResponse.Range("2026-10-09T12:00+09:00", "2026-10-16T12:00+09:00", null), result.range());
+        assertEquals(new CompanyPriceResponse.Range("2026-10-09T12:00:00+09:00", "2026-10-16T12:00:00+09:00", null),
+                result.range());
     }
 
     @Test
@@ -381,6 +405,28 @@ class CompanyMarketClientsTest {
 
     private String baseUrl() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
 
+    /**
+     * Toss market calendar stub (times in KST, as the provider documents). KR: 10-15 open; 10-16 a holiday unless
+     * fridayOpen; 10-18 a Sunday. US: 11-27 closes early at 13:00 ET (03:00 KST on 11-28).
+     */
+    private String calendar(boolean kr, String rawQuery) {
+        String date = rawQuery.replaceAll(".*date=([0-9-]{10}).*", "$1");
+        if (!kr) return """
+                {"result":{"today":{"date":"2026-11-27","regularMarket":{"startTime":"2026-11-27T23:30:00+09:00","endTime":"2026-11-28T03:00:00+09:00"}},
+                  "previousBusinessDay":{"date":"2026-11-25","regularMarket":{"startTime":"2026-11-25T23:30:00+09:00","endTime":"2026-11-26T06:00:00+09:00"}},
+                  "nextBusinessDay":{"date":"2026-11-30","regularMarket":{"startTime":"2026-11-30T23:30:00+09:00","endTime":"2026-12-01T06:00:00+09:00"}}}}
+                """;
+        boolean open = date.equals("2026-10-15") || (date.equals("2026-10-16") && fridayOpen);
+        String previous = date.equals("2026-10-15") ? "2026-10-14" : fridayOpen && !date.equals("2026-10-16") ? "2026-10-16" : "2026-10-15";
+        return "{\"result\":{\"today\":" + krDay(date, open) + ",\"previousBusinessDay\":" + krDay(previous, true)
+                + ",\"nextBusinessDay\":" + krDay("2026-10-19", true) + "}}";
+    }
+
+    private static String krDay(String date, boolean open) {
+        return "{\"date\":\"" + date + "\",\"integrated\":" + (open ? "{\"regularMarket\":{\"startTime\":\"" + date
+                + "T09:00:00+09:00\",\"endTime\":\"" + date + "T15:30:00+09:00\"}}" : "null") + "}";
+    }
+
     private String response(String path, String rawQuery) {
         if (path.equals("/oauth2/token")) return """
                 {"access_token":"test-token","expires_in":3600}
@@ -395,6 +441,18 @@ class CompanyMarketClientsTest {
                   {"timestamp":"2026-10-15T00:00:00+09:00","openPrice":695,"highPrice":710,"lowPrice":690,"closePrice":700,"volume":1234}
                 ],"nextBefore":"2026-10-15T00:00:00+09:00"}}
                 """;
+        if (path.startsWith("/api/v1/market-calendar/")) return calendar(path.endsWith("/KR"), rawQuery);
+        // NVDA on the 2026-11-27 early close (13:00 ET): one bar in the session, one at 13:30 ET after it.
+        if (path.equals("/api/v1/candles") && rawQuery.contains("interval=1m") && rawQuery.contains("symbol=NVDA")) {
+            return rawQuery.contains("before=2026-11-28T05") ? """
+                {"result":{"candles":[
+                  {"timestamp":"2026-11-27T18:31:00Z","openPrice":210,"highPrice":212,"lowPrice":209,"closePrice":211,"volume":3},
+                  {"timestamp":"2026-11-27T17:01:00Z","openPrice":200,"highPrice":202,"lowPrice":199,"closePrice":201,"volume":2}
+                ],"nextBefore":null}}
+                """ : """
+                {"result":{"candles":[],"nextBefore":null}}
+                """;
+        }
         if (path.equals("/api/v1/candles") && rawQuery.contains("interval=1m")) return rawQuery.contains("before=2026-10-15T15") ? """
                 {"result":{"candles":[
                   {"timestamp":"2026-10-15T12:06:00+09:00","openPrice":104,"highPrice":104,"lowPrice":103,"closePrice":103,"volume":1},
