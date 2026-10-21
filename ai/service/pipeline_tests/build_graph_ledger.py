@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from zoop_ai_pipeline.graph_projection import Store
+from zoop_ai_pipeline.graph_projection_contracts import PLAN_VERSION
 
 STAMP = "2026-10-12T03:00:00+00:00"
 
@@ -24,8 +25,12 @@ def main() -> None:
     store = Store(root, relation, extraction, ingestion, mode="create")
     try:
         for version_id, state in states.items():
+            # A row that is not `ready` is frozen under THIS build's plan contract (the ledger-only preflight reads only the stored plan's `schema`; a
+            # plan without it, or of an unknown schema, is a damaged ledger and is refused before the state is ever looked at). A `ready` row keeps
+            # the damaged `{}` plan on purpose: it is the one the pipeline refuses while verifying the plan.
+            plan = "{}" if state == "ready" else json.dumps({"schema": PLAN_VERSION})
             store.db.execute("INSERT INTO versions(version_id,input_digest,request,plan,payload_digest,graph_digest,state,created_at,updated_at) "
-                             "VALUES(?,?,?,?,?,?,?,?,?)", (version_id, "0" * 64, "{}", "{}", "1" * 64, "2" * 64, state, STAMP, STAMP))
+                             "VALUES(?,?,?,?,?,?,?,?,?)", (version_id, "0" * 64, "{}", plan, "1" * 64, "2" * 64, state, STAMP, STAMP))
     finally:
         store.close()
     print(json.dumps({"ok": True, "versions": sorted(states)}))

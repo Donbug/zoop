@@ -45,10 +45,12 @@ final class RelationWire {
         PipelineJob.State state = root.choice("state", PipelineWire.parser(PipelineJob.State.class));
         PipelineJob.Delivery delivery = PipelineWire.delivery(root.object("delivery"));
         PipelineWire.requireDeliveryFitsState(root, state, delivery);
+        PipelineJob.Provenance provenance = PipelineWire.provenance(root.object("provenance"));
         return new RelationJobStatus(
                 jobId,
                 root.string("inputDigest", Obj.SHA256),
-                PipelineWire.provenance(root.object("provenance")),
+                provenance.sourceKind(),
+                provenance.executionMode(),
                 new RelationUpstream(upstream.string("jobId", UPSTREAM_ID), upstream.string("inputDigest", Obj.SHA256)),
                 state,
                 root.string("phase", Obj.SAFE),
@@ -100,9 +102,11 @@ final class RelationWire {
     }
 
     /**
-     * {@code RelationOperationStatus}: every key required, bound to the requested job and operation id, and internally coherent:
-     * the review phase and the revalidation phase must agree with each other, with the decision and with the expected revision
-     * (the recorded event sits at {@code expected + 1}, a verdict or a superseding reject at {@code expected + 2}).
+     * {@code RelationOperationStatus}: every key required, bound to the requested job and operation id, and internally coherent. A
+     * current-contract operation requested no revalidation (its revalidation phase is {@code not_requested} whatever the decision) and is
+     * terminal once recorded ({@code next=none}; an unconfirmed review says {@code retry_review}). Only an operation that carries the
+     * {@code review_contract_changed} limitation (recorded under the earlier contract) may show another phase, and then it is history:
+     * {@code verified}/{@code superseded} (a settlement at {@code expected + 2}) or {@code contract_changed}, never anything to wait for.
      */
     static RelationOperationStatus operation(JsonNode node, String path, String expectedJobId, String expectedOperationId,
                                              Optional<Duration> retryAfter) {
@@ -133,9 +137,11 @@ final class RelationWire {
         Revalidation revalidation = new Revalidation(state, revObj.count("dispatchCount"),
                 revObj.optChoice("lastOutcome", PipelineWire.parser(PipelineJob.Outcome.class)),
                 revObj.optString("lastRuntimeCode", Obj.SAFE), verdict, resulting, optStamp(revObj, "updatedAt"));
-        checkRevalidation(path, revalidation, decision, applied, expected);
+        Optional<RelationOperationStatus.Limitation> limitation = root.optChoice("limitation",
+                PipelineWire.parser(RelationOperationStatus.Limitation.class));
+        checkRevalidation(path, revalidation, limitation.isPresent(), decision, applied, expected);
         RelationOperationStatus.Next next = root.choice("next", PipelineWire.parser(RelationOperationStatus.Next.class));
-        if (next != expectedNext(review, revalidation)) {
+        if (next != expectedNext(review, limitation.isPresent())) {
             throw new Malformed(path + ".next");
         }
         if (!"not_published".equals(root.object("publication").string("state", Obj.PRINTABLE))) {
@@ -152,66 +158,46 @@ final class RelationWire {
                 review,
                 revalidation,
                 next,
+                limitation,
                 AnalysisWire.stamp(root, "acceptedAt"),
                 AnalysisWire.stamp(root, "observedAt"),
                 retryAfter);
     }
 
-    private static void checkRevalidation(String path, Revalidation revalidation, RelationDecision decision, boolean applied, long expected) {
+    private static void checkRevalidation(String path, Revalidation revalidation, boolean legacy, RelationDecision decision, boolean applied, long expected) {
         RevalidationState state = revalidation.state();
-        boolean requested = decision == RelationDecision.ALLOW && applied;
         boolean settled = state == RevalidationState.VERIFIED || state == RevalidationState.SUPERSEDED;
-        boolean coherent = (state != RevalidationState.NOT_REQUESTED) == requested
-                && (state == RevalidationState.VERIFIED) == revalidation.verdict().isPresent()
-                && settled == revalidation.resultingSourceRevision().isPresent()
-                && revalidation.resultingSourceRevision().map(v -> v.equals(Long.toString(expected + 2))).orElse(true);
+        boolean coherent;
+        if (!legacy) {
+            // the current contract requests nothing: no phase, verdict or settlement, whatever the decision
+            coherent = state == RevalidationState.NOT_REQUESTED && revalidation.verdict().isEmpty() && revalidation.resultingSourceRevision().isEmpty();
+        } else {
+            boolean historicalAllow = decision == RelationDecision.ALLOW && applied;
+            coherent = (state != RevalidationState.NOT_REQUESTED) == historicalAllow
+                    && (state == RevalidationState.VERIFIED) == revalidation.verdict().isPresent()
+                    && settled == revalidation.resultingSourceRevision().isPresent()
+                    && revalidation.resultingSourceRevision().map(v -> v.equals(Long.toString(expected + 2))).orElse(true);
+        }
         if (!coherent) {
             throw new Malformed(path + ".revalidation");
         }
     }
 
-    /** The service's ordered rule for what the caller does next, derived from fields already decoded (relation_review.next_operation_action). */
-    private static RelationOperationStatus.Next expectedNext(Review review, Revalidation revalidation) {
-        if (review.state() != ReviewState.APPLIED) {
-            return RelationOperationStatus.Next.RETRY_REVIEW;
-        }
-        return switch (revalidation.state()) {
-            case QUEUED, RUNNING -> RelationOperationStatus.Next.WAIT;
-            case INTERRUPTED -> RelationOperationStatus.Next.RECOVER;
-            case FAILED -> revalidation.lastRuntimeCode().filter("replay_response_unknown"::equals).isPresent()
-                    ? RelationOperationStatus.Next.OPERATOR_RECONCILE : RelationOperationStatus.Next.RECOVER;
-            default -> RelationOperationStatus.Next.NONE;
-        };
+    /** The service's rule for what the caller does next (relation_review.next_operation_action): a legacy operation has nothing to do, an unproven review is repeated. */
+    private static RelationOperationStatus.Next expectedNext(Review review, boolean legacy) {
+        return legacy || review.state() == ReviewState.APPLIED ? RelationOperationStatus.Next.NONE : RelationOperationStatus.Next.RETRY_REVIEW;
     }
 
     /**
-     * A successful {@code review} answer is a recorded decision: 200 for a recorded reject or any replay of an applied operation, 202 only
-     * for a newly recorded allow whose revalidation is still pending. The 202 phase is provable, not incidental: the service adopts the
-     * event and builds the reply inside {@code with self._cli()} (relation_jobs.review), and the dispatcher can claim the new revalidation
-     * ({@code in_flight}, reported {@code running}) but cannot run or record it without the same gate (relation_dispatch._supervise_operation).
+     * A successful {@code review} answer is a recorded decision: always HTTP 200, whether the decision was just recorded (an allow is the
+     * final approval, a reject an exclusion) or the same key and body replayed an existing operation (a legacy one included). Anything
+     * unproven is not a recorded decision.
      */
-    static RelationOperationStatus reviewAccepted(RelationOperationStatus operation, boolean created) {
-        if (operation.review().state() != ReviewState.APPLIED || (created && !pendingAllow(operation))) {
+    static RelationOperationStatus reviewAccepted(RelationOperationStatus operation) {
+        if (operation.review().state() != ReviewState.APPLIED) {
             throw new Malformed("operation.review");
         }
         return operation;
-    }
-
-    /**
-     * A successful {@code recoverOperation} answer concerns the revalidation of a recorded allow. Its phase is not constrained further, also
-     * not for 202: the service builds that reply (relation_jobs.recover_operation) after the gate is released, so the dispatcher may already
-     * have advanced or finished the re-queued revalidation, and any coherent phase of an applied allow is a valid snapshot.
-     */
-    static RelationOperationStatus recoveryAccepted(RelationOperationStatus operation) {
-        if (operation.review().state() != ReviewState.APPLIED || operation.decision() != RelationDecision.ALLOW) {
-            throw new Malformed("operation.revalidation");
-        }
-        return operation;
-    }
-
-    private static boolean pendingAllow(RelationOperationStatus operation) {
-        RevalidationState state = operation.revalidation().state();
-        return operation.decision() == RelationDecision.ALLOW && (state == RevalidationState.QUEUED || state == RevalidationState.RUNNING);
     }
 
     private static Optional<Instant> optStamp(Obj obj, String name) {

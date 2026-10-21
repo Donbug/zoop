@@ -7,6 +7,7 @@ two-job world is `pipeline_tests/test_handoff_real_cli.py` and `scripts/handoff_
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import shutil
@@ -19,7 +20,7 @@ from typing import Any
 import pytest
 
 from handoff_support import (HANDOFF, OTHER_HANDOFF, PRINCIPAL, SOURCE_DATA, HandoffWorkspace, bundle_url, envelope, error_output, export_entry, full_bundle,
-                             manifest_of, mutated, status_url, withheld_output)
+                             manifest_of, mutated, status_url, structural, withheld_output)
 from support import canonical, document_replay
 from zoop_ai_service.handoff_doc import digest, example_bundle, pins
 
@@ -423,7 +424,7 @@ def test_a_bundle_whose_own_digest_or_identity_disagrees_with_its_content_is_ref
     service = start(workspace=ws)
     for change, code in ((lambda b: b["digests"].update(content="4" * 64), "runtime_binding_mismatch"),
                          (lambda b: b.update(handoffId=OTHER_HANDOFF), "runtime_binding_mismatch"),
-                         (lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-3"), "runtime_contract_mismatch")):
+                         (lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-unsupported"), "runtime_contract_mismatch")):
         bundle = example_bundle()
         change(bundle)
         serve(ws, bundle)
@@ -478,6 +479,22 @@ def _drop(path: tuple):
 MENTION = ("issues", 0, "mentions", 0)
 UNKNOWN_MENTION = [_set((*MENTION, "extra"), 1), _set((*MENTION, "participants", 0, "extra"), 1), _set((*MENTION, "publisher"), "x"), _set((*MENTION, "approval"), "none"),
                    _set((*MENTION, "fieldDecisions"), {}), _set((*MENTION, "sourceSupport"), [])]
+PROVENANCE = ("issues", 0, "fieldProvenance")
+UNKNOWN_PROVENANCE = [_set(("issues", 0, "fieldDecisions"), []), _set((*PROVENANCE, "extra"), 1), _set((*PROVENANCE, "fieldDecisions"), []),
+                      _set((*PROVENANCE, "sameValueMentions", "extra"), []), _set((*PROVENANCE, "sameValueMentions", "geography"), []),
+                      _set((*PROVENANCE, "sameValueMentions", "timePrecision"), []), _set((*PROVENANCE, "sameValueMentions", "title", 0, "extra"), 1),
+                      _set((*PROVENANCE, "sameValueMentions", "title", 0, "articleId"), "doc-" + "c" * 64)]
+MISSING_PROVENANCE = [_drop(PROVENANCE), *[_drop((*PROVENANCE, key)) for key in ("selection", "verification", "sameValueMentions")],
+                      *[_drop((*PROVENANCE, "sameValueMentions", key)) for key in ("title", "action", "target", "eventTime", "period", "assertionStatus")],
+                      *[_drop((*PROVENANCE, "sameValueMentions", "title", 0, key)) for key in ("documentId", "documentVersion", "mentionId")]]
+WRONG_PROVENANCE = [_set(PROVENANCE, None), _set((*PROVENANCE, "selection"), "consensus"), _set((*PROVENANCE, "selection"), None),
+                    _set((*PROVENANCE, "verification"), "verified"), _set((*PROVENANCE, "verification"), "operator-field-verdict"), _set((*PROVENANCE, "verification"), None),
+                    _set((*PROVENANCE, "sameValueMentions"), None), _set((*PROVENANCE, "sameValueMentions"), []),
+                    *[_set((*PROVENANCE, "sameValueMentions", key), value) for key in ("title", "action", "target", "eventTime", "period", "assertionStatus")
+                      for value in ([], None, {}, [0], [None])],
+                    _set((*PROVENANCE, "sameValueMentions", "title", 0, "documentVersion"), "short"), _set((*PROVENANCE, "sameValueMentions", "title", 0, "mentionId"), ""),
+                    _set((*PROVENANCE, "sameValueMentions", "title", 0, "documentId"), "bad id with space"),
+                    _set((*PROVENANCE, "sameValueMentions", "title"), [{"documentId": "synthetic-doc-1", "documentVersion": "a" * 64, "mentionId": "m-synthetic-1"}] * 1001)]
 MISSING_MENTION = [_drop(("issues", 0, "mentions")), *[_drop((*MENTION, key)) for key in
                    ("documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification", "title", "action", "target", "eventTime", "timePrecision",
                     "period", "assertionStatus", "background", "participants", "evidenceIds")],
@@ -491,10 +508,23 @@ WRONG_MENTION = [_set((*MENTION, "verification"), "verified"), _set((*MENTION, "
                  _set((*MENTION, "participants", 0, "companyId"), 5), _set((*MENTION, "participants", 0, "companyId"), "bad id with space"),
                  _set((*MENTION, "participants", 0, "role"), None), _set((*MENTION, "participants", 0, "name"), None),
                  _set((*MENTION, "participants", 0, "sourceCompanyId"), 5),
-                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-1")]
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-1"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-2"),
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-3"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-4")]
+VERDICTS = ("issues", 0, "fieldVerdicts")
+VERDICT = (*VERDICTS, 0)
+UNKNOWN_VERDICT = [_set((*VERDICT, "extra"), 1), _set((*VERDICT, "note"), "review prose"), _set((*VERDICT, "evidence"), []), _set((*VERDICT, "notes"), "x"),
+                   _set((*VERDICT, "candidateId"), "c-1")]
+MISSING_VERDICT = [_drop(VERDICTS), _drop((*PROVENANCE, "withheld")),
+                   *[_drop((*VERDICT, key)) for key in ("documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds", "verification",
+                                                         "reviewer", "decisionRef", "decisionVersion")]]
+WRONG_VERDICT = [_set(VERDICTS, None), _set(VERDICTS, {}), _set((*VERDICT, "field"), "title"), _set((*VERDICT, "value"), None), _set((*VERDICT, "decision"), "PASS"),
+                 _set((*VERDICT, "reasonCode"), "free text"), _set((*VERDICT, "verification"), "none"), _set((*VERDICT, "evidenceIds"), []),
+                 _set((*VERDICT, "evidenceIds"), [{"start": 0, "end": 1}]), _set((*VERDICT, "evidenceIds"), ["ev-bad"]),
+                 _set((*VERDICT, "decision"), "REJECT"), _set((*VERDICT, "reviewer"), "bad reviewer"), _set((*PROVENANCE, "withheld"), None),
+                 _set((*PROVENANCE, "withheld"), ["title"]), _set((*PROVENANCE, "withheld"), ["eventTime", "period", "period"])]
 
 
-@pytest.mark.parametrize("change", [*UNKNOWN, *UNKNOWN_MENTION], ids=lambda change: "unknown")
+@pytest.mark.parametrize("change", [*UNKNOWN, *UNKNOWN_MENTION, *UNKNOWN_PROVENANCE, *UNKNOWN_VERDICT], ids=lambda change: "unknown")
 def test_an_unknown_nested_field_is_refused_even_when_every_digest_and_pin_was_updated_to_match(tmp_path, start, change):
     ws = workspace(tmp_path)
     bundle = serve(ws, mutated(change))        # content digest, receipt, bundle digest and the operator's pin all describe THIS bundle
@@ -503,7 +533,8 @@ def test_an_unknown_nested_field_is_refused_even_when_every_digest_and_pin_was_u
     assert "bundle" not in response.json() and "KRX:005930" not in response.text and pins(bundle)["bundleDigest"] not in response.text
 
 
-@pytest.mark.parametrize("change", [*WRONG_TYPE, *WRONG_MENTION, *MISSING_MENTION], ids=lambda change: "type")
+@pytest.mark.parametrize("change", [*WRONG_TYPE, *WRONG_MENTION, *MISSING_MENTION, *MISSING_PROVENANCE, *WRONG_PROVENANCE, *MISSING_VERDICT, *WRONG_VERDICT],
+                         ids=lambda change: "type")
 def test_a_wrongly_typed_or_out_of_contract_value_is_refused_even_with_updated_digests(tmp_path, start, change):
     ws = workspace(tmp_path)
     serve(ws, mutated(change))
@@ -513,17 +544,116 @@ def test_a_wrongly_typed_or_out_of_contract_value_is_refused_even_with_updated_d
         assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch", response.text[:300]
 
 
-def test_a_current_answer_in_the_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
-    """The service knows only `zoop-graph-handoff-bundle-2`: a bundle-1 shaped export is never relayed, and the producer's own withheld answer for a handoff frozen
-    under bundle-1 reaches the caller as a 200 with that reason and nothing of the old receipt."""
+# ---- bundle 5: private path companies, structural paths and basis scopes ------------------------------------------------------------
+
+def _structural(hops: int, middle: str = "private", *changes):
+    def build(bundle: dict[str, Any]) -> None:
+        structural(bundle, hops, middle)
+        for change in changes:
+            change(bundle)
+    return build
+
+
+def _path(bundle: dict[str, Any]) -> dict[str, Any]:
+    return bundle["relations"][-1]["structuralPath"]
+
+
+@pytest.mark.parametrize("hops,middle", [(1, "private"), (2, "private"), (2, "main"), (2, "unmapped")])
+def test_a_structural_path_and_its_private_companies_are_relayed_exactly(tmp_path, start, hops, middle):
     ws = workspace(tmp_path)
-    legacy = mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [issue.pop("mentions") for issue in b["issues"]]))
-    serve(ws, legacy)
+    bundle = serve(ws, mutated(_structural(hops, middle)))
+    wire = get(start(workspace=ws), bundle_url()).json()
+    assert wire["bundle"] == bundle and sha(wire["bundle"]) == wire["verification"]["bundleDigest"]
+    path = wire["bundle"]["relations"][-1]["structuralPath"]
+    assert path["status"] == ("unavailable" if middle == "unmapped" else "complete")
+    assert [c["id"] for c in wire["bundle"]["pathCompanies"]] == (["KRX:000270"] if (hops, middle) == (2, "private") else [])
+    assert wire["verification"]["counts"]["pathCompanies"] == len(wire["bundle"]["pathCompanies"])
+    assert wire["bundle"]["relations"][0]["structuralPath"] is None           # INVOLVES carries an explicit null
+    assert wire["bundle"]["relations"][-1]["basis"][0]["businessScope"] == "합성 사업 범위" and wire["bundle"]["relations"][-1]["basis"][-1]["productScope"] in ("합성 제품 범위", None)
+
+
+def _reverse_link(bundle: dict[str, Any]) -> None:
+    link = _path(bundle)["links"][0]
+    link["supplierCompanyId"], link["customerCompanyId"] = link["customerCompanyId"], link["supplierCompanyId"]
+
+
+BUNDLE5_REFUSED = {
+    "unavailable_with_one_basis": _structural(1, "unmapped"),
+    "unavailable_reason": _structural(2, "unmapped", lambda b: _path(b).update(reason="anything")),
+    "orphan_private_company": _structural(1, "private", lambda b: (b["pathCompanies"].append({"id": "KRX:009999", "canonicalId": "co:orphan", "label": "고아", "decisionRef": "c"}),
+                                                                  b["counts"].update(pathCompanies=1))),
+    "used_middle_missing_from_catalogue": _structural(2, "private", lambda b: (b["pathCompanies"].clear(), b["counts"].update(pathCompanies=0))),
+    "private_company_also_public": _structural(2, "private", lambda b: (b["companies"].append(copy.deepcopy(b["pathCompanies"][0])), b["companies"].sort(key=lambda c: c["id"]),
+                                                                        b["counts"].update(companies=len(b["companies"])))),
+    "private_company_is_an_issue": _structural(2, "private", lambda b: b["pathCompanies"][0].update(id="issue:synthetic-supply")),
+    "path_companies_count": _structural(2, "private", lambda b: b["counts"].update(pathCompanies=2)),
+    "companies_count": _structural(1, "private", lambda b: b["counts"].update(companies=1)),
+    "path_on_involves": lambda b: b["relations"][0].update(structuralPath={"status": "unavailable", "reason": "intermediate_company_unmapped"}),
+    "missing_path_key": lambda b: b["relations"][0].pop("structuralPath"),
+    "null_path_on_structural": _structural(1, "private", lambda b: b["relations"][-1].update(structuralPath=None)),
+    "link_count": _structural(2, "private", lambda b: _path(b)["links"].pop()),
+    "link_endpoints": _structural(2, "private", lambda b: _path(b)["links"][0].update(customerCompanyId="KRX:000660")),
+    "repeated_company": _structural(2, "private", lambda b: _path(b).update(companyIds=["KRX:005930", "KRX:005930", "KRX:000660"])),
+    "path_ends_elsewhere": _structural(1, "private", lambda b: b["relations"][-1].update(target="KRX:005930")),
+    "target_is_a_participant": _structural(1, "private", lambda b: b["relations"].append({**copy.deepcopy(b["relations"][0]), "target": "KRX:000660", "id": "edge-x"})),
+    "start_is_not_a_participant": _structural(1, "private", lambda b: b["relations"].pop(0)),
+    "extra_path_key": _structural(1, "private", lambda b: _path(b).update(extra=1)),
+    "unknown_status": _structural(1, "private", lambda b: _path(b).update(status="partial")),
+    "three_hops": _structural(2, "private", lambda b: _path(b).update(companyIds=["KRX:005930", "KRX:000270", "KRX:000660", "KRX:001"])),
+    "oversized_business_scope": _structural(1, "private", lambda b: b["relations"][-1]["basis"][0].update(businessScope="x" * 501)),
+    "oversized_product_scope": _structural(1, "private", lambda b: b["relations"][-1]["basis"][0].update(productScope="가" * 501)),
+    "scope_not_text": _structural(1, "private", lambda b: b["relations"][-1]["basis"][0].update(businessScope=["x"])),
+    "missing_scope": _structural(1, "private", lambda b: b["relations"][-1]["basis"][0].pop("productScope")),
+}
+
+
+@pytest.mark.parametrize("change", [pytest.param(change, id=name) for name, change in BUNDLE5_REFUSED.items() if change is not None])
+def test_a_malformed_or_unclosed_structural_path_is_refused_even_with_updated_digests(tmp_path, start, change):
+    ws = workspace(tmp_path)
+    serve(ws, mutated(change))
     service = start(workspace=ws)
     for url in (bundle_url(), status_url()):
         response = get(service, url)
-        assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch" and "bundle" not in response.json()
-        assert "KRX:005930" not in response.text and pins(legacy)["bundleDigest"] not in response.text
+        assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch", response.text[:300]
+
+
+def test_a_supplier_customer_direction_is_relayed_as_the_producer_states_it_and_scopes_at_the_limit_are_accepted(tmp_path, start):
+    ws = workspace(tmp_path)
+    bundle = serve(ws, mutated(_structural(2, "private", _reverse_link, lambda b: b["relations"][-1]["basis"][0].update(businessScope="가" * 500, productScope="x" * 500))))
+    wire = get(start(workspace=ws), bundle_url()).json()
+    assert wire["bundle"] == bundle and _path(wire["bundle"])["links"][0] == {"supplierCompanyId": "KRX:000270", "customerCompanyId": "KRX:005930"}
+
+
+def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
+    """The service knows only `zoop-graph-handoff-bundle-5`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`), a
+    bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`) or a bundle-4 shaped export (no `pathCompanies`/`structuralPath`/basis scopes) is never relayed,
+    and the producer's own withheld answer for a handoff frozen under any of them reaches the caller as a 200 with that reason and nothing of the old receipt."""
+    ws = workspace(tmp_path)
+    service = start(workspace=ws)
+
+    def four() -> dict[str, Any]:
+        """A genuine bundle-4 shape: no pathCompanies/structuralPath/scopes, sealed over the HISTORICAL five content lists (never the current-schema seal)."""
+        b = copy.deepcopy(example_bundle())
+        b["schemaVersion"] = "zoop-graph-handoff-bundle-4"
+        del b["pathCompanies"], b["counts"]["pathCompanies"]
+        for relation in b["relations"]:
+            del relation["structuralPath"]
+        b["manifestDigest"] = digest(manifest_of(b))
+        b["digests"]["content"] = digest({key: b[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+        return b
+
+    earlier = (mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [(issue.pop("mentions"), issue.pop("fieldProvenance"), issue.pop("fieldVerdicts"))
+                                                                                       for issue in b["issues"]])),
+               mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [(issue.pop("fieldProvenance"), issue.pop("fieldVerdicts")) for issue in b["issues"]])),
+               mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-3"), [(issue.pop("fieldVerdicts"), issue["fieldProvenance"].pop("withheld"))
+                                                                                       for issue in b["issues"]])),
+               four())
+    for legacy in earlier:
+        serve(ws, legacy)
+        for url in (bundle_url(), status_url()):
+            response = get(service, url)
+            assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch" and "bundle" not in response.json()
+            assert "KRX:005930" not in response.text and pins(legacy)["bundleDigest"] not in response.text
     ws.script({"mode": "result", "output": withheld_output(code="handoff_contract_changed"), "exit": 2})
     for url in (status_url(), bundle_url()):
         wire = get(service, url).json()

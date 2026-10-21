@@ -25,6 +25,21 @@
       "minimum": 1
     },
     "query.limit:required": false,
+    "response:200:application/json.items[].assertionStatus:required": true,
+    "response:200:application/json.items[].assertionStatus<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "occurred",
+        "announced",
+        "planned",
+        "forecast",
+        "cancelled",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.items[].assertionStatus<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.items[].relationTypes": {
       "type": "array",
       "uniqueItems": true
@@ -44,6 +59,21 @@
       ]
     },
     "response:200:application/json.nextCursor:required": true,
+    "response:200:application/json.unknownTimeItems[].assertionStatus:required": true,
+    "response:200:application/json.unknownTimeItems[].assertionStatus<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "occurred",
+        "announced",
+        "planned",
+        "forecast",
+        "cancelled",
+        "unknown"
+      ]
+    },
+    "response:200:application/json.unknownTimeItems[].assertionStatus<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:application/json.unknownTimeItems[].relationTypes": {
       "type": "array",
       "uniqueItems": true

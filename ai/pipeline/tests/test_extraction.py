@@ -380,7 +380,7 @@ def test_same_job_different_input_or_fixture_conflicts_and_wire_is_closed(world)
         with pytest.raises(Exception):
             k.job("run", bad, replay=replay)
     live = k.run("run", {**request, "provenance": {**request["provenance"], "executionMode": "live", "recordingKind": "provider"}}, replay=replay, expected=2)
-    assert live["error"]["code"] == "live_mode_unsupported"
+    assert live["error"]["code"] == "fixture_not_allowed"
     assert k.run("run", {**request, "unknown": 1}, replay=replay, expected=2)["error"]["code"] == "input_or_configuration_invalid"
 
 
@@ -861,7 +861,7 @@ def test_submit_cli_requires_the_replay_fixture_and_refuses_topic_fixture_and_li
     live = {**request, "provenance": {**request["provenance"], "executionMode": "live", "recordingKind": "provider"}}
     assert k.run("submit", request, expected=2)["error"]["code"] == "replay_fixture_required"
     assert k.run("submit", request, replay=replay, topic=topic_replay(k, "t", {}), expected=2)["error"]["code"] == "fixture_not_allowed"
-    assert k.run("submit", live, replay=replay, expected=2)["error"]["code"] == "live_mode_unsupported"
+    assert k.run("submit", live, replay=replay, expected=2)["error"]["code"] == "fixture_not_allowed"  # a live job takes no authored fixture
     assert k.run("submit", {**request, "unknown": 1}, replay=replay, expected=2)["error"]["code"] == "input_or_configuration_invalid"
     assert not (k.root / "extraction").exists()
     queued = k.run("submit", request, replay=replay, forbid_execution=True)

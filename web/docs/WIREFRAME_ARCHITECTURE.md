@@ -75,6 +75,7 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | 브리핑 운영         | /admin/briefings                                | admin/briefings/AdminBriefingsPage.tsx         | 관리자                                  | A-ADM-04                     |
 | AI 운영             | /admin/ai                                       | admin/ai/AdminAiPage.tsx                       | 관리자                                  | A-ADM-04b                    |
 | 회원 관리           | /admin/members                                  | admin/members/AdminMembersPage.tsx             | 관리자                                  | A-ADM-05                     |
+| 회원 상세           | /admin/members/:memberId                        | admin/members/AdminMemberDetailPage.tsx        | 관리자                                  | A-ADM-05                     |
 | 감사 로그           | /admin/audit                                    | admin/audit/AdminAuditPage.tsx                 | 관리자                                  | A-ADM-05b                    |
 
 온보딩은 원본에서 모두 /onboarding이다. 이번 구조에서는 직접 진입·뒤로 가기·단계 분리를 위해 하위 경로를 제안했다. 가입 성공/투자 여부에 따른 자동 분기와 완료 저장은 API 연결 시 구현한다. 현재 단계 내비게이션은 파일 골조를 확인하는 링크다.
@@ -121,8 +122,8 @@ PDF 주석의 원본 페이지 번호와 이 파일의 실제 페이지를 혼�
 | `components/admin/pipeline/PipelineReview.tsx`      | 그래프 관제·검수  | A-ADM-03                    | 후보·공개 버전·작업 상태를 연결한다. 검수 권한과 R1 정책은 확정 필요하다.                                                                                     |
 | `components/admin/briefings/BriefingOperations.tsx` | 브리핑 회차·이력  | A-ADM-04                    | 회차별 데이터 기준 시점·단계 상태·실패 사유(커서)와 발행 원문·정정·처리 기록을 보여 주고, 사유를 받아 재처리·정정·제공 중단/재개를 요청한다(Idempotency-Key). |
 | `components/admin/ai/AiUsageOverview.tsx`           | AI 사용량·오류    | A-ADM-04b                   | 기능별 요청·실제 모델 호출·재사용·재시도·처리 시간·토큰과 실제/추정 비용을 구분한다. 모르는 값은 0으로 채우지 않는다.                                         |
-| `components/admin/members/MemberManagement.tsx`     | 회원·접근 관리    | A-ADM-05                    | 가명 ID·마스킹 이메일·정상/차단 필터와 접근 권한을 연결한다.                                                                                                  |
-| `components/admin/audit/AuditLogTable.tsx`          | 관리자 감사 로그  | A-ADM-05b                   | 기존 감사 기록의 동작·대상·사유·행위자를 조회한다.                                                                                                            |
+| `components/admin/members/MemberManagement.tsx`     | 회원·접근 관리    | A-ADM-05                    | 가명 ID·가린 이메일·활동 요약과 정상/차단 필터·검색(커서)을 보여 준다. 회원 상세에서 사유를 받아 차단·해제한다(Idempotency-Key).                              |
+| `components/admin/audit/AuditLogTable.tsx`          | 관리자 감사 로그  | A-ADM-05b                   | 감사 기록의 시각·주체·동작·대상·결과·사유를 동작 필터·검색(커서)으로 조회한다. 기록은 만들거나 고치지 않는다.                                                 |
 | `components/evidence/EvidenceDrawer.tsx`            | 근거 창           | D-GRP-05                    | 대상별 출처·인용·발행/검증 시각, 성공 근거 유지 및 실패 부분 재시도                                                                                           |
 | `components/ai/AiChatDrawer.tsx`                    | AI 서랍           | D-AI-01/01b/02/02b          | 연결 대상·초안·대화 회수·새 요청, 닫기 후 맥락 유지                                                                                                           |
 

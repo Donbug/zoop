@@ -103,8 +103,8 @@ public final class DocumentImporter {
             outcome = registration.register(new RegistrationCommand(
                     document.observation().documentId(), document.observation().documentVersion(),
                     document.observation().sourceId(), item.kind(), document.textArtifactId(), file.uri(), file.sha256(),
-                    file.bytes(), document.title(), document.url(), document.publishedAt(), document.publishedDate(),
-                    document.publicationPrecision(), collectedAt, item.pointer()));
+                    file.bytes(), document.title(), document.url(), document.publisher(), document.publishedAt(),
+                    document.publishedDate(), document.publicationPrecision(), collectedAt, item.pointer()));
         } catch (DocumentImportException rolledBack) {
             if (session.discard(file)) {
                 log.info("document import item {} removed the text file it had created", index);

@@ -39,6 +39,17 @@ def _safe(value: str) -> str:
 Safe = Annotated[str, AfterValidator(_safe)]
 
 
+def _reviewer(value: str) -> str:
+    """The approving principal's name as the S3 review wire carries it: bounded, non-blank free text. It is data, never an identifier pattern, so it is
+    relayed exactly (not redacted, not normalised); only an empty/blank or over-long value is invalid."""
+    if not value.strip() or len(value) > 200:
+        raise ValueError("reviewer must be non-blank and at most 200 characters")
+    return value
+
+
+Reviewer = Annotated[str, AfterValidator(_reviewer)]
+
+
 class Wire(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
 

@@ -37,17 +37,22 @@ final class ExtractionWire {
         PipelineJob.State state = root.choice("state", PipelineWire.parser(PipelineJob.State.class));
         PipelineJob.Delivery delivery = PipelineWire.delivery(root.object("delivery"));
         PipelineWire.requireDeliveryFitsState(root, state, delivery);
+        PipelineJob.Provenance provenance = PipelineWire.provenance(root.object("provenance"));
         return new ExtractionJobStatus(
                 jobId,
                 root.string("inputDigest", Obj.SHA256),
                 root.object("approval").string("approvedRequestDigest", Obj.SHA256),
-                PipelineWire.provenance(root.object("provenance")),
+                provenance.sourceKind(),
+                provenance.executionMode(),
                 state,
                 root.string("phase", Obj.SAFE),
                 root.choice("resumeMode", PipelineWire.parser(PipelineJob.ResumeMode.class)),
                 PipelineWire.failure(root),
                 new ExtractionJobStatus.Usage(usage.count("replayCalls"), usage.count("startedWithoutReceipt"),
-                        usage.count("providerCalls"), usage.count("paidModelCalls")),
+                        usage.count("providerCalls"), usage.count("paidModelCalls"), usage.count("receivedCalls"), usage.count("unsentCalls"),
+                        Optional.ofNullable(usage.optCount("inputTokens")), Optional.ofNullable(usage.optCount("outputTokens")),
+                        Optional.ofNullable(usage.optCount("reasoningTokens")), usage.optString("estimatedUsd", Obj.SAFE),
+                        usage.optString("chargedUsd", Obj.SAFE)),
                 stages,
                 delivery,
                 PipelineWire.dispatch(root.object("dispatch")),

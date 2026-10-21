@@ -1050,7 +1050,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listEvents · 기업·기간별 사건 타임라인 조회
 
-기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다.
+기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각이며 오프셋이 있는 to는 그 시각을 포함한다(getCompanyPrices와 같음). 승인된 사건 시각이 있는 사건은 그 기간(연·월·일은 KST 그 기간 전체, 시각은 그 시각)이 범위와 겹치면 items에 든다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1309,7 +1309,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다. 확인 질문 사슬은 루트 질문부터 최대 2회다. 확인 답에 대한 답(깊이 2) 작업도 대상·기간이 확정되면 정상 처리해 answered 등의 결과를 내고, 도구 장애는 failed다. 추가 확인이 필요할 때만 clarification 대신 대상·기간을 구체적으로 적은 새 질문을 안내하는 guidance로 끝난다. 확인 답은 루트 질문과 사슬의 답을 순서대로 합쳐 실행한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1323,7 +1323,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | WBS | 6.1.2, 6.11.1, 6.6.10, 6.9.1, 6.9.2, 6.9.3, 6.9.4, 6.9.5, 6.9.6, 6.9.10, 6.9.11, 6.9.12, 6.9.13, 6.9.14, 6.5.7 |
 | 프로토타입 대응 | /api/chat/sessions/{id}/jobs |
 | 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF는 규칙 기반/예시 엔진이다. 목표는 실제 근거 기반 분석·검증·저장 및 asOf/graphVersion을 고정한다. |
-| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회·ChatJob 30초 등 초기값은 ZOOP-AIG-001 v0.7을 적용하고 변경 시 정책·평가 버전을 함께 올린다. |
+| 팀 확인 필요 | 대화·작업·멱등성 키의 실제 보존 기간과 배포 모델·외부 전송 승인을 출시 전에 등록해야 한다., Jev 0.70/0.35, MCP 12회·동시 4회, 단계별 시간 상한과 경로별 실행 기한(최대 60초)·재실행 3회 등 초기값은 ZOOP-AIG-001 v0.8을 적용하고, 시간 상한은 출시 전 단계별 p95 실측으로 보정하며 변경 시 정책·평가 버전을 함께 올린다. |
 
 ### 요청 필드
 
@@ -1649,9 +1649,9 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 <a id="decideanalysiscandidate"></a>
 
-## decideAnalysisCandidate · 후보 거부 또는 재검증 대상으로 전환
+## decideAnalysisCandidate · 후보 거부 또는 운영자 최종 승인
 
-관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·재검증 작업·감사를 성공으로 기록하지 않는다. allow는 재검증 대상으로만 전환한다. 필수 근거 확인 및 자동 검증 통과 전에 공개할 수 없다. 결정·재검증·공개는 별도 기록이다.
+관리자는 후보 상세에서 확인한 대상별 revision과 AI 원천 sourceVersion/sourceRevision을 expectedRevision/expectedSourceVersion/expectedSourceRevision으로 보낸다. relationId가 있으면 세 기대값은 해당 relation의 값이다. 서버는 대상·현재 AI 원천을 다시 확인하고 하나라도 다르면 REVISION_CONFLICT/409로 거절하며 결정·감사를 성공으로 기록하지 않는다. allow는 현재 HOLD인 대상에 대한 운영자의 최종 승인이다(2026-10-21 사용자 정책, DecisionResponse.decision=approved). 재검증·모델 호출·작업 접수가 아니며 jobId를 만들지 않는다. 대상이 HOLD가 아니거나 응답 없는 모델 호출이 남아 있는 등 현재 상태와 맞지 않으면 REVISION_CONFLICT/409다. 결정성 검사(스키마·endpoint·정확한 인용 좌표·현재 원천 권리)는 사람이 덮어쓸 수 없으며 통과하지 못하거나 원천이 철회됐으면 VALIDATION_FAILED/422다. 기존 자동 검증 판정과 claim 분포는 이력으로 그대로 남고 수동 승인이 자동 검증을 통과한 것으로 표시되지 않는다. reject는 대상을 제외한다. 이미 ALLOW인 대상의 승인과 확정된 reject의 번복은 이 계약 범위 밖이다. 승인은 공개·그래프 활성화가 아니므로 publicChanged는 항상 false이며 투영과 활성화는 별도 기록이다. 승인 근거(approvalBasis)는 내부 감사 메타데이터이며 이 응답에 넣지 않는다. 이전 계약의 allow(재검증 접수, revalidation_requested, jobId)는 이력으로만 보존하며 승인으로 소급하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1664,8 +1664,10 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | 화면 | [A-ADM-03](../../system/out/screen-A-ADM-03.md) |
 | WBS | 6.1.2, 6.11.1, 6.10.7, 6.10.16, 6.5.5 |
 | 프로토타입 대응 | /api/admin/pipeline/candidates/{candidate_id}/decision |
-| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., BFF allow 처리와 목표의 재검증 접수·expectedRevision·expectedSourceVersion·expectedSourceRevision·비공개 유지 규칙을 대조한다. |
-| 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |
+| 목표와 차이 | /api → /api/v1 경로 버전, 공통 오류 코드·요청 ID·세션 보안 규칙 적용., 프로토타입 BFF의 allow는 후보를 곧바로 공개 그래프 반영 경로에 올리며 expectedSourceVersion/expectedSourceRevision 대조(CAS)가 없고 응답도 decision/idempotent/onUserGraph 형태다. 목표의 HOLD 한정 최종 승인·결정성 검사 재확인·원천 CAS·publicChanged=false(승인≠공개)와 다르며 깨끗한 본개발 소비자로 보지 않는다. 프로토타입 BFF/UI 이전은 이번 계약 정렬 범위 밖이다. |
+| 팀 확인 필요 | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다., allow=HOLD 최종 승인(재검증 아님)은 2026-10-21 사용자 정책이다. 원문 FS067-02의 '재검증' 문구와 팀 합의로 확인되지 않았으므로 팀이 원문 정정 또는 확정을 해야 한다. |
+
+명세 의미 구분: FS067-02: 원문(2026-10-18 고정본)의 '허용은 재검증 대상 전환'은 보존한다. 2026-10-21 사용자 정책은 허용을 HOLD에 대한 운영자 최종 승인으로 해석하며 재검증 작업을 만들지 않는다. 팀 확정이 아니다.
 
 ### 요청 필드
 
@@ -2243,7 +2245,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 ## getInsightsOverview · 사용 통계 개요 조회
 
-사용 통계 개요 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+7일 사용 통계 개요를 조회한다. 기준 시각은 응답 asOf이며 기간은 asOf가 속한 KST 날짜를 포함한 최근 7개 달력일이다. 원천이 미연결·조회 불가인 지표는 0 대신 availability 상태와 null 값으로 표현한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2269,7 +2271,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 ## getInsightsSummary · 사용 통계와 산식 조회
 
-사용 통계와 산식 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기간별 사용 통계와 산식을 조회한다. 7d는 asOf가 속한 KST 날짜를 포함한 최근 7개 달력일, 30d는 최근 30개 달력일, all은 첫 원천 기록부터 asOf까지다. 시작일 00:00 KST는 포함하고 asOf는 제외한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2289,14 +2291,14 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| window | query | 선택 | string {7d, 30d, all} |  |
+| window | query | 선택 | string {7d, 30d, all} | 기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="listcompanyinsights"></a>
 
 ## listCompanyInsights · 기업별 활동 집계 조회
 
-기업별 활동 집계 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업별 활동 집계를 조회한다. 활동은 선택한 기간 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다. 첫 페이지에서 정렬 결과 전체를 스냅샷으로 고정하며 nextCursor는 30분 동안 같은 스냅샷의 다음 페이지를 반환한다. limit은 1~100이며 기본값은 50이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2316,16 +2318,16 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| window | query | 선택 | string {7d, 30d, all} |  |
+| window | query | 선택 | string {7d, 30d, all} | 기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
-| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본값 50, 허용 범위 1~100. |
 
 <a id="getcompanyinsights"></a>
 
 ## getCompanyInsights · 기업별 일별 활동 조회
 
-기업별 일별 활동 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업별 일별 활동을 조회한다. 일별 활동은 KST 달력일 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2346,7 +2348,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | company_id | path | 필수 | string |  |
-| window | query | 선택 | string {7d, 30d, all} |  |
+| window | query | 선택 | string {7d, 30d, all} | 기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getfeedbacksummary"></a>
@@ -2471,7 +2473,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## listMembers · 회원 활동 목록 조회
 
-회원 활동 목록 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 활동 목록 조회. 활동 기간은 [회원 생성 시각, metadata.asOf)이며 세션은 만료·회수 여부와 무관하게 생성된 member 세션을 센다. 저장 원천이 없는 지표는 null이고 metadata.failures에 SOURCE_UNAVAILABLE을 남긴다. cursor는 status·q·limit과 결합한 불투명 키셋이며 회원 상태가 페이지 사이에 바뀌는 경우 각 페이지 읽기 시점의 상태를 반영한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2492,16 +2494,16 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | status | query | 선택 | string {active, blocked} / null |  |
-| q | query | 선택 | string / null | Matches the pseudonymous id or the masked e-mail |
+| q | query | 선택 | string / null | 가명 회원 ID 또는 정규화된 전체 이메일의 정확 일치. 응답 이메일은 항상 마스킹한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
-| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본값 50, 최대 100. |
 
 <a id="getmemberactivity"></a>
 
 ## getMemberActivity · 회원 활동 상세 조회
 
-회원 활동 상세 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 활동 상세 조회. 조회는 회원·세션 상태를 변경하지 않으며 대화·AI 결과·브리핑 원문을 읽거나 반환하지 않는다. 활동 기간과 unavailable 표현은 목록과 같다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2528,13 +2530,13 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 ## blockMember · 회원 차단 및 세션 회수
 
-회원 차단 및 세션 회수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 차단 및 활성 member 세션 회수. expectedRevision이 현재 statusRevision과 같아야 하며 실제 변경 시 revision을 증가시킨다. 같은 Idempotency-Key와 같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다. 이 작업의 완료 레코드는 별도 보존 만료 정책이 도입되기 전까지 자동 삭제하지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/members/{member_id}/block` |
 | 권한·우선순위 | 관리자(작업별 권한) · P2 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [MemberStatusRequest](#schema-memberstatusrequest) |
 | 응답 | 200: [MemberStatusResult](#schema-memberstatusresult), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS069-02](../../system/out/feature-FS069-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -2553,19 +2555,19 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [MemberStatusRequest](#schema-memberstatusrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="unblockmember"></a>
 
 ## unblockMember · 회원 차단 해제
 
-회원 차단 해제.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+회원 차단 해제. expectedRevision이 현재 statusRevision과 같아야 한다. 해제는 신규 로그인을 허용하지만 이전에 회수된 세션을 복구하지 않는다. 같은 Idempotency-Key 재전송 규칙과 완료 레코드 보존은 차단과 같다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/members/{member_id}/unblock` |
 | 권한·우선순위 | 관리자(작업별 권한) · P2 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [MemberStatusRequest](#schema-memberstatusrequest) |
 | 응답 | 200: [MemberStatusResult](#schema-memberstatusresult), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS069-02](../../system/out/feature-FS069-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -2584,7 +2586,7 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [MemberStatusRequest](#schema-memberstatusrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="getcompanyfinancials"></a>
 
@@ -3322,6 +3324,18 @@ A candidate a publication rule covers: whether it is on the user graph through t
 | kind | 필수 | string |  |
 | label | 필수 | string |  |
 
+<a id="schema-chatanswersection"></a>
+
+### ChatAnswerSection
+
+answered 본문의 근거 수준별 구간.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| basis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded} | 이 구간의 근거 수준. general_knowledge 구간은 서버가 고정 안내 문장 '일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.'로 시작하고 최신 사실·수치·전망·투자 판단을 담지 않는다. |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] (uniqueItems) | 이 구간의 사실 주장이 연결된 근거. 모두 result.citations의 evidenceId여야 하며 general_knowledge 구간은 빈 배열이다. zoop_documented 구간은 sourceKind=zoop_doc, evidence_grounded 구간은 sourceKind=article 인용만 가리킨다. |
+
 <a id="schema-chatapplied"></a>
 
 ### ChatApplied
@@ -3371,7 +3385,18 @@ What the answer was actually built on.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | label | 필수 | string |  |
-| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. |
+| kind | 필수 | string {company, period, scope, snapshot, other} | 확인해야 할 선택지의 종류. id는 서버가 다시 해석할 수 있는 불투명 값이며 클라이언트가 DB 식별자로 가정하지 않는다. 회원이 고른 선택지는 새 질문의 resolves.choiceId로 그대로 돌려보낸다. |
+
+<a id="schema-chatclarificationreply"></a>
+
+### ChatClarificationReply
+
+확인 질문(clarification)에 대한 답. 서버는 루트 질문·사슬의 이전 답·고정 문맥과 이 선택을 합쳐 새 작업을 실행하며 원 작업은 바꾸지 않는다. 확인 질문 사슬은 최대 2회다. 깊이 2 작업도 정상 처리하며, 추가 확인이 필요할 때만 clarification 대신 guidance로 끝난다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| jobId | 필수 | string | 답하는 원 작업. 같은 대화에 속하고 completed·outcome=clarification이어야 한다. |
+| choiceId | 필수 | string, null | 원 작업 result.choices[].id 중 하나. null이면 선택지 대신 question에 쓴 자유 입력이 답이다. |
 
 <a id="schema-chatcontextitem"></a>
 
@@ -3428,10 +3453,10 @@ What the member had selected when asking: graph targets, optional evidence refer
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} |  |
-| reason | 필수 | string / null |  |
+| kind | 필수 | string {validation_failed, save_failed, result_lost, transient, budget_exceeded, permission_denied, internal} | transient: 같은 고정 문맥으로 다시 실행하면 달라질 수 있는 시간 초과·공급자 오류. 재실행 가능 여부는 retry로 판단하며, 모델 응답 불명(response_unknown)은 중복 호출·과금을 막기 위해 retry=null이다. budget_exceeded: 같은 입력이면 반드시 다시 넘는 크기 한도(rerun 불가, 범위를 좁힌 새 질문 안내). |
+| reason | 필수 | string / null | 기계 판독용 원인 코드. transient: deadline_guard(시작 전 잔여 기한 부족), provider_error(송신 전 연결 실패·처리 거부가 명시된 오류·형식 불일치 응답), tool_timeout(읽기 전용 MCP 조회 상한 초과), response_unknown(모델 송신 후 응답 불명, retry=null). budget_exceeded: context_too_large, output_limit. UI 문구와 관리자 집계의 기준이다. |
 | message | 필수 | string |  |
-| retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. |
+| retry | 필수 | string {rerun, save_only} / null | What 'retry' would do: rerun the same job with its frozen context, or only save the kept verified result. null = not allowed. rerun은 작업당 실행 3회(runs ≤ 3)까지이며 이후에는 null이다. reason=response_unknown이면 처음부터 null이다. |
 
 <a id="schema-chatfrozencontext"></a>
 
@@ -3460,12 +3485,14 @@ The selection frozen when the question was first received.
 | seq | 필수 | integer |  |
 | question | 필수 | string |  |
 | status | 필수 | string {queued, running, completed, failed, cancelled} |  |
+| phase | 필수 | string {planning, retrieving, writing, verifying} / null | running 중 현재 단계(질문 이해·자료 확인·답변 작성·검증). queued와 종료 상태에서는 null이다. 진행 표시용이며 검증 전 본문을 노출하지 않는다. 자료 조회가 없는 경로는 retrieving을 건너뛴다. |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} / null |  |
 | askedAt | 필수 | string (date-time) | UTC time the question was first received; relative dates are read against its KST day |
 | context | 필수 | [ChatFrozenContext](#schema-chatfrozencontext) |  |
+| resolves | 필수 | [ChatClarificationReply](#schema-chatclarificationreply) / null | 이 작업이 답한 확인 질문. 최초 접수 때 고정되며 확인 질문 답이 아니면 null이다. |
 | failure | 필수 | [ChatFailure](#schema-chatfailure) / null |  |
 | result | 필수 | [ChatResult](#schema-chatresult) / null | Only a saved result; null until the job is completed |
-| runs | 필수 | integer | Executions started so far (a retry starts another) |
+| runs | 필수 | integer | Executions started so far (a rerun starts another). 모델을 호출한 실행만 세며 최대 3이다. save_only는 세지 않는다. |
 | createdAt | 필수 | string (date-time) |  |
 | updatedAt | 필수 | string (date-time) |  |
 | finishedAt | 필수 | string (date-time) / null |  |
@@ -3474,13 +3501,26 @@ The selection frozen when the question was first received.
 
 ### ChatJobRequest
 
-
+새 질문 또는 확인 질문에 대한 답. resolves가 있으면 context를 보내지 않으며 서버가 원 작업의 고정 문맥을 이어받는다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | jobId | 필수 | string | Client-made idempotency key of this question (not a request-trace id). Resending it never asks twice. |
-| question | 필수 | string |  |
+| question | 필수 | string | 질문 원문. resolves가 있으면 회원에게 보일 답(선택지 label 또는 자유 입력)이다. |
 | context | 선택 | [ChatContextRequest](#schema-chatcontextrequest) |  |
+| resolves | 선택 | [ChatClarificationReply](#schema-chatclarificationreply) |  |
+
+<a id="schema-chatlimitation"></a>
+
+### ChatLimitation
+
+answered 결과에서 답하지 않은 요구 하나와 그 이유.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| kind | 필수 | string {investment_advice, precondition_unmet, results_truncated, evidence_insufficient, out_of_scope} | investment_advice: 투자 판단 요청이라 제공하지 않음. precondition_unmet: 앞 단계 결과가 체크포인트 조건에 못 미쳐 의존 요구를 수행할 수 없음. results_truncated: 조회 상한에 걸려 일부 자료만 확인함. evidence_insufficient: 조회는 성공했으나 이 요구의 공개 근거가 부족함. out_of_scope: 지원하지 않는 하위 요구. 서버가 gate·체크포인트·도구 결과로 정하며 모델 자기평가로 정하지 않는다. |
+| label | 필수 | string | 해당 요구를 회원 질문의 표현으로 나타낸 문구 |
+| message | 필수 | string | kind별 서버 템플릿으로 만든 안내 문장 |
 
 <a id="schema-chatperiod"></a>
 
@@ -3503,15 +3543,17 @@ The selection frozen when the question was first received.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string |  |
-| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. Q02 일반 개념은 general_knowledge, 승인된 ZOOP 도움말·정책은 zoop_documented, 공개 근거 기반 사실은 evidence_grounded, 둘 이상을 명시적으로 결합하면 mixed, 답변 본문이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가가 아니라 서버 계획과 검증 결과로 정한다. |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. |
+| sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
+| answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
 | sources | 필수 | string[] (uniqueItems) |  |
 | citations | 필수 | [Citation](#schema-citation)[] |  |
-| graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] |  |
+| graphTargets | 필수 | [GraphTarget](#schema-graphtarget)[] | 답변 본문이 실제로 가리키는 기업·이슈·관계로 지도에서 열 대상이다. 답변 생성에 쓴 그래프 context 전체(노드 50개·간선 50개 상한)가 아니라 그 부분집합이며, 모두 같은 graphVersion의 도구 결과에 있어야 한다. |
 | applied | 필수 | [ChatApplied](#schema-chatapplied) |  |
-| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 새 질문으로 접수한다. |
+| choices | 필수 | [ChatChoice](#schema-chatchoice)[] | clarification: 기업·기간·범위·스냅샷 중 회원이 고를 수 있는 선택지. 선택은 원 작업을 수정하지 않고 resolves.choiceId를 담은 새 질문으로 접수한다. |
 | action | 필수 | [ChatAction](#schema-chataction) / null | guidance: what the member can do to meet the missing condition |
+| limitations | 필수 | [ChatLimitation](#schema-chatlimitation)[] | answered에서 답하지 않은 요구. 모든 필수 요구는 본문에서 근거와 함께 답했거나 이 배열의 항목 중 정확히 하나에 속한다. answered가 아니면 빈 배열이며 전체 이유는 reason을 쓴다. 도구 장애·timeout은 항목이 아니라 failed다. |
 | metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-chatsessionresponse"></a>
@@ -3534,11 +3576,14 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| evidenceId | 필수 | string |  |
+| sourceKind | 필수 | string {article, zoop_doc} | article: 뉴스·공시 원문(articleId·articleVersion 필수, docId·docVersion null). zoop_doc: 승인된 ZOOP 도움말·화면 명세·정책 문서(docId·docVersion 필수, articleId·articleVersion·publisher·publishedAt·url은 null, articleTitle에는 문서 제목). zoop_documented 구간은 zoop_doc 인용만, evidence_grounded 구간은 article 인용만 쓴다. |
+| evidenceId | 필수 | string | 인용 식별자. article이면 evidence ID, zoop_doc이면 서버가 문서 ID·버전·구간으로 만든 결정적 ID다. sections[].evidenceIds가 이 값을 가리킨다. |
 | quote | 필수 | string |  |
-| articleId | 필수 | string |  |
-| articleVersion | 필수 | string |  |
-| start | 필수 | integer |  |
+| articleId | 필수 | string, null |  |
+| articleVersion | 필수 | string, null |  |
+| docId | 필수 | string, null |  |
+| docVersion | 필수 | string, null |  |
+| start | 필수 | integer | 고정 원문 버전의 Unicode code point 기준 [start,end) 시작 |
 | end | 필수 | integer |  |
 | articleTitle | 필수 | string / null |  |
 | publisher | 필수 | string / null |  |
@@ -3712,10 +3757,10 @@ The selection frozen when the question was first received.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | date | 필수 | string (date) |  |
-| nodeViews | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| issueSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| nodeViews | 필수 | integer | Accepted graph_node_select events for this company, deduplicated by idempotency key. Despite the legacy field name, this is a selection count, not an impression count. |
+| edgeSelections | 필수 | integer, null | Accepted graph_edge_select events attributable to this company; null until a reliable edge-to-company mapping source is integrated. |
+| issueSelections | 필수 | integer, null | Briefing issue opens attributed to this company only when the issue-to-company mapping is unambiguous; null when that mapping source is unavailable. |
+| aiQuestions | 필수 | integer, null | Number of AI question submissions attributed to this company; null until a source is integrated, zero when the source is available and has no events. |
 
 <a id="schema-companystatrow"></a>
 
@@ -3728,11 +3773,11 @@ The selection frozen when the question was first received.
 | companyId | 필수 | string |  |
 | name | 필수 | string |  |
 | ticker | 필수 | string / null |  |
-| watchlistMembers | 필수 | integer |  |
-| holdingMembers | 필수 | integer |  |
-| nodeViews | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| watchlistMembers | 필수 | integer | Distinct members with this company in their current watchlist at asOf; not a historical snapshot. |
+| holdingMembers | 필수 | integer | Distinct members connected to a mock portfolio currently holding this company at asOf; not a historical snapshot. |
+| nodeViews | 필수 | integer | Accepted graph_node_select events for this company in the selected window; this is a selection count, not an impression count. |
+| edgeSelections | 필수 | integer, null | Accepted graph_edge_select events attributable to this company in the selected window; null until a reliable edge-to-company mapping source is integrated. |
+| aiQuestions | 필수 | integer, null | Number of AI question submissions attributed to this company; null until a source is integrated, zero when the source is available and has no events. |
 
 <a id="schema-companysummary"></a>
 
@@ -3822,12 +3867,12 @@ The selection frozen when the question was first received.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| date | 필수 | string (date) | KST calendar day |
-| activeUsers | 필수 | integer |  |
-| nodeSelections | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| briefingViews | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| date | 필수 | string (date) | KST calendar day; periods include asOf's day, and the final day may be partial. |
+| activeUsers | 필수 | integer | Distinct pseudonymous member or guest analytics principals with at least one accepted interaction event that day. |
+| nodeSelections | 필수 | integer | Accepted graph_node_select events that day, deduplicated by idempotency key. |
+| edgeSelections | 필수 | integer | Accepted graph_edge_select events that day, deduplicated by idempotency key. |
+| briefingViews | 필수 | integer | Accepted briefing_view events that day, deduplicated by idempotency key. |
+| aiQuestions | 필수 | integer, null | AI question submission count; null until a source is integrated, zero when the source is available and has no events. |
 
 <a id="schema-dashboard"></a>
 
@@ -4014,14 +4059,13 @@ The selection frozen when the question was first received.
 
 ### DecisionResponse
 
-허용은 재검증 접수다. 결정 요청 자체로 공개 상태를 바꾸지 않는다.
+allow는 HOLD 대상의 운영자 최종 승인(approved)이며 재검증이나 작업 접수가 아니므로 jobId가 없다. reject는 rejected다. 결정 요청 자체로 공개 상태를 바꾸지 않아 publicChanged는 항상 false다.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | candidateId | 필수 | string |  |
-| decision | 필수 | string {revalidation_requested, rejected} |  |
+| decision | 필수 | string {approved, rejected} |  |
 | revision | 필수 | integer |  |
-| jobId | 필수 | string, null |  |
 | publicChanged | 필수 | boolean |  |
 
 <a id="schema-dislikepage"></a>
@@ -4208,7 +4252,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | items | 필수 | [EventSummary](#schema-eventsummary)[] |  |
-| unknownTimeItems | 필수 | [EventSummary](#schema-eventsummary)[] | With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. |
+| unknownTimeItems | 필수 | [EventSummary](#schema-eventsummary)[] | With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. Paging treats `items` then `unknownTimeItems` as one sequence: limit counts both arrays together and nextCursor continues into the unknown-time events. |
 | metadata | 필수 | [EventListMetadata](#schema-eventlistmetadata) |  |
 | nextCursor | 필수 | string, null |  |
 
@@ -4227,6 +4271,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | eventTime | 필수 | string / null |  |
 | timePrecision | 필수 | string {year, month, day, datetime, unknown} |  |
 | period | 필수 | string / null |  |
+| assertionStatus | 필수 | string {occurred, announced, planned, forecast, cancelled, unknown} / null | AI 인계 묶음 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다. |
 | companyIds | 필수 | string[] |  |
 | relationTypes | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO}[] (uniqueItems) | 이 응답의 요청 companyId와 사건 사이의 직접 승인 간선 유형만 포함한다. items/unknownTimeItems 모두 같은 공개 graphVersion/asOf를 사용한다. 두 유형이 함께 있으면 각각 한 번 포함한다. companyId 없음·직접 승인 간선 없음·간접 2-hop 전용 사건은 []다. companyIds 전체의 관계 합집합, 감성/영향 방향, 기업 간 공급/경쟁 유형이 아니다. |
 | articleCount | 필수 | integer |  |
@@ -4701,12 +4746,12 @@ and the baseline stays where it was.
 | name | 필수 | string |  |
 | ticker | 필수 | string / null |  |
 | inCatalog | 필수 | boolean |  |
-| watchlistMembers | 필수 | integer |  |
-| holdingMembers | 필수 | integer |  |
+| watchlistMembers | 필수 | integer | Distinct members whose current watchlist contains this company at asOf. This is a current-state count, not a historical value for the selected window. |
+| holdingMembers | 필수 | integer | Distinct members whose connected mock portfolio currently holds this company at asOf. This is a current-state count, not a historical value for the selected window. |
 | nodeViews | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| issueSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| edgeSelections | 필수 | integer, null |  |
+| issueSelections | 필수 | integer, null | Briefing issue opens attributed to this company only when the issue-to-company mapping is unambiguous; null when that mapping source is unavailable. |
+| aiQuestions | 필수 | integer, null | AI question submission count attributed to this company; null while its source is unavailable, zero when the source is available and has no events. |
 | viewers | 필수 | integer |  |
 | minSample | 필수 | integer |  |
 | series | 필수 | [CompanySeriesPoint](#schema-companyseriespoint)[] |  |
@@ -4737,7 +4782,7 @@ and the baseline stays where it was.
 | --- | --- | --- | --- |
 | window | 필수 | string |  |
 | asOf | 필수 | string (date-time) |  |
-| minSample | 필수 | integer |  |
+| minSample | 필수 | integer | Minimum denominator for showing a ratio; currently 5. |
 | metrics | 필수 | [StatsMetric](#schema-statsmetric)[] |  |
 | feedback | 필수 | [OverviewFeedback](#schema-overviewfeedback) |  |
 | members | 필수 | [OverviewMembers](#schema-overviewmembers) |  |
@@ -4989,10 +5034,10 @@ The three market indicators stored with a published round; never changed after p
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| sessions | 필수 | integer |  |
-| graphSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
-| briefingViews | 필수 | integer |  |
+| sessions | 필수 | integer | [member.createdAt, metadata.asOf) 사이 생성된 kind=member 세션 수. 만료·회수된 세션도 포함한다. |
+| graphSelections | 필수 | integer / null | 그래프 선택 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
+| aiQuestions | 필수 | integer / null | AI 질문 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
+| briefingViews | 필수 | integer / null | 브리핑 조회 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
 
 <a id="schema-membercounts"></a>
 
@@ -5018,11 +5063,12 @@ The three market indicators stored with a published round; never changed after p
 | onboardingCompleted | 필수 | boolean |  |
 | tutorialCompleted | 필수 | boolean |  |
 | watchlistCount | 필수 | integer |  |
-| holdingCount | 필수 | integer |  |
+| holdingCount | 필수 | integer / null | 보유 종목 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
 | accountConnected | 필수 | boolean |  |
-| feedbackUp | 필수 | integer |  |
-| feedbackDown | 필수 | integer |  |
+| feedbackUp | 필수 | integer / null | 긍정 평가 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
+| feedbackDown | 필수 | integer / null | 부정 평가 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다. |
 | history | 필수 | [MemberAction](#schema-memberaction)[] |  |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-memberlist"></a>
 
@@ -5035,6 +5081,7 @@ The three market indicators stored with a published round; never changed after p
 | items | 필수 | [MemberRow](#schema-memberrow)[] |  |
 | nextCursor | 필수 | string / null |  |
 | counts | 필수 | [MemberCounts](#schema-membercounts) |  |
+| metadata | 필수 | [Metadata](#schema-metadata) |  |
 
 <a id="schema-memberrow"></a>
 
@@ -5048,9 +5095,21 @@ The three market indicators stored with a published round; never changed after p
 | emailMasked | 필수 | string |  |
 | signupMethod | 필수 | string |  |
 | createdAt | 필수 | string (date-time) |  |
-| lastActiveAt | 필수 | string (date-time) / null |  |
+| lastActiveAt | 필수 | string (date-time) / null | metadata.asOf 이전에 생성된 가장 최근 member 세션 시각. 세션이 없으면 null이다. |
 | status | 필수 | string {active, blocked} |  |
+| statusRevision | 필수 | integer (int64) | 회원 상태 변경 선행조건. 상태가 실제 변경될 때만 증가한다. |
 | activity | 필수 | [MemberActivity](#schema-memberactivity) |  |
+
+<a id="schema-memberstatusrequest"></a>
+
+### MemberStatusRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| expectedRevision | 필수 | integer (int64) |  |
+| reason | 필수 | string |  |
 
 <a id="schema-memberstatusresult"></a>
 
@@ -5060,7 +5119,7 @@ The three market indicators stored with a published round; never changed after p
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| changed | 필수 | boolean | False when the member already had that status (the call is idempotent) |
+| changed | 필수 | boolean | 최신 expectedRevision에서 이미 목표 상태이면 false다. 오래된 revision은 false가 아니라 REVISION_CONFLICT이며 같은 키 재전송은 최초 응답의 값을 재현한다. |
 | detail | 필수 | [MemberDetail](#schema-memberdetail) |  |
 
 <a id="schema-mentionout"></a>
@@ -5232,10 +5291,12 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| up | 필수 | integer |  |
-| down | 필수 | integer |  |
+| up | 필수 | integer, null |  |
+| down | 필수 | integer, null |  |
 | rate | 필수 | number / null |  |
-| sampleHidden | 필수 | boolean |  |
+| sampleHidden | 필수 | boolean | True only when an available rating rate is hidden because its denominator is below minSample. |
+| availability | 필수 | string {available, unavailable} | Whether the feedback source is integrated and readable. |
+| unavailableReason | 필수 | string {not_integrated, source_unavailable} / null |  |
 
 <a id="schema-overviewjobs"></a>
 
@@ -5259,9 +5320,9 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| registered | 필수 | integer |  |
-| active | 필수 | integer |  |
-| blocked | 필수 | integer |  |
+| registered | 필수 | integer | All member accounts created before asOf, including blocked accounts. |
+| active | 필수 | integer | Registered accounts with active status at asOf. |
+| blocked | 필수 | integer | Registered accounts with blocked status at asOf. |
 
 <a id="schema-participantout"></a>
 
@@ -5693,11 +5754,11 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | roundId | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
-| views | 필수 | integer |  |
-| viewers | 필수 | integer |  |
-| issueOpens | 필수 | integer |  |
-| likes | 필수 | integer |  |
-| dislikes | 필수 | integer |  |
+| views | 필수 | integer | Distinct (analytics principal, roundId, viewId) briefing detail views. Repeated events within the same view count once. |
+| viewers | 필수 | integer | Distinct pseudonymous analytics principals with a briefing_view event for this round. |
+| issueOpens | 필수 | integer | Accepted briefing_issue_open events for this round, deduplicated by idempotency key. |
+| likes | 필수 | integer, null | Current valid positive ratings when an FS066 feedback source is connected; null otherwise. |
+| dislikes | 필수 | integer, null | Current valid negative ratings when an FS066 feedback source is connected; null otherwise. |
 
 <a id="schema-rulechangeout"></a>
 
@@ -5966,17 +6027,19 @@ Key issues of an evening round compared with the same day's published morning ro
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| key | 필수 | string |  |
+| key | 필수 | string {activeUsers, onboarding, nodeCtr, edgeCtr, briefingRate, briefingIssueOpens, aiQuestions, aiQuestionRate} | Stable metric identifier. activeUsers: distinct active principals; onboarding: completed members / members registered in the selected window; nodeCtr and edgeCtr: distinct map views with a selection / distinct map views; briefingRate: distinct briefing detail views / distinct briefing screen views; briefingIssueOpens: accepted issue-open events; aiQuestions: accepted question submissions; aiQuestionRate: distinct AI views with a submission / distinct AI views. |
 | group | 필수 | string {usage, interest, ai} |  |
 | label | 필수 | string |  |
 | kind | 필수 | string {count, ratio} |  |
 | unit | 필수 | string | Unit of the count, or of numerator and denominator |
 | definition | 필수 | string | How the figure is computed, shown next to it |
-| count | 필수 | integer / null | kind=count |
-| numerator | 필수 | integer / null | kind=ratio |
-| denominator | 필수 | integer / null | kind=ratio |
-| rate | 필수 | number / null | 0..1; null for counts and for ratios below the sample threshold |
-| sampleHidden | 필수 | boolean | True when the denominator is below minSample, so only counts are shown |
+| availability | 필수 | string {available, unavailable} | Whether this metric has an integrated, readable source. An available metric with value zero means the source was read and no matching activity was found. |
+| unavailableReason | 필수 | string {not_integrated, source_unavailable, insufficient_history} / null | Reason when availability is unavailable; null when the metric is available. |
+| count | 필수 | integer / null | Count metric value; null when unavailable and zero only when its source was read with no matching events. |
+| numerator | 필수 | integer / null | Ratio numerator; null when unavailable. |
+| denominator | 필수 | integer / null | Ratio denominator; null when unavailable. |
+| rate | 필수 | number / null | 0..1; null for counts, unavailable metrics, and ratios below the sample threshold. |
+| sampleHidden | 필수 | boolean | True only for an available ratio whose denominator is below minSample; unavailable sources use availability/unavailableReason. |
 
 <a id="schema-statssummary"></a>
 
@@ -5988,9 +6051,9 @@ Key issues of an evening round compared with the same day's published morning ro
 | --- | --- | --- | --- |
 | window | 필수 | string {7d, 30d, all} |  |
 | asOf | 필수 | string (date-time) |  |
-| since | 필수 | string / null |  |
-| minSample | 필수 | integer |  |
-| membersScope | 필수 | string | Which members the onboarding figure covers |
+| since | 필수 | string / null | Inclusive KST start date; null for all. |
+| minSample | 필수 | integer | Minimum ratio denominator required to show a rate; 5. |
+| membersScope | 필수 | string | The onboarding cohort: member accounts created during the selected window; completion is read as of asOf. |
 | metrics | 필수 | [StatsMetric](#schema-statsmetric)[] |  |
 | trend | 필수 | [DailyActivity](#schema-dailyactivity)[] |  |
 | rounds | 필수 | [RoundStat](#schema-roundstat)[] |  |
@@ -6042,15 +6105,82 @@ Key issues of an evening round compared with the same day's published morning ro
 
 ### TelemetryEvent
 
-One user action. Only these fields exist; anything else (e-mail, free text) is rejected.
+One allowed user action. Event-specific schemas reject unknown fields, including names, email addresses, and question text.
+
+[TelemetryScreenView](#schema-telemetryscreenview) / [TelemetryGraphNodeSelect](#schema-telemetrygraphnodeselect) / [TelemetryGraphEdgeSelect](#schema-telemetrygraphedgeselect) / [TelemetryBriefingView](#schema-telemetrybriefingview) / [TelemetryBriefingIssueOpen](#schema-telemetrybriefingissueopen) / [TelemetryAiQuestion](#schema-telemetryaiquestion)
+
+<a id="schema-telemetryscreenview"></a>
+
+### TelemetryScreenView
+
+
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| type | 필수 | string {screen_view, graph_node_select, graph_edge_select, briefing_view, briefing_issue_open} |  |
-| screen | 선택 | string {main, briefing} / null |  |
+| type | 필수 | string |  |
+| screen | 필수 | string {main, briefing, ai} |  |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrygraphnodeselect"></a>
+
+### TelemetryGraphNodeSelect
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Selected graph node identifier; no label or user-entered text. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrygraphedgeselect"></a>
+
+### TelemetryGraphEdgeSelect
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Selected graph edge identifier; no label or user-entered text. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrybriefingview"></a>
+
+### TelemetryBriefingView
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Briefing round identifier. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrybriefingissueopen"></a>
+
+### TelemetryBriefingIssueOpen
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Opened issue identifier. |
+| roundId | 필수 | string | Briefing round identifier only: 1-256 ASCII letters, digits, or . _ : / -. Do not include personal data or free text. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetryaiquestion"></a>
+
+### TelemetryAiQuestion
+
+Count a validated user submission attempt. Never include question text or generated content.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
 | targetId | 선택 | string / null |  |
-| roundId | 선택 | string / null |  |
-| viewId | 선택 | string / null |  |
+| viewId | 필수 | string |  |
 
 <a id="schema-termout"></a>
 

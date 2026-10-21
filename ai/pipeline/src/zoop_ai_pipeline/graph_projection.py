@@ -19,7 +19,9 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import sqlite3
+import tempfile
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -29,10 +31,11 @@ from neo4j.exceptions import ConstraintError, DriverError, Neo4jError
 
 from . import graph_neo4j as neo
 from .extraction import Sources
-from .graph_projection_contracts import (DEPTHS, EDGE_SPECS, KIND_OF_LABEL, KINDS, LABELS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_EDGES, MAX_EVIDENCE, MAX_NODES,
-    MAX_PLAN, MAX_REGISTRY, PLAN_VERSION, SCHEMA, STORE_SCHEMA, UNRESOLVED_SHOWN, CanonicalEntry, CanonicalRegistry, ExtractionFailure, Focus, Freeze,
-    Init, Selector, Withheld, canonical, digest, entry_key, graph_digest, marker_props, normalized_props, plan_graph_digest, relation_id, stored_props)
-from .ingestion_contracts import Authority, IngestionFailure, now, read_file, reserved_state_roots
+from .graph_projection_contracts import (APPROVAL_KEYS, APPROVAL_KINDS, DEPTHS, EDGE_SPECS, HISTORIC_PLAN_VERSIONS, KIND_OF_LABEL, KINDS, LABELS, LEDGER_VERSION,
+    MAX_ATTEMPTS, MAX_EDGES, MAX_EVIDENCE, MAX_NODES, MAX_PLAN, MAX_REGISTRY, PLAN_VERSION, SCHEMA, STORE_SCHEMA, UNRESOLVED_SHOWN, CanonicalEntry,
+    CanonicalRegistry, ExtractionFailure, Focus, Freeze, Init, Selector, Withheld, canonical, digest, entry_key, graph_digest, marker_props, normalized_props,
+    plan_graph_digest, relation_id, stored_props)
+from .ingestion_contracts import Authority, IngestionFailure, copy_bounded, now, read_file, reserved_state_roots, timestamp
 from .relation import Engine
 from .relation import Store as RelationStore
 from .relation_contracts import MAX_PATH
@@ -313,6 +316,112 @@ class Store:
                             (state, code if state != "ready" else None, canonical(detail) if detail and state != "ready" else None, now(), version_id))
 
 
+# ---------------------------------------------------------------------------------------------- history preflight ----------
+
+def _ledger_identity_ok(db: sqlite3.Connection) -> bool:
+    """The database is exactly THIS ledger: its identity row and its complete object set (tables and guard triggers), judged from reads only. A foreign or
+    altered schema is never classified as absent, current or history, so it can never fall through to a writable open."""
+    identity = db.execute("SELECT value FROM meta WHERE key='ledger'").fetchone()
+    objects = {(kind, name) for kind, name in db.execute("SELECT type,name FROM sqlite_master") if not name.startswith("sqlite_autoindex_")}
+    expected = {("table", name) for name in ("meta", "versions", "attempts")}
+    expected.update(("trigger", statement.split()[5]) for statement in _TRIGGERS)
+    return identity is not None and identity[0] == LEDGER_VERSION and objects == expected
+
+
+class WalHistory:
+    """A read-only view of a graph ledger whose committed rows still sit in a HOT write-ahead log (a writer died before checkpointing).
+
+    An immutable open ignores the WAL and any other open of the real files may create `-shm`, replay or checkpoint it, so the view never opens the real files
+    with SQLite: under a held SHARED ledger lock the main file and the WAL are copied, bounded, into a private 0700 scratch directory and SQLite opens THAT
+    copy. The real directory, its modes, its WAL and its `-shm` are never written; the scratch directory is removed on `close`. It offers the reads
+    `Projector` needs of a history row (`version`, `attempts`, `one`, `all`)."""
+
+    def __init__(self, root: Path):
+        self.lock = os.open(root / "graph.lock", os.O_RDONLY | os.O_NOFOLLOW)
+        self.scratch: Path | None = None
+        try:
+            try:
+                fcntl.flock(self.lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise ExtractionFailure("graph_busy") from exc
+            self.scratch = Path(tempfile.mkdtemp(prefix="zoop-graph-history-"))
+            try:
+                for name in ("graph.sqlite3", "graph.sqlite3-wal"):
+                    copy_bounded(root / name, self.scratch / name)
+            except ValueError:
+                raise ExtractionFailure("graph_state_invalid") from None
+            self.db = sqlite3.connect(self.scratch / "graph.sqlite3", isolation_level=None)
+            self.db.row_factory = sqlite3.Row
+            if not _ledger_identity_ok(self.db):
+                raise ExtractionFailure("ledger_version_unknown")
+        except sqlite3.DatabaseError as exc:
+            self.close()
+            raise ExtractionFailure("graph_state_invalid") from exc
+        except BaseException:
+            self.close()
+            raise
+
+    def one(self, sql, args=()):
+        return self.db.execute(sql, args).fetchone()
+
+    def all(self, sql, args=()):
+        return self.db.execute(sql, args).fetchall()
+
+    def version(self, version_id: str):
+        return self.one("SELECT * FROM versions WHERE version_id=?", (version_id,))
+
+    def attempts(self, version_id: str) -> list:
+        return self.all("SELECT n,outcome,code FROM attempts WHERE version_id=? ORDER BY n", (version_id,))
+
+    def close(self) -> None:
+        if hasattr(self, "db"):
+            self.db.close()
+            del self.db
+        if self.scratch is not None:
+            shutil.rmtree(self.scratch, ignore_errors=True)
+            self.scratch = None
+        if hasattr(self, "lock"):
+            os.close(self.lock)
+            del self.lock
+
+
+def open_legacy_history(root: Path, *upstream_roots: Path, version_id: str) -> "Store | WalHistory | None":
+    """Ledger-only, read-only preflight, BEFORE any writable `Store`, authority, registry or Neo4j (same discipline as the handoff's).
+
+    Returns a read-only view when the ledger already holds `version_id` under an earlier plan contract. Returns None ONLY when that is PROVEN not to be the
+    case: no state directory, no ledger file, or the row is absent or current. Everything inconclusive (busy writer, foreign or invalid namespace/ledger,
+    unreadable or oversize state) is raised exactly as the ordinary open would, never turned into a fall-through to a writable open, whose chmod, WAL
+    checkpoint or DDL would change a history ledger before the refusal. It writes nothing: a ledger with a non-empty WAL is read through a private copy
+    (`WalHistory`); otherwise through the immutable read-only store. A current row (including one that needs `recover` over a hot WAL) falls through to the
+    ordinary writer, which settles the WAL itself."""
+    root = checked_root(root, *upstream_roots)
+    if not os.path.lexists(root):
+        return None
+    if not root.is_dir():
+        raise ExtractionFailure("state_namespace_conflict")
+    ours_only(root)
+    if not os.path.lexists(root / "graph.sqlite3"):
+        return None
+    if not (root / "graph.lock").is_file() or (root / "graph.lock").is_symlink() or (root / "graph.sqlite3").is_symlink():
+        raise ExtractionFailure("graph_state_invalid")
+    wal = root / "graph.sqlite3-wal"
+    view = WalHistory(root) if wal.exists() and wal.stat().st_size > 0 else Store(root, *upstream_roots, mode="read")
+    try:
+        if not _ledger_identity_ok(view.db):
+            raise ExtractionFailure("ledger_version_unknown")
+        row = view.version(version_id)
+        if row is not None and not plan_current(row):
+            return view
+    except sqlite3.DatabaseError as exc:
+        view.close()
+        raise ExtractionFailure("graph_state_invalid") from exc
+    except BaseException:
+        view.close()
+        raise
+    view.close()
+    return None
+
+
 # ---------------------------------------------------------------------------------------------- canonical registry ------------------
 
 @dataclass
@@ -391,6 +500,44 @@ def review_state(result: dict) -> list:
                   for r in result["relations"])
 
 
+def offset_timestamp(value) -> bool:
+    """Whether `value` is an ISO timestamp WITH an offset (the native `timestamp` rule; the backend parses the same text as an OffsetDateTime)."""
+    try:
+        timestamp(value)
+    except (ValueError, TypeError):
+        return False
+    return True
+
+
+def approval_basis(relation: dict) -> dict:
+    """The effective approval of ONE projectable S3 relation (eligible, not review-pending), proven against its own append-only history.
+
+    The S3 owner reports `eligibility.approvalBasis`; this never trusts it alone. The deciding event is the LAST event of the chain and its sequence is the
+    revision. `automatic-verifier` needs that event to be a verdict that made the relation eligible (no reviewer); `operator-final-approval` needs it to be
+    a review `allow` whose effect is `approved` by exactly the named reviewer. Anything else (a legacy `revalidation-requested`, a stale or forged basis, a
+    chain that does not end at the revision) is `relation_payload_invalid`: a basis is never guessed, repaired or defaulted to automatic."""
+    invalid = ExtractionFailure("relation_payload_invalid", {"relationCandidateId": relation.get("relationCandidateId")})
+    state, history = relation["eligibility"], relation["history"]
+    basis = state.get("approvalBasis")
+    if state["status"] != "eligible" or state["reviewPending"] or not isinstance(basis, dict) or set(basis) != set(APPROVAL_KEYS) or not history:
+        raise invalid
+    last = history[-1]
+    if (basis["revision"] != state["revision"] or last["seq"] != basis["revision"] or last["createdAt"] != basis["decidedAt"]
+            or not offset_timestamp(basis["decidedAt"])):
+        raise invalid
+    if basis["kind"] == "automatic-verifier":
+        proven = basis["reviewer"] is None and last["kind"] == "verdict" and last["eligibility"] == "eligible"
+    elif basis["kind"] == "operator-final-approval":
+        proven = (isinstance(basis["reviewer"], str) and last["kind"] == "review" and last["decision"] == "allow" and last.get("effect") == "approved"
+                  and last["reviewer"] == basis["reviewer"])
+    else:
+        proven = False
+    if not proven:
+        raise invalid
+    return {key: basis[key] for key in APPROVAL_KEYS}
+
+
+
 # ---------------------------------------------------------------------------------------------- planning (pure) --------------------
 
 def _evidence(citations: list, records: dict) -> list[str]:
@@ -425,6 +572,7 @@ def plan_version(version_id: str, result: dict, entries: dict) -> dict:
 def _plan(version_id: str, result: dict, entries: dict) -> dict:
     upstream = {key: result["binding"]["upstream"][key] for key in ("jobId", "inputDigest", "digest")}
     selected = [r for r in result["relations"] if r["eligibility"]["status"] == "eligible" and not r["eligibility"]["reviewPending"]]
+    approvals = {r["relationCandidateId"]: approval_basis(r) for r in selected}      # the effective, history-proven basis of every projected relation
     used: dict[tuple, CanonicalEntry] = {}
     missing: set[tuple] = set()
 
@@ -483,10 +631,12 @@ def _plan(version_id: str, result: dict, entries: dict) -> dict:
                                   "validityEvidenceIds": _evidence(validity["citations"], records),
                                   "step1EvidenceIds": step_evidence[0] if step_evidence else [],
                                   "step2EvidenceIds": step_evidence[1] if len(step_evidence) > 1 else [], "sourceRelationCandidateIds": [rc]})
-        edge = edges.setdefault(edge_id, {"type": r["type"], "subject": subject, "object": obj, "props": props})
+        mine = [{"relationCandidateId": rc, "kind": approvals[rc]["kind"]}]
+        edge = edges.setdefault(edge_id, {"type": r["type"], "subject": subject, "object": obj, "props": props, "approvals": mine})
         if edge["props"] is not props:
             for key in ("evidenceIds", "validityEvidenceIds", "step1EvidenceIds", "step2EvidenceIds", "sourceRelationCandidateIds"):
                 edge["props"][key] = sorted(set(edge["props"][key]) | set(props[key]))
+            edge["approvals"] = sorted([*edge["approvals"], *mine], key=lambda a: a["relationCandidateId"])
     nodes = sorted({(LABELS[e[role]["kind"]], e[role]["id"]) for e in edges.values() for role in ("subject", "object")}
                    | {(LABELS["company"], company) for e in edges.values() for company in e["props"]["pathCompanyIds"]})
     ordered_edges = sorted(edges.values(), key=lambda e: (e["type"], e["props"]["id"]))
@@ -499,15 +649,58 @@ def _plan(version_id: str, result: dict, entries: dict) -> dict:
             "source": {"relation": {"jobId": result["jobId"], "inputDigest": result["inputDigest"]}, "upstream": upstream, "provenance": result["provenance"],
                        "policies": result["binding"]["versions"],
                        "review": {"digest": digest(review_state(result)),
-                                  "projected": sorted([r["relationCandidateId"], r["eligibility"]["revision"]] for r in selected)}},
+                                  "projected": [{"relationCandidateId": rc, "revision": approvals[rc]["revision"], "approvalBasis": approvals[rc]} for rc in sorted(approvals)]}},
             "canonical": {"digest": digest(entry_list), "entries": entry_list},
             "nodes": [list(n) for n in nodes], "edges": ordered_edges, "evidence": evidence,
             "audit": {"s3Relations": len(result["relations"]), "eligibility": {key: counts["eligibility"][key] for key in ("eligible", "hold", "reject", "pending")},
                       "reviewPending": sum(bool(r["eligibility"]["reviewPending"]) for r in result["relations"]), "projectedCandidates": len(selected),
+                      "approvals": {"automatic": sum(a["kind"] == "automatic-verifier" for a in approvals.values()),
+                                    "operatorFinal": sum(a["kind"] == "operator-final-approval" for a in approvals.values())},
                       "canonicalMerges": len(selected) - len(ordered_edges), "impactCandidatesNotProjected": counts["impactCandidates"]}}
     if len(canonical(plan).encode("utf-8")) > MAX_PLAN:
         raise ExtractionFailure("version_limit_exceeded", {"plan": "bytes"})
     return plan
+
+
+def plan_current(row) -> bool:
+    """Whether a ledger row was frozen under THIS build's plan contract, read from its stored immutable plan schema alone (before any authority, registry or
+    Neo4j is touched). A plan of an earlier contract is HISTORY: it carries no pinned approval basis, so it is shown as stored and never projected, recovered
+    or served. A schema this build has never heard of is a damaged ledger."""
+    try:
+        schema = json.loads(row["plan"])["schema"]
+    except (ValueError, KeyError, TypeError):
+        raise ExtractionFailure("graph_state_invalid") from None
+    if schema in HISTORIC_PLAN_VERSIONS:
+        return False
+    if schema != PLAN_VERSION:
+        raise ExtractionFailure("graph_state_invalid")
+    return True
+
+
+def _approvals_closed(plan: dict) -> bool:
+    """The pinned approval basis of every projected relation is well formed, unique and consistent with the edges' per-source kinds and the audit counts."""
+    projected = plan["source"]["review"]["projected"]
+    by_rc: dict[str, dict] = {}
+    for item in projected:
+        basis = item["approvalBasis"]
+        if (set(item) != {"relationCandidateId", "revision", "approvalBasis"} or set(basis) != set(APPROVAL_KEYS) or basis["kind"] not in APPROVAL_KINDS
+                or basis["revision"] != item["revision"] or type(item["revision"]) is not int or (basis["reviewer"] is None) != (basis["kind"] == "automatic-verifier")
+                or not offset_timestamp(basis["decidedAt"]) or item["relationCandidateId"] in by_rc):
+            return False
+        by_rc[item["relationCandidateId"]] = basis
+    if [i["relationCandidateId"] for i in projected] != sorted(by_rc) or plan["audit"]["projectedCandidates"] != len(by_rc):
+        return False
+    if plan["audit"]["approvals"] != {"automatic": sum(b["kind"] == "automatic-verifier" for b in by_rc.values()),
+                                      "operatorFinal": sum(b["kind"] == "operator-final-approval" for b in by_rc.values())}:
+        return False
+    seen: set[str] = set()
+    for e in plan["edges"]:
+        listed = e["approvals"]
+        if ([a["relationCandidateId"] for a in listed] != e["props"]["sourceRelationCandidateIds"]
+                or any(set(a) != {"relationCandidateId", "kind"} or by_rc.get(a["relationCandidateId"], {}).get("kind") != a["kind"] for a in listed)):
+            return False
+        seen.update(a["relationCandidateId"] for a in listed)
+    return seen == set(by_rc)
 
 
 def verify_plan(row) -> dict:
@@ -522,6 +715,7 @@ def verify_plan(row) -> dict:
             p = e["props"]
             ok = ok and (LABELS[e["subject"]["kind"]], e["subject"]["id"]) in nodes and (LABELS[e["object"]["kind"]], e["object"]["id"]) in nodes
             ok = ok and set(p["evidenceIds"] + p["validityEvidenceIds"] + p["step1EvidenceIds"] + p["step2EvidenceIds"]) <= evidence
+        ok = ok and _approvals_closed(plan)
     except (ValueError, KeyError, TypeError, AttributeError):
         ok = False
     if not ok:
@@ -534,7 +728,8 @@ def verify_plan(row) -> dict:
 def ledger_result(row, attempts: list) -> dict:
     plan = json.loads(row["plan"])
     state = row["state"]
-    return {"schemaVersion": SCHEMA, "versionId": row["version_id"], "state": state, "publication": "not-published", "next": NEXT[state],
+    history = not plan_current(row)
+    return {"schemaVersion": SCHEMA, "versionId": row["version_id"], "state": state, "publication": "not-published", "next": None if history else NEXT[state],
             "failure": {"code": row["failure"], **({"detail": json.loads(row["detail"])} if row["detail"] else {})} if row["failure"] else None,
             "source": {"provenance": plan["source"]["provenance"], "relation": plan["source"]["relation"], "upstream": plan["source"]["upstream"],
                        "reviewDigest": plan["source"]["review"]["digest"]},
@@ -542,7 +737,8 @@ def ledger_result(row, attempts: list) -> dict:
             "counts": {"nodes": {kind: sum(label == LABELS[kind] for label, _ in plan["nodes"]) for kind in KINDS},
                        "edges": {name: sum(e["type"] == name for e in plan["edges"]) for name in EDGE_SPECS}, "evidence": len(plan["evidence"])},
             "audit": plan["audit"], "digests": {"payload": row["payload_digest"], "graph": row["graph_digest"]},
-            "attempts": [{"n": a["n"], "outcome": a["outcome"], "code": a["code"]} for a in attempts], "usage": USAGE}
+            "attempts": [{"n": a["n"], "outcome": a["outcome"], "code": a["code"]} for a in attempts], "usage": USAGE,
+            **({"delivery": {"status": "withheld", "code": "graph_contract_changed"}} if history else {})}
 
 
 def withheld_result(row, code: str) -> dict:
@@ -557,7 +753,7 @@ def edge_view(edge: dict) -> dict:
             "object": edge["object"], "businessScope": p["businessScope"], "productScope": p["productScope"],
             "validity": {"from": p["validFrom"], "until": p["validUntil"]}, "countries": p["countries"], "path": {"companyIds": p["pathCompanyIds"]},
             "evidence": {"relation": p["evidenceIds"], "validity": p["validityEvidenceIds"], "steps": [p["step1EvidenceIds"], p["step2EvidenceIds"]]},
-            "sourceRelationCandidateIds": p["sourceRelationCandidateIds"]}
+            "sourceRelationCandidateIds": p["sourceRelationCandidateIds"], "sourceApprovals": edge["approvals"]}
 
 
 def focus_of(plan: dict, company_id: str, depth: int) -> dict:
@@ -646,12 +842,20 @@ class Projector:
 
     @staticmethod
     def _unchanged_review(plan: dict, result: dict) -> bool:
-        """Every projected relation is still eligible, not review-pending and at the same revision. Returns whether the WHOLE review state (also
-        excluded candidates) is still the frozen one; a newer review state calls for a new version, it does not withhold this immutable one."""
-        by_id = {r["relationCandidateId"]: r["eligibility"] for r in result["relations"]}
-        for rc, revision in plan["source"]["review"]["projected"]:
-            state = by_id.get(rc)
-            if state is None or state["status"] != "eligible" or state["reviewPending"] or state["revision"] != revision:
+        """Every projected relation is still eligible, not review-pending, at the same revision and with exactly the pinned approval basis (kind, reviewer,
+        decision time; proven against its own history again). Returns whether the WHOLE review state (also excluded candidates) is still the frozen one; a
+        newer review state calls for a new version, it does not withhold this immutable one."""
+        by_id = {r["relationCandidateId"]: r for r in result["relations"]}
+        for item in plan["source"]["review"]["projected"]:
+            relation = by_id.get(item["relationCandidateId"])
+            state = relation["eligibility"] if relation is not None else None
+            if state is None or state["status"] != "eligible" or state["reviewPending"] or state["revision"] != item["revision"]:
+                raise Withheld("review_revision_changed")
+            try:
+                current = approval_basis(relation)
+            except ExtractionFailure:
+                raise Withheld("review_revision_changed") from None
+            if current != item["approvalBasis"]:
                 raise Withheld("review_revision_changed")
         return digest(review_state(result)) == plan["source"]["review"]["digest"]
 
@@ -722,8 +926,10 @@ class Projector:
         paths = self.paths
         relation = request.wire()["relation"]
         input_digest = digest(request.wire())
-        registry = load_registry(paths.canonical)
         row = self.store.version(request.version_id)
+        if row is not None and not plan_current(row):
+            raise ExtractionFailure("graph_contract_changed")        # history: decided from the stored plan schema alone; a changed review needs a NEW version id
+        registry = load_registry(paths.canonical)
         with Source(paths) as source:
             if row is not None:
                 if row["input_digest"] != input_digest:
@@ -748,7 +954,8 @@ class Projector:
 
     def inspect(self, request: Selector) -> dict:
         row = self._existing(request.version_id)
-        verify_plan(row)
+        if plan_current(row):
+            verify_plan(row)
         return self.result(row)
 
     # ---- project ---------------------------------------------------------------------------------------------------------------------------
@@ -757,6 +964,8 @@ class Projector:
         """Write one frozen version as ONE explicit unmanaged transaction (never retried automatically). The attempt is `reserved` in SQLite first;
         a commit whose outcome is unknown stays `unknown` until `recover` has read the whole graph back."""
         row = self._existing(request.version_id)
+        if not plan_current(row):
+            raise ExtractionFailure("graph_contract_changed")        # never projected, resumed or settled: an earlier contract's plan has no pinned approval basis
         version_id, state = row["version_id"], row["state"]
         if state == "ready":
             return self.result(row)
@@ -874,6 +1083,8 @@ class Projector:
         """Settle a `reserved`/`unknown` version from what Neo4j actually holds. Reads only: it never writes the graph, never regenerates anything
         and never calls a model. The decision comes from the FULL stored graph, not from the marker alone."""
         row = self._existing(request.version_id)
+        if not plan_current(row):
+            raise ExtractionFailure("graph_contract_changed")        # an earlier contract's attempt is never settled by this build
         version_id = row["version_id"]
         if row["state"] not in {"reserved", "unknown"}:
             raise ExtractionFailure("recovery_not_required", {"state": row["state"]})
@@ -913,6 +1124,8 @@ class Projector:
         the projected relations are unchanged, the Neo4j database is still exactly the bound store, and the FULL stored graph matches the frozen
         content digest. Any failure is a `withheld` result with no content. Read-only: no ledger write, no S3 write, no model call."""
         row = self._existing(request.version_id)
+        if not plan_current(row):
+            return withheld_result(row, "graph_contract_changed")
         if row["state"] != "ready":
             raise ExtractionFailure("version_not_ready", {"state": row["state"]})
         plan = verify_plan(row)

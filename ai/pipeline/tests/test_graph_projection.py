@@ -423,7 +423,7 @@ def test_zero_eligible_relations_is_a_valid_empty_version(rig):
     out, _ = rig.freeze("v-empty", "rel-empty")
     assert out["counts"] == {"nodes": {"company": 0, "event": 0, "topic": 0}, "edges": {name: 0 for name in EDGE_SPECS}, "evidence": 0}
     assert out["audit"] == {"s3Relations": 1, "eligibility": {"eligible": 0, "hold": 1, "reject": 0, "pending": 0}, "reviewPending": 0, "projectedCandidates": 0,
-                            "canonicalMerges": 0, "impactCandidatesNotProjected": 0} and out["canonical"]["entries"] == 0
+                            "approvals": {"automatic": 0, "operatorFinal": 0}, "canonicalMerges": 0, "impactCandidatesNotProjected": 0} and out["canonical"]["entries"] == 0
     plan = rig.plan("v-empty")
     assert plan["nodes"] == [] and plan["edges"] == [] and plan["evidence"] == []
     assert out["digests"]["graph"] == graph_digest("v-empty", [], []) and rig.run("inspect", rig.sel("v-empty"))[0] == out
@@ -594,13 +594,17 @@ def test_ledger_identity_attempt_outcomes_and_terminal_states_are_immutable_in_s
 
 
 def tamper(rig, column: str, value: str | None = None) -> str:
-    """Rewrite one frozen column the way a damaged disk or a manual edit would (the guard triggers are dropped first), then close so no WAL is left."""
+    """Rewrite one frozen column the way a damaged disk or a manual edit would. The guard triggers are captured, dropped for the edit and RESTORED exactly as
+    defined, so the ledger keeps its full object set (ownership/schema identity) and only the column differs; then close so no WAL is left."""
     db = sqlite3.connect(rig.state / "graph.sqlite3", isolation_level=None)
     try:
-        for trigger in ("immutable_versions_identity", "terminal_versions"):
-            db.execute(f"DROP TRIGGER IF EXISTS {trigger}")
+        triggers = db.execute("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name IN ('immutable_versions_identity','terminal_versions')").fetchall()
+        for name, _ in triggers:
+            db.execute(f"DROP TRIGGER IF EXISTS {name}")
         original = db.execute(f"SELECT {column} FROM versions").fetchone()[0]
         db.execute(f"UPDATE versions SET {column}=?", (value if value is not None else original[:-1] + ("0" if original[-1] != "0" else "1"),))
+        for _, sql in triggers:
+            db.execute(sql)
         return original
     finally:
         db.close()
@@ -727,12 +731,23 @@ def citation(n: int, **override) -> dict:
             "textArtifactId": "t", "rawLocatorIds": ["l"], "sourceSegments": [], **override}
 
 
-def relation(i: int, rtype: str = "SUPPLIES", *, status: str = "eligible", pending: bool = False, **override) -> dict:
+def relation(i: int, rtype: str = "SUPPLIES", *, status: str = "eligible", pending: bool = False, manual: bool = False, **override) -> dict:
+    """An S3-shaped relation. Eligible and not pending carries its history-proven approval basis: the automatic verdict (revision 1), or with `manual` a HOLD verdict
+    followed by the operator's final approval `approved` (revision 2)."""
     spec = EDGE_SPECS[rtype]
+    at = f"2026-10-21T00:00:{i % 60:02d}+00:00"
+    if manual:
+        history = [{"seq": 1, "kind": "verdict", "createdAt": "2026-10-21T00:00:00+00:00", "eligibility": "hold"},
+                   {"seq": 2, "kind": "review", "createdAt": at, "decision": "allow", "reviewer": "operator-a", "effect": "approved", "expectedRevision": 1}]
+        basis = {"kind": "operator-final-approval", "revision": 2, "reviewer": "operator-a", "decidedAt": at}
+    else:
+        history = [{"seq": 1, "kind": "verdict", "createdAt": at, "eligibility": status}]
+        basis = {"kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": at}
     return {"relationCandidateId": f"rc-{i:064x}", "relationKey": f"key-{i}", "type": rtype, "direction": spec.direction,
             "subject": {"kind": spec.subject, "ref": f"S{i}"}, "object": {"kind": spec.object, "ref": f"O{i}"}, "connection": "direct", "businessScope": None,
             "productScope": None, "validity": {"from": None, "until": None, "citations": []}, "countries": [], "citations": [citation(i)], "path": [],
-            "eligibility": {"status": status, "reviewPending": pending, "revision": 1}, **override}
+            "eligibility": {"status": status, "reviewPending": pending, "revision": basis["revision"] if manual else 1,
+                            "approvalBasis": basis if status == "eligible" and not pending else None}, "history": history, **override}
 
 
 def result_of(relations: list) -> dict:
@@ -764,9 +779,11 @@ def test_planner_projects_only_eligible_unpending_relations_and_counts_the_rest(
     relations = [*eligible, *excluded]
     plan = gp.plan_version("v1", result_of(relations), entries_for(eligible))   # no decision exists for any excluded endpoint
     assert len(plan["edges"]) == 3 and plan["audit"] == {"s3Relations": 7, "eligibility": {"eligible": 4, "hold": 1, "reject": 1, "pending": 1}, "reviewPending": 1,
-                                                       "projectedCandidates": 3, "canonicalMerges": 0, "impactCandidatesNotProjected": 3}
-    assert plan["source"]["review"]["projected"] == sorted([r["relationCandidateId"], 1] for r in eligible)
-    assert "PRIVATE-QUOTE" not in json.dumps(plan) and plan["schema"] == "zoop-graph-plan-1" and plan["source"]["upstream"] == {**UPSTREAM, "digest": "b" * 64}
+                                                       "projectedCandidates": 3, "approvals": {"automatic": 3, "operatorFinal": 0}, "canonicalMerges": 0,
+                                                       "impactCandidatesNotProjected": 3}
+    assert plan["source"]["review"]["projected"] == [{"relationCandidateId": r["relationCandidateId"], "revision": 1, "approvalBasis": r["eligibility"]["approvalBasis"]}
+                                                     for r in sorted(eligible, key=lambda x: x["relationCandidateId"])]
+    assert "PRIVATE-QUOTE" not in json.dumps(plan) and plan["schema"] == "zoop-graph-plan-2" and plan["source"]["upstream"] == {**UPSTREAM, "digest": "b" * 64}
     assert sorted(e["subject"]["id"] for e in plan["edges"]) == ["c-company-S1", "c-company-S2", "c-company-S3"]
     unresolved = code_of(lambda: gp.plan_version("v1", result_of(relations), entries_for(eligible[:2])))
     assert unresolved.code == "canonical_mapping_unresolved" and unresolved.detail == {"total": 2, "unresolved": [{"kind": "company", "ref": "O3"}, {"kind": "company", "ref": "S3"}]}
@@ -813,3 +830,241 @@ def test_aliases_merge_equal_canonical_claims_with_unioned_evidence_and_self_or_
     assert folded.code == "canonical_mapping_conflict" and folded.detail["reason"] == "path_collapsed"
     broken = [relation(1, connection="indirect", citations=[], path=path[:1])]
     assert code_of(lambda: gp.plan_version("v1", result_of(broken), entries_for(broken))).code == "relation_payload_invalid"
+
+
+# ---------------------------------------------------------------- approval basis: automatic verdict vs the operator's final approval ----------
+
+def test_the_approval_basis_is_proven_from_the_history_and_a_forged_or_legacy_basis_is_refused():
+    automatic, manual = relation(1), relation(2, manual=True)
+    assert gp.approval_basis(automatic) == {"kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": "2026-10-21T00:00:01+00:00"}
+    assert gp.approval_basis(manual) == {"kind": "operator-final-approval", "revision": 2, "reviewer": "operator-a", "decidedAt": "2026-10-21T00:00:02+00:00"}
+    # An approval claimed over the wrong evidence is never trusted: the owner's history must prove exactly this kind, reviewer, revision and time.
+    forged = [
+        relation(3, manual=True, history=relation(3)["history"]),                                                    # operator basis over an automatic verdict
+        relation(4, history=relation(4, manual=True)["history"]),                                                     # automatic basis over an operator approval
+        relation(5, manual=True, eligibility={**relation(5, manual=True)["eligibility"], "revision": 3}),             # revision is not the deciding event's
+        relation(6, manual=True, eligibility={**relation(6, manual=True)["eligibility"], "approvalBasis": {**relation(6, manual=True)["eligibility"]["approvalBasis"],
+                                                                                                          "reviewer": "someone-else"}}),
+        relation(7, manual=True, eligibility={**relation(7, manual=True)["eligibility"], "approvalBasis": {**relation(7, manual=True)["eligibility"]["approvalBasis"],
+                                                                                                          "decidedAt": "2026-01-01T00:00:00+00:00"}}),
+        relation(8, manual=True, eligibility={**relation(8, manual=True)["eligibility"], "approvalBasis": None}),
+        relation(9, manual=True, eligibility={**relation(9, manual=True)["eligibility"], "approvalBasis": {"kind": "operator-final-approval", "revision": 2}}),
+        relation(10, manual=True, history=[relation(10, manual=True)["history"][0], {**relation(10, manual=True)["history"][1], "effect": "revalidation-requested"}]),
+        relation(11, history=[]),
+        relation(12, status="hold"),
+        relation(13, pending=True)]
+    for item in forged:
+        assert code_of(lambda: gp.approval_basis(item)).code == "relation_payload_invalid", item["relationCandidateId"]
+    assert code_of(lambda: gp.plan_version("v1", result_of([forged[0]]), entries_for([forged[0]]))).code == "relation_payload_invalid"
+    for stamp in ("2026-10-21T00:00:14", "garbage", "2026-10-21"):                       # no offset / not a timestamp: the app's OffsetDateTime parse would refuse it
+        bad_time = relation(14)
+        bad_time["eligibility"]["approvalBasis"]["decidedAt"] = bad_time["history"][-1]["createdAt"] = stamp
+        assert code_of(lambda: gp.approval_basis(bad_time)).code == "relation_payload_invalid", stamp
+
+
+def test_the_plan_pins_each_projected_relations_basis_and_keeps_automatic_and_manual_apart_on_every_edge():
+    auto, hand = relation(1), relation(2, manual=True)
+    merged_hand = relation(3, manual=True, citations=[citation(3)])
+    shared = entries_for([auto, hand, merged_hand], {("company", "S3"): "c-company-S1", ("company", "O3"): "c-company-O1"})
+    plan = gp.plan_version("v1", result_of([auto, hand, merged_hand]), shared)
+    assert plan["schema"] == "zoop-graph-plan-2" and len(plan["edges"]) == 2 and plan["audit"]["approvals"] == {"automatic": 1, "operatorFinal": 2}
+    assert plan["source"]["review"]["projected"] == [{"relationCandidateId": r["relationCandidateId"], "revision": r["eligibility"]["revision"],
+                                                      "approvalBasis": r["eligibility"]["approvalBasis"]} for r in (auto, hand, merged_hand)]
+    by_target = {e["subject"]["id"]: e for e in plan["edges"]}
+    assert by_target["c-company-S1"]["approvals"] == [{"relationCandidateId": auto["relationCandidateId"], "kind": "automatic-verifier"},
+                                                      {"relationCandidateId": merged_hand["relationCandidateId"], "kind": "operator-final-approval"}]
+    assert by_target["c-company-S2"]["approvals"] == [{"relationCandidateId": hand["relationCandidateId"], "kind": "operator-final-approval"}]
+    assert gp.edge_view(by_target["c-company-S2"])["sourceApprovals"] == by_target["c-company-S2"]["approvals"]
+    assert "operator-a" not in json.dumps([gp.edge_view(e) for e in plan["edges"]])          # the reviewer lives in the frozen plan only, never in a read view
+    # The per-edge kinds are part of the stored plan: a plan whose edge disagrees with the pinned basis is a damaged ledger.
+    row = {"plan": json.dumps(plan), "version_id": "v1", "payload_digest": gp.digest(plan), "graph_digest": gp.plan_graph_digest(plan)}
+    assert gp.verify_plan(row) == plan
+    broken = json.loads(json.dumps(plan))
+    next(e for e in broken["edges"] if e["subject"]["id"] == "c-company-S1")["approvals"][0]["kind"] = "operator-final-approval"
+    row.update(plan=json.dumps(broken), payload_digest=gp.digest(broken))
+    assert code_of(lambda: gp.verify_plan(row)).code == "graph_state_invalid"
+
+
+def test_a_manual_approval_is_current_only_while_exactly_the_pinned_basis_stands():
+    hand = relation(1, manual=True)
+    plan = gp.plan_version("v1", result_of([hand]), entries_for([hand]))
+    same = gp.Projector._unchanged_review(plan, result_of([hand]))
+    assert same is True
+    swapped = relation(1)                      # the same candidate, now decided by the automatic verdict: another kind, revision and time
+    for changed in (swapped, relation(1, manual=True, eligibility={**hand["eligibility"], "revision": 3}), relation(1, status="hold"), relation(1, pending=True)):
+        assert code_of(lambda: gp.Projector._unchanged_review(plan, result_of([changed]))).code == "review_revision_changed"
+    later = relation(1, manual=True)
+    later["history"] = [*later["history"], {"seq": 3, "kind": "review", "createdAt": "2026-10-21T01:00:00+00:00", "decision": "reject", "reviewer": "operator-b", "effect": "excluded"}]
+    later["eligibility"] = {"status": "reject", "reviewPending": False, "revision": 3, "approvalBasis": None}
+    assert code_of(lambda: gp.Projector._unchanged_review(plan, result_of([later]))).code == "review_revision_changed"
+
+
+def test_a_ledger_row_frozen_under_the_earlier_plan_contract_is_history_and_never_projected_recovered_or_served(rig):
+    rig.freeze("v1", "rel-main")
+    current = rig.plan()
+    assert current["schema"] == "zoop-graph-plan-2" and current["audit"]["approvals"] == {"automatic": current["audit"]["projectedCandidates"], "operatorFinal": 0}
+    earlier = {**current, "schema": "zoop-graph-plan-1"}
+    earlier["source"] = {**earlier["source"], "review": {**earlier["source"]["review"], "projected": [[p["relationCandidateId"], p["revision"]]
+                                                                                                      for p in earlier["source"]["review"]["projected"]]}}
+    tamper(rig, "plan", json.dumps(earlier, sort_keys=True))
+    before = rig.ledger()
+    shown, _ = rig.run("inspect", rig.sel(), expected=2)
+    assert shown["state"] == "frozen" and shown["next"] is None and shown["delivery"] == {"status": "withheld", "code": "graph_contract_changed"}
+    for command, body in (("project", rig.sel()), ("recover", rig.sel())):
+        error(rig.run(command, body, expected=2)[0], "graph_contract_changed")
+    relation_ref = {"jobId": "rel-main", "inputDigest": rig.shared.jobs["rel-main"]["inputDigest"]}
+    error(rig.run("freeze", {**rig.sel(), "relation": relation_ref}, expected=2)[0], "graph_contract_changed")
+    served, _ = rig.run("read", rig.sel(), expected=2)
+    assert served["delivery"] == {"status": "withheld", "code": "graph_contract_changed"} and "graph" not in served
+    assert rig.ledger() == before                    # nothing was noted, settled or rewritten
+    fresh, _ = rig.run("freeze", {**rig.sel("v2"), "relation": relation_ref})
+    assert fresh["state"] == "frozen" and fresh["next"] == "project"       # the operator freezes a NEW version id under the current contract
+
+
+# ---------------------------------------------------------------- history is decided read-only, before any writer opens the ledger ----------
+
+def earlier_plan(rig, name: str = "v1") -> dict:
+    current = rig.plan(name)
+    earlier = {**current, "schema": "zoop-graph-plan-1"}
+    earlier["source"] = {**earlier["source"], "review": {**earlier["source"]["review"], "projected": [[p["relationCandidateId"], p["revision"]]
+                                                                                                      for p in earlier["source"]["review"]["projected"]]}}
+    return earlier
+
+
+def disk(root: Path) -> dict:
+    """Everything the ledger directory holds: its own mode and, per file, mode, size, mtime and bytes."""
+    found = {".": (root.stat().st_mode, root.stat().st_mtime_ns)}
+    for p in sorted(root.iterdir()):
+        info = p.stat()
+        found[p.name] = (info.st_mode, info.st_size, info.st_mtime_ns, p.read_bytes())
+    return found
+
+
+KILLED_WRITER = ("import json, os, sqlite3, sys\n"
+                 "spec = json.load(sys.stdin)\n"
+                 "db = sqlite3.connect(spec['database'], isolation_level=None)\n"
+                 "db.execute('PRAGMA journal_mode=WAL')\n"
+                 "db.execute('PRAGMA wal_autocheckpoint=0')\n"
+                 "for statement in spec['statements']:\n"
+                 "    db.execute(statement[0], statement[1:])\n"
+                 "os._exit(0)\n")        # committed rows stay in the WAL: no checkpoint, no close
+
+
+def kill_writer(rig, *statements) -> None:
+    import subprocess
+    out = subprocess.run([sys.executable, "-c", KILLED_WRITER], input=json.dumps({"database": str(rig.state / "graph.sqlite3"),
+                         "statements": [list(s) for s in statements]}).encode(), capture_output=True, timeout=60)
+    assert out.returncode == 0, out.stderr.decode()
+    assert (rig.state / "graph.sqlite3-wal").stat().st_size > 0
+
+
+def loosen(rig) -> None:
+    """Modes a writer would re-permission (0700 directory, 0600 files): the history decision must leave them exactly as they are."""
+    rig.state.chmod(0o755)
+    for p in rig.state.iterdir():
+        p.chmod(0o644)
+
+
+def test_history_is_decided_from_the_ledger_alone_and_no_command_changes_a_byte_mode_or_mtime(rig):
+    rig.freeze("v1", "rel-main")
+    tamper(rig, "plan", json.dumps(earlier_plan(rig), sort_keys=True))
+    loosen(rig)
+    before = disk(rig.state)
+    relation_ref = {"jobId": "rel-main", "inputDigest": rig.shared.jobs["rel-main"]["inputDigest"]}
+    for command, body, expected in (("inspect", rig.sel(), 2), ("project", rig.sel(), 2), ("recover", rig.sel(), 2), ("read", rig.sel(), 2),
+                                    ("focus", {**rig.sel(), "companyId": "kr-000100", "depth": 1}, 2), ("freeze", {**rig.sel(), "relation": relation_ref}, 2)):
+        out, _ = rig.run(command, body, expected=expected)
+        assert (out.get("error", {}).get("code") or out["delivery"]["code"]) == "graph_contract_changed", command
+        assert disk(rig.state) == before, command       # no chmod, no WAL/SHM file, no checkpoint, no rewrite
+
+
+def test_a_history_row_that_only_lives_in_a_hot_wal_is_still_history_and_the_ledger_is_untouched(rig):
+    rig.freeze("v1", "rel-main")
+    loosen(rig)
+    plan = json.dumps(earlier_plan(rig), sort_keys=True)
+    db = sqlite3.connect(rig.state / "graph.sqlite3")
+    triggers = db.execute("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name IN ('immutable_versions_identity','terminal_versions')").fetchall()
+    db.close()
+    kill_writer(rig, *[(f"DROP TRIGGER {name}",) for name, _ in triggers], ("UPDATE versions SET plan=?", plan), *[(sql,) for _, sql in triggers])    # schema restored in the WAL
+    before = disk(rig.state)
+    assert any(name.endswith("-wal") and values[1] > 0 for name, values in before.items() if name != ".")
+    relation_ref = {"jobId": "rel-main", "inputDigest": rig.shared.jobs["rel-main"]["inputDigest"]}
+    shown, _ = rig.run("inspect", rig.sel(), expected=2)
+    assert shown["state"] == "frozen" and shown["delivery"] == {"status": "withheld", "code": "graph_contract_changed"}
+    for command, body in (("project", rig.sel()), ("recover", rig.sel()), ("freeze", {**rig.sel(), "relation": relation_ref})):
+        error(rig.run(command, body, expected=2)[0], "graph_contract_changed")
+    assert rig.run("read", rig.sel(), expected=2)[0]["delivery"] == {"status": "withheld", "code": "graph_contract_changed"}
+    assert disk(rig.state) == before
+    assert not list(Path(tempfile_dir()).glob("zoop-graph-history-*"))             # the private scratch copy was removed
+
+
+def tempfile_dir() -> str:
+    import tempfile
+    return tempfile.gettempdir()
+
+
+def test_a_busy_writer_or_a_foreign_ledger_is_refused_not_opened_writable_on_the_history_path(rig):
+    import fcntl
+    import os
+    rig.freeze("v1", "rel-main")
+    fd = os.open(rig.state / "graph.lock", os.O_RDWR)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        before = disk(rig.state)
+        error(rig.run("inspect", rig.sel(), expected=2)[0], "graph_busy")
+        error(rig.run("project", rig.sel(), expected=2)[0], "graph_busy")
+        assert disk(rig.state) == before
+    finally:
+        os.close(fd)
+    foreign = rig.root / "foreign"
+    foreign.mkdir()
+    db = sqlite3.connect(foreign / "graph.sqlite3")
+    db.execute("CREATE TABLE unrelated(x)")
+    db.commit()
+    db.close()
+    (foreign / "graph.lock").write_bytes(b"")
+    before = disk(foreign)
+    error(rig.run("project", rig.sel(), state=foreign, expected=2)[0], "graph_state_invalid")
+    assert disk(foreign) == before
+
+
+def test_a_current_plan_with_a_hot_wal_still_recovers_through_the_writer_and_a_reader_still_refuses_it(rig):
+    rig.freeze("v1", "rel-main")
+    relation_ref = {"jobId": "rel-main", "inputDigest": rig.shared.jobs["rel-main"]["inputDigest"]}
+    kill_writer(rig, ("UPDATE versions SET updated_at=?", "2099-01-01T00:00:00+00:00"))
+    before = disk(rig.state)
+    error(rig.run("inspect", rig.sel(), expected=2)[0], "graph_recovery_required")          # a reader never settles somebody else's WAL
+    assert disk(rig.state) == before
+    echoed, _ = rig.run("freeze", {**rig.sel(), "relation": relation_ref})                 # the writer opens, replays the WAL and answers
+    assert echoed["state"] == "frozen" and echoed["next"] == "project"
+    assert rig.run("inspect", rig.sel())[0]["state"] == "frozen"                            # the ledger is settled: readers work again
+
+
+def test_a_ledger_with_a_missing_guard_trigger_or_a_foreign_schema_is_refused_before_any_writer_and_never_classified(rig):
+    """Ownership/schema identity is proven (identity row AND the full table/trigger set) before a row is classified as absent, current or history, with the
+    ledger untouched, whether the damage is in the main file or only in a hot WAL."""
+    rig.freeze("v1", "rel-main")
+    relation_ref = {"jobId": "rel-main", "inputDigest": rig.shared.jobs["rel-main"]["inputDigest"]}
+    db = sqlite3.connect(rig.state / "graph.sqlite3", isolation_level=None)
+    db.execute("DROP TRIGGER terminal_versions")
+    db.close()
+    loosen(rig)
+    before = disk(rig.state)
+    for command, body in (("inspect", rig.sel()), ("project", rig.sel()), ("recover", rig.sel()), ("freeze", {**rig.sel(), "relation": relation_ref})):
+        error(rig.run(command, body, expected=2)[0], "ledger_version_unknown")
+        assert disk(rig.state) == before, command
+    # the same damage that exists only in a hot WAL (a writer that died before checkpointing)
+    other = rig.root / "wal-ledger"
+    shutil.copytree(rig.state, other)
+    db = sqlite3.connect(other / "graph.sqlite3", isolation_level=None)
+    db.execute("CREATE TRIGGER terminal_versions BEFORE UPDATE ON versions WHEN OLD.state IN ('ready','failed') BEGIN SELECT RAISE(ABORT,'terminal'); END")
+    db.close()
+    rig.state, kept = other, rig.state
+    try:
+        kill_writer(rig, ("CREATE TABLE intruder(x)",))
+        before = disk(other)
+        error(rig.run("project", rig.sel(), expected=2)[0], "ledger_version_unknown")
+        error(rig.run("inspect", rig.sel(), expected=2)[0], "ledger_version_unknown")
+        assert disk(other) == before
+    finally:
+        rig.state = kept

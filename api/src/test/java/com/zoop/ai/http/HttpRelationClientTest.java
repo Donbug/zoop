@@ -27,7 +27,7 @@ import static com.zoop.ai.http.PipelineJson.INPUT;
 import static com.zoop.ai.http.PipelineJson.OTHER;
 import static com.zoop.ai.http.PipelineJson.RELATION_SCHEMA;
 import static com.zoop.ai.http.PipelineJson.REVAL_NONE;
-import static com.zoop.ai.http.PipelineJson.REVAL_QUEUED;
+import static com.zoop.ai.http.PipelineJson.REVAL_CONTRACT_CHANGED;
 import static com.zoop.ai.http.PipelineJson.REVAL_VERIFIED;
 import static com.zoop.ai.http.PipelineJson.REVIEW_APPLIED;
 import static com.zoop.ai.http.PipelineJson.REVIEW_UNCONFIRMED;
@@ -68,7 +68,7 @@ class HttpRelationClientTest {
     }
 
     private static Reply allowAccepted() {
-        return Reply.json(202, PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_QUEUED, "wait"));
+        return Reply.json(200, PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_NONE, "none"));
     }
 
     private static AiTransportException malformed(Runnable call) {
@@ -79,7 +79,7 @@ class HttpRelationClientTest {
 
     @Test
     void submitSendsOnlyProvenanceAndTheUpstreamAndRequiresTheAnswerToEchoThem() {
-        RelationSubmission submission = new RelationSubmission(JOB, PipelineJob.SourceKind.SYNTHETIC,
+        RelationSubmission submission = new RelationSubmission(JOB, PipelineJob.SourceKind.SYNTHETIC, com.zoop.ai.ExecutionMode.REPLAY,
                 new RelationUpstream(UPSTREAM_JOB, UPSTREAM_DIGEST));
         server.respond(Reply.json(202, PipelineJson.relationStatus(JOB, "queued", "wait", UPSTREAM_DIGEST, "job_not_ready")));
         RelationAcknowledgement ack = client.submit(submission);
@@ -101,10 +101,12 @@ class HttpRelationClientTest {
     void reviewSendsTheSourceExpectationsUnderTheOperationKeyAndDecodesBothOutcomes() {
         server.respond(allowAccepted());
         RelationOperationAcknowledgement accepted = client.review(JOB, allow());
-        assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_ACCEPTED, accepted.disposition());
+        assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED, accepted.disposition());
         assertEquals(RelationOperationStatus.ReviewState.APPLIED, accepted.status().review().state());
         assertEquals("2", accepted.status().review().resultingSourceRevision().orElseThrow());
-        assertEquals(RelationOperationStatus.RevalidationState.QUEUED, accepted.status().revalidation().state());
+        assertEquals(RelationOperationStatus.RevalidationState.NOT_REQUESTED, accepted.status().revalidation().state());
+        assertEquals(RelationOperationStatus.Next.NONE, accepted.status().next());
+        assertTrue(accepted.status().limitation().isEmpty());
 
         StubAiServer.Seen seen = server.requests.get(0);
         assertEquals("POST", seen.method());
@@ -146,23 +148,28 @@ class HttpRelationClientTest {
 
     @Test
     void aForeignOrIncoherentOperationIsNeverAccepted() {
-        String applied = PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_QUEUED, "wait");
+        String applied = PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_NONE, "none");
         server.respond(Reply.json(200, applied));
         assertEquals(OP, client.operation(JOB, OP).operationId());
         assertEquals("/internal/v1/relation-jobs/" + JOB + "/reviews/" + OP, server.requests.get(0).path());
 
+        String legacy = "review_contract_changed";
         String[] wrong = {
-                PipelineJson.operation("another-operation", JOB, "allow", REVIEW_APPLIED, REVAL_QUEUED, "wait"),
-                PipelineJson.operation(OP, "another-job", "allow", REVIEW_APPLIED, REVAL_QUEUED, "wait"),
+                PipelineJson.operation("another-operation", JOB, "allow", REVIEW_APPLIED, REVAL_NONE, "none"),
+                PipelineJson.operation(OP, "another-job", "allow", REVIEW_APPLIED, REVAL_NONE, "none"),
                 // applied, but the recorded event is not at expected + 1
-                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED.replace("\"2\"", "\"5\""), REVAL_QUEUED, "wait"),
-                // unconfirmed review that already claims a revalidation
-                PipelineJson.operation(OP, JOB, "allow", REVIEW_UNCONFIRMED, REVAL_QUEUED, "retry_review"),
-                // verified without a verdict, and a verdict that is not at expected + 2
-                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED.replace("\"eligible\"", "null"), "none"),
-                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED.replace("\"3\"", "\"2\""), "none"),
-                // a reject never requests a revalidation
-                PipelineJson.operation(OP, JOB, "reject", REVIEW_APPLIED, REVAL_QUEUED, "wait"),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED.replace("\"2\"", "\"5\""), REVAL_NONE, "none"),
+                // a current-contract operation requests no revalidation and has nothing to wait for
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED, "none"),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_CONTRACT_CHANGED, "none"),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_NONE, "wait"),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_UNCONFIRMED, REVAL_NONE, "none"),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_NONE, "retry_review"),
+                // legacy: verified without a verdict, a settlement not at expected + 2, a settlement of a reject, next other than none
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED.replace("\"eligible\"", "null"), "none", legacy),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED.replace("\"3\"", "\"2\""), "none", legacy),
+                PipelineJson.operation(OP, JOB, "reject", REVIEW_APPLIED, REVAL_CONTRACT_CHANGED, "none", legacy),
+                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_CONTRACT_CHANGED, "retry_review", legacy),
                 applied.replace("not_published", "published"),
         };
         for (String body : wrong) {
@@ -172,13 +179,21 @@ class HttpRelationClientTest {
 
         // a review answer must be the answer to THIS request
         for (String body : new String[] {
-                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_QUEUED, "wait").replace("\"expectedSourceRevision\":\"1\"", "\"expectedSourceRevision\":\"2\"")
+                applied.replace("\"expectedSourceRevision\":\"1\"", "\"expectedSourceRevision\":\"2\"")
                         .replace("\"resultingSourceRevision\":\"2\"", "\"resultingSourceRevision\":\"3\""),
-                PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_QUEUED, "wait").replace(CANDIDATE, "rc-" + "b".repeat(64)),
+                applied.replace(CANDIDATE, "rc-" + "b".repeat(64)),
                 PipelineJson.operation(OP, JOB, "reject", REVIEW_APPLIED, REVAL_NONE, "none")}) {
-            server.respond(Reply.json(202, body));
+            server.respond(Reply.json(200, body));
             assertTrue(malformed(() -> client.review(JOB, allow())).requestMaybeProcessed());
         }
+
+        // legacy history is a valid read, and its settlement is shown without becoming an approval
+        server.respond(Reply.json(200, PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED, "none", legacy)));
+        RelationOperationStatus old = client.operation(JOB, OP);
+        assertEquals(RelationOperationStatus.Limitation.REVIEW_CONTRACT_CHANGED, old.limitation().orElseThrow());
+        assertEquals(RelationOperationStatus.RevalidationState.VERIFIED, old.revalidation().state());
+        server.respond(Reply.json(200, PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_CONTRACT_CHANGED, "none", legacy)));
+        assertEquals(RelationOperationStatus.RevalidationState.CONTRACT_CHANGED, client.operation(JOB, OP).revalidation().state());
     }
 
     @Test
@@ -196,10 +211,10 @@ class HttpRelationClientTest {
         }
 
         // the recorded-or-not question is answered by the operation's own status, which a refusal can carry
-        String unconfirmed = PipelineJson.operation(OP, JOB, "allow", REVIEW_UNCONFIRMED, REVAL_NONE, "retry_review");
-        server.respond(seen -> Reply.json(409, PipelineJson.error(RELATION_SCHEMA, "review_not_confirmed", false, seen.requestId(), null, unconfirmed)));
-        RelationServiceErrorException refused = assertThrows(RelationServiceErrorException.class, () -> client.recoverOperation(JOB, OP));
-        assertEquals(RelationOperationStatus.Next.RETRY_REVIEW, refused.operationStatus().orElseThrow().next());
+        String unconfirmed = PipelineJson.operation(OP, JOB, "allow", REVIEW_UNCONFIRMED, REVAL_NONE, "none", "review_contract_changed");
+        server.respond(seen -> Reply.json(409, PipelineJson.error(RELATION_SCHEMA, "review_contract_changed", false, seen.requestId(), null, unconfirmed)));
+        RelationServiceErrorException refused = assertThrows(RelationServiceErrorException.class, () -> client.review(JOB, allow()));
+        assertEquals(RelationOperationStatus.Limitation.REVIEW_CONTRACT_CHANGED, refused.operationStatus().orElseThrow().limitation().orElseThrow());
         assertFalse(refused.requestMaybeProcessed());
 
         server.respond(seen -> Reply.json(409, PipelineJson.error(RELATION_SCHEMA, "job_already_terminal", false, seen.requestId(), null, unconfirmed)));
@@ -256,7 +271,7 @@ class HttpRelationClientTest {
     }
 
     @Test
-    void aMutationSuccessMustBeARecordedAllowWhileAnUnconfirmedOperationStaysAValidRead() {
+    void aMutationSuccessMustBeARecordedDecisionWhileAnUnconfirmedOperationStaysAValidRead() {
         String unconfirmed = PipelineJson.operation(OP, JOB, "allow", REVIEW_UNCONFIRMED, REVAL_NONE, "retry_review");
         String appliedReject = PipelineJson.operation(OP, JOB, "reject", REVIEW_APPLIED, REVAL_NONE, "none");
         RelationReviewRequest reject = new RelationReviewRequest(OP, CANDIDATE, INPUT, "1", RelationDecision.REJECT);
@@ -264,101 +279,45 @@ class HttpRelationClientTest {
         // reads and error envelopes may legitimately describe both
         server.respond(Reply.json(200, unconfirmed));
         assertEquals(RelationOperationStatus.ReviewState.UNCONFIRMED, client.operation(JOB, OP).review().state());
+        assertEquals(RelationOperationStatus.Next.RETRY_REVIEW, client.operation(JOB, OP).next());
         server.respond(Reply.json(200, appliedReject));
         assertEquals(RelationDecision.REJECT, client.operation(JOB, OP).decision());
 
-        for (int http : new int[] {200, 202}) {
-            server.respond(Reply.json(http, unconfirmed));
-            assertTrue(malformed(() -> client.review(JOB, allow())).requestMaybeProcessed(), "unconfirmed is not a recorded decision");
-            server.respond(Reply.json(http, unconfirmed));
-            assertTrue(malformed(() -> client.recoverOperation(JOB, OP)).requestMaybeProcessed(), "unconfirmed is not a recovery");
-            server.respond(Reply.json(http, appliedReject));
-            assertTrue(malformed(() -> client.recoverOperation(JOB, OP)).requestMaybeProcessed(), "a reject has no revalidation to recover");
-        }
+        server.respond(Reply.json(200, unconfirmed));
+        assertTrue(malformed(() -> client.review(JOB, allow())).requestMaybeProcessed(), "unconfirmed is not a recorded decision");
         server.respond(Reply.json(202, appliedReject));
-        assertTrue(malformed(() -> client.review(JOB, reject)).requestMaybeProcessed(), "202 means an allow was accepted");
+        AiTransportException unexpected = assertThrows(AiTransportException.class, () -> client.review(JOB, reject));
+        assertEquals(Failure.UNEXPECTED_RESPONSE, unexpected.failure(), "the review route answers 200 only");
+        assertTrue(unexpected.requestMaybeProcessed(), "an unexpected status does not prove that the mutation was not applied");
 
         // controls
         server.respond(allowAccepted());
-        assertEquals(RelationOperationAcknowledgement.Disposition.RECOVERY_ENQUEUED, client.recoverOperation(JOB, OP).disposition());
-        server.respond(Reply.json(200, PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, REVAL_VERIFIED, "none")));
-        assertEquals(RelationOperationAcknowledgement.Disposition.RECOVERY_COALESCED, client.recoverOperation(JOB, OP).disposition());
+        assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED, client.review(JOB, allow()).disposition());
         server.respond(Reply.json(200, appliedReject));
         assertEquals(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED, client.review(JOB, reject).disposition());
     }
 
-    private static String revalidation(String state) {
-        return PipelineJson.reval(state, "null", "superseded".equals(state) ? "\"3\"" : "null", "\"" + PipelineJson.STAMP + "\"");
-    }
-
     @Test
-    void theOperationNextActionMustFollowTheServicesRuleForItsPhases() {
-        String unknownCall = revalidation("failed").replace("\"lastRuntimeCode\":null", "\"lastRuntimeCode\":\"replay_response_unknown\"");
-        String[][] valid = {
-                {"allow", REVIEW_UNCONFIRMED, REVAL_NONE, "retry_review"},
-                {"allow", REVIEW_APPLIED, revalidation("queued"), "wait"},
-                {"allow", REVIEW_APPLIED, revalidation("running"), "wait"},
-                {"allow", REVIEW_APPLIED, REVAL_VERIFIED, "none"},
-                {"allow", REVIEW_APPLIED, revalidation("superseded"), "none"},
-                {"allow", REVIEW_APPLIED, revalidation("interrupted"), "recover"},
-                {"allow", REVIEW_APPLIED, revalidation("failed"), "recover"},
-                {"allow", REVIEW_APPLIED, unknownCall, "operator_reconcile"},
-                {"allow", REVIEW_APPLIED, revalidation("cancelled"), "none"},
-                {"reject", REVIEW_APPLIED, REVAL_NONE, "none"},
-        };
-        String[][] contradictory = {
-                {"allow", REVIEW_UNCONFIRMED, REVAL_NONE, "none"},
-                {"allow", REVIEW_UNCONFIRMED, REVAL_NONE, "wait"},
-                {"allow", REVIEW_APPLIED, revalidation("queued"), "none"},
-                {"allow", REVIEW_APPLIED, revalidation("queued"), "recover"},
-                {"allow", REVIEW_APPLIED, revalidation("running"), "none"},
-                {"allow", REVIEW_APPLIED, REVAL_VERIFIED, "wait"},
-                {"allow", REVIEW_APPLIED, REVAL_VERIFIED, "recover"},
-                {"allow", REVIEW_APPLIED, revalidation("superseded"), "wait"},
-                {"allow", REVIEW_APPLIED, revalidation("interrupted"), "none"},
-                {"allow", REVIEW_APPLIED, revalidation("interrupted"), "wait"},
-                {"allow", REVIEW_APPLIED, revalidation("failed"), "none"},
-                {"allow", REVIEW_APPLIED, revalidation("failed"), "operator_reconcile"},
-                {"allow", REVIEW_APPLIED, unknownCall, "recover"},
-                {"allow", REVIEW_APPLIED, revalidation("cancelled"), "recover"},
-                {"reject", REVIEW_APPLIED, REVAL_NONE, "wait"},
-        };
-        for (String[] row : valid) {
-            server.respond(Reply.json(200, PipelineJson.operation(OP, JOB, row[0], row[1], row[2], row[3])));
-            assertEquals(row[3], client.operation(JOB, OP).next().name().toLowerCase(java.util.Locale.ROOT), String.join(" | ", row));
-        }
-        for (String[] row : contradictory) {
-            server.respond(Reply.json(200, PipelineJson.operation(OP, JOB, row[0], row[1], row[2], row[3])));
-            assertFalse(malformed(() -> client.operation(JOB, OP)).requestMaybeProcessed(), String.join(" | ", row));
-        }
-    }
+    void liveProvenanceIsSentOnlyWhenTheCallerChoosesItAndAnAnswerOfAnotherModeIsNeverAccepted() {
+        String live = PipelineJson.relationStatus(JOB, "queued", "wait", UPSTREAM_DIGEST, "job_not_ready")
+                .replace("\"executionMode\":\"replay\",\"recordingKind\":\"authored-test\"", "\"executionMode\":\"live\",\"recordingKind\":\"provider\"");
+        assertFalse(live.contains("authored-test"));
+        server.respond(Reply.json(200, live));
+        assertEquals(com.zoop.ai.ExecutionMode.LIVE, client.status(JOB).executionMode());
+        server.respond(Reply.json(200, live.replace("\"recordingKind\":\"provider\"", "\"recordingKind\":\"authored-test\"")));
+        malformed(() -> client.status(JOB));
 
-    @Test
-    void aRecoveryAcknowledgementMayShowAnyCoherentPhaseOfARecordedAllowBecauseTheDispatcherRunsOutsideItsGate() {
-        for (String phase : new String[] {REVAL_QUEUED, REVAL_VERIFIED}) {
-            String next = phase.equals(REVAL_QUEUED) ? "wait" : "none";
-            server.respond(Reply.json(202, PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, phase, next)));
-            RelationOperationAcknowledgement ack = client.recoverOperation(JOB, OP);
-            assertEquals(RelationOperationAcknowledgement.Disposition.RECOVERY_ENQUEUED, ack.disposition());
-        }
-    }
+        RelationUpstream upstream = new RelationUpstream(UPSTREAM_JOB, UPSTREAM_DIGEST);
+        RelationSubmission liveSubmission = new RelationSubmission(JOB, PipelineJob.SourceKind.SYNTHETIC, com.zoop.ai.ExecutionMode.LIVE, upstream);
+        server.respond(Reply.json(202, live));
+        assertEquals(PipelineJob.State.QUEUED, client.submit(liveSubmission).status().state());
+        assertTrue(server.requests.get(server.requests.size() - 1).body().contains("\"executionMode\":\"live\",\"recordingKind\":\"provider\""));
 
-    @Test
-    void aRecoveryAcknowledgementMayAlreadyBeFailedOrInterruptedAndTheFollowingReadTellsWhatToDo() {
-        String stamp = "\"" + PipelineJson.STAMP + "\"";
-        String unknownCall = PipelineJson.reval("failed", "null", "null", stamp)
-                .replace("\"lastRuntimeCode\":null", "\"lastRuntimeCode\":\"replay_response_unknown\"");
-        String[][] terminal = {
-                {PipelineJson.reval("failed", "null", "null", stamp), "recover"},
-                {PipelineJson.reval("interrupted", "null", "null", stamp), "recover"},
-                {unknownCall, "operator_reconcile"},
-        };
-        for (String[] row : terminal) {
-            String body = PipelineJson.operation(OP, JOB, "allow", REVIEW_APPLIED, row[0], row[1]);
-            server.respond(Reply.json(202, body));
-            assertEquals(RelationOperationAcknowledgement.Disposition.RECOVERY_ENQUEUED, client.recoverOperation(JOB, OP).disposition());
-            server.respond(Reply.json(200, body));
-            assertEquals(row[1], client.operation(JOB, OP).next().name().toLowerCase(java.util.Locale.ROOT));
-        }
+        // the answer must be the mode that was asked for, in both directions
+        server.respond(Reply.json(202, live));
+        assertTrue(malformed(() -> client.submit(new RelationSubmission(JOB, PipelineJob.SourceKind.SYNTHETIC, com.zoop.ai.ExecutionMode.REPLAY,
+                upstream))).requestMaybeProcessed());
+        server.respond(Reply.json(202, PipelineJson.relationStatus(JOB, "queued", "wait", UPSTREAM_DIGEST, "job_not_ready")));
+        assertTrue(malformed(() -> client.submit(liveSubmission)).requestMaybeProcessed());
     }
 }

@@ -1,6 +1,8 @@
 """The single supervised dispatcher thread for S2 extraction jobs.
 
-The initial intent of an accepted job is one `resume`, claimed once. Everything after that is an explicit `recover`:
+The initial intent of an accepted job is one `resume`, claimed once, and run under the pipeline's own under-lock INITIAL-ONLY restriction (a job that
+already took its first dispatch is refused with `initial_dispatch_taken` and no effect). Everything after that is an explicit `recover`, the only dispatch
+that runs without it:
 
   * a child that timed out, died or produced unreadable output, and a row a dead service left in flight, are AMBIGUOUS: the child may already
     have reserved or sent a replay call. They end `idle` (`transport_unknown`, `service_restarted`) and are never run again automatically. The
@@ -12,14 +14,11 @@ The initial intent of an accepted job is one `resume`, claimed once. Everything 
     result, which is `exited` here and only an explicit recover resumes it. The pipeline is not changed to retry that.
 
 Authority first, on every dispatch (the first included): before any child the owner's approval for the job must still be exactly the one the job was
-reserved under and the fixture files must still be the pinned bytes, otherwise the dispatch ends idle with that refusal code and no child is started.
-A later recover (after the operator restores the approval or the fixture) is explicit.
+reserved under (a live approval's runtime identity included) and the fixture files must still be the pinned bytes, otherwise the dispatch ends idle with
+that refusal code and no child is started. A later recover (after the operator restores the approval or the fixture) is explicit.
 
 The gate is the one the relation dispatcher uses, so an S2 child and an S3 child can never run at the same time (the pipeline's ledger lock does
 not wait, and S3 reads the very ledger S2 writes).
-
-This is sound because the pipeline is replay-only (`live_mode_unsupported`): a repeated attempt can cost nothing, and the rules above do not depend
-on that. Before any live S2 the pipeline needs an under-lock initial-only flag like the S1 worker's.
 """
 from __future__ import annotations
 
@@ -41,8 +40,14 @@ BUSY_CODES = frozenset({"extraction_busy", "ingestion_busy"})
 
 
 def call_pin_problem(view: ExtractionView, pins: Pins) -> str | None:
-    """Every receipt must have been answered by exactly the pinned fixture bytes (the topic stage by the topic fixture, the others by the producer
-    fixture). This is what closes the window between the service's digest check and the child's own read of the file."""
+    """A replay job: every receipt must have been answered by exactly the pinned fixture bytes (the topic stage by the topic fixture, the others by
+    the producer fixture). This is what closes the window between the service's digest check and the child's own read of the file. A live job
+    has no fixture: no receipt may name one, and the runtime the pipeline froze must be the pinned identity."""
+    if pins.live_binding is not None:
+        live = None if view.binding is None else view.binding.live
+        if live is None or live.binding_digest != pins.live_binding or any(call.fixture_hash is not None for call in view.calls):
+            return "live_binding_changed"
+        return None
     for call in view.calls:
         wanted = pins.topic_digest if call.stage == "topic" else pins.producer_digest
         if wanted is None or call.fixture_hash != wanted:
@@ -132,11 +137,15 @@ class ExtractionDispatcher:
         if not self._hold_gate():
             return None
         try:
+            if claim.pins.live_binding is not None and not self._process.live_available:
+                self._log({"event": "extraction_dispatch", "jobId": claim.job_id, "outcome": "live_unavailable"})
+                return Update("idle", "runtime_error", "live_unavailable")
             refusal = self._authorize(claim.owner, claim.pins, claim.job_id)
             if refusal is not None:
                 self._log({"event": "extraction_dispatch", "jobId": claim.job_id, "outcome": refusal})
                 return Update("idle", "runtime_error", refusal)
-            outcome = self._process.resume(claim.job_id, topic=claim.pins.topic_digest is not None, stop=self._stop)
+            outcome = self._process.resume(claim.job_id, topic=claim.pins.topic_digest is not None, stop=self._stop,
+                                           live=claim.pins.live_binding is not None, initial_only=not claim.explicit)
         finally:
             self._gate.release()
         if outcome.kind == "abandoned":

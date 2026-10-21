@@ -15,8 +15,9 @@ final class PipelineJson {
     static final String REVIEW_APPLIED = "{\"state\":\"applied\",\"resultingSourceRevision\":\"2\",\"recordedAt\":\"" + STAMP + "\"}";
     static final String REVIEW_UNCONFIRMED = "{\"state\":\"unconfirmed\",\"resultingSourceRevision\":null,\"recordedAt\":null}";
     static final String REVAL_NONE = reval("not_requested", "null", "null", "null");
-    static final String REVAL_QUEUED = reval("queued", "null", "null", "\"" + STAMP + "\"");
     static final String REVAL_VERIFIED = reval("verified", "\"eligible\"", "\"3\"", "\"" + STAMP + "\"");
+    static final String REVAL_SUPERSEDED = reval("superseded", "null", "\"3\"", "\"" + STAMP + "\"");
+    static final String REVAL_CONTRACT_CHANGED = reval("contract_changed", "null", "null", "\"" + STAMP + "\"");
 
     private PipelineJson() {
     }
@@ -41,7 +42,8 @@ final class PipelineJson {
         return "{\"schemaVersion\":\"" + EXTRACTION_SCHEMA + "\",\"jobId\":\"" + jobId + "\",\"inputDigest\":\"" + INPUT
                 + "\",\"approval\":{\"approvedRequestDigest\":\"" + approved + "\"},\"provenance\":" + PROVENANCE + ",\"state\":\"" + state
                 + "\",\"phase\":\"extract.pending\",\"resumeMode\":\"resume\",\"failure\":null,"
-                + "\"usage\":{\"replayCalls\":0,\"startedWithoutReceipt\":0,\"providerCalls\":0,\"paidModelCalls\":0},"
+                + "\"usage\":{\"replayCalls\":0,\"startedWithoutReceipt\":0,\"providerCalls\":0,\"paidModelCalls\":0,\"receivedCalls\":0,\"unsentCalls\":0,"
+                + "\"inputTokens\":null,\"outputTokens\":null,\"reasoningTokens\":null,\"estimatedUsd\":null,\"chargedUsd\":null},"
                 + "\"stages\":[{\"stage\":\"extract\",\"state\":\"pending\"}],\"delivery\":" + delivery(withheldReason)
                 + ",\"dispatch\":" + DISPATCH + ",\"next\":\"" + next + "\",\"acceptedAt\":\"" + STAMP + "\",\"observedAt\":\"" + STAMP + "\"}";
     }
@@ -79,12 +81,19 @@ final class PipelineJson {
                 + ",\"delivery\":" + delivery(reason) + ",\"job\":" + job + ",\"receipts\":[]}";
     }
 
+    /** A current-contract operation: no limitation. */
     static String operation(String operationId, String jobId, String decision, String review, String revalidation, String next) {
+        return operation(operationId, jobId, decision, review, revalidation, next, null);
+    }
+
+    /** {@code limitation} is {@code review_contract_changed} for an operation recorded under the earlier revalidation contract, else null. */
+    static String operation(String operationId, String jobId, String decision, String review, String revalidation, String next, String limitation) {
         return "{\"schemaVersion\":\"" + RELATION_SCHEMA + "\",\"operationId\":\"" + operationId + "\",\"jobId\":\"" + jobId
                 + "\",\"relationCandidateId\":\"" + CANDIDATE + "\",\"decision\":\"" + decision + "\",\"reviewer\":\"alpha\","
                 + "\"expectedSourceVersion\":\"" + INPUT + "\",\"expectedSourceRevision\":\"1\",\"review\":" + review
                 + ",\"revalidation\":" + revalidation + ",\"publication\":{\"state\":\"not_published\"},\"next\":\"" + next
-                + "\",\"acceptedAt\":\"" + STAMP + "\",\"observedAt\":\"" + STAMP + "\"}";
+                + "\",\"limitation\":" + (limitation == null ? "null" : "\"" + limitation + "\"")
+                + ",\"acceptedAt\":\"" + STAMP + "\",\"observedAt\":\"" + STAMP + "\"}";
     }
 
     /** A {@code receipts} array of {@code count} content-free receipts: the services emit one per runtime call, without a fixed cap. */

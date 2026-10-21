@@ -25,7 +25,10 @@ SCHEMA = "zoop-graph-projection-1"
 LEDGER_VERSION = "zoop-graph-ledger-1"
 STORE_SCHEMA = "zoop-graph-store-1"
 VERSION_SCHEMA = "zoop-graph-version-1"
-PLAN_VERSION = "zoop-graph-plan-1"
+PLAN_VERSION = "zoop-graph-plan-2"
+HISTORIC_PLAN_VERSIONS = ("zoop-graph-plan-1",)      # frozen before an approval basis was pinned: history only, never reinterpreted, projected, recovered or read
+APPROVAL_KINDS = ("automatic-verifier", "operator-final-approval")       # who made an S3 relation eligible: the independent verifier, or a final human approval
+APPROVAL_KEYS = ("kind", "revision", "reviewer", "decidedAt")
 RELATION_ID_VERSION = "zoop-graph-relation-1"
 
 MAX_COMMAND = 65_536

@@ -1,4 +1,4 @@
-"""Operator-only offline S2-2 candidate process; never a BFF route, S1 command or application publisher."""
+"""Operator-only S2-2 candidate process (authored replay or live provider); never a BFF route, S1 command or application publisher."""
 from __future__ import annotations
 
 import argparse
@@ -22,6 +22,7 @@ def main() -> int:
     parser.add_argument("--sources", required=True, type=Path)
     parser.add_argument("--replay", type=Path)
     parser.add_argument("--topic-replay", type=Path)
+    parser.add_argument("--initial-only", action="store_true", help="automatic dispatch: refuse (initial_dispatch_taken) unless nothing has dispatched this job")
     args = parser.parse_args()
     store = None
     try:
@@ -30,14 +31,15 @@ def main() -> int:
             raise ExtractionFailure("command_input_limit")
         incoming = json.loads(raw)
         if args.command in {"run", "submit"}:
-            provenance = incoming.get("provenance") if isinstance(incoming, dict) else None
-            if isinstance(provenance, dict) and provenance.get("executionMode") == "live":
-                # No live path or fake fallback exists in the offline seam.
-                raise ExtractionFailure("live_mode_unsupported")
+            # Live is inferred from the request's provenance (the pair executionMode live / recordingKind provider); the provider runtime reads its own
+            # environment lazily, so a replay job and inspect/cancel never need a gate, key or endpoint.
             request = Submit.model_validate(incoming)
         else:
             request = Selector.model_validate(incoming)
-        if args.command in {"inspect", "cancel"} and (args.replay or args.topic_replay):
+        if args.initial_only and args.command not in {"run", "resume"}:
+            raise ExtractionFailure("initial_only_not_allowed")
+        live = isinstance(request, Submit) and request.provenance.execution_mode == "live"
+        if (args.command in {"inspect", "cancel"} or live) and (args.replay or args.topic_replay):
             raise ExtractionFailure("fixture_not_allowed")
         if args.command == "submit" and args.topic_replay:
             # The topic fixture is not part of the frozen job; only its stage-time `resume` may name it.
@@ -57,7 +59,7 @@ def main() -> int:
                 store = legacy
                 extractor = Extractor(store, Sources(args.ingestion_state_dir, None))
         else:
-            if args.command in {"run", "submit"} and args.replay is None:
+            if args.command in {"run", "submit"} and args.replay is None and not live:
                 raise ExtractionFailure("replay_fixture_required")
             fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                                 read_file(args.topic_replay, MAX_REPLAY) if args.topic_replay else None)
@@ -65,13 +67,13 @@ def main() -> int:
             store = Store(args.state_dir, args.ingestion_state_dir)
             extractor = Extractor(store, Sources(args.ingestion_state_dir, authority))
         if args.command == "run":
-            result = extractor.run(request, fixtures)
+            result = extractor.run(request, fixtures, initial_only=args.initial_only)
         elif args.command == "submit":
             # Registration only: freeze, then report the stored job. No execution, replay call or state change for an existing job.
             extractor.freeze(request, fixtures)
             result = extractor.inspect(request.job_id)
         elif args.command == "resume":
-            result = extractor.resume(request.job_id, fixtures)
+            result = extractor.resume(request.job_id, fixtures, initial_only=args.initial_only)
         elif args.command == "inspect":
             result = extractor.inspect(request.job_id)
         else:

@@ -624,6 +624,63 @@ class DocumentImporterTest {
         assertEquals(Instant.parse("2026-10-14T01:02:03.456789Z"), imported(result, 0).collectedAt());
     }
 
+    private void servePublisher(Observation observation, Object publisher) {
+        ObjectNode export = ExportFixtures.export(observation, PLAIN_TEXT, PLAIN_HASH);
+        ExportFixtures.observationOf(export).put("observedAt", FIRST_OBSERVED);
+        if (publisher != null) {
+            ExportFixtures.observationOf(export).put("publisher", publisher.toString());
+        }
+        exporter.responses.put(observation, ExportFixtures.bytes(export));
+    }
+
+    @Test
+    void aDeclaredPublisherReachesTheVersionRowWhileAnOlderExportStaysNull() {
+        Observation declared = obs("r6", SOURCE, 0, 0, 'd', '6');
+        servePublisher(declared, "합성일보 \uD83D\uDE00");
+
+        DocumentImportResult first = run(item(A1, PointerPolicy.keep()), item(declared, PointerPolicy.keep()));
+
+        assertTrue(first.succeeded());
+        var versions = registry.state().versions();
+        assertNull(versions.get(A1.documentId() + "\u0000" + A1.documentVersion()).publisher());
+        assertEquals("합성일보 \uD83D\uDE00", versions.get(declared.documentId() + "\u0000" + declared.documentVersion()).publisher());
+        // The operator result has no publisher key: the public/operator shapes are unchanged.
+        assertFalse(json(first).get("items").get(1).has("publisher"));
+
+        InMemoryDocumentRegistry.State before = registry.state();
+        DocumentImportResult again = run(item(A1, PointerPolicy.keep()), item(declared, PointerPolicy.keep()));
+        assertTrue(again.succeeded());
+        assertEquals(Presence.EXISTING, imported(again, 1).version());
+        assertEquals(before, registry.state());
+    }
+
+    @Test
+    void aPublisherThatDisagreesWithTheRegisteredVersionIsAConflictAndWritesNothing() {
+        Observation declared = obs("r6", SOURCE, 0, 0, 'd', '6');
+        servePublisher(declared, "합성일보");
+        assertTrue(run(item(declared, PointerPolicy.keep())).succeeded());
+        InMemoryDocumentRegistry.State before = registry.state();
+
+        for (Object other : new Object[] {"합성경제", null}) {
+            servePublisher(declared, other);
+            DocumentImportResult result = run(item(declared, PointerPolicy.keep()));
+            assertEquals(DocumentImportFailure.VERSION_CONFLICT, failed(result, 0).failure(), String.valueOf(other));
+            assertEquals(before, registry.state());
+        }
+    }
+
+    @Test
+    void anInvalidPublisherIsRefusedBeforeAnyFileOrRow() {
+        Observation declared = obs("r6", SOURCE, 0, 0, 'd', '6');
+        servePublisher(declared, "   ");
+
+        DocumentImportResult result = run(item(declared, PointerPolicy.keep()));
+
+        assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED, failed(result, 0).failure());
+        assertTrue(registry.state().versions().isEmpty());
+        assertFalse(Files.exists(textFile(declared)));
+    }
+
     /** Stand-in for {@code zoop-ai-ingest export}: serves a prepared document, refuses, or fails. */
     static final class FakeExporter implements IngestionExporter {
         final Map<Observation, Object> responses = new HashMap<>();

@@ -4,7 +4,7 @@
 
 기준 API: [`docs/api/openapi.yaml`](../api/openapi.yaml)의 `createConversation`, `getConversation`, `getCurrentConversation`, `submitQuestion`, `getQuestionJob`, `retryQuestionJob`, `cancelQuestionJob`
 
-상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.7`](../ZOOP_AI_거버넌스_정책_v0.1.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
+상세 처리 정책: [`ZOOP AI 거버넌스 정책 v0.8`](../ZOOP_AI_거버넌스_정책.md), [`AI 챗봇 설계 요약`](../design/ai-chatbot-design-summary.md)
 
 이 문서는 네 정적 와이어프레임이 증명하지 않는 로딩·오류·빈 상태·권한·복구 동작을 구현 계약으로 보완한다. 새 시각 디자인을 임의로 만들기보다 같은 드로어 안의 상태 변형으로 먼저 구현한다. 별도 화면 ID가 필요한 수준으로 구조가 바뀌면 manifest와 Figma 화면을 함께 갱신한다.
 
@@ -14,7 +14,7 @@
 - 질문 접수 시 화면 선택 문맥을 `contextIds`, `evidenceIds`, `period`, `asOf`, `graphVersion`으로 전송한다. 질문에 명시된 대상·기간이 화면 문맥보다 우선한다.
 - 생성 중인 미검증 본문은 스트리밍하지 않는다. `completed`이며 저장된 `result`만 사용자 답변으로 표시한다.
 - 같은 대화의 활성 작업은 하나다. 전송 버튼은 접수 성공 뒤 비활성화하고 중복 전송으로 새 job을 만들지 않는다.
-- `PARTIAL` 상태를 만들지 않는다. 필요한 범위가 예산을 넘거나 서로 다른 스냅샷을 동시에 요구하면 실행 전에 `clarification`을 보여준다.
+- `PARTIAL` 상태를 만들지 않는다. 필요한 범위가 예산을 넘거나 서로 다른 스냅샷을 동시에 요구하면 `clarification`을 보여준다. 조회 결과로 대상이 정해지는 질문(예: 오늘 뉴스가 있는 내 종목이 셋 이상)은 서버가 실제 조회된 대상으로 선택지를 만들어 답변 생성 전에 되묻는다. UI는 두 경우를 같은 D-AI-01b로 표시한다.
 - 브라우저 새로고침이나 재접속은 `getCurrentConversation`과 `getQuestionJob`으로 저장된 상태를 회수한다. 회수는 새 모델 호출이 아니다.
 
 ## 2. 화면별 상태
@@ -31,19 +31,34 @@
 
 ### D-AI-01b · 확인 질문
 
-`outcome=clarification`을 일반 답변처럼 보이지 않게 표시한다. 원 질문과 확인 이유를 유지하고 `ChatChoice.kind`에 따라 기업·기간·범위·스냅샷 선택지를 버튼으로 제공한다. 선택 결과는 기존 job의 결과를 수정하지 않고, 원 질문과 선택값을 명시한 새 질문 job으로 접수한다. 선택지가 없으면 자유 입력을 허용한다.
+`outcome=clarification`을 일반 답변처럼 보이지 않게 표시한다. 원 질문과 확인 이유를 유지하고 `ChatChoice.kind`에 따라 기업·기간·범위·스냅샷 선택지를 버튼으로 제공한다. 선택지가 없으면 자유 입력을 허용한다.
+
+답은 기존 job의 결과를 수정하지 않고 새 jobId로 접수한다.
+
+| 답 방식 | `ChatJobRequest` |
+| --- | --- |
+| 선택지 버튼 | `question`=선택지 `label`, `resolves={jobId: 원 job, choiceId: 선택지 id}`, `context` 생략 |
+| 자유 입력 | `question`=입력한 답, `resolves={jobId: 원 job, choiceId: null}`, `context` 생략 |
+
+- `choiceId`는 받은 값을 그대로 돌려보낸다. 기업 ID 등으로 해석해 `contextIds`·`period`·`graphVersion`에 옮기지 않는다.
+- 원 질문의 선택 문맥은 서버가 원 job에서 이어받으므로 다시 보내지 않는다. 화면에서 다른 대상을 고른 뒤 묻는 것은 `resolves` 없는 새 질문이다.
+- 대화 목록에서 `ChatJob.resolves`가 있는 job은 원 확인 질문 아래에 이어진 답으로 표시한다. 답한 뒤에도 원 확인 질문의 선택지는 다시 고를 수 있으며 매번 새 job이다.
+- 확인 질문 사슬은 최대 2회다. 두 번째 확인 질문에 답한 job은 다시 모호해도 확인 질문 대신 `guidance`로 끝나며, UI는 4절의 `guidance` 렌더링을 그대로 쓴다. UI가 깊이를 세거나 선택지를 숨기지 않는다.
+- `422`(선택지가 원 결과에 없음 등)는 입력 오류로 표시하고 선택지를 다시 불러온다. 원 job을 찾을 수 없는 `404`는 새 질문을 안내한다.
 
 ### D-AI-02 · 작업 상태·복구
 
 | API 상태 | UI 상태 |
 | --- | --- |
 | `queued` | “질문을 접수했어요”와 취소 동작 표시 |
-| `running` | “자료를 확인하고 있어요” 표시. 검증 전 답변 본문은 숨김 |
+| `running` | `phase`에 따라 진행 단계 표시(`planning` 질문 이해 → `retrieving` 자료 확인 → `writing` 답변 작성 → `verifying` 검증). 자료 조회가 없는 경로는 `retrieving`을 건너뛴다. 검증 전 답변 본문은 숨김 |
 | `completed` | 저장된 `ChatResult` 렌더링. polling 중단 |
 | `failed` | `ChatFailure.message`와 허용된 복구 동작만 표시 |
 | `cancelled` | 취소됨을 표시하고 같은 질문을 자동 재접수하지 않음 |
 
-`failure.retry=save_only`이면 “저장 다시 시도”, `rerun`이면 “질문 다시 처리”로 구분한다. `retry=null`이면 재시도 버튼을 만들지 않고 새 질문 또는 지원 안내만 제공한다. 출력 검증 실패는 자동 재생성하지 않는다.
+`failure.retry=save_only`이면 “저장 다시 시도”, `rerun`이면 “질문 다시 처리”로 구분한다. `retry=null`이면 재시도 버튼을 만들지 않고 새 질문 또는 지원 안내만 제공한다. 작업당 실행이 3회에 도달하면 서버가 `retry=null`을 내려주므로 UI가 횟수를 따로 세지 않는다. 출력 검증 실패는 자동 재생성하지 않는다.
+
+진행 단계는 `phase`만 사용하고 경과 시간으로 단계를 추정하지 않는다. 단계 표시는 `aria-live=polite`로 알리되 단계마다 포커스를 옮기지 않는다.
 
 ### D-AI-02b · 대화 조회 오류
 
@@ -51,29 +66,29 @@
 
 ## 3. 완료 결과 표시
 
-`ChatResult.answerBasis`는 서버가 계획·검증 결과로 정하며 UI가 추측하지 않는다.
+`ChatResult.answerBasis`는 서버가 `sections`에서 계산하며 UI가 추측하지 않는다. 결과 상단 배지는 `answerBasis`, 본문은 `sections`를 순서대로 렌더링하고 각 구간에 아래 배지를 붙인다. `answer` 문자열을 잘라 구간을 추정하지 않는다.
 
-| answerBasis | 사용자 표시 |
+| answerBasis·구간 basis | 사용자 표시 |
 | --- | --- |
-| `general_knowledge` | “일반 개념” 배지와 `일반 개념 설명입니다. 최신 기업·시장 사실은 별도 조회가 필요합니다.` 안내. 출처 영역을 만들지 않음 |
-| `zoop_documented` | “ZOOP 안내” 배지와 사용한 도움말·정책 버전 표시 |
+| `general_knowledge` | “일반 개념” 배지. 고정 안내 문장은 서버가 구간 text 맨 앞에 넣었으므로 UI가 다시 붙이지 않는다. 이 구간에는 인용·출처를 연결하지 않음 |
+| `zoop_documented` | “ZOOP 안내” 배지와 사용한 도움말·정책의 제목·버전 표시(`citations`의 `sourceKind=zoop_doc` 항목의 `articleTitle`·`docVersion`) |
 | `evidence_grounded` | “근거 확인됨” 배지, 기준 시점과 인용·원문 열기 제공 |
-| `mixed` | 일반 설명과 근거 기반 현재 사실의 경계를 본문에서 분리하고 사실 주장에만 인용 연결 |
+| `mixed` | 결과 배지만 해당한다. 본문은 구간별 배지로 일반 설명과 근거 기반 사실의 경계를 보여 주고, 인용은 각 구간의 `evidenceIds`에만 연결한다 |
 | `none` | 확인 질문·안내·근거 부족 결과. 근거 검증 배지를 표시하지 않음 |
 
-`sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. 투자 판단 제한이 섞인 답변은 허용한 내용과 제한한 요청·이유를 같은 결과 안에서 구분한다.
+`sources`는 목록 식별용이고 실제 인용 표시는 `citations`의 `evidenceId`, 문서 버전, quote 범위를 사용한다. `sourceKind=article`이면 원문 기사·공시 열기를, `zoop_doc`이면 해당 도움말·정책 문서 열기를 제공한다. `applied`의 기업·이슈·기간·graphVersion·dataAsOf는 답변 상단의 “적용 범위”에서 확인할 수 있게 한다. `limitations`가 비어 있지 않으면 본문 아래·인용 위에 “답하지 않은 부분” 영역을 두고 항목마다 `label`과 `message`를 표시한다. 투자 판단 거절, 전제 불충족, 조회 상한, 요구별 근거 부족을 본문 문장에서 추측해 만들지 않고 이 배열만 사용한다. `kind`는 아이콘·스타일 구분에만 쓰고 문구는 `message`를 그대로 쓴다.
 
 ## 4. 결과·오류별 렌더링
 
 | 결과 | 필수 UI |
 | --- | --- |
-| `answered` | 답변, answerBasis, 적용 범위, 해당 시 인용·그래프 대상, 피드백 |
+| `answered` | 답변, answerBasis, 적용 범위, 해당 시 답하지 않은 부분(`limitations`)·인용·그래프 대상, 피드백 |
 | `clarification` | 확인 이유, choices 또는 자유 입력, 새 job 생성 안내 |
 | `guidance` | 지원 범위와 가능한 다음 행동. action이 있을 때만 버튼 표시 |
 | `insufficient_evidence` | 실제 조회 범위와 부족한 근거 설명. “사건이 없다”로 바꾸지 않음 |
 | `validation_failed` | 결과 미표시, 자동 재생성 없음, 요청 ID와 허용된 복구 안내 |
-| `budget_exceeded` | 부분 답변 미표시, 범위를 줄여 새 질문하도록 안내 |
-| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공 |
+| `budget_exceeded` | 부분 답변 미표시, 재시도 버튼 없음. `reason`이 `context_too_large`면 대상·기간을 줄이도록, `output_limit`이면 질문을 나누도록 안내하고 새 질문을 유도 |
+| `transient` | 장애와 근거 부족을 구분하고 retry 값에 따른 동작만 제공. `tool_timeout`·`deadline_guard`·`provider_error`는 “일시적으로 처리하지 못했어요” 계열 문구를 쓰고 “자료 없음”으로 표현하지 않음. `response_unknown`은 재시도 버튼 없이 처리 결과를 확인하지 못했다는 안내와 요청 ID를 보여 주고 새 질문을 유도 |
 | `permission_denied` | 개인·원문 데이터 미표시, 로그인·권한 안내 |
 
 ## 5. 접근성·상태 보존
@@ -87,9 +102,12 @@
 ## 6. 수용 시나리오
 
 1. `D-AI-01`에서 선택 기업과 질문을 보내면 한 job만 생성되고 새로고침 뒤 `D-AI-02`가 같은 job을 회수한다.
-2. 모호한 “그 기업은 언제?”는 `D-AI-01b`에서 기업 선택을 요구하고 선택 후 새 job을 만든다.
-3. Q02 일반 개념은 `general_knowledge`, 고정 안내 문구, 빈 sources/citations로 표시한다.
+2. 모호한 “그 기업은 언제?”는 `D-AI-01b`에서 기업 선택을 요구하고, 선택하면 `resolves.choiceId`를 담은 새 job을 만든다. 새 job의 `context`는 원 job과 같고 원 job은 바뀌지 않는다.
+3. Q02 일반 개념만 물으면 `answerBasis=general_knowledge`와 구간 하나로 표시하고, 고정 안내 문구는 한 번만 보이며 sources/citations는 비어 있다.
 4. 근거 기반 답변은 모든 인용이 공개 문서 버전과 연결되고 철회 뒤 다시 열 때 노출되지 않는다.
 5. 대화 GET 503은 `D-AI-02b`로 표시되고 “다시 확인”이 새 AI 실행을 만들지 않는다.
 6. 검증 실패·예산 초과·도구 timeout은 부분 답변으로 바뀌지 않는다.
 7. 로그아웃 중 늦게 도착한 응답이 이전 회원 화면이나 cache에 남지 않는다.
+8. “HBM 설명과 지금 살 주식”은 `answered`로 HBM 설명을 표시하고, 매수 판단은 “답하지 않은 부분”에 `investment_advice` 항목의 `label`·`message`로 표시한다.
+9. “HBM이 뭐고 SK하이닉스 최근 HBM 뉴스는?”은 `answerBasis=mixed`로 “일반 개념” 구간(고정 안내 + 설명, 인용 없음)과 “근거 확인됨” 구간(뉴스, 인용 연결)을 나눠 표시한다.
+10. 확인 질문에 두 번 답한 뒤에도 대상이 모호하면 세 번째 확인 질문 대신 `guidance`가 표시되고, 새 질문 입력으로 돌아간다.

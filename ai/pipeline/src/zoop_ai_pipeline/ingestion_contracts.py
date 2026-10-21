@@ -5,11 +5,12 @@ import hashlib
 import json
 import os
 import stat
+import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, model_serializer, model_validator
 from pydantic.alias_generators import to_camel
 
 SCHEMA = "zoop-ingestion-s2-1"
@@ -17,6 +18,37 @@ MAX_INPUT = 2_000_000
 MAX_RAW = 10_000_000
 MAX_TEXT = 500_000
 CLEANER = "exact-copy-1"
+
+
+MAX_LEDGER_COPY = 128 * 1024 * 1024         # a ledger holds receipts and plans only (artifacts are files): a main file or WAL beyond this is not ours to copy
+
+
+def copy_bounded(source: Path, target: Path) -> None:
+    """A bounded private copy of one regular, non-symlink ledger file (the source is only read). Any failure is a `ValueError`; the caller names the code."""
+    try:
+        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        raise ValueError("ledger_copy") from None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_LEDGER_COPY:
+            raise ValueError("ledger_copy")
+        out = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            copied = 0
+            while chunk := os.read(fd, 1 << 20):
+                copied += len(chunk)
+                if copied > MAX_LEDGER_COPY:
+                    raise ValueError("ledger_copy")
+                view, written = memoryview(chunk), 0
+                while written < len(view):
+                    written += os.write(out, view[written:])
+        finally:
+            os.close(out)
+    except OSError:
+        raise ValueError("ledger_copy") from None
+    finally:
+        os.close(fd)
 
 
 class IngestionFailure(Exception):
@@ -84,6 +116,36 @@ class Wire(BaseModel):
 
     def wire(self):
         return self.model_dump(by_alias=True, mode="json")
+
+
+def _declared_publisher(value: str) -> str:
+    """An operator-declared outlet name, stored exactly as written: no trimming and no Unicode normalization.
+
+    Rejected: a lone surrogate, any Unicode control character (category Cc, which includes NUL, tab and newline) and a value made
+    only of separator characters (category Z*), because none of them can name an outlet. The application importer applies the same rule."""
+    if any(unicodedata.category(c) == "Cc" or 0xD800 <= ord(c) <= 0xDFFF for c in value) or all(unicodedata.category(c).startswith("Z") for c in value):
+        raise ValueError("publisher must be a printable outlet name")
+    return value
+
+
+Publisher = Annotated[str, StringConstraints(min_length=1, max_length=200), AfterValidator(_declared_publisher)]
+
+
+class Declared(Wire):
+    """A request/item model with an optional operator-declared publishing outlet.
+
+    Unspecified is the key's absence, never an explicit null: the key is dropped from every dump, including a dump nested in a parent
+    model (`Request.wire()` does not call `Target.wire()`, so a `wire()` override would not reach it), and ONLY this key is dropped.
+    Every existing nullable key keeps serializing as null, so no earlier request digest, page, metadata or raw version changes.
+    A present publisher is identity: it enters the metadata hash, so it yields a new raw/document version of the same document."""
+    publisher: Publisher | None = None
+
+    @model_serializer(mode="wrap")
+    def _without_unspecified_publisher(self, handler):
+        dumped = handler(self)
+        if self.publisher is None:
+            dumped.pop("publisher", None)
+        return dumped
 
 
 class Window(Wire):
@@ -327,7 +389,7 @@ class Receipt(Wire):
         return self
 
 
-class Item(Wire):
+class Item(Declared):
     candidate_id: str = Field(min_length=1, max_length=200)
     supplier_document_id: str | None = Field(default=None, min_length=1, max_length=500)
     url: str = Field(min_length=1, max_length=4000)
@@ -352,6 +414,7 @@ class Item(Wire):
 
     def metadata(self):
         # Collection facts describe one observation; they are not part of the immutable raw-version identity.
+        # A present publisher stays in this metadata (it is raw-version identity); an unspecified one has no key at all.
         return {k: v for k, v in self.wire().items() if k not in {"candidateId", "bodyRef", "url", "supplierDocumentId", "collection"}}
 
 
@@ -380,13 +443,23 @@ def read_file(path: Path, maximum: int) -> bytes:
         os.close(fd)
 
 
+NAVER_SEARCH = frozenset({"naver-search", "naver-developers-search"})
+
+
 class Authority:
     def __init__(self, path: Path):
         self.path = path
         self.raw = read_file(path, MAX_INPUT)
         self.registry = Registry.model_validate_json(self.raw)
 
-    def check(self, source_id: str, scope_id: str, operations=("read", "store"), config=None):
+    def check(self, source_id: str, scope_id: str, operations=("read", "store"), config=None, *, purpose: str | None = None, recipient: str | None = None):
+        """Current registry authority for `operations`. `purpose`/`recipient` (together) make this a live model-send check, the only live authority.
+
+        Without them nothing changes: replay and ingestion never need `model-send`. With them the grant must additionally allow `model-send`, the
+        source must not be a Naver search source (same normalization as the S1 grant registry), and the exact purpose and recipient must be named
+        by the grant (an empty list authorizes nothing). Nothing is inferred from the endpoint, the model or the document's own flags."""
+        if (purpose is None) != (recipient is None):
+            raise ValueError("purpose and recipient are checked together")
         if read_file(self.path, MAX_INPUT) != self.raw:
             raise IngestionFailure("registry_changed")
         source = next((s for s in self.registry.sources if s.source_id == source_id), None)
@@ -398,10 +471,38 @@ class Authority:
             raise IngestionFailure("source_unauthorized")
         if config is not None and source.configuration(scope) != config:
             raise IngestionFailure("scope_configuration_conflict")
+        if purpose is not None:
+            if source.source_id.lower().replace("_", "-") in NAVER_SEARCH:
+                raise IngestionFailure("naver_search_ai_prohibited")
+            if "model-send" not in g.allowed_operations:
+                raise IngestionFailure("source_operation_denied")
+            if purpose not in g.purposes or recipient not in g.recipients:
+                raise IngestionFailure("source_purpose_or_recipient_denied")
         return source, scope
+
+    def sending(self, purpose: str, recipient: str) -> "Sending":
+        """A view of this authority for one outbound model call: every check it answers is the model-send check for this purpose and recipient."""
+        return Sending(self, purpose, recipient)
 
     def fixture(self, source: Source, ref: FileRef, maximum=MAX_RAW):
         raw = read_file(Path(source.input_root) / ref.file, maximum)
         if byte_hash(raw) != ref.sha256:
             raise IngestionFailure("fixture_hash_mismatch")
         return raw
+
+
+class Sending:
+    """`Authority` as seen by one outbound model call (usable anywhere an Authority is): `check` always adds this purpose and recipient."""
+
+    def __init__(self, authority: Authority, purpose: str, recipient: str):
+        self.authority, self.purpose, self.recipient = authority, purpose, recipient
+
+    @property
+    def raw(self) -> bytes:
+        return self.authority.raw
+
+    def check(self, source_id: str, scope_id: str, operations=("read", "store"), config=None):
+        return self.authority.check(source_id, scope_id, operations, config, purpose=self.purpose, recipient=self.recipient)
+
+    def fixture(self, source: Source, ref: FileRef, maximum=MAX_RAW):
+        return self.authority.fixture(source, ref, maximum)

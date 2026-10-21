@@ -2,6 +2,9 @@ import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
+import { companyLogo } from '@/util/company-logo';
+import { themeColor } from '@/util/theme-color';
+import { separateNodes, shortTitle } from './graph-geometry';
 
 export function graphSummary(data: GraphResponse) {
   const companyNodes = data.nodes.filter((n) => n.kind === 'company');
@@ -79,7 +82,7 @@ export function companyNodeSize(issueCount: number, scale = 1) {
           : issueCount <= 4
             ? 3
             : 4;
-  return [18, 22, 26, 34, 44][level] * scale;
+  return [36, 44, 52, 68, 88][level] * scale;
 }
 
 export function focusNeighborhood(
@@ -170,7 +173,7 @@ export function toG6Data(
             }),
     );
   });
-  return {
+  const result: GraphData = {
     nodes: visible.map((n, i) => {
       const company = n.kind === 'company',
         p = positions.get(n.id),
@@ -203,7 +206,7 @@ export function toG6Data(
               {
                 text: `ϟ${summary.folded.get(n.id)}`,
                 placement: 'right-top' as const,
-                fill: '#55554f',
+                fill: themeColor('muted'),
                 background: false,
                 fontSize: 7.178 * scale,
                 fontFamily: 'JetBrains Mono Variable',
@@ -218,14 +221,15 @@ export function toG6Data(
                   .join('·'),
                 placement: 'bottom' as const,
                 offsetY: 12,
-                fill: '#1a1a1a',
-                backgroundFill: '#f2f2f0',
+                fill: themeColor('ink'),
+                backgroundFill: themeColor('soft'),
                 fontSize: 8,
               },
             ]
           : []),
       ];
       const dimmed = emphasizedNodes.size > 0 && !emphasizedNodes.has(n.id);
+      const logo = company ? companyLogo(n.id, n.logoUrl) : null;
       return {
         id: n.id,
         type: company ? 'circle' : 'diamond',
@@ -234,33 +238,34 @@ export function toG6Data(
           x: x * sx,
           y: y * sy,
           size,
-          fill: company ? '#ffffff' : '#1a1a1a',
-          stroke: '#1a1a1a',
+          fill: company ? themeColor('paper') : themeColor('ink'),
+          stroke: themeColor('ink'),
           lineWidth: n.isFocus ? 1.4 : 0.667,
           halo: n.isFocus,
-          haloStroke: '#1a1a1a',
+          haloStroke: themeColor('ink'),
           haloLineWidth: 0.667,
           haloFill: 'transparent',
           haloStrokeOpacity: 1,
           icon: company,
-          iconSrc: n.logoUrl ?? undefined,
-          iconText: n.logoUrl ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
-          iconWidth: size * (n.label === '삼성전자' ? 0.8 : 0.52),
-          iconHeight: size * 0.52,
+          iconSrc: logo ?? undefined,
+          iconText: logo ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
+          iconWidth: size,
+          iconHeight: size,
+          iconRadius: size / 2,
           iconFontSize: size * 0.34,
           iconFontFamily: 'Inter Variable',
           iconFontWeight: 700,
-          iconFill: n.brandColor ?? '#1a1a1a',
-          labelText: company ? n.label : planned ? n.label : '',
+          iconFill: n.brandColor ?? themeColor('ink'),
+          labelText: company ? n.label : shortTitle(n.label, 13 * scale),
           labelPlacement: company ? 'bottom' : 'top',
           labelFontFamily: company ? 'Inter Variable' : 'Pretendard Variable',
-          labelFontSize: (company ? 8.6 : 9.57) * scale,
-          labelFontWeight: company ? 400 : 700,
-          labelFill: company ? '#8a8a86' : '#1a1a1a',
-          labelOffsetY: company ? 6 : -5,
+          labelFontSize: (company ? 17.2 : 13) * scale,
+          labelFontWeight: company ? 500 : 700,
+          labelFill: company ? themeColor('muted') : themeColor('ink'),
+          labelOffsetY: company ? (n.holding || n.watch ? 28 : 10) : -5,
           labelBackground: !company,
-          labelBackgroundFill: '#ffffff',
-          labelBackgroundStroke: '#1a1a1a',
+          labelBackgroundFill: themeColor('paper'),
+          labelBackgroundStroke: themeColor('ink'),
           labelBackgroundLineWidth: 0.5,
           labelBackgroundRadius: 8,
           labelPadding: [2, 7],
@@ -281,7 +286,8 @@ export function toG6Data(
           source: e.source,
           target: e.target,
           style: {
-            stroke: e.relationType === 'FOLLOWS' ? '#c0362c' : '#94948f',
+            stroke:
+              e.relationType === 'FOLLOWS' ? '#c0362c' : themeColor('faint'),
             lineWidth: 0.65,
             strokeOpacity: dimmed
               ? 0.08
@@ -297,4 +303,6 @@ export function toG6Data(
         };
       }),
   };
+  result.nodes = separateNodes(result.nodes ?? []);
+  return result;
 }

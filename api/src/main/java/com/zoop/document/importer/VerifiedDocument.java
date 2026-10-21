@@ -11,6 +11,8 @@ import tools.jackson.databind.JsonNode;
  * @param textArtifactId the export's {@code textArtifactId} ({@code "text-" + documentVersion})
  * @param textUtf8       the strict UTF-8 encoding of the text; this is what is stored and hashed as the artifact
  * @param url            the normalized URL of this observation
+ * @param publisher      the operator-declared publishing outlet exactly as the ledger recorded it, or null when none was declared
+ *                       (older exports never carry one); never derived from the source id, host or page
  * @param publishedAt    set only for the {@code datetime} precision; null otherwise
  * @param publishedDate  set only for the {@code day} precision (a calendar date, never a midnight); null otherwise
  * @param publicationPrecision {@code datetime}, {@code day} or {@code unknown}, the registry's own vocabulary. A declared time
@@ -21,7 +23,7 @@ import tools.jackson.databind.JsonNode;
  *                       (the key set is closed; {@code rawLocators} is only known to be an array)
  */
 public record VerifiedDocument(Observation observation, String textArtifactId, String text, byte[] textUtf8,
-        String title, String url, Instant publishedAt, LocalDate publishedDate, String publicationPrecision,
+        String title, String url, String publisher, Instant publishedAt, LocalDate publishedDate, String publicationPrecision,
         Instant observedAt, String grantId, String grantRevision, CollectedProvenance collected, JsonNode document) {
 
     @Override

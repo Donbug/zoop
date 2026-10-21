@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
+import { companyLogo } from '@/util/company-logo';
 import { Link } from 'react-router-dom';
 import ServiceHeader from '@/components/common/ServiceHeader';
 import GraphCanvas from '@/components/graph/GraphCanvas';
@@ -18,7 +20,21 @@ import AiChatDrawer from '@/components/ai/AiChatDrawer';
 import BriefingSnapshotBanner from '@/components/graph/BriefingSnapshotBanner';
 import EvidenceDrawer from '@/components/evidence/EvidenceDrawer';
 import { graphSummary } from '@/components/graph/graph-model';
-import { useGraphData } from '@/hooks/useGraphData';
+import {
+  useGraphData,
+  graphRequestKey,
+  type GraphPrefetch,
+} from '@/hooks/useGraphData';
+import { getGraph } from '@/apis/graph/graph';
+import {
+  emptyView,
+  isolatedIssues,
+  readModeEntry,
+  saveModeEntry,
+  restoreTargets,
+} from '@/components/graph/graph-view';
+import IsolatedIssuesPanel from '@/components/graph/IsolatedIssuesPanel';
+import MapDetailSheet from '@/components/graph/MapDetailSheet';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource } from '@/hooks/useCompanyResource';
 import { useImpactPath } from '@/hooks/useImpactPath';
@@ -58,8 +74,33 @@ export default function MapPage() {
   // 회원 세션의 회원 ID(쿠키 세션). 비회원·세션 없음은 null
   const { checking } = useAuth();
   const token = useAuthStore(selectMemberId);
+  const revision = useAuthStore((state) => state.sessionRevision);
+  const memoryOwner = `${token ?? 'guest'}:${revision}`;
+  const prefetch = useRef<GraphPrefetch | null>(null);
+  const modeSequence = useRef(0);
+  const [switching, setSwitching] = useState<MapMode | null>(null);
+  const [transitionNotice, setTransitionNotice] = useState('');
+  const evidenceOpen = useGraphUiStore((state) =>
+    Boolean(state.evidenceTarget),
+  );
+  const isolatedOpen = params.get('select') === 'bundle:isolated';
+  const paramsKey = params.toString();
+  useEffect(() => {
+    const sequence = ++modeSequence.current;
+    void Promise.resolve().then(() => {
+      if (sequence === modeSequence.current) setSwitching(null);
+    });
+    return () => {
+      modeSequence.current += 1;
+    };
+  }, [paramsKey, memoryOwner]);
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [centerRequest, setCenterRequest] = useState<{
+    id: string;
+    seq: number;
+  } | null>(null);
   const [tutorialSaving, setTutorialSaving] = useState(false);
   const [tutorialError, setTutorialError] = useState('');
   const openAi = useAiChatStore((state) => state.open);
@@ -106,8 +147,24 @@ export default function MapPage() {
     },
     token,
     retry,
+    prefetch,
   );
   const appliedMode = data?.metadata.mode ?? 'all';
+  useEffect(() => {
+    if (
+      !data ||
+      loading ||
+      error ||
+      data.metadata.mode !== requestedMode ||
+      round
+    )
+      return;
+    const saved = readModeEntry(memoryOwner, data.metadata.mode);
+    saveModeEntry(memoryOwner, data.metadata.mode, {
+      url: `/?${paramsKey}`,
+      view: saved?.view ?? emptyView(),
+    });
+  }, [data, loading, error, requestedMode, memoryOwner, paramsKey, round]);
   const stats = data ? graphSummary(data) : null;
   const rawSelection = params.get('select');
   const pathParts = params.get('path')?.split(',') ?? [];
@@ -136,10 +193,18 @@ export default function MapPage() {
   const opener = useRef<HTMLElement | null>(null);
   const previousEvent = useRef<string | null>(null);
   const selectedPanel =
-    pathFrom ?? impactIssueId ?? eventId ?? edgeId ?? companyNode?.id ?? null;
+    (isolatedOpen ? '__isolated__' : null) ??
+    pathFrom ??
+    impactIssueId ??
+    eventId ??
+    edgeId ??
+    companyNode?.id ??
+    null;
   const focusId = params.get('focus');
   const focusHops: 1 | 2 = params.get('hops') === '2' ? 2 : 1;
   const focusNode = data?.nodes.find((node) => node.id === focusId) ?? null;
+  const logoOf = (companyId: string) =>
+    data?.nodes.find((node) => node.id === companyId)?.logoUrl;
   const tutorialOpen = params.get('tour') === '1';
   useEffect(() => {
     if (tutorialOpen && tutorialStep === null) setTutorialStep(1);
@@ -329,27 +394,77 @@ export default function MapPage() {
   }
   const loginNeeded =
     !checking && !token && (desiredMode === 'personal' || notice === 'login');
-  function changeMode(mode: MapMode) {
+  async function changeMode(mode: MapMode) {
     if (mode === 'personal' && !token) {
       setNotice('login');
       return;
     }
-    setNotice('');
-    updateQuery({
-      mode,
-      scope:
-        mode === 'personal'
-          ? (sessionStorage.getItem(FILTER_KEY) ?? 'all')
-          : null,
-      select: null,
-      id: null,
-      round: null,
-      focus: null,
-      hops: null,
-      tour: null,
-      impact: null,
-      path: null,
+    if (mode === appliedMode && !switching) return;
+    const sequence = ++modeSequence.current;
+    const sessionRevision = useAuthStore.getState().sessionRevision;
+    const savedCurrent = readModeEntry(memoryOwner, appliedMode);
+    saveModeEntry(memoryOwner, appliedMode, {
+      url: `/?${params}`,
+      view: savedCurrent?.view ?? emptyView(),
     });
+    const saved = readModeEntry(memoryOwner, mode);
+    const storedParams = saved
+      ? new URL(saved.url, 'http://localhost').searchParams
+      : null;
+    const nextFilter = readFilter(
+      storedParams?.get('scope') ?? sessionStorage.getItem(FILTER_KEY),
+    );
+    const request = { mode, personalFilter: nextFilter, depth: 1 as const };
+    setSwitching(mode);
+    setTransitionNotice('');
+    try {
+      const nextGraph = await getGraph(request);
+      if (
+        nextGraph.metadata.mode !== mode ||
+        (mode === 'personal' &&
+          nextGraph.metadata.personalFilter !== nextFilter)
+      )
+        throw new Error('요청한 모드와 범위가 다른 응답입니다.');
+      if (
+        sequence !== modeSequence.current ||
+        sessionRevision !== useAuthStore.getState().sessionRevision
+      )
+        return;
+      const restored = restoreTargets(saved, nextGraph);
+      prefetch.current = {
+        key: graphRequestKey(request, token),
+        data: nextGraph,
+      };
+      setNotice('');
+      setSwitching(null);
+      setTransitionNotice(
+        restored.dropped
+          ? '전에 고른 대상이 이 지도에 없어 해당 선택을 해제했습니다.'
+          : '',
+      );
+      updateQuery({
+        mode,
+        scope: mode === 'personal' ? nextFilter : null,
+        ...restored.changes,
+        id: null,
+        round: null,
+        companyId: null,
+        asOf: null,
+        graphVersion: null,
+        event: null,
+        tour: null,
+      });
+    } catch (failure) {
+      if (
+        sequence !== modeSequence.current ||
+        sessionRevision !== useAuthStore.getState().sessionRevision
+      )
+        return;
+      setSwitching(null);
+      setTransitionNotice(
+        `지도 전환 실패. 현재 지도와 선택을 유지합니다. ${failure instanceof Error ? failure.message : ''}`,
+      );
+    }
   }
   function changeFilter(scope: PersonalScope) {
     sessionStorage.setItem(FILTER_KEY, scope);
@@ -363,13 +478,7 @@ export default function MapPage() {
     });
   }
   return (
-    <div
-      className={
-        round
-          ? 'relationship-map min-w-0! max-sm:[&_.relationship-header]:h-auto! max-sm:[&_.relationship-header]:flex-wrap! max-sm:[&_.relationship-header]:gap-2! max-sm:[&_.relationship-header]:py-2! max-sm:[&_.relationship-header_nav]:order-last max-sm:[&_.relationship-header_nav]:w-full max-sm:[&_.relationship-header_nav]:overflow-x-auto max-sm:[&_.relationship-toolbar]:max-w-full max-sm:[&_.relationship-toolbar]:overflow-x-auto'
-          : 'relationship-map'
-      }
-    >
+    <div className="relationship-map min-w-0! [&_.relationship-toolbar]:overflow-x-auto [&_.relationship-toolbar]:max-w-full max-md:min-h-0! max-md:[&_.relationship-header]:h-auto! max-md:[&_.relationship-header]:flex-wrap! max-md:[&_.relationship-header]:gap-2! max-md:[&_.relationship-header]:px-2! max-md:[&_.relationship-header]:py-2! max-md:[&_.relationship-header_nav]:order-last max-md:[&_.relationship-header_nav]:w-full max-md:[&_.relationship-header_nav]:overflow-x-auto max-md:[&_.relationship-toolbar]:max-w-full max-md:[&_.relationship-toolbar]:overflow-x-auto max-md:[&_.relationship-canvas]:min-h-0! max-md:[&_.relationship-body]:min-h-0! max-md:[&_.relationship-legend]:left-2! max-md:[&_.relationship-legend]:top-2! max-md:[&_.relationship-legend]:w-[150px]! max-md:[&_.relationship-title_h1]:text-base! max-md:[&_.relationship-body]:px-1!">
       <ServiceHeader />
       {returnTo?.startsWith('/companies/') && (
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
@@ -417,22 +526,24 @@ export default function MapPage() {
           <div className="relationship-toolbar">
             <button
               className="relationship-sidebar-toggle"
-              onClick={() => setNotice('sidebar')}
-              title="내 종목 사이드바 디자인 확인 대기"
+              aria-expanded={sidebarOpen}
+              aria-controls="holdings-sidebar"
+              onClick={() => setSidebarOpen((open) => !open)}
+              title="내가 보유 중인 종목 보기"
             >
               <GraphIcon name="sidebar" />내 종목
             </button>
             <div className="relationship-mode" aria-label="그래프 모드">
               <button
                 aria-pressed={appliedMode === 'all'}
-                onClick={() => changeMode('all')}
+                onClick={() => void changeMode('all')}
               >
                 <GraphIcon name="globe" />
                 시장 전체
               </button>
               <button
                 aria-pressed={appliedMode === 'personal'}
-                onClick={() => changeMode('personal')}
+                onClick={() => void changeMode('personal')}
               >
                 <GraphIcon name="personal" />내 종목
               </button>
@@ -524,12 +635,47 @@ export default function MapPage() {
             </div>
           </div>
           <div
-            className={`relationship-body${selectedPanel ? ' has-company-panel' : ''}${tutorialOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
+            className={`relationship-body${selectedPanel ? ' has-company-panel max-md:pb-[48dvh]!' : ''}${tutorialOpen || sidebarOpen ? ' flex! gap-3! max-sm:flex-col [&>.relationship-canvas]:min-w-0 [&>.relationship-canvas]:flex-1 [&>.relationship-canvas]:w-auto' : ''}`}
             aria-busy={loading}
           >
+            {sidebarOpen && (
+              <div id="holdings-sidebar" className="flex min-h-0 max-sm:w-full">
+                <HoldingsSidebar
+                  member={Boolean(token)}
+                  logoOf={(id) =>
+                    companyLogo(
+                      id,
+                      data?.nodes.find((node) => node.id === id)?.logoUrl,
+                    )
+                  }
+                  onPick={(id) => {
+                    if (!data?.nodes.some((node) => node.id === id)) {
+                      setNotice('holding-missing');
+                      return;
+                    }
+                    setNotice('');
+                    selectNode(id);
+                    setCenterRequest((request) => ({
+                      id,
+                      seq: (request?.seq ?? 0) + 1,
+                    }));
+                  }}
+                  onClose={() => setSidebarOpen(false)}
+                />
+              </div>
+            )}
             {data ? (
               <GraphCanvas
                 data={data}
+                centerRequest={centerRequest}
+                memoryOwner={memoryOwner}
+                onOpenIsolated={() => {
+                  updateQuery({
+                    select: 'bundle:isolated',
+                    impact: null,
+                    path: null,
+                  });
+                }}
                 selectedId={
                   pathFrom ?? selectedId ?? detailEventId ?? companyId
                 }
@@ -581,121 +727,146 @@ export default function MapPage() {
                 onRetry={() => void closeTutorial()}
               />
             )}
-            {companyNode && !impactIssueId && !pathFrom && (
-              <CompanyDetailPanel
-                key={companyNode.id}
-                companyId={companyNode.id}
-                context={round ? eventContext : undefined}
-                fallback={companyNode}
-                relatedCompanies={relatedCompanies}
-                token={token}
-                onClose={() => selectNode(null)}
-                onSelectIssue={(issueId) => openImpact(companyNode.id, issueId)}
-                onFocus={() =>
-                  updateQuery({ focus: companyNode.id, hops: '1' })
-                }
-                onConnections={() => {
-                  updateQuery({
-                    path: companyNode.id,
-                    select: null,
-                    focus: null,
-                    hops: null,
-                    impact: null,
-                  });
-                }}
-                onSelectRelation={(companyId) => {
-                  const edge = data?.edges.find(
-                    (item) =>
-                      item.relationType === 'SHARES_ISSUE' &&
-                      ((item.source === companyNode.id &&
-                        item.target === companyId) ||
-                        (item.target === companyNode.id &&
-                          item.source === companyId)),
-                  );
-                  if (edge) selectEdge(edge.id);
-                }}
-                onAskAi={() => openAi({ kind: 'company', id: companyNode.id })}
-              />
-            )}
-            {pathFrom && (
-              <CompanyPathPanel
-                graph={data}
-                from={pathFrom}
-                to={pathTo}
-                loading={loading}
-                error={error}
-                onRetry={() => setRetry((v) => v + 1)}
-                onClose={() => updateQuery({ path: null })}
-                onPick={(id) =>
-                  updateQuery({
-                    path: id ? `${pathFrom},${id}` : pathFrom,
-                    select: null,
-                  })
-                }
-                onEvidence={(id) => {
-                  const node = data?.nodes.find((n) => n.id === id);
-                  const evidenceIds = [
-                    ...new Set(
-                      data?.edges
-                        .filter((e) => e.source === id || e.target === id)
-                        .flatMap((e) => e.evidenceIds) ?? [],
-                    ),
-                  ];
-                  useGraphUiStore.getState().openEvidence({
-                    kind: 'issue',
-                    id,
-                    label: node?.label ?? id,
-                    evidenceIds,
-                    mapContext: { ...eventContext, url: `/?${params}` },
-                  });
-                }}
-              />
-            )}
-            {data && impactCompanyId && impactIssueId && !pathFrom && (
-              <ImpactPathPanel
-                companyId={impactCompanyId}
-                issueId={impactIssueId}
-                graph={data}
-                impact={impact.data}
-                loading={impact.loading}
-                error={impact.error}
-                onRetry={impact.retry}
-                onClose={() => updateQuery({ impact: null })}
-                onViewIssue={() =>
-                  updateQuery({
-                    select: `node:${impactIssueId}`,
-                    impact: null,
-                  })
-                }
-                onEvidence={(evidenceIds) =>
-                  useGraphUiStore
-                    .getState()
-                    .openEvidence(impactTarget(evidenceIds))
-                }
-                onAskAi={() => openAi(impactTarget())}
-              />
-            )}
-            {eventId && !pathFrom && (
-              <EventDetailPanel
-                key={eventId}
-                id={eventId}
-                context={eventContext}
-                geography={selectedNode?.geography ?? null}
-                onClose={() => selectNode(null)}
-                onAction={eventAction}
-              />
-            )}
-            {edgeId && !pathFrom && (
-              <RelationDetailPanel
-                key={edgeId}
-                id={edgeId}
-                context={eventContext}
-                onClose={() => selectNode(null)}
-                onSelectNode={selectNode}
-                onAction={relationAction}
-              />
-            )}
+            <MapDetailSheet
+              open={Boolean(selectedPanel)}
+              suspended={evidenceOpen}
+              onClose={() => {
+                updateQuery({ select: null, impact: null, path: null });
+              }}
+            >
+              {isolatedOpen && data && (
+                <IsolatedIssuesPanel
+                  issues={isolatedIssues(data)}
+                  onClose={() => selectNode(null)}
+                  onSelect={(id) => {
+                    selectNode(id);
+                  }}
+                />
+              )}
+              {companyNode && !impactIssueId && !pathFrom && (
+                <CompanyDetailPanel
+                  key={companyNode.id}
+                  companyId={companyNode.id}
+                  context={round ? eventContext : undefined}
+                  fallback={companyNode}
+                  relatedCompanies={relatedCompanies}
+                  token={token}
+                  onClose={() => selectNode(null)}
+                  onSelectIssue={(issueId) =>
+                    openImpact(companyNode.id, issueId)
+                  }
+                  onFocus={() =>
+                    updateQuery({ focus: companyNode.id, hops: '1' })
+                  }
+                  onConnections={() => {
+                    updateQuery({
+                      path: companyNode.id,
+                      select: null,
+                      focus: null,
+                      hops: null,
+                      impact: null,
+                    });
+                  }}
+                  onSelectRelation={(companyId) => {
+                    const edge = data?.edges.find(
+                      (item) =>
+                        item.relationType === 'SHARES_ISSUE' &&
+                        ((item.source === companyNode.id &&
+                          item.target === companyId) ||
+                          (item.target === companyNode.id &&
+                            item.source === companyId)),
+                    );
+                    if (edge) selectEdge(edge.id);
+                  }}
+                  onAskAi={() =>
+                    openAi({ kind: 'company', id: companyNode.id })
+                  }
+                />
+              )}
+              {pathFrom && (
+                <CompanyPathPanel
+                  graph={data}
+                  from={pathFrom}
+                  to={pathTo}
+                  loading={loading}
+                  error={error}
+                  onRetry={() => setRetry((v) => v + 1)}
+                  onClose={() => updateQuery({ path: null })}
+                  onPick={(id) =>
+                    updateQuery({
+                      path: id ? `${pathFrom},${id}` : pathFrom,
+                      select: null,
+                    })
+                  }
+                  onEvidence={(id) => {
+                    const node = data?.nodes.find((n) => n.id === id);
+                    const evidenceIds = [
+                      ...new Set(
+                        data?.edges
+                          .filter((e) => e.source === id || e.target === id)
+                          .flatMap((e) => e.evidenceIds) ?? [],
+                      ),
+                    ];
+                    useGraphUiStore.getState().openEvidence({
+                      kind: 'issue',
+                      id,
+                      label: node?.label ?? id,
+                      evidenceIds,
+                      mapContext: { ...eventContext, url: `/?${params}` },
+                    });
+                  }}
+                />
+              )}
+              {data && impactCompanyId && impactIssueId && !pathFrom && (
+                <ImpactPathPanel
+                  companyId={impactCompanyId}
+                  issueId={impactIssueId}
+                  graph={data}
+                  impact={impact.data}
+                  loading={impact.loading}
+                  error={impact.error}
+                  onRetry={impact.retry}
+                  onClose={() => updateQuery({ impact: null })}
+                  onViewIssue={() =>
+                    updateQuery({
+                      select: `node:${impactIssueId}`,
+                      impact: null,
+                    })
+                  }
+                  onEvidence={(evidenceIds) =>
+                    useGraphUiStore
+                      .getState()
+                      .openEvidence(impactTarget(evidenceIds))
+                  }
+                  onAskAi={() => openAi(impactTarget())}
+                />
+              )}
+              {eventId && !pathFrom && (
+                <EventDetailPanel
+                  key={eventId}
+                  id={eventId}
+                  context={eventContext}
+                  geography={selectedNode?.geography ?? null}
+                  logoOf={logoOf}
+                  onClose={() => selectNode(null)}
+                  onAction={eventAction}
+                />
+              )}
+              {edgeId && !pathFrom && (
+                <RelationDetailPanel
+                  key={edgeId}
+                  id={edgeId}
+                  context={eventContext}
+                  logoOf={logoOf}
+                  onClose={() => selectNode(null)}
+                  onSelectNode={selectNode}
+                  onAction={relationAction}
+                />
+              )}
+            </MapDetailSheet>
             {(loading ||
+              switching ||
+              transitionNotice ||
               error ||
               loginNeeded ||
               notice ||
@@ -705,6 +876,20 @@ export default function MapPage() {
                 className="relationship-notice"
                 role={error ? 'alert' : 'status'}
               >
+                {switching && (
+                  <p role="status">
+                    {switching === 'all' ? '시장 전체' : '내 종목'} 지도 전환
+                    중… 현재 지도를 유지합니다.
+                  </p>
+                )}
+                {transitionNotice && (
+                  <p>
+                    {transitionNotice}{' '}
+                    <button onClick={() => setTransitionNotice('')}>
+                      안내 닫기
+                    </button>
+                  </p>
+                )}
                 {loading && <p>선택한 그래프 조회 중…</p>}
                 {error && (
                   <p>
@@ -721,10 +906,9 @@ export default function MapPage() {
                     <Link to="/login">로그인</Link>
                   </p>
                 )}
-                {notice === 'sidebar' && (
+                {notice === 'holding-missing' && (
                   <p>
-                    내 종목 목록 사이드바는 Figma 프레임 확인 대기 중입니다.
-                    임의 UI는 구현하지 않았습니다.
+                    이 종목은 지금 지도에 없어요. 시장 전체 지도에서 찾아보세요.
                   </p>
                 )}
                 {notice === 'info' && (

@@ -40,7 +40,7 @@ def main() -> int:
     parser.add_argument("--ingestion-state-dir", type=Path)
     parser.add_argument("--sources", type=Path, help="S1/S2 source and grant registry, consumed only through the owner seams")
     parser.add_argument("--canonical", type=Path, help="server-owned canonical decision registry (zoop-graph-canonical-1)")
-    parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (zoop-public-decisions-1)")
+    parser.add_argument("--decisions", type=Path, help="operator public-projection decisions (zoop-public-decisions-2, with per-issue fieldVerdicts)")
     parser.add_argument("--bindings", type=Path, help="server-owned app document bindings (zoop-app-document-bindings-1)")
     args = parser.parse_args()
     store = None

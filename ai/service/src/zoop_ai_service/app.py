@@ -475,13 +475,13 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
         reply = await run_in_threadpool(getattr(relation, operation), principal.name, job_id, operation_id, seen)
         return respond(reply)
 
-    @app.post("/internal/v1/relation-jobs/{jobId}/reviews", operation_id="submitRelationReview", tags=["relation-jobs"], status_code=202,
-              response_model=RelationOperationStatus, summary="Record one allow/reject review of a relation candidate (one operation per Idempotency-Key)",
+    @app.post("/internal/v1/relation-jobs/{jobId}/reviews", operation_id="submitRelationReview", tags=["relation-jobs"], status_code=200,
+              response_model=RelationOperationStatus, summary="Record one allow (final approval) / reject (exclusion) review of a HOLD relation candidate (one operation per Idempotency-Key)",
               responses={**{code: model for code, model in RELATION_ERRORS.items() if code not in (403, 404, 409)},
-                         200: {"model": RelationOperationStatus, "description": "The decision is recorded and either needs no revalidation (reject) or this is a replay of an existing operation."},
+                         200: {"model": RelationOperationStatus, "description": "The decision is recorded in the AI relation ledger and is terminal: an allow is the operator's final approval (revalidation not_requested, next none), a reject an exclusion. Also the answer to a replay of an existing operation, including one recorded under the earlier revalidation contract (its `limitation` says so)."},
                          403: {"model": RelationErrorEnvelope, "description": "scope_denied, or upstream_not_allowed: the job's upstream is not (any more) listed for this principal."},
                          404: {"model": RelationErrorEnvelope, "description": "job_not_found (unknown or another principal's job) or relation_candidate_not_found."},
-                         409: {"model": RelationErrorEnvelope, "description": "source_version_conflict, source_revision_conflict, review_target_not_hold, review_already_pending, job_cancelled, idempotency_conflict, operation_id_unavailable, upstream_unavailable or execution_unavailable. A refusal records nothing."},
+                         409: {"model": RelationErrorEnvelope, "description": "source_version_conflict, source_revision_conflict, review_target_not_hold, review_call_in_flight, review_candidate_ineligible, review_contract_changed, job_cancelled, idempotency_conflict, operation_id_unavailable, upstream_unavailable or execution_unavailable. A refusal records nothing."},
                          413: {"model": RelationErrorEnvelope, "description": "request_too_large"},
                          415: {"model": RelationErrorEnvelope, "description": "unsupported_media_type"}})
     async def relation_review(request: Request, principal: Annotated[Principal, Depends(require("relation.review"))],
@@ -510,19 +510,6 @@ def create_app(service: JobService | None = None, relation: RelationJobs | None 
                                  job_id: Annotated[str, PATH_JOB_ID], operation_id: Annotated[str, PATH_OPERATION_ID],
                                  x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
         return await relation_operation_call(request, "operation", principal, job_id, operation_id)
-
-    @app.post("/internal/v1/relation-jobs/{jobId}/reviews/{operationId}/recover", operation_id="recoverRelationReviewOperation", tags=["relation-jobs"],
-              status_code=202, response_model=RelationOperationStatus,
-              summary="Explicitly re-queue the revalidation of an accepted allow, after reading the chain (idempotent)",
-              responses={**{code: model for code, model in RELATION_ERRORS.items() if code not in (403, 404, 409)},
-                         200: {"model": RelationOperationStatus, "description": "Nothing to add: a revalidation is already pending or running, or the chain shows it already settled."},
-                         403: {"model": RelationErrorEnvelope, "description": "scope_denied, or upstream_not_allowed."},
-                         404: {"model": RelationErrorEnvelope, "description": "job_not_found or operation_not_found."},
-                         409: {"model": RelationErrorEnvelope, "description": "review_not_confirmed, operation_not_recoverable, reconcile_required, job_cancelled, upstream_unavailable or execution_unavailable."}})
-    async def relation_operation_recover(request: Request, principal: Annotated[Principal, Depends(require("relation.recover"))],
-                                         job_id: Annotated[str, PATH_JOB_ID], operation_id: Annotated[str, PATH_OPERATION_ID],
-                                         x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None) -> JSONResponse:
-        return await relation_operation_call(request, "recover_operation", principal, job_id, operation_id)
 
     def extraction_service(request: Request) -> ExtractionJobs:
         extraction_jobs = request.app.state.extraction

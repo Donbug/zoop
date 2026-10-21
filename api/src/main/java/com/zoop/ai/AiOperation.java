@@ -2,8 +2,8 @@ package com.zoop.ai;
 
 /**
  * The operations of the internal AI transports. The first five exist in every family (S1 analysis, S2 extraction, S3
- * relation); the last three are the S3 review operation: {@code REVIEW} records one decision, {@code OPERATION} reads it by its
- * key, {@code RECOVER_OPERATION} re-queues the revalidation of an accepted allow.
+ * relation); the last two are the S3 review operation: {@code REVIEW} records one decision (an allow is the operator's final
+ * approval, terminal), {@code OPERATION} reads it by its key.
  */
 public enum AiOperation {
     SUBMIT(true),
@@ -12,8 +12,7 @@ public enum AiOperation {
     CANCEL(true),
     RECOVER(true),
     REVIEW(true),
-    OPERATION(false),
-    RECOVER_OPERATION(true);
+    OPERATION(false);
 
     private final boolean mutating;
 

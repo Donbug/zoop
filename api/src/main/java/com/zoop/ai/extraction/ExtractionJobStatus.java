@@ -9,18 +9,20 @@ import com.zoop.ai.PipelineJob;
 
 /**
  * Content-free S2 job status exactly as the AI service observed it for this request ({@code ExtractionJobStatus}, schema
- * {@code zoop-ai-internal-extraction-1}). {@code state=READY} means a candidate set exists, not that anything is approved; the
- * runtime is replay-only, so {@code usage.providerCalls} and {@code paidModelCalls} are zero by contract and are reported as the
- * service states them.
+ * {@code zoop-ai-internal-extraction-1}). {@code state=READY} means a candidate set exists, not that anything is approved. A
+ * replay job reports zero provider calls; a live job (a real model call the operator approved and pinned server-side) reports
+ * what the runtime counted, with tokens and USD null while unknown (never a guess).
  *
  * @param inputDigest the runtime job's input digest; for an S3 job over this S2 job it is the upstream {@code inputDigest}
  * @param approvedRequestDigest the digest of the operator-approved request this job was built from
+ * @param executionMode {@code REPLAY} or {@code LIVE}
  */
 public record ExtractionJobStatus(
         String jobId,
         String inputDigest,
         String approvedRequestDigest,
         PipelineJob.SourceKind sourceKind,
+        com.zoop.ai.ExecutionMode executionMode,
         PipelineJob.State state,
         String phase,
         PipelineJob.ResumeMode resumeMode,
@@ -38,7 +40,14 @@ public record ExtractionJobStatus(
         stages = List.copyOf(stages);
     }
 
-    public record Usage(long replayCalls, long startedWithoutReceipt, long providerCalls, long paidModelCalls) {
+    /**
+     * {@code providerCalls} counts calls transmitted or possibly transmitted (a started call without a receipt included),
+     * {@code receivedCalls} those a reply was stored for, {@code unsentCalls} those definitively not sent. Tokens and USD are null
+     * while unknown.
+     */
+    public record Usage(long replayCalls, long startedWithoutReceipt, long providerCalls, long paidModelCalls, long receivedCalls,
+                        long unsentCalls, Optional<Long> inputTokens, Optional<Long> outputTokens, Optional<Long> reasoningTokens,
+                        Optional<String> estimatedUsd, Optional<String> chargedUsd) {
     }
 
     public enum StageName {
