@@ -1256,7 +1256,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getConversation · 대화와 질문 작업 조회
 
-대화와 질문 작업 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+대화와 질문 작업 조회. 각 작업에 getQuestionJob과 같은 현재 근거 접근 권한 재확인을 적용한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1283,7 +1283,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCurrentConversation · 최신 대화 복원
 
-최신 대화 복원.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+최신 대화 복원. 각 작업에 getQuestionJob과 같은 현재 근거 접근 권한 재확인을 적용한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1340,7 +1340,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getQuestionJob · 질문 작업 상태·저장 결과 회수
 
-질문 작업 상태·저장 결과 회수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -3543,7 +3543,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 저장 결과와 달리 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob). |
 | sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
 | answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
