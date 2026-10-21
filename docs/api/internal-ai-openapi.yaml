@@ -141,7 +141,7 @@
 
     **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
     family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-    (`zoop-graph-handoff-bundle-5`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+    (`zoop-graph-handoff-bundle-6`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
     writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
     path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
     `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -159,7 +159,7 @@
     `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
     `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
     `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2`, `-3` or `-4`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` ... `-5`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
     A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
     so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -183,6 +183,17 @@
     `verification` always `operator-field-verdict`). They are never AI output, carry no free-text note, and exist only where an operator reviewed; an empty list means
     "no field verdict exists", not "verified". This service neither derives nor judges them and checks only the shapes (decision/reason/evidence-count combinations:
     ALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous spans, REJECT+contradicted spans). Original `mentions[]` values are never changed.
+
+    **Impacts.** `impacts[]` has exactly one closed row per emitted `INVOLVES` source relation `(edgeId, sourceRelation.jobId, sourceRelation.relationCandidateId)`, sorted by
+    that tuple. It never aggregates: two source relations of one edge stay two rows. A row says what the S3 independent verifier mapped for the company, or why there is
+    none: `status` is `not-applicable` (an operator-final-approval source: no impact candidate exists), `not-proposed`, `no-evidence`, `technical-reject` or
+    `verifier-reject` (`targetVerdict` contradicted), `verified` or `withheld` (`code` explains a withheld or technically rejected row). Only a `verified` row carries `effects`
+    (`positive`, `negative`, `neutral`, `uncertain`: sorted, disjoint app evidence ids, 1..40 in all, each of an article version the edge cites, with distinct source
+    evidence per row) and the deterministic `label` (`uncertain` effects or an `insufficient` target give `undetermined`; positive and negative together give `mixed`; one
+    side gives that side; neutral only gives `undetermined`). `proposal` is the producer's UNVERIFIED private proposal (`verification` always `none`): never a verified
+    reason. The label belongs to one source relation's quote evidence, never to the event as a whole, and is neither a causal claim nor a price probability. This service checks
+    the rows' shape and the closure its closed models can see (coverage of every `INVOLVES` source relation, endpoints, source approval kind, evidence ids and article
+    versions, counts, policy, label); the producer owns everything else. An earlier-schema handoff has no `impacts`: that absence means "unavailable", never "not proposed".
 
     **The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical
     UTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python
@@ -6245,12 +6256,13 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "07ef274989e54aebac48cbbb76adf659e7659f1cec5aa47a04bdbedef4e70e0d"
-                      "contentDigest": "cffe8dddd6a1cda33959c9e27faec0417e99d9ee99e5ec27dd5e106cdec57edb"
-                      "bundleBytes": 9990
+                      "bundleDigest": "45390a4efa68ea55698e57edd525683157b7980a49d86dbdfbcdff6a29b59db3"
+                      "contentDigest": "06a5925bb187b2433585a120d176ff3d9a66611cf9d38c76bb3de82a95c59558"
+                      "bundleBytes": 10938
                       "counts":
                         "companies": 1
                         "pathCompanies": 0
+                        "impacts": 1
                         "issues": 1
                         "relations":
                           "INVOLVES": 1
@@ -6529,12 +6541,13 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "07ef274989e54aebac48cbbb76adf659e7659f1cec5aa47a04bdbedef4e70e0d"
-                      "contentDigest": "cffe8dddd6a1cda33959c9e27faec0417e99d9ee99e5ec27dd5e106cdec57edb"
-                      "bundleBytes": 9990
+                      "bundleDigest": "45390a4efa68ea55698e57edd525683157b7980a49d86dbdfbcdff6a29b59db3"
+                      "contentDigest": "06a5925bb187b2433585a120d176ff3d9a66611cf9d38c76bb3de82a95c59558"
+                      "bundleBytes": 10938
                       "counts":
                         "companies": 1
                         "pathCompanies": 0
+                        "impacts": 1
                         "issues": 1
                         "relations":
                           "INVOLVES": 1
@@ -6569,7 +6582,7 @@
                         "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
                         "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
                     "bundle":
-                      "schemaVersion": "zoop-graph-handoff-bundle-5"
+                      "schemaVersion": "zoop-graph-handoff-bundle-6"
                       "handoffId": "handoff-synthetic-1"
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
                       "provenance":
@@ -6589,6 +6602,7 @@
                         "structural": "manual-operator-review"
                         "sequence": "s2-comparison-with-operator-decision"
                         "sourceSupport": "origin-or-exact-text-union"
+                        "impacts": "s3-independent-verifier-quote-effect"
                       "sources":
                         - "relation":
                             "jobId": "s3-synthetic-relation"
@@ -6626,7 +6640,7 @@
                               "reject": 0
                               "pending": 0
                             "reviewPending": 0
-                            "impactCandidates": 0
+                            "impactCandidates": 1
                             "eligibleNotPublicByType":
                               "SUPPLIES": 0
                       "companies":
@@ -6790,6 +6804,31 @@
                             - "kind": "s3-relation"
                               "jobId": "s3-synthetic-relation"
                               "id": "rc-4444444444444444444444444444444444444444444444444444444444444444"
+                      "impacts":
+                        - "edgeId": "edge-598c6cc670a3a559743e1364d69d811a7b341e64eea8b2eda04d4f170c4051aa"
+                          "issueId": "issue:synthetic-supply"
+                          "companyId": "KRX:005930"
+                          "sourceRelation":
+                            "jobId": "s3-synthetic-relation"
+                            "relationCandidateId": "rc-4444444444444444444444444444444444444444444444444444444444444444"
+                          "impactCandidateId": "ic-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                          "status": "verified"
+                          "code": null
+                          "label": "positive"
+                          "targetVerdict": "supported"
+                          "effects":
+                            "positive":
+                              - "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
+                            "negative": []
+                            "neutral": []
+                            "uncertain": []
+                          "verifier": "called"
+                          "verifierRequestDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                          "proposal":
+                            "direction": "positive"
+                            "reason": "합성 공급 계약이 합성기업의 매출에 긍정적일 수 있다는 제안"
+                            "limitations": null
+                            "verification": "none"
                       "evidence":
                         - "id": "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
                           "kind": "graph-body-span"
@@ -6835,6 +6874,7 @@
                       "counts":
                         "companies": 1
                         "pathCompanies": 0
+                        "impacts": 1
                         "issues": 1
                         "relations":
                           "INVOLVES": 1
@@ -6870,7 +6910,7 @@
                         "publicActivation": "none"
                         "graphDb": "none"
                       "digests":
-                        "content": "cffe8dddd6a1cda33959c9e27faec0417e99d9ee99e5ec27dd5e106cdec57edb"
+                        "content": "06a5925bb187b2433585a120d176ff3d9a66611cf9d38c76bb3de82a95c59558"
                 "withheld":
                   "summary": "Source rights were revoked: no manifest, no bundle, no counts"
                   "value":
@@ -7387,6 +7427,10 @@
           "type": "integer"
           "minimum": 0.0
           "title": "Pathcompanies"
+        "impacts":
+          "type": "integer"
+          "minimum": 0.0
+          "title": "Impacts"
         "issues":
           "type": "integer"
           "minimum": 0.0
@@ -7410,6 +7454,7 @@
       "required":
         - "companies"
         - "pathCompanies"
+        - "impacts"
         - "issues"
         - "relations"
         - "evidence"
@@ -7888,6 +7933,182 @@
         - "grantId"
         - "revision"
       "title": "BGrant"
+    "BImpact":
+      "properties":
+        "edgeId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Edgeid"
+        "issueId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Issueid"
+        "companyId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Companyid"
+        "sourceRelation":
+          "$ref": "#/components/schemas/BSourceRelation"
+        "impactCandidateId":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^ic-[a-f0-9]{64}$"
+            - "type": "null"
+          "title": "Impactcandidateid"
+        "status":
+          "type": "string"
+          "enum":
+            - "not-applicable"
+            - "not-proposed"
+            - "no-evidence"
+            - "technical-reject"
+            - "verifier-reject"
+            - "verified"
+            - "withheld"
+          "title": "Status"
+        "code":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "producer_reply_invalid"
+                - "impact_precheck_rejected"
+                - "verifier_reply_invalid"
+                - "impact_evidence_outside_relation_documents"
+                - "impact_quote_ambiguous"
+            - "type": "null"
+          "title": "Code"
+        "label":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "positive"
+                - "negative"
+                - "mixed"
+                - "undetermined"
+            - "type": "null"
+          "title": "Label"
+        "targetVerdict":
+          "anyOf":
+            - "type": "string"
+              "enum":
+                - "supported"
+                - "insufficient"
+                - "contradicted"
+            - "type": "null"
+          "title": "Targetverdict"
+        "effects":
+          "anyOf":
+            - "$ref": "#/components/schemas/BImpactEffects"
+            - "type": "null"
+        "verifier":
+          "type": "string"
+          "enum":
+            - "called"
+            - "not-called"
+          "title": "Verifier"
+        "verifierRequestDigest":
+          "anyOf":
+            - "type": "string"
+              "pattern": "^[a-f0-9]{64}$"
+            - "type": "null"
+          "title": "Verifierrequestdigest"
+        "proposal":
+          "anyOf":
+            - "$ref": "#/components/schemas/BImpactProposal"
+            - "type": "null"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "edgeId"
+        - "issueId"
+        - "companyId"
+        - "sourceRelation"
+        - "impactCandidateId"
+        - "status"
+        - "code"
+        - "label"
+        - "targetVerdict"
+        - "effects"
+        - "verifier"
+        - "verifierRequestDigest"
+        - "proposal"
+      "title": "BImpact"
+      "description": |-
+        One impact row per emitted INVOLVES source relation: the independent verifier's mapped effect on the company, or why there is none. Never a public
+        label of the event, never causality or price probability.
+    "BImpactEffects":
+      "properties":
+        "positive":
+          "items":
+            "type": "string"
+            "pattern": "^ev-[a-f0-9]{64}$"
+          "type": "array"
+          "maxItems": 40
+          "title": "Positive"
+        "negative":
+          "items":
+            "type": "string"
+            "pattern": "^ev-[a-f0-9]{64}$"
+          "type": "array"
+          "maxItems": 40
+          "title": "Negative"
+        "neutral":
+          "items":
+            "type": "string"
+            "pattern": "^ev-[a-f0-9]{64}$"
+          "type": "array"
+          "maxItems": 40
+          "title": "Neutral"
+        "uncertain":
+          "items":
+            "type": "string"
+            "pattern": "^ev-[a-f0-9]{64}$"
+          "type": "array"
+          "maxItems": 40
+          "title": "Uncertain"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "positive"
+        - "negative"
+        - "neutral"
+        - "uncertain"
+      "title": "BImpactEffects"
+      "description": "The verifier-mapped app evidence ids per effect side: sorted, unique, disjoint, 1..40 in all."
+    "BImpactProposal":
+      "properties":
+        "direction":
+          "type": "string"
+          "enum":
+            - "positive"
+            - "negative"
+            - "mixed"
+            - "undetermined"
+          "title": "Direction"
+        "reason":
+          "type": "string"
+          "maxLength": 2000
+          "minLength": 1
+          "title": "Reason"
+        "limitations":
+          "anyOf":
+            - "type": "string"
+              "maxLength": 1000
+            - "type": "null"
+          "title": "Limitations"
+        "verification":
+          "type": "string"
+          "const": "none"
+          "title": "Verification"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "direction"
+        - "reason"
+        - "limitations"
+        - "verification"
+      "title": "BImpactProposal"
+      "description": "The producer's UNVERIFIED private proposal (direction, reason, limitations): never a verified reason. Lengths are Unicode code points."
     "BInvolvesProvenance":
       "properties":
         "origin":
@@ -8332,6 +8553,10 @@
           "type": "string"
           "const": "origin-or-exact-text-union"
           "title": "Sourcesupport"
+        "impacts":
+          "type": "string"
+          "const": "s3-independent-verifier-quote-effect"
+          "title": "Impacts"
       "additionalProperties": false
       "type": "object"
       "required":
@@ -8343,6 +8568,7 @@
         - "structural"
         - "sequence"
         - "sourceSupport"
+        - "impacts"
       "title": "BPolicy"
     "BPolicyFiles":
       "properties":
@@ -9010,7 +9236,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-graph-handoff-bundle-5"
+          "const": "zoop-graph-handoff-bundle-6"
           "title": "Schemaversion"
         "handoffId":
           "type": "string"
@@ -9055,6 +9281,12 @@
           "type": "array"
           "maxItems": 10000
           "title": "Relations"
+        "impacts":
+          "items":
+            "$ref": "#/components/schemas/BImpact"
+          "type": "array"
+          "maxItems": 10000
+          "title": "Impacts"
         "evidence":
           "items":
             "$ref": "#/components/schemas/BEvidence"
@@ -9090,6 +9322,7 @@
         - "pathCompanies"
         - "issues"
         - "relations"
+        - "impacts"
         - "evidence"
         - "articles"
         - "exclusions"

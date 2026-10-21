@@ -319,6 +319,36 @@ class GraphHandoffImportPostgresIntegrationTest {
     }
 
     @Test
+    void aVerifiedImpactQuoteIsRegisteredAsEvidenceAndItsRowsLiveOnlyInTheRetainedReceipt() throws Exception {
+        Built impact = HandoffFixtures.build(HandoffFixtures.Spec.standard().withImpact());
+        handoff.envelope = impact.envelopeBytes();
+        String history = activationFingerprint();
+        String active = activeVersion();
+
+        GraphHandoffResult staged = importer.run(impact.request());
+
+        assertTrue(staged.succeeded(), () -> String.valueOf(staged.failure() == null ? null : staged.failure().failure()));
+        // The quote only an impact row cites is a registered, verified body span like every other span of the bundle.
+        String quote = impact.bundle().get("impacts").get(0).get("effects").get("positive").get(0).stringValue();
+        assertEquals(4, count("SELECT count(*) FROM evidence WHERE verification_artifact_id = ? AND quote_verified",
+                "artifact-receipt-" + impact.versionId()));
+        assertEquals(HandoffFixtures.BASIS2, jdbc.queryForObject("SELECT quote FROM evidence WHERE id = ?", String.class, quote));
+        assertEquals(active, activeVersion(), "the import never activates");
+        assertEquals(history, activationFingerprint());
+        String snapshot = new String(Files.readAllBytes(root.resolve("graph_snapshot").resolve(impact.versionId() + ".json")),
+                java.nio.charset.StandardCharsets.UTF_8);
+        // Structural, not a substring search: an id may contain a reserved word, an object key or an exact protected value may not.
+        assertEquals(java.util.List.of(), HandoffFixtures.impactLeaks(snapshot, impact.bundle().get("impacts").get(0)
+                .get("impactCandidateId").stringValue(), "합성 영향"));
+        assertTrue(snapshot.contains(quote), "the span is a public span of the snapshot");
+        String receipt = new String(Files.readAllBytes(root.resolve("verification_receipt").resolve(impact.versionId() + ".json")),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(receipt.contains("impact_rows_closed_over_involves_sources_approvals_and_labels"));
+        assertTrue(receipt.contains("\"impacts\""));
+        assertTrue(receipt.contains("s3-independent-verifier-quote-effect"));
+    }
+
+    @Test
     void anEvidenceCollisionRollsEverythingBackInPostgresAndRemovesTheFilesItCreated() throws Exception {
         String last = built.evidenceIds().get(built.evidenceIds().size() - 1);
         jdbc.update("""

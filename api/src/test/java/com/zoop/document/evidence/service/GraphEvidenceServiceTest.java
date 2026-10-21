@@ -78,7 +78,7 @@ class GraphEvidenceServiceTest {
         sources = world.directory.resolve("sources.json");
         found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF,
                 new GraphEvidence.Span(ARTICLE, VERSION, (int) EvidenceWorld.START, (int) EvidenceWorld.END), List.of("iss-1", "iss-2"),
-                List.of());
+                List.of(), List.of());
         world.registry.insertArtifactIfAbsent(new ArtifactRow(EARLIER_RECEIPT, "verification_receipt",
                 "artifact-root:verification_receipt/gone.json", "d".repeat(64), 10, "application/json", NOW));
         world.read.evidence.put(EVIDENCE_ID, new EvidenceView(EVIDENCE_ID, ARTICLE, VERSION, TEXT, QUOTE, EvidenceWorld.START,
@@ -319,7 +319,7 @@ class GraphEvidenceServiceTest {
     @Test
     void anEvidenceThatIsNotVisibleInThePinnedFilteredVersionIsWithheld() throws Exception {
         setUp();
-        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, null, List.of(), List.of());
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, null, List.of(), List.of(), List.of());
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused());
     }
 
@@ -329,7 +329,7 @@ class GraphEvidenceServiceTest {
         for (GraphEvidence.Span span : List.of(new GraphEvidence.Span("art-x", VERSION, 5, 9),
                 new GraphEvidence.Span(ARTICLE, "v9", 5, 9), new GraphEvidence.Span(ARTICLE, VERSION, 4, 9),
                 new GraphEvidence.Span(ARTICLE, VERSION, 5, 10))) {
-            found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, span, List.of("iss-1"), List.of());
+            found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, span, List.of("iss-1"), List.of(), List.of());
             assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), span.toString());
         }
     }
@@ -421,7 +421,7 @@ class GraphEvidenceServiceTest {
         // no operator field verdicts) stays readable: nothing re-verifies the retained bundle, and -4 adds the issue's field verdicts
         // (and the withheld list of its provenance) beside the same articles.
         for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3",
-                "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5")) {
+                "zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5", "zoop-graph-handoff-bundle-6")) {
             ObjectNode edited = receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION));
             ObjectNode bundle = (ObjectNode) edited.get("bundle");
             bundle.put("schemaVersion", schema);
@@ -567,7 +567,7 @@ class GraphEvidenceServiceTest {
     void theAuthorityClockIsNowEvenWhenAnHistoricalAsOfWasSelected() throws Exception {
         setUp();
         found = new GraphEvidence(GRAPH_VERSION, Instant.parse("2026-01-01T00:00:00Z"), found.span(), found.eventIds(),
-                found.basisRefs());
+                found.basisRefs(), found.impactRefs());
         writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"), "e",
                 "2026-06-01T00:00:00Z"));
 
@@ -662,7 +662,7 @@ class GraphEvidenceServiceTest {
     /** The evidence is cited by no visible issue or relation, only by the one visible structural basis the receipt records. */
     private void basisOnly() throws IOException {
         setUp();
-        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(basisRef()));
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(basisRef()), List.of());
         rewriteRegisteredReceipt(basisReceipt());
     }
 
@@ -733,7 +733,7 @@ class GraphEvidenceServiceTest {
     void anotherBasisOfTheSameRelationThatDoesNotCiteTheSpanIsNotAFailureButEveryCandidateMustResolveExactly() throws Exception {
         basisOnly();
         GraphEvidence.BasisRef second = new GraphEvidence.BasisRef(RELATION, BASIS_TYPE, "iss-1", "KRX:B", "8".repeat(64));
-        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(basisRef(), second));
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(basisRef(), second), List.of());
 
         ObjectNode both = withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
                 relationNode(RELATION, BASIS_TYPE, "iss-1", "KRX:B", basisNode(BASIS_KEY, EVIDENCE_ID),
@@ -753,7 +753,7 @@ class GraphEvidenceServiceTest {
         rewriteRegisteredReceipt(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)));
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "no relations in the receipt: fail closed");
 
-        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of("iss-1"), List.of());
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of("iss-1"), List.of(), List.of());
         assertEquals(List.of("iss-1"), get().eventIds(), "a directly cited span needs no basis proof");
     }
 
@@ -1061,5 +1061,440 @@ class GraphEvidenceServiceTest {
         assertEquals(List.of(), get().eventIds(), "an already imported receipt with the needed shape serves a basis-only span");
         writeSources(source(PROVIDER, SOURCE_GRANT, "rev-2", true, "known", List.of("read", "store", "quote-display"), "e", null));
         assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "the current rights gate still decides");
+    }
+
+    // ---- impact-only evidence --------------------------------------------------------------------------------------------
+
+    private static final String INVOLVES_EDGE = "edge-involves";
+    private static final String JOB = "rel-1";
+    private static final String RC = "rc-" + "2".repeat(64);
+    private static final String OTHER_RC = "rc-" + "9".repeat(64);
+    private static final String OTHER_ID = "ev-" + "d".repeat(64);
+
+    private static GraphEvidence.ImpactRef impactRef() {
+        return new GraphEvidence.ImpactRef(INVOLVES_EDGE, "INVOLVES", "iss-1", "KRX:A");
+    }
+
+    private static ObjectNode involvesNode(String id, String company, String... candidates) {
+        ObjectNode relation = relationNode(id, "INVOLVES", "iss-1", company);
+        ArrayNode refs = relation.putArray("sourceRefs");
+        for (String candidate : candidates) {
+            refs.addObject().put("kind", "s3-relation").put("jobId", JOB).put("id", candidate);
+        }
+        return relation;
+    }
+
+    /** One impact row in the closed 13-key shape; a verified row lists {@code positive} (the verifier-mapped quotes). */
+    private static ObjectNode impactRow(String edge, String company, String candidate, String status, String... positive) {
+        ObjectNode row = StrictJson.newObject();
+        row.put("edgeId", edge);
+        row.put("issueId", "iss-1");
+        row.put("companyId", company);
+        row.putObject("sourceRelation").put("jobId", JOB).put("relationCandidateId", candidate);
+        row.put("status", status);
+        row.putNull("code");
+        if (status.equals("verified")) {
+            row.put("impactCandidateId", "ic-" + "a".repeat(64));
+            row.put("label", "positive");
+            row.put("targetVerdict", "supported");
+            ObjectNode effects = row.putObject("effects");
+            ArrayNode ids = effects.putArray("positive");
+            for (String id : positive) {
+                ids.add(id);
+            }
+            effects.putArray("negative");
+            effects.putArray("neutral");
+            effects.putArray("uncertain");
+            row.put("verifier", "called");
+            row.put("verifierRequestDigest", "b".repeat(64));
+            ObjectNode proposal = row.putObject("proposal");
+            proposal.put("direction", "positive");
+            proposal.put("reason", "합성 사유");
+            proposal.putNull("limitations");
+            proposal.put("verification", "none");
+        } else {
+            row.putNull("impactCandidateId");
+            row.putNull("label");
+            row.putNull("targetVerdict");
+            row.putNull("effects");
+            row.put("verifier", "not-called");
+            row.putNull("verifierRequestDigest");
+            row.putNull("proposal");
+        }
+        return row;
+    }
+
+    /**
+     * A receipt with the INVOLVES relation of KRX:A (one S3 source relation) and the structural relation whose only basis rests on
+     * OTHER evidence, so the span is cited by no basis; {@code rows} are the receipt's impact rows.
+     */
+    private static ObjectNode impactReceipt(ObjectNode... rows) {
+        ObjectNode receipt = withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
+                involvesNode(INVOLVES_EDGE, "KRX:A", RC),
+                relationNode(RELATION, BASIS_TYPE, "iss-1", "KRX:B", basisNode(BASIS_KEY, OTHER_ID)));
+        ArrayNode impacts = ((ObjectNode) receipt.get("bundle")).putArray("impacts");
+        for (ObjectNode row : rows) {
+            impacts.add(row);
+        }
+        return receipt;
+    }
+
+    private static ObjectNode verifiedReceipt() {
+        return impactReceipt(impactRow(INVOLVES_EDGE, "KRX:A", RC, "verified", EVIDENCE_ID));
+    }
+
+    private static ObjectNode rowOf(ObjectNode receipt) {
+        return (ObjectNode) receipt.get("bundle").get("impacts").get(0);
+    }
+
+    /** The evidence is cited by no visible issue or relation and by no basis: only the one visible INVOLVES relation can serve it. */
+    private void impactOnly() throws IOException {
+        setUp();
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(), List.of(impactRef()));
+        rewriteRegisteredReceipt(verifiedReceipt());
+    }
+
+    @Test
+    void anImpactOnlySpanIsServedWithoutEventsWhenAVerifiedRowOfTheReferencedRelationListsIt() throws Exception {
+        impactOnly();
+
+        EvidenceResponse response = get();
+
+        assertEquals(EVIDENCE_ID, response.id());
+        assertEquals(QUOTE, response.quote());
+        assertEquals(List.of(), response.eventIds(), "an impact quote is not an event citation");
+        assertEquals(GRAPH_VERSION, response.metadata().graphVersion());
+        assertEquals(Boolean.TRUE, response.quoteVerified());
+        assertEquals(1, graphReads.get());
+    }
+
+    @Test
+    void everyEffectSideOfAVerifiedRowServesItAndEveryOtherStatusOrIdDoesNot() throws Exception {
+        impactOnly();
+        for (String side : List.of("positive", "negative", "neutral", "uncertain")) {
+            ObjectNode edited = verifiedReceipt();
+            ((ObjectNode) rowOf(edited).get("effects")).putArray("positive");
+            ((ObjectNode) rowOf(edited).get("effects")).putArray(side).add(EVIDENCE_ID);
+            rewriteRegisteredReceipt(edited);
+            assertNotNull(get(), "a quote the verifier mapped as " + side);
+        }
+        for (String status : List.of("not-applicable", "not-proposed", "no-evidence", "technical-reject", "verifier-reject", "withheld")) {
+            rewriteRegisteredReceipt(impactReceipt(impactRow(INVOLVES_EDGE, "KRX:A", RC, status)));
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), status + " proves nothing");
+        }
+        rewriteRegisteredReceipt(impactReceipt(impactRow(INVOLVES_EDGE, "KRX:A", RC, "verified", OTHER_ID)));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "a verified row that lists other evidence");
+        rewriteRegisteredReceipt(impactReceipt());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "no row for the relation: impact absence is unavailable, never a pass");
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNotNull(get(), "restored");
+    }
+
+    @Test
+    void aVerifiedRowOfAnotherRelationNeverServesThisOne() throws Exception {
+        impactOnly();
+        ObjectNode elsewhere = withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
+                involvesNode(INVOLVES_EDGE, "KRX:A", RC), involvesNode("edge-other", "KRX:C", RC));
+        ((ObjectNode) elsewhere.get("bundle")).putArray("impacts").add(impactRow("edge-other", "KRX:C", RC, "verified", EVIDENCE_ID))
+                .add(impactRow(INVOLVES_EDGE, "KRX:A", RC, "not-proposed"));
+        rewriteRegisteredReceipt(elsewhere);
+
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "the referenced edge's own row decides, not another edge's");
+    }
+
+    @Test
+    void aReceiptThatDoesNotBindTheImpactRowsToTheRelationExactlyWithholdsTheImpactOnlySpan() throws Exception {
+        impactOnly();
+        List<Consumer<ObjectNode>> edits = new ArrayList<>();
+        edits.add(n -> ((ObjectNode) n.get("bundle")).put("impacts", "x"));
+        edits.add(n -> ((ObjectNode) n.get("bundle")).putObject("impacts"));
+        edits.add(n -> rowOf(n).remove("proposal"));
+        edits.add(n -> rowOf(n).put("aggregate", "positive"));
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("impacts")).add(rowOf(n).deepCopy()));
+        edits.add(n -> rowOf(n).put("issueId", "iss-2"));
+        edits.add(n -> rowOf(n).put("companyId", "KRX:Z"));
+        edits.add(n -> ((ObjectNode) rowOf(n).get("sourceRelation")).put("relationCandidateId", OTHER_RC));
+        edits.add(n -> ((ObjectNode) rowOf(n).get("sourceRelation")).put("extra", "x"));
+        edits.add(n -> rowOf(n).remove("sourceRelation"));
+        edits.add(n -> rowOf(n).put("edgeId", 7));
+        edits.add(n -> rowOf(n).remove("edgeId"));
+        edits.add(n -> rowOf(n).put("status", 7));
+        edits.add(n -> ((ObjectNode) rowOf(n).get("effects")).remove("uncertain"));
+        edits.add(n -> ((ObjectNode) rowOf(n).get("effects")).put("positive", EVIDENCE_ID));
+        edits.add(n -> ((ObjectNode) rowOf(n).get("effects")).put("supporting", "x"));
+        edits.add(n -> rowOf(n).putNull("effects"));
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("relations")).remove(0));
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("relations")).add(n.get("bundle").get("relations").get(0).deepCopy()));
+        edits.add(n -> relationOf(n, 0).put("type", "FOLLOWS"));
+        edits.add(n -> relationOf(n, 0).put("source", "iss-2"));
+        edits.add(n -> relationOf(n, 0).put("target", "KRX:Z"));
+        edits.add(n -> relationOf(n, 0).remove("sourceRefs"));
+        edits.add(n -> relationOf(n, 0).putArray("sourceRefs"));
+        edits.add(n -> relationOf(n, 0).put("id", "edge-renamed"));
+        int index = 0;
+        for (Consumer<ObjectNode> edit : edits) {
+            ObjectNode edited = verifiedReceipt();
+            edit.accept(edited);
+            rewriteRegisteredReceipt(edited);
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "receipt variant " + index++);
+        }
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNotNull(get(), "the exact receipt serves it again");
+    }
+
+    @Test
+    void aReceiptWithoutImpactsOfTheEarlierSchemasNeverServesAnImpactOnlySpanAndIsNotReadAsNotProposed() throws Exception {
+        impactOnly();
+        for (String schema : List.of("zoop-graph-handoff-bundle-4", "zoop-graph-handoff-bundle-5")) {
+            ObjectNode earlier = withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
+                    involvesNode(INVOLVES_EDGE, "KRX:A", RC));
+            ((ObjectNode) earlier.get("bundle")).put("schemaVersion", schema);
+            rewriteRegisteredReceipt(earlier);
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), schema);
+        }
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of("iss-1"), List.of(), List.of());
+        assertEquals(List.of("iss-1"), get().eventIds(), "a directly cited span needs neither seam");
+    }
+
+    // ---- the two seams together: valid non-membership of one, structural malformation of either ----------------------------
+
+    /** A candidate basis AND a candidate INVOLVES relation: the basis does not cite the span, the verified impact row does. */
+    private void bothSeams() throws IOException {
+        setUp();
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(basisRef()), List.of(impactRef()));
+        rewriteRegisteredReceipt(verifiedReceipt());
+    }
+
+    @Test
+    void aBasisThatDoesNotCiteTheSpanIsValidNonMembershipAndTheVerifiedImpactRowStillServesIt() throws Exception {
+        bothSeams();
+
+        EvidenceResponse response = get();
+
+        assertEquals(List.of(), response.eventIds());
+        assertEquals(EVIDENCE_ID, response.id());
+        // The same receipt with the span listed by the basis serves it through the basis, with no impact row needed at all.
+        ObjectNode basisProves = withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
+                involvesNode(INVOLVES_EDGE, "KRX:A", RC), relationNode(RELATION, BASIS_TYPE, "iss-1", "KRX:B", basisNode(BASIS_KEY, EVIDENCE_ID)));
+        ((ObjectNode) basisProves.get("bundle")).putArray("impacts").add(impactRow(INVOLVES_EDGE, "KRX:A", RC, "not-proposed"));
+        rewriteRegisteredReceipt(basisProves);
+        assertNotNull(get(), "membership is basis-proven OR impact-proven");
+    }
+
+    @Test
+    void neitherSeamProvingTheSpanWithholdsItEvenWhenBothReceiptsAreValid() throws Exception {
+        bothSeams();
+        rewriteRegisteredReceipt(impactReceipt(impactRow(INVOLVES_EDGE, "KRX:A", RC, "no-evidence")));
+
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused());
+    }
+
+    @Test
+    void aMalformedBasisIsNeverBypassedByAnImpactRowThatWouldProveTheSpan() throws Exception {
+        bothSeams();
+        List<Consumer<ObjectNode>> edits = new ArrayList<>();
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("relations")).remove(1));
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("relations")).add(relationOf(n, 1).deepCopy()));
+        edits.add(n -> relationOf(n, 1).put("target", "KRX:Z"));
+        edits.add(n -> relationOf(n, 1).put("id", "edge-renamed"));
+        edits.add(n -> relationOf(n, 1).remove("basis"));
+        edits.add(n -> relationOf(n, 1).putArray("basis"));
+        edits.add(n -> ((ObjectNode) relationOf(n, 1).get("basis").get(0)).remove("relationKey"));
+        edits.add(n -> ((ObjectNode) relationOf(n, 1).get("basis").get(0)).put("relationKey", "8".repeat(64)));
+        edits.add(n -> ((ArrayNode) relationOf(n, 1).get("basis")).add(relationOf(n, 1).get("basis").get(0).deepCopy()));
+        edits.add(n -> ((ObjectNode) relationOf(n, 1).get("basis").get(0)).remove("evidenceIds"));
+        int index = 0;
+        for (Consumer<ObjectNode> edit : edits) {
+            ObjectNode edited = verifiedReceipt();
+            edit.accept(edited);
+            rewriteRegisteredReceipt(edited);
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "malformed basis variant " + index++);
+        }
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNotNull(get(), "the exact receipt serves it again");
+    }
+
+    @Test
+    void aMalformedImpactIsNeverBypassedByABasisThatProvesTheSpan() throws Exception {
+        bothSeams();
+        List<Consumer<ObjectNode>> edits = new ArrayList<>();
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("impacts")).add(rowOf(n).deepCopy()));
+        edits.add(n -> rowOf(n).remove("proposal"));
+        edits.add(n -> rowOf(n).put("companyId", "KRX:Z"));
+        edits.add(n -> ((ObjectNode) rowOf(n).get("sourceRelation")).put("relationCandidateId", OTHER_RC));
+        edits.add(n -> ((ArrayNode) n.get("bundle").get("relations")).add(relationOf(n, 0).deepCopy()));
+        edits.add(n -> relationOf(n, 0).put("type", "FOLLOWS"));
+        edits.add(n -> ((ObjectNode) n.get("bundle")).put("impacts", "x"));
+        int index = 0;
+        for (Consumer<ObjectNode> edit : edits) {
+            // The basis cites the span exactly, so it alone would serve it.
+            ObjectNode edited = withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
+                    involvesNode(INVOLVES_EDGE, "KRX:A", RC),
+                    relationNode(RELATION, BASIS_TYPE, "iss-1", "KRX:B", basisNode(BASIS_KEY, EVIDENCE_ID)));
+            ((ObjectNode) edited.get("bundle")).putArray("impacts").add(impactRow(INVOLVES_EDGE, "KRX:A", RC, "not-proposed"));
+            edit.accept(edited);
+            rewriteRegisteredReceipt(edited);
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "malformed impact variant " + index++);
+        }
+    }
+
+    @Test
+    void aReceiptWithoutImpactsStillServesABasisOnlySpanThatAlsoHasAnImpactCandidate() throws Exception {
+        setUp();
+        found = new GraphEvidence(GRAPH_VERSION, SELECTED_AS_OF, found.span(), List.of(), List.of(basisRef()), List.of(impactRef()));
+        // A -5 receipt: a structural basis that cites the span, a relation list, no impacts key at all.
+        rewriteRegisteredReceipt(withRelations(receipt(pins(PROVIDER, SOURCE_GRANT, SOURCE_REVISION)),
+                involvesNode(INVOLVES_EDGE, "KRX:A", RC), relationNode(RELATION, BASIS_TYPE, "iss-1", "KRX:B", basisNode(BASIS_KEY, EVIDENCE_ID))));
+
+        assertEquals(List.of(), get().eventIds(), "the impact seam is inert without impacts");
+    }
+
+    @Test
+    void everyCurrentRightsRowAndReceiptGateStillAppliesToAnImpactOnlySpan() throws Exception {
+        impactOnly();
+        List<String> needed = List.of("read", "store", "quote-display");
+        String valid = source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", needed, "e", null);
+        for (String revoked : List.of(
+                source(PROVIDER, SOURCE_GRANT, "rev-2", true, "known", needed, "e", null),
+                source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, false, "known", needed, "e", null),
+                source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store"), "e", null),
+                source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", needed, "e", "2026-10-15T01:00:00Z"))) {
+            writeSources(revoked);
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), revoked);
+            writeSources(valid);
+            assertNotNull(get(), "restored");
+        }
+        for (String status : List.of("private", "deleted")) {
+            world.registry.setAccessStatus(ARTICLE, status);
+            assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), status);
+        }
+        world.registry.setAccessStatus(ARTICLE, "available");
+        assertNotNull(get());
+
+        EvidenceView row = world.read.evidence.get(EVIDENCE_ID);
+        world.read.evidence.put(EVIDENCE_ID, new EvidenceView(row.id(), row.articleId(), row.articleVersion(), row.textArtifactId(),
+                row.quote(), row.startOffset(), row.endOffset(), "body", Boolean.FALSE, row.verificationArtifactId()));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "an unverified row is never served as an impact quote");
+        world.read.evidence.put(EVIDENCE_ID, row);
+        assertNotNull(get());
+
+        byte[] original = Files.readAllBytes(receiptFile());
+        Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "tampered receipt bytes");
+        Files.write(receiptFile(), original);
+        assertNotNull(get(), "restored");
+        Files.setPosixFilePermissions(receiptFile(), PosixFilePermissions.fromString("rw-r--r--"));
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, refused(), "an insecure receipt file is a storage problem, not absence");
+        Files.setPosixFilePermissions(receiptFile(), PosixFilePermissions.fromString("rw-------"));
+
+        ObjectNode other = verifiedReceipt();
+        other.put("handoffId", "handoff-other");
+        rewriteRegisteredReceipt(other);
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused(), "the receipt of another graph version never proves an impact quote");
+    }
+
+    // ---- the real pinned reader: impact-only quote end to end through the service ------------------------------------------------
+
+    /** The stack snapshot, a receipt whose basis cites OTHER evidence and whose verified INVOLVES row lists {@link #EVIDENCE_ID}. */
+    private void realImpactReader(java.util.function.Supplier<DisclosureExclusions> exclusions) throws IOException {
+        realReader(exclusions);
+        rewriteRegisteredReceipt(verifiedReceipt());
+    }
+
+    @Test
+    void anImpactOnlyQuoteIsServedUnderTheRealReaderWithEmptyEventIdsAndTheDirectOneKeepsItsEvent() throws Exception {
+        realImpactReader(() -> DisclosureExclusions.NONE);
+
+        EvidenceResponse impact = service().read(EVIDENCE_ID, null, null, null, null, "r1");
+        assertEquals(List.of(), impact.eventIds());
+        assertEquals(GRAPH_VERSION, impact.metadata().graphVersion());
+        assertEquals(List.of("iss-1"), service().read(DIRECT_ID, null, null, null, null, "r2").eventIds());
+        assertNull(outcome(EVIDENCE_ID, GRAPH_VERSION, null), "the selected version pinned explicitly");
+        assertNull(outcome(EVIDENCE_ID, null, AFTER_VERIFICATION));
+        assertNull(outcome(EVIDENCE_ID, null, BEFORE_VERIFICATION),
+                "the INVOLVES relation does not depend on the time of a structural basis");
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, outcome(EVIDENCE_ID, null, "2026-10-09T00:00:00Z"),
+                "before the version was ever active: the asOf semantics are unchanged");
+        assertEquals(ErrorCode.VERSION_UNAVAILABLE, outcome(EVIDENCE_ID, "gv-" + "0".repeat(64), null));
+    }
+
+    @Test
+    void anExcludedInvolvesEdgeIssueOrQuoteWithdrawsTheImpactOnlyQuoteAndRestoringItServesAgain() throws Exception {
+        DisclosureExclusions[] current = {DisclosureExclusions.NONE};
+        realImpactReader(() -> current[0]);
+        assertNull(outcome(EVIDENCE_ID, null, null));
+
+        current[0] = new DisclosureExclusions(1, java.util.Set.of(), java.util.Set.of(INVOLVES_EDGE), java.util.Set.of());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the INVOLVES edge is excluded");
+        assertNull(outcome(DIRECT_ID, null, null), "the issue's own evidence is untouched by a relation exclusion");
+        current[0] = DisclosureExclusions.NONE;
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+
+        current[0] = new DisclosureExclusions(2, java.util.Set.of("iss-1"), java.util.Set.of(), java.util.Set.of());
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the issue is excluded with its relations");
+        current[0] = DisclosureExclusions.NONE;
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+
+        current[0] = new DisclosureExclusions(3, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(EVIDENCE_ID));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the quote itself is excluded");
+        current[0] = DisclosureExclusions.NONE;
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+
+        // The INVOLVES relation's own evidence being excluded removes the relation (the relation is dropped once any evidence is).
+        current[0] = new DisclosureExclusions(4, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(DIRECT_ID));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null));
+        current[0] = DisclosureExclusions.NONE;
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+    }
+
+    @Test
+    void currentRightsPrivateArticleAndTamperedReceiptStillDecideAnImpactOnlyQuoteUnderTheRealReader() throws Exception {
+        realImpactReader(() -> DisclosureExclusions.NONE);
+        List<String> needed = List.of("read", "store", "quote-display");
+
+        writeSources(source(PROVIDER, SOURCE_GRANT, "rev-2", true, "known", needed, "e", null));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the grant revision was revoked");
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", needed, "e", null));
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+
+        world.registry.setAccessStatus(ARTICLE, "private");
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "a private article");
+        world.registry.setAccessStatus(ARTICLE, "available");
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+
+        byte[] original = Files.readAllBytes(receiptFile());
+        Files.write(receiptFile(), EvidenceWorld.bytes("{}"));
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "tampered receipt bytes");
+        Files.write(receiptFile(), original);
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+    }
+
+    @Test
+    void aMalformedBasisUnderTheRealReaderIsNeverBypassedByTheImpactRowAndRestoringItServesAgain() throws Exception {
+        realImpactReader(() -> DisclosureExclusions.NONE);
+        assertNull(outcome(EVIDENCE_ID, null, null));
+
+        // The snapshot references the structural basis (the same article); the receipt's basis list lost its relationKey.
+        ObjectNode broken = verifiedReceipt();
+        ((ObjectNode) relationOf(broken, 1).get("basis").get(0)).remove("relationKey");
+        rewriteRegisteredReceipt(broken);
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, null), "the malformed basis is not hidden by the verified row");
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, outcome(EVIDENCE_ID, null, AFTER_VERIFICATION));
+        // Before the basis was verified the snapshot references no basis at all: the same receipt serves through the impact row only.
+        assertNull(outcome(EVIDENCE_ID, null, BEFORE_VERIFICATION), "no basis candidate, so no basis malformation is read");
+        rewriteRegisteredReceipt(verifiedReceipt());
+        assertNull(outcome(EVIDENCE_ID, null, null), "restored");
+    }
+
+    @Test
+    void theImpactOnlyReadWritesNothingAndCreatesNoFile() throws Exception {
+        impactOnly();
+        List<String> files = snapshot(world.root);
+        int writes = world.registry.writeAttempts();
+
+        assertNotNull(get());
+
+        assertEquals(files, snapshot(world.root), "no file is created, locked or changed by the read");
+        assertEquals(writes, world.registry.writeAttempts());
     }
 }

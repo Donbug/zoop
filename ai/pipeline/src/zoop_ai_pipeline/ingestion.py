@@ -172,6 +172,14 @@ class Ingestor:
         request = Run.model_validate_json(row["request"])
         return self.authority.check(row["source"], request.scope_id, operations, json.loads(row["config"]))
 
+    def authorize_round(self, rid, source, operations):
+        """Read-only: the saved round's source, scope and frozen configuration against the CURRENT registry for `operations`, before anything of the
+        round is read. Returns the saved `(scopeId, config)` a later `Authority.check` re-verifies. `round_not_found` precedes authorization,
+        exactly as for export/inspect; nothing is written."""
+        row = self._round(rid, source)
+        self._authorize(row, operations)
+        return Run.model_validate_json(row["request"]).scope_id, json.loads(row["config"])
+
     def run(self, request: Run, manifest_path: Path):
         source, scope = self.authority.check(request.source_id, request.scope_id)
         raw = read_file(manifest_path, MAX_INPUT)
