@@ -83,6 +83,21 @@ def test_the_http_bundle_is_the_real_cli_export_of_a_two_job_world_and_the_produ
     for issue in bundle["issues"]:     # the contract's partition rule, stated here independently of the producer's validator: every source event is one original mention and no other exists
         identity = lambda item: canonical({k: item[k] for k in ("documentId", "documentVersion", "mentionId")})  # noqa: E731
         assert [identity(m) for m in issue["mentions"]] == sorted({identity(e) for e in issue["sourceEvents"]}) and all(m["verification"] == "none" for m in issue["mentions"])
+        # the selection rule's closure, stated independently of the producer's validator: exact equality (null equals null, no normalisation), nonempty, ordered as
+        # the mentions, every mention in all six lists when unanimous and the representative's identity in every list otherwise; never a verdict
+        provenance, fields = issue["fieldProvenance"], ("title", "action", "target", "eventTime", "period", "assertionStatus")
+        assert "fieldDecisions" not in issue and "fieldDecisions" not in provenance
+        assert set(provenance) == {"selection", "verification", "sameValueMentions"} and provenance["verification"] == "none"
+        assert provenance["selection"] == ("operator-representative" if issue["representative"] is not None else "unanimous")
+        assert set(provenance["sameValueMentions"]) == set(fields)
+        for name in fields:
+            expected = [{k: m[k] for k in ("documentId", "documentVersion", "mentionId")} for m in issue["mentions"] if m[name] == issue[name]]
+            assert expected and provenance["sameValueMentions"][name] == expected, (issue["id"], name)
+            if provenance["selection"] == "unanimous":
+                assert len(expected) == len(issue["mentions"])
+            else:
+                assert {k: issue["representative"][k] for k in ("documentId", "documentVersion", "mentionId")} in expected
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-3"
     assert (bundle["readiness"], wire["verification"]["provenance"]) == ({"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none",
                                                                           "graphDb": "none"}, bundle["provenance"])
     assert producer_accepts(response.content)

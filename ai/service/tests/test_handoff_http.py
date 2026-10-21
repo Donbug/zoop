@@ -423,7 +423,7 @@ def test_a_bundle_whose_own_digest_or_identity_disagrees_with_its_content_is_ref
     service = start(workspace=ws)
     for change, code in ((lambda b: b["digests"].update(content="4" * 64), "runtime_binding_mismatch"),
                          (lambda b: b.update(handoffId=OTHER_HANDOFF), "runtime_binding_mismatch"),
-                         (lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-3"), "runtime_contract_mismatch")):
+                         (lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-4"), "runtime_contract_mismatch")):
         bundle = example_bundle()
         change(bundle)
         serve(ws, bundle)
@@ -478,6 +478,22 @@ def _drop(path: tuple):
 MENTION = ("issues", 0, "mentions", 0)
 UNKNOWN_MENTION = [_set((*MENTION, "extra"), 1), _set((*MENTION, "participants", 0, "extra"), 1), _set((*MENTION, "publisher"), "x"), _set((*MENTION, "approval"), "none"),
                    _set((*MENTION, "fieldDecisions"), {}), _set((*MENTION, "sourceSupport"), [])]
+PROVENANCE = ("issues", 0, "fieldProvenance")
+UNKNOWN_PROVENANCE = [_set(("issues", 0, "fieldDecisions"), []), _set((*PROVENANCE, "extra"), 1), _set((*PROVENANCE, "fieldDecisions"), []),
+                      _set((*PROVENANCE, "sameValueMentions", "extra"), []), _set((*PROVENANCE, "sameValueMentions", "geography"), []),
+                      _set((*PROVENANCE, "sameValueMentions", "timePrecision"), []), _set((*PROVENANCE, "sameValueMentions", "title", 0, "extra"), 1),
+                      _set((*PROVENANCE, "sameValueMentions", "title", 0, "articleId"), "doc-" + "c" * 64)]
+MISSING_PROVENANCE = [_drop(PROVENANCE), *[_drop((*PROVENANCE, key)) for key in ("selection", "verification", "sameValueMentions")],
+                      *[_drop((*PROVENANCE, "sameValueMentions", key)) for key in ("title", "action", "target", "eventTime", "period", "assertionStatus")],
+                      *[_drop((*PROVENANCE, "sameValueMentions", "title", 0, key)) for key in ("documentId", "documentVersion", "mentionId")]]
+WRONG_PROVENANCE = [_set(PROVENANCE, None), _set((*PROVENANCE, "selection"), "consensus"), _set((*PROVENANCE, "selection"), None),
+                    _set((*PROVENANCE, "verification"), "verified"), _set((*PROVENANCE, "verification"), "operator-field-verdict"), _set((*PROVENANCE, "verification"), None),
+                    _set((*PROVENANCE, "sameValueMentions"), None), _set((*PROVENANCE, "sameValueMentions"), []),
+                    *[_set((*PROVENANCE, "sameValueMentions", key), value) for key in ("title", "action", "target", "eventTime", "period", "assertionStatus")
+                      for value in ([], None, {}, [0], [None])],
+                    _set((*PROVENANCE, "sameValueMentions", "title", 0, "documentVersion"), "short"), _set((*PROVENANCE, "sameValueMentions", "title", 0, "mentionId"), ""),
+                    _set((*PROVENANCE, "sameValueMentions", "title", 0, "documentId"), "bad id with space"),
+                    _set((*PROVENANCE, "sameValueMentions", "title"), [{"documentId": "synthetic-doc-1", "documentVersion": "a" * 64, "mentionId": "m-synthetic-1"}] * 1001)]
 MISSING_MENTION = [_drop(("issues", 0, "mentions")), *[_drop((*MENTION, key)) for key in
                    ("documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification", "title", "action", "target", "eventTime", "timePrecision",
                     "period", "assertionStatus", "background", "participants", "evidenceIds")],
@@ -491,10 +507,10 @@ WRONG_MENTION = [_set((*MENTION, "verification"), "verified"), _set((*MENTION, "
                  _set((*MENTION, "participants", 0, "companyId"), 5), _set((*MENTION, "participants", 0, "companyId"), "bad id with space"),
                  _set((*MENTION, "participants", 0, "role"), None), _set((*MENTION, "participants", 0, "name"), None),
                  _set((*MENTION, "participants", 0, "sourceCompanyId"), 5),
-                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-1")]
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-1"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-2")]
 
 
-@pytest.mark.parametrize("change", [*UNKNOWN, *UNKNOWN_MENTION], ids=lambda change: "unknown")
+@pytest.mark.parametrize("change", [*UNKNOWN, *UNKNOWN_MENTION, *UNKNOWN_PROVENANCE], ids=lambda change: "unknown")
 def test_an_unknown_nested_field_is_refused_even_when_every_digest_and_pin_was_updated_to_match(tmp_path, start, change):
     ws = workspace(tmp_path)
     bundle = serve(ws, mutated(change))        # content digest, receipt, bundle digest and the operator's pin all describe THIS bundle
@@ -503,7 +519,7 @@ def test_an_unknown_nested_field_is_refused_even_when_every_digest_and_pin_was_u
     assert "bundle" not in response.json() and "KRX:005930" not in response.text and pins(bundle)["bundleDigest"] not in response.text
 
 
-@pytest.mark.parametrize("change", [*WRONG_TYPE, *WRONG_MENTION, *MISSING_MENTION], ids=lambda change: "type")
+@pytest.mark.parametrize("change", [*WRONG_TYPE, *WRONG_MENTION, *MISSING_MENTION, *MISSING_PROVENANCE, *WRONG_PROVENANCE], ids=lambda change: "type")
 def test_a_wrongly_typed_or_out_of_contract_value_is_refused_even_with_updated_digests(tmp_path, start, change):
     ws = workspace(tmp_path)
     serve(ws, mutated(change))
@@ -513,17 +529,20 @@ def test_a_wrongly_typed_or_out_of_contract_value_is_refused_even_with_updated_d
         assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch", response.text[:300]
 
 
-def test_a_current_answer_in_the_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
-    """The service knows only `zoop-graph-handoff-bundle-2`: a bundle-1 shaped export is never relayed, and the producer's own withheld answer for a handoff frozen
-    under bundle-1 reaches the caller as a 200 with that reason and nothing of the old receipt."""
+def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
+    """The service knows only `zoop-graph-handoff-bundle-3`: a bundle-1 shaped export (no mentions) or a bundle-2 shaped export (mentions, no `fieldProvenance`) is
+    never relayed, and the producer's own withheld answer for a handoff frozen under either reaches the caller as a 200 with that reason and nothing of the old
+    receipt."""
     ws = workspace(tmp_path)
-    legacy = mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [issue.pop("mentions") for issue in b["issues"]]))
-    serve(ws, legacy)
     service = start(workspace=ws)
-    for url in (bundle_url(), status_url()):
-        response = get(service, url)
-        assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch" and "bundle" not in response.json()
-        assert "KRX:005930" not in response.text and pins(legacy)["bundleDigest"] not in response.text
+    earlier = (mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [(issue.pop("mentions"), issue.pop("fieldProvenance")) for issue in b["issues"]])),
+               mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [issue.pop("fieldProvenance") for issue in b["issues"]])))
+    for legacy in earlier:
+        serve(ws, legacy)
+        for url in (bundle_url(), status_url()):
+            response = get(service, url)
+            assert response.status_code == 500 and error_of(response)["code"] == "runtime_contract_mismatch" and "bundle" not in response.json()
+            assert "KRX:005930" not in response.text and pins(legacy)["bundleDigest"] not in response.text
     ws.script({"mode": "result", "output": withheld_output(code="handoff_contract_changed"), "exit": 2})
     for url in (status_url(), bundle_url()):
         wire = get(service, url).json()

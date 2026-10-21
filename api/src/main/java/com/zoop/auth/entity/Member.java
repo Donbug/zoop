@@ -35,6 +35,9 @@ public class Member {
     @Column(name = "status", nullable = false, columnDefinition = "text")
     private String status;
 
+    @Column(name = "status_revision", nullable = false)
+    private long statusRevision;
+
     @Column(name = "mode", columnDefinition = "text")
     private String mode;
 

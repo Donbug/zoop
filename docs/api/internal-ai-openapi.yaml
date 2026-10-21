@@ -127,7 +127,7 @@
 
     **Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only
     family over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle
-    (`zoop-graph-handoff-bundle-2`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
+    (`zoop-graph-handoff-bundle-3`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It
     writes nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied
     path, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409
     `execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side
@@ -145,7 +145,7 @@
     `delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,
     `canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,
     `handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the
-    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
+    handoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` or `-2`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.
     A withheld answer is not an error and not an empty bundle; do not import it and do not treat it as "no data". The checks are separate reads at separate instants,
     so a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.
 
@@ -155,6 +155,13 @@
     never verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the
     S2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id
     to the same company of this bundle, otherwise null.
+
+    **Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,
+    `target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or
+    `operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`
+    lists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the
+    issue's value (null equals null; no trimming or time normalisation). `verification` is always `none`: this is the actual selection, never a fact verification, a
+    support or an approval, and it is not a `fieldDecisions` verdict. The producer proves list exactness and closure; this service checks only the shapes.
 
     **The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical
     UTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python
@@ -6438,9 +6445,9 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "144231dd776203047c22891174c8f4e816d6b5882530fac23096da76a544d3a3"
-                      "contentDigest": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
-                      "bundleBytes": 7832
+                      "bundleDigest": "5ca1afb6afefafae8e77cd644e03691fb8e282a2f2abccc65150792e0f160316"
+                      "contentDigest": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153"
+                      "bundleBytes": 8873
                       "counts":
                         "companies": 1
                         "issues": 1
@@ -6721,9 +6728,9 @@
                       "checkedAt": "2026-10-16T03:00:00.123456+00:00"
                     "verification":
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
-                      "bundleDigest": "144231dd776203047c22891174c8f4e816d6b5882530fac23096da76a544d3a3"
-                      "contentDigest": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
-                      "bundleBytes": 7832
+                      "bundleDigest": "5ca1afb6afefafae8e77cd644e03691fb8e282a2f2abccc65150792e0f160316"
+                      "contentDigest": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153"
+                      "bundleBytes": 8873
                       "counts":
                         "companies": 1
                         "issues": 1
@@ -6760,7 +6767,7 @@
                         "decisions": "7777777777777777777777777777777777777777777777777777777777777777"
                         "bindings": "8888888888888888888888888888888888888888888888888888888888888888"
                     "bundle":
-                      "schemaVersion": "zoop-graph-handoff-bundle-2"
+                      "schemaVersion": "zoop-graph-handoff-bundle-3"
                       "handoffId": "handoff-synthetic-1"
                       "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb"
                       "provenance":
@@ -6901,6 +6908,34 @@
                                 - "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
                           "decisionRef": "issue-2026-10-16:1"
                           "representative": null
+                          "fieldProvenance":
+                            "selection": "unanimous"
+                            "verification": "none"
+                            "sameValueMentions":
+                              "title":
+                                - "documentId": "synthetic-doc-1"
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  "mentionId": "m-synthetic-1"
+                              "action":
+                                - "documentId": "synthetic-doc-1"
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  "mentionId": "m-synthetic-1"
+                              "target":
+                                - "documentId": "synthetic-doc-1"
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  "mentionId": "m-synthetic-1"
+                              "eventTime":
+                                - "documentId": "synthetic-doc-1"
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  "mentionId": "m-synthetic-1"
+                              "period":
+                                - "documentId": "synthetic-doc-1"
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  "mentionId": "m-synthetic-1"
+                              "assertionStatus":
+                                - "documentId": "synthetic-doc-1"
+                                  "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                  "mentionId": "m-synthetic-1"
                       "relations":
                         - "id": "edge-598c6cc670a3a559743e1364d69d811a7b341e64eea8b2eda04d4f170c4051aa"
                           "type": "INVOLVES"
@@ -6996,7 +7031,7 @@
                         "publicActivation": "none"
                         "graphDb": "none"
                       "digests":
-                        "content": "77417b9a0221a98ec00d6b41085d4dcd78aa21278f792dd4055eed449bfaa224"
+                        "content": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153"
                 "withheld":
                   "summary": "Source rights were revoked: no manifest, no bundle, no counts"
                   "value":
@@ -7640,6 +7675,30 @@
         - "counts"
         - "items"
       "title": "BExclusions"
+    "BFieldProvenance":
+      "properties":
+        "selection":
+          "type": "string"
+          "enum":
+            - "unanimous"
+            - "operator-representative"
+          "title": "Selection"
+        "verification":
+          "type": "string"
+          "const": "none"
+          "title": "Verification"
+        "sameValueMentions":
+          "$ref": "#/components/schemas/BSameValueMentions"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "selection"
+        - "verification"
+        - "sameValueMentions"
+      "title": "BFieldProvenance"
+      "description": |-
+        How the producer chose the issue's six headline values: `unanimous` (every mention states them) or `operator-representative` (the operator's single
+        representative decision). `verification` is always `none`: this is the actual selection, never a verification, support or approval of any value.
     "BFollowsProvenance":
       "properties":
         "origin":
@@ -7902,6 +7961,8 @@
           "anyOf":
             - "$ref": "#/components/schemas/BSourceEvent"
             - "type": "null"
+        "fieldProvenance":
+          "$ref": "#/components/schemas/BFieldProvenance"
       "additionalProperties": false
       "type": "object"
       "required":
@@ -7920,6 +7981,7 @@
         - "mentions"
         - "decisionRef"
         - "representative"
+        - "fieldProvenance"
       "title": "BIssue"
     "BJob":
       "properties":
@@ -8049,6 +8111,29 @@
       "description": |-
         One original S2 mention of the issue, identified by its source document version and S2 local id (a local id is unique only within one document version).
         `verification` is always `none`: these are S2 candidate or snapshot values, never verified, decided or approved fields.
+    "BMentionRef":
+      "properties":
+        "documentId":
+          "type": "string"
+          "pattern": "^[A-Za-z0-9._:-]{1,200}$"
+          "title": "Documentid"
+        "documentVersion":
+          "type": "string"
+          "pattern": "^[a-f0-9]{64}$"
+          "title": "Documentversion"
+        "mentionId":
+          "type": "string"
+          "maxLength": 200
+          "minLength": 1
+          "title": "Mentionid"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "documentId"
+        - "documentVersion"
+        - "mentionId"
+      "title": "BMentionRef"
+      "description": "The identity of one original mention of the same issue (a reference, never a copy of its values)."
     "BObservation":
       "properties":
         "roundId":
@@ -8385,6 +8470,63 @@
         - "STRUCTURALLY_RELATED_TO"
         - "FOLLOWS"
       "title": "BRelationCounts"
+    "BSameValueMentions":
+      "properties":
+        "title":
+          "items":
+            "$ref": "#/components/schemas/BMentionRef"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Title"
+        "action":
+          "items":
+            "$ref": "#/components/schemas/BMentionRef"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Action"
+        "target":
+          "items":
+            "$ref": "#/components/schemas/BMentionRef"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Target"
+        "eventTime":
+          "items":
+            "$ref": "#/components/schemas/BMentionRef"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Eventtime"
+        "period":
+          "items":
+            "$ref": "#/components/schemas/BMentionRef"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Period"
+        "assertionStatus":
+          "items":
+            "$ref": "#/components/schemas/BMentionRef"
+          "type": "array"
+          "maxItems": 1000
+          "minItems": 1
+          "title": "Assertionstatus"
+      "additionalProperties": false
+      "type": "object"
+      "required":
+        - "title"
+        - "action"
+        - "target"
+        - "eventTime"
+        - "period"
+        - "assertionStatus"
+      "title": "BSameValueMentions"
+      "description": |-
+        Per headline field, the mentions whose own value equals the issue's value exactly (null equals null, no normalisation). Shape only: the producer owns the
+        exactness, order and closure of these lists.
     "BSource":
       "properties":
         "relation":
@@ -8655,7 +8797,7 @@
       "properties":
         "schemaVersion":
           "type": "string"
-          "const": "zoop-graph-handoff-bundle-2"
+          "const": "zoop-graph-handoff-bundle-3"
           "title": "Schemaversion"
         "handoffId":
           "type": "string"

@@ -7,6 +7,45 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.feedback.availability": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.feedback.availability:required": true,
+    "response:200:application/json.feedback.unavailableReason:required": true,
+    "response:200:application/json.feedback.unavailableReason<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "not_integrated",
+        "source_unavailable"
+      ]
+    },
+    "response:200:application/json.feedback.unavailableReason<anyOf:1>": {
+      "type": "null"
+    },
+    "response:200:application/json.metrics[].availability": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.metrics[].availability:required": true,
+    "response:200:application/json.metrics[].unavailableReason:required": true,
+    "response:200:application/json.metrics[].unavailableReason<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "not_integrated",
+        "source_unavailable",
+        "insufficient_history"
+      ]
+    },
+    "response:200:application/json.metrics[].unavailableReason<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -340,6 +379,46 @@
       "target": {
         "type": "string",
         "format": "date-time"
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
+    "response:200:application/json.feedback.down": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.feedback.up": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.metrics[].key": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "activeUsers",
+          "onboarding",
+          "nodeCtr",
+          "edgeCtr",
+          "briefingRate",
+          "briefingIssueOpens",
+          "aiQuestions",
+          "aiQuestionRate"
+        ]
       },
       "bff": {
         "type": "string"

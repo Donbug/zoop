@@ -57,10 +57,16 @@ def test_a_non_string_is_not_a_time():
 # ---- the public validator (`validate_bundle`) over the producer's real export ---------------------------------------------------------------
 
 def sealed(value, precision) -> dict:
-    """A copy of the real export whose first mention carries this time, with the content digest recomputed so only the targeted rule can refuse it."""
+    """A copy of the real export whose supply issue's NON-representative mention (`m-a2`) carries this time, with the content digest recomputed so only the targeted rule
+    can refuse it. The issue keeps the representative's time `2026-09-30`, so by hand: `m-a2` stays listed as stating the issue's eventTime only when it carries exactly
+    that string, and is otherwise dropped from that one list (field provenance is exact equality, never a normalised time)."""
     bundle = copy.deepcopy(EXPORT)
-    mention = bundle["issues"][0]["mentions"][0]
+    supply = next(issue for issue in bundle["issues"] if issue["id"] == "issue:supply-2026q3")
+    mention = next(m for m in supply["mentions"] if m["mentionId"] == "m-a2")
     mention["eventTime"], mention["timePrecision"] = value, precision
+    if value != supply["eventTime"]:
+        listed = supply["fieldProvenance"]["sameValueMentions"]
+        listed["eventTime"] = [ref for ref in listed["eventTime"] if ref["mentionId"] != "m-a2"]
     bundle["digests"]["content"] = content_digest(bundle)
     return bundle
 

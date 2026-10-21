@@ -1,4 +1,4 @@
-"""Handoffs frozen under the earlier bundle schema (`-1`) whose committed rows exist ONLY in a hot write-ahead log (a pre-cutover writer was killed).
+"""Handoffs frozen under an earlier bundle schema (`-1` before original mentions, `-2` before field provenance) whose committed rows exist ONLY in a hot write-ahead log (a pre-cutover writer was killed).
 
 An immutable/read-only open never sees such rows, and any writable open of the ledger re-permissions it, checkpoints the WAL and may run DDL BEFORE the legacy
 refusal. Every command below runs through the real `zoop_ai_pipeline.handoff_cli` in a child process (`graph_handoff_smoke.Operator`) against a real ledger:
@@ -19,6 +19,7 @@ from scripts import graph_handoff_smoke as hs
 
 CONTRACT_CHANGED = {"status": "withheld", "code": "handoff_contract_changed"}
 ROWS = {"ready": ("ready", "written"), "reserved": ("reserved", "missing"), "failed": ("failed", "garbage")}
+SCHEMAS = [hs.BUNDLE_1, hs.BUNDLE_2]
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +30,7 @@ def world(tmp_path_factory):
 
 
 class Hot:
-    """A real current ledger (one current v2 row) plus ONE legacy row committed only to its hot WAL, with modes a writer would reset."""
+    """A real current ledger (one current `-3` row) plus ONE legacy row (`schema=` `-1` or `-2`) committed only to its hot WAL, with modes a writer would reset."""
 
     def __init__(self, world, tmp_path, kind: str = "ready", **plant):
         self.world, self.operator, self.state = world, hs.Operator(world), tmp_path / "handoff"
@@ -68,9 +69,11 @@ def error_code(out: dict) -> str:
     return out["error"]["code"]
 
 
+@pytest.mark.parametrize("schema", SCHEMAS)
 @pytest.mark.parametrize("kind", list(ROWS))
-def test_a_legacy_row_committed_only_to_a_hot_wal_is_history_and_no_command_changes_the_ledger(world, tmp_path, kind):
-    hot = Hot(world, tmp_path, kind)
+def test_a_legacy_row_committed_only_to_a_hot_wal_is_history_and_no_command_changes_the_ledger(world, tmp_path, kind, schema):
+    hot = Hot(world, tmp_path, kind, schema=schema)
+    assert hot.row["receipt"]["bundleSchema"] == schema
     assert hot.only_in_the_wal(), "the fixture must leave the legacy row only in a non-empty WAL"
     assert stat.S_IMODE(hot.state.stat().st_mode) == 0o755
     before = hot.snapshot()
@@ -95,7 +98,7 @@ def test_a_legacy_row_committed_only_to_a_hot_wal_is_history_and_no_command_chan
 
 @pytest.mark.parametrize("command", ["inspect", "export", "recover", "freeze"])
 def test_a_damaged_receipt_in_the_wal_is_a_state_error_and_still_changes_nothing(world, tmp_path, command):
-    hot = Hot(world, tmp_path, "ready", schema=None)
+    hot = Hot(world, tmp_path, "ready", damaged=True)
     before = hot.snapshot()
     request = hot.manifest(hot.name) if command == "freeze" else None
     out = hot.cli(command, expected=2, absent=command in {"export", "freeze"}, request=request)
@@ -103,9 +106,10 @@ def test_a_damaged_receipt_in_the_wal_is_a_state_error_and_still_changes_nothing
     assert hot.snapshot() == before
 
 
+@pytest.mark.parametrize("schema", SCHEMAS)
 @pytest.mark.parametrize("command", ["inspect", "export", "recover", "freeze"])
-def test_a_busy_writer_is_an_error_never_a_fall_through_to_a_writable_open(world, tmp_path, command):
-    hot = Hot(world, tmp_path, "ready")
+def test_a_busy_writer_is_an_error_never_a_fall_through_to_a_writable_open(world, tmp_path, command, schema):
+    hot = Hot(world, tmp_path, "ready", schema=schema)
     before = hot.snapshot()
     fd = os.open(hot.state / "handoff.lock", os.O_RDWR)
     try:
@@ -118,8 +122,9 @@ def test_a_busy_writer_is_an_error_never_a_fall_through_to_a_writable_open(world
     assert hot.snapshot() == before
 
 
-def test_a_new_handoff_id_still_freezes_beside_the_wal_only_history_which_stays_as_it_was(world, tmp_path):
-    hot = Hot(world, tmp_path, "ready")
+@pytest.mark.parametrize("schema", SCHEMAS)
+def test_a_new_handoff_id_still_freezes_beside_the_wal_only_history_which_stays_as_it_was(world, tmp_path, schema):
+    hot = Hot(world, tmp_path, "ready", schema=schema)
 
     def history() -> tuple:
         db = sqlite3.connect(hot.state / "handoff.sqlite3")

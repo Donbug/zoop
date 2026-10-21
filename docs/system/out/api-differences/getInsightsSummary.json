@@ -7,6 +7,26 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "response:200:application/json.metrics[].availability": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
+      ]
+    },
+    "response:200:application/json.metrics[].availability:required": true,
+    "response:200:application/json.metrics[].unavailableReason:required": true,
+    "response:200:application/json.metrics[].unavailableReason<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "not_integrated",
+        "source_unavailable",
+        "insufficient_history"
+      ]
+    },
+    "response:200:application/json.metrics[].unavailableReason<anyOf:1>": {
+      "type": "null"
+    },
     "response:200:header:X-Request-ID": {
       "type": "string"
     },
@@ -345,6 +365,24 @@
         "type": "string"
       }
     },
+    "response:200:application/json.metrics[].key": {
+      "target": {
+        "type": "string",
+        "enum": [
+          "activeUsers",
+          "onboarding",
+          "nodeCtr",
+          "edgeCtr",
+          "briefingRate",
+          "briefingIssueOpens",
+          "aiQuestions",
+          "aiQuestionRate"
+        ]
+      },
+      "bff": {
+        "type": "string"
+      }
+    },
     "response:200:application/json.rounds[].date": {
       "target": {
         "type": "string",
@@ -352,6 +390,39 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.rounds[].dislikes": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.rounds[].likes": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.trend[].aiQuestions": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
       }
     },
     "response:200:application/json.trend[].date": {

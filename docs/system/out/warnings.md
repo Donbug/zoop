@@ -266,7 +266,7 @@
 | BFF_PATH_DIFFERENCE | difference | listCompanyDocuments | 목표 /api/v1/companies/{id}/documents ↔ BFF /api/companies/{id}/documents |  |
 | BFF_FIELD_DIFFERENCE | difference | listCompanyDocuments | 목표만 118 · BFF만 64 · 형식/필수/권한 변경 19 |  |
 | BFF_PATH_DIFFERENCE | difference | listEvents | 목표 /api/v1/events ↔ BFF /api/events |  |
-| BFF_FIELD_DIFFERENCE | difference | listEvents | 목표만 113 · BFF만 39 · 형식/필수/권한 변경 13 |  |
+| BFF_FIELD_DIFFERENCE | difference | listEvents | 목표만 119 · BFF만 39 · 형식/필수/권한 변경 13 |  |
 | BFF_PATH_DIFFERENCE | difference | getEvent | 목표 /api/v1/events/{id} ↔ BFF /api/events/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getEvent | 목표만 134 · BFF만 52 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | getEvidence | 목표 /api/v1/evidence/{id} ↔ BFF /api/evidence/{id} |  |
@@ -342,19 +342,19 @@
 | BFF_PATH_DIFFERENCE | difference | setBriefingSuspension | 목표 /api/v1/admin/briefings/{round_id}/suspension ↔ BFF /api/admin/briefings/{round_id}/suspension |  |
 | BFF_FIELD_DIFFERENCE | difference | setBriefingSuspension | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 13 |  |
 | BFF_PATH_DIFFERENCE | difference | recordInteractionEvents | 목표 /api/v1/telemetry ↔ BFF /api/telemetry |  |
-| BFF_FIELD_DIFFERENCE | difference | recordInteractionEvents | 목표만 161 · BFF만 13 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | recordInteractionEvents | 목표만 206 · BFF만 28 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | getMyFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
 | BFF_FIELD_DIFFERENCE | difference | getMyFeedback | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | setFeedback | 목표 /api/v1/feedback ↔ BFF /api/feedback |  |
 | BFF_FIELD_DIFFERENCE | difference | setFeedback | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | getInsightsOverview | 목표 /api/v1/admin/insights/overview ↔ BFF /api/admin/insights/overview |  |
-| BFF_FIELD_DIFFERENCE | difference | getInsightsOverview | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | getInsightsOverview | 목표만 124 · BFF만 21 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | getInsightsSummary | 목표 /api/v1/admin/insights/summary ↔ BFF /api/admin/insights/summary |  |
-| BFF_FIELD_DIFFERENCE | difference | getInsightsSummary | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | getInsightsSummary | 목표만 119 · BFF만 21 · 형식/필수/권한 변경 13 |  |
 | BFF_PATH_DIFFERENCE | difference | listCompanyInsights | 목표 /api/v1/admin/insights/companies ↔ BFF /api/admin/insights/companies |  |
-| BFF_FIELD_DIFFERENCE | difference | listCompanyInsights | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 7 |  |
+| BFF_FIELD_DIFFERENCE | difference | listCompanyInsights | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyInsights | 목표 /api/v1/admin/insights/companies/{company_id} ↔ BFF /api/admin/insights/companies/{company_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyInsights | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyInsights | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 15 |  |
 | BFF_PATH_DIFFERENCE | difference | getFeedbackSummary | 목표 /api/v1/admin/feedback/summary ↔ BFF /api/admin/feedback/summary |  |
 | BFF_FIELD_DIFFERENCE | difference | getFeedbackSummary | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listDislikedResults | 목표 /api/v1/admin/feedback/dislikes ↔ BFF /api/admin/feedback/dislikes |  |
@@ -364,13 +364,13 @@
 | BFF_PATH_DIFFERENCE | difference | getMaskedTranscript | 목표 /api/v1/admin/transcripts/{session_id} ↔ BFF /api/admin/transcripts/{session_id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getMaskedTranscript | 목표만 116 · BFF만 21 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listMembers | 목표 /api/v1/admin/members ↔ BFF /api/admin/members |  |
-| BFF_FIELD_DIFFERENCE | difference | listMembers | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | listMembers | 목표만 148 · BFF만 26 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | getMemberActivity | 목표 /api/v1/admin/members/{member_id} ↔ BFF /api/admin/members/{member_id} |  |
-| BFF_FIELD_DIFFERENCE | difference | getMemberActivity | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | getMemberActivity | 목표만 153 · BFF만 27 · 형식/필수/권한 변경 10 |  |
 | BFF_PATH_DIFFERENCE | difference | blockMember | 목표 /api/v1/admin/members/{member_id}/block ↔ BFF /api/admin/members/{member_id}/block |  |
-| BFF_FIELD_DIFFERENCE | difference | blockMember | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | blockMember | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | unblockMember | 목표 /api/v1/admin/members/{member_id}/unblock ↔ BFF /api/admin/members/{member_id}/unblock |  |
-| BFF_FIELD_DIFFERENCE | difference | unblockMember | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | unblockMember | 목표만 203 · BFF만 18 · 형식/필수/권한 변경 12 |  |
 | TARGET_ONLY_API | difference | getCompanyFinancials | GET /api/v1/companies/{id}/financials: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getCompanyIssueImpact | GET /api/v1/companies/{id}/issues/{issueId}/impact: 직접 대응 BFF 없음 |  |
 | TARGET_ONLY_API | difference | getPersonalizedBriefing | GET /api/v1/briefings/{id}/personalized: 직접 대응 BFF 없음 |  |

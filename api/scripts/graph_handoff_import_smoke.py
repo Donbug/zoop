@@ -27,7 +27,9 @@ not cleaned):
 
 (the Make target runs this script with --jar/--handoff-cli/--ingest-cli; the direct python invocation with those flags and
 --psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217) and carries no original mention value:
-the retained receipt keeps the complete `zoop-graph-handoff-bundle-2` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values.
+the retained receipt keeps the complete `zoop-graph-handoff-bundle-3` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values and whose
+`issues[].fieldProvenance` (which mentions state each headline value, and whether the operator's representative or unanimity selected it; never a verification) it compares
+with hand-written selection facts.
 A second, legal producer world is imported last: documents a and a2 of one issue both use the local mention id `m-a`, which the app maps to two distinct
 mention ids and the receipt keeps as two original mentions.
 
@@ -71,6 +73,9 @@ PUBLIC_IDS = {"KRX:005930": "SYNTH:000001", "KRX:000660": "SYNTH:000002"}   # th
 SCHEMA = "zoop-graph-handoff-import-1"
 COMPANIES = (("SYNTH:000001", "합성기업"), ("SYNTH:000002", "합성부품"))
 HANDOFFS = ("handoff-smoke-1", "handoff-smoke-2")
+# The operator-declared publishing outlets of the authored world, written out by hand. Only document "a" declares one; "a2" and "b" do not, so their
+# stored versions keep a NULL publisher and the public read must answer null. The AI world must have been generated with exactly this declaration.
+DECLARED_PUBLISHERS = {"a": "합성일보 Synthetic Daily"}
 
 
 def sha256(raw: bytes) -> str:
@@ -113,6 +118,18 @@ def expected_mentions(world, *items: tuple) -> list:
                       "target": "공급 계약", "eventTime": event_time, "timePrecision": "day", "period": period, "assertionStatus": "announced", "background": False,
                       "participants": participants, "evidenceIds": [hs.evidence_id(world, name, quote)]})
     return sorted(found, key=lambda m: hs.canonical({k: m[k] for k in ("documentId", "documentVersion", "mentionId")}))
+
+
+def expected_field_provenance(world, selection: str, every: tuple, **different: tuple) -> dict:
+    """One issue's `fieldProvenance`, written out by hand: `every` is the (document name, S2 local mention id) pairs that state the issue's value in each of the six
+    headline fields, and a keyword overrides one field's pairs where fewer mentions state it. Ordered like the mentions: by the canonical JSON of the identity.
+    It records which mentions state the issue's value, never that the value is verified (`verification` is always `none`)."""
+    def references(pairs: tuple) -> list:
+        found = [{"documentId": world.refs[name]["documentId"], "documentVersion": world.refs[name]["documentVersion"], "mentionId": local_id}
+                 for name, local_id in pairs]
+        return sorted(found, key=hs.canonical)
+    fields = ("title", "action", "target", "eventTime", "period", "assertionStatus")
+    return {"selection": selection, "verification": "none", "sameValueMentions": {field: references(different.get(field, every)) for field in fields}}
 
 
 def fingerprint(path: Path) -> dict:
@@ -346,6 +363,7 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         harness_fingerprint = smoke.table_fingerprint()
 
         # reads after the harness activation ---------------------------------------------------------------------------------------
+        publishers_read: dict = {}
         for eid, fact in expected.items():
             if not fact["events"]:
                 continue    # cited only by a relation: visible only while that relation is, not asserted here
@@ -358,6 +376,11 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
             check(body["eventIds"] == fact["events"] and body["sentiment"] is None and body["documentSummary"] is None
                   and body["analysisStatus"] is None and body["analysisProvenance"] is None and body["resultVersion"] is None,
                   f"graph evidence body fields {fact['name']}: {body}")
+            article = body["article"]
+            check(set(article) == {"title", "publisher", "url", "publishedAt"}, f"graph evidence article keys {fact['name']}: {article}")
+            check(article["publisher"] == DECLARED_PUBLISHERS.get(fact["name"]),
+                  f"graph evidence {fact['name']}: article.publisher {article['publisher']!r} is not the declared {DECLARED_PUBLISHERS.get(fact['name'])!r}")
+            publishers_read[fact["name"]] = article["publisher"]
             meta = body["metadata"]
             check(meta["source"] == "public_graph_snapshot" and meta["graphVersion"] == vid2 and meta["partial"] is False and meta["failures"] == [],
                   f"graph evidence metadata: {meta}")
@@ -386,6 +409,13 @@ def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tu
         check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown company: {code} {body}")
         code, body = get(web, "ev-" + "0" * 64)
         check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown evidence id: {code} {body}")
+        check(publishers_read.get("a") == DECLARED_PUBLISHERS["a"] and publishers_read.get("a2", "missing") is None
+              and publishers_read.get("b", "missing") is None,
+              f"the public reads did not cover the declared and the undeclared documents: {publishers_read}")
+        for name, quote in spans:
+            span = hs.span(world, name, quote)
+            stored = db.scalar(f"SELECT json_build_object('publisher', publisher) FROM article_versions WHERE article_id = '{span['documentId']}' AND version = '{span['documentVersion']}'")["publisher"]
+            check(stored == DECLARED_PUBLISHERS.get(name), f"the stored article_versions.publisher of {name} is {stored!r}")
         check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
         check(fingerprint(layout.artifacts) == artifact_tree, "a public read changed the artifact tree")
         check(before_reads["evidence"] == harness_fingerprint["evidence"] and before_reads["artifacts"] == harness_fingerprint["artifacts"],
@@ -676,12 +706,21 @@ def main() -> int:
     check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
         world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
           f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
-    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-2", "the retained bundle is not schema 2")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-3", "the retained bundle is not schema 3")
+    # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
+    # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
+    # value is a selection fact, never a verification (`verification` stays `none`).
+    check(receipt_issues["issue:supply-2026q3"]["fieldProvenance"] == expected_field_provenance(
+        world, "operator-representative", (("a", "m-a"), ("a2", "m-a2")), title=(("a", "m-a"),)),
+          f"supply field provenance: {receipt_issues['issue:supply-2026q3']['fieldProvenance']}")
+    check(receipt_issues["issue:factory-2026q4"]["fieldProvenance"] == expected_field_provenance(world, "unanimous", (("b", "m-b"),)),
+          f"factory field provenance: {receipt_issues['issue:factory-2026q4']['fieldProvenance']}")
     check(all(sorted(set(i["evidenceIds"])) == sorted({e for m in i["mentions"] for e in m["evidenceIds"]} | set(i["geography"]["evidenceIds"]))
               for i in receipt["bundle"]["issues"]), "an issue's evidence is not the union of its mentions' and its geography's")
     snapshot_text = snapshot_file.read_text("utf-8")
-    check(not any(word in snapshot_text for word in ('"participants"', '"sourceCompanyId"', "issuer", "counterparty", "observer", "미등록 법인")),
-          "a mention value reached the format 3 snapshot (it belongs to the receipt only)")
+    check(not any(word in snapshot_text for word in ('"participants"', '"sourceCompanyId"', '"fieldProvenance"', '"sameValueMentions"', "issuer", "counterparty", "observer",
+                                                     "미등록 법인")),
+          "a mention value or a field provenance reached the format 3 snapshot (they belong to the receipt only)")
     check(db.scalar("SELECT count(*) FROM artifacts WHERE kind IN ('graph_snapshot', 'verification_receipt')") == 2 + 2,
           "unexpected extra graph artifacts (two fixture snapshots and this import's two are expected)")
     step("snapshot (format 3: period, assertion status, mention references, structured basis, no mention values) and receipt files registered with the registry's hash and size; "
@@ -803,6 +842,11 @@ def main() -> int:
                                                ("a2", "m-a", hs.EVT_A2, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", [MAPPED]))
           and len(supply_mentions) == 2 and {m["mentionId"] for m in supply_mentions} == {"m-a"}
           and len({m["documentId"] for m in supply_mentions}) == 2, f"the collision receipt does not keep two original mentions with one local id: {supply_mentions}")
+    # Both documents state every value (a2's title equals a's here), yet the operator still chose a: the selection stays `operator-representative` and both
+    # identities are in every list, in mention order.
+    supply_provenance = next(i for i in receipt3["bundle"]["issues"] if i["id"] == "issue:supply-2026q3")["fieldProvenance"]
+    check(supply_provenance == expected_field_provenance(world2, "operator-representative", (("a", "m-a"), ("a2", "m-a"))),
+          f"the collision receipt's field provenance is not both identities in every list: {supply_provenance}")
     status, again, _ = smoke2.graph_import("collision-again", smoke2.request(hid3, manifest3, bundle3))
     check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file3.read_bytes() == snapshot_bytes3,
           f"retrying the collision import changed ids or bytes: {again}")

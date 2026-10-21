@@ -6,7 +6,7 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
-A ledger row whose stored receipt names another bundle schema than this build's (every `-1` row) is HISTORY: `inspect` shows its stored state, receipt and
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1` and `-2` row) is HISTORY: `inspect` shows its stored state, receipt and
 attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
 any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
 as a current bundle, resumed, settled or rewritten.
@@ -36,9 +36,9 @@ from .extraction_contracts import CitationFailure, ExtractionFailure, Mention, O
 from .graph_projection import Paths as SourcePaths
 from .graph_projection import Registry, Source, gate, load_registry, review_state
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
-from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE, MAX_EVIDENCE, MAX_EXCLUSIONS,
-    MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_VERIFICATION, OFFSET_UNIT, POLICY, PRODUCER_CHECKS, SCHEMA, STRUCTURAL_BASIS_TYPES, Bindings, Decisions,
-    Manifest, Selector, app_evidence_id, content_digest, countries_class, mention_key, mention_time_precision, text_sha256, time_precision, validate_bundle)
+from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, ISSUE_FIELDS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE, MAX_EVIDENCE, MAX_EXCLUSIONS,
+    MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, POLICY, PRODUCER_CHECKS, SCHEMA, STRUCTURAL_BASIS_TYPES, Bindings,
+    Decisions, Manifest, Selector, app_evidence_id, content_digest, countries_class, mention_key, mention_time_precision, text_sha256, time_precision, validate_bundle)
 from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, digest, now, read_file, reserved_state_roots
 
 _SQL = """
@@ -673,10 +673,6 @@ class Resolver:
                 "publicationPrecision": precision, "observations": observations}
 
 
-ISSUE_FIELDS = (("title", "title"), ("action", "action"), ("target", "target"), ("event_time", "eventTime"), ("period", "period"),
-                ("assertion_status", "assertionStatus"))
-
-
 def outside_validity(when: str, validity: dict) -> bool:
     """FS042: a relation is valid for `validFrom <= time <= validUntil` (start and END INCLUSIVE: `validUntil` is the last valid day), compared by the written
     calendar date of the source (`when` has at least day precision; its text is not shifted by any time zone). A null bound is unknown, never infinite or a
@@ -810,8 +806,18 @@ class Planner:
         issue = {"id": decision.public_id, "canonicalId": decision.canonical_id, **fields, "timePrecision": precision, "geography": geography,
                  "evidenceIds": sorted(set(event_evidence) | set(geography["evidenceIds"])),
                  "sourceEvents": sorted({canonical(m.source_event()): m.source_event() for m in members}.values(), key=canonical),
-                 "decisionRef": decision.decision_ref, "representative": decision.representative.wire() if decision.representative else None, "mentions": mentions}
+                 "decisionRef": decision.decision_ref, "representative": decision.representative.wire() if decision.representative else None,
+                 "fieldProvenance": self.field_provenance(decision, fields, mentions), "mentions": mentions}
         return issue, {"decision": decision, "members": members, "eventEvidence": event_evidence, "mentionUpstreams": carrying}
+
+    @staticmethod
+    def field_provenance(decision, fields: dict, mentions: list[dict]) -> dict:
+        """How `fields` were SELECTED (the rule `fields` applied), never whether they are true: `selection` is `operator-representative` when the operator named
+        the representative whose six values the issue carries, otherwise `unanimous` (every member said the same, or the issue is excluded). Each field lists, in the
+        mentions' own order, EVERY original mention whose value equals the issue's by exact JSON equality (null equals null, nothing trimmed or normalised); a mention
+        that differs is not listed and the representative is always listed. `verification` is `none`: no field was verified, supported or approved."""
+        return {"selection": "operator-representative" if decision.representative else "unanimous", "verification": MENTION_VERIFICATION,
+                "sameValueMentions": {wire: [{key: m[key] for key in MENTION_IDENTITY} for m in mentions if m[wire] == fields[wire]] for _, wire in ISSUE_FIELDS}}
 
     def mention_values(self, m: Member) -> dict:
         """What ONE source member says about its mention: the carried S2 fields exactly as the source holds them and the app ids of its own exact citations.
