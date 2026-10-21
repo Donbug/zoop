@@ -6686,7 +6686,7 @@ paths:
       tags:
         - "admin-insights"
       summary: "사용 통계 개요 조회"
-      description: "사용 통계 개요 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "7일 사용 통계 개요를 조회한다. 기준 시각은 응답 asOf이며 기간은 asOf가 속한 KST 날짜를 포함한 최근 7개 달력일이다. 원천이 미연결·조회 불가인 지표는 0 대신 availability 상태와 null 값으로 표현한다."
       operationId: "getInsightsOverview"
       responses:
         "200":
@@ -6755,13 +6755,14 @@ paths:
       tags:
         - "admin-insights"
       summary: "사용 통계와 산식 조회"
-      description: "사용 통계와 산식 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "기간별 사용 통계와 산식을 조회한다. 7d는 asOf가 속한 KST 날짜를 포함한 최근 7개 달력일, 30d는 최근 30개 달력일, all은 첫 원천 기록부터 asOf까지다. 시작일 00:00 KST는 포함하고 asOf는 제외한다."
       operationId: "getInsightsSummary"
       parameters:
         -
           name: "window"
           in: "query"
           required: false
+          description: "기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다."
           schema:
             enum:
               - "7d"
@@ -6834,13 +6835,14 @@ paths:
       tags:
         - "admin-insights"
       summary: "기업별 활동 집계 조회"
-      description: "기업별 활동 집계 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "기업별 활동 집계를 조회한다. 활동은 선택한 기간 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다."
       operationId: "listCompanyInsights"
       parameters:
         -
           name: "window"
           in: "query"
           required: false
+          description: "기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다."
           schema:
             enum:
               - "7d"
@@ -6919,7 +6921,7 @@ paths:
       tags:
         - "admin-insights"
       summary: "기업별 일별 활동 조회"
-      description: "기업별 일별 활동 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "기업별 일별 활동을 조회한다. 일별 활동은 KST 달력일 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다."
       operationId: "getCompanyInsights"
       parameters:
         -
@@ -6932,6 +6934,7 @@ paths:
           name: "window"
           in: "query"
           required: false
+          description: "기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다."
           schema:
             enum:
               - "7d"
@@ -10658,12 +10661,16 @@ components:
           format: "date"
         nodeViews:
           type: "integer"
+          description: "Accepted graph_node_select events for this company, deduplicated by idempotency key. Despite the legacy field name, this is a selection count, not an impression count."
         edgeSelections:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Accepted graph_edge_select events attributable to this company; null until a reliable edge-to-company mapping source is integrated."
         issueSelections:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Briefing issue opens attributed to this company only when the issue-to-company mapping is unambiguous; null when that mapping source is unavailable."
         aiQuestions:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Number of AI question submissions attributed to this company; null until a source is integrated, zero when the source is available and has no events."
       type: "object"
       required:
         - "date"
@@ -10685,14 +10692,19 @@ components:
               type: "null"
         watchlistMembers:
           type: "integer"
+          description: "Distinct members with this company in their current watchlist at asOf; not a historical snapshot."
         holdingMembers:
           type: "integer"
+          description: "Distinct members connected to a mock portfolio currently holding this company at asOf; not a historical snapshot."
         nodeViews:
           type: "integer"
+          description: "Accepted graph_node_select events for this company in the selected window; this is a selection count, not an impression count."
         edgeSelections:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Accepted graph_edge_select events attributable to this company in the selected window; null until a reliable edge-to-company mapping source is integrated."
         aiQuestions:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Number of AI question submissions attributed to this company; null until a source is integrated, zero when the source is available and has no events."
       type: "object"
       required:
         - "companyId"
@@ -10890,18 +10902,23 @@ components:
       properties:
         date:
           type: "string"
-          description: "KST calendar day"
+          description: "KST calendar day; periods include asOf's day, and the final day may be partial."
           format: "date"
         activeUsers:
           type: "integer"
+          description: "Distinct pseudonymous member or guest analytics principals with at least one accepted interaction event that day."
         nodeSelections:
           type: "integer"
+          description: "Accepted graph_node_select events that day, deduplicated by idempotency key."
         edgeSelections:
           type: "integer"
+          description: "Accepted graph_edge_select events that day, deduplicated by idempotency key."
         briefingViews:
           type: "integer"
+          description: "Accepted briefing_view events that day, deduplicated by idempotency key."
         aiQuestions:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "AI question submission count; null until a source is integrated, zero when the source is available and has no events."
       type: "object"
       required:
         - "date"
@@ -12921,16 +12938,20 @@ components:
           type: "boolean"
         watchlistMembers:
           type: "integer"
+          description: "Distinct members whose current watchlist contains this company at asOf. This is a current-state count, not a historical value for the selected window."
         holdingMembers:
           type: "integer"
+          description: "Distinct members whose connected mock portfolio currently holds this company at asOf. This is a current-state count, not a historical value for the selected window."
         nodeViews:
           type: "integer"
         edgeSelections:
-          type: "integer"
+          type: ["integer", "null"]
         issueSelections:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Briefing issue opens attributed to this company only when the issue-to-company mapping is unambiguous; null when that mapping source is unavailable."
         aiQuestions:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "AI question submission count attributed to this company; null while its source is unavailable, zero when the source is available and has no events."
         viewers:
           type: "integer"
         minSample:
@@ -12998,6 +13019,7 @@ components:
           format: "date-time"
         minSample:
           type: "integer"
+          description: "Minimum denominator for showing a ratio; currently 5."
         metrics:
           items:
             "$ref": "#/components/schemas/StatsMetric"
@@ -13962,9 +13984,9 @@ components:
     OverviewFeedback:
       properties:
         up:
-          type: "integer"
+          type: ["integer", "null"]
         down:
-          type: "integer"
+          type: ["integer", "null"]
         rate:
           anyOf:
             -
@@ -13973,12 +13995,26 @@ components:
               type: "null"
         sampleHidden:
           type: "boolean"
+          description: "True only when an available rating rate is hidden because its denominator is below minSample."
+        availability:
+          type: "string"
+          enum: ["available", "unavailable"]
+          description: "Whether the feedback source is integrated and readable."
+        unavailableReason:
+          anyOf:
+            -
+              type: "string"
+              enum: ["not_integrated", "source_unavailable"]
+            -
+              type: "null"
       type: "object"
       required:
         - "up"
         - "down"
         - "rate"
         - "sampleHidden"
+        - "availability"
+        - "unavailableReason"
     OverviewJobs:
       properties:
         running:
@@ -14007,10 +14043,13 @@ components:
       properties:
         registered:
           type: "integer"
+          description: "All member accounts created before asOf, including blocked accounts."
         active:
           type: "integer"
+          description: "Registered accounts with active status at asOf."
         blocked:
           type: "integer"
+          description: "Registered accounts with blocked status at asOf."
       type: "object"
       required:
         - "registered"
@@ -15094,14 +15133,19 @@ components:
             - "evening"
         views:
           type: "integer"
+          description: "Distinct (analytics principal, roundId, viewId) briefing detail views. Repeated events within the same view count once."
         viewers:
           type: "integer"
+          description: "Distinct pseudonymous analytics principals with a briefing_view event for this round."
         issueOpens:
           type: "integer"
+          description: "Accepted briefing_issue_open events for this round, deduplicated by idempotency key."
         likes:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Current valid positive ratings when an FS066 feedback source is connected; null otherwise."
         dislikes:
-          type: "integer"
+          type: ["integer", "null"]
+          description: "Current valid negative ratings when an FS066 feedback source is connected; null otherwise."
       type: "object"
       required:
         - "roundId"
@@ -15617,6 +15661,8 @@ components:
       properties:
         key:
           type: "string"
+          enum: ["activeUsers", "onboarding", "nodeCtr", "edgeCtr", "briefingRate", "briefingIssueOpens", "aiQuestions", "aiQuestionRate"]
+          description: "Stable metric identifier. activeUsers: distinct active principals; onboarding: completed members / members registered in the selected window; nodeCtr and edgeCtr: distinct map views with a selection / distinct map views; briefingRate: distinct briefing detail views / distinct briefing screen views; briefingIssueOpens: accepted issue-open events; aiQuestions: accepted question submissions; aiQuestionRate: distinct AI views with a submission / distinct AI views."
         group:
           type: "string"
           enum:
@@ -15636,37 +15682,49 @@ components:
         definition:
           type: "string"
           description: "How the figure is computed, shown next to it"
+        availability:
+          type: "string"
+          enum: ["available", "unavailable"]
+          description: "Whether this metric has an integrated, readable source. An available metric with value zero means the source was read and no matching activity was found."
+        unavailableReason:
+          anyOf:
+            -
+              type: "string"
+              enum: ["not_integrated", "source_unavailable", "insufficient_history"]
+            -
+              type: "null"
+          description: "Reason when availability is unavailable; null when the metric is available."
         count:
           anyOf:
             -
               type: "integer"
             -
               type: "null"
-          description: "kind=count"
+          description: "Count metric value; null when unavailable and zero only when its source was read with no matching events."
         numerator:
           anyOf:
             -
               type: "integer"
             -
               type: "null"
-          description: "kind=ratio"
+          description: "Ratio numerator; null when unavailable."
         denominator:
           anyOf:
             -
               type: "integer"
             -
               type: "null"
-          description: "kind=ratio"
+          description: "Ratio denominator; null when unavailable."
         rate:
           anyOf:
             -
               type: "number"
             -
               type: "null"
-          description: "0..1; null for counts and for ratios below the sample threshold"
+          description: "0..1; null for counts, unavailable metrics, and ratios below the sample threshold."
         sampleHidden:
           type: "boolean"
-          description: "True when the denominator is below minSample, so only counts are shown"
+          description: "True only for an available ratio whose denominator is below minSample; unavailable sources use availability/unavailableReason."
       type: "object"
       required:
         - "key"
@@ -15675,6 +15733,8 @@ components:
         - "kind"
         - "unit"
         - "definition"
+        - "availability"
+        - "unavailableReason"
         - "count"
         - "numerator"
         - "denominator"
@@ -15697,11 +15757,13 @@ components:
               type: "string"
             -
               type: "null"
+          description: "Inclusive KST start date; null for all."
         minSample:
           type: "integer"
+          description: "Minimum ratio denominator required to show a rate; 5."
         membersScope:
           type: "string"
-          description: "Which members the onboarding figure covers"
+          description: "The onboarding cohort: member accounts created during the selected window; completion is read as of asOf."
         metrics:
           items:
             "$ref": "#/components/schemas/StatsMetric"
@@ -15765,55 +15827,129 @@ components:
             "$ref": "#/components/schemas/TelemetryEvent"
           type: "array"
           minItems: 1
+          maxItems: 20
       additionalProperties: false
       type: "object"
       required:
         - "events"
     TelemetryEvent:
+      oneOf:
+        - "$ref": "#/components/schemas/TelemetryScreenView"
+        - "$ref": "#/components/schemas/TelemetryGraphNodeSelect"
+        - "$ref": "#/components/schemas/TelemetryGraphEdgeSelect"
+        - "$ref": "#/components/schemas/TelemetryBriefingView"
+        - "$ref": "#/components/schemas/TelemetryBriefingIssueOpen"
+        - "$ref": "#/components/schemas/TelemetryAiQuestion"
+      discriminator:
+        propertyName: "type"
+        mapping:
+          screen_view: "#/components/schemas/TelemetryScreenView"
+          graph_node_select: "#/components/schemas/TelemetryGraphNodeSelect"
+          graph_edge_select: "#/components/schemas/TelemetryGraphEdgeSelect"
+          briefing_view: "#/components/schemas/TelemetryBriefingView"
+          briefing_issue_open: "#/components/schemas/TelemetryBriefingIssueOpen"
+          ai_question: "#/components/schemas/TelemetryAiQuestion"
+      description: "One allowed user action. Event-specific schemas reject unknown fields, including names, email addresses, and question text."
+    TelemetryScreenView:
+      type: "object"
+      additionalProperties: false
       properties:
         type:
           type: "string"
-          enum:
-            - "screen_view"
-            - "graph_node_select"
-            - "graph_edge_select"
-            - "briefing_view"
-            - "briefing_issue_open"
+          const: "screen_view"
         screen:
-          anyOf:
-            -
-              type: "string"
-              enum:
-                - "main"
-                - "briefing"
-            -
-              type: "null"
+          type: "string"
+          enum: ["main", "briefing", "ai"]
+        viewId:
+          type: "string"
+          pattern: "^[A-Za-z0-9\\-]{8,40}$"
+      required: ["type", "screen", "viewId"]
+    TelemetryGraphNodeSelect:
+      type: "object"
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          const: "graph_node_select"
+        targetId:
+          type: "string"
+          minLength: 1
+          pattern: "^[A-Za-z0-9._:/\\-]+$"
+          description: "Selected graph node identifier; no label or user-entered text."
+        viewId:
+          type: "string"
+          pattern: "^[A-Za-z0-9\\-]{8,40}$"
+      required: ["type", "targetId", "viewId"]
+    TelemetryGraphEdgeSelect:
+      type: "object"
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          const: "graph_edge_select"
+        targetId:
+          type: "string"
+          minLength: 1
+          pattern: "^[A-Za-z0-9._:/\\-]+$"
+          description: "Selected graph edge identifier; no label or user-entered text."
+        viewId:
+          type: "string"
+          pattern: "^[A-Za-z0-9\\-]{8,40}$"
+      required: ["type", "targetId", "viewId"]
+    TelemetryBriefingView:
+      type: "object"
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          const: "briefing_view"
+        targetId:
+          type: "string"
+          description: "Briefing round identifier."
+        viewId:
+          type: "string"
+          pattern: "^[A-Za-z0-9\\-]{8,40}$"
+      required: ["type", "targetId", "viewId"]
+    TelemetryBriefingIssueOpen:
+      type: "object"
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          const: "briefing_issue_open"
+        targetId:
+          type: "string"
+          minLength: 1
+          pattern: "^[A-Za-z0-9._:/\\-]+$"
+          description: "Opened issue identifier."
+        roundId:
+          type: "string"
+          description: "Briefing round containing the issue."
+        viewId:
+          type: "string"
+          pattern: "^[A-Za-z0-9\\-]{8,40}$"
+      required: ["type", "targetId", "roundId", "viewId"]
+    TelemetryAiQuestion:
+      type: "object"
+      additionalProperties: false
+      properties:
+        type:
+          type: "string"
+          const: "ai_question"
         targetId:
           anyOf:
             -
               type: "string"
               minLength: 1
               pattern: "^[A-Za-z0-9._:/\\-]+$"
-            -
-              type: "null"
-        roundId:
-          anyOf:
-            -
-              type: "string"
+              description: "Company identifier only when the submitted question has exactly one explicit company context."
             -
               type: "null"
         viewId:
-          anyOf:
-            -
-              type: "string"
-              pattern: "^[A-Za-z0-9\\-]{8,40}$"
-            -
-              type: "null"
-      additionalProperties: false
-      type: "object"
-      required:
-        - "type"
-      description: "One user action. Only these fields exist; anything else (e-mail, free text) is rejected."
+          type: "string"
+          pattern: "^[A-Za-z0-9\\-]{8,40}$"
+      required: ["type", "viewId"]
+      description: "Count a validated user submission attempt. Never include question text or generated content."
     TermOut:
       properties:
         title:

@@ -22,7 +22,7 @@ public class JdbcMemberSessionRepository implements MemberSessionRepository {
                 SELECT s.id, s.member_id, s.kind, s.token_hash, s.csrf_key_id,
                        s.csrf_version, s.created_at, s.expires_at, s.revoked_at,
                        m.status AS member_status, m.email, m.display_name,
-                       m.completed, m.tutorial_completed
+                       m.completed, m.tutorial_completed, COALESCE(m.analytics_key, s.analytics_key) AS analytics_key
                 FROM member_sessions s
                 LEFT JOIN members m ON m.id = s.member_id
                 WHERE s.token_hash = :tokenHash
@@ -35,7 +35,7 @@ public class JdbcMemberSessionRepository implements MemberSessionRepository {
                         rs.getTimestamp("revoked_at") == null ? null : rs.getTimestamp("revoked_at").toInstant(),
                         rs.getString("member_status"), rs.getString("email"),
                         rs.getString("display_name"), rs.getBoolean("completed"),
-                        rs.getBoolean("tutorial_completed")));
+                        rs.getBoolean("tutorial_completed"), rs.getString("analytics_key")));
         return rows.stream().findFirst();
     }
 

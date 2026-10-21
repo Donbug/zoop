@@ -361,6 +361,28 @@
         "type": "string"
       }
     },
+    "response:200:application/json.items[].aiQuestions": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.items[].edgeSelections": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
     "response:401:application/json.error.code": {
       "target": {
         "type": "string",

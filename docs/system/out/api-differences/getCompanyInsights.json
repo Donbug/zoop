@@ -345,6 +345,17 @@
         "maxLength": 100
       }
     },
+    "response:200:application/json.aiQuestions": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
     "response:200:application/json.asOf": {
       "target": {
         "type": "string",
@@ -354,6 +365,39 @@
         "type": "string"
       }
     },
+    "response:200:application/json.edgeSelections": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.issueSelections": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.series[].aiQuestions": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
     "response:200:application/json.series[].date": {
       "target": {
         "type": "string",
@@ -361,6 +405,28 @@
       },
       "bff": {
         "type": "string"
+      }
+    },
+    "response:200:application/json.series[].edgeSelections": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
+      }
+    },
+    "response:200:application/json.series[].issueSelections": {
+      "target": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "bff": {
+        "type": "integer"
       }
     },
     "response:401:application/json.error.code": {

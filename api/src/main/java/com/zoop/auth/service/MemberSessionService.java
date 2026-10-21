@@ -105,6 +105,18 @@ public class MemberSessionService {
                 .isPresent();
     }
 
+    /** Returns the stable pseudonymous analytics key for a live member or guest session. */
+    @Transactional(readOnly = true)
+    public String analyticsPrincipal(String cookieToken) {
+        if (!validToken(cookieToken)) throw new CustomException(ErrorCode.AUTH_REQUIRED);
+        Instant now = clock.instant();
+        var row = repository.findByTokenHash(hashToken(cookieToken));
+        if (row.isEmpty() || !isUsable(row.get(), now) || row.get().analyticsKey() == null) {
+            throw new CustomException(ErrorCode.AUTH_REQUIRED);
+        }
+        return row.get().analyticsKey();
+    }
+
     /** Revokes only the current member session; guest sessions are outside member logout scope. */
     @Transactional
     public void logoutMember(String cookieToken) {
