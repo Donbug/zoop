@@ -164,9 +164,7 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
     expect(
       screen.getByRole('heading', { name: '시장에 대한 해석' }),
     ).toBeTruthy();
-    expect(
-      screen.getByRole('heading', { name: '오늘의 전망' }),
-    ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '오늘의 전망' })).toBeTruthy();
     expect(screen.getByText('이전 전망 완화')).toBeTruthy();
     expect(
       screen.getByText(/전망 조건: 수주 증가가 실제로 확인될 경우/),
@@ -231,13 +229,9 @@ describe('D-BRF-01·02 저장된 전망형 시장 분석', () => {
       screen.getByText(/비교 가능한 검증된 시장 분석이 없어 사용하지 않습니다/),
     ).toBeTruthy();
     expect(
-      screen.getByText(
-        '이 회차에는 검증을 통과한 새로운 전망이 없습니다.',
-      ),
+      screen.getByText('이 회차에는 검증을 통과한 새로운 전망이 없습니다.'),
     ).toBeTruthy();
-    expect(
-      screen.queryByRole('heading', { name: '오늘의 전망' }),
-    ).toBeNull();
+    expect(screen.queryByRole('heading', { name: '오늘의 전망' })).toBeNull();
   });
   it('다른 회차의 구조화 분석을 현재 회차 전망으로 노출하지 않는다', () => {
     show(analysis(), 'evening', '2026-10-07T17:30:00+09:00');

@@ -106,10 +106,7 @@ export default function MarketSummary({
     { kind: 'result_comparison', title: '아침 예상과 관측 결과 비교' },
     {
       kind: 'forecast',
-      title:
-        edition === 'morning'
-          ? '오늘의 전망'
-          : '다음 거래일의 전망',
+      title: edition === 'morning' ? '오늘의 전망' : '다음 거래일의 전망',
     },
   ];
   return (
