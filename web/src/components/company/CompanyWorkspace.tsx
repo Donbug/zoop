@@ -35,7 +35,6 @@ import {
   impactEdges,
   number,
   requestTime,
-  barEnd,
 } from './detail-model';
 
 const workspaceClasses =
@@ -186,36 +185,23 @@ export default function CompanyWorkspace() {
   const prices = useCompanyResource<Prices>(
     invalid ? null : companyUrl(id, '/prices', { period, ...range }),
   );
-  const latestPoint =
-    prices.data?.status === 'available'
-      ? prices.data.points.at(-1)?.time
-      : null;
-  const latestInterval =
-    prices.data?.status === 'available' ? prices.data.interval : null;
   useEffect(() => {
-    const latest =
-      latestPoint && latestInterval && exactTime(latestPoint)
-        ? barEnd(latestPoint, latestInterval)
-        : company.data?.metadata.asOf;
-    // 공개 그래프 버전이 없으면(스냅샷 미게시) 기준 시점을 고정하지 않는다. 고정하면 409가 된다.
-    // 기준 시점을 가격 봉에서 가져오면 그 시점의 버전은 다음 기업 응답이 채운다(지금 버전과 다를 수 있다).
+    // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
+    // 거래가 없는 날(주말·휴장)에 오래된 시점을 가리켜 이후 공개 자료를 빼거나 409를 만든다.
+    // 공개 그래프 버전이 없으면(스냅샷 미게시) 고정하지 않는다. 고정하면 409가 된다.
+    // 주소에 graphVersion만 있는 과거 조회는 metadata.asOf가 요청 시각이라 덧붙이면 422가 된다.
+    const latest = company.data?.metadata.asOf;
     const currentVersion = company.data?.metadata.graphVersion ?? null;
     if (
       !asOf &&
+      !version &&
       company.data &&
       currentVersion &&
-      !prices.loading &&
       latest &&
       exactTime(latest)
     )
       updateQuery(
-        {
-          asOf: requestTime(latest),
-          ...(latest === company.data.metadata.asOf
-            ? { graphVersion: currentVersion }
-            : {}),
-          period,
-        },
+        { asOf: requestTime(latest), graphVersion: currentVersion, period },
         { replace: true },
       );
     if (asOf && !version && company.data?.metadata.graphVersion)
@@ -228,11 +214,8 @@ export default function CompanyWorkspace() {
   }, [
     asOf,
     version,
-    latestPoint,
-    latestInterval,
     company.data?.metadata.asOf,
     company.data?.metadata.graphVersion,
-    prices.loading,
     period,
   ]);
   const depth = params.get('depth') === '2' ? 2 : 1;

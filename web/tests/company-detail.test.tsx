@@ -7,7 +7,6 @@ import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   bucketKey,
-  barEnd,
   impactEdges,
   requestTime,
   timeRange,
@@ -1245,16 +1244,51 @@ test('price bar times without seconds become RFC 3339 request times for asOf', (
   );
 });
 
-test('the reference time from the last price bar is that bar end, never later than now', () => {
-  // Bars carry the interval start (#236): today's daily bar starts at 00:00 KST.
-  const now = Date.parse('2026-10-20T08:40:00Z');
-  expect(barEnd('2026-10-20T00:00+09:00', '1d', now)).toBe(
-    '2026-10-20T08:40:00Z',
+test('first entry pins the company reference time and version, not an older last price bar (closed market)', async () => {
+  // FS040: on a weekend the last bar is Friday; the latest public version activated afterwards.
+  const saturday = '2026-10-24T03:00:00Z';
+  server.on('GET', '/api/v1/companies/:id', (r) =>
+    json({
+      ...company,
+      id: r.params.id,
+      metadata: {
+        ...metadata,
+        asOf: r.query.get('asOf') ?? saturday,
+        graphVersion: 'v-weekend',
+      },
+    }),
   );
-  expect(barEnd('2026-10-20T17:35+09:00', '5m', now)).toBe(
-    '2026-10-20T08:40:00Z',
+  open();
+  await screen.findByRole('heading', { name: '합성 기업' });
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain(
+      `asOf=${encodeURIComponent(saturday)}`,
+    ),
   );
-  expect(barEnd('2026-10-13T00:00+09:00', '1wk', now)).toBe(
-    '2026-10-19T15:00:00Z',
+  expect(screen.getByTestId('address').textContent).toContain(
+    'graphVersion=v-weekend',
   );
+});
+
+test('a past view addressed by graphVersion alone is not given a reference time', async () => {
+  // In this mode metadata.asOf is the request time; adding it to an old version would be rejected (422).
+  server.on('GET', '/api/v1/companies/:id', (r) =>
+    json({
+      ...company,
+      id: r.params.id,
+      metadata: {
+        ...metadata,
+        graphVersion: r.query.get('graphVersion') ?? 'v1',
+      },
+    }),
+  );
+  open('?graphVersion=v-past');
+  await screen.findByRole('heading', { name: '합성 기업' });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.getByTestId('address').textContent).not.toContain('asOf=');
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id')
+      .every((call) => !call.query.has('asOf')),
+  ).toBe(true);
 });
