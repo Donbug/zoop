@@ -2,7 +2,18 @@
 
 PR #258, 기준 2026-10-21. 대상은 로컬 과거 회차 재생·검증 경로다. PoC 추출·사건 묶음, ERD·공개 API 형태·운영 공급원은 변경하지 않는다.
 
-## 현재 보완 계약: market-context-v2.4-outlook
+## 현재 역할 필드 계약: market-context-v2.5-outlook
+
+2026-10-21 실제 실행에서 v2.4의 필수 전망 슬롯은 유지됐지만 forecast_update에 새 forecast용 counterFactors가 들어가 결정 검사에서 거부됐다. 실행한 v2.4 리소스/원응답은 보존하고 v2.5로 분리했다.
+
+- 필수 forecast_update/result_comparison은 targetId·direction=null, counterFactors=[]를 schema로 요구한다. updateAction은 forecast_update만 유지/강화/약화/철회 중 하나이며 나머지는 null이다. 필수 forecast의 targetId/direction은 null일 수 없고 지정 target/방향만 허용하며 evidenceIds/counterFactors는 적어도 하나다.
+- 기존 의미 검증은 유지한다. 필드 형식 통과와 사실·해석의 검증 통과는 별개다. 보완 과정에서 전망을 서버가 창작/복사하지 않는다. 기존 v2.3/v2.4를 새 버전으로 재명명하지 않는다.
+- 승인된 전체440/신규최대16 안에서 v2.4 4회차12회(3PASS/1WITHHELD) 후, v2.5로10/8 출근·퇴근을4회 재생성·검증했다. 마지막은10/7 출근·퇴근(v2.4) PASS,10/8 출근·퇴근(v2.5) WITHHELD다. 새16회/전체440, 새미응답0·기존unknown2보존이다.
+- 마지막 보류는 전망 누락/갱신 필드 오류가 아니다. 출근은 매출·영업이익 결합 및 단일 기업 실적을 대형주 이익·수급으로 확대, 퇴근은 두 실적 지표 결합·인용에 없는 사상최대/수요해석 때문에 거부됐다. 이전 비교·새 전망은 초안에 존재하지만 시도 전체 보류 규칙에 따라 공개하지 않는다.
+- 이번 실행의 권위 있는 신규 사용량은 최초424개 digest를 뺀 고유 신규16개의 complete 영수증 합계다(입력7,118,572/출력24,641). 부분 회차 실행 proof의 inputTokens/outputTokens는 해당 layer의 유지된 회차도 포함하므로 여러 layer proof를 단순 합산하지 않는다.
+- 코드는 v2.4/v2.5를 별도 지원하며 같은 source/회차/선행 hash·원응답·검증·원장을 계속 결속한다. 실제4개 전부 통과·연속 전망 갱신/성과 비교 완료·운영 발행 준비 완료를 주장하지 않는다. 남은 호출0이고 추가 실행을 하지 않는다.
+
+## 이전 보완 계약: market-context-v2.4-outlook (089 시점)
 
 2026-10-21: 실제 v2.3 실행은 1 PASS/3 WITHHELD다. 아래 보완은 새 유료 실행 전 코드·오프라인/DB 검증이며 기존 결과의 재판정이 아니다.
 

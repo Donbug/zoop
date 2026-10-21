@@ -216,8 +216,8 @@ def _prepare(data):
                    "allowedEvidenceIds": sorted(evidence), "allowedPreviousForecastIds": sorted(prior),
                    "allowedEvaluationIds": sorted(evaluations),
                    "allowedPreviousPublicationIds": [previous["roundId"]] if previous["status"] == "available" else []})
-    if data["context"].get("summaryPromptVersion") == ROLE_VERSION:
-        frozen["claimRequirements"] = {"version": ROLE_VERSION, "requiredKinds": required_kinds(frozen),
+    if data["context"].get("summaryPromptVersion") in ROLE_VERSIONS:
+        frozen["claimRequirements"] = {"version": data["context"]["summaryPromptVersion"], "requiredKinds": required_kinds(frozen),
             "factUnit": "one independently verifiable subject-predicate-time-scope assertion; qualifiers belong to that assertion",
             "comparisonUnit": "prior simulated judgment + current observation or missingness + server evaluation status",
             "repair": "return every required slot on every attempt; retain supported roles and correct only rejected content; never invent a missing outlook"}
@@ -241,12 +241,26 @@ def _schema(frozen, evidence, indicators, prior, evaluations):
     props["targetId"]["enum"] = [None, *(t["targetId"] for t in targets)]
     if not targets:
         props["kind"]["enum"].remove("forecast")
-    if frozen["context"].get("summaryPromptVersion") == ROLE_VERSION:
+    if frozen["context"].get("summaryPromptVersion") in ROLE_VERSIONS:
         # Required roles are separate, mandatory schema fields on the first AND repair call.
         slots = {}
         for kind in required_kinds(frozen):
             slot = copy.deepcopy(schema["properties"]["claims"]["items"])
             slot["properties"]["kind"]["enum"] = [kind]
+            if frozen["context"]["summaryPromptVersion"] == STRUCTURE_VERSION:
+                fields = slot["properties"]
+                if kind == "forecast":
+                    fields["targetId"] = {"type": "string", "enum": [t["targetId"] for t in targets]}
+                    fields["direction"] = {"type": "string", "enum": ["up", "down", "flat", "uncertain"]}
+                    fields["evidenceIds"]["minItems"] = 1
+                    fields["counterFactors"]["minItems"] = 1
+                    fields["updateAction"] = {"type": "null"}
+                else:
+                    fields["targetId"] = {"type": "null"}
+                    fields["direction"] = {"type": "null"}
+                    fields["counterFactors"]["maxItems"] = 0
+                    fields["updateAction"] = ({"type": "string", "enum": ["maintain", "strengthen", "weaken", "withdraw"]}
+                        if kind == "forecast_update" else {"type": "null"})
             slots[kind] = slot
         props["kind"]["enum"] = [k for k in props["kind"]["enum"]
             if k not in {"forecast_update", "result_comparison"} or k in slots]
@@ -260,7 +274,9 @@ QUALITY_VERSION = "market-context-v2.3-outlook"
 QUALITY_FLAGS = ("atomicClaim", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly")
 ROLE_VERSION = "market-context-v2.4-outlook"
 ROLE_FLAGS = ("factUnitAppropriate", "comparisonElementsComplete", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly")
-QUALITY_VERSIONS = {QUALITY_VERSION, ROLE_VERSION}
+STRUCTURE_VERSION = "market-context-v2.5-outlook"
+ROLE_VERSIONS = {ROLE_VERSION, STRUCTURE_VERSION}
+QUALITY_VERSIONS = {QUALITY_VERSION, *ROLE_VERSIONS}
 
 
 def required_kinds(frozen):
@@ -277,7 +293,7 @@ def required_kinds(frozen):
 
 def draft_claims(draft, frozen):
     """Lossless projection, never an insertion/restoration of an omitted model claim."""
-    if frozen["context"].get("summaryPromptVersion") != ROLE_VERSION:
+    if frozen["context"].get("summaryPromptVersion") not in ROLE_VERSIONS:
         return draft
     require(type(draft) is dict and set(draft) == {"claims", "requiredClaims"}
             and type(draft["claims"]) is list and type(draft["requiredClaims"]) is dict,
@@ -334,7 +350,7 @@ def _claims(draft, frozen, evidence, indicators, prior, evaluations):
             require(c.get("updateAction") is None, "market_context_foreign_update")
         if kind == "result_comparison":
             require(frozen["marketContext"]["edition"] == "evening" and (c["previousForecastIds"] or c["previousPublicationIds"]), "market_context_comparison_basis")
-            if frozen["context"].get("summaryPromptVersion") == ROLE_VERSION:
+            if frozen["context"].get("summaryPromptVersion") in ROLE_VERSIONS:
                 expected = {key for key, value in evaluations.items() if value["forecastId"] in c["previousForecastIds"]}
                 require(set(c["evaluationIds"]) == expected and (expected or not c["previousForecastIds"]),
                         "market_role_comparison_evaluations")
@@ -397,7 +413,7 @@ def generate_market_summary(client, data, max_repairs=1):
         flags = ("noUnsupportedNumbers", "noUnsupportedCausality", "temporalAppropriate", "noInvestmentAdvice",
                  "comparisonAppropriate", "forecastAppropriate")
         if frozen["context"].get("summaryPromptVersion") in QUALITY_VERSIONS:
-            flags += ROLE_FLAGS if frozen["context"]["summaryPromptVersion"] == ROLE_VERSION else QUALITY_FLAGS
+            flags += ROLE_FLAGS if frozen["context"]["summaryPromptVersion"] in ROLE_VERSIONS else QUALITY_FLAGS
         passed = all(check["verdict"] == "SUPPORTED" and all(check[k] is True for k in flags) for check in checks)
         last_validation = {"status": "PASS" if passed else "WITHHELD", "checks": checks,
                            "meaning": "Independent model assessment of frozen inputs; no external fact certification."}

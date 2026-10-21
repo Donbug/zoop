@@ -24,7 +24,7 @@ def compare(baseline,current):
             summary=value['summaryResult']
             rejected = []
             for check in summary['verification'].get('checks',[]):
-                if check.get('verdict') != 'SUPPORTED' or any(check.get(k) is False for k in ['atomicClaim','evidenceClauseCoverage','qualifiersPreserved','observableConditionsOnly']):
+                if check.get('verdict') != 'SUPPORTED' or any(check.get(k) is False for k in ['atomicClaim','factUnitAppropriate','comparisonElementsComplete','evidenceClauseCoverage','qualifiersPreserved','observableConditionsOnly']):
                     rejected.append(check.get('reason','검증 보류'))
             if summary['verification'].get('reason'):
                 reasons={'market_outlook_forecast_required':'보완 초안에서 필수인 오늘/다음 거래일 전망 문장이 빠졌습니다.',
@@ -37,7 +37,11 @@ def compare(baseline,current):
                 if response_path and response_path.is_file():
                     response=json.loads(response_path.read_text())
                     text=next(t['text'] for m in response['output'] if m['type']=='message' for t in m['content'] if t['type']=='output_text')
-                    draft=json.loads(text).get('claims',[])
+                    raw_draft=json.loads(text)
+                    draft=list(raw_draft.get('claims',[]))
+                    slots=raw_draft.get('requiredClaims',{})
+                    for kind in ['forecast','forecast_update','result_comparison']:
+                        if kind in slots: draft.append(slots[kind])
             return {'rejectionReasons':rejected,'rejectedDraft':draft,'version':value['context']['summaryPromptVersion'],'status':summary['verification']['status'],
                     'resultVersion':summary['resultVersion'],'text':summary['text'],'claims':summary['claims'],
                     'forecasts':summary['forecasts'],'evaluations':summary['forecastEvaluations'],
@@ -58,7 +62,7 @@ function el(tag,text,cls){const n=document.createElement(tag);if(text!==undefine
 function draw(i){const r=data.rounds[i];document.querySelectorAll('nav button').forEach((b,k)=>b.setAttribute('aria-pressed',String(i===k)));document.querySelector('#heading').textContent=r.date+' '+(r.edition==='morning'?'출근':'퇴근');
 const count=v=>v.claims.length;const conditions=v=>v.forecasts.reduce((s,f)=>s+f.conditions.length,0);
 document.querySelector('#changes').textContent='문장 '+count(r.old)+' → '+count(r.new)+'개 · 새 가정 조건 '+conditions(r.old)+' → '+conditions(r.new)+'개 · 입력 문서 '+r.old.documents+' → '+r.new.documents+'개';
-const links=document.querySelector('#links');links.replaceChildren();for(const k of ['old','new']){const a=el('a',k==='old'?'기존 브리핑 화면 열기':'새 브리핑 화면 열기');a.href=urls[k]+'/briefing?date='+r.date+'&edition='+r.edition;a.target='_blank';a.rel='noopener';links.append(a)}
+const links=document.querySelector('#links');links.replaceChildren();for(const k of ['old','new']){if(!urls[k])continue;const a=el('a',k==='old'?'기존 브리핑 화면 열기':'새 브리핑 화면 열기');a.href=urls[k]+'/briefing?date='+r.date+'&edition='+r.edition;a.target='_blank';a.rel='noopener';links.append(a)}
 const main=document.querySelector('#content');main.replaceChildren();for(const key of ['old','new']){const v=r[key],card=el('article',undefined,key);card.append(el('h2',key==='old'?'기존 생성본':'새 생성본'));card.append(el('p','검증: '+v.status+' · 문장 '+v.claims.length+'개 · 검증 통과 전망 '+v.forecasts.length+'개','meta'));
 if(v.status!=='PASS')card.append(el('p','검증을 통과하지 못해 이 문안은 발행하지 않았습니다. 아래 내용은 비교용 보류 기록입니다.','warning'));
 if(v.rejectionReasons.length){const why=el('details');why.append(el('summary','보류 이유 보기'));for(const reason of v.rejectionReasons)why.append(el('p',reason));card.append(why)}if(v.rejectedDraft.length){card.append(el('h3','마지막 반려 초안 · 미발행'));for(const draft of v.rejectedDraft)card.append(el('p',draft.text,'warning'))}for(const c of v.claims){const block=el('div',undefined,'claim');block.append(el('div',labels[c.kind]||c.kind,'kind'));block.append(el('p',c.text));if(c.conditions.length)block.append(el('p','조건: '+c.conditions.join(' · '),'basis'));if(c.counterFactors.length)block.append(el('p','반대 요인: '+c.counterFactors.join(' · '),'basis'));block.append(el('span','근거 '+c.evidenceIds.length+'개 · 지표 '+c.indicatorIds.length+'개','basis'));card.append(block)}main.append(card)}

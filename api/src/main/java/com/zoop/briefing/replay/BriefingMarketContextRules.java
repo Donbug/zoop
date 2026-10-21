@@ -28,8 +28,10 @@ final class BriefingMarketContextRules {
     static final String ROLE_VERSION = "market-context-v2.4-outlook";
     static final List<String> ROLE_FLAGS = List.of("factUnitAppropriate", "comparisonElementsComplete", "evidenceClauseCoverage", "qualifiersPreserved", "observableConditionsOnly");
 
+    static boolean roleVersion(String version) { return Set.of(ROLE_VERSION, "market-context-v2.5-outlook").contains(version); }
+
     static List<String> qualityFlags(String version) {
-        return ROLE_VERSION.equals(version) ? ROLE_FLAGS : "market-context-v2.3-outlook".equals(version) ? QUALITY_FLAGS : List.of();
+        return roleVersion(version) ? ROLE_FLAGS : "market-context-v2.3-outlook".equals(version) ? QUALITY_FLAGS : List.of();
     }
 
     static List<String> requiredKinds(StrictJson.Obj context) {
@@ -70,7 +72,7 @@ final class BriefingMarketContextRules {
         }
     }
 
-    /** v2.3 guards only; older immutable recordings retain their original contract. */
+    /** v2.3+ anchor guards; older immutable recordings retain their original contract. */
     static void qualityClaims(StrictJson.Obj summary, StrictJson.Obj news, StrictJson.Obj broad) {
         Map<String, String> owners = new HashMap<>();
         for (StrictJson.Obj item : news.objects("selected"))

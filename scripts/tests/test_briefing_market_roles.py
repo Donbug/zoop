@@ -134,6 +134,25 @@ class MarketRoleTest(unittest.TestCase):
         self.assertEqual([], schema['properties']['requiredClaims']['required'])
         self.assertNotIn('forecast', schema['properties']['claims']['items']['properties']['kind']['enum'])
 
+    def test_v25_required_update_cannot_receive_forecast_only_fields(self):
+        c.PROMPTS = c.PROMPTS.with_name(c.STRUCTURE_VERSION)
+        data = self.data(morning=True, previous=True)
+        data['context']['summaryPromptVersion'] = c.STRUCTURE_VERSION
+        data['contextSha256'] = c.base.digest(c.base.canonical(data['context']))
+        values = c._prepare(data)
+        schema = c._schema(*values[:5])
+        slots = schema['properties']['requiredClaims']['properties']
+        self.assertEqual({'type':'null'}, slots['forecast_update']['properties']['targetId'])
+        self.assertEqual({'type':'null'}, slots['forecast_update']['properties']['direction'])
+        self.assertEqual(0, slots['forecast_update']['properties']['counterFactors']['maxItems'])
+        self.assertEqual('string', slots['forecast']['properties']['targetId']['type'])
+        self.assertEqual(1, slots['forecast']['properties']['counterFactors']['minItems'])
+        with tempfile.TemporaryDirectory() as directory:
+            transport = RoleTransport()
+            client = c.legacy.MarketSummaryClient(Path(directory), transport, 8, prompt_root=c.PROMPTS)
+            result = c.generate_market_summary(client, data, 0)
+        self.assertEqual('PASS', result['verification']['status'])
+
 
 if __name__ == '__main__':
     unittest.main()

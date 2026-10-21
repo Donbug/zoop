@@ -22,7 +22,7 @@ def helper(name):
 
 context = helper("briefing_market_context")
 base = context.base
-VERSION = "market-context-v2.4-outlook"
+VERSION = "market-context-v2.5-outlook"
 context.PROMPTS = context.PROMPTS.with_name(VERSION)
 
 
@@ -99,7 +99,7 @@ def prepare(args):
     cutoffs = [context.legacy._aware(x[0]["window"]["to"]) for x in chosen]
     context.require(cutoffs == sorted(set(cutoffs)), "outlook_chronological_rounds_required")
     requested = [r[0]["roundId"] for r in chosen]
-    if VERSION == context.ROLE_VERSION:
+    if VERSION in context.ROLE_VERSIONS:
         # A changed predecessor invalidates a retained paid successor's frozen context.
         # Include that successor instead of splicing old and new comparison histories.
         changed = set(requested)
@@ -136,7 +136,7 @@ def prepare(args):
             "maxRepairsPerRound": getattr(args, "max_repairs", 0),
             "plannedNewCalls": 2 * len(chosen), "roundIds": [r[0]["roundId"] for r in chosen],
             "coverage": coverage, "newProviderFetches": 0, "operationalCollectionGate": False}
-    if VERSION == context.ROLE_VERSION:
+    if VERSION in context.ROLE_VERSIONS:
         plan.update({"requestedRoundIds": requested,
             "dependencyRoundIds": [r[0]["roundId"] for r in chosen if r[0]["roundId"] not in requested],
             "maximumNewCalls": 2 * (1 + getattr(args, "max_repairs", 0)) * len(chosen),
@@ -265,8 +265,8 @@ def parser():
         p.add_argument("--" + flag, required=True)
     p.add_argument("--round", action="append", help="Chronological date-edition key; defaults to all available rounds")
     p.add_argument("--key-file")
-    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook"),
-                   help="Fresh CLI runs default to v2.4; select the original version to reuse an immutable old plan")
+    p.add_argument("--prompt-version", choices=("market-context-v2.1-outlook", "market-context-v2.2-outlook", "market-context-v2.3-outlook", "market-context-v2.4-outlook", "market-context-v2.5-outlook"),
+                   help="Fresh CLI runs default to v2.5; select the original version to reuse an immutable old plan")
     p.add_argument("--max-calls", type=base.bounded(1, 512), default=400)
     p.add_argument("--budget-approval-ref", help="Separate explicit human approval for a ceiling above the existing 400 calls")
     p.add_argument("--max-repairs", type=int, choices=(0, 1), default=0)

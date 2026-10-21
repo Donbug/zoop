@@ -18,7 +18,8 @@ def load(name, path):
     return value
 
 
-def create(directory, tampered_history=False, quality=False, continuation=False, role=False):
+def create(directory, tampered_history=False, quality=False, continuation=False, role=False, structure=False):
+    role = role or structure
     recovery = load("history_authored_recovery", ROOT / "api/scripts/briefing_recovery_fixture.py")
     presentation = load("history_authored_presentation", ROOT / "scripts/briefing_presentation_enrichment.py")
     market = load("history_authored_market", ROOT / "scripts/tests/test_briefing_market_data.py")
@@ -59,7 +60,7 @@ def create(directory, tampered_history=False, quality=False, continuation=False,
                 "--run-id", "authored-" + version.replace(".", "_"), "--max-calls", "400", "--max-repairs", "0",
                 "--execute-authorized-generation",
                 "--round", "2026-10-07-morning", "--round", "2026-10-07-evening"]
-            if version != runner.context.ROLE_VERSION:
+            if version not in runner.context.ROLE_VERSIONS:
                 arguments += ["--round", "2026-10-08-morning"]
             arguments += ["--round", "2026-10-08-evening"]
             args = runner.parser().parse_args(arguments)
@@ -94,7 +95,7 @@ def create(directory, tampered_history=False, quality=False, continuation=False,
                     else:
                         optional.append(claim)
                 answer.update(claims=optional, requiredClaims=slots)
-        version = runner.context.ROLE_VERSION if role else "market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook"
+        version = runner.context.STRUCTURE_VERSION if structure else runner.context.ROLE_VERSION if role else "market-context-v2.3-outlook" if quality else "market-context-v2.2-outlook"
         second = run(version, directory / "first", directory / "second", authored.ContextTransport(quality_answer if quality or role else None))
         if role:
             plan = base.strict_load(base.regular(directory / "second/outlook-plan.json"))
@@ -110,4 +111,4 @@ def create(directory, tampered_history=False, quality=False, continuation=False,
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv, "--role" in sys.argv))
+    print(create(Path(sys.argv[1]), "--tampered-history" in sys.argv, "--quality" in sys.argv, "--continuation" in sys.argv, "--role" in sys.argv, "--structure" in sys.argv))

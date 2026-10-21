@@ -69,3 +69,12 @@ v2.4는 사실의 독립 주장 단위와 비교/갱신의 요소 완전성을 �
 부분 회차 요청은 새 선행 결과로 입력이 바뀌는 후속 유료 회차를 포함한다. `requestedRoundIds`/`dependencyRoundIds`로 원요청과 추가 의존 회차를 구분한다. `plannedNewCalls`는 생성+검증 기본 수, `maximumNewCalls`는 `--max-repairs`를 포함한 상한이다. `minimumTotalReservations`, `maximumTotalReservations`, `additionalCeilingForMinimum/Maximum`은 기존 미응답까지 포함한 계획이며 승인 자체가 아니다. 미실행 계획은 현재 승인 상한이 부족해도 표시할 수 있지만 `--execute-authorized-generation`은 최소 예산 부족 시 어떤 호출/출력 생성도 하기 전에 거부한다.
 
 10/7 출근·퇴근 +10/8 퇴근 요청에는10/8 출근이 추가돼4개를 순서대로 다시 연결한다. 실제424/425 기록 기준 신규8~16, 총432~440이 필요하다. 현재는 보완 코드/합성 검증만 실행했으며 기존 실제v2.3의1PASS/3WITHHELD·화면·DB는 보존한다. 새 실제 문안이 나와 검증된 뒤 별도 실행/DB/비교 목록에 등록한다.
+
+
+## v2.5 역할 필드 제약과 부분 회차 재실행 기록
+
+새 CLI 기본은 v2.5다. 기존 완료 실행은 반드시 원래 prompt-version/plan/output으로 재사용한다. v2.4에서 드러난 forecast_update의 counterFactors/target/direction 오입력을 필수 역할별 schema로 제한한다. 필수 forecast는 지정 target/방향·근거·반대 요인이 필요하고, update/comparison에는 새 forecast용 target/direction/counterFactors를 허용하지 않는다. 의미 검증을 완화하지 않는다.
+
+440회 승인 범위 실제 실행: v2.4 4회차12회 후 v2.5의10/8 출근·퇴근4회를 별도 output에 보존했다. 최신4회차는2PASS/2WITHHELD이며 첫 실행3PASS/1WITHHELD도 조상으로 보존한다. 비교 도구는 새 품질flag와 raw requiredClaims의 반려 전망도 표시하고, 중간 실행의 실제 프론트가 없으면 --old-url/--new-url에 빈 문자열을 주어 다른 버전 화면으로 잘못 연결하지 않는다. 이전/중간/최신 문안·판정을 구분한다.
+
+부분 회차 실행 layer는 이전 회차의 영수증을 유지할 수 있다. 전체 신규 토큰은 초기 원장의 requestDigest 집합을 제외한 실제 신규 고유 영수증으로 집계하며, 각 proof의 layer 토큰 합을 신규 호출 토큰으로 단순 합산하지 않는다. 완료 기록 재사용에는 추가 모델 호출이 필요하지 않다.
