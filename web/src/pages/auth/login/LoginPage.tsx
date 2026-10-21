@@ -345,27 +345,31 @@ export default function LoginPage() {
         )}
 
         <div className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-3 text-[11px] text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
-            또는
-          </div>
-          <ul className="m-0 flex list-none justify-center gap-4 p-0">
-            {providers.map((provider) => (
-              <li key={provider.id}>
-                <a
-                  // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
-                  href={socialLoginUrl(provider.id, '/login')}
-                  aria-disabled={busy}
-                  aria-label={
-                    SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`
-                  }
-                  className={startCircle}
-                  onClick={(event) => busy && event.preventDefault()}
-                >
-                  <StartIcon id={provider.id} />
-                </a>
-              </li>
-            ))}
-          </ul>
+          {providers.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 text-[11px] text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
+                또는
+              </div>
+              <ul className="m-0 flex list-none justify-center gap-4 p-0">
+                {providers.map((provider) => (
+                  <li key={provider.id}>
+                    <a
+                      // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
+                      href={socialLoginUrl(provider.id, '/login')}
+                      aria-disabled={busy}
+                      aria-label={
+                        SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`
+                      }
+                      className={startCircle}
+                      onClick={(event) => busy && event.preventDefault()}
+                    >
+                      <StartIcon id={provider.id} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {guestError && (
             <p role="alert" className={authAlert}>
               비회원으로 시작하지 못했어요. 다시 시도해 주세요.
