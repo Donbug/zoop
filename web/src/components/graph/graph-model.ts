@@ -2,7 +2,7 @@ import type { GraphData } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
 import { isSelectableRelation } from '@/types/map/relation';
 import layouts from './figma-layout.json';
-import { companyLogo } from '@/util/company-logo';
+import { companyLogo, logoScale, logoBackground } from '@/util/company-logo';
 import { themeColor } from '@/util/theme-color';
 import { separateNodes, shortTitle } from './graph-geometry';
 
@@ -230,6 +230,7 @@ export function toG6Data(
       ];
       const dimmed = emphasizedNodes.size > 0 && !emphasizedNodes.has(n.id);
       const logo = company ? companyLogo(n.id, n.logoUrl) : null;
+      const iconSize = logo ? size * logoScale(logo) : size;
       return {
         id: n.id,
         type: company ? 'circle' : 'diamond',
@@ -238,7 +239,11 @@ export function toG6Data(
           x: x * sx,
           y: y * sy,
           size,
-          fill: company ? themeColor('paper') : themeColor('ink'),
+          fill: company
+            ? logo
+              ? logoBackground(logo)
+              : themeColor('paper')
+            : themeColor('ink'),
           stroke: themeColor('ink'),
           lineWidth: n.isFocus ? 1.4 : 0.667,
           halo: n.isFocus,
@@ -249,9 +254,9 @@ export function toG6Data(
           icon: company,
           iconSrc: logo ?? undefined,
           iconText: logo ? undefined : (p?.symbol ?? n.label.slice(0, 1)),
-          iconWidth: size,
-          iconHeight: size,
-          iconRadius: size / 2,
+          iconWidth: iconSize,
+          iconHeight: iconSize,
+          iconRadius: logoScale(logo) === 1 ? size / 2 : 0,
           iconFontSize: size * 0.34,
           iconFontFamily: 'Inter Variable',
           iconFontWeight: 700,
