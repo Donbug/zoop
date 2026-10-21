@@ -3517,7 +3517,7 @@ paths:
       tags:
         - "chat"
       summary: "대화와 질문 작업 조회"
-      description: "대화와 질문 작업 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "대화와 질문 작업 조회. 각 작업에 getQuestionJob과 같은 현재 근거 접근 권한 재확인을 적용한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "getConversation"
       parameters:
         -
@@ -3609,7 +3609,7 @@ paths:
       tags:
         - "chat"
       summary: "최신 대화 복원"
-      description: "최신 대화 복원.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "최신 대화 복원. 각 작업에 getQuestionJob과 같은 현재 근거 접근 권한 재확인을 적용한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "getCurrentConversation"
       responses:
         "200":
@@ -3689,7 +3689,7 @@ paths:
       tags:
         - "chat"
       summary: "질문 접수·맥락 고정·비동기 분석"
-      description: "최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다. 확인 질문 사슬은 루트 질문부터 최대 2회다. 확인 답에 대한 답(깊이 2) 작업도 대상·기간이 확정되면 정상 처리해 answered 등의 결과를 내고, 도구 장애는 failed다. 추가 확인이 필요할 때만 clarification 대신 대상·기간을 구체적으로 적은 새 질문을 안내하는 guidance로 끝난다. 확인 답은 루트 질문과 사슬의 답을 순서대로 합쳐 실행한다."
+      description: "최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다. 확인 질문 사슬은 루트 질문부터 최대 2회다. 확인 답에 대한 답(깊이 2) 작업도 대상·기간이 확정되면 정상 처리해 answered 등의 결과를 내고, 도구 장애는 failed다. 추가 확인이 필요할 때만 clarification 대신 대상·기간을 구체적으로 적은 새 질문을 안내하는 guidance로 끝난다. 확인 답은 루트 질문과 사슬의 답을 순서대로 합쳐 실행한다. Idempotency-Key 헤더는 본문 jobId와 같아야 하며 다르면 422 INVALID_REQUEST다. 선택한 근거 ID(contextIds·evidenceIds의 evidence)는 고정한 그래프 버전·asOf에서 공개 근거 조회(getEvidence)로 지금 읽을 수 있어야 하며(구조 관계 basis만 인용하는 근거 포함), 아니면 422 INVALID_REQUEST다."
       operationId: "submitQuestion"
       parameters:
         -
@@ -3830,7 +3830,7 @@ paths:
       tags:
         - "chat"
       summary: "질문 작업 상태·저장 결과 회수"
-      description: "질문 작업 상태·저장 결과 회수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "getQuestionJob"
       parameters:
         -
@@ -3927,7 +3927,7 @@ paths:
       tags:
         - "chat"
       summary: "허용된 실패만 같은 질문 작업 재시도"
-      description: "허용된 실패만 같은 질문 작업 재시도.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "허용된 실패만 같은 질문 작업 재시도. failed이고 ChatFailure.retry가 null이 아닐 때만 접수하며(아니면 409 JOB_NOT_RETRYABLE, 대화에 활성 작업이 있으면 409 JOB_IN_PROGRESS), 같은 작업에 이미 쓴 Idempotency-Key로 다시 보내면 새 실행 없이 현재 작업을 200으로 반환한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "retryQuestionJob"
       parameters:
         -
@@ -4040,7 +4040,7 @@ paths:
       tags:
         - "chat"
       summary: "질문 작업 명시적 취소"
-      description: "질문 작업 명시적 취소.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "질문 작업 명시적 취소. queued·running 작업만 cancelled로 바꾸고, 이미 끝난 작업은 상태를 바꾸지 않고 그대로 반환한다(취소된 것처럼 표시하지 않음).  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
       operationId: "cancelQuestionJob"
       parameters:
         -
@@ -10133,7 +10133,7 @@ components:
         answer:
           type: "string"
           maxLength: 12000
-          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다."
+          description: "표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 저장 결과와 달리 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob)."
         sections:
           items:
             "$ref": "#/components/schemas/ChatAnswerSection"

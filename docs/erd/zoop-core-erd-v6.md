@@ -352,7 +352,7 @@ id text PK; member_id text FK members; created_at timestamptz; updated_at timest
 
 ```text
 id text PK; session_id text FK chat_sessions; seq integer
-question text; request_hash text; asked_at timestamptz; frozen_context jsonb; context_company_ids text[]
+question text; request_hash text; asked_at timestamptz; frozen_context jsonb; frozen_selection jsonb; context_company_ids text[]
 graph_version_id text? FK graph_versions; status text; phase text?; outcome text?
 deadline_at timestamptz?
 resolves_job_id text? FK chat_jobs; resolves_choice_id text?; clarification_depth integer
@@ -373,11 +373,11 @@ CHECK(clarification_depth < 2 OR outcome IS DISTINCT FROM 'clarification')
 
 `resolves_job_id`/`resolves_choice_id`는 확인 질문(clarification)에 대한 답을 원 작업과 연결하며 API `ChatJob.resolves`(`ChatClarificationReply`)와 같은 값이다. 둘 다 최초 접수 때 고정하고 request_hash에 포함한다. 접수 트랜잭션에서 원 작업이 같은 session_id이고 status=completed·outcome=clarification인지, resolves_choice_id가 원 작업 `result.choices[].id`에 있는지 검사한다(JSON 항목 FK 대체). choice가 NULL이면 question이 자유 입력 답이다. 새 작업의 frozen_context·context_company_ids·graph_version_id는 요청 context가 아니라 원 작업에서 복사한다. 같은 원 작업에 여러 답 작업을 허용하므로 resolves_job_id에 UNIQUE를 두지 않고, 원 작업 조회용 인덱스 `(resolves_job_id) WHERE resolves_job_id IS NOT NULL`을 둔다. `clarification_depth`는 확인 질문 사슬 깊이다. 루트 질문은 0이고 확인 답은 접수 트랜잭션에서 원 작업 값 + 1로 고정하며 최대 2다. 깊이 2 작업은 `clarification` 결과를 저장할 수 없고 그 상황은 `guidance`로 끝낸다(정책 6.3.4절). API에는 노출하지 않는다.
 
-`chat_results`, `chat_citations`, `chat_attempts`를 합친다. result는 `ChatResult` 전체로 sections/citations/sources/applied/choices/action/limitations/metadata를 포함한다. SQL message_id는 result.messageId와 일치해야 한다. frozen_context는 최초 `ChatFrozenContext`로 불변이다. 같은 jobId로 다른 질문/요청이 오면 409. 세션 잠금으로 seq를 부여한다.
+`chat_results`, `chat_citations`, `chat_attempts`를 합친다. result는 `ChatResult` 전체로 sections/citations/sources/applied/choices/action/limitations/metadata를 포함한다. SQL message_id는 result.messageId와 일치해야 한다. frozen_context는 최초 `ChatFrozenContext`로 불변이다. frozen_selection은 공개 문맥이 표시하지 않는 범위를 재현하기 위한 내부 불변 값 `{contextIds, evidenceIds, evidencePool}`이다: 요청의 contextIds·evidenceIds를 그대로, evidencePool은 고정 그래프 버전에서 선택 대상이 가진 가시 근거(둘 다 오면 evidenceIds로 좁힌 결과)를 담는다. 확인 답 작업은 원 작업의 값을 복사한다. 저장된 문맥·결과는 반환할 때마다 현재 근거 접근 권한으로 다시 확인하며, 읽을 수 없는 내용은 응답에서만 가리고 저장 값은 바꾸지 않는다(OpenAPI getQuestionJob). 같은 jobId로 다른 질문/요청이 오면 409. 세션 잠금으로 seq를 부여한다.
 
 `route_summary`는 사용자에게 노출하지 않는 버전 고정 내부 계약이다. 명시적 `requirementId`, Q01~Q08 multi-label 결과, 논리 기능, 커버리지 판정, 선택·제외 이유, 계획 revision, 단계·체크포인트 선언과 판정 결과(관측 개수·잘림 여부·결정·중단 단계), 예약·사용 예산, `answerBasis`, 최종 계획·출력 검증 상태(결정론적 check ID별 결과, 의미 검증 호출 여부·전체 판정·hold로 제외한 요구)를 저장한다. claim별 Jev 분포와 원문 응답은 `ai_executions`의 영수증 artifact에 둔다. 자유 형식 추론 원문은 저장하지 않는다. `route_schema_version` 없이 값을 저장하지 않으며 완료 뒤에는 불변이다. 실패 작업은 마지막으로 확정된 단계까지만 저장하고 완료한 것처럼 채우지 않는다.
 
-attempts는 내부 스키마의 `{n, mode, ownerToken, recoveryKey, recoveryArtifactId, sourceAttemptNo, startedAt, finishedAt, status, failure}` 배열이다. n은 작업 안에서 유일하고 잠금 아래 증가시킨다. 새 생성 시도의 recoveryKey는 `chat/{jobId}/attempt/{n}/verified-result`처럼 작업+시도 번호로 결정하며 URI 경로 값은 안전하게 인코딩한다. 각 생성 시도의 키는 전역 유일하고 파일 덮어쓰기를 금지한다. DB 저장 전에 시도와 키를 먼저 커밋해 장애 뒤에도 찾을 수 있게 한다. job의 recovery_key/artifact는 현재 복구 대상 포인터이며 최초 실행 전 NULL이다.
+attempts는 내부 스키마의 `{n, mode, requestKey, queuedAt, ownerToken, recoveryKey, recoveryArtifactId, sourceAttemptNo, startedAt, finishedAt, status, failure}` 배열이다. 원소는 실행 요청을 접수할 때 만든다: 최초 접수는 `mode=run`·`requestKey`=jobId, 허용된 재시도는 `mode`=`ChatFailure.retry`·`requestKey`=그 요청의 Idempotency-Key이며 둘 다 `status=queued`로 시작한다. 같은 작업에서 이미 기록된 `requestKey`의 재시도는 새 원소를 만들지 않고 현재 작업을 반환한다. status는 queued/running/succeeded/failed/cancelled/unknown이고, 취소는 활성 원소를 cancelled로 닫는다. n은 작업 안에서 유일하고 잠금 아래 증가시킨다. 새 생성 시도의 recoveryKey는 `chat/{jobId}/attempt/{n}/verified-result`처럼 작업+시도 번호로 결정하며 URI 경로 값은 안전하게 인코딩한다. 각 생성 시도의 키는 전역 유일하고 파일 덮어쓰기를 금지한다. DB 저장 전에 시도와 키를 먼저 커밋해 장애 뒤에도 찾을 수 있게 한다. job의 recovery_key/artifact는 현재 복구 대상 포인터이며 최초 실행 전 NULL이다.
 
 save_only 시도는 sourceAttemptNo로 원래 검증된 산출물을 읽으며 같은 URI에 새 결과를 쓰지 않는다. rerun은 새 번호·새 키를 사용한다. 완료된 배열 원소는 불변, 활성 원소만 해당 토큰으로 종료한다. JSON 전체 교체는 행 잠금/조건부 UPDATE 경로에서만 허용한다. URI UNIQUE는 artifacts에서 보장하며 배열 내부 키·시도 중복도 저장 시 검증한다. AI 토큰·비용은 ai_executions로 집계한다.
 

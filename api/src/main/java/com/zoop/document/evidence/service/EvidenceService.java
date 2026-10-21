@@ -137,7 +137,7 @@ public class EvidenceService {
         Instant now = clock.instant();
         Instant pinnedAt = requestedAsOf;
         try {
-            return transaction.execute(status -> dispatch(id, graphVersion, pinnedAt, companyId, requestId, now));
+            return transaction.execute(status -> dispatch(id, graphVersion, pinnedAt, companyId, requestId, now, false));
         } catch (DataAccessException | TransactionException error) {
             log.warn("Evidence read failed in the database (cause={}, requestId={})", error.getClass().getSimpleName(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
@@ -150,17 +150,36 @@ public class EvidenceService {
      * have no pinned form: a graph version or as-of is refused before the S1 registry is read.
      */
     private EvidenceResponse dispatch(String id, String graphVersion, Instant asOf, String companyId, String requestId,
-            Instant now) {
+            Instant now, boolean pinGraphOnly) {
         EvidenceView row = evidence.findEvidence(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
         ArtifactRow verification = row.verificationArtifactId() == null ? null
                 : registry.findArtifact(row.verificationArtifactId()).orElse(null);
         if (verification != null && GRAPH_RECEIPT.equals(verification.kind())) {
             return serveGraph(row, graphVersion, asOf, companyId, requestId, now);
         }
-        if (graphVersion != null || asOf != null) {
+        if (!pinGraphOnly && (graphVersion != null || asOf != null)) {
             throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
         }
         return serve(row, companyId, requestId, now, grants.registry(requestId));
+    }
+
+    /**
+     * Whether a citation is readable right now under exactly the gates of {@link #read}, for stored chat results that must be
+     * re-checked every time they are returned: a graph citation at the given pinned version and as-of, an S1 citation
+     * unpinned (it has no pinned form). A denial, an unknown id and an unverifiable state (registry or store unreadable) are
+     * all "not readable"; denials are logged with the request id as in a read. It never writes.
+     */
+    public boolean readable(String id, String graphVersion, Instant asOf, String requestId) {
+        if (id == null || !EVIDENCE_ID.matcher(id).matches()) {
+            return false;
+        }
+        Instant now = clock.instant();
+        try {
+            transaction.execute(status -> dispatch(id, graphVersion, asOf, null, requestId, now, true));
+            return true;
+        } catch (CustomException | DataAccessException | TransactionException notReadable) {
+            return false;
+        }
     }
 
     private EvidenceResponse serve(EvidenceView row, String companyId, String requestId, Instant now, GrantRegistry current) {
