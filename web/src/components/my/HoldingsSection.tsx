@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import ErrorNotice from '@/components/common/ErrorNotice';
 import StockRow from '@/components/my/StockRow';
@@ -11,6 +11,7 @@ import {
 } from '@/util/format';
 import type { HoldingsSectionProps } from '@/types/my';
 import type { Holding, Portfolio } from '@/types/portfolio';
+import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
 const DISCONNECTED: Portfolio = {
   connected: false,
@@ -44,6 +45,13 @@ export default function HoldingsSection({
   portfolio,
   onConnect,
 }: HoldingsSectionProps) {
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectFailed, setDisconnectFailed] = useState(false);
@@ -57,17 +65,23 @@ export default function HoldingsSection({
 
   const disconnect = async () => {
     if (!connection || disconnecting) return;
+    const ownerId = selectMemberId(useAuthStore.getState());
+    const current = () =>
+      active.current && selectMemberId(useAuthStore.getState()) === ownerId;
     setDisconnecting(true);
     setDisconnectFailed(false);
     try {
       await disconnectPortfolio(connection.id);
+      if (!current()) return;
       portfolio.setData(DISCONNECTED);
       setConfirming(false);
     } catch {
+      if (!current()) return;
       setDisconnectFailed(true);
       // 다른 탭에서 이미 끊었으면(404 등) 다시 시도해도 계속 실패하므로 연결 상태를 다시 확인한다.
       try {
         const latest = await getPortfolio();
+        if (!current()) return;
         if (!latest.connected) {
           portfolio.setData(latest);
           closeConfirm();
@@ -76,7 +90,7 @@ export default function HoldingsSection({
         // 확인도 실패하면 기존 연결·보유를 그대로 두고 다시 시도를 안내한다.
       }
     } finally {
-      setDisconnecting(false);
+      if (current()) setDisconnecting(false);
     }
   };
 
