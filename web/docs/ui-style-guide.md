@@ -93,3 +93,11 @@ import { BUTTON, TD, TH, count } from '@/components/admin/common/adminStyles';
 ## Graph feature port
 
 D-GRP-01/01b uses `graph-view` for member/mode-scoped state and legend keys. G6 supplies the conditional desktop minimap. Saved zoom/pan is reused only when the map size is unchanged; otherwise the default layout opens. `MapDetailSheet` owns M-GRP-01 modal snaps and focus return; `IsolatedIssuesPanel` reuses the detail panel tokens.
+
+## Map appearance and graph filtering
+
+D-GRP-01/01b MapPage provides the approved light/dark GraphAppearanceContext and applies `mapAppearanceStyles` from `@/components/common/map-appearance-styles`. Its shared `graphTypography` recipe layers map-specific readability over `panelStyles`, including D-GRP-02/03/04/05. Other service pages keep the existing panel baseline. MapDetailSheet passes the same recipe across its mobile portal boundary. Explicit appearance overrides support local comparisons; normal routes need none.
+
+Render one GraphLegend group in the top toolbar using the GraphCanvas portal slot. Preserve its member/mode-scoped visibility state, aria-pressed, relationship explanations, camera, selection and at least one visible node kind. The left legend was removed by user request. Let toolbar items scroll horizontally without shrinking or creating vertical clipping.
+
+Company logos use `CompanyLogo`, `logoScale` and `logoBackground` from the shared logo utility. Background marks with checked safe margins fill the circle; other symbols fit the inscribed square (68% diameter) and use object-contain. Preserve brand colors and the Micron/Amazon backgrounds across themes. See [graph UI improvements](GRAPH_UI_IMPROVEMENTS.md) for asset provenance, verification and scope.

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { logoScale, logoBackground } from '@/util/company-logo';
 
 type CompanyLogoProps = {
   name: string;
@@ -15,16 +16,21 @@ export default function CompanyLogo({
 }: CompanyLogoProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showLogo = Boolean(logoUrl) && failedUrl !== logoUrl;
+  const background = showLogo ? logoBackground(logoUrl) : null;
   return (
     <span
       aria-hidden="true"
-      className={`grid shrink-0 place-items-center overflow-hidden ${className}`}
+      className={`grid shrink-0 place-items-center overflow-hidden ${className} ${background === '#000000' ? 'bg-black!' : background === '#232f3e' ? 'bg-[#232f3e]!' : ''}`}
     >
       {showLogo ? (
         <img
           src={logoUrl!}
           alt=""
-          className="size-full object-cover"
+          className={
+            logoScale(logoUrl) === 1
+              ? 'size-full object-contain'
+              : 'size-[68%] object-contain'
+          }
           onError={() => setFailedUrl(logoUrl!)}
         />
       ) : (

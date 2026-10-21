@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { GraphData } from '@antv/g6';
+import { MemoryRouter } from 'react-router-dom';
+import MapPage from '@/pages/map/MapPage';
+import * as graphApi from '@/apis/graph/graph';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -85,6 +89,42 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it.each(['light', 'dark'] as const)(
+    'D-GRP-01 uses the approved appearance on the normal %s map route',
+    async (theme) => {
+      document.documentElement.dataset.theme = theme;
+      useAuthStore.setState({ status: 'ready', member: null, session: null });
+      vi.spyOn(graphApi, 'getGraph').mockResolvedValue(
+        createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      );
+      const { unmount } = render(
+        <MemoryRouter initialEntries={['/?mode=all']}>
+          <MapPage />
+        </MemoryRouter>,
+      );
+      try {
+        await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+        const rendered = canvas.setData.mock.lastCall![0] as GraphData;
+        const direct = rendered.edges?.find(
+          (edge) => !edge.style?.lineDash && !edge.style?.endArrow,
+        );
+        expect(direct?.style?.lineWidth).toBe(1.5);
+        expect(direct?.style?.stroke).toBe(
+          theme === 'dark' ? '#c4c9d1' : '#606a76',
+        );
+        const label = rendered.nodes?.find(
+          (node) => node.id === 'NASDAQ:NVDA',
+        )?.style;
+        expect(Number(label?.labelFontSize)).toBeGreaterThan(17.2);
+        const filters = screen.getByRole('group', { name: '그래프 표시 필터' });
+        expect(filters.closest('.relationship-toolbar')).toBeTruthy();
+        expect(screen.queryByLabelText('그래프 범례')).toBeNull();
+      } finally {
+        unmount();
+        delete document.documentElement.dataset.theme;
+      }
+    },
+  );
   it('shows the full API issue title on hover and clears it on leave', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const issue = data.nodes.find((node) => node.kind === 'issue')!;
@@ -102,7 +142,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
-  it('fits the graph inside a measured legend-free region without recreating it', async () => {
+  it('fits the graph around remaining overlays without recreating it', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
@@ -111,7 +151,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       clientWidth: { value: 1200, configurable: true },
       clientHeight: { value: 800, configurable: true },
     });
-    const legend = screen.getByLabelText('그래프 범례');
+    const legend = screen.getByLabelText('지도 확대 조절');
     const box = {
       x: 20,
       y: 16,
@@ -178,15 +218,59 @@ describe('D-GRP-02 · canvas selection bridge', () => {
   it('explains each legend item in its tooltip', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
-    const shared = await screen.findByRole('button', { name: /^■ 사건 공유/ });
+    const shared = await screen.findByRole('button', { name: /^사건 공유/ });
     expect(shared.getAttribute('title')).toContain(
       '같은 사건에 각각 직접 또는 구조적으로 연결',
     );
     expect(
-      screen
-        .getByRole('button', { name: /^■ 후속 사건/ })
-        .getAttribute('title'),
+      screen.getByRole('button', { name: /^후속 사건/ }).getAttribute('title'),
     ).toContain('앞 사건 다음에');
+  });
+  it('D-GRP-01 moves the only filter group to the toolbar and toggles actual edges without moving the camera', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const toolbar = document.createElement('header');
+    document.body.append(toolbar);
+    const { unmount } = render(
+      <GraphCanvas data={data} filterHost={toolbar} />,
+    );
+    try {
+      await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+      expect(
+        screen.getAllByRole('group', { name: '그래프 표시 필터' }),
+      ).toHaveLength(1);
+      const button = screen.getByRole('button', { name: /^사건 공유 \d/ });
+      expect(toolbar.contains(button)).toBe(true);
+      expect(
+        screen.getByTestId('graph-canvas').querySelector('aside'),
+      ).toBeNull();
+      canvas.zoomTo.mockClear();
+      canvas.translateBy.mockClear();
+      await userEvent.click(button);
+      await waitFor(() =>
+        expect(button.getAttribute('aria-pressed')).toBe('false'),
+      );
+      await waitFor(() =>
+        expect(
+          (canvas.setData.mock.lastCall![0] as GraphData).edges
+            ?.filter(
+              (edge) =>
+                data.edges.find((item) => item.id === edge.id)?.relationType ===
+                'SHARES_ISSUE',
+            )
+            .every((edge) => edge.style?.visibility === 'hidden'),
+        ).toBe(true),
+      );
+      expect(canvas.created).toHaveBeenCalledOnce();
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      await userEvent.click(button);
+      await waitFor(() =>
+        expect(button.getAttribute('aria-pressed')).toBe('true'),
+      );
+    } finally {
+      unmount();
+      toolbar.remove();
+    }
   });
   it('ports legend filters without moving nodes and keeps at least one node kind visible', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -195,7 +279,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const before = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
       (node) => node.id === 'NASDAQ:NVDA',
     )?.style;
-    await userEvent.click(screen.getByRole('button', { name: /■ 기업/ }));
+    await userEvent.click(screen.getByRole('button', { name: /기업 \d/ }));
     await waitFor(() =>
       expect(
         (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
@@ -204,7 +288,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       ).toBe('hidden'),
     );
     expect(
-      (screen.getByRole('button', { name: /■ 사건 \d/ }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: /^사건 \d+$/ }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
     const after = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
@@ -316,7 +400,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     });
     expect(canvas.setSize).not.toHaveBeenCalled();
   });
-  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches and an semi-transparent legend', async () => {
+  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches without the old left legend', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const personal = createMockGraph({
       mode: 'personal',
@@ -328,9 +412,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const host = screen.getByRole('img');
     expect(host.className).toContain('absolute!');
     expect(host.className).toContain('inset-0');
-    expect(screen.getByLabelText('그래프 범례').className).toContain(
-      'bg-zoop-map/60',
-    );
+    expect(screen.queryByLabelText('그래프 범례')).toBeNull();
     rerender(<GraphCanvas data={personal} />);
     await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));
     rerender(<GraphCanvas data={all} />);
@@ -338,18 +420,18 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(screen.getByRole('img').className).toContain('absolute!');
     expect(canvas.destroyed).toHaveBeenCalledTimes(2);
   });
-  it('D-GRP-01 keeps the market title when a company is selected and omits the frame number', () => {
+  it('D-GRP-01 removes the duplicate left title and retains the map accessible name', () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const { rerender } = render(
       <GraphCanvas data={data} selectedId="KRX:005930" />,
     );
     expect(
-      screen.getByRole('heading', { name: '시장 전체 지도' }),
+      screen.getByRole('img', { name: /시장 전체 관계 지도/ }),
     ).toBeTruthy();
     expect(screen.queryByText('(01)')).toBeNull();
     rerender(<GraphCanvas data={data} selectedId="NASDAQ:NVDA" />);
     expect(
-      screen.getByRole('heading', { name: '시장 전체 지도' }),
+      screen.getByRole('img', { name: /시장 전체 관계 지도/ }),
     ).toBeTruthy();
   });
   it('D-GRP-01 hover emphasizes incident nodes/edges without selecting or redrawing the viewport', async () => {

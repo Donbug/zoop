@@ -1,4 +1,12 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  GraphAppearanceContext,
+  defaultAppearance,
+  appearanceColors,
+  styleGraph,
+} from './graph-appearance';
+import { createPortal } from 'react-dom';
+import GraphLegend from './GraphLegend';
 import { themeColor } from '@/util/theme-color';
 import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
@@ -16,21 +24,6 @@ import {
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
-/** 범례 항목에 마우스를 올리면 보이는 설명(D-GRP-01). 연결선 정의는 openapi 관계 유형을 따른다. */
-const LEGEND_HELP: Record<LegendKey, string> = {
-  company: '기업 노드입니다. 원 크기는 연결된 사건 수(활동량)를 나타냅니다.',
-  issue:
-    '사건 노드입니다. 공시·기사에서 확인된 사건이며 여러 기업이 함께 연결될 수 있습니다.',
-  INVOLVES:
-    '직접 관련: 기업이 사건의 당사자입니다. 계약 당사자나 공시 주체처럼 기사·공시에 행위자로 나옵니다.',
-  STRUCTURALLY_RELATED_TO:
-    '구조적 관련: 사건의 당사자는 아니지만 공급망·지분·고객 관계 같은 구조로 영향이 닿는 기업입니다. 관계에 유효 기간이 있을 수 있습니다.',
-  SHARES_ISSUE:
-    '사건 공유: 두 기업이 같은 사건에 각각 직접 또는 구조적으로 연결되어 있을 때 그리는 선입니다. 두 기업 사이의 관계를 기사가 따로 말한 것은 아니며, 근거는 공유한 사건의 근거를 따릅니다.',
-  FOLLOWS:
-    '후속 사건: 앞 사건 다음에 이어서 일어난 사건을 잇는 선입니다. 뒤 사건이 아직 일어나지 않았으면 나타나지 않습니다.',
-};
-
 export default function GraphCanvas({
   data,
   selectedId: selected = null,
@@ -44,8 +37,11 @@ export default function GraphCanvas({
   memoryOwner = 'public',
   onOpenIsolated,
   centerRequest = null,
+  filterHost,
 }: {
   data: GraphResponse;
+  /** Render the one legend in the map toolbar, sharing this canvas visibility state. */
+  filterHost?: HTMLElement | null;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
@@ -59,6 +55,8 @@ export default function GraphCanvas({
   /** 내 종목 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
   centerRequest?: { id: string; seq: number } | null;
 }) {
+  const appearance = useContext(GraphAppearanceContext) ?? defaultAppearance;
+  const colors = appearanceColors(appearance);
   const viewKey = `${memoryOwner}:${data.metadata.mode}`;
   const [viewState, setViewState] = useState(() => ({
     key: viewKey,
@@ -236,7 +234,7 @@ export default function GraphCanvas({
     const root = host.parentElement;
     const overlays = [
       ...(root?.querySelectorAll<HTMLElement>(
-        '.relationship-legend,.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview',
+        '.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview',
       ) ?? []),
       ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
     ];
@@ -335,21 +333,24 @@ export default function GraphCanvas({
     drawing.current = drawing.current
       .then(async () => {
         if (graph.destroyed) return;
-        const rendered = toG6Data(
-          data,
-          host.clientWidth,
-          host.clientHeight,
-          selected ?? focusId,
-          data.edges
-            .filter((edge) => highlightedEdgeIds.includes(edge.id))
-            .flatMap((edge) => [edge.source, edge.target]),
-          connectionPath && highlightedEdgeIds.length
-            ? new Set(
-                data.edges
-                  .filter((e) => highlightedEdgeIds.includes(e.id))
-                  .flatMap((e) => [e.source, e.target]),
-              )
-            : focusedNodes,
+        const rendered = styleGraph(
+          toG6Data(
+            data,
+            host.clientWidth,
+            host.clientHeight,
+            selected ?? focusId,
+            data.edges
+              .filter((edge) => highlightedEdgeIds.includes(edge.id))
+              .flatMap((edge) => [edge.source, edge.target]),
+            connectionPath && highlightedEdgeIds.length
+              ? new Set(
+                  data.edges
+                    .filter((e) => highlightedEdgeIds.includes(e.id))
+                    .flatMap((e) => [e.source, e.target]),
+                )
+              : focusedNodes,
+          ),
+          appearance,
         );
         rendered.edges = rendered.edges?.map((edge) =>
           highlightedEdgeIds.includes(String(edge.id))
@@ -357,7 +358,11 @@ export default function GraphCanvas({
                 ...edge,
                 style: {
                   ...edge.style,
-                  stroke: connectionPath ? themeColor('ink') : '#b75b00',
+                  stroke: connectionPath
+                    ? appearance.variant === 'improved'
+                      ? colors.selected
+                      : themeColor('ink')
+                    : '#b75b00',
                   strokeOpacity: 1,
                   lineWidth: connectionPath ? 2 : 4,
                 },
@@ -551,20 +556,29 @@ export default function GraphCanvas({
         width: host.clientWidth,
         height: host.clientHeight,
         animation: false,
-        data: toG6Data(data, host.clientWidth, host.clientHeight),
+        data: styleGraph(
+          toG6Data(data, host.clientWidth, host.clientHeight),
+          appearance,
+        ),
         behaviors: ['drag-canvas', 'zoom-canvas'],
         zoomRange: [0.01, 4],
         edge: {
           state: {
             related: {
-              lineWidth: 2,
-              stroke: themeColor('ink'),
+              lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+              stroke:
+                appearance.variant === 'improved'
+                  ? colors.selected
+                  : themeColor('ink'),
               strokeOpacity: 1,
             },
             inactive: { strokeOpacity: 0.2 },
             selected: {
-              lineWidth: 2,
-              stroke: themeColor('ink'),
+              lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+              stroke:
+                appearance.variant === 'improved'
+                  ? colors.selected
+                  : themeColor('ink'),
               strokeOpacity: 1,
             },
           },
@@ -626,7 +640,9 @@ export default function GraphCanvas({
       const saved = readModeEntry(memoryOwner, graphMode)?.view.camera;
       // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 화면에 맞춰 연다.
       const camera =
-        saved && sameViewport(saved.size, host.clientWidth, host.clientHeight)
+        !appearance.preview &&
+        saved &&
+        sameViewport(saved.size, host.clientWidth, host.clientHeight)
           ? saved
           : null;
       followFit.current = !camera;
@@ -671,8 +687,6 @@ export default function GraphCanvas({
         });
       });
       observer.observe(host);
-      const legend = host.parentElement?.querySelector('.relationship-legend');
-      if (legend) observer.observe(legend);
     }
     void mount().catch(() => {
       if (!disposed) setRenderError(true);
@@ -691,7 +705,7 @@ export default function GraphCanvas({
       graph?.destroy();
       instance.current = null;
     };
-  }, [data, retry, memoryOwner]);
+  }, [data, retry, memoryOwner, appearance, colors.selected]);
   async function control(action: 'in' | 'out' | 'fit') {
     const graph = instance.current;
     if (!graph || graph.destroyed) return;
@@ -736,65 +750,20 @@ export default function GraphCanvas({
           {hoveredIssue}
         </p>
       )}
-      {!focusId && (
-        <aside
-          className="relationship-legend z-10 bg-zoop-map/60 pb-3"
-          aria-label="그래프 범례"
-        >
-          <div className="relationship-title">
-            <h1>{personal ? '내 종목 지도' : '시장 전체 지도'}</h1>
-          </div>
-          <p className="relationship-subtitle">
-            (RELATIONSHIP MAP) · 기업·사건 관계
-          </p>
-          <p className="relationship-meta">
-            {stats.company} COMPANIES · {stats.sharedIssues} SHARED EVENTS
-          </p>
-          <div className="mt-3 border-t border-zoop-line pt-2">
-            <h2 className="mb-2 text-[10px] tracking-widest">
-              LEGEND · 표시 필터
-            </h2>
-            <div className="grid grid-cols-2 gap-1">
-              {(
-                [
-                  ['company', '기업'],
-                  ['issue', '사건'],
-                  ['INVOLVES', '직접 관련'],
-                  ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
-                  ['FOLLOWS', '후속 사건'],
-                  ['SHARES_ISSUE', '사건 공유'],
-                ] as [LegendKey, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="pointer-events-auto rounded border border-zoop-line px-1 py-1 text-left text-[10px] aria-pressed:bg-white aria-pressed:font-bold focus-visible:outline-2"
-                  aria-pressed={!view.hidden.includes(key)}
-                  title={LEGEND_HELP[key]}
-                  aria-description={LEGEND_HELP[key]}
-                  disabled={
-                    (key === 'company' || key === 'issue') &&
-                    !view.hidden.includes(key) &&
-                    view.hidden.includes(
-                      key === 'company' ? 'issue' : 'company',
-                    )
-                  }
-                  onClick={() => toggleKind(key)}
-                >
-                  {view.hidden.includes(key) ? '□' : '■'} {label}{' '}
-                  {key === 'company'
-                    ? stats.company
-                    : key === 'issue'
-                      ? stats.issue
-                      : data.edges.filter((edge) => edge.relationType === key)
-                          .length}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[10px]">○ 기업 · ◆ 사건 · 크기=활동</p>
-          </div>
-        </aside>
-      )}
+      {filterHost ? (
+        createPortal(
+          <GraphLegend
+            data={data}
+            hidden={view.hidden}
+            onToggle={toggleKind}
+          />,
+          filterHost,
+        )
+      ) : filterHost === undefined ? (
+        <div className="absolute top-2 right-2 left-2 z-10 overflow-x-auto bg-zoop-paper p-1">
+          <GraphLegend data={data} hidden={view.hidden} onToggle={toggleKind} />
+        </div>
+      ) : null}
       {stats.disconnected > 0 && !view.hidden.includes('issue') && (
         <button
           type="button"
