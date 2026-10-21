@@ -49,7 +49,25 @@ public final class BriefingHttpSchemas {
     public record CompanyOutlook(String companyId, String companyName, List<String> issueIds, List<CompanyStatement> facts,
             @Schema(allowableValues = {"positive", "negative", "mixed", "watch"}) String assessment,
             CompanyStatement impact, CompanyStatement outlook, List<CompanyStatement> conditions, List<CompanyStatement> risks,
-            CompanyComparison comparison, JsonNode previous, JsonNode observedMovement, List<CompanyOutlookSource> sources) { }
+            CompanyComparison comparison, JsonNode previous, JsonNode observedMovement, List<CompanyOutlookSource> sources,
+            CompanyShortReading reading, CompanyPrice price) { }
+
+    @Schema(name = "CompanyShortReading", requiredProperties = {"status", "resultVersion"},
+            description = "검증된 전문과 별도로 생성·검증한 짧은 읽기입니다. PASS일 때만 세 문장을 제공합니다.")
+    public record CompanyShortReading(@Schema(allowableValues = {"PASS", "WITHHELD"}) String status, String resultVersion,
+            CompanyStatement brief, CompanyStatement watch, CompanyStatement change) { }
+    @Schema(name = "CompanyPricePoint", requiredProperties = {"value", "observedAt", "sessionDate", "kind"})
+    public record CompanyPricePoint(String value, Instant observedAt, LocalDate sessionDate,
+            @Schema(allowableValues = {"five_minute_close", "daily_close"}) String kind) { }
+    @Schema(name = "CompanyPriceSource", requiredProperties = {"companyId", "interval", "url", "httpStatus", "sha256", "bytes", "collectedAt"})
+    public record CompanyPriceSource(String companyId, String interval, String url, int httpStatus, String sha256, long bytes, Instant collectedAt) { }
+    @Schema(name = "CompanyPrice", requiredProperties = {"companyId", "cutoff", "currency", "exchangeTimezone", "source", "official", "note", "sources", "status", "reason", "latest", "baseline", "comparisonStatus", "change", "changeRate"},
+            description = "회차 마감 전 완료된 정규장 관측값입니다. 출근은 전일 종가 대비, 퇴근은 같은 날 09:20 기준 대비이며 전망 적중률이 아닙니다.")
+    public record CompanyPrice(String companyId, Instant cutoff, String currency, String exchangeTimezone, String source,
+            boolean official, String note, List<CompanyPriceSource> sources, String status,
+            @Schema(nullable = true) String reason, @Schema(nullable = true) CompanyPricePoint latest,
+            @Schema(nullable = true) CompanyPricePoint baseline, String baselineKind, String comparisonStatus,
+            @Schema(nullable = true) String change, @Schema(nullable = true) String changeRate) { }
 
     @Schema(name = "BriefingRoundsResponse", requiredProperties = {"items", "nextCursor"})
     public record BriefingRoundsResponse(List<BriefingRoundRef> items, @Schema(nullable = true) String nextCursor) { }

@@ -511,6 +511,11 @@ public final class BriefingReplayImporter {
             StrictJson.Obj companyLayer = presentation.root().has("companyOutlookLayer") ? presentation.root().object("companyOutlookLayer") : null;
             Map<String, StrictJson.Obj> companyRows = companyLayer == null ? Map.of() : BriefingCompanyOutlookRules.rows(companyLayer);
             Map<String, JsonNode> companyReceipts = companyLayer == null ? Map.of() : simulationReceiptLedger(companyLayer.objects("receipts"));
+            StrictJson.Obj readingLayer = presentation.root().has("companyReadingLayer") ? presentation.root().object("companyReadingLayer") : null;
+            Map<String, StrictJson.Obj> readingRows = readingLayer == null ? Map.of() : BriefingCompanyReadingRules.rows(readingLayer);
+            Map<String, JsonNode> readingReceipts = readingLayer == null ? Map.of() : simulationReceiptLedger(readingLayer.objects("receipts"));
+            require(companyRows.keySet().containsAll(readingRows.keySet()), "reading_company_rounds");
+            Set<String> readingOwned = new HashSet<>();
             List<Map<String, StrictJson.Obj>> priorCompanyRows = new ArrayList<>(); List<List<StrictJson.Obj>> priorCompanyHistory = new ArrayList<>();
             if (companyLayer != null && companyLayer.has("previousRuns")) {
                 require(companyLayer.objects("previousRuns").size() <= 2, "company_outlook_history_limit");
@@ -607,6 +612,19 @@ public final class BriefingReplayImporter {
                     }
                     if (companyGenerated.isAfter(created)) created = companyGenerated;
                     blobs.put(namespace + "-company-" + enriched.size(), blob("briefing_input", StrictJson.write(company.node())));
+                    if (readingRows.containsKey(base.id())) {
+                        StrictJson.Obj reading = readingRows.get(base.id());
+                        BriefingCompanyReadingRules.apply(reading, company, (ObjectNode) snapshot.path("companyOutlooks"),
+                                readingReceipts, readingOwned, settings.bundle().getParent());
+                        Instant finished = Instant.parse(reading.string("generatedAt"));
+                        if (finished.isAfter(generated)) { generated = finished; payload.put("generatedAt", generated.toString()); }
+                        if (finished.isAfter(publishedAt)) publishedAt = finished;
+                        if (finished.isAfter(created)) created = finished;
+                        blobs.put(namespace + "-company-reading-" + enriched.size(), blob("briefing_input", StrictJson.write(reading.node())));
+                        for (String cid : reading.object("prices").node().propertyNames())
+                            for (StrictJson.Obj source : reading.object("prices").object(cid).objects("sources"))
+                                blobs.put(namespace + "-company-price-" + source.string("sha256"), blob("raw_document", BriefingCompanyPriceRules.raw(source, settings.bundle().getParent())));
+                    }
                 }
                 ObjectNode lineage = snapshot.putObject("presentationEnrichment").put("schemaVersion", BriefingPresentationRules.SCHEMA)
                         .put("baseBundleSha256", presentation.root().string("baseBundleSha256")).put("baseResultSha256", record.string("baseResultSha256"));
@@ -619,6 +637,8 @@ public final class BriefingReplayImporter {
             for (StrictJson.Obj market : validatedMarkets) if (market.has("marketContext")) BriefingMarketContextRules.previous(market, validatedMarkets);
             require(accountedMarket.equals(layerReceipts.keySet()), "presentation_unowned_receipt");
             require(companyOwned.equals(companyReceipts.keySet()), "company_outlook_unowned_receipts");
+            require(readingOwned.equals(readingReceipts.keySet()), "company_reading_unowned_receipts");
+            for (var receipt : readingReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_reading_duplicate_receipt");
             for (var receipt : companyReceipts.entrySet()) require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "company_outlook_duplicate_receipts");
             for (var receipt : layerReceipts.entrySet()) {
                 JsonNode oldReceipt = allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue());

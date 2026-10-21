@@ -72,8 +72,151 @@ describe('D-BRF-01·02 company outlook', () => {
       screen.getAllByRole('link', { hidden: true })[0].getAttribute('href'),
     ).toBe('https://example.com/source');
     expect(
-      screen.getByText(/가격 흐름·예측 적중 여부는 평가하지 않았습니다/),
+      screen.getByText(/회차 마감까지 확인된 기업 시세가 없습니다/),
     ).toBeTruthy();
+  });
+  it('shows newly condensed text and keeps the entire original behind details', () => {
+    const company = {
+      ...layer.companies[0],
+      reading: {
+        status: 'PASS' as const,
+        resultVersion: 'reading',
+        brief: {
+          text: '사업 기회는 있으나 공급 이행이 관건입니다.',
+          evidenceIds: ['e'],
+        },
+        watch: { text: '공급 규모를 확인하세요.', evidenceIds: ['e'] },
+        change: { text: '이전 판단 없음', evidenceIds: ['e'] },
+      },
+    };
+    const { rerender } = render(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: { ...layer, companies: [company] },
+        }}
+        compact
+      />,
+    );
+    expect(screen.getByLabelText('합성 기업 짧은 읽기').textContent).toContain(
+      '사업 기회는 있으나',
+    );
+    const detail = screen
+      .getByText('자세히 · 기업 전망 전문과 근거')
+      .closest('details')!;
+    expect(detail.open).toBe(false);
+    expect(detail.textContent).toContain(statement.text);
+    rerender(<CompanyOutlooks result={result} compact={false} />);
+    expect(
+      screen.getByText('자세히 · 기업 전망 전문과 근거').closest('details')!
+        .open,
+    ).toBe(true);
+  });
+  it('does not replace an unavailable short reading with the full paragraph', () => {
+    render(<CompanyOutlooks result={result} compact />);
+    expect(screen.getByText(/검증된 짧은 요약이 없습니다/)).toBeTruthy();
+    expect(
+      screen.getByText('자세히 · 기업 전망 전문과 근거').closest('details')!
+        .open,
+    ).toBe(false);
+  });
+  it('shows a same-day morning price comparison and guards the round cutoff', () => {
+    const price = {
+      companyId: 'KRX:TEST',
+      cutoff: layer.cutoff,
+      currency: 'KRW' as const,
+      exchangeTimezone: 'Asia/Seoul',
+      source: 'Yahoo Finance',
+      official: false,
+      note: '합성 과거 이력',
+      sources: [],
+      status: 'available' as const,
+      reason: null,
+      latest: {
+        value: '262000.00',
+        observedAt: '2026-10-08T00:20:00Z',
+        sessionDate: '2026-10-08',
+        kind: 'five_minute_close' as const,
+      },
+      baseline: {
+        value: '268500.00',
+        observedAt: '2026-10-08T00:15:00Z',
+        sessionDate: '2026-10-08',
+        kind: 'five_minute_close' as const,
+      },
+      baselineKind: 'morning_cutoff' as const,
+      comparisonStatus: 'available' as const,
+      change: '-6500.00',
+      changeRate: '-2.42',
+    };
+    const resultWithPrice = {
+      ...result,
+      companyOutlooks: {
+        ...layer,
+        companies: [{ ...layer.companies[0], price }],
+      },
+    };
+    const { rerender } = render(
+      <CompanyOutlooks result={resultWithPrice} compact />,
+    );
+    expect(screen.getByText(/아침 268,500원 → 262,000원/)).toBeTruthy();
+    expect(screen.getByText(/아침 기준 대비/)).toBeTruthy();
+    rerender(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: {
+            ...layer,
+            companies: [
+              {
+                ...layer.companies[0],
+                price: { ...price, cutoff: '2026-10-09T00:20:00Z' },
+              },
+            ],
+          },
+        }}
+        compact
+      />,
+    );
+    expect(screen.queryByText(/아침 268,500원 → 262,000원/)).toBeNull();
+  });
+  it('does not claim zero return when no US session has occurred', () => {
+    const company = {
+      ...layer.companies[0],
+      price: {
+        companyId: 'KRX:TEST',
+        cutoff: layer.cutoff,
+        currency: 'USD' as const,
+        exchangeTimezone: 'America/New_York',
+        source: 'Yahoo Finance',
+        official: false,
+        note: '합성 과거 이력',
+        sources: [],
+        status: 'available' as const,
+        reason: null,
+        latest: {
+          value: '472.20',
+          observedAt: '2026-10-07T20:00:00Z',
+          sessionDate: '2026-10-07',
+          kind: 'daily_close' as const,
+        },
+        baseline: null,
+        comparisonStatus: 'no_new_session' as const,
+        change: null,
+        changeRate: null,
+      },
+    };
+    render(
+      <CompanyOutlooks
+        result={{
+          ...result,
+          companyOutlooks: { ...layer, companies: [company] },
+        }}
+        compact
+      />,
+    );
+    expect(screen.getByText(/아침 이후 새 정규장 관측 없음/)).toBeTruthy();
+    expect(screen.queryByText('0%')).toBeNull();
   });
   it('does not show a forecast for another round, cutoff or selected company', () => {
     const { rerender } = render(

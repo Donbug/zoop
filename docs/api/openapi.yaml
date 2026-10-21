@@ -8259,6 +8259,10 @@ components:
             cutoff: {type: string, format: date-time}
             resultVersion: {type: string}
             judgment: {type: object}
+        reading:
+          "$ref": "#/components/schemas/CompanyShortReading"
+        price:
+          "$ref": "#/components/schemas/CompanyPrice"
         observedMovement:
           type: object
           required: [status, reason]
@@ -8279,6 +8283,65 @@ components:
               title: {type: string}
               url: {type: string, format: uri}
               publishedAt: {type: string, format: date-time}
+
+    CompanyShortReading:
+      type: object
+      description: 전문을 보존하면서 별도 생성·검증한 짧은 읽기. PASS일 때만 세 문장이 존재합니다.
+      required: [status, resultVersion]
+      properties:
+        status: {type: string, enum: [PASS, WITHHELD]}
+        resultVersion: {type: string}
+        brief: {"$ref": "#/components/schemas/CompanyStatement"}
+        watch: {"$ref": "#/components/schemas/CompanyStatement"}
+        change: {"$ref": "#/components/schemas/CompanyStatement"}
+    CompanyPricePoint:
+      type: object
+      required: [value, observedAt, sessionDate, kind]
+      properties:
+        value: {type: string, description: 통화 단위의 양수 가격. 소수점 두 자리 문자열.}
+        observedAt: {type: string, format: date-time}
+        sessionDate: {type: string, format: date}
+        kind: {type: string, enum: [five_minute_close, daily_close]}
+    CompanyPriceSource:
+      type: object
+      required: [companyId, interval, url, httpStatus, sha256, bytes, collectedAt]
+      properties:
+        companyId: {type: string}
+        interval: {type: string, enum: [5m, 1d]}
+        url: {type: string, format: uri}
+        httpStatus: {type: integer}
+        sha256: {type: string}
+        bytes: {type: integer}
+        collectedAt: {type: string, format: date-time}
+    CompanyPrice:
+      type: object
+      description: 회차 마감 전 완료된 정규장 이력. 출근은 전일 종가, 퇴근은 같은 날 09:20 관측값 대비. 당시 수집본이나 전망 적중률을 뜻하지 않습니다.
+      required: [companyId, cutoff, currency, exchangeTimezone, source, official, note, sources, status, reason, latest, baseline, comparisonStatus, change, changeRate]
+      properties:
+        companyId: {type: string}
+        cutoff: {type: string, format: date-time}
+        currency: {type: string, enum: [KRW, USD]}
+        exchangeTimezone: {type: string}
+        source: {type: string}
+        official: {type: boolean}
+        note: {type: string}
+        sources:
+          type: array
+          items: {"$ref": "#/components/schemas/CompanyPriceSource"}
+        status: {type: string, enum: [available, unavailable]}
+        reason: {type: [string, 'null']}
+        latest:
+          anyOf:
+            - {"$ref": "#/components/schemas/CompanyPricePoint"}
+            - {type: 'null'}
+        baseline:
+          anyOf:
+            - {"$ref": "#/components/schemas/CompanyPricePoint"}
+            - {type: 'null'}
+        baselineKind: {type: string, enum: [morning_cutoff, previous_close]}
+        comparisonStatus: {type: string, enum: [available, unavailable, no_new_session]}
+        change: {type: [string, 'null']}
+        changeRate: {type: [string, 'null']}
 
 
     ActivateResponse:

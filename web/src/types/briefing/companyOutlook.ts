@@ -13,6 +13,20 @@ export type CompanyOutlook = {
     status: 'updated' | 'compared' | 'unavailable';
     previousResultVersion: string | null;
   };
+  reading?: {
+    status: 'PASS' | 'WITHHELD';
+    resultVersion: string;
+    brief?: CompanyStatement;
+    watch?: CompanyStatement;
+    change?: CompanyStatement;
+  };
+  price?: CompanyPrice;
+  previous?: {
+    status: 'available' | 'unavailable';
+    cutoff?: string;
+    resultVersion?: string;
+    judgment?: { outlook: CompanyStatement };
+  };
   observedMovement: { status: 'unavailable'; reason: string };
   sources: {
     evidenceId: string;
@@ -36,4 +50,29 @@ export type CompanyOutlooks = {
   scopeNote: string;
   companies: CompanyOutlook[];
   reason?: string;
+};
+
+export type CompanyPricePoint = {
+  value: string;
+  observedAt: string;
+  sessionDate: string;
+  kind: 'five_minute_close' | 'daily_close';
+};
+export type CompanyPrice = {
+  companyId: string;
+  cutoff: string;
+  currency: 'KRW' | 'USD';
+  exchangeTimezone: string;
+  source: string;
+  official: boolean;
+  note: string;
+  status: 'available' | 'unavailable';
+  reason: string | null;
+  latest: CompanyPricePoint | null;
+  baseline: CompanyPricePoint | null;
+  baselineKind?: 'morning_cutoff' | 'previous_close';
+  comparisonStatus: 'available' | 'unavailable' | 'no_new_session';
+  change: string | null;
+  changeRate: string | null;
+  sources: { interval: string; url: string; collectedAt: string }[];
 };

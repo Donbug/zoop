@@ -11,6 +11,7 @@ import {
   SECTION_TITLE,
 } from './briefingStyles';
 import { briefingTime } from '@/util/briefingTime';
+import CompanyPrice from './CompanyPrice';
 
 const assessments = {
   positive: '사업상 긍정 요인',
@@ -118,20 +119,45 @@ export default function CompanyOutlooks({
               <p className={`${NOTE} mt-1`}>
                 {assessments[company.assessment]}
               </p>
-              <Statement value={company.outlook} company={company} />
-              <div className="mt-3">
-                <h5 className="text-sm font-semibold">전망이 성립하려면</h5>
-                {company.conditions.map((s, i) => (
-                  <Statement key={i} value={s} company={company} />
+              {compact &&
+                (company.reading?.status === 'PASS' ? (
+                  <div
+                    className="mt-3 space-y-2"
+                    aria-label={`${company.companyName} 짧은 읽기`}
+                  >
+                    <p className="text-base leading-relaxed font-medium">
+                      {company.reading.brief?.text}
+                    </p>
+                    <p className="text-sm leading-relaxed">
+                      <span className="font-semibold">확인할 것 · </span>
+                      {company.reading.watch?.text}
+                    </p>
+                    <p className="text-sm leading-relaxed text-zoop-muted">
+                      {company.reading.change?.text}
+                    </p>
+                  </div>
+                ) : (
+                  <p className={`${NOTE} mt-2`}>
+                    검증된 짧은 요약이 없습니다. 자세히 보기에서 전문을
+                    확인하세요.
+                  </p>
                 ))}
-              </div>
+              <CompanyPrice company={company} cutoff={layer.cutoff} />
               <details open={!compact} className="mt-3">
                 <summary
                   className={`min-h-11 cursor-pointer content-center text-sm font-semibold ${FOCUS_RING}`}
                 >
-                  확인된 사실·사업 영향·반대 요인
+                  자세히 · 기업 전망 전문과 근거
                 </summary>
-                <h5 className="mt-2 text-sm font-semibold">확인된 사실</h5>
+                <h5 className="mt-3 text-sm font-semibold">조건부 기업 전망</h5>
+                <Statement value={company.outlook} company={company} />
+                <h5 className="mt-3 text-sm font-semibold">
+                  전망이 성립하려면
+                </h5>
+                {company.conditions.map((s, i) => (
+                  <Statement key={i} value={s} company={company} />
+                ))}
+                <h5 className="mt-3 text-sm font-semibold">확인된 사실</h5>
                 {company.facts.map((s, i) => (
                   <Statement key={i} value={s} company={company} />
                 ))}
@@ -145,19 +171,48 @@ export default function CompanyOutlooks({
                 {company.risks.map((s, i) => (
                   <Statement key={i} value={s} company={company} />
                 ))}
+                <div className="mt-3 border-t border-panel-line pt-3">
+                  <h5 className="text-sm font-semibold">
+                    {result.edition === 'morning'
+                      ? '이전 기업 전망에서 달라진 점'
+                      : '아침 판단과 실제 사업 정보 비교'}
+                  </h5>
+                  <Statement value={company.comparison} company={company} />
+                  {company.previous?.status === 'available' ? (
+                    <div className="mt-2 border-l-2 border-panel-line pl-3">
+                      <p className={NOTE}>
+                        기존 판단 · {briefingTime(company.previous.cutoff!)}
+                      </p>
+                      <p className={BODY}>
+                        {company.previous.judgment?.outlook.text}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className={NOTE}>
+                      {result.edition === 'evening'
+                        ? '이 기업의 같은 날 아침 판단은 없습니다. 아침 시세 기준과 아침 전망 유무는 별개입니다.'
+                        : '이 기업의 이전 전망 기록이 없습니다.'}
+                    </p>
+                  )}
+                </div>
+                {company.reading?.status === 'PASS' && (
+                  <details className="mt-3">
+                    <summary
+                      className={`min-h-11 cursor-pointer content-center text-sm ${FOCUS_RING}`}
+                    >
+                      짧은 요약의 문장별 근거
+                    </summary>
+                    {[
+                      company.reading.brief,
+                      company.reading.watch,
+                      company.reading.change,
+                    ].map(
+                      (s, i) =>
+                        s && <Statement key={i} value={s} company={company} />,
+                    )}
+                  </details>
+                )}
               </details>
-              <div className="mt-3 border-t border-panel-line pt-3">
-                <h5 className="text-sm font-semibold">
-                  {result.edition === 'morning'
-                    ? '이전 기업 전망에서 달라진 점'
-                    : '아침 판단과 실제 사업 정보 비교'}
-                </h5>
-                <Statement value={company.comparison} company={company} />
-                <p className={NOTE}>
-                  기업 주가 관측값이 없어 가격 흐름·예측 적중 여부는 평가하지
-                  않았습니다.
-                </p>
-              </div>
             </article>
           ))}
         </div>

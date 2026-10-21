@@ -107,11 +107,46 @@ final class BriefingSnapshotValidator {
                 check(!array(company, field).isEmpty()); for (JsonNode statement : array(company, field)) companyStatement(statement, ownSources);
             }
             choice(field(company, "comparison"), "status", Set.of("updated", "compared", "unavailable"));
+            if (company.has("reading")) {
+                JsonNode reading = object(field(company, "reading")); text(reading, "resultVersion");
+                if ("PASS".equals(choice(reading, "status", Set.of("PASS", "WITHHELD")))) {
+                    for (String field : java.util.List.of("brief", "watch", "change")) {
+                        companyStatement(field(reading, field), ownSources);
+                        String value = text(field(reading, field), "text");
+                        check(value.codePointCount(0, value.length()) <= switch (field) { case "brief" -> 70; case "watch" -> 50; default -> 60; });
+                    }
+                }
+            }
+            if (company.has("price")) companyPrice(object(field(company, "price")), text(company, "companyId"), row.windowTo());
         }
         check(actual.equals(expected));
     }
     private static void companyStatement(JsonNode statement, Set<String> sources) {
         object(statement); text(statement, "text"); Set<String> refs = strings(statement, "evidenceIds"); check(!refs.isEmpty() && sources.containsAll(refs));
+    }
+
+    private static void companyPrice(JsonNode price, String companyId, Instant cutoff) {
+        same(text(price, "companyId"), companyId); same(timestamp(price, "cutoff"), cutoff);
+        choice(price, "currency", Set.of("KRW", "USD")); bool(price, "official"); text(price, "source"); text(price, "note");
+        String status = choice(price, "status", Set.of("available", "unavailable"));
+        if ("unavailable".equals(status)) { check(field(price, "latest").isNull()); return; }
+        JsonNode latest = object(field(price, "latest"));
+        java.math.BigDecimal value = new java.math.BigDecimal(text(latest, "value")); check(value.signum() > 0);
+        Instant observed = timestamp(latest, "observedAt"); check(!observed.isAfter(cutoff));
+        choice(latest, "kind", Set.of("five_minute_close", "daily_close"));
+        String comparison = choice(price, "comparisonStatus", Set.of("available", "unavailable", "no_new_session"));
+        JsonNode baseline = field(price, "baseline");
+        if (!baseline.isNull()) {
+            object(baseline); check(!timestamp(baseline, "observedAt").isAfter(observed));
+            java.math.BigDecimal before = new java.math.BigDecimal(text(baseline, "value")); check(before.signum() > 0);
+            if ("available".equals(comparison)) {
+                java.math.BigDecimal delta = value.subtract(before);
+                check(delta.compareTo(new java.math.BigDecimal(text(price, "change"))) == 0);
+                check(delta.multiply(java.math.BigDecimal.valueOf(100)).divide(before, 2, java.math.RoundingMode.HALF_UP)
+                        .compareTo(new java.math.BigDecimal(text(price, "changeRate"))) == 0);
+            } else if ("no_new_session".equals(comparison)) same(timestamp(baseline, "observedAt"), observed);
+        } else check("unavailable".equals(comparison));
+        if (!"available".equals(comparison)) check(field(price, "change").isNull() && field(price, "changeRate").isNull());
     }
 
     private static void metadata(JsonNode value, String graphVersion, boolean localReplay) {

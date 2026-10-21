@@ -2797,6 +2797,8 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | previous.cutoff | 선택 | string (date-time) |  |
 | previous.resultVersion | 선택 | string |  |
 | previous.judgment | 선택 | object |  |
+| reading | 선택 | [CompanyShortReading](#schema-companyshortreading) |  |
+| price | 선택 | [CompanyPrice](#schema-companyprice) |  |
 | observedMovement | 필수 | object |  |
 | observedMovement.status | 필수 | string |  |
 | observedMovement.reason | 필수 | string |  |
@@ -2809,6 +2811,74 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | sources[].title | 필수 | string |  |
 | sources[].url | 필수 | string (uri) |  |
 | sources[].publishedAt | 필수 | string (date-time) |  |
+
+<a id="schema-companyshortreading"></a>
+
+### CompanyShortReading
+
+전문을 보존하면서 별도 생성·검증한 짧은 읽기. PASS일 때만 세 문장이 존재합니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| resultVersion | 필수 | string |  |
+| brief | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| watch | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| change | 선택 | [CompanyStatement](#schema-companystatement) |  |
+
+<a id="schema-companypricepoint"></a>
+
+### CompanyPricePoint
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| value | 필수 | string | 통화 단위의 양수 가격. 소수점 두 자리 문자열. |
+| observedAt | 필수 | string (date-time) |  |
+| sessionDate | 필수 | string (date) |  |
+| kind | 필수 | string {five_minute_close, daily_close} |  |
+
+<a id="schema-companypricesource"></a>
+
+### CompanyPriceSource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| interval | 필수 | string {5m, 1d} |  |
+| url | 필수 | string (uri) |  |
+| httpStatus | 필수 | integer |  |
+| sha256 | 필수 | string |  |
+| bytes | 필수 | integer |  |
+| collectedAt | 필수 | string (date-time) |  |
+
+<a id="schema-companyprice"></a>
+
+### CompanyPrice
+
+회차 마감 전 완료된 정규장 이력. 출근은 전일 종가, 퇴근은 같은 날 09:20 관측값 대비. 당시 수집본이나 전망 적중률을 뜻하지 않습니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| currency | 필수 | string {KRW, USD} |  |
+| exchangeTimezone | 필수 | string |  |
+| source | 필수 | string |  |
+| official | 필수 | boolean |  |
+| note | 필수 | string |  |
+| sources | 필수 | [CompanyPriceSource](#schema-companypricesource)[] |  |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 필수 | string, null |  |
+| latest | 필수 | [CompanyPricePoint](#schema-companypricepoint) / null |  |
+| baseline | 필수 | [CompanyPricePoint](#schema-companypricepoint) / null |  |
+| baselineKind | 선택 | string {morning_cutoff, previous_close} |  |
+| comparisonStatus | 필수 | string {available, unavailable, no_new_session} |  |
+| change | 필수 | string, null |  |
+| changeRate | 필수 | string, null |  |
 
 <a id="schema-activateresponse"></a>
 

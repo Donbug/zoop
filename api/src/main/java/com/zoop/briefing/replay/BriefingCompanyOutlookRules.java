@@ -158,17 +158,22 @@ final class BriefingCompanyOutlookRules {
     }
 
     private static StrictJson.Obj call(String digest, String phase, StrictJson.Obj frozen, Map<String, JsonNode> receipts, Path output, Set<String> owned) {
+        return recordedCall(digest, phase, frozen, receipts, output, owned, "company_outlook_", VERSION);
+    }
+
+    static StrictJson.Obj recordedCall(String digest, String phase, StrictJson.Obj frozen, Map<String, JsonNode> receipts,
+            Path output, Set<String> owned, String stage, String promptVersion) {
         require(digest.matches("[0-9a-f]{64}") && (owned.add(digest) || owned.contains(digest)), "call_ownership");
         StrictJson.Obj receipt = StrictJson.Obj.of(receipts.get(digest));
         byte[] requestBytes = read(output.resolve("calls/" + digest + ".request.json")), responseBytes = read(output.resolve("calls/" + digest + ".response.json"));
         require(digest.equals(Canonical.sha256(requestBytes)) && receipt.string("responseSha256").equals(Canonical.sha256(responseBytes))
-                && ("company_outlook_" + phase).equals(receipt.string("stage")) && receipt.bool("usageKnown")
+                && (stage + phase).equals(receipt.string("stage")) && receipt.bool("usageKnown")
                 && receipt.count("httpStatus") == 200 && "completed".equals(receipt.string("status")), "recording");
         StrictJson.Obj request = StrictJson.parseObject(requestBytes), response = StrictJson.parseObject(responseBytes);
         require("gpt-6-luna".equals(request.string("model")) && !request.bool("store")
                 && "gpt-6-luna".equals(receipt.string("model")) && receipt.string("responseId").equals(response.string("id"))
                 && "completed".equals(response.string("status")), "model");
-        require(request.string("instructions").equals(resource(phase + ".md")), "prompt_bytes");
+        require(request.string("instructions").equals(resource(promptVersion, phase + ".md")), "prompt_bytes");
         require(StrictJson.parseObject(request.string("input")).object("frozen").node().equals(frozen.node()), "frozen_input");
         require(response.object("usage").raw("input_tokens").equals(receipt.raw("inputTokens"))
                 && response.object("usage").raw("output_tokens").equals(receipt.raw("outputTokens")), "usage");
@@ -177,8 +182,8 @@ final class BriefingCompanyOutlookRules {
             for (StrictJson.Obj content : item.objects("content")) { require("output_text".equals(content.string("type")), "response_type"); text.append(content.string("text")); }
         return StrictJson.parseObject(text.toString());
     }
-    private static String resource(String name) {
-        try (var stream = BriefingCompanyOutlookRules.class.getResourceAsStream("/briefing/prompts/" + VERSION + "/" + name)) {
+    private static String resource(String version, String name) {
+        try (var stream = BriefingCompanyOutlookRules.class.getResourceAsStream("/briefing/prompts/" + version + "/" + name)) {
             require(stream != null, "prompt_missing"); return new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         } catch (java.io.IOException error) { throw new IllegalArgumentException("Company prompt unavailable", error); }
     }
