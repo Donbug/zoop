@@ -63,4 +63,27 @@ public class JdbcAdminAuditRepository implements AdminAuditRepository {
                 .addValue("requestId", requestId)
                 .addValue("occurredAt", Timestamp.from(occurredAt)));
     }
+
+    @Override
+    public void recordMemberStatusAction(String adminId, String email, String action,
+            String memberId, String reason, String beforeStatus, String afterStatus,
+            long beforeRevision, long afterRevision, String requestId, Instant occurredAt) {
+        jdbc.update("""
+                INSERT INTO audit_logs
+                  (actor_kind, admin_id, actor_id, actor_email_snapshot, action,
+                   target_type, target_id, outcome, purpose, reason, request_id, detail, occurred_at)
+                VALUES ('admin', :adminId, :adminId, :email, :action,
+                        'member', :memberId, 'succeeded', 'member_access_management', :reason,
+                        :requestId, jsonb_build_object(
+                            'beforeStatus', :beforeStatus,
+                            'afterStatus', :afterStatus,
+                            'beforeRevision', :beforeRevision,
+                            'afterRevision', :afterRevision), :occurredAt)
+                """, new MapSqlParameterSource("adminId", adminId)
+                .addValue("email", email).addValue("action", action)
+                .addValue("memberId", memberId).addValue("reason", reason)
+                .addValue("beforeStatus", beforeStatus).addValue("afterStatus", afterStatus)
+                .addValue("beforeRevision", beforeRevision).addValue("afterRevision", afterRevision)
+                .addValue("requestId", requestId).addValue("occurredAt", Timestamp.from(occurredAt)));
+    }
 }

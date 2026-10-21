@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class JdbcMemberSessionRepository implements MemberSessionRepository {
@@ -40,23 +41,26 @@ public class JdbcMemberSessionRepository implements MemberSessionRepository {
     }
 
     @Override
-    public void insertMemberSession(String id, String memberId, String tokenHash,
+    @Transactional
+    public boolean insertMemberSession(String id, String memberId, String tokenHash,
             String csrfKeyId, Instant createdAt, Instant expiresAt) {
-        int inserted = jdbc.update("""
+        var memberStatus = jdbc.query("""
+                SELECT status FROM members WHERE id = :memberId FOR UPDATE
+                """, new MapSqlParameterSource("memberId", memberId),
+                (rs, rowNum) -> rs.getString("status")).stream().findFirst();
+        if (memberStatus.isEmpty() || !"active".equals(memberStatus.get())) return false;
+
+        return jdbc.update("""
                 INSERT INTO member_sessions
                   (id, member_id, kind, analytics_key, token_hash, csrf_key_id,
                    csrf_version, tutorial_completed, auth_flow, created_at, expires_at, revoked_at)
-                SELECT :id, m.id, 'member', NULL, :tokenHash, :csrfKeyId,
-                       1, false, NULL, :createdAt, :expiresAt, NULL
-                FROM members m WHERE m.id = :memberId AND m.status = 'active'
+                VALUES (:id, :memberId, 'member', NULL, :tokenHash, :csrfKeyId,
+                        1, false, NULL, :createdAt, :expiresAt, NULL)
                 """, new MapSqlParameterSource()
                 .addValue("id", id).addValue("memberId", memberId)
                 .addValue("tokenHash", tokenHash).addValue("csrfKeyId", csrfKeyId)
                 .addValue("createdAt", Timestamp.from(createdAt))
-                .addValue("expiresAt", Timestamp.from(expiresAt)));
-        if (inserted != 1) {
-            throw new IllegalArgumentException("Active member required");
-        }
+                .addValue("expiresAt", Timestamp.from(expiresAt))) == 1;
     }
 
     @Override

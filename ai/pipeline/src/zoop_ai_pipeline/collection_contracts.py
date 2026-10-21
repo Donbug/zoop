@@ -1,7 +1,7 @@
 """One-off document URL collection protocol. Only explicitly listed URLs are fetched; nothing is discovered or scheduled.
 
 Every limit is mandatory in the operator's policy file: there is no default user agent and no default budget. Descriptive
-metadata (title, dates, kind) comes only from the request and is never scraped from the fetched page.
+metadata (title, dates, kind, publisher) comes only from the request and is never scraped from the fetched page or guessed from the host.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .ingestion_contracts import MAX_RAW, Published, Wire
+from .ingestion_contracts import MAX_RAW, Declared, Published, Wire
 
 SCHEMA = "zoop-collection-1"
 POLICY_SCHEMA = "zoop-collection-policy-1"
@@ -66,7 +66,7 @@ def declared_published(value: str | None) -> Published:
     raise ValueError("unsupported publication time")
 
 
-class Target(Wire):
+class Target(Declared):
     candidate_id: str = Field(min_length=1, max_length=200)
     url: str = Field(min_length=1, max_length=4000)
     supplier_document_id: str | None = Field(default=None, min_length=1, max_length=500)

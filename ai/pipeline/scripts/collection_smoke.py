@@ -30,6 +30,7 @@ COLLECTION_SCHEMA = "zoop-collection-1"
 INGESTION_SCHEMA = "zoop-ingestion-s2-1"
 NEWS = '<html><head><title>합성</title></head><body><article><p>합성 공시 &amp; <b>본문😀</b> 끝</p><p>둘째 문단</p></article></body></html>'.encode()
 ROBOTS = b"User-agent: *\nDisallow: /private/\nAllow: /private/open\n"
+PUBLISHER = "합성일보 Synthetic Daily"  # declared by the operator for one synthetic target; never derived from the loopback host or the page
 PROXY_ENV = {"HTTP_PROXY": "http://127.0.0.1:9", "http_proxy": "http://127.0.0.1:9", "HTTPS_PROXY": "http://127.0.0.1:9",
              "https_proxy": "http://127.0.0.1:9", "ALL_PROXY": "http://127.0.0.1:9", "all_proxy": "http://127.0.0.1:9"}
 
@@ -103,9 +104,10 @@ class CollectionKit(OfflineFixture):
         self.policy_path.write_bytes(json_bytes(self.policy))
 
     @staticmethod
-    def target(url, candidate, *, title="synthetic title", kind="news", published=None, modified=None, supplier=None, revision=None):
-        return {"candidateId": candidate, "url": url, "title": title, "documentKind": kind, "publishedAt": published, "modifiedAt": modified,
-                "supplierDocumentId": supplier, "sourceRevision": revision}
+    def target(url, candidate, *, title="synthetic title", kind="news", published=None, modified=None, supplier=None, revision=None, publisher=None):
+        target = {"candidateId": candidate, "url": url, "title": title, "documentKind": kind, "publishedAt": published, "modifiedAt": modified,
+                  "supplierDocumentId": supplier, "sourceRevision": revision}
+        return target if publisher is None else {**target, "publisher": publisher}
 
     def collection_request(self, collection_id, targets):
         return {"schemaVersion": COLLECTION_SCHEMA, "collectionId": collection_id, "sourceId": "synthetic-source", "scopeId": "body", "targets": targets}
@@ -135,7 +137,7 @@ def synthetic_routes(site: LocalSite):
 
 
 def synthetic_targets(kit: CollectionKit, site: LocalSite):
-    return [kit.target(site.url("/news/a"), "n1", title="synthetic news", published="2026-10-14"),
+    return [kit.target(site.url("/news/a"), "n1", title="synthetic news", published="2026-10-14", publisher=PUBLISHER),
             kit.target(site.url("/disclosure/b.pdf"), "d1", title="synthetic disclosure", kind="disclosure", published="2026-10-14T09:00:00+09:00", supplier="filing-1")]
 
 
@@ -157,6 +159,11 @@ def smoke(root: Path) -> dict:
         again = kit.collect("collect-1", targets)
         assert again["replayed"] is True and len(site.log) == 3 and again["manifest"] == first["manifest"]
         checks.append("same immutable collectionId and input: replayed from the stored record, zero new requests")
+        explicit = kit.collect("collect-1", [targets[0], {**targets[1], "publisher": None}])
+        assert explicit["replayed"] is True and len(site.log) == 3 and explicit["manifest"] == first["manifest"]
+        conflict = kit.collect("collect-1", [{**targets[0], "publisher": "Another Outlet"}, targets[1]], expected=2)
+        assert conflict["error"]["code"] == "collection_input_conflict" and len(site.log) == 3
+        checks.append("publisher in the request identity: an explicit null is the same request as an omitted key (replayed), a different outlet is collection_input_conflict with zero requests")
 
         manifest = Path(first["manifestPath"])
         ran = kit.cli("run", kit.request(manifest, "round-1"), manifest=manifest)
@@ -177,6 +184,12 @@ def smoke(root: Path) -> dict:
         exact_check(html["document"], 0, html["document"]["rawLocators"][0]["end"])
         exact_check(pdf["document"], 0, len(pdf["document"]["text"]))
         checks.append("collect -> ingest -> export: hash-bound HTML and PDF versions, exact citations, day precision never becomes midnight, instant keeps its offset")
+        assert o["publisher"] == PUBLISHER and "publisher" not in p, (o, p)
+        page = json.loads((kit.inputs / "collections" / "collect-1" / "page-0.json").read_bytes())
+        assert page["items"][0]["publisher"] == PUBLISHER and "publisher" not in page["items"][1], page["items"]
+        assert set(o) == {"roundId", "sourceId", "page", "ordinal", "pageId", "observedAt", "documentId", "rawVersion", "documentVersion", "url", "title", "publishedAt",
+                          "modifiedAt", "sourceRevision", "mediaType", "publisher", "provenance", "collection"}
+        checks.append("declared publisher: reaches the export of the target that declared it (page file, then ingestion export), is absent from the target that did not, and is never taken from the host or page")
 
         partial = kit.collect("collect-partial", [kit.target(site.url("/news/a"), "n1", published="2026-10-14"), kit.target(site.url("/private/x"), "p1")], expected=2)
         assert partial["state"] == "partial" and {t["candidateId"]: t["code"] for t in partial["targets"]} == {"n1": None, "p1": "robots_denied"}

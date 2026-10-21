@@ -52,6 +52,10 @@ BODY2 = BODY1.replace("첫째", "변경")
 BODY3 = BODY1.replace("둘째", "셋째")
 BODY4 = BODY1.replace("둘째", "넷째")
 
+# Operator-declared publishers, written out by hand (never read back from the code under test). Every other observation of
+# this scenario declares none, so its export has no `publisher` key and its version row must keep a NULL publisher.
+DECLARED = {"u1": "합성일보 \U0001F600 Daily", "a8": "Synthetic Daily"}
+
 STEPS: list[str] = []
 DOCUMENT_MIGRATION = "20261014120000"
 OUTPUT: list[str] = []  # every jar run's combined output, checked for leaks at the end
@@ -249,9 +253,10 @@ def item(ref: dict, kind: str = "news", expected=KEEP) -> dict:
     return value
 
 
-def ledger_item(candidate: str, supplier: str, url: str, published: str | None) -> dict:
-    return {"candidateId": candidate, "supplierDocumentId": supplier, "url": url, "bodyRef": "html", "mediaType": "text/html",
-            "title": "authored", "publishedAt": published, "modifiedAt": None, "sourceRevision": None}
+def ledger_item(candidate: str, supplier: str, url: str, published: str | None, publisher: str | None = None) -> dict:
+    value = {"candidateId": candidate, "supplierDocumentId": supplier, "url": url, "bodyRef": "html", "mediaType": "text/html",
+             "title": "authored", "publishedAt": published, "modifiedAt": None, "sourceRevision": None}
+    return value if publisher is None else {**value, "publisher": publisher}
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -362,13 +367,15 @@ def main() -> int:
     r4 = world.round("r4", SOURCE, "r4", 3, [ledger_item("c-a", "supplier-a", "https://example.invalid/a", "2026-10-08T09:00:00+09:00")], BODY3)
     r5 = world.round("r5", SOURCE, "r5", 4, [ledger_item("c-a", "supplier-a", "https://example.invalid/a", "2026-10-08T09:00:00+09:00")], BODY4)
     r6 = world.round("r6", SOURCE, "r6", 5, [ledger_item("c-c", "supplier-c", "https://example.invalid/c", None)], BODY1)
-    r7 = world.round("r7", UNICODE_SOURCE, "라운드-\U0001F600-1", 0, [ledger_item("c-u", "supplier-u", "https://example.invalid/u", None)], BODY1)
+    r7 = world.round("r7", UNICODE_SOURCE, "라운드-\U0001F600-1", 0, [ledger_item("c-u", "supplier-u", "https://example.invalid/u", None, DECLARED["u1"])], BODY1)
+    # The same document and bytes as A1, now with a declared outlet: another raw/document version of document A.
+    r8 = world.round("r8", SOURCE, "r8", 6, [ledger_item("c-a", "supplier-a", "https://example.invalid/a", "2026-10-08T09:00:00+09:00", DECLARED["a8"])], BODY1)
     a1, b1 = r1
-    (a2,), (a1p,), (a3,), (a4,), (c1,), (u1,) = r2, r3, r4, r5, r6, r7
+    (a2,), (a1p,), (a3,), (a4,), (c1,), (u1,), (a8,) = r2, r3, r4, r5, r6, r7, r8
 
     step("ledger from the installed CLI: identities, replay, same bytes under two suppliers and two sources")
     fingerprint = world.ledger_fingerprint()
-    exports = {name: world.export(ref) for name, ref in {"a1": a1, "b1": b1, "a2": a2, "a1p": a1p, "a3": a3, "a4": a4, "c1": c1, "u1": u1}.items()}
+    exports = {name: world.export(ref) for name, ref in {"a1": a1, "b1": b1, "a2": a2, "a1p": a1p, "a3": a3, "a4": a4, "c1": c1, "u1": u1, "a8": a8}.items()}
     check(a1["documentId"] == a2["documentId"] == a1p["documentId"] == a3["documentId"] == a4["documentId"], "document A changed identity across rounds")
     check(a1["documentVersion"] == a1p["documentVersion"], "a replay of the same content must reuse the version")
     check(len({a1["documentVersion"], a2["documentVersion"], a3["documentVersion"], a4["documentVersion"]}) == 4, "changed content must be a new version")
@@ -379,7 +386,7 @@ def main() -> int:
         check(document["textArtifactId"] == "text-" + document["documentVersion"], f"{name}: textArtifactId is not text-<version>")
         check(document["sourceHash"] == python_source_hash(document["text"]), f"{name}: sourceHash is not Python's canonical JSON hash")
     check(exports["a1"]["document"]["text"] == exports["b1"]["document"]["text"] == exports["u1"]["document"]["text"], "same body bytes must give the same text")
-    version = {name: ref["documentVersion"] for name, ref in {"a1": a1, "b1": b1, "a2": a2, "a3": a3, "a4": a4, "c1": c1, "u1": u1}.items()}
+    version = {name: ref["documentVersion"] for name, ref in {"a1": a1, "b1": b1, "a2": a2, "a3": a3, "a4": a4, "c1": c1, "u1": u1, "a8": a8}.items()}
     text = {name: exports[name]["document"]["text"] for name in exports}
 
     def file_state(path: Path) -> tuple:
@@ -421,7 +428,9 @@ def main() -> int:
         observation = exports[name]["observation"]
         published = observation["publishedAt"]
         check((row["title"], row["publisher"], row["url"], row["raw_artifact_id"], row["text_artifact_id"], row["published_date"])
-              == ("authored", None, observation["url"], None, "text-" + version[name], None), f"{label}: version {name} {row}")
+              == ("authored", DECLARED.get(name), observation["url"], None, "text-" + version[name], None), f"{label}: version {name} {row}")
+        check(observation.get("publisher") == DECLARED.get(name) and ("publisher" in observation) == (name in DECLARED),
+              f"{label}: {name} export publisher key {observation.get('publisher')!r}")
         check(row["collected_at"] == iso_us(observation["observedAt"]), f"{label}: version {name} collected_at {row['collected_at']}")
         if published is None:
             check((row["publication_precision"], row["published_at"]) == ("unknown", None), f"{label}: {name} precision {row}")
@@ -657,14 +666,58 @@ def main() -> int:
     assert_unchanged(label, before)
     normal_start(jar)
 
+    # ---- 15: a declared publisher is version-bound: a new version of document A, the older ones keep NULL -------------------
+    label = step("declared publisher: a new version of an existing document stores it; NULL versions stay NULL; a NULL/other publisher conflicts")
+    a_id = a1["documentId"]
+    check(a8["documentId"] == a_id and a8["rawVersion"] != a1["rawVersion"] and version["a8"] != version["a1"],
+          f"{label}: a declared publisher must be another raw/document version of the same document")
+    check(text["a8"] == text["a1"] and exports["a8"]["observation"]["publisher"] == DECLARED["a8"]
+          and all("publisher" not in exports[n]["observation"] for n in ("a1", "b1", "a2", "a1p", "a3", "a4", "c1")),
+          f"{label}: exports must carry the publisher key only when one was declared")
+    before = db.snapshot()
+    old_versions = {(r["article_id"], r["version"]): r for r in db.versions()}
+    a8_artifact = "text-" + version["a8"]
+    raw_a8 = text["a8"].encode("utf-8")
+    db.run(f"INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at) VALUES ('{a8_artifact}', 'extracted_text', "
+           f"'artifact-root:extracted_text/{a8_artifact}.txt', '{sha(raw_a8)}', {len(raw_a8)}, 'text/plain; charset=utf-8', now())")
+    db.run(f"INSERT INTO article_versions (article_id, version, title, publisher, url, published_at, publication_precision, text_artifact_id, collected_at) "
+           f"VALUES ('{a_id}', '{version['a8']}', 'authored', NULL, 'https://example.invalid/a', '{exports['a8']['observation']['publishedAt']}', "
+           f"'datetime', '{a8_artifact}', now())")
+    planted = db.snapshot()
+    code, result, _ = jar.run("publisher-null-conflict", [item(a8)])
+    failed(label, code, result, "version_conflict")
+    assert_unchanged(label + " (stored NULL vs declared)", planted)
+    check(not world.text_file(version["a8"]).exists(), f"{label}: the file of a rolled-back conflicting item survived")
+    db.run(f"DELETE FROM article_versions WHERE article_id = '{a_id}' AND version = '{version['a8']}'")
+    db.run(f"DELETE FROM artifacts WHERE id = '{a8_artifact}'")
+    assert_unchanged(label + " (cleanup)", before)
+
+    code, result, _ = jar.run("publisher-new-version", [item(a8)])
+    check(code == 0, f"{label}: exit {code} {json.dumps(result)[:400]}")
+    outcome = result["items"][0]
+    check((outcome["article"], outcome["artifact"], outcome["artifactFile"], outcome["version"]) == ("existing", "created", "created", "created")
+          and outcome["currentVersion"] == {"result": "unchanged", "value": version["a2"]} and "publisher" not in outcome,
+          f"{label}: {outcome}")
+    after = {(r["article_id"], r["version"]): r for r in db.versions()}
+    check(after[(a_id, version["a8"])]["publisher"] == DECLARED["a8"], f"{label}: publisher not stored exactly")
+    check({k: v for k, v in after.items() if k != (a_id, version["a8"])} == old_versions,
+          f"{label}: an earlier version row changed")
+    check([after[(a_id, version[n])]["publisher"] for n in ("a1", "a2")] == [None, None], f"{label}: an older version gained a publisher")
+    check(after[(u1["documentId"], version["u1"])]["publisher"] == DECLARED["u1"], f"{label}: Unicode publisher")
+    before = db.snapshot()
+    code, result, _ = jar.run("publisher-repeat", [item(a8)])
+    check(code == 0 and result["items"][0]["version"] == "existing", f"{label}: repeat {result}")
+    assert_unchanged(label + " (repeat)", before)
+
     # ---- final -----------------------------------------------------------------------------------------------------------
     label = step("final state, read-only ledger and no leaked credentials")
-    check(len(db.articles()) == 3 and len(db.versions()) == 5 and len(db.artifacts()) == 5, f"{label}: final counts {len(db.articles())}/{len(db.versions())}/{len(db.artifacts())}")
+    check(len(db.articles()) == 3 and len(db.versions()) == 6 and len(db.artifacts()) == 6, f"{label}: final counts {len(db.articles())}/{len(db.versions())}/{len(db.artifacts())}")
     check(all(row["publication_precision"] in ("datetime", "unknown") for row in db.versions()), f"{label}: a day-precision row exists")
     check({row["id"]: row["current_version"] for row in db.articles()} == {a1["documentId"]: version["a2"], b1["documentId"]: version["b1"], u1["documentId"]: version["u1"]},
           f"{label}: unexpected pointers {db.articles()}")
-    expected_files = sorted(f"text-{version[n]}.txt" for n in ("a1", "b1", "a2", "a3", "u1"))
-    check(sorted(p.name for p in (world.artifacts / "extracted_text").iterdir()) == expected_files, f"{label}: unexpected final files")
+    expected_files = sorted(f"text-{version[n]}.txt" for n in ("a1", "b1", "a2", "a3", "u1", "a8"))
+    check(sorted(p.name for p in (world.artifacts / "extracted_text").iterdir()) == expected_files,
+          f"{label}: unexpected files (temporary leftovers?) in the artifact directory")
     check(world.ledger_fingerprint() == fingerprint, f"{label}: the S2-1 ledger changed: the import must treat it as read-only")
     if args.upgrade_from:
         applied = db.rows("SELECT version, success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank")
@@ -680,8 +733,8 @@ def main() -> int:
     for body_text in (text["a1"], text["a2"], text["a3"]):
         check(body_text not in joined, f"{label}: document text was logged")
 
-    print(json.dumps({"status": "passed", "steps": len(STEPS), "providerCalls": 0, "modelCalls": 0, "articles": 3, "versions": 5,
-                      "artifacts": 5, "importRuns": jar.counter, "ledgerReadOnly": True}))
+    print(json.dumps({"status": "passed", "steps": len(STEPS), "providerCalls": 0, "modelCalls": 0, "articles": 3, "versions": 6,
+                      "artifacts": 6, "importRuns": jar.counter, "ledgerReadOnly": True}))
     return 0
 
 

@@ -2819,7 +2819,7 @@ paths:
       tags:
         - "market"
       summary: "기업·기간별 사건 타임라인 조회"
-      description: "기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다."
+      description: "기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각이며 오프셋이 있는 to는 그 시각을 포함한다(getCompanyPrices와 같음). 승인된 사건 시각이 있는 사건은 그 기간(연·월·일은 KST 그 기간 전체, 시각은 그 시각)이 범위와 겹치면 items에 든다."
       operationId: "listEvents"
       parameters:
         -
@@ -7408,7 +7408,7 @@ paths:
       tags:
         - "admin-members"
       summary: "회원 활동 목록 조회"
-      description: "회원 활동 목록 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "회원 활동 목록 조회. 활동 기간은 [회원 생성 시각, metadata.asOf)이며 세션은 만료·회수 여부와 무관하게 생성된 member 세션을 센다. 저장 원천이 없는 지표는 null이고 metadata.failures에 SOURCE_UNAVAILABLE을 남긴다. cursor는 status·q·limit과 결합한 불투명 키셋이며 회원 상태가 페이지 사이에 바뀌는 경우 각 페이지 읽기 시점의 상태를 반영한다."
       operationId: "listMembers"
       parameters:
         -
@@ -7434,14 +7434,22 @@ paths:
                 type: "string"
               -
                 type: "null"
-            description: "Matches the pseudonymous id or the masked e-mail"
-          description: "Matches the pseudonymous id or the masked e-mail"
+            description: "가명 회원 ID 또는 정규화된 전체 이메일의 정확 일치. 검색어는 응답·로그·cursor에 원문으로 남기지 않는다."
+          description: "가명 회원 ID 또는 정규화된 전체 이메일의 정확 일치. 응답 이메일은 항상 마스킹한다."
         -
           "$ref": "#/components/parameters/RequestId"
         -
           "$ref": "#/components/parameters/Cursor"
         -
-          "$ref": "#/components/parameters/Limit"
+          name: "limit"
+          in: "query"
+          required: false
+          description: "페이지 크기. 기본값 50, 최대 100."
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 100
+            default: 50
       responses:
         "200":
           description: "정상 응답"
@@ -7544,7 +7552,7 @@ paths:
           "$ref": "#/components/responses/Error500"
         "503":
           "$ref": "#/components/responses/Error503"
-      description: "회원 활동 상세 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "회원 활동 상세 조회. 조회는 회원·세션 상태를 변경하지 않으며 대화·AI 결과·브리핑 원문을 읽거나 반환하지 않는다. 활동 기간과 unavailable 표현은 목록과 같다."
       security:
         -
           adminSession: []
@@ -7585,7 +7593,7 @@ paths:
       tags:
         - "admin-members"
       summary: "회원 차단 및 세션 회수"
-      description: "회원 차단 및 세션 회수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "회원 차단 및 활성 member 세션 회수. expectedRevision이 현재 statusRevision과 같아야 하며 실제 변경 시 revision을 증가시킨다. 같은 Idempotency-Key와 같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다. 이 작업의 완료 레코드는 별도 보존 만료 정책이 도입되기 전까지 자동 삭제하지 않는다."
       operationId: "blockMember"
       parameters:
         -
@@ -7607,7 +7615,7 @@ paths:
         content:
           "application/json":
             schema:
-              "$ref": "#/components/schemas/ReasonRequest"
+              "$ref": "#/components/schemas/MemberStatusRequest"
       responses:
         "200":
           description: "정상 응답"
@@ -7681,7 +7689,7 @@ paths:
       tags:
         - "admin-members"
       summary: "회원 차단 해제"
-      description: "회원 차단 해제.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다."
+      description: "회원 차단 해제. expectedRevision이 현재 statusRevision과 같아야 한다. 해제는 신규 로그인을 허용하지만 이전에 회수된 세션을 복구하지 않는다. 같은 Idempotency-Key 재전송 규칙과 완료 레코드 보존은 차단과 같다."
       operationId: "unblockMember"
       parameters:
         -
@@ -7703,7 +7711,7 @@ paths:
         content:
           "application/json":
             schema:
-              "$ref": "#/components/schemas/ReasonRequest"
+              "$ref": "#/components/schemas/MemberStatusRequest"
       responses:
         "200":
           description: "정상 응답"
@@ -11742,7 +11750,7 @@ components:
           items:
             "$ref": "#/components/schemas/EventSummary"
           type: "array"
-          description: "With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty."
+          description: "With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. Paging treats `items` then `unknownTimeItems` as one sequence: limit counts both arrays together and nextCursor continues into the unknown-time events."
         metadata:
           "$ref": "#/components/schemas/EventListMetadata"
         nextCursor:
@@ -11793,6 +11801,20 @@ components:
               type: "string"
             -
               type: "null"
+        assertionStatus:
+          anyOf:
+            -
+              type: "string"
+              enum:
+                - "occurred"
+                - "announced"
+                - "planned"
+                - "forecast"
+                - "cancelled"
+                - "unknown"
+            -
+              type: "null"
+          description: "AI 인계 묶음(zoop-graph-handoff-bundle-2) 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다."
         companyIds:
           items:
             type: "string"
@@ -11823,6 +11845,7 @@ components:
         - "eventTime"
         - "timePrecision"
         - "period"
+        - "assertionStatus"
         - "companyIds"
         - "relationTypes"
         - "articleCount"
@@ -13546,12 +13569,26 @@ components:
       properties:
         sessions:
           type: "integer"
+          minimum: 0
+          description: "[member.createdAt, metadata.asOf) 사이 생성된 kind=member 세션 수. 만료·회수된 세션도 포함한다."
         graphSelections:
-          type: "integer"
+          anyOf:
+            - type: "integer"
+              minimum: 0
+            - type: "null"
+          description: "그래프 선택 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다."
         aiQuestions:
-          type: "integer"
+          anyOf:
+            - type: "integer"
+              minimum: 0
+            - type: "null"
+          description: "AI 질문 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다."
         briefingViews:
-          type: "integer"
+          anyOf:
+            - type: "integer"
+              minimum: 0
+            - type: "null"
+          description: "브리핑 조회 횟수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다."
       type: "object"
       required:
         - "sessions"
@@ -13582,17 +13619,31 @@ components:
         watchlistCount:
           type: "integer"
         holdingCount:
-          type: "integer"
+          anyOf:
+            - type: "integer"
+              minimum: 0
+            - type: "null"
+          description: "보유 종목 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다."
         accountConnected:
           type: "boolean"
         feedbackUp:
-          type: "integer"
+          anyOf:
+            - type: "integer"
+              minimum: 0
+            - type: "null"
+          description: "긍정 평가 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다."
         feedbackDown:
-          type: "integer"
+          anyOf:
+            - type: "integer"
+              minimum: 0
+            - type: "null"
+          description: "부정 평가 수. 승인된 저장 원천이 없으면 null이고 metadata.failures에 사유를 제공한다."
         history:
           items:
             "$ref": "#/components/schemas/MemberAction"
           type: "array"
+        metadata:
+          "$ref": "#/components/schemas/Metadata"
       type: "object"
       required:
         - "member"
@@ -13604,6 +13655,7 @@ components:
         - "feedbackUp"
         - "feedbackDown"
         - "history"
+        - "metadata"
     MemberList:
       properties:
         items:
@@ -13618,11 +13670,14 @@ components:
               type: "null"
         counts:
           "$ref": "#/components/schemas/MemberCounts"
+        metadata:
+          "$ref": "#/components/schemas/Metadata"
       type: "object"
       required:
         - "items"
         - "nextCursor"
         - "counts"
+        - "metadata"
     MemberRow:
       properties:
         id:
@@ -13642,11 +13697,17 @@ components:
               format: "date-time"
             -
               type: "null"
+          description: "metadata.asOf 이전에 생성된 가장 최근 member 세션 시각. 세션이 없으면 null이다."
         status:
           type: "string"
           enum:
             - "active"
             - "blocked"
+        statusRevision:
+          type: "integer"
+          format: "int64"
+          minimum: 1
+          description: "회원 상태 변경 선행조건. 상태가 실제 변경될 때만 증가한다."
         activity:
           "$ref": "#/components/schemas/MemberActivity"
       type: "object"
@@ -13657,12 +13718,27 @@ components:
         - "createdAt"
         - "lastActiveAt"
         - "status"
+        - "statusRevision"
         - "activity"
+    MemberStatusRequest:
+      properties:
+        expectedRevision:
+          type: "integer"
+          format: "int64"
+          minimum: 1
+        reason:
+          type: "string"
+          minLength: 1
+          maxLength: 1000
+      type: "object"
+      required:
+        - "expectedRevision"
+        - "reason"
     MemberStatusResult:
       properties:
         changed:
           type: "boolean"
-          description: "False when the member already had that status (the call is idempotent)"
+          description: "최신 expectedRevision에서 이미 목표 상태이면 false다. 오래된 revision은 false가 아니라 REVISION_CONFLICT이며 같은 키 재전송은 최초 응답의 값을 재현한다."
         detail:
           "$ref": "#/components/schemas/MemberDetail"
       type: "object"

@@ -4,13 +4,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The parts of a fully validated {@code zoop-graph-handoff-bundle-2} that the import maps. Every field here has passed the
+ * The parts of a fully validated {@code zoop-graph-handoff-bundle-3} that the import maps. Every field here has passed the
  * closed schema, the reference closure and the id formulas of {@link HandoffBundleVerifier}; nothing is trusted from the producer
  * that the verifier did not check. The snapshot writer reads the fields this model does not type ({@code period}, source events,
  * the representative, per-basis relation key, type, countries and source articles) from the verified raw bundle; the issue's
- * original {@code mentions[]} (S2 values with {@code verification: "none"}, checked by the verifier but not typed here) and the
- * provenance the snapshot has no place for (decisions, source references, source events it cannot pin to an issue article) stay
- * in the retained receipt and are never dropped silently.
+ * original {@code mentions[]} (S2 values with {@code verification: "none"}), the issue's {@code fieldProvenance} (which mentions
+ * state each headline value and whether the operator's representative or unanimity selected it: a selection record, never a
+ * verification), both checked by the verifier but not typed here, and the provenance the snapshot has no place for (decisions,
+ * source references, source events it cannot pin to an issue article) stay in the retained receipt and are never dropped silently.
  */
 public record HandoffBundle(String handoffId, String manifestDigest, String sourceKind, String executionMode,
         String recordingKind, String policyVersion, Map<String, String> files, List<SourcePin> sources,

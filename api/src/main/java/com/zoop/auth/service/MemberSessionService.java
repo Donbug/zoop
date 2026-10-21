@@ -49,8 +49,9 @@ public class MemberSessionService {
         String token = randomToken();
         String hash = hashToken(token);
         String id = randomToken();
-        repository.insertMemberSession(id, memberId, hash, keyRing.activeKeyId(),
+        boolean inserted = repository.insertMemberSession(id, memberId, hash, keyRing.activeKeyId(),
                 now, now.plus(SessionCookie.LIFETIME));
+        if (!inserted) throw new CustomException(ErrorCode.MEMBER_BLOCKED);
         if (validToken(previousCookieToken)) {
             repository.revokeMemberSession(hashToken(previousCookieToken), memberId, now);
         }

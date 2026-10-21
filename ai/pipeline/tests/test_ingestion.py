@@ -8,10 +8,11 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from scripts.ingestion_smoke import HTML, OfflineFixture, authored_pdf, exact_check, json_bytes, sha
 from zoop_ai_pipeline.ingestion import Ingestor, Store
-from zoop_ai_pipeline.ingestion_contracts import Authority, IngestionFailure, Inspect, Run
+from zoop_ai_pipeline.ingestion_contracts import Authority, Export, IngestionFailure, Inspect, Item, Run, canonical
 from zoop_ai_pipeline import ingestion_parsers as parsers
 
 
@@ -533,3 +534,75 @@ def test_installed_package_rejects_the_explicit_app_and_worker_roots_of_a_synthe
     assert guessed not in __import__("zoop_ai_pipeline.ingestion_contracts", fromlist=["x"]).reserved_state_roots()
     ledger = Store(tmp_path / "independent-ledger")
     ledger.close()
+
+
+# ------------------------------------------------------------------------------------ declared publisher
+
+OLD_OBSERVATION_KEYS = {"roundId", "sourceId", "page", "ordinal", "pageId", "observedAt", "documentId", "rawVersion", "documentVersion",
+                        "url", "title", "publishedAt", "modifiedAt", "sourceRevision", "mediaType"}
+
+
+def export(kit, ref, rid="round-1"):
+    store = Store(kit.root / "state")
+    try:
+        request = Export.model_validate(kit.selector(rid, **{k: ref[k] for k in ("page", "ordinal", "documentId", "rawVersion", "documentVersion")}))
+        return Ingestor(store, Authority(kit.registry_path)).export(request)
+    finally:
+        store.close()
+
+
+def test_a_fixture_without_publisher_keeps_every_earlier_byte_and_identity(kit):
+    # The literals below were taken from the commit before `publisher` existed (a one-time run of that code), not from this implementation.
+    assert canonical(Item.model_validate(kit.item()).metadata()) == \
+        '{"mediaType":"text/html","modifiedAt":null,"publishedAt":"2026-10-08T00:00:00+00:00","sourceRevision":null,"title":"authored"}'
+    assert canonical(Item.model_validate(kit.item()).wire()) == \
+        ('{"bodyRef":"html","candidateId":"c1","collection":null,"mediaType":"text/html","modifiedAt":null,"publishedAt":"2026-10-08T00:00:00+00:00",'
+         '"sourceRevision":null,"supplierDocumentId":"supplier-1","title":"authored","url":"https://example.invalid/article"}')
+    ref = execute(kit, kit.manifest("a", [[kit.item()]]))["documentRefs"][0]
+    assert (ref["documentId"], ref["rawVersion"], ref["documentVersion"]) == (
+        "doc-e222c75b08309d1fb600b12fee9d0e3d1608abf308b1e2729d150b70edde50a0",
+        "763f311a471328bb47ba04b484173642acc840e6f5bba9afcad601424c424986",
+        "4b685906fc3a1402c605da54a7ab7fc9e2e49f7af6021dbc06eab3287a551fe9")
+    assert set(export(kit, ref)["observation"]) == OLD_OBSERVATION_KEYS
+
+
+def test_a_declared_publisher_is_a_new_version_of_the_same_document_exported_exactly(kit):
+    plain = execute(kit, kit.manifest("plain", [[kit.item()]]), "plain", 0)["documentRefs"][0]
+    before = export(kit, plain, "plain")
+    named_item = kit.item(publisher="한국경제 Daily")
+    named = execute(kit, kit.manifest("named", [[named_item]]), "named", 1)["documentRefs"][0]
+    other = execute(kit, kit.manifest("other", [[kit.item(publisher="Other Daily")]]), "other", 2)["documentRefs"][0]
+    assert plain["documentId"] == named["documentId"] == other["documentId"]
+    assert len({plain["rawVersion"], named["rawVersion"], other["rawVersion"]}) == 3
+    assert len({plain["documentVersion"], named["documentVersion"], other["documentVersion"]}) == 3
+    assert export(kit, named, "named")["observation"]["publisher"] == "한국경제 Daily"
+    assert export(kit, other, "other")["observation"]["publisher"] == "Other Daily"
+    assert export(kit, plain, "plain") == before and "publisher" not in before["observation"]
+    # Same declared outlet again (a new round, a fresh manifest) is exactly the version already stored, not a new one.
+    again = execute(kit, kit.manifest("again", [[named_item]]), "again", 3)
+    assert again["counts"]["newRawVersions"] == 0 and again["counts"]["newTextVersions"] == 0
+    assert again["documentRefs"][0]["documentVersion"] == named["documentVersion"] and again["documentRefs"][0]["rawVersion"] == named["rawVersion"]
+    # An explicit null is unspecified: the earlier version, with no key and no new row.
+    null = execute(kit, kit.manifest("null", [[{**kit.item(), "publisher": None}]]), "null", 4)["documentRefs"][0]
+    assert (null["rawVersion"], null["documentVersion"]) == (plain["rawVersion"], plain["documentVersion"])
+    assert "publisher" not in export(kit, null, "null")["observation"]
+
+
+@pytest.mark.parametrize("value", ["", " ", "   ", "\u3000", "\u2028", "\u00a0", "\t", "a\nb", "a\x00b", "\x7f", "\x85", "x" * 201, "😀" * 201, 5, True, ["a"], {"name": "a"}])
+def test_an_invalid_declared_publisher_is_refused_everywhere_it_can_enter(kit, value):
+    with pytest.raises(ValidationError):
+        Item.model_validate({**kit.item(), "publisher": value})
+    refused = execute(kit, kit.manifest("bad", [[{**kit.item(), "publisher": value}]]))
+    assert refused["state"] == "incomplete" and refused["counts"]["textReady"] == 0 and refused["documentRefs"][0]["error"] == "discovery_item_invalid"
+
+
+@pytest.mark.parametrize("value", ["x", " A ", "A  B", "x" * 200, "😀" * 200, "e\u0301", "\u00e9", "한국경제TV", "A\u00a0B"])
+def test_a_valid_declared_publisher_is_stored_and_exported_exactly_without_normalization(kit, value):
+    ref = execute(kit, kit.manifest("good", [[kit.item(publisher=value)]]))["documentRefs"][0]
+    assert export(kit, ref)["observation"]["publisher"] == value
+    assert Item.model_validate(kit.item(publisher=value)).metadata()["publisher"] == value
+
+
+def test_a_lone_surrogate_publisher_is_refused(kit):
+    with pytest.raises(ValidationError):
+        Item.model_validate({**kit.item(), "publisher": "a\ud800b"})
