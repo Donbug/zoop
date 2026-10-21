@@ -369,6 +369,7 @@ describe('D-AUT-01 시작 방법 선택 (FS001·FS005)', () => {
     );
     expect(screen.queryByRole('link', { name: '구글 로그인' })).toBeNull();
     expect(screen.queryByRole('link', { name: '카카오톡 로그인' })).toBeNull();
+    expect(screen.queryByText('또는', { exact: true })).toBeNull();
   });
 
   test.each([

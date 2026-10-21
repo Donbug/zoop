@@ -1,13 +1,20 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import CompanyDetailPage from '@/pages/company/CompanyDetailPage';
 import MapPage from '@/pages/map/MapPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   bucketKey,
   impactEdges,
+  requestTime,
   timeRange,
 } from '@/components/company/detail-model';
 import {
@@ -286,6 +293,19 @@ function open(query = '') {
   );
 }
 const pinned = `?asOf=${encodeURIComponent(time)}&graphVersion=v1`;
+
+function VersionOnlyNavigation() {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() =>
+        navigate(`/companies/${encodeURIComponent(id)}?graphVersion=v-past`)
+      }
+    >
+      버전 단독 주소로 이동
+    </button>
+  );
+}
 
 test('D-COM-05: session response drives chart and timeline; 1d price request has no from', async () => {
   const range = {
@@ -1233,3 +1253,205 @@ test('without a published graph version the page does not pin a reference time (
       .every((call) => !call.query.has('asOf')),
   ).toBe(true);
 });
+
+test('price bar times without seconds become RFC 3339 request times for asOf', () => {
+  // Toss bars arrive as 2026-10-20T00:00+09:00; company and graph APIs reject that (422).
+  expect(requestTime('2026-10-20T00:00+09:00')).toBe('2026-10-19T15:00:00Z');
+  expect(requestTime('2026-10-20T17:40+09:00')).toBe('2026-10-20T08:40:00Z');
+  expect(requestTime('2026-10-20T06:03:38.413Z')).toBe(
+    '2026-10-20T06:03:38.413Z',
+  );
+});
+
+test('first entry pins the company reference time and version, not an older last price bar (closed market)', async () => {
+  // FS040: on a weekend the last bar is Friday; the latest public version activated afterwards.
+  const saturday = '2026-10-24T03:00:00Z';
+  server.on('GET', '/api/v1/companies/:id', (r) =>
+    json({
+      ...company,
+      id: r.params.id,
+      metadata: {
+        ...metadata,
+        asOf: r.query.get('asOf') ?? saturday,
+        graphVersion: 'v-weekend',
+      },
+    }),
+  );
+  open();
+  await screen.findByRole('heading', { name: '합성 기업' });
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain(
+      `asOf=${encodeURIComponent(saturday)}`,
+    ),
+  );
+  expect(screen.getByTestId('address').textContent).toContain(
+    'graphVersion=v-weekend',
+  );
+});
+
+test('a graphVersion-only address explains it cannot open that version and moves to the latest data', async () => {
+  // The API answers this mode with the request time as metadata.asOf and no time for the version, so the page
+  // must not invent one (422) nor wait forever; it stops follow-up reads and offers the latest data.
+  server.on('GET', '/api/v1/companies/:id', (r) =>
+    json({
+      ...company,
+      id: r.params.id,
+      metadata: {
+        ...metadata,
+        graphVersion: r.query.get('graphVersion') ?? 'v1',
+      },
+    }),
+  );
+  open('?graphVersion=v-past');
+  await screen.findByRole('heading', { name: '합성 기업' });
+  const notice = await screen.findByText(/그래프 버전\(v-past\)만 있어/);
+  expect(
+    screen.queryByText('타임라인의 기준 시점을 확인하고 있어요.'),
+  ).toBeNull();
+  expect(
+    screen.queryByText('관계 그래프의 기준 시점을 확인하고 있어요.'),
+  ).toBeNull();
+  expect(screen.getByTestId('address').textContent).not.toContain('asOf=');
+  expect(server.calls('GET', '/api/v1/events')).toHaveLength(0);
+  expect(server.calls('GET', '/api/v1/companies/:id/graph')).toHaveLength(0);
+  expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(0);
+  expect(screen.queryByText(/최신 제공 시점 확인 중/)).toBeNull();
+  expect(screen.queryByText(/차트 불러오는 중/)).toBeNull();
+  expect(screen.queryByText(/별 종가/)).toBeNull();
+  expect(
+    server
+      .calls('GET', '/api/v1/companies/:id')
+      .every((call) => !call.query.has('asOf')),
+  ).toBe(true);
+
+  await userEvent.click(
+    within(notice.closest('p')!).getByRole('button', {
+      name: '최신 자료로 보기',
+    }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain(
+      `asOf=${encodeURIComponent(time)}`,
+    ),
+  );
+  expect(screen.getByTestId('address').textContent).toContain(
+    'graphVersion=v1',
+  );
+  await waitFor(() =>
+    expect(server.calls('GET', '/api/v1/events').length).toBeGreaterThan(0),
+  );
+  expect(
+    server.calls('GET', '/api/v1/companies/:id/prices').length,
+  ).toBeGreaterThan(0);
+  expect(await screen.findByText(/별 종가/)).toBeTruthy();
+  expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
+});
+
+test.each(['success', 'failure'] as const)(
+  'D-COM-01 discards a late price %s after entering a graphVersion-only address',
+  async (outcome) => {
+    const pending = deferred<Response>();
+    const priceResponse = () =>
+      json({
+        status: 'available',
+        companyId: id,
+        period: '1m',
+        interval: '1d',
+        source,
+        currency: 'KRW',
+        points: [
+          {
+            time: old,
+            open: 100,
+            high: 115,
+            low: 90,
+            close: 110,
+            volume: null,
+          },
+          { time, open: 110, high: 130, low: 100, close: 120, volume: null },
+        ],
+      });
+    let first = true;
+    server.on('GET', '/api/v1/companies/:id/prices', () => {
+      if (first) {
+        first = false;
+        return pending.promise;
+      }
+      return priceResponse();
+    });
+    server.on('GET', '/api/v1/companies/:id', (r) =>
+      json({
+        ...company,
+        metadata: {
+          ...metadata,
+          graphVersion: r.query.get('graphVersion') ?? 'v1',
+        },
+      }),
+    );
+    render(
+      <MemoryRouter
+        initialEntries={[`/companies/${encodeURIComponent(id)}${pinned}`]}
+      >
+        <Address />
+        <VersionOnlyNavigation />
+        <Routes>
+          <Route path="/companies/:id" element={<CompanyDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(
+        1,
+      ),
+    );
+    expect(screen.getByText(/차트 불러오는 중/)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole('button', { name: '버전 단독 주소로 이동' }),
+    );
+    const notice = await screen.findByText(/그래프 버전\(v-past\)만 있어/);
+    const assertUnsupported = () => {
+      expect(server.calls('GET', '/api/v1/companies/:id/prices')).toHaveLength(
+        1,
+      );
+      expect(screen.getByTestId('address').textContent).toContain(
+        'graphVersion=v-past',
+      );
+      expect(screen.getByTestId('address').textContent).not.toContain('asOf=');
+      expect(screen.queryByText(/별 종가/)).toBeNull();
+      expect(
+        screen.queryByText(
+          /차트 불러오는 중|차트 조회 실패|최신 제공 시점 확인 중/,
+        ),
+      ).toBeNull();
+      expect(screen.getByRole('region', { name: '최신 시세' })).toBeTruthy();
+    };
+    assertUnsupported();
+    await act(async () => {
+      pending.resolve(
+        outcome === 'success'
+          ? priceResponse()
+          : apiError(503, 'SOURCE_UNAVAILABLE'),
+      );
+    });
+    assertUnsupported();
+
+    await userEvent.click(
+      within(notice.closest('p')!).getByRole('button', {
+        name: '최신 자료로 보기',
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('address').textContent).toContain(
+        `asOf=${encodeURIComponent(time)}`,
+      ),
+    );
+    expect(screen.getByTestId('address').textContent).toContain(
+      'graphVersion=v1',
+    );
+    expect(await screen.findByText(/별 종가/)).toBeTruthy();
+    expect(
+      server.calls('GET', '/api/v1/companies/:id/prices').length,
+    ).toBeGreaterThan(1);
+    expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
+  },
+);

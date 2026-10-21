@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useRouteQuery } from '@/hooks/useRouteQuery';
 import { useCompanyResource, type Resource } from '@/hooks/useCompanyResource';
 import { companyUrl } from '@/apis/company/company';
-import { exactTime, safeHref } from './detail-model';
+import { exactTime, safeHref, versionOnlyAddress } from './detail-model';
 import type { CompanyDocuments, Evidence } from '@/types/company/documents';
 import type { DocumentAnalysis } from '@/types/evidence';
 
@@ -243,7 +243,9 @@ export default function CompanyDocumentPanel() {
           </button>
         </nav>
       )}
-      {!ready && <p role="status">기업 상세의 기준 시점을 확인하고 있어요.</p>}
+      {!ready && !versionOnlyAddress(asOf, version) && (
+        <p role="status">기업 상세의 기준 시점을 확인하고 있어요.</p>
+      )}
       <Failure resource={list} label="뉴스·공시" />
       {list.data && (
         <>

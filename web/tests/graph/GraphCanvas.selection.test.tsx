@@ -1,9 +1,19 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
 import { createMockGraph } from '@/mocks/graph/response';
 import type { GraphData } from '@antv/g6';
+import { MemoryRouter } from 'react-router-dom';
+import MapPage from '@/pages/map/MapPage';
+import * as graphApi from '@/apis/graph/graph';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 const canvas = vi.hoisted(() => ({
   created: vi.fn(),
@@ -85,6 +95,42 @@ beforeEach(() => {
   );
 });
 describe('D-GRP-02 · canvas selection bridge', () => {
+  it.each(['light', 'dark'] as const)(
+    'D-GRP-01 uses the approved appearance on the normal %s map route',
+    async (theme) => {
+      document.documentElement.dataset.theme = theme;
+      useAuthStore.setState({ status: 'ready', member: null, session: null });
+      vi.spyOn(graphApi, 'getGraph').mockResolvedValue(
+        createMockGraph({ mode: 'all', personalFilter: 'all' }),
+      );
+      const { unmount } = render(
+        <MemoryRouter initialEntries={['/?mode=all']}>
+          <MapPage />
+        </MemoryRouter>,
+      );
+      try {
+        await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+        const rendered = canvas.setData.mock.lastCall![0] as GraphData;
+        const direct = rendered.edges?.find(
+          (edge) => !edge.style?.lineDash && !edge.style?.endArrow,
+        );
+        expect(direct?.style?.lineWidth).toBe(1.5);
+        expect(direct?.style?.stroke).toBe(
+          theme === 'dark' ? '#c4c9d1' : '#606a76',
+        );
+        const label = rendered.nodes?.find(
+          (node) => node.id === 'NASDAQ:NVDA',
+        )?.style;
+        expect(Number(label?.labelFontSize)).toBeGreaterThan(17.2);
+        const filters = screen.getByRole('group', { name: '그래프 표시 필터' });
+        expect(filters.closest('.relationship-toolbar')).toBeTruthy();
+        expect(screen.queryByLabelText('그래프 범례')).toBeNull();
+      } finally {
+        unmount();
+        delete document.documentElement.dataset.theme;
+      }
+    },
+  );
   it('shows the full API issue title on hover and clears it on leave', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const issue = data.nodes.find((node) => node.kind === 'issue')!;
@@ -102,7 +148,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     );
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
-  it('fits the graph inside a measured legend-free region without recreating it', async () => {
+  it('fits the graph around remaining overlays without recreating it', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
@@ -111,7 +157,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       clientWidth: { value: 1200, configurable: true },
       clientHeight: { value: 800, configurable: true },
     });
-    const legend = screen.getByLabelText('그래프 범례');
+    const legend = screen.getByLabelText('지도 확대 조절');
     const box = {
       x: 20,
       y: 16,
@@ -142,14 +188,204 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const { rerender } = render(<GraphCanvas data={data} />);
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
-    canvas.focusElement.mockClear();
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { value: 900, configurable: true },
+      clientHeight: { value: 600, configurable: true },
+    });
+    canvas.translateBy.mockClear();
     rerender(
       <GraphCanvas data={data} centerRequest={{ id: 'KRX:005930', seq: 1 }} />,
     );
-    await waitFor(() =>
-      expect(canvas.focusElement).toHaveBeenCalledWith('KRX:005930', false),
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    const node = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+      (node) => node.id === 'KRX:005930',
+    )!;
+    expect(canvas.translateBy).toHaveBeenLastCalledWith(
+      [450 - Number(node.style!.x), 300 - Number(node.style!.y)],
+      false,
     );
   });
+  it('D-GRP-01/03 centers the clicked node after the detail rail resizes and redraws the map, preserving zoom', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <GraphCanvas data={data} onSelect={onSelect} />,
+    );
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { value: 1200, configurable: true },
+      clientHeight: { value: 700, configurable: true },
+    });
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() => expect(canvas.setSize).toHaveBeenCalledWith(1200, 700));
+    await act(async () => {});
+    canvas.zoomTo.mockClear();
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+    );
+    expect(onSelect).toHaveBeenCalledWith('KRX:005930');
+    rerender(
+      <GraphCanvas data={data} onSelect={onSelect} selectedId="KRX:005930" />,
+    );
+    await act(async () => {});
+    // The rail opens after selection, changing the responsive node positions.
+    Object.defineProperty(host, 'clientWidth', {
+      value: 868,
+      configurable: true,
+    });
+    canvas.translateBy.mockClear();
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    const node = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+      (node) => node.id === 'KRX:005930',
+    )!;
+    expect(canvas.translateBy).toHaveBeenLastCalledWith(
+      [434 - Number(node.style!.x), 350 - Number(node.style!.y)],
+      false,
+    );
+    expect(canvas.translateBy.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      canvas.draw.mock.invocationCallOrder.at(-1)!,
+    );
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(canvas.created).toHaveBeenCalledOnce();
+
+    // A deliberate pan/zoom releases the selected-node anchor on later resize.
+    fireEvent.wheel(host);
+    Object.defineProperty(host, 'clientWidth', {
+      value: 800,
+      configurable: true,
+    });
+    canvas.translateBy.mockClear();
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() =>
+      expect(canvas.translateBy).toHaveBeenCalledWith([-34, 0], false),
+    );
+    await act(async () => {});
+    expect(canvas.translateBy).toHaveBeenCalledTimes(1);
+
+    // Clicking the same node again centers it, even though the URL is unchanged.
+    canvas.translateBy.mockClear();
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+    );
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    const latest = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+      (node) => node.id === 'KRX:005930',
+    )!;
+    expect(canvas.translateBy).toHaveBeenLastCalledWith(
+      [400 - Number(latest.style!.x), 350 - Number(latest.style!.y)],
+      false,
+    );
+  });
+  it('M-GRP-01 centers selection above an overlapping mobile detail sheet', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const sheet = document.createElement('aside');
+    sheet.dataset.screenId = 'M-GRP-01';
+    document.body.append(sheet);
+    const rect = {
+      left: 0,
+      top: 400,
+      right: 390,
+      bottom: 700,
+      width: 390,
+      height: 300,
+    } as DOMRect;
+    vi.spyOn(sheet, 'getClientRects').mockReturnValue([
+      rect,
+    ] as unknown as DOMRectList);
+    vi.spyOn(sheet, 'getBoundingClientRect').mockReturnValue(rect);
+    const { rerender, unmount } = render(<GraphCanvas data={data} />);
+    try {
+      await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { value: 390, configurable: true },
+        clientHeight: { value: 700, configurable: true },
+      });
+      rerender(<GraphCanvas data={data} selectedId="KRX:005930" />);
+      await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+      const node = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+        (node) => node.id === 'KRX:005930',
+      )!;
+      expect(canvas.translateBy).toHaveBeenLastCalledWith(
+        // freeViewport reserves 20px at the canvas edge and 12px above the sheet.
+        [195 - Number(node.style!.x), 204 - Number(node.style!.y)],
+        false,
+      );
+    } finally {
+      unmount();
+      sheet.remove();
+    }
+  });
+  it.each(['canvas click', 'external selection clear'])(
+    'D-GRP-01/03 keeps every node and the camera in place after %s closes the rail',
+    async (method) => {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const onSelect = vi.fn();
+      const { rerender } = render(
+        <GraphCanvas data={data} onSelect={onSelect} />,
+      );
+      await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { value: 868, configurable: true },
+        clientHeight: { value: 700, configurable: true },
+      });
+      rerender(
+        <GraphCanvas data={data} onSelect={onSelect} selectedId="KRX:005930" />,
+      );
+      await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setSize).toHaveBeenCalledWith(868, 700),
+      );
+      await act(async () => {});
+      const positions = () =>
+        new Map(
+          (canvas.setData.mock.lastCall![0] as GraphData).nodes!.map((node) => [
+            node.id,
+            [node.style!.x, node.style!.y],
+          ]),
+        );
+      const before = positions();
+      canvas.translateBy.mockClear();
+      canvas.zoomTo.mockClear();
+      canvas.focusElement.mockClear();
+      if (method === 'canvas click') {
+        act(() => canvas.handlers.get('canvas:click')!({ target: { id: '' } }));
+        expect(onSelect).toHaveBeenLastCalledWith(null);
+      }
+      // Esc and the close button clear selectedId through MapPage, bypassing
+      // the canvas click handler. Both must preserve the same screen position.
+      rerender(<GraphCanvas data={data} onSelect={onSelect} />);
+      Object.defineProperty(host, 'clientWidth', {
+        value: 1200,
+        configurable: true,
+      });
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setSize).toHaveBeenLastCalledWith(1200, 700),
+      );
+      await act(async () => {});
+      expect(positions()).toEqual(before);
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(canvas.focusElement).not.toHaveBeenCalled();
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ 'KRX:005930': [] }),
+      );
+      expect(canvas.created).toHaveBeenCalledOnce();
+
+      // An explicit fit can still use the full, newly expanded graph surface.
+      await userEvent.click(
+        screen.getByRole('button', { name: '전체 그래프 맞춤' }),
+      );
+      await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+      expect(positions()).not.toEqual(before);
+    },
+  );
   it('keeps a user-placed view centered when a sidebar narrows the map', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     sessionStorage.setItem(
@@ -178,15 +414,59 @@ describe('D-GRP-02 · canvas selection bridge', () => {
   it('explains each legend item in its tooltip', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     render(<GraphCanvas data={data} />);
-    const shared = await screen.findByRole('button', { name: /^■ 사건 공유/ });
+    const shared = await screen.findByRole('button', { name: /^사건 공유/ });
     expect(shared.getAttribute('title')).toContain(
       '같은 사건에 각각 직접 또는 구조적으로 연결',
     );
     expect(
-      screen
-        .getByRole('button', { name: /^■ 후속 사건/ })
-        .getAttribute('title'),
+      screen.getByRole('button', { name: /^후속 사건/ }).getAttribute('title'),
     ).toContain('앞 사건 다음에');
+  });
+  it('D-GRP-01 moves the only filter group to the toolbar and toggles actual edges without moving the camera', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const toolbar = document.createElement('header');
+    document.body.append(toolbar);
+    const { unmount } = render(
+      <GraphCanvas data={data} filterHost={toolbar} />,
+    );
+    try {
+      await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+      expect(
+        screen.getAllByRole('group', { name: '그래프 표시 필터' }),
+      ).toHaveLength(1);
+      const button = screen.getByRole('button', { name: /^사건 공유 \d/ });
+      expect(toolbar.contains(button)).toBe(true);
+      expect(
+        screen.getByTestId('graph-canvas').querySelector('aside'),
+      ).toBeNull();
+      canvas.zoomTo.mockClear();
+      canvas.translateBy.mockClear();
+      await userEvent.click(button);
+      await waitFor(() =>
+        expect(button.getAttribute('aria-pressed')).toBe('false'),
+      );
+      await waitFor(() =>
+        expect(
+          (canvas.setData.mock.lastCall![0] as GraphData).edges
+            ?.filter(
+              (edge) =>
+                data.edges.find((item) => item.id === edge.id)?.relationType ===
+                'SHARES_ISSUE',
+            )
+            .every((edge) => edge.style?.visibility === 'hidden'),
+        ).toBe(true),
+      );
+      expect(canvas.created).toHaveBeenCalledOnce();
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      await userEvent.click(button);
+      await waitFor(() =>
+        expect(button.getAttribute('aria-pressed')).toBe('true'),
+      );
+    } finally {
+      unmount();
+      toolbar.remove();
+    }
   });
   it('ports legend filters without moving nodes and keeps at least one node kind visible', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
@@ -195,7 +475,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const before = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
       (node) => node.id === 'NASDAQ:NVDA',
     )?.style;
-    await userEvent.click(screen.getByRole('button', { name: /■ 기업/ }));
+    await userEvent.click(screen.getByRole('button', { name: /기업 \d/ }));
     await waitFor(() =>
       expect(
         (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
@@ -204,7 +484,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
       ).toBe('hidden'),
     );
     expect(
-      (screen.getByRole('button', { name: /■ 사건 \d/ }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: /^사건 \d+$/ }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
     const after = (canvas.setData.mock.lastCall![0] as GraphData).nodes?.find(
@@ -316,7 +596,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     });
     expect(canvas.setSize).not.toHaveBeenCalled();
   });
-  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches and an semi-transparent legend', async () => {
+  it('D-GRP-01 keeps the graph host pinned to the map surface across mode switches without the old left legend', async () => {
     const all = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const personal = createMockGraph({
       mode: 'personal',
@@ -328,9 +608,7 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const host = screen.getByRole('img');
     expect(host.className).toContain('absolute!');
     expect(host.className).toContain('inset-0');
-    expect(screen.getByLabelText('그래프 범례').className).toContain(
-      'bg-zoop-map/60',
-    );
+    expect(screen.queryByLabelText('그래프 범례')).toBeNull();
     rerender(<GraphCanvas data={personal} />);
     await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(2));
     rerender(<GraphCanvas data={all} />);
@@ -338,18 +616,18 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     expect(screen.getByRole('img').className).toContain('absolute!');
     expect(canvas.destroyed).toHaveBeenCalledTimes(2);
   });
-  it('D-GRP-01 keeps the market title when a company is selected and omits the frame number', () => {
+  it('D-GRP-01 removes the duplicate left title and retains the map accessible name', () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const { rerender } = render(
       <GraphCanvas data={data} selectedId="KRX:005930" />,
     );
     expect(
-      screen.getByRole('heading', { name: '시장 전체 지도' }),
+      screen.getByRole('img', { name: /시장 전체 관계 지도/ }),
     ).toBeTruthy();
     expect(screen.queryByText('(01)')).toBeNull();
     rerender(<GraphCanvas data={data} selectedId="NASDAQ:NVDA" />);
     expect(
-      screen.getByRole('heading', { name: '시장 전체 지도' }),
+      screen.getByRole('img', { name: /시장 전체 관계 지도/ }),
     ).toBeTruthy();
   });
   it('D-GRP-01 hover emphasizes incident nodes/edges without selecting or redrawing the viewport', async () => {
