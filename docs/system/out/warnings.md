@@ -262,7 +262,7 @@
 | BFF_PATH_DIFFERENCE | difference | getCompanyMetrics | 목표 /api/v1/companies/{id}/metrics ↔ BFF /api/companies/{id}/metrics |  |
 | BFF_FIELD_DIFFERENCE | difference | getCompanyMetrics | 목표만 84 · BFF만 39 · 형식/필수/권한 변경 4 |  |
 | BFF_PATH_DIFFERENCE | difference | getCompanyPrices | 목표 /api/v1/companies/{id}/prices ↔ BFF /api/companies/{id}/prices |  |
-| BFF_FIELD_DIFFERENCE | difference | getCompanyPrices | 목표만 80 · BFF만 39 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | getCompanyPrices | 목표만 89 · BFF만 39 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | listCompanyDocuments | 목표 /api/v1/companies/{id}/documents ↔ BFF /api/companies/{id}/documents |  |
 | BFF_FIELD_DIFFERENCE | difference | listCompanyDocuments | 목표만 118 · BFF만 64 · 형식/필수/권한 변경 19 |  |
 | BFF_PATH_DIFFERENCE | difference | listEvents | 목표 /api/v1/events ↔ BFF /api/events |  |
@@ -301,7 +301,7 @@
 | BFF_PATH_DIFFERENCE | difference | getAdminDashboard | 목표 /api/v1/admin/dashboard ↔ BFF /api/admin/dashboard |  |
 | BFF_FIELD_DIFFERENCE | difference | getAdminDashboard | 목표만 695 · BFF만 633 · 형식/필수/권한 변경 7 |  |
 | BFF_PATH_DIFFERENCE | difference | listAuditRecords | 목표 /api/v1/admin/audit-log ↔ BFF /api/admin/audit-log |  |
-| BFF_FIELD_DIFFERENCE | difference | listAuditRecords | 목표만 115 · BFF만 23 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | listAuditRecords | 목표만 119 · BFF만 31 · 형식/필수/권한 변경 8 |  |
 | BFF_PATH_DIFFERENCE | difference | getPipelineOverview | 목표 /api/v1/admin/pipeline/overview ↔ BFF /api/admin/pipeline/overview |  |
 | BFF_FIELD_DIFFERENCE | difference | getPipelineOverview | 목표만 114 · BFF만 21 · 형식/필수/권한 변경 12 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisCandidates | 목표 /api/v1/admin/pipeline/candidates ↔ BFF /api/admin/pipeline/candidates |  |

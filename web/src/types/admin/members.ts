@@ -53,7 +53,7 @@ export type MemberFilter = 'all' | MemberStatus;
 export type AuditEntry = {
   id: number;
   at: string;
-  actorKind: 'admin' | 'system';
+  actorKind: 'admin' | 'system' | 'anonymous';
   actorId: string;
   actorEmail: string | null;
   action: string;

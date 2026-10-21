@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,6 +83,37 @@ class AdminMemberStatusServiceTest {
         verify(repository, never()).updateStatus(anyString(), anyLong(), anyString(), any(), any());
         verify(audit, never()).recordMemberStatusAction(anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString(), anyString(), anyLong(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    void rejectsCredentialOrPersonalDataInAuditReasonBeforeChangingMember() {
+        var failure = assertThrows(CustomException.class, () -> service().block("member-1",
+                new MemberStatusRequest(1, "Contact person@example.com with password"),
+                "key", ADMIN, "request"));
+        assertEquals(ErrorCode.INVALID_REQUEST, failure.getErrorCode());
+        verifyNoInteractions(repository, audit);
+    }
+
+    @Test
+    void auditWriteFailureNeverCompletesTheMemberChangeResult() {
+        when(repository.claimIdempotency(anyString(), eq("admin-1"), anyString(), eq("key-4"),
+                anyString(), eq(NOW))).thenReturn(true);
+        when(repository.findIdempotencyForUpdate(eq("admin-1"), anyString(), eq("key-4")))
+                .thenReturn(java.util.Optional.of(new IdempotencyRow(
+                        "idem-4", hash("member-1", "blocked", 1, "abuse"), "processing", null, null)));
+        when(repository.findStatusForUpdate("member-1"))
+                .thenReturn(java.util.Optional.of(new MemberStatusRow("member-1", "active", 1)));
+        when(repository.updateStatus("member-1", 1, "blocked", NOW, NOW)).thenReturn(true);
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataAccessResourceFailureException("audit unavailable"))
+                .when(audit).recordMemberStatusAction(anyString(), anyString(), anyString(),
+                        anyString(), anyString(), anyString(), anyString(), anyLong(), anyLong(),
+                        anyString(), any());
+
+        var failure = assertThrows(CustomException.class, () -> service().block("member-1",
+                new MemberStatusRequest(1, "abuse"), "key-4", ADMIN, "request-4"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, failure.getErrorCode());
+        verify(repository, never()).completeIdempotency(anyString(), anyInt(), anyString());
     }
 
     @Test

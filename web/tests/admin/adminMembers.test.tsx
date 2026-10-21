@@ -322,6 +322,15 @@ describe('A-ADM-05b 관리자 감사 로그 (FS073·NFS008)', () => {
                 reason: '이용 약관 위반',
                 outcome: 'denied',
               }),
+              audit({
+                id: 4,
+                actorKind: 'anonymous',
+                actorEmail: null,
+                actorId: 'unknown',
+                action: 'auth.login_failed',
+                targetId: null,
+                outcome: 'denied',
+              }),
             ],
             nextCursor: 'next-1',
           }),
@@ -331,8 +340,9 @@ describe('A-ADM-05b 관리자 감사 로그 (FS073·NFS008)', () => {
     const table = await screen.findByRole('table', { name: '감사 로그' });
     expect(within(table).getByText('로그인')).toBeTruthy();
     expect(within(table).getByText('admin-session · admin-demo')).toBeTruthy();
-    expect(within(table).getByText('거부됨')).toBeTruthy();
+    expect(within(table).getAllByText('거부됨')).toHaveLength(2);
     expect(within(table).getByText('이용 약관 위반')).toBeTruthy();
+    expect(within(table).getByText('익명')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: '더 보기' }));
     expect(await within(table).findByText('시스템')).toBeTruthy();

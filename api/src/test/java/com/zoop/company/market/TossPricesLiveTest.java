@@ -24,11 +24,32 @@ class TossPricesLiveTest {
     @Test
     void aggregatedPeriodsLandOnTheirBucketBoundaries() {
         for (String[] stock : List.of(new String[] {"KRX:005930", "KRX", "005930"}, new String[] {"NASDAQ:NVDA", "NASDAQ", "NVDA"})) {
-            // Three days back always reaches a trading day, even on a weekend.
-            Instant now = Instant.now();
-            check(stock, "1d", "5m", now.minus(Duration.ofDays(3)), now, t -> t.getMinute() % 5 == 0);
+            // 1d is the last regular session, even on a weekend; its 5-minute buckets never leave it.
+            check(stock, "1d", "5m", null, null, t -> t.getMinute() % 5 == 0);
             check(stock, "1w", "1h", null, null, t -> t.getMinute() == 0);
             check(stock, "1y", "1wk", null, null, t -> t.getDayOfWeek() == DayOfWeek.MONDAY && t.getHour() == 0);
+        }
+    }
+
+    /**
+     * The 1d session comes from Toss's market calendar: a normal KRX day, the 2025 CSAT day (KRX 10:00–16:30), a KR holiday,
+     * the US Thanksgiving holiday and the next day's 13:00 ET early close. Prints every range so a mismatch is visible.
+     */
+    @Test
+    void dayFollowsTheMarketCalendar() {
+        String[][] cases = {
+                {"KRX:005930", "KRX", "005930", "2025-10-21T16:00:00+09:00", "2025-10-21T09:00:00+09:00", "2025-10-21T15:30:00+09:00"},
+                {"KRX:005930", "KRX", "005930", "2025-11-13T17:00:00+09:00", "2025-11-13T10:00:00+09:00", "2025-11-13T16:30:00+09:00"},
+                {"KRX:005930", "KRX", "005930", "2025-10-06T12:00:00+09:00", "2025-10-02T09:00:00+09:00", "2025-10-02T15:30:00+09:00"},
+                {"NASDAQ:NVDA", "NASDAQ", "NVDA", "2025-11-27T12:00:00-05:00", "2025-11-26T09:30:00-05:00", "2025-11-26T16:00:00-05:00"},
+                {"NASDAQ:NVDA", "NASDAQ", "NVDA", "2025-11-28T14:00:00-05:00", "2025-11-28T09:30:00-05:00", "2025-11-28T13:00:00-05:00"},
+        };
+        for (String[] c : cases) {
+            CompanyPriceResponse r = toss.prices(c[0], c[1], c[2], "1d", null, OffsetDateTime.parse(c[3]).toInstant().plusNanos(1));
+            System.out.printf("%s to %s -> %s %s%n", c[0], c[3], r.status(),
+                    r.range() == null ? r.reasonCode() : r.range().from() + " .. " + r.range().to() + " (" + r.range().sessionDate() + ")");
+            assertEquals("available", r.status(), c[0] + " " + c[3]);
+            assertEquals(c[4] + " .. " + c[5], r.range().from() + " .. " + r.range().to(), c[0] + " " + c[3]);
         }
     }
 
@@ -54,6 +75,8 @@ class TossPricesLiveTest {
             assertTrue(onBoundary.test(t) && t.getSecond() == 0, stock[0] + " " + period + " off boundary: " + p.time());
             assertTrue(previous == null || t.isAfter(previous), "points oldest first");
             assertTrue(p.high() >= Math.max(p.open(), p.close()) && p.low() <= Math.min(p.open(), p.close()), p.toString());
+            assertTrue(!"1d".equals(period) || (!t.isBefore(OffsetDateTime.parse(r.range().from()))
+                    && t.isBefore(OffsetDateTime.parse(r.range().to()))), "1d point outside its session: " + p.time());
             previous = t;
         }
         System.out.printf("%s %s: %d points, %s .. %s%n", stock[0], period, r.points().size(),

@@ -129,7 +129,8 @@ public class TossMarketClient {
      * 1y daily bars aggregated into the contract's fixed resolution (x-zoop.chartResolution); 1m is the daily bars as
      * they are. A point is a whole bucket (5 minutes, an hour, an exchange day or a Monday week) that overlaps
      * [from, to): the chart sends a point's own start back as to, and that point must come back with the same values.
-     * A missing to is now and a missing from one period before it.
+     * A missing to is now and a missing from one period before it. 1d takes no from: it is the listing exchange's
+     * regular session that is open at to, or the last one before it (FS040).
      */
     public CompanyPriceResponse prices(String companyId, String exchange, String code, String period,
             Instant from, Instant to) {
@@ -144,14 +145,18 @@ public class TossMarketClient {
         ZoneId zone = marketZone(exchange);
         Instant end = to != null ? to : clock.instant();
         Instant start = from != null ? from : periodStart(period, end);
+        String sessionDate = null;
         try {
-            List<CompanyPriceResponse.Point> points;
-            if ("5m".equals(interval) || "1h".equals(interval)) {
-                long size = "5m".equals(interval) ? 300 : 3600;
-                // Every minute of the first and last bucket, so the edge buckets are whole.
-                Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(), size) * size);
-                Instant last = Instant.ofEpochSecond(Math.floorDiv(end.minusNanos(1).getEpochSecond(), size) * size + size);
-                points = PriceBars.byInterval(minuteBars(code, zone, first, last), size, zone);
+            List<CompanyPriceResponse.Point> points = List.of();
+            if ("1d".equals(period)) {
+                Session session = session("KRX".equals(exchange), end.minusNanos(1).atZone(zone).toLocalDate(), end);
+                start = session.open();
+                end = end.isBefore(session.close()) ? end : session.close();
+                sessionDate = session.date();
+                // A session the calendar says was open but that has no bars is no_data, never the day before.
+                points = minuteBuckets(code, zone, start, end, 300);
+            } else if ("1h".equals(interval)) {
+                points = minuteBuckets(code, zone, start, end, 3600);
             } else {
                 boolean weekly = "1wk".equals(interval);
                 // A daily bar starts at its exchange-local midnight; a week bucket at that week's Monday.
@@ -173,8 +178,12 @@ public class TossMarketClient {
             // Bars came back, so a missing stock row or currency is a provider format failure, not an absence of data.
             String currency = stock == null ? null : strictText(stock.get("currency"));
             if (currency == null) throw formatFailure();
+            // An exact to arrives as to + 1ns (inclusive); millis drop that nanosecond again. RFC 3339 always has seconds.
+            var rfc3339 = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+            var range = new CompanyPriceResponse.Range(start.atZone(zone).format(rfc3339),
+                    end.truncatedTo(java.time.temporal.ChronoUnit.MILLIS).atZone(zone).format(rfc3339), sessionDate);
             return CompanyPriceResponse.available(companyId, period,
-                    new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, points);
+                    new CompanyQuoteResponse.Source("toss", "토스증권", true, null, code, null), currency, interval, range, points);
         } catch (MarketDataException exception) {
             throw exception;
         } catch (TossUnsupportedSymbolException exception) {
@@ -184,6 +193,47 @@ public class TossMarketClient {
         } catch (Exception exception) {
             throw new MarketDataException(false);
         }
+    }
+
+    record Session(String date, Instant open, Instant close) { }
+
+    /**
+     * The regular session for 1d, taken from Toss's market calendar (exchange-local date in, previous/current/next business
+     * day out): the given day's session once it has opened, otherwise (before the open, a weekend or a holiday) the previous
+     * business day's whole session. The calendar decides closures and early closes; missing bars never move the session.
+     * KR is the calendar's integrated regular session, the union of KRX and NXT regular hours.
+     * shortcut: that union equals KRX regular hours only while NXT's main market (09:00:30–15:20) stays inside KRX's; read a
+     * KRX-only schedule if NXT ever trades outside KRX regular hours.
+     */
+    private Session session(boolean krx, LocalDate day, Instant at) {
+        JsonNode calendar = get("/api/v1/market-calendar/" + (krx ? "KR" : "US"), Map.of("date", day.toString())).path("result");
+        JsonNode today = calendar.path("today");
+        // The calendar answers for the asked day; a missing or different date is a provider format failure, never a holiday.
+        if (!day.toString().equals(text(today.get("date")))) throw formatFailure();
+        Session current = regular(krx, today); // null: the asked day has no regular session (closed)
+        // at is the exclusive end (an exact to + 1ns), so a to at the opening instant is in the session and gets its bucket.
+        if (current != null && current.open().isBefore(at)) return current;
+        Session previous = regular(krx, calendar.path("previousBusinessDay"));
+        if (previous == null) throw formatFailure(); // a business day always has a regular session
+        return previous;
+    }
+
+    /** A calendar day's regular session; null when the day has none (closed). */
+    private static Session regular(boolean krx, JsonNode marketDay) {
+        String date = text(marketDay.get("date"));
+        JsonNode regular = (krx ? marketDay.path("integrated") : marketDay).path("regularMarket");
+        if (date == null) throw formatFailure();
+        if (regular.isMissingNode() || regular.isNull()) return null;
+        Instant open = instant(text(regular.get("startTime"))), close = instant(text(regular.get("endTime")));
+        if (open == null || close == null || !open.isBefore(close)) throw formatFailure();
+        return new Session(date, open, close);
+    }
+
+    /** Minute bars over [start, end) in size-second buckets; every minute of the first and last bucket, so edge buckets are whole. */
+    private List<CompanyPriceResponse.Point> minuteBuckets(String code, ZoneId zone, Instant start, Instant end, long size) {
+        Instant first = Instant.ofEpochSecond(Math.floorDiv(start.getEpochSecond(), size) * size);
+        Instant last = Instant.ofEpochSecond(Math.floorDiv(end.minusNanos(1).getEpochSecond(), size) * size + size);
+        return PriceBars.byInterval(minuteBars(code, zone, first, last), size, zone);
     }
 
     /** Default range: one day, 7 days, one calendar month or one calendar year (KST) before the end. */

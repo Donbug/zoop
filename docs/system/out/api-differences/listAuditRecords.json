@@ -7,8 +7,24 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "query.action": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "query.actor": {
+      "type": "string",
+      "maxLength": 200
+    },
     "query.cursor": {
       "type": "string"
+    },
+    "query.q": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "query.targetType": {
+      "type": "string",
+      "maxLength": 80
     },
     "response:200:header:X-Request-ID": {
       "type": "string"
@@ -284,10 +300,38 @@
     }
   },
   "bffOnly": {
+    "query.action<anyOf:0>": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "query.action<anyOf:1>": {
+      "type": "null"
+    },
+    "query.actor<anyOf:0>": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "query.actor<anyOf:1>": {
+      "type": "null"
+    },
     "query.cursor<anyOf:0>": {
       "type": "string"
     },
     "query.cursor<anyOf:1>": {
+      "type": "null"
+    },
+    "query.q<anyOf:0>": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "query.q<anyOf:1>": {
+      "type": "null"
+    },
+    "query.targetType<anyOf:0>": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "query.targetType<anyOf:1>": {
       "type": "null"
     },
     "response:401:application/json.error.details<anyOf:0>": {
@@ -345,28 +389,11 @@
     }
   },
   "changed": {
-    "query.action<anyOf:0>": {
-      "target": {
-        "type": "string"
-      },
-      "bff": {
-        "type": "string",
-        "maxLength": 80
-      }
-    },
-    "query.actor<anyOf:0>": {
-      "target": {
-        "type": "string"
-      },
-      "bff": {
-        "type": "string",
-        "maxLength": 200
-      }
-    },
     "query.limit": {
       "target": {
         "type": "integer",
-        "minimum": 1
+        "minimum": 1,
+        "maximum": 100
       },
       "bff": {
         "type": "integer",
@@ -374,22 +401,21 @@
         "maximum": 200
       }
     },
-    "query.q<anyOf:0>": {
+    "response:200:application/json.items[].actorKind": {
       "target": {
-        "type": "string"
+        "type": "string",
+        "enum": [
+          "admin",
+          "system",
+          "anonymous"
+        ]
       },
       "bff": {
         "type": "string",
-        "maxLength": 200
-      }
-    },
-    "query.targetType<anyOf:0>": {
-      "target": {
-        "type": "string"
-      },
-      "bff": {
-        "type": "string",
-        "maxLength": 80
+        "enum": [
+          "admin",
+          "system"
+        ]
       }
     },
     "response:401:application/json.error.code": {

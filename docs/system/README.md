@@ -106,6 +106,12 @@ uv run --with openapi-spec-validator openapi-spec-validator docs/api/openapi.yam
 - **종료 1:** 원본 경고·팀 미결정·목표/BFF 차이·참조 오류 중 하나 이상 있다. 의도한 경로 버전 변경도 차이로 남긴다. 따라서 현재 목표 계약이 문법적으로 유효하고 P1 연결이 완료되어도 `--check`는 1일 수 있다.
 - `warning`은 원문/팀 미결정, `difference`는 목표/BFF 차이, `error`는 끊긴 참조/의미 불일치/관측 실패다. 합격 기준은 `out/checks.json`의 **hard error 0**과 `xlsxReadback.status=passed`다. `severityCounts`, `scopeCounts`, 시트 행 수도 이 파일에 있다. 원문/목표 차이를 감춰 종료 0으로 만들지 않는다.
 
+### PR에서 `zoop-trace.xlsx`가 충돌할 때
+
+`out/zoop-trace.xlsx`는 `catalog.yaml`, `links.yaml`, `docs/api/openapi.yaml`에서 생성한 ZIP 형식의 바이너리 파일이다. 서로 다른 PR이 각자의 정본 변경 후 이 파일을 재생성하면, 수정한 시트·셀이 달라도 Git은 XLSX 내부 셀을 병합하지 못해 파일 전체를 충돌로 표시한다. 한쪽 파일만 선택하면 다른 쪽의 계약 변경이 추적표에서 빠진다.
+
+작업 브랜치에 최신 `main`을 병합하고, XLSX 충돌 파일은 어느 쪽 버전으로든 임시 배치한 뒤 **병합된 정본에서 이 절의 생성 명령을 다시 실행**한다. `make docs-check`의 생성물 drift와 XLSX 되읽기가 통과하는지 확인하고, 재생성한 XLSX를 충돌 해결 파일로 스테이징한다. 이후 `git ls-files -u`가 비어 있는지 확인한다. 이 절차는 현재 충돌을 해결하지만, XLSX를 Git에서 계속 추적하고 여러 PR이 병렬로 정본을 바꾸는 한 같은 종류의 충돌은 다시 발생할 수 있다.
+
 현재 결정 반영 작업은 새 BFF 관측이 필요하지 않으므로 `--bff-url` 없이 저장된 관측본을 사용한다. 기존 관측 시각/URL은 `out/bff-observation.json`, 재사용 사실은 `BFF_CACHED_OBSERVATION` 경고로 명시한다. 이는 현재 서버나 실제 기능 동작을 재검증한 결과가 아니다.
 
 관측은 코드를 읽는 **새 BFF 프로세스**로 한다. 공유 포트/`prototype/bff/var/`/실제 `.env`를 읽거나 복사하지 않는다. 문서 관측용 포트 **8865**, 새 상태 **`/tmp/zoop-trace-20261008`**에 합성 fixture로만 기동한다. 다음 환경은 scheduler·시세·기업 지표를 모두 끄고 상속된 모델/비밀 환경을 전달하지 않는다. 관측 뒤 종료한다.
