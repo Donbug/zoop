@@ -1,4 +1,5 @@
 import {
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -6,6 +7,8 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { GraphAppearanceContext } from './graph-appearance';
+import { mapAppearanceStyles } from '@/components/common/map-appearance-styles';
 function subscribe(callback: () => void) {
   const media = window.matchMedia?.('(max-width: 767px)');
   media?.addEventListener('change', callback);
@@ -25,6 +28,7 @@ export default function MapDetailSheet({
   onClose: () => void;
   suspended?: boolean;
 }) {
+  const appearance = useContext(GraphAppearanceContext);
   const mobile = useSyncExternalStore(subscribe, mobileSnapshot, () => false);
   const [full, setFull] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
@@ -69,7 +73,9 @@ export default function MapDetailSheet({
   if (!open) return null;
   if (!mobile) return <>{children}</>;
   return createPortal(
-    <div className={suspended ? 'hidden' : ''}>
+    <div
+      className={`${appearance ? mapAppearanceStyles(appearance) : ''} ${suspended ? 'hidden' : ''}`}
+    >
       <div
         className="fixed inset-0 z-40 bg-black/35"
         aria-hidden="true"

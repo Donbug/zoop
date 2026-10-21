@@ -12,18 +12,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useAuthCompletion } from '@/hooks/useAuthCompletion';
 import { acceptMemberSession, loadSession } from '@/apis/auth/member-session';
-import AuthFrame from '@/components/auth/AuthFrame';
+import LoginFrame from '@/components/auth/LoginFrame';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
-import ServiceIntro from '@/components/auth/ServiceIntro';
 import SessionStatus from '@/components/auth/SessionStatus';
-import {
-  authAlert,
-  authInput,
-  authLabel,
-  authNote,
-  authPrimaryButton,
-  focusRing,
-} from '@/components/auth/authStyles';
+import { authAlert, authNote, focusRing } from '@/components/auth/authStyles';
 import type { LoginLocationState } from '@/types/auth';
 
 // 와이어프레임 D-AUT-01 버튼 문구. 서버가 알려 준 제공자만 버튼을 둔다.
@@ -31,19 +23,16 @@ const SOCIAL_LABEL: Record<string, string> = {
   google: '구글 로그인',
   kakao: '카카오톡 로그인',
 };
-const SOCIAL_CAPTION: Record<string, string> = {
-  google: '구글',
-  kakao: '카카오',
-};
+// D-AUT-01: 승인된 중앙 로그인 시안. 셸의 3px 모서리 규칙보다 우선한다.
+const pillInput = `h-12 w-full rounded-full! border-0 bg-zoop-soft px-5 text-[13px] text-zoop-ink placeholder:text-zoop-muted focus:bg-zoop-paper focus:ring-1 focus:ring-zoop-ink disabled:opacity-60 ${focusRing}`;
+const pillButton = `mt-2 flex h-12 w-full items-center justify-center rounded-full! bg-zoop-ink text-[13px] font-bold text-zoop-paper disabled:cursor-progress disabled:opacity-60 ${focusRing}`;
+const textLink = `min-h-0! rounded! bg-transparent text-zoop-muted hover:text-zoop-ink hover:underline aria-disabled:opacity-60 disabled:opacity-60 ${focusRing}`;
+const startCircle = `group grid rounded-full! aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${focusRing}`;
 
-// 원형 버튼 아래에 짧은 이름을 붙인다. 보조 기술에는 aria-label의 전체 문구를 읽힌다.
-const startCircle = `group flex! flex-col items-center gap-1.5 rounded-[3px] bg-transparent disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${focusRing}`;
-const startCaption = 'text-[11px] text-zoop-muted';
-
-/** 시작 방법별 원형 아이콘(제공자 상표 색). 이름은 아래 캡션과 aria-label이 맡는다. */
+/** 제공자 상표 색은 유지하고 aria-label로 이름을 제공한다. */
 function StartIcon({ id }: { id: string }) {
   const circle =
-    'grid size-12 place-items-center rounded-full transition-transform group-hover:scale-105';
+    'grid size-10 place-items-center rounded-full transition-transform group-hover:scale-105';
   if (id === 'google')
     return (
       <span
@@ -81,21 +70,7 @@ function StartIcon({ id }: { id: string }) {
         </svg>
       </span>
     );
-  if (id === 'guest')
-    return (
-      <span aria-hidden="true" className={`${circle} bg-zoop-ink`}>
-        <svg
-          viewBox="0 0 24 24"
-          className="size-5 fill-none stroke-zoop-paper"
-          strokeWidth={1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </span>
-    );
+
   return (
     <span
       aria-hidden="true"
@@ -256,8 +231,16 @@ export default function LoginPage() {
         ? loginErrorMessage(new ApiError(0, flow.error, flow.error))
         : null);
   return (
-    <AuthFrame screen="D-AUT-01" aside={<ServiceIntro />}>
-      <section className="flex w-full max-w-[400px] flex-col gap-6 text-zoop-ink">
+    <LoginFrame>
+      <section className="mx-auto flex w-full max-w-[340px] flex-col gap-6 text-zoop-ink">
+        <header className="mb-5 text-center">
+          <p className="text-[30px] leading-none font-[750] tracking-[-0.045em]">
+            줍
+          </p>
+          <p className="mt-4 text-[13px] leading-6 text-zoop-muted">
+            내 종목 주변의 사건을 하나의 그래프로 봐요
+          </p>
+        </header>
         {socialResult && (
           <p role="alert" className={authAlert}>
             {socialResult}
@@ -274,12 +257,12 @@ export default function LoginPage() {
             noValidate
             aria-labelledby="login-title"
             onSubmit={(event) => void handleSubmit(event)}
-            className="flex flex-col gap-1"
+            className="flex flex-col gap-2.5"
           >
-            <h1 id="login-title" className="mb-3 text-sm font-bold">
+            <h1 id="login-title" className="sr-only">
               이메일로 로그인
             </h1>
-            <label htmlFor="login-email" className={authLabel}>
+            <label htmlFor="login-email" className="sr-only">
               이메일
             </label>
             <input
@@ -291,9 +274,10 @@ export default function LoginPage() {
               disabled={busy}
               aria-invalid={missing && !email.trim()}
               onChange={(event) => setEmail(event.target.value)}
-              className={authInput}
+              placeholder="이메일"
+              className={pillInput}
             />
-            <label htmlFor="login-password" className={authLabel}>
+            <label htmlFor="login-password" className="sr-only">
               비밀번호
             </label>
             <input
@@ -305,7 +289,8 @@ export default function LoginPage() {
               disabled={busy}
               aria-invalid={missing && !password}
               onChange={(event) => setPassword(event.target.value)}
-              className={authInput}
+              placeholder="비밀번호"
+              className={pillInput}
             />
             {missing && (
               <p role="alert" className={authAlert}>
@@ -321,7 +306,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 disabled={flow.busy}
-                className={authPrimaryButton}
+                className={pillButton}
                 onClick={() =>
                   void flow.run(undefined, email.trim() || undefined, from)
                 }
@@ -329,81 +314,70 @@ export default function LoginPage() {
                 로그인 상태 다시 확인
               </button>
             ) : (
-              <button
-                type="submit"
-                disabled={busy}
-                className={authPrimaryButton}
-              >
+              <button type="submit" disabled={busy} className={pillButton}>
                 {flow.busy ? '로그인하고 있어요' : '로그인'}
               </button>
             )}
-            <p className="mt-3 text-center text-[12px] text-zoop-muted">
-              처음이세요?{' '}
+            <div className="mt-1 flex items-center justify-between gap-2 px-2 text-[12px]">
               <Link
                 to="/signup"
                 aria-disabled={busy}
-                className="font-semibold text-zoop-ink underline underline-offset-2"
+                className={textLink}
                 onClick={(event) => busy && event.preventDefault()}
               >
                 이메일로 회원가입
               </Link>
-            </p>
-          </form>
-        )}
-
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-3 text-[11px] text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
-            또는
-          </div>
-          <p className="text-center text-[13px] font-bold">
-            다른 방법으로 시작하기
-          </p>
-          <ul className="m-0 flex list-none justify-center gap-6 p-0">
-            {providers.map((provider) => (
-              <li key={provider.id}>
-                <a
-                  // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
-                  href={socialLoginUrl(provider.id, '/login')}
-                  aria-disabled={busy}
-                  aria-label={
-                    SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`
-                  }
-                  className={startCircle}
-                  onClick={(event) => busy && event.preventDefault()}
-                >
-                  <StartIcon id={provider.id} />
-                  <span className={startCaption}>
-                    {SOCIAL_CAPTION[provider.id] ?? provider.name}
-                  </span>
-                </a>
-              </li>
-            ))}
-            <li>
               <button
                 type="button"
                 disabled={busy}
-                aria-label={
-                  pending === 'guest'
-                    ? '시작하고 있어요'
-                    : '로그인 없이 둘러보기'
-                }
+                className={textLink}
                 onClick={() => {
                   setGuestError(false);
                   setGuestConfirm(true);
                 }}
-                className={startCircle}
               >
-                <StartIcon id="guest" />
-                <span className={startCaption}>로그인 없이 둘러보기</span>
+                {pending === 'guest'
+                  ? '시작하고 있어요'
+                  : '로그인 없이 둘러보기'}
               </button>
-            </li>
-          </ul>
+            </div>
+          </form>
+        )}
+
+        <div className="flex flex-col gap-2.5">
+          {providers.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 text-[11px] text-zoop-faint before:h-px before:flex-1 before:bg-zoop-line after:h-px after:flex-1 after:bg-zoop-line">
+                또는
+              </div>
+              <ul className="m-0 flex list-none justify-center gap-4 p-0">
+                {providers.map((provider) => (
+                  <li key={provider.id}>
+                    <a
+                      // 서버는 허용한 경로(/login·/signup·/)로만 돌려보낸다. 로그인 화면으로 돌아와 FS006 분기를 이어 간다.
+                      href={socialLoginUrl(provider.id, '/login')}
+                      aria-disabled={busy}
+                      aria-label={
+                        SOCIAL_LABEL[provider.id] ?? `${provider.name} 로그인`
+                      }
+                      className={startCircle}
+                      onClick={(event) => busy && event.preventDefault()}
+                    >
+                      <StartIcon id={provider.id} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {guestError && (
             <p role="alert" className={authAlert}>
               비회원으로 시작하지 못했어요. 다시 시도해 주세요.
             </p>
           )}
-          <p className={authNote}>본 서비스는 투자 권유를 제공하지 않아요.</p>
+          <p className={`${authNote} mt-2 text-center text-zoop-muted!`}>
+            본 서비스는 투자 권유를 제공하지 않아요.
+          </p>
         </div>
       </section>
       {guestConfirm && (
@@ -436,6 +410,6 @@ export default function LoginPage() {
           </p>
         </ConfirmDialog>
       )}
-    </AuthFrame>
+    </LoginFrame>
   );
 }

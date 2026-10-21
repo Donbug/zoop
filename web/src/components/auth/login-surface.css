@@ -1,0 +1,47 @@
+/* D-AUT-01: 로그인 전용 무채색 팔레트. 다른 서비스 화면에는 적용하지 않는다. */
+:root[data-theme='dark'] .login-surface {
+  --color-zoop-paper: #171717;
+  --color-zoop-wash: #171717;
+  --color-zoop-soft: #262626;
+  --color-zoop-ink: #fafafa;
+  --color-zoop-muted: #d4d4d4;
+  --color-zoop-faint: #a3a3a3;
+  --color-zoop-line: #373737;
+  --color-white: #171717;
+
+  /* service-shell.css의 root 별칭도 현재 화면 팔레트로 다시 해석한다. */
+  --zoop-paper: var(--color-zoop-paper);
+  --zoop-wash: var(--color-zoop-wash);
+  --zoop-soft: var(--color-zoop-soft);
+  --zoop-ink: var(--color-zoop-ink);
+  --zoop-muted: var(--color-zoop-muted);
+  --zoop-faint: var(--color-zoop-faint);
+  --zoop-line: var(--color-zoop-line);
+}
+
+.login-surface [role='alert'],
+.login-surface [role='alert'] p {
+  color: var(--color-zoop-alert);
+}
+
+/* 밝게 처리된 원본을 반전한 뒤 명도를 복원해 좌우 실루엣이 묻히지 않게 한다. */
+:root[data-theme='dark'] .login-background {
+  mix-blend-mode: screen;
+  filter: invert(1) brightness(3.2);
+}
+
+/* 좌우 삽화의 명도와 별개로 중앙 폼 뒤는 어둡고 차분하게 유지한다. */
+:root[data-theme='dark'] .login-surface main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 15%,
+    var(--color-zoop-paper) 42%,
+    var(--color-zoop-paper) 58%,
+    transparent 85%
+  );
+}

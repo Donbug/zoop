@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import PublishedBriefing from '@/components/briefing/PublishedBriefing';
 import BriefingRoundPicker from '@/components/briefing/BriefingRoundPicker';
@@ -9,6 +10,16 @@ import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 
 const EDITION_BUTTON = `min-w-[76px] whitespace-nowrap rounded-[2px] text-xs font-semibold text-zoop-muted aria-pressed:bg-zoop-paper aria-pressed:text-zoop-ink aria-pressed:shadow-[0_0_0_0.5px_#1a1a1a14] max-sm:flex-1 ${FOCUS_RING}`;
 
+const narrowScreen = '(max-width: 639px)';
+const subscribeScreen = (notify: () => void) => {
+  if (!window.matchMedia) return () => {};
+  const media = window.matchMedia(narrowScreen);
+  media.addEventListener('change', notify);
+  return () => media.removeEventListener('change', notify);
+};
+const isNarrowScreen = () => window.matchMedia?.(narrowScreen).matches ?? false;
+const desktopScreen = () => false;
+
 // D-BRF-01 출근 · D-BRF-02 퇴근 브리핑 (/briefing). 날짜·회차는 주소(?date=&edition=)에 남는다.
 export default function BriefingPage() {
   const { params, updateQuery } = useRouteQuery();
@@ -17,12 +28,19 @@ export default function BriefingPage() {
   const revision = useAuthStore((s) => s.sessionRevision);
   const edition: BriefingEdition =
     params.get('edition') === 'evening' ? 'evening' : 'morning';
+  const narrow = useSyncExternalStore(
+    subscribeScreen,
+    isNarrowScreen,
+    desktopScreen,
+  );
+  const reading = params.get('reading');
+  const compact = reading === 'compact' || (reading !== 'full' && narrow);
   const date = params.get('date') ?? '';
   // FS036: 공통 / 내 종목 기준. 주소(?view=personal)에 남는다.
   const personal = params.get('view') === 'personal';
   return (
     <section
-      className="mx-auto w-full max-w-[800px] text-zoop-ink"
+      className={`mx-auto w-full text-zoop-ink ${compact ? 'max-w-[480px]' : 'max-w-[800px]'}`}
       data-screen-id={edition === 'morning' ? 'D-BRF-01' : 'D-BRF-02'}
     >
       <h1 className="flex items-center gap-2.5 text-[28px] font-[750] tracking-[-0.045em]">
@@ -92,11 +110,38 @@ export default function BriefingPage() {
         </button>
       </div>
 
+      <div
+        className="mt-3 flex items-center gap-2"
+        role="group"
+        aria-label="브리핑 읽기 방식"
+      >
+        <span className="mr-auto text-[11px] text-zoop-muted">
+          {compact ? '핵심부터 가볍게' : '전체 분석과 근거'}
+        </span>
+        <button
+          type="button"
+          aria-pressed={compact}
+          className={`min-h-11 border border-zoop-line px-3 ${EDITION_BUTTON}`}
+          onClick={() => updateQuery({ reading: 'compact' })}
+        >
+          간단히
+        </button>
+        <button
+          type="button"
+          aria-pressed={!compact}
+          className={`min-h-11 border border-zoop-line px-3 ${EDITION_BUTTON}`}
+          onClick={() => updateQuery({ reading: 'full' })}
+        >
+          전체 보기
+        </button>
+      </div>
+
       <PublishedBriefing
         key={`${date}:${edition}:${memberId ?? 'public'}:${revision}`}
         date={date}
         edition={edition}
         personal={personal}
+        compact={compact}
       />
     </section>
   );

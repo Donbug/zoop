@@ -157,6 +157,7 @@ LLM 모델·추론 수준은 .env에서 stage별로 명시 설정한다. 문서 
 | [getEvidence](#getevidence) | GET | /api/v1/evidence/{id} | 공개 | P1 |
 | [getBriefing](#getbriefing) | GET | /api/v1/briefings | 공개 | P1 |
 | [listBriefingRounds](#listbriefingrounds) | GET | /api/v1/briefings/rounds | 공개 | P1 |
+| [getBriefingItemDetail](#getbriefingitemdetail) | GET | /api/v1/briefings/{roundId}/items/{eventId} | 공개 | P1 |
 | [getBriefingGraphBasis](#getbriefinggraphbasis) | GET | /api/v1/briefings/{id}/graph | 공개 | P1 |
 | [createConversation](#createconversation) | PUT | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
 | [getConversation](#getconversation) | GET | /api/v1/chat/sessions/{id} | 회원(본인) | P1 |
@@ -985,7 +986,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCompanyPrices · 기간별 가격 차트 조회
 
-기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각(to는 그 시각 포함)이며, 각 점은 [from, to]와 겹치는 구간(5m·1h·거래소 하루·월요일 시작 주) 하나로 구간 전체 값을 담는다. 가격은 공개 그래프 버전·기준 시점과 무관하므로 asOf·graphVersion을 받지 않으며 주면 422 INVALID_REQUEST다.
+기간별 가격 차트 조회. period는 1d/1w/1m/1y이며 봉 해상도는 기간별로 고정한다: 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉). 공급자가 목표 해상도를 직접 주지 않으면 같은 공급자의 더 촘촘한 봉(1분봉·일봉)을 거래소 현지 시각 기준 구간으로 집계해 만든다: 시가는 첫 봉 시가, 고가·저가는 최대·최소, 종가는 마지막 봉 종가, 거래량은 합. 5m·1h 구간은 시각을 그 단위로 내림한 봉 시작 시각이고, 1wk는 거래소 현지 날짜의 월요일에 시작하는 주다. 각 점의 time은 구간 시작 시각이다. 더 성긴 봉을 쪼개거나 빈 구간을 보간하지 않으며, 거래가 없는 구간은 점을 만들지 않는다. 집계할 원천도 없으면 200 unavailable(no_data)로 정상 자료 부재를 표현한다. 공급자 인증·네트워크·형식 장애는 503 SOURCE_UNAVAILABLE이며 retryable은 일시 장애에만 true다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각(to는 그 시각 포함)이며, 각 점은 [from, to]와 겹치는 구간(5m·1h·거래소 하루·월요일 시작 주) 하나로 구간 전체 값을 담는다. 1d는 상장 거래소의 당일 정규 거래 시간이다(FS040): 세션 시작·종료와 휴장일은 공급자의 거래소 장 운영 캘린더를 따른다(평소 KRX 09:00–15:30 KST, NASDAQ·NYSE·AMEX 09:30–16:00 America/New_York, 조기 마감일은 그날 마감 시각). 시간외 거래는 넣지 않는다. to가 세션 중이면 세션 시작부터 to까지, 장 시작 전·휴장일이면 직전 거래일 세션 전체다. 캘린더상 정상 세션인데 그 종목의 봉이 없으면(거래 정지·무거래) 직전 거래일로 옮기지 않고 200 unavailable(no_data)다. range의 시각은 초까지 쓴 RFC 3339다. 1d 구간은 서버가 정하므로 from을 주면 422 INVALID_REQUEST다. 응답 range는 점이 다루는 실제 구간이다. 가격은 공개 그래프 버전·기준 시점과 무관하므로 asOf·graphVersion을 받지 않으며 주면 422 INVALID_REQUEST다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1007,7 +1008,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | --- | --- | --- | --- | --- |
 | id | path | 필수 | string |  |
 | period | query | 선택 | string {1d, 1w, 1m, 1y} |  |
-| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. 범위는 period 하나(1d=하루, 1w=7일, 1m=한 달, 1y=1년, KST 달력 기준)까지이며, from이 to(생략 시 요청 시각)에서 그만큼 전보다 앞서면 422 INVALID_REQUEST다. |
+| from | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. 범위는 period 하나(1w=7일, 1m=한 달, 1y=1년, KST 달력 기준)까지이며, from이 to(생략 시 요청 시각)에서 그만큼 전보다 앞서면 422 INVALID_REQUEST다. 1d는 from을 받지 않는다(422). |
 | to | query | 선택 | string (date) / string (date-time) | KST 날짜 또는 오프셋을 포함한 정확한 시각. from/to는 동일 기준을 사용한다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
@@ -1197,6 +1198,34 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
 | limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
 
+<a id="getbriefingitemdetail"></a>
+
+## getBriefingItemDetail · 회차에 고정된 브리핑 항목과 근거 조회
+
+발행 당시 저장된 주장·선정 근거·정확 인용·동일 버전 원문 문맥을 복원한다. 현재 원문 권한과 버전을 재검증하며 재생성·최신 원문 대체를 하지 않는다. 다른 회차의 항목 또는 상세 미저장은 404, 제공 중단·권한 철회·검증 실패는 503이다.
+
+| 항목 | 계약 |
+| --- | --- |
+| 메서드·경로 | `GET /api/v1/briefings/{roundId}/items/{eventId}` |
+| 권한·우선순위 | 공개 · P1 |
+| 요청 본문 | 없음 |
+| 응답 | 200: [BriefingItemDetail](#schema-briefingitemdetail), 404: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
+| 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR |
+| FS/NFS | [FS030](../../system/out/feature-FS030.md) · [FS033](../../system/out/feature-FS033.md) · [FS035](../../system/out/feature-FS035.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS005](../../system/out/feature-NFS005.md) · [NFS006](../../system/out/feature-NFS006.md) |
+| 화면 | [D-BRF-01](../../system/out/screen-D-BRF-01.md) · [D-BRF-02](../../system/out/screen-D-BRF-02.md) · [M-BRF-01](../../system/out/screen-M-BRF-01.md) |
+| WBS | 6.1.2, 6.11.1, 6.8.3, 6.8.6, 6.8.8, 6.8.11, 6.8.12, 6.8.13, 6.5.3 |
+| 프로토타입 대응 | 없음 |
+| 목표와 차이 | 기존 BFF 대응 작업 없이 Spring API와 root web을 직접 연결한다. |
+| 팀 확인 필요 | 해당 작업의 별도 항목 없음. 공통 미결정은 별도로 남는다. |
+
+### 요청 필드
+
+| 이름 | 위치 | 필수 | 형식 | 설명 |
+| --- | --- | --- | --- | --- |
+| roundId | path | 필수 | string |  |
+| eventId | path | 필수 | string |  |
+| X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
+
 <a id="getbriefinggraphbasis"></a>
 
 ## getBriefingGraphBasis · 발행 당시 그래프 기준 조회
@@ -1256,7 +1285,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getConversation · 대화와 질문 작업 조회
 
-대화와 질문 작업 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+대화와 질문 작업 조회. 각 작업에 getQuestionJob과 같은 현재 근거 접근 권한 재확인을 적용한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1283,7 +1312,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getCurrentConversation · 최신 대화 복원
 
-최신 대화 복원.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+최신 대화 복원. 각 작업에 getQuestionJob과 같은 현재 근거 접근 권한 재확인을 적용한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1309,7 +1338,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## submitQuestion · 질문 접수·맥락 고정·비동기 분석
 
-최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다. 확인 질문 사슬은 루트 질문부터 최대 2회다. 확인 답에 대한 답(깊이 2) 작업도 대상·기간이 확정되면 정상 처리해 answered 등의 결과를 내고, 도구 장애는 failed다. 추가 확인이 필요할 때만 clarification 대신 대상·기간을 구체적으로 적은 새 질문을 안내하는 guidance로 끝난다. 확인 답은 루트 질문과 사슬의 답을 순서대로 합쳐 실행한다.
+최초 접수에서 질문·시각·대화·작업 ID·기업/이슈/기업 간 관계·문서·기간·asOf·graphVersion을 고정한다. 같은 jobId/멱등성 키는 저장된 같은 작업을 반환하고 내용 불일치는 409다. 질문의 명시 조건을 화면 맥락보다 우선한다. 내부에서는 Q01~Q08 multi-label 분류, 최소 충분 읽기 도구 계획, 커버리지 검증, 근거 조회, 답변 생성과 출력 검증을 수행하지만 모델은 도구 실행 권한을 갖지 않는다. 검증과 저장이 완료된 결과만 completed다. 유효한 근거 없음을 기술 장애로 위장하지 않는다. 확인 질문에 답할 때는 resolves에 원 작업 ID와 선택지 ID(자유 입력이면 null)를 담는다. 서버는 원 작업이 같은 대화의 completed·clarification인지, choiceId가 그 결과의 choices에 있는지 검사하고(아니면 422 INVALID_REQUEST, 원 작업이 없거나 다른 회원 것이면 404), 원 질문·원 고정 문맥·선택을 합쳐 실행한다. resolves와 context를 함께 보내면 422다. 같은 확인 질문에 여러 번 답할 수 있으며 각 답은 별도 작업이다. 확인 질문 사슬은 루트 질문부터 최대 2회다. 확인 답에 대한 답(깊이 2) 작업도 대상·기간이 확정되면 정상 처리해 answered 등의 결과를 내고, 도구 장애는 failed다. 추가 확인이 필요할 때만 clarification 대신 대상·기간을 구체적으로 적은 새 질문을 안내하는 guidance로 끝난다. 확인 답은 루트 질문과 사슬의 답을 순서대로 합쳐 실행한다. Idempotency-Key 헤더는 본문 jobId와 같아야 하며 다르면 422 INVALID_REQUEST다. 선택한 근거 ID(contextIds·evidenceIds의 evidence)는 고정한 그래프 버전·asOf에서 공개 근거 조회(getEvidence)로 지금 읽을 수 있어야 하며(구조 관계 basis만 인용하는 근거 포함), 아니면 422 INVALID_REQUEST다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1340,7 +1369,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## getQuestionJob · 질문 작업 상태·저장 결과 회수
 
-질문 작업 상태·저장 결과 회수.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+질문 작업 상태·저장 결과 회수. 결과를 돌려줄 때마다(작업·대화 조회, 최신 대화 복원, 멱등 재전송, 취소·재시도 응답) 현재 근거 접근 권한을 공개 근거 조회(getEvidence)와 같은 기준으로 다시 확인한다. 저장된 결과는 바꾸지 않으며, 인용 근거가 철회·비공개·권리 변경·공개 제외로 지금 읽을 수 없거나 확인할 수 없으면 응답에서 answer를 고정 안내 문장으로 바꾸고 sections·sources·citations·graphTargets를 비우며 answerBasis=none으로 보낸다. 지금 읽을 수 없는 선택 근거(context.items의 evidence)는 id·kind만 남기고 label을 '표시할 수 없는 근거'로 보낸다. 모델을 호출하지 않는다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1367,7 +1396,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## retryQuestionJob · 허용된 실패만 같은 질문 작업 재시도
 
-허용된 실패만 같은 질문 작업 재시도.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+허용된 실패만 같은 질문 작업 재시도. failed이고 ChatFailure.retry가 null이 아닐 때만 접수하며(아니면 409 JOB_NOT_RETRYABLE, 대화에 활성 작업이 있으면 409 JOB_IN_PROGRESS), 같은 작업에 이미 쓴 Idempotency-Key로 다시 보내면 새 실행 없이 현재 작업을 200으로 반환한다.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1396,7 +1425,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## cancelQuestionJob · 질문 작업 명시적 취소
 
-질문 작업 명시적 취소.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+질문 작업 명시적 취소. queued·running 작업만 cancelled로 바꾸고, 이미 끝난 작업은 상태를 바꾸지 않고 그대로 반환한다(취소된 것처럼 표시하지 않음).  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1532,7 +1561,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listAuditRecords · 운영 감사 기록 조회
 
-운영 감사 기록 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+관리자 감사 기록을 occurred_at DESC, id DESC로 조회한다. DB outcome=succeeded는 응답 ok로 변환하며 denied/failed는 그대로 반환한다. actor_kind=anonymous인 로그인 실패도 누락하지 않는다. 검색·반환·커서·민감정보 경계는 docs/development/issue-138-audit-contract.md를 따른다. 빈 결과는 200 {items: [], nextCursor: null}이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -1552,13 +1581,13 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| action | query | 선택 | string / null |  |
-| actor | query | 선택 | string / null |  |
-| targetType | query | 선택 | string / null |  |
-| q | query | 선택 | string / null |  |
+| action | query | 선택 | string | 동작 코드 정확 일치. 빈 문자열은 필터 없음. 최대 80자. |
+| actor | query | 선택 | string | actor_id 또는 actor_email_snapshot 정확 일치. 빈 문자열은 필터 없음. 최대 200자. |
+| targetType | query | 선택 | string | 대상 종류 정확 일치. 빈 문자열은 필터 없음. 최대 80자. |
+| q | query | 선택 | string | 대소문자 구분 없는 부분 검색: action, actor_id, actor_email_snapshot, target_id, 공개 허용된 reason. 숨긴 사유·detail·인증정보는 검색하지 않는다. 빈 문자열은 필터 없음. 최대 200자. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
-| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본 50, 최대 100. 커서 재사용 시 첫 페이지와 같은 값을 사용한다. |
 
 <a id="getpipelineoverview"></a>
 
@@ -2711,6 +2740,146 @@ AI 기능별 유효 평가 집계.  공통 규칙 및 x-zoop의 팀 확인 필�
 
 nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하지 않는다. 필수 필드는 null 허용 여부와 별개다. JSON 필드 이름·중첩 참조의 정본은 OpenAPI다.
 
+<a id="schema-companystatement"></a>
+
+### CompanyStatement
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-companyoutlooks"></a>
+
+### CompanyOutlooks
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string |  |
+| roundId | 필수 | string |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| resultVersion | 필수 | string |  |
+| generatedAt | 필수 | string (date-time) |  |
+| scopeNote | 필수 | string |  |
+| reason | 선택 | string |  |
+| companies | 필수 | [CompanyOutlook](#schema-companyoutlook)[] |  |
+
+<a id="schema-companyoutlook"></a>
+
+### CompanyOutlook
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| companyName | 필수 | string |  |
+| issueIds | 필수 | string[] |  |
+| facts | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| assessment | 필수 | string {positive, negative, mixed, watch} |  |
+| impact | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| outlook | 필수 | [CompanyStatement](#schema-companystatement) |  |
+| conditions | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| risks | 필수 | [CompanyStatement](#schema-companystatement)[] |  |
+| comparison | 필수 | [CompanyStatement](#schema-companystatement) / object |  |
+| comparison.status | 필수 | string {updated, compared, unavailable} |  |
+| comparison.previousResultVersion | 필수 | string, null |  |
+| previous | 필수 | object |  |
+| previous.status | 필수 | string {available, unavailable} |  |
+| previous.reason | 선택 | string |  |
+| previous.roundId | 선택 | string |  |
+| previous.cutoff | 선택 | string (date-time) |  |
+| previous.resultVersion | 선택 | string |  |
+| previous.judgment | 선택 | object |  |
+| reading | 선택 | [CompanyShortReading](#schema-companyshortreading) |  |
+| price | 선택 | [CompanyPrice](#schema-companyprice) |  |
+| observedMovement | 필수 | object |  |
+| observedMovement.status | 필수 | string |  |
+| observedMovement.reason | 필수 | string |  |
+| sources | 필수 | object[] |  |
+| sources[].evidenceId | 필수 | string |  |
+| sources[].documentId | 필수 | string |  |
+| sources[].documentVersion | 필수 | string |  |
+| sources[].bodySha256 | 필수 | string |  |
+| sources[].quote | 필수 | string |  |
+| sources[].title | 필수 | string |  |
+| sources[].url | 필수 | string (uri) |  |
+| sources[].publishedAt | 필수 | string (date-time) |  |
+
+<a id="schema-companyshortreading"></a>
+
+### CompanyShortReading
+
+전문을 보존하면서 별도 생성·검증한 짧은 읽기. PASS일 때만 세 문장이 존재합니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {PASS, WITHHELD} |  |
+| resultVersion | 필수 | string |  |
+| brief | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| watch | 선택 | [CompanyStatement](#schema-companystatement) |  |
+| change | 선택 | [CompanyStatement](#schema-companystatement) |  |
+
+<a id="schema-companypricepoint"></a>
+
+### CompanyPricePoint
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| value | 필수 | string | 통화 단위의 양수 가격. 소수점 두 자리 문자열. |
+| observedAt | 필수 | string (date-time) |  |
+| sessionDate | 필수 | string (date) |  |
+| kind | 필수 | string {five_minute_close, daily_close} |  |
+
+<a id="schema-companypricesource"></a>
+
+### CompanyPriceSource
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| interval | 필수 | string {5m, 1d} |  |
+| url | 필수 | string (uri) |  |
+| httpStatus | 필수 | integer |  |
+| sha256 | 필수 | string |  |
+| bytes | 필수 | integer |  |
+| collectedAt | 필수 | string (date-time) |  |
+
+<a id="schema-companyprice"></a>
+
+### CompanyPrice
+
+회차 마감 전 완료된 정규장 이력. 출근은 전일 종가, 퇴근은 같은 날 09:20 관측값 대비. 당시 수집본이나 전망 적중률을 뜻하지 않습니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| companyId | 필수 | string |  |
+| cutoff | 필수 | string (date-time) |  |
+| currency | 필수 | string {KRW, USD} |  |
+| exchangeTimezone | 필수 | string |  |
+| source | 필수 | string |  |
+| official | 필수 | boolean |  |
+| note | 필수 | string |  |
+| sources | 필수 | [CompanyPriceSource](#schema-companypricesource)[] |  |
+| status | 필수 | string {available, unavailable} |  |
+| reason | 필수 | string, null | eligible_price_missing은 정상 조회 후 적격 관측 없음, provider_request_failed는 관측이 없고 공급자 HTTP 요청 실패, provider_history_unverified는 이력 검증 실패입니다. |
+| latest | 필수 | [CompanyPricePoint](#schema-companypricepoint) / null |  |
+| baseline | 필수 | [CompanyPricePoint](#schema-companypricepoint) / null |  |
+| baselineKind | 선택 | string {morning_cutoff, previous_close} |  |
+| comparisonStatus | 필수 | string {available, unavailable, no_new_session} |  |
+| change | 필수 | string, null |  |
+| changeRate | 필수 | string, null |  |
+
 <a id="schema-activateresponse"></a>
 
 ### ActivateResponse
@@ -2870,15 +3039,15 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | --- | --- | --- | --- |
 | id | 필수 | integer |  |
 | at | 필수 | string |  |
-| actorKind | 필수 | string {admin, system} |  |
+| actorKind | 필수 | string {admin, system, anonymous} | DB actor_kind를 그대로 반환한다. anonymous는 인증되지 않은 로그인 실패 주체이며 actorId는 unknown이다. |
 | actorId | 필수 | string |  |
-| actorEmail | 필수 | string / null |  |
+| actorEmail | 필수 | string / null | 기록 당시 관리자 이메일. 익명·시스템 행은 null. |
 | action | 필수 | string |  |
 | targetType | 필수 | string |  |
 | targetId | 필수 | string / null |  |
-| reason | 필수 | string / null |  |
-| outcome | 필수 | string {ok, denied, failed} |  |
-| detail | 필수 | object |  |
+| reason | 필수 | string / null | 운영상 필요한 사유만 반환한다. 저장된 비밀값·불필요한 개인정보는 반환하지 않으며 안전하지 않은 과거 값은 null이다. |
+| outcome | 필수 | string {ok, denied, failed} | DB succeeded를 ok로 변환한다. denied와 failed는 그대로 반환한다. |
+| detail | 필수 | object | 동작별 허용된 비민감 필드만 반환한다. 미허용 키·원문·인증정보는 제거한다. |
 
 <a id="schema-auditpage"></a>
 
@@ -2972,6 +3141,111 @@ answer from that state, never from the newest graph. Any status but ``available`
 | documentSentiments[].articleId | 필수 | string |  |
 | documentSentiments[].sentiment | 필수 | [DocumentSentiment](#schema-documentsentiment) |  |
 
+<a id="schema-briefingitemdetail"></a>
+
+### BriefingItemDetail
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| roundId | 필수 | string |  |
+| eventId | 필수 | string |  |
+| title | 필수 | string |  |
+| summary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
+| selectionReason | 필수 | string |  |
+| claims | 필수 | [BriefingClaim](#schema-briefingclaim)[] |  |
+| companies | 필수 | [CompanyLink](#schema-companylink)[] |  |
+| evidence | 필수 | [BriefingItemEvidence](#schema-briefingitemevidence)[] |  |
+| limitations | 필수 | string[] |  |
+| metadata | 필수 | [BriefingMetadata](#schema-briefingmetadata) |  |
+
+<a id="schema-briefingclaim"></a>
+
+### BriefingClaim
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| type | 필수 | string {fact, plan, outlook} |  |
+| evidenceIds | 필수 | string[] |  |
+
+<a id="schema-briefingitemevidence"></a>
+
+### BriefingItemEvidence
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| id | 필수 | string |  |
+| quote | 필수 | string |  |
+| documentId | 필수 | string |  |
+| documentVersion | 필수 | string |  |
+| title | 필수 | string |  |
+| publisher | 필수 | string |  |
+| url | 필수 | string |  |
+| publishedAt | 필수 | string (date-time) / null |  |
+| quoteVerified | 필수 | boolean |  |
+| sourceKind | 필수 | string {news, disclosure} |  |
+| bodySha256 | 필수 | string |  |
+| bodyContext | 필수 | [BriefingBodyContext](#schema-briefingbodycontext) / null |  |
+
+<a id="schema-briefingbodycontext"></a>
+
+### BriefingBodyContext
+
+동일 버전 원문에서 보존한 인용 주변 본문. 모든 위치는 원문 전체 기준 Unicode code point이며 끝 위치는 제외한다. 문맥이 없는 원문은 bodyContext=null이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| text | 필수 | string |  |
+| start | 필수 | integer |  |
+| end | 필수 | integer |  |
+| quoteStart | 필수 | integer |  |
+| quoteEnd | 필수 | integer |  |
+| offsetUnit | 필수 | string {unicode_code_point} |  |
+
+<a id="schema-previouscomparison"></a>
+
+### PreviousComparison
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available} |  |
+| previousRoundId | 필수 | string |  |
+| previousPublishedAt | 필수 | string (date-time) |  |
+| previousDataAsOf | 필수 | string (date-time) |  |
+| previousDate | 선택 | string (date) | 실제 이전 발행본의 날짜. 과거 스냅샷에는 없을 수 있습니다. |
+| previousEdition | 선택 | string {morning, evening} | 실제 이전 발행본의 회차. 부재 시 퇴근으로 추정하지 않습니다. |
+| comparisonBasis | 필수 | string {event_identity} |  |
+| forecastEvaluation | 필수 | [Unavailable](#schema-unavailable) |  |
+| items | 필수 | [PreviousComparisonItem](#schema-previouscomparisonitem)[] |  |
+
+<a id="schema-previouscomparisonitem"></a>
+
+### PreviousComparisonItem
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| title | 필수 | string |  |
+| eventId | 필수 | string |  |
+| eventTime | 필수 | string, null |  |
+| timePrecision | 필수 | string {year, month, day, datetime, unknown} |  |
+| reportedAt | 필수 | string, null |  |
+| companyNames | 필수 | string[] |  |
+| change | 필수 | string {new, continuing, dropped} |  |
+| rank | 필수 | integer, null |  |
+| previousRank | 필수 | integer, null |  |
+| evidenceCount | 필수 | integer, null |  |
+| previousEvidenceCount | 필수 | integer, null |  |
+
 <a id="schema-briefingmetadata"></a>
 
 ### BriefingMetadata
@@ -3058,9 +3332,11 @@ The immutable published original of a round (what users saw before any correctio
 | dataAsOf | 필수 | string (date-time) / null |  |
 | graphVersion | 필수 | string / null |  |
 | items | 필수 | [BriefingItem](#schema-briefingitem)[] |  |
+| companyOutlooks | 선택 | [CompanyOutlooks](#schema-companyoutlooks) | 선정 기업별 사업 전망·조건·근거와 동일 기업의 이전 판단 비교. 과거 발행본에는 없을 수 있습니다. 시장 요약·지표와 별도이며 주가 예측이 아닙니다. |
 | marketSummary | 필수 | [AnalysisSummary](#schema-analysissummary) / [Unavailable](#schema-unavailable) |  |
 | marketVariables | 필수 | [MarketVariables](#schema-marketvariables) / [Unavailable](#schema-unavailable) | KOSPI, KOSDAQ and USD/KRW stored with the published round; unavailable (with the reason) when the round has none |
 | sinceMorning | 필수 | [SinceMorning](#schema-sincemorning) / [Unavailable](#schema-unavailable) / null | Evening rounds only: key issues compared with the same day's published morning round; null for morning rounds |
+| previousComparison | 필수 | [PreviousComparison](#schema-previouscomparison) / [Unavailable](#schema-unavailable) / null | 직전 발행 회차와 사건 ID 기준 포함 여부 비교. current grant를 이전 원문에도 적용한다. 전망 정확도 평가는 unavailable이며 기존 sinceMorning은 동일 날짜 아침 대비를 유지한다. |
 | emptyReason | 필수 | string / null |  |
 | corrections | 필수 | [BriefingCorrection](#schema-briefingcorrection)[] |  |
 | notice | 필수 | [BriefingNotice](#schema-briefingnotice) / null |  |
@@ -3543,7 +3819,7 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | --- | --- | --- | --- |
 | outcome | 필수 | string {answered, clarification, guidance, insufficient_evidence} |  |
 | messageId | 필수 | string |  |
-| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. |
+| answer | 필수 | string | 표시용 전체 본문. answered이면 서버가 sections의 text를 순서대로 이어 만들며, 이어 붙인 전체가 12000자를 넘으면 검증 실패다. 돌려줄 때 인용 근거를 지금 읽을 수 없으면 저장 결과와 달리 고정 안내 문장만 담고 sections·citations는 빈 배열이다(getQuestionJob). |
 | sections | 필수 | [ChatAnswerSection](#schema-chatanswersection)[] | answered 본문을 근거 수준별로 나눈 구간. answered가 아니면 빈 배열이다. 일반 개념과 근거 기반 사실을 한 구간에 섞지 않는다. |
 | answerBasis | 필수 | string {general_knowledge, zoop_documented, evidence_grounded, mixed, none} | 사용자 표시용 답변 근거 수준. 서버가 sections에서 계산한다: 구간 basis가 한 종류면 그 값(Q02 일반 개념 general_knowledge, 승인된 ZOOP 도움말·정책 zoop_documented, 공개 근거 기반 사실 evidence_grounded), 두 종류 이상이면 mixed, 구간이 없는 확인·안내·근거 부족은 none이다. 모델의 자기평가로 정하지 않는다. |
 | reason | 필수 | string / null |  |
@@ -4978,9 +5254,9 @@ One indicator as it stood when the round was generated. ``status`` separates wha
 | unit | 필수 | string {pt, KRW} |  |
 | status | 필수 | string {ok, delayed, unavailable, failed} |  |
 | value | 필수 | number / null |  |
-| valueKind | 필수 | string {close, latest} / null | close = the session's closing value; latest = the last observation before the cut-off |
+| valueKind | 필수 | string {close, latest, reference} / null | close = the session's closing value; latest = the last observation before the cut-off; reference = a bank-published reference exchange rate, not a market close. Legacy Naver FX_USDKRW daily bank values stored as close are exposed as reference without modifying the publication snapshot. |
 | observedDate | 필수 | string / null | KST date of the value actually used |
-| observedAt | 필수 | string (date-time) / null | KST time of the value actually used; null for a daily close |
+| observedAt | 필수 | string (date-time) / null | KST time of the value actually used; null for a daily close or a date-only bank reference. Do not fabricate an observation time. |
 | baseline | 필수 | [IndicatorBaseline](#schema-indicatorbaseline) / null |  |
 | change | 필수 | number / null |  |
 | changeRate | 필수 | number / null | change / baseline.value as a fraction (0.0123 = +1.23%) |
@@ -5439,6 +5715,10 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 | source | 필수 | [QuoteSourceOut](#schema-quotesourceout) |  |
 | currency | 필수 | string |  |
 | interval | 필수 | string {5m, 1h, 1d, 1wk} | 공급된 가격 봉 해상도다. 기간별로 고정이며 1d=5m, 1w=1h, 1m=1d, 1y=1wk(주봉)다. 조회 기간과 구분하고 from/to 및 자료 기준 시각을 함께 표시한다. 더 촘촘한 봉을 집계한 경우에도 집계 결과의 해상도를 담으며, 다른 해상도를 이 필드로 위장하지 않는다(x-zoop.chartResolution). |
+| range | 필수 | object | 점이 다루는 실제 구간(거래소 현지 오프셋 ISO 8601). 1d는 고른 거래 세션의 시작부터 세션 종료 또는 to까지이고, 그 밖의 기간은 요청 from(생략 시 기본 시작)부터 to까지다. 차트 x축은 이 구간을 쓴다. |
+| range.from | 필수 | string (date-time) |  |
+| range.to | 필수 | string (date-time) |  |
+| range.sessionDate | 필수 | string (date) / null | 1d가 고른 거래소 현지 거래일. 다른 기간은 null. |
 | points | 필수 | [PricePoint](#schema-pricepoint)[] | Oldest first. |
 
 <a id="schema-priceseriesunavailable"></a>
@@ -6558,6 +6838,7 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 | evidenceIds | 필수 | string[] |  |
 | generatedAt | 필수 | string (date-time) |  |
 | resultVersion | 필수 | string |  |
+| analysis | 선택 | [MarketOutlookAnalysis](#schema-marketoutlookanalysis) / null | 검증된 시장 요약의 구조화된 전망·비교. 기존 이슈 요약과 이전 발행본에는 생략되거나 null일 수 있다. 별도 생성 결과가 아니라 같은 검증 문장의 표현이다. |
 
 <a id="schema-socialprovider"></a>
 
@@ -6625,3 +6906,129 @@ S1 실제 문서 요약. exact citation+별도 semantic supported 영수증을 �
 
 
 string {INVALID_REQUEST, INVALID_CREDENTIALS, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, MEMBER_BLOCKED, EMAIL_TAKEN, TERMS_REQUIRED, RESOURCE_NOT_FOUND, EVIDENCE_UNAVAILABLE, VERSION_UNAVAILABLE, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, JOB_IN_PROGRESS, JOB_NOT_RETRYABLE, ALREADY_PUBLISHED, VALIDATION_FAILED, SOCIAL_AUTH_CANCELLED, SOCIAL_AUTH_FAILED, SOCIAL_LINK_REQUIRED, SOCIAL_EMAIL_REQUIRED, INVALID_CURSOR, RATE_LIMITED, SOURCE_UNAVAILABLE, MODEL_UNAVAILABLE, AUDIT_UNAVAILABLE, MASKING_FAILED, INTERNAL_ERROR}
+
+<a id="schema-marketoutlookanalysis"></a>
+
+### MarketOutlookAnalysis
+
+출근은 새 정보에 따른 오늘 전망 갱신, 퇴근은 아침 판단과 확인 가능한 실제 흐름 비교 및 다음 거래일 전망이다. 문장은 근거·지표·실제 직전 브리핑에 결속되고 검증을 통과한 경우에만 공개한다. 과거 시뮬레이션을 당시 운영 발행이나 전체 시장 분석으로 표현하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| schemaVersion | 필수 | string {zoop-market-outlook-analysis-v1} |  |
+| edition | 필수 | string {morning, evening} |  |
+| cutoff | 필수 | string (date-time) |  |
+| mode | 필수 | string {morning_update, evening_review} |  |
+| scopeNote | 필수 | string |  |
+| previousPublication | 필수 | [MarketPreviousPublication](#schema-marketpreviouspublication) |  |
+| coverage | 필수 | [MarketCoverage](#schema-marketcoverage) |  |
+| claims | 필수 | [MarketOutlookClaim](#schema-marketoutlookclaim)[] |  |
+| forecasts | 필수 | [MarketForecast](#schema-marketforecast)[] |  |
+| forecastEvaluations | 필수 | [MarketForecastEvaluation](#schema-marketforecastevaluation)[] |  |
+
+<a id="schema-marketpreviouspublication"></a>
+
+### MarketPreviousPublication
+
+회차 창 시작과 일치하는 실제 직전 검증 결과. available이면 회차·시각·결과 버전이 제공되고, unavailable이면 이유를 제공한다. 이전 비공개 요청이나 문서 본문은 포함하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| status | 필수 | string {available, unavailable} |  |
+| kind | 필수 | string {simulated_previous_output} |  |
+| roundId | 선택 | string, null |  |
+| date | 선택 | string, null (date) |  |
+| edition | 선택 | string, null {morning, evening, None} |  |
+| cutoff | 선택 | string, null (date-time) |  |
+| resultVersion | 선택 | string, null |  |
+| reason | 선택 | string, null |  |
+
+<a id="schema-marketcoverage"></a>
+
+### MarketCoverage
+
+회차 마감까지 원 발행시각을 확인한 적격 자료 범위. documents=newDocuments+backgroundDocuments이며 해당 기업 목록이다. 전체 시장 대표성과 별도 업종 시세 보유를 주장하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| documents | 필수 | integer |  |
+| newDocuments | 필수 | integer |  |
+| backgroundDocuments | 필수 | integer |  |
+| companyNames | 필수 | string[] |  |
+| marketRepresentative | 필수 | boolean |  |
+| sectorPriceFeedAvailable | 필수 | boolean |  |
+
+<a id="schema-marketoutlookclaim"></a>
+
+### MarketOutlookClaim
+
+원문 사실·해석·가격 전망·이전 전망 갱신·결과 비교를 구분한 검증 문장. forecast에는 실제 평가 대상과 반대 요인이 필요하다. forecast_update는 출근 회차의 실제 이전 전망과 새 근거를 연결한다. result_comparison은 퇴근 회차에서만 제공한다. 가격 전망 이외에는 targetId/direction이 null이고 conditions/counterFactors는 빈 배열이다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| claimId | 필수 | string |  |
+| kind | 필수 | string {fact, interpretation, forecast, forecast_update, result_comparison} |  |
+| text | 필수 | string |  |
+| evidenceIds | 필수 | string[] |  |
+| indicatorIds | 필수 | string {kospi, kosdaq, usdkrw}[] |  |
+| previousPublicationIds | 필수 | string[] |  |
+| previousForecastIds | 필수 | string[] |  |
+| evaluationIds | 필수 | string[] |  |
+| targetId | 필수 | string, null |  |
+| direction | 필수 | string, null {up, down, flat, uncertain, None} |  |
+| conditions | 필수 | string[] |  |
+| counterFactors | 필수 | string[] |  |
+| updateAction | 필수 | string, null {maintain, strengthen, weaken, withdraw, None} |  |
+
+<a id="schema-marketforecast"></a>
+
+### MarketForecast
+
+검증된 forecast 문장과 동일한 내용의 불변 전망 원장. 조건과 반대 요인을 보존한다. 방향은 단정된 수익 약속이나 매수·매도 권유가 아니다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| forecastId | 필수 | string |  |
+| text | 필수 | string |  |
+| direction | 필수 | string {up, down, flat, uncertain} |  |
+| conditions | 필수 | string[] |  |
+| counterFactors | 필수 | string[] |  |
+| evidenceIds | 필수 | string[] |  |
+| indicatorIds | 필수 | string {kospi, kosdaq, usdkrw}[] |  |
+| target | 필수 | [MarketForecastTarget](#schema-marketforecasttarget) |  |
+
+<a id="schema-marketforecasttarget"></a>
+
+### MarketForecastTarget
+
+확인된 거래 세션과 회차 마감 전에 사용 가능한 종가로 고정한 가격 비교 대상. 출근은 당일, 퇴근은 다음 확인된 거래일 종가를 대상으로 하며 원/달러 은행 고시 환율을 주식 종가 대상으로 바꾸지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| targetId | 필수 | string |  |
+| indicatorId | 필수 | string {kospi, kosdaq} |  |
+| valueKind | 필수 | string {close} |  |
+| baselineDate | 필수 | string (date) |  |
+| baselineValue | 필수 | number |  |
+| targetDate | 필수 | string (date) |  |
+| targetEnd | 필수 | string (date-time) |  |
+| calendarRef | 필수 | string |  |
+| rule | 필수 | string {close_vs_baseline_v1} |  |
+
+<a id="schema-marketforecastevaluation"></a>
+
+### MarketForecastEvaluation
+
+실제 직전 전망 원장의 평가 대상·조건을 그대로 복원한다. 조건 충족을 관측하지 못했거나 대상 기간이 끝나지 않았거나 정확한 대상 종가가 없으면 unavailable과 이유를 제공하고 actualValue/actualDirection/directionMatched는 null이다. 평가 가능한 경우에만 고정 기준값 대비 종가 방향을 비교하며 개별 뉴스의 인과관계나 투자 성과를 뜻하지 않는다.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| evaluationId | 필수 | string |  |
+| forecastId | 필수 | string |  |
+| target | 필수 | [MarketForecastTarget](#schema-marketforecasttarget) |  |
+| rule | 필수 | string {close_vs_baseline_v1} |  |
+| status | 필수 | string {evaluated, unavailable} |  |
+| reason | 필수 | string, null |  |
+| actualValue | 필수 | number, null |  |
+| actualDirection | 필수 | string, null {up, down, flat, None} |  |
+| directionMatched | 필수 | boolean, null |  |

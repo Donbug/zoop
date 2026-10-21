@@ -1,4 +1,12 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
+import {
+  GraphAppearanceContext,
+  defaultAppearance,
+  appearanceColors,
+  styleGraph,
+} from './graph-appearance';
+import { createPortal } from 'react-dom';
+import GraphLegend from './GraphLegend';
 import { themeColor } from '@/util/theme-color';
 import { Graph, type IElementEvent } from '@antv/g6';
 import type { GraphResponse } from '@/types/map/graph';
@@ -16,21 +24,6 @@ import {
 import { focusNeighborhood, graphSummary, toG6Data } from './graph-model';
 import { freeViewport, nodeRect, type Rect } from './graph-geometry';
 
-/** 범례 항목에 마우스를 올리면 보이는 설명(D-GRP-01). 연결선 정의는 openapi 관계 유형을 따른다. */
-const LEGEND_HELP: Record<LegendKey, string> = {
-  company: '기업 노드입니다. 원 크기는 연결된 사건 수(활동량)를 나타냅니다.',
-  issue:
-    '사건 노드입니다. 공시·기사에서 확인된 사건이며 여러 기업이 함께 연결될 수 있습니다.',
-  INVOLVES:
-    '직접 관련: 기업이 사건의 당사자입니다. 계약 당사자나 공시 주체처럼 기사·공시에 행위자로 나옵니다.',
-  STRUCTURALLY_RELATED_TO:
-    '구조적 관련: 사건의 당사자는 아니지만 공급망·지분·고객 관계 같은 구조로 영향이 닿는 기업입니다. 관계에 유효 기간이 있을 수 있습니다.',
-  SHARES_ISSUE:
-    '사건 공유: 두 기업이 같은 사건에 각각 직접 또는 구조적으로 연결되어 있을 때 그리는 선입니다. 두 기업 사이의 관계를 기사가 따로 말한 것은 아니며, 근거는 공유한 사건의 근거를 따릅니다.',
-  FOLLOWS:
-    '후속 사건: 앞 사건 다음에 이어서 일어난 사건을 잇는 선입니다. 뒤 사건이 아직 일어나지 않았으면 나타나지 않습니다.',
-};
-
 export default function GraphCanvas({
   data,
   selectedId: selected = null,
@@ -44,8 +37,11 @@ export default function GraphCanvas({
   memoryOwner = 'public',
   onOpenIsolated,
   centerRequest = null,
+  filterHost,
 }: {
   data: GraphResponse;
+  /** Render the one legend in the map toolbar, sharing this canvas visibility state. */
+  filterHost?: HTMLElement | null;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
   focusId?: string | null;
@@ -59,6 +55,8 @@ export default function GraphCanvas({
   /** 내 종목 사이드바에서 고른 기업. seq가 바뀔 때마다 그 노드를 화면 가운데로 옮긴다. */
   centerRequest?: { id: string; seq: number } | null;
 }) {
+  const appearance = useContext(GraphAppearanceContext) ?? defaultAppearance;
+  const colors = appearanceColors(appearance);
   const viewKey = `${memoryOwner}:${data.metadata.mode}`;
   const [viewState, setViewState] = useState(() => ({
     key: viewKey,
@@ -101,12 +99,25 @@ export default function GraphCanvas({
   const fitPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
-  // 사이드바에서 고른 기업. 상세 패널이 열려 지도 크기가 바뀌어도 이 기업을 가운데에 둔다.
+  // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
   const centerTarget = useRef<string | null>(null);
+  const previousSelected = useRef<string | null>(null);
+  const preservePositions = useRef(false);
+  const [centerSequence, setCenterSequence] = useState(0);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
-  const selectNode = useEffectEvent((id: string | null) =>
-    id === '__isolated__' ? onOpenIsolated?.() : onSelect?.(id),
-  );
+  function handleNodeSelect(id: string | null) {
+    if (id === '__isolated__') return onOpenIsolated?.();
+    // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
+    centerTarget.current = id;
+    if (id) {
+      preservePositions.current = false;
+      followFit.current = false;
+      fitPending.current = false;
+      setCenterSequence((sequence) => sequence + 1);
+    }
+    onSelect?.(id);
+  }
+  const selectNode = useEffectEvent(handleNodeSelect);
   const selectEdge = useEffectEvent((id: string) => {
     if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
       onSelectEdge?.(id);
@@ -206,28 +217,52 @@ export default function GraphCanvas({
   const retainFocus = useEffectEvent(() => {
     lastFocused.current = focusId;
   });
-  useEffect(() => {
-    if (!centerRequest) return;
-    const graph = instance.current;
-    if (!graph) return;
-    drawing.current = drawing.current
-      .then(async () => {
-        if (graph.destroyed || instance.current !== graph) return;
-        if (
-          !renderedData.current?.nodes?.some(
-            (node) => String(node.id) === centerRequest.id,
-          )
-        )
-          return;
-        // 사용자가 고른 위치이므로 자동 맞춤을 멈춘다.
-        followFit.current = false;
-        centerTarget.current = centerRequest.id;
-        await graph.focusElement(centerRequest.id, false);
-      })
-      .catch(() => {
-        if (!graph.destroyed) setRenderError(true);
-      });
-  }, [centerRequest]);
+  async function centerSelectedNode(
+    graph: Graph,
+    rendered: ReturnType<typeof toG6Data>,
+  ) {
+    const host = container.current;
+    const target = rendered.nodes?.find(
+      (node) =>
+        node.id === centerTarget.current && node.style?.visibility !== 'hidden',
+    );
+    if (!host || !target || !host.clientWidth || !host.clientHeight) return;
+    // Desktop rails already reduce the host width. Mobile details overlay the
+    // canvas, so use the part above the sheet instead of centering behind it.
+    const hostRect = host.getBoundingClientRect();
+    const sheet = document.querySelector<HTMLElement>(
+      '[data-screen-id="M-GRP-01"]',
+    );
+    const rect = sheet?.getClientRects().length
+      ? sheet.getBoundingClientRect()
+      : null;
+    const safe = freeViewport(
+      host.clientWidth,
+      host.clientHeight,
+      rect
+        ? [
+            {
+              x: rect.left - hostRect.left,
+              y: rect.top - hostRect.top,
+              width: rect.width,
+              height: rect.height,
+            },
+          ]
+        : [],
+    );
+    if (safe.width < 40 || safe.height < 40) return;
+    // Use the circle/diamond position, rather than label/halo bounds.
+    const point = graph.getViewportByCanvas([
+      Number(target.style?.x ?? 0),
+      Number(target.style?.y ?? 0),
+    ]);
+    followFit.current = false;
+    fitPending.current = false;
+    await graph.translateBy(
+      [safe.x + safe.width / 2 - point[0], safe.y + safe.height / 2 - point[1]],
+      false,
+    );
+  }
   async function fitVisibleGraph(graph: Graph) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
@@ -236,7 +271,7 @@ export default function GraphCanvas({
     const root = host.parentElement;
     const overlays = [
       ...(root?.querySelectorAll<HTMLElement>(
-        '.relationship-legend,.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview',
+        '.relationship-zoom,.relationship-source,.relationship-selection,.graph-overview',
       ) ?? []),
       ...document.querySelectorAll<HTMLElement>('[data-screen-id="M-GRP-01"]'),
     ];
@@ -335,21 +370,24 @@ export default function GraphCanvas({
     drawing.current = drawing.current
       .then(async () => {
         if (graph.destroyed) return;
-        const rendered = toG6Data(
-          data,
-          host.clientWidth,
-          host.clientHeight,
-          selected ?? focusId,
-          data.edges
-            .filter((edge) => highlightedEdgeIds.includes(edge.id))
-            .flatMap((edge) => [edge.source, edge.target]),
-          connectionPath && highlightedEdgeIds.length
-            ? new Set(
-                data.edges
-                  .filter((e) => highlightedEdgeIds.includes(e.id))
-                  .flatMap((e) => [e.source, e.target]),
-              )
-            : focusedNodes,
+        const rendered = styleGraph(
+          toG6Data(
+            data,
+            host.clientWidth,
+            host.clientHeight,
+            selected ?? focusId,
+            data.edges
+              .filter((edge) => highlightedEdgeIds.includes(edge.id))
+              .flatMap((edge) => [edge.source, edge.target]),
+            connectionPath && highlightedEdgeIds.length
+              ? new Set(
+                  data.edges
+                    .filter((e) => highlightedEdgeIds.includes(e.id))
+                    .flatMap((e) => [e.source, e.target]),
+                )
+              : focusedNodes,
+          ),
+          appearance,
         );
         rendered.edges = rendered.edges?.map((edge) =>
           highlightedEdgeIds.includes(String(edge.id))
@@ -357,7 +395,11 @@ export default function GraphCanvas({
                 ...edge,
                 style: {
                   ...edge.style,
-                  stroke: connectionPath ? themeColor('ink') : '#b75b00',
+                  stroke: connectionPath
+                    ? appearance.variant === 'improved'
+                      ? colors.selected
+                      : themeColor('ink')
+                    : '#b75b00',
                   strokeOpacity: 1,
                   lineWidth: connectionPath ? 2 : 4,
                 },
@@ -389,6 +431,22 @@ export default function GraphCanvas({
             .filter((edge) => highlightedEdgeIds.includes(edge.id))
             .flatMap((edge) => [edge.source, edge.target]),
         );
+        // Closing details changes the available width, but must not rearrange
+        // the graph the user just centered (including its surrounding nodes).
+        if (preservePositions.current && renderedData.current) {
+          const positions = new Map(
+            renderedData.current.nodes?.map((node) => [node.id, node.style]),
+          );
+          rendered.nodes = rendered.nodes?.map((node) => {
+            const position = positions.get(node.id);
+            return position
+              ? {
+                  ...node,
+                  style: { ...node.style, x: position.x, y: position.y },
+                }
+              : node;
+          });
+        }
         const hiddenNodes = new Set(
           data.nodes
             .filter(
@@ -457,6 +515,9 @@ export default function GraphCanvas({
         )
           await graph.focusElement(focusId, false);
         lastFocused.current = focusId;
+        // Resize changes layout coordinates. Center only after the new draw,
+        // never on the previous layout before the detail rail has resized it.
+        if (centerTarget.current) await centerSelectedNode(graph, rendered);
         if (fitPending.current) {
           fitPending.current = false;
           await fitVisibleGraph(graph);
@@ -467,9 +528,28 @@ export default function GraphCanvas({
       });
   });
   useEffect(() => {
+    if (previousSelected.current && !selected) preservePositions.current = true;
+    previousSelected.current = selected;
+    centerTarget.current = selected;
+    if (selected) {
+      preservePositions.current = false;
+      followFit.current = false;
+      fitPending.current = false;
+    }
+  }, [selected]);
+  useEffect(() => {
+    if (!centerRequest) return;
+    preservePositions.current = false;
+    followFit.current = false;
+    fitPending.current = false;
+    centerTarget.current = centerRequest.id;
+    syncSelection();
+  }, [centerRequest]);
+  useEffect(() => {
     syncSelection();
   }, [
     selected,
+    centerSequence,
     selectedEdgeId,
     focusId,
     focusHops,
@@ -509,6 +589,10 @@ export default function GraphCanvas({
       centerTarget.current = null;
     };
     const viewportChanged = () => {
+      if (centerTarget.current) {
+        syncSelection();
+        return;
+      }
       if (followFit.current) {
         fitPending.current = true;
         syncSelection();
@@ -522,6 +606,7 @@ export default function GraphCanvas({
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
     renderedData.current = null;
+    preservePositions.current = false;
     const graphMode = data.metadata.mode;
     const rememberCamera = () => {
       if (!graph || disposed || graph.destroyed || instance.current !== graph)
@@ -551,20 +636,29 @@ export default function GraphCanvas({
         width: host.clientWidth,
         height: host.clientHeight,
         animation: false,
-        data: toG6Data(data, host.clientWidth, host.clientHeight),
+        data: styleGraph(
+          toG6Data(data, host.clientWidth, host.clientHeight),
+          appearance,
+        ),
         behaviors: ['drag-canvas', 'zoom-canvas'],
         zoomRange: [0.01, 4],
         edge: {
           state: {
             related: {
-              lineWidth: 2,
-              stroke: themeColor('ink'),
+              lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+              stroke:
+                appearance.variant === 'improved'
+                  ? colors.selected
+                  : themeColor('ink'),
               strokeOpacity: 1,
             },
             inactive: { strokeOpacity: 0.2 },
             selected: {
-              lineWidth: 2,
-              stroke: themeColor('ink'),
+              lineWidth: appearance.variant === 'improved' ? 2.5 : 2,
+              stroke:
+                appearance.variant === 'improved'
+                  ? colors.selected
+                  : themeColor('ink'),
               strokeOpacity: 1,
             },
           },
@@ -626,7 +720,9 @@ export default function GraphCanvas({
       const saved = readModeEntry(memoryOwner, graphMode)?.view.camera;
       // 창 크기가 달라졌으면 예전 위치가 화면 밖을 가리킬 수 있어 화면에 맞춰 연다.
       const camera =
-        saved && sameViewport(saved.size, host.clientWidth, host.clientHeight)
+        !appearance.preview &&
+        saved &&
+        sameViewport(saved.size, host.clientWidth, host.clientHeight)
           ? saved
           : null;
       followFit.current = !camera;
@@ -646,18 +742,24 @@ export default function GraphCanvas({
           if (!graph || disposed || graph.destroyed) return;
           if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
           const [width, height] = [host.clientWidth, host.clientHeight];
+          const origin = preservePositions.current
+            ? graph.getViewportByCanvas([0, 0])
+            : null;
           graph.setSize(width, height);
-          // 사이드바·패널이 열려 지도 크기가 바뀌면, 사이드바에서 고른 기업은 다시 가운데에
-          // 두고, 그 밖에 사용자가 둔 위치는 화면 가운데를 유지한다.
-          const target = centerTarget.current;
+          // Some renderers shift their projection on resize. Preserve screen
+          // pixels when the detail rail closes, rather than recentering the view.
+          if (origin) {
+            const next = graph.getViewportByCanvas([0, 0]);
+            if (origin[0] !== next[0] || origin[1] !== next[1])
+              void graph.translateBy(
+                [origin[0] - next[0], origin[1] - next[1]],
+                false,
+              );
+          }
+          // 선택 노드의 중앙 이동은 아래 syncSelection의 새 좌표로 처리한다.
           if (
-            target &&
-            renderedData.current?.nodes?.some(
-              (node) => String(node.id) === target,
-            )
-          )
-            void graph.focusElement(target, false);
-          else if (
+            !centerTarget.current &&
+            !preservePositions.current &&
             !followFit.current &&
             (width !== lastSize[0] || height !== lastSize[1])
           )
@@ -671,8 +773,6 @@ export default function GraphCanvas({
         });
       });
       observer.observe(host);
-      const legend = host.parentElement?.querySelector('.relationship-legend');
-      if (legend) observer.observe(legend);
     }
     void mount().catch(() => {
       if (!disposed) setRenderError(true);
@@ -691,16 +791,17 @@ export default function GraphCanvas({
       graph?.destroy();
       instance.current = null;
     };
-  }, [data, retry, memoryOwner]);
+  }, [data, retry, memoryOwner, appearance, colors.selected]);
   async function control(action: 'in' | 'out' | 'fit') {
     const graph = instance.current;
     if (!graph || graph.destroyed) return;
     try {
+      centerTarget.current = null;
       if (action === 'fit') {
+        preservePositions.current = false;
         followFit.current = true;
-        await drawing.current;
-        if (!graph.destroyed && instance.current === graph)
-          await fitVisibleGraph(graph);
+        fitPending.current = true;
+        setCenterSequence((sequence) => sequence + 1);
       } else {
         followFit.current = false;
         await graph.zoomTo(
@@ -736,65 +837,20 @@ export default function GraphCanvas({
           {hoveredIssue}
         </p>
       )}
-      {!focusId && (
-        <aside
-          className="relationship-legend z-10 bg-zoop-map/60 pb-3"
-          aria-label="그래프 범례"
-        >
-          <div className="relationship-title">
-            <h1>{personal ? '내 종목 지도' : '시장 전체 지도'}</h1>
-          </div>
-          <p className="relationship-subtitle">
-            (RELATIONSHIP MAP) · 기업·사건 관계
-          </p>
-          <p className="relationship-meta">
-            {stats.company} COMPANIES · {stats.sharedIssues} SHARED EVENTS
-          </p>
-          <div className="mt-3 border-t border-zoop-line pt-2">
-            <h2 className="mb-2 text-[10px] tracking-widest">
-              LEGEND · 표시 필터
-            </h2>
-            <div className="grid grid-cols-2 gap-1">
-              {(
-                [
-                  ['company', '기업'],
-                  ['issue', '사건'],
-                  ['INVOLVES', '직접 관련'],
-                  ['STRUCTURALLY_RELATED_TO', '구조적 관련'],
-                  ['FOLLOWS', '후속 사건'],
-                  ['SHARES_ISSUE', '사건 공유'],
-                ] as [LegendKey, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="pointer-events-auto rounded border border-zoop-line px-1 py-1 text-left text-[10px] aria-pressed:bg-white aria-pressed:font-bold focus-visible:outline-2"
-                  aria-pressed={!view.hidden.includes(key)}
-                  title={LEGEND_HELP[key]}
-                  aria-description={LEGEND_HELP[key]}
-                  disabled={
-                    (key === 'company' || key === 'issue') &&
-                    !view.hidden.includes(key) &&
-                    view.hidden.includes(
-                      key === 'company' ? 'issue' : 'company',
-                    )
-                  }
-                  onClick={() => toggleKind(key)}
-                >
-                  {view.hidden.includes(key) ? '□' : '■'} {label}{' '}
-                  {key === 'company'
-                    ? stats.company
-                    : key === 'issue'
-                      ? stats.issue
-                      : data.edges.filter((edge) => edge.relationType === key)
-                          .length}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[10px]">○ 기업 · ◆ 사건 · 크기=활동</p>
-          </div>
-        </aside>
-      )}
+      {filterHost ? (
+        createPortal(
+          <GraphLegend
+            data={data}
+            hidden={view.hidden}
+            onToggle={toggleKind}
+          />,
+          filterHost,
+        )
+      ) : filterHost === undefined ? (
+        <div className="absolute top-2 right-2 left-2 z-10 overflow-x-auto bg-zoop-paper p-1">
+          <GraphLegend data={data} hidden={view.hidden} onToggle={toggleKind} />
+        </div>
+      ) : null}
       {stats.disconnected > 0 && !view.hidden.includes('issue') && (
         <button
           type="button"
@@ -876,7 +932,7 @@ export default function GraphCanvas({
             <button
               key={node.id}
               aria-pressed={selected === node.id}
-              onClick={() => onSelect?.(node.id)}
+              onClick={() => handleNodeSelect(node.id)}
             >
               {node.kind === 'issue' ? '사건: ' : '기업: '}
               {node.label}

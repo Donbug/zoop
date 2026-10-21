@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  GraphAppearanceContext,
+  type GraphAppearance,
+} from '@/components/graph/graph-appearance';
+import { mapAppearanceStyles } from '@/components/common/map-appearance-styles';
 import HoldingsSidebar from '@/components/graph/HoldingsSidebar';
 import { companyLogo } from '@/util/company-logo';
 import { Link } from 'react-router-dom';
@@ -68,6 +73,21 @@ function readFilter(value: string | null): PersonalScope {
 
 // WBS 6.6.21~6.6.23 · D-GRP-01/01b + D-GRP-02/03.
 export default function MapPage() {
+  const inherited = useContext(GraphAppearanceContext);
+  const theme =
+    document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const appearance = useMemo<GraphAppearance>(
+    () => inherited ?? { variant: 'improved', theme },
+    [inherited, theme],
+  );
+  return (
+    <GraphAppearanceContext value={appearance}>
+      <MapWorkspace appearance={appearance} />
+    </GraphAppearanceContext>
+  );
+}
+
+function MapWorkspace({ appearance }: { appearance: GraphAppearance }) {
   const { params, updateQuery } = useRouteQuery();
   // FS065 계측: 메인 지도 노출 1회와 노드 선택. 노출 중 선택 여부는 viewId로 묶는다.
   const viewId = useScreenView('main');
@@ -97,6 +117,7 @@ export default function MapPage() {
   const [retry, setRetry] = useState(0);
   const [notice, setNotice] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
   const [centerRequest, setCenterRequest] = useState<{
     id: string;
     seq: number;
@@ -478,7 +499,9 @@ export default function MapPage() {
     });
   }
   return (
-    <div className="relationship-map min-w-0! [&_.relationship-toolbar]:overflow-x-auto [&_.relationship-toolbar]:max-w-full max-md:min-h-0! max-md:[&_.relationship-header]:h-auto! max-md:[&_.relationship-header]:flex-wrap! max-md:[&_.relationship-header]:gap-2! max-md:[&_.relationship-header]:px-2! max-md:[&_.relationship-header]:py-2! max-md:[&_.relationship-header_nav]:order-last max-md:[&_.relationship-header_nav]:w-full max-md:[&_.relationship-header_nav]:overflow-x-auto max-md:[&_.relationship-toolbar]:max-w-full max-md:[&_.relationship-toolbar]:overflow-x-auto max-md:[&_.relationship-canvas]:min-h-0! max-md:[&_.relationship-body]:min-h-0! max-md:[&_.relationship-legend]:left-2! max-md:[&_.relationship-legend]:top-2! max-md:[&_.relationship-legend]:w-[150px]! max-md:[&_.relationship-title_h1]:text-base! max-md:[&_.relationship-body]:px-1!">
+    <div
+      className={`${mapAppearanceStyles(appearance)} relationship-map min-w-0! [&_.relationship-toolbar]:overflow-x-auto [&_.relationship-toolbar]:max-w-full max-md:min-h-0! max-md:[&_.relationship-header]:h-auto! max-md:[&_.relationship-header]:flex-wrap! max-md:[&_.relationship-header]:gap-2! max-md:[&_.relationship-header]:px-2! max-md:[&_.relationship-header]:py-2! max-md:[&_.relationship-header_nav]:order-last max-md:[&_.relationship-header_nav]:w-full max-md:[&_.relationship-header_nav]:h-10! max-md:[&_.relationship-header_nav]:flex! max-md:[&_.relationship-header_nav]:overflow-y-hidden! max-md:[&_.relationship-header_nav>*]:shrink-0 max-md:[&_.relationship-header_nav]:overflow-x-auto max-md:[&_.relationship-toolbar]:max-w-full max-md:[&_.relationship-toolbar]:overflow-x-auto [&_.relationship-canvas]:min-h-0! max-md:[&_.relationship-body]:min-h-0! max-md:[&_.relationship-body]:px-1!`}
+    >
       <ServiceHeader />
       {returnTo?.startsWith('/companies/') && (
         <Link to={returnTo}>기업 상세로 돌아가기</Link>
@@ -523,7 +546,7 @@ export default function MapPage() {
                               : 'D-GRP-01'
           }
         >
-          <div className="relationship-toolbar">
+          <div className="relationship-toolbar h-auto! min-h-12 overflow-y-hidden! py-1! [&>*]:shrink-0">
             <button
               className="relationship-sidebar-toggle"
               aria-expanded={sidebarOpen}
@@ -578,14 +601,7 @@ export default function MapPage() {
                 ))}
               </div>
             )}
-            <div className="relationship-count">
-              <GraphIcon name="company" size={12} />
-              기업<span>{stats?.company ?? '—'}</span>
-            </div>
-            <div className="relationship-count">
-              <GraphIcon name="issue" size={12} />
-              사건<span>{stats?.issue ?? '—'}</span>
-            </div>
+            <div ref={setFilterHost} className="contents" />
             {appliedMode === 'all' && (
               <>
                 <div
@@ -604,18 +620,6 @@ export default function MapPage() {
                 </div>
               </>
             )}
-            <div className="relationship-count">
-              <b className="legend-line" />
-              직접 관련<span>{stats?.direct ?? '—'}</span>
-            </div>
-            <div className="relationship-count">
-              <b className="legend-line follows" />
-              후속 사건<span>{stats?.follows ?? '—'}</span>
-            </div>
-            <div className="relationship-count">
-              <b className="legend-line dashed" />
-              사건 공유<span>{stats?.shared ?? '—'}</span>
-            </div>
             <div className="relationship-toolbar-help">
               <button
                 onClick={() => setNotice(notice === 'info' ? '' : 'info')}
@@ -667,6 +671,7 @@ export default function MapPage() {
             {data ? (
               <GraphCanvas
                 data={data}
+                filterHost={filterHost}
                 centerRequest={centerRequest}
                 memoryOwner={memoryOwner}
                 onOpenIsolated={() => {

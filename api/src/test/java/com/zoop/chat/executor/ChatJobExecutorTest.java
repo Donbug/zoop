@@ -1,0 +1,280 @@
+package com.zoop.chat.executor;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+
+import com.zoop.chat.dto.ChatFailure;
+import com.zoop.chat.dto.ChatResult;
+import com.zoop.chat.repository.ChatJobRow;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/** D-AI-02: a queued job is claimed, run under its owner token and ends stored; a superseded run changes nothing. */
+class ChatJobExecutorTest {
+    private static final Instant NOW = Instant.parse("2026-10-21T03:00:00Z");
+    private static final String CONTEXT = "{\"items\":[],\"evidenceCount\":0,\"period\":null,\"asOf\":null,\"graphVersion\":null}";
+    private static final String SELECTION = "{\"contextIds\":[\"ev-1\"],\"evidenceIds\":[],\"evidencePool\":[\"ev-1\"]}";
+
+    private final ObjectMapper mapper = new ObjectMapper();
+    private MemoryChatStore store;
+    private MutableClock clock;
+
+    @BeforeEach
+    void setUp() {
+        store = new MemoryChatStore();
+        clock = new MutableClock(NOW);
+    }
+
+    @Test
+    void withoutAnEngineNothingIsClaimed() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var executor = executor(null);
+        assertFalse(executor.hasEngine());
+        assertFalse(executor.runOnce());
+        assertEquals("queued", store.job("job-00001").row.status());
+    }
+
+    @Test
+    void aRunReportsPhasesCountsItsModelCallOnceAndStoresTheResult() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            assertTrue(control.owned());
+            assertEquals(Duration.ofSeconds(60), control.remaining());
+            control.beforeModelCall();
+            control.phase("writing");
+            control.beforeModelCall();
+            control.phase("verifying");
+            return ScriptedChatEngine.generalAnswer("HBM은 고대역폭 메모리입니다.");
+        });
+
+        assertTrue(executor(engine).runOnce());
+        var job = store.job("job-00001");
+        assertEquals("completed", job.row.status());
+        assertEquals("answered", job.row.outcome());
+        assertEquals(1, job.row.runs());
+        assertEquals(List.of("writing", "verifying"), job.phases);
+        assertEquals("msg-job-00001", job.messageId);
+        ChatResult stored = mapper.readValue(job.result, ChatResult.class);
+        assertEquals("msg-job-00001", stored.messageId());
+        assertEquals("general_knowledge", stored.sections().getFirst().basis());
+        assertTrue(job.row.attempts().contains("\"status\":\"succeeded\""), job.row.attempts());
+        assertTrue(job.row.attempts().contains("\"modelCalled\":true"));
+        assertNull(job.ownerToken);
+        assertFalse(executor(engine).runOnce());
+    }
+
+    @Test
+    void aReplyRunsWithTheWholeClarificationChainInOrder() {
+        store.add(queued("job-00001", null, null, 0, "run", "completed"));
+        store.add(queued("job-00002", "job-00001", "choice-a", 1, "run", "completed"));
+        store.add(queued("job-00003", "job-00002", null, 2, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> ScriptedChatEngine.guidance("대상을 구체적으로 적어 주세요."));
+
+        executor(engine).runOnce();
+        var run = engine.runs.getFirst();
+        assertEquals("job-00003", run.jobId());
+        assertEquals(2, run.clarificationDepth());
+        assertEquals(List.of("ev-1"), run.selection().evidencePool());
+        assertEquals(List.of(new ChatRun.Turn("job-00001", "질문 job-00001", null),
+                new ChatRun.Turn("job-00002", "질문 job-00002", "choice-a"),
+                new ChatRun.Turn("job-00003", "질문 job-00003", null)), run.turns());
+        assertEquals("guidance", store.job("job-00003").row.outcome());
+    }
+
+    @Test
+    void aDepthTwoJobNeverStoresAClarification() {
+        store.add(queued("job-00001", null, null, 0, "run", "completed"));
+        store.add(queued("job-00002", "job-00001", null, 1, "run", "completed"));
+        store.add(queued("job-00003", "job-00002", null, 2, "run"));
+        executor(new ScriptedChatEngine((run, control) -> ScriptedChatEngine.clarification("어느 회사?", "a"))).runOnce();
+
+        var job = store.job("job-00003");
+        assertEquals("failed", job.row.status());
+        assertEquals(new ChatFailure("internal", null, job(job).message(), null), job(job));
+    }
+
+    @Test
+    void aClarificationBelowTheLimitIsStoredWithItsChoices() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> ScriptedChatEngine.clarification("어느 삼성?", "a", "b"))).runOnce();
+        var stored = mapper.readValue(store.job("job-00001").result, ChatResult.class);
+        assertEquals("clarification", stored.outcome());
+        assertEquals(2, stored.choices().size());
+    }
+
+    @Test
+    void retryIsGrantedOnlyForARerunnableTransientFailureWithinThreeRuns() {
+        assertFailure(1, new ChatEngineOutcome.Failed("transient", "provider_error", true), "rerun", "failed");
+        assertFailure(2, new ChatEngineOutcome.Failed("transient", "tool_timeout", true), null, "failed");
+        assertFailure(0, new ChatEngineOutcome.Failed("transient", "response_unknown", false), null, "unknown");
+        assertFailure(0, new ChatEngineOutcome.Failed("transient", "response_unknown", true), null, "unknown");
+        assertFailure(0, new ChatEngineOutcome.Failed("budget_exceeded", "context_too_large", true), null, "failed");
+        assertFailure(0, new ChatEngineOutcome.Failed("validation_failed", null, false), null, "failed");
+        assertFailure(0, new ChatEngineOutcome.Failed("save_failed", null, true), null, "failed");
+    }
+
+    @Test
+    void anUnexpectedEngineErrorIsAnInternalFailureThatIsNeverRerun() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        executor(new ScriptedChatEngine((run, control) -> {
+            throw new IllegalStateException("bug");
+        })).runOnce();
+        var failure = job(store.job("job-00001"));
+        assertEquals("internal", failure.kind());
+        assertNull(failure.retry());
+    }
+
+    @Test
+    void aCancelledRunCannotReportProgressOrStoreItsResult() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            store.cancel(run.jobId(), clock.instant());
+            assertFalse(control.owned());
+            assertThrows(ChatRunSuperseded.class, () -> control.phase("writing"));
+            assertThrows(ChatRunSuperseded.class, control::beforeModelCall);
+            return ScriptedChatEngine.generalAnswer("늦은 답");
+        });
+        executor(engine).runOnce();
+        var job = store.job("job-00001");
+        assertEquals("cancelled", job.row.status());
+        assertNull(job.result);
+        assertEquals(0, job.row.runs());
+    }
+
+    @Test
+    void aLateCompletionAfterTheLeaseIsRejectedAndRecoveryEndsTheJob() {
+        store.add(queued("job-00001", null, null, 0, "run"));
+        store.add(queued("job-00002", null, null, 0, "run"));
+        var engine = new ScriptedChatEngine((run, control) -> {
+            if (run.jobId().equals("job-00001")) control.beforeModelCall();
+            clock.advance(ChatJobExecutor.MAX_DEADLINE.plus(ChatJobExecutor.LEASE_GRACE));
+            return ScriptedChatEngine.generalAnswer("너무 늦은 답");
+        });
+        var executor = executor(engine);
+        executor.runOnce();
+        executor.runOnce();
+        assertEquals("running", store.job("job-00001").row.status());
+        assertNull(store.job("job-00001").result);
+
+        assertEquals(2, executor.recoverExpired());
+        var called = job(store.job("job-00001"));
+        assertEquals(new ChatFailure("transient", "response_unknown", called.message(), null), called);
+        assertTrue(store.job("job-00001").row.attempts().contains("\"status\":\"unknown\""));
+        var notCalled = job(store.job("job-00002"));
+        assertEquals(new ChatFailure("transient", "deadline_guard", notCalled.message(), "rerun"), notCalled);
+        assertEquals(0, executor.recoverExpired());
+    }
+
+    @Test
+    void aSaveOnlyAttemptCannotRecoverWithoutAKeptResult() {
+        store.add(queued("job-00001", null, null, 0, "save_only"));
+        var engine = new ScriptedChatEngine((run, control) -> fail("save_only must not call the engine"));
+        executor(engine).runOnce();
+        assertEquals("result_lost", job(store.job("job-00001")).kind());
+        assertTrue(engine.runs.isEmpty());
+    }
+
+    private void assertFailure(int runsBefore, ChatEngineOutcome.Failed outcome, String retry, String attemptStatus) {
+        String id = "job-f" + store.jobs.size() + "000";
+        store.add(withRuns(queued(id, null, null, 0, "rerun"), runsBefore));
+        executor(new ScriptedChatEngine((run, control) -> {
+            if (outcome.reason() != null && !"provider_error".equals(outcome.reason())) control.beforeModelCall();
+            return outcome;
+        })).runOnce();
+        var failure = job(store.job(id));
+        String expectedKind = "save_failed".equals(outcome.kind()) ? "internal" : outcome.kind();
+        assertEquals(expectedKind, failure.kind(), id);
+        assertEquals(retry, failure.retry(), id);
+        assertFalse(failure.message().isBlank());
+        assertTrue(store.job(id).row.attempts().contains("\"status\":\"" + attemptStatus + "\""), store.job(id).row.attempts());
+    }
+
+    private ChatFailure job(MemoryChatStore.Job job) {
+        return mapper.readValue(job.failure, ChatFailure.class);
+    }
+
+    private ChatJobExecutor executor(ChatEngine engine) {
+        var beans = new StaticListableBeanFactory(engine == null ? Map.of() : Map.of("engine", engine));
+        return new ChatJobExecutor(store, store, beans.getBeanProvider(ChatEngine.class), mapper, clock,
+                new NoTransactions());
+    }
+
+    private static ChatJobRow queued(String id, String resolves, String choice, int depth, String mode) {
+        return queued(id, resolves, choice, depth, mode, "queued");
+    }
+
+    private static ChatJobRow queued(String id, String resolves, String choice, int depth, String mode, String status) {
+        String attempts = "[{\"n\":1,\"mode\":\"" + mode + "\",\"requestKey\":\"" + id + "\",\"status\":\""
+                + ("queued".equals(status) ? "queued" : "succeeded") + "\"}]";
+        return new ChatJobRow(id, "conv-0001", "member-a", depth + 1, "질문 " + id, "a".repeat(64), NOW, CONTEXT, SELECTION,
+                List.of(),
+                null, status, null, "completed".equals(status) ? "clarification" : null, resolves, choice, depth, null, null,
+                0, attempts, NOW, NOW, null);
+    }
+
+    private static ChatJobRow withRuns(ChatJobRow r, int runs) {
+        return new ChatJobRow(r.id(), r.sessionId(), r.memberId(), r.seq(), r.question(), r.requestHash(), r.askedAt(),
+                r.frozenContext(), r.frozenSelection(), r.contextCompanyIds(), r.graphVersionId(), r.status(), r.phase(), r.outcome(),
+                r.resolvesJobId(), r.resolvesChoiceId(), r.clarificationDepth(), r.result(), r.failure(), runs, r.attempts(),
+                r.createdAt(), r.updatedAt(), r.finishedAt());
+    }
+
+    /** The memory store needs no transaction; the template still runs the callback. */
+    private static final class NoTransactions extends AbstractPlatformTransactionManager {
+        @Override
+        protected Object doGetTransaction() {
+            return new Object();
+        }
+
+        @Override
+        protected void doBegin(Object transaction, TransactionDefinition definition) {
+        }
+
+        @Override
+        protected void doCommit(DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected void doRollback(DefaultTransactionStatus status) {
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    }
+}

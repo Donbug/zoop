@@ -49,6 +49,22 @@ public final class CsrfKeyRing {
         return activeKeyId;
     }
 
+    /** Domain-separated MAC for short-lived, authenticated server cursors. */
+    public Optional<byte[]> sign(String keyId, String purpose, byte[] payload) {
+        byte[] key = keys.get(keyId);
+        if (key == null) return Optional.empty();
+        if (!"admin-audit-cursor-v1".equals(purpose)) throw new IllegalArgumentException("Invalid MAC purpose");
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(key, "HmacSHA256"));
+            mac.update(purpose.getBytes(StandardCharsets.US_ASCII));
+            mac.update((byte) 0);
+            return Optional.of(mac.doFinal(payload));
+        } catch (NoSuchAlgorithmException | InvalidKeyException exception) {
+            throw new IllegalStateException("Cursor signing unavailable", exception);
+        }
+    }
+
     public Optional<String> derive(String keyId, String sessionKind, String sessionId, long version) {
         byte[] key = keys.get(keyId);
         if (key == null) {

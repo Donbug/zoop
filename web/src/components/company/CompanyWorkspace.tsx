@@ -34,6 +34,8 @@ import {
   bucketKey,
   impactEdges,
   number,
+  requestTime,
+  versionOnlyAddress,
 } from './detail-model';
 
 const workspaceClasses =
@@ -175,42 +177,36 @@ export default function CompanyWorkspace() {
   const invalid = !!asOf && !exactTime(asOf);
   const snapshot = { asOf, graphVersion: version };
   const ready = !!asOf && !invalid;
+  const versionOnly = versionOnlyAddress(asOf, version);
   const range = ready ? timeRange(asOf!, period) : {};
   const company = useCompanyResource<Company>(
     invalid ? null : companyUrl(id, '', snapshot),
     owner,
   );
   const quote = useCompanyResource<Quote>(companyUrl(id, '/quote'));
+  // 버전 단독 주소는 그 버전의 차트를 열 수 없다고 안내하므로 가격 조회도 시작하지 않는다.
   const prices = useCompanyResource<Prices>(
-    invalid ? null : companyUrl(id, '/prices', { period, ...range }),
+    invalid || versionOnly
+      ? null
+      : companyUrl(id, '/prices', { period, ...range }),
   );
-  const latestPoint =
-    prices.data?.status === 'available'
-      ? prices.data.points.at(-1)?.time
-      : null;
   useEffect(() => {
-    const latest = exactTime(latestPoint)
-      ? latestPoint
-      : company.data?.metadata.asOf;
-    // 공개 그래프 버전이 없으면(스냅샷 미게시) 기준 시점을 고정하지 않는다. 고정하면 409가 된다.
-    // 기준 시점을 가격 봉에서 가져오면 그 시점의 버전은 다음 기업 응답이 채운다(지금 버전과 다를 수 있다).
+    // FS040: 처음 열 때의 기준 시점은 기업 응답의 공개 기준 시점과 그 버전이다. 가격 봉 시각은
+    // 거래가 없는 날(주말·휴장)에 오래된 시점을 가리켜 이후 공개 자료를 빼거나 409를 만든다.
+    // 공개 그래프 버전이 없으면(스냅샷 미게시) 고정하지 않는다. 고정하면 409가 된다.
+    // 주소에 graphVersion만 있는 과거 조회는 metadata.asOf가 요청 시각이라 덧붙이면 422가 된다.
+    const latest = company.data?.metadata.asOf;
     const currentVersion = company.data?.metadata.graphVersion ?? null;
     if (
       !asOf &&
+      !version &&
       company.data &&
       currentVersion &&
-      !prices.loading &&
       latest &&
       exactTime(latest)
     )
       updateQuery(
-        {
-          asOf: latest,
-          ...(latest === company.data.metadata.asOf
-            ? { graphVersion: currentVersion }
-            : {}),
-          period,
-        },
+        { asOf: requestTime(latest), graphVersion: currentVersion, period },
         { replace: true },
       );
     if (asOf && !version && company.data?.metadata.graphVersion)
@@ -223,10 +219,8 @@ export default function CompanyWorkspace() {
   }, [
     asOf,
     version,
-    latestPoint,
     company.data?.metadata.asOf,
     company.data?.metadata.graphVersion,
-    prices.loading,
     period,
   ]);
   const depth = params.get('depth') === '2' ? 2 : 1;
@@ -373,6 +367,19 @@ export default function CompanyWorkspace() {
         portfolio={portfolio}
       />
       <main className="min-w-0 bg-white p-6 max-md:p-4">
+        {versionOnly && (
+          <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
+            이 주소에는 기준 시점 없이 그래프 버전({version})만 있어, 그 버전의
+            차트·사건·관계 그래프를 열 수 없어요.{' '}
+            <button
+              type="button"
+              className="font-semibold underline"
+              onClick={() => updateQuery({ graphVersion: null })}
+            >
+              최신 자료로 보기
+            </button>
+          </p>
+        )}
         <section aria-label="기업 개요">
           <Status resource={company} label="기업 정보" />
           {company.data && (
@@ -549,8 +556,13 @@ export default function CompanyWorkspace() {
             </button>
           </nav>
           <p>
-            기준 {asOf ? formatKst(asOf) : '최신 제공 시점 확인 중'} ·{' '}
-            {periods.find((p) => p.value === period)?.bucket} 버킷
+            기준{' '}
+            {asOf
+              ? formatKst(asOf)
+              : versionOnly
+                ? '시점 없음'
+                : '최신 제공 시점 확인 중'}{' '}
+            · {periods.find((p) => p.value === period)?.bucket} 버킷
           </p>
           {prices.data?.status === 'available' &&
             prices.data.points.length > 1 && (
@@ -634,7 +646,7 @@ export default function CompanyWorkspace() {
           <section aria-label="사건 타임라인" data-screen-id="D-COM-05">
             <h2>사건 타임라인</h2>
             <Status resource={events} label="타임라인" />
-            {!ready && (
+            {!ready && !versionOnly && (
               <p role="status">타임라인의 기준 시점을 확인하고 있어요.</p>
             )}
             {events.data && (
@@ -851,7 +863,7 @@ export default function CompanyWorkspace() {
           ))}
         </nav>
         <Status resource={graph} label="관계 그래프" />
-        {!ready && (
+        {!ready && !versionOnly && (
           <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
         )}
         {graph.data && (

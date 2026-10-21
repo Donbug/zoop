@@ -59,6 +59,26 @@ public class BriefingRoundRepository {
         return jdbc.query(ROUND + " WHERE id=?", rows, id).stream().findFirst();
     }
 
+    /** Exact publication evidence, independent of document-analysis summary ownership. */
+    public Optional<ItemEvidence> findItemEvidence(String id) {
+        return jdbc.query("""
+                SELECT e.id, e.article_id, e.article_version, e.quote, e.start_offset, e.end_offset,
+                    v.title, v.publisher, v.url, v.published_at, a.kind, t.sha256
+                FROM evidence e JOIN article_versions v ON v.article_id=e.article_id AND v.version=e.article_version
+                JOIN articles a ON a.id=v.article_id JOIN artifacts t ON t.id=v.text_artifact_id
+                WHERE e.id=? AND a.access_status='available' AND e.quote_verified IS TRUE
+                    AND e.verification_artifact_id IS NOT NULL AND e.text_artifact_id=v.text_artifact_id
+                    AND e.input_kind='body' AND e.offset_unit='unicode_code_point'
+                """, (rs, index) -> new ItemEvidence(rs.getString("id"), rs.getString("article_id"),
+                        rs.getString("article_version"), rs.getString("quote"), rs.getLong("start_offset"),
+                        rs.getLong("end_offset"), rs.getString("title"), rs.getString("publisher"), rs.getString("url"),
+                        instant(rs, "published_at"), rs.getString("kind"), rs.getString("sha256")), id)
+                .stream().findFirst();
+    }
+
+    public record ItemEvidence(String id, String documentId, String documentVersion, String quote, long start, long end,
+            String title, String publisher, String url, Instant publishedAt, String sourceKind, String bodySha256) { }
+
     /** C collation keeps the cursor comparison and ordering identical across database locales. */
     public List<BriefingHistoryEntry> history(Instant before, String id, int fetchSize) {
         if (before == null) {

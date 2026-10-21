@@ -1,5 +1,12 @@
+import { useId } from 'react';
 import { Link } from 'react-router-dom';
-import type { SinceMorning, SinceMorningItem } from '@/types/briefing';
+import type {
+  PreviousBriefingComparison,
+  PreviousBriefingComparisonItem,
+  SinceMorning,
+  SinceMorningItem,
+} from '@/types/briefing';
+import { briefingTime } from '@/util/briefingTime';
 import { formatKst } from '@/util/format';
 import {
   EMPTY,
@@ -28,17 +35,17 @@ function reported(iso: string | null, roundDate: string) {
 }
 
 /** 둘째 줄: 근거 수 변화. 같은 제목이 여럿이면 관련 기업을 앞에 붙여 구분한다. */
-function detail(item: SinceMorningItem, sharesTitle: boolean) {
+function detail(item: PreviousBriefingComparisonItem, sharesTitle: boolean) {
   const count = (value: number | null) =>
     value === null ? '확인되지 않음' : `${value}건`;
   let evidence = `근거 ${count(item.evidenceCount)}`;
   if (item.change === 'dropped')
-    evidence = `이번 회차 핵심 이슈에는 없어요 · 근거 ${count(item.morningEvidenceCount)}`;
+    evidence = `이번 회차 핵심 이슈에는 없어요 · 근거 ${count(item.previousEvidenceCount)}`;
   else if (
     item.change === 'continuing' &&
-    item.morningEvidenceCount !== item.evidenceCount
+    item.previousEvidenceCount !== item.evidenceCount
   )
-    evidence = `근거 ${count(item.morningEvidenceCount)} → ${count(item.evidenceCount)}`;
+    evidence = `근거 ${count(item.previousEvidenceCount)} → ${count(item.evidenceCount)}`;
   if (!sharesTitle || item.companyNames.length === 0) return evidence;
   const names = item.companyNames;
   const companies = `관련 기업 ${names.slice(0, 3).join(', ')}${
@@ -47,71 +54,137 @@ function detail(item: SinceMorningItem, sharesTitle: boolean) {
   return `${companies} · ${evidence}`;
 }
 
-// D-BRF-02 아침 대비 변화 (FS029). 같은 날 발행된 출근 회차와 이슈 ID로 견준 결과를 시간순으로 보여 준다.
-// - 신규: 아침 핵심 이슈에 없던 이슈 / 이어짐: 아침에도 있던 이슈 / 빠짐: 아침에만 있던 이슈
-// - 출근 회차가 없거나 비교할 수 없으면 이유만 보여 준다. 회차를 받기 전에는 준비 중으로 둔다.
-export default function BriefingComparison({
-  since,
-  roundDate,
-}: {
-  since?: SinceMorning | null;
-  roundDate?: string;
-}) {
+type Props = { roundDate?: string } & (
+  | { basis?: 'morning'; since?: SinceMorning | null; previous?: never }
+  | {
+      basis: 'previous';
+      previous?: PreviousBriefingComparison | null;
+      since?: never;
+    }
+);
+
+// D-BRF-01·02. 직전 성공 발행본 또는 같은 날 출근의 고정 선정 목록을 비교한다.
+// 신규/이어짐/빠짐은 비교 회차의 핵심 이슈 포함 여부이며 전망 적중이나 악재 해소가 아니다.
+export default function BriefingComparison(props: Props) {
+  const id = useId();
+  const { roundDate } = props;
+  const isPrevious = props.basis === 'previous';
+  const comparison = isPrevious ? props.previous : props.since;
+  const available = comparison?.status === 'available' ? comparison : null;
+  const previousEdition =
+    available && 'previousEdition' in available
+      ? available.previousEdition
+      : undefined;
+  const reference = isPrevious
+    ? previousEdition === 'morning'
+      ? '이전 출근 브리핑'
+      : previousEdition === 'evening'
+        ? '이전 퇴근 브리핑'
+        : '이전 브리핑'
+    : '출근 브리핑';
+  const title = isPrevious ? `${reference} 대비` : '아침 대비 변화';
+  const items: PreviousBriefingComparisonItem[] = !available
+    ? []
+    : 'previousRoundId' in available
+      ? available.items
+      : available.items.map(
+          ({ morningRank, morningEvidenceCount, ...item }) => ({
+            ...item,
+            previousRank: morningRank,
+            previousEvidenceCount: morningEvidenceCount,
+          }),
+        );
   const heading = (
-    <h3 id="briefing-comparison-title" className={SECTION_TITLE}>
-      아침 대비 변화
-      {since?.status === 'available' && (
+    <h3 id={id} className={SECTION_TITLE}>
+      {title}
+      {available && (
         <span className="ml-1.5 font-normal text-zoop-muted tabular-nums">
-          {since.items.length}건
+          {items.length}건
         </span>
       )}
     </h3>
   );
 
-  if (since === undefined)
+  if (comparison === undefined)
     return (
-      <section className={SECTION} aria-labelledby="briefing-comparison-title">
+      <section className={SECTION} aria-labelledby={id}>
         {heading}
         <p className={EMPTY}>
-          출근 브리핑과 비교할 수 있도록 신규·이어짐·빠짐 이슈를 준비하고
+          {reference}과 비교할 수 있도록 신규·이어짐·빠짐 이슈를 준비하고
           있어요.
         </p>
       </section>
     );
 
-  if (since === null || since.status === 'unavailable')
+  if (!available)
     return (
-      <section className={SECTION} aria-labelledby="briefing-comparison-title">
+      <section className={SECTION} aria-labelledby={id}>
         {heading}
         <p className={EMPTY}>
-          {since?.reason ?? '같은 날 출근 브리핑과 비교한 정보가 없어요.'}
+          {comparison?.status === 'unavailable'
+            ? comparison.reason
+            : isPrevious
+              ? '이전 브리핑과 비교한 정보가 없어요.'
+              : '같은 날 출근 브리핑과 비교한 정보가 없어요.'}
         </p>
       </section>
     );
 
   const titleCount = new Map<string, number>();
-  since.items.forEach((item) =>
+  items.forEach((item) =>
     titleCount.set(item.title, (titleCount.get(item.title) ?? 0) + 1),
   );
+  const previousDataAsOf =
+    'previousDataAsOf' in available
+      ? available.previousDataAsOf
+      : available.morningDataAsOf;
+  const previousPublishedAt =
+    'previousPublishedAt' in available
+      ? available.previousPublishedAt
+      : available.morningPublishedAt;
+  const referenceDate = isPrevious
+    ? 'previousDate' in available
+      ? available.previousDate
+      : undefined
+    : roundDate;
+  const referenceHref =
+    referenceDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(referenceDate) &&
+    (!isPrevious || previousEdition)
+      ? `/briefing?date=${referenceDate}&edition=${isPrevious ? previousEdition : 'morning'}`
+      : null;
 
   return (
-    <section className={SECTION} aria-labelledby="briefing-comparison-title">
+    <section className={SECTION} aria-labelledby={id}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         {heading}
-        {roundDate && (
+        {referenceHref && (
           <Link
-            to={`/briefing?date=${roundDate}&edition=morning`}
+            to={referenceHref}
             className={`text-[11px] text-zoop-muted underline underline-offset-4 hover:text-zoop-ink ${FOCUS_RING}`}
           >
-            출근 브리핑 보기
+            {reference} 보기
           </Link>
         )}
       </div>
-      {since.items.length === 0 ? (
-        <p className={EMPTY}>출근 브리핑과 달라진 핵심 이슈가 없어요.</p>
+      <p className={`${NOTE} mb-2`}>
+        비교 회차 데이터 기준 {briefingTime(previousDataAsOf)} · 발행{' '}
+        {briefingTime(previousPublishedAt)}
+      </p>
+      <p role="note" className={`${NOTE} mb-3`}>
+        선정된 이슈 목록을 비교합니다. 신규·이어짐·빠짐은 중요 이슈 선정의
+        변화이며, 빠짐이 악재나 사건의 해소를 뜻하지 않아요.
+      </p>
+      {'forecastEvaluation' in available && (
+        <p className={`${NOTE} mb-3`}>
+          전망 결과 평가: {available.forecastEvaluation.reason}
+        </p>
+      )}
+      {items.length === 0 ? (
+        <p className={EMPTY}>{reference}과 달라진 핵심 이슈가 없어요.</p>
       ) : (
-        <ol aria-label="아침 대비 변화 목록">
-          {since.items.map((item) => (
+        <ol aria-label={`${title} 목록`}>
+          {items.map((item) => (
             <li
               key={`${item.change}-${item.eventId}`}
               className="flex gap-3 border-b-[0.667px] border-zoop-line py-3 last:border-b-0 max-sm:flex-col max-sm:gap-1"
@@ -141,6 +214,14 @@ export default function BriefingComparison({
                 <p className={NOTE}>
                   {detail(item, (titleCount.get(item.title) ?? 0) > 1)}
                 </p>
+                {item.change === 'continuing' &&
+                  item.previousRank !== null &&
+                  item.rank !== null &&
+                  item.previousRank !== item.rank && (
+                    <p className={NOTE}>
+                      선정 순위 {item.previousRank} → {item.rank}
+                    </p>
+                  )}
               </div>
             </li>
           ))}

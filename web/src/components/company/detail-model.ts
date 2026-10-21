@@ -17,6 +17,21 @@ export const exactTime = (value: string | null | undefined) =>
   !!value &&
   /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value));
+/**
+ * 요청에 쓸 RFC 3339 시각(초 포함, UTC). 초 없는 시각(2026-10-20T00:00+09:00)은 기업·그래프 API가
+ * 422로 거절하므로 기준 시점(asOf)으로 주소에 고정할 때 바꾼다.
+ */
+export const requestTime = (value: string) =>
+  new Date(value).toISOString().replace(/\.000Z$/, 'Z');
+/**
+ * 주소에 graphVersion만 있고 기준 시점이 없다. 백엔드는 이 경우 metadata.asOf로 요청 시각을 주며 그 버전이
+ * 공개된 시점을 알려 주지 않으므로, 과거 버전에 맞는 기준 시점을 만들 수 없다(임의 시각은 422).
+ * 차트·타임라인·그래프·문서·재무 조회를 시작하지 않고 안내한다. 앱 안의 링크는 asOf와 함께 넘긴다.
+ */
+export const versionOnlyAddress = (
+  asOf: string | null,
+  version: string | null,
+) => !asOf && !!version;
 export function bucketKey(
   event: Pick<Event, 'eventTime' | 'timePrecision'>,
   period: ChartPeriod,
