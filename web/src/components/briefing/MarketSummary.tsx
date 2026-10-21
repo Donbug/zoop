@@ -5,6 +5,7 @@ import type {
   MarketOutlookClaim,
   MarketOutlookTarget,
 } from '@/types/briefing/marketOutlook';
+import { matchingBriefingAnalysis } from './briefingAnalysis';
 import { briefingTime } from '@/util/briefingTime';
 import {
   BODY,
@@ -88,16 +89,7 @@ export default function MarketSummary({
   dataAsOf: string | null;
 }) {
   const stored = 'text' in summary ? summary.analysis : undefined;
-  const expectedMode =
-    edition === 'morning' ? 'morning_update' : 'evening_review';
-  const analysis =
-    stored?.schemaVersion === 'zoop-market-outlook-analysis-v1' &&
-    stored.edition === edition &&
-    stored.mode === expectedMode &&
-    dataAsOf !== null &&
-    Date.parse(stored.cutoff) === Date.parse(dataAsOf)
-      ? stored
-      : undefined;
+  const analysis = matchingBriefingAnalysis(summary, edition, dataAsOf);
   const previous = analysis?.previousPublication;
   const groups: { kind: MarketOutlookClaim['kind']; title: string }[] = [
     { kind: 'fact', title: '확인된 정보' },
