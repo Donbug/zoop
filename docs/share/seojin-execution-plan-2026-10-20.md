@@ -1,10 +1,12 @@
-# 윤서진 본개발 실행 및 인계 기준선 (10/20 수립·10/21 갱신)
+# 윤서진 본개발 실행 및 인계 기준선 (10/20 수립·10/22 갱신)
 
 **이 문서는 2026-10-20 기준 윤서진의 본개발 우선순위, 3단계 완료 판정, 팀원 인계 검증, 23개 담당·공동 이슈의 수직 슬라이스 실행 순서를 관리하는 단일 기준선이다.** 일일 작업 일지를 계속 덧붙이는 대신 이 문서를 갱신해 사용하며, 이전 계획인 [`seojin-work-plan-2026-10-12.md`](seojin-work-plan-2026-10-12.md)는 착수 초기 이력으로 보존한다.
 
 **원격 반영 확인:** [PR #247](https://github.com/Donbug/zoop/pull/247)이 `e26a8c7`로 main에 병합됐다. PR CI 9개가 통과했으며, 병합 직후 실행은 후속 main push로 자동 취소됐다. 해당 변경을 포함하는 `d87262f`의 [main CI 9개 통과](https://github.com/Donbug/zoop/actions/runs/39390679330)를 확인했다. 코드 인계가 가능해진 상태이며 수령자 실행·운영 배포 완료를 뜻하지 않는다.
 
 **10/21 원격 기준선:** 선택 이력·발행처 전달의 [PR #259](https://github.com/Donbug/zoop/pull/259)는 `9af911d`로 병합됐고 [main CI 9개](https://github.com/Donbug/zoop/actions/runs/39525429347)가 모두 통과했다. 필드 판정·출처 지지도·실모델·최종 승인 변경의 [PR #266](https://github.com/Donbug/zoop/pull/266)은 최신 main을 통합한 `b9ed817`의 [CI 전체 통과](https://github.com/Donbug/zoop/actions/runs/39547467242)를 확인한 뒤 `b1f046d`로 병합했다. 구조 경로·근거 조회 후속인 [PR #269](https://github.com/Donbug/zoop/pull/269)도 `d1dd36d`로 병합했고 [main CI 9개](https://github.com/Donbug/zoop/actions/runs/39550112723)가 통과했다. 아래 ‘로컬·미게시’는 당시 기록이다.
+
+**10/22 원격 인계:** 영향 판정 인계, 수집 회차 제어, 완료 회차의 S2 등록 연결을 [PR #279](https://github.com/Donbug/zoop/pull/279)로 게시했다(`97ad2af`, 최신 main 통합 `979c439`). 통합 후 Java는 1,131개 중 1,064개 통과·67개 제외, 빌드와 문서·계약 검사는 통과했다. PR은 미병합이며, 최신 CI 상태는 해당 PR에서 확인한다. 이 인계로 전체 운영·배포 완료를 선언하지 않는다.
 
 ## 1. 목적·권위 경계와 정본 출처
 
