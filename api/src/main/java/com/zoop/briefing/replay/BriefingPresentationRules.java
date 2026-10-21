@@ -149,6 +149,8 @@ final class BriefingPresentationRules {
                 .put(morning ? "morningPublishedAt" : "previousPublishedAt", previous.publishedAt())
                 .put(morning ? "morningDataAsOf" : "previousDataAsOf", previous.cutoff());
         if (!morning) {
+            result.put("previousDate", previous.payload().path("date").stringValue())
+                    .put("previousEdition", previous.payload().path("edition").stringValue());
             result.put("comparisonBasis", "event_identity");
             result.putObject("forecastEvaluation").put("status", "unavailable").put("reason", "검증 가능한 전망·성과 입력이 없어 전망 정확도를 평가하지 않았습니다.");
         }
@@ -173,7 +175,10 @@ final class BriefingPresentationRules {
     }
     static void suppliedComparison(StrictJson.Obj record, String field, ObjectNode computed) {
         if (!record.has(field) || record.isNull(field)) return;
-        require(computed.equals(record.raw(field)), "comparison_not_derived_from_publication");
+        ObjectNode compatible = computed.deepCopy();
+        for (String optional : List.of("previousDate", "previousEdition"))
+            if (!record.object(field).has(optional)) compatible.remove(optional);
+        require(compatible.equals(record.raw(field)), "comparison_not_derived_from_publication");
     }
     private static String slice(String body, int start, int end) {
         require(start >= 0 && end > start && end <= body.codePointCount(0, body.length()), "body_span_bounds");

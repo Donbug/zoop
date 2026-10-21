@@ -63,16 +63,26 @@ type Props = { roundDate?: string } & (
     }
 );
 
-// D-BRF-01·02. 출근은 직전 퇴근, 퇴근은 같은 날 출근의 저장된 선정 목록을 비교한다.
+// D-BRF-01·02. 직전 성공 발행본 또는 같은 날 출근의 고정 선정 목록을 비교한다.
 // 신규/이어짐/빠짐은 비교 회차의 핵심 이슈 포함 여부이며 전망 적중이나 악재 해소가 아니다.
 export default function BriefingComparison(props: Props) {
   const id = useId();
   const { roundDate } = props;
   const isPrevious = props.basis === 'previous';
   const comparison = isPrevious ? props.previous : props.since;
-  const title = isPrevious ? '이전 퇴근 브리핑 대비' : '아침 대비 변화';
-  const reference = isPrevious ? '이전 퇴근 브리핑' : '출근 브리핑';
   const available = comparison?.status === 'available' ? comparison : null;
+  const previousEdition =
+    available && 'previousEdition' in available
+      ? available.previousEdition
+      : undefined;
+  const reference = isPrevious
+    ? previousEdition === 'morning'
+      ? '이전 출근 브리핑'
+      : previousEdition === 'evening'
+        ? '이전 퇴근 브리핑'
+        : '이전 브리핑'
+    : '출근 브리핑';
+  const title = isPrevious ? `${reference} 대비` : '아침 대비 변화';
   const items: PreviousBriefingComparisonItem[] = !available
     ? []
     : 'previousRoundId' in available
@@ -114,7 +124,7 @@ export default function BriefingComparison(props: Props) {
           {comparison?.status === 'unavailable'
             ? comparison.reason
             : isPrevious
-              ? '이전 퇴근 브리핑과 비교한 정보가 없어요.'
+              ? '이전 브리핑과 비교한 정보가 없어요.'
               : '같은 날 출근 브리핑과 비교한 정보가 없어요.'}
         </p>
       </section>
@@ -133,11 +143,15 @@ export default function BriefingComparison(props: Props) {
       ? available.previousPublishedAt
       : available.morningPublishedAt;
   const referenceDate = isPrevious
-    ? formatKst(previousDataAsOf).slice(0, 10)
+    ? 'previousDate' in available
+      ? available.previousDate
+      : undefined
     : roundDate;
   const referenceHref =
-    referenceDate && /^\d{4}-\d{2}-\d{2}$/.test(referenceDate)
-      ? `/briefing?date=${referenceDate}&edition=${isPrevious ? 'evening' : 'morning'}`
+    referenceDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(referenceDate) &&
+    (!isPrevious || previousEdition)
+      ? `/briefing?date=${referenceDate}&edition=${isPrevious ? previousEdition : 'morning'}`
       : null;
 
   return (

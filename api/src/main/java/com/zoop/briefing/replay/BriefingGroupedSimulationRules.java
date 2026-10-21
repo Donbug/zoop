@@ -173,7 +173,9 @@ final class BriefingGroupedSimulationRules {
         String key = round.string("groupedSelectionRequestDigest"); JsonNode node = receipts.get(key);
         require(node != null, "selection_receipt_missing"); StrictJson.Obj receipt = StrictJson.Obj.of(node);
         require(SELECTION_STAGE.equals(receipt.string("stage")), "selection_stage");
-        Recording selected = recording(receipt, output, true);
+        boolean heldSelection = round.has("groupedUnresolvedPaidRequest")
+                && SELECTION_STAGE.equals(round.object("groupedUnresolvedPaidRequest").string("stage"));
+        Recording selected = heldSelection ? unresolvedSelection(round, receipt, output) : recording(receipt, output, true);
         StrictJson.Obj request = selected.input(); context(request, round);
         require(request.array("previousSelectedIssues").equals(history) && request.array("priorSelectedIssues").equals(history), "selection_previous_history");
         require(request.count("maximumIssues") == 3 && !request.bool("operationalCollectionGate")
@@ -387,6 +389,38 @@ final class BriefingGroupedSimulationRules {
     }
 
     record Recording(StrictJson.Obj input, StrictJson.Obj answer) { }
+
+    private static Recording unresolvedSelection(StrictJson.Obj round, StrictJson.Obj receipt, Path output) {
+        StrictJson.Obj disposition = round.object("groupedUnresolvedPaidRequest");
+        String digest = receipt.string("requestDigest");
+        require("HELD_VALIDATION".equals(round.string("selectionStatus")) && round.objects("selected").isEmpty()
+                && round.isNull("result") && round.isNull("resultSha256")
+                && digest.equals(disposition.string("requestDigest")) && SELECTION_STAGE.equals(disposition.string("stage"))
+                && "hold_without_retransmission".equals(disposition.string("operatorDisposition"))
+                && disposition.bool("preexistingAtProcessStart") && !disposition.bool("usageKnown")
+                && disposition.isNull("inputTokens") && disposition.isNull("outputTokens"), "unresolved_selection_disposition");
+        require("unknown".equals(receipt.string("status")) && !receipt.bool("usageKnown")
+                && receipt.isNull("inputTokens") && receipt.isNull("outputTokens")
+                && (!receipt.has("responseSha256") || receipt.isNull("responseSha256"))
+                && (!receipt.has("responseId") || receipt.isNull("responseId"))
+                && !Files.exists(output.resolve("calls/" + digest + ".complete.json"))
+                && !Files.exists(output.resolve("calls/" + digest + ".response.json")), "unresolved_selection_no_completed_answer");
+        recording(receipt, output, false); // Validate the actual immutable request digest/provider identity.
+        StrictJson.Obj request = StrictJson.parseObject(read(output.resolve("calls/" + digest + ".request.json")));
+        StrictJson.Obj pending = StrictJson.parseObject(read(output.resolve("calls/" + digest + ".pending.json")));
+        StrictJson.Obj format = request.object("text").object("format");
+        require("gpt-6-luna".equals(request.string("model")) && "json_schema".equals(format.string("type")) && format.bool("strict")
+                && digest.equals(pending.string("requestDigest")) && SELECTION_STAGE.equals(pending.string("stage"))
+                && request.string("model").equals(pending.string("model"))
+                && request.count("max_output_tokens") == pending.count("maxOutputTokens")
+                && Canonical.sha256(request.string("instructions")).equals(pending.string("promptSha256"))
+                && Canonical.digest(format.object("schema").node()).equals(pending.string("schemaSha256")), "unresolved_selection_reservation");
+        Instant.parse(pending.string("createdAt"));
+        StrictJson.Obj input = StrictJson.parseObject(request.string("input"));
+        require(Canonical.sha256(request.string("instructions")).equals(input.object("context").object("promptArtifacts").string("grouped-selection.md")), "unresolved_selection_prompt");
+        require(round.objects("receipts").stream().allMatch(r -> SELECTION_STAGE.equals(r.string("stage"))), "unresolved_selection_has_no_generation");
+        return new Recording(input, null);
+    }
 
     private static Recording recording(StrictJson.Obj receipt, Path output, boolean completed) {
         String digest = receipt.string("requestDigest"); require(digest.matches("[0-9a-f]{64}"), "receipt_digest");

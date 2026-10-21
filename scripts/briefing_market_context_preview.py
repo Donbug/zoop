@@ -21,7 +21,8 @@ def run(args):
     records = bundle["marketEnrichment"]["rounds"]
     by_id = {r["roundId"]: r for r in records}
     context.require(len(by_id) == len(records), "preview_duplicate_round")
-    calendar = base.strict_load(base.regular(Path(args.session_calendar))) if args.session_calendar else None
+    calendar_raw = base.regular(Path(args.session_calendar)) if args.session_calendar else None
+    calendar = base.strict_load(calendar_raw) if calendar_raw else None
     output = Path(args.output).resolve() if args.output else None
     if args.write_inputs:
         context.require(output is not None and output != bundle_path.parent and bundle_path.parent not in output.parents,
@@ -59,6 +60,10 @@ def run(args):
     result = {"schemaVersion": "zoop-market-context-preview-v1", "baselineBundleSha256": base.digest(raw),
               "userInboxRef": args.user_inbox_ref, "rounds": values, "realHttpCalls": 0, "realPaidCalls": 0,
               "historicalSimulationOnly": True, "generatedMarketSummaries": 0}
+    if calendar_raw is not None:
+        result["sessionCalendarSha256"] = base.digest(calendar_raw)
+        if args.write_inputs:
+            base.write_once(output / ("session-calendar-" + result["sessionCalendarSha256"] + ".json"), calendar_raw)
     if args.write_inputs:
         base.write_once(output / "preview.json", base.canonical(result))
     return result

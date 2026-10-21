@@ -76,6 +76,26 @@ class CompanyPriceTest(unittest.TestCase):
             self.assertEqual('unavailable', result['status'])
             self.assertIsNone(result['latest'])
 
+    def test_provider_failure_is_distinct_from_successful_empty_history(self):
+        for status in (200, 503):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as d:
+                root = Path(d)
+                symbol, currency, zone = p.identity('KRX:005930')
+                raw = json.dumps({'chart': {'error': None, 'result': [{'meta': {
+                    'symbol': symbol, 'currency': currency, 'exchangeTimezoneName': zone},
+                    'timestamp': [], 'indicators': {'quote': [{'close': []}]}}]}}).encode()
+                calls = []
+                def send(url):
+                    calls.append(url)
+                    return status, raw if status == 200 else b'provider temporarily unavailable'
+                refs = p.collect(['KRX:005930'], root, send)['KRX:005930']
+                result = p.snapshot('KRX:005930', '2026-10-08T09:20:00+09:00', refs, root)
+                self.assertEqual('unavailable', result['status'])
+                self.assertEqual('eligible_price_missing' if status == 200 else 'provider_request_failed', result['reason'])
+                self.assertEqual([status, status], [r['httpStatus'] for r in result['sources']])
+                self.assertEqual(2, len(calls))
+                self.assertIsNone(result['latest'])
+
 
 if __name__ == '__main__':
     unittest.main()

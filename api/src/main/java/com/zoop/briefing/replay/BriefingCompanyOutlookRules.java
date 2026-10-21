@@ -170,6 +170,7 @@ final class BriefingCompanyOutlookRules {
                 && (stage + phase).equals(receipt.string("stage")) && receipt.bool("usageKnown")
                 && receipt.count("httpStatus") == 200 && "completed".equals(receipt.string("status")), "recording");
         StrictJson.Obj request = StrictJson.parseObject(requestBytes), response = StrictJson.parseObject(responseBytes);
+        require(BriefingCompanySchemas.format(stage, phase, frozen).equals(request.object("text").object("format").node()), "response_schema");
         require("gpt-6-luna".equals(request.string("model")) && !request.bool("store")
                 && "gpt-6-luna".equals(receipt.string("model")) && receipt.string("responseId").equals(response.string("id"))
                 && "completed".equals(response.string("status")), "model");

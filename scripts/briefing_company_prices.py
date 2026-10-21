@@ -128,6 +128,8 @@ def snapshot(cid, cutoff_string, receipts, output):
         result['reason'] = 'provider_history_unverified'
         return result
     if not eligible:
+        if any(receipt['httpStatus'] != 200 for receipt in receipts):
+            result['reason'] = 'provider_request_failed'
         return result
     latest = eligible[-1]
     morning = cutoff.astimezone(market.KST).replace(hour=9, minute=20, second=0, microsecond=0)

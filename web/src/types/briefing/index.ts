@@ -118,6 +118,8 @@ export type PreviousBriefingComparison =
   | {
       status: 'available';
       previousRoundId: string;
+      previousDate?: string;
+      previousEdition?: BriefingEdition;
       previousPublishedAt: string | null;
       previousDataAsOf: string;
       comparisonBasis: 'event_identity';

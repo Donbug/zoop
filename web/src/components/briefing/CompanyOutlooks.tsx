@@ -77,7 +77,16 @@ export default function CompanyOutlooks({
   compact: boolean;
 }) {
   const layer = result.companyOutlooks;
-  if (!layer) return null;
+  if (!layer)
+    return (
+      <section className={SECTION} aria-label="핵심 이슈 기업별 전망">
+        <h3 className={SECTION_TITLE}>기업별 전망 미제공</h3>
+        <p className={NOTE}>
+          이 회차에는 기업별 전망이 저장되어 있지 않습니다. 시장 요약은 아래에서
+          확인할 수 있습니다.
+        </p>
+      </section>
+    );
   const expected = new Set(
     result.items.flatMap((item) => item.companies.map((c) => c.id)),
   );

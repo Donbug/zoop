@@ -18,7 +18,7 @@ def load(name, relative):
     return value
 
 
-def create(directory, frozen=False):
+def create(directory, frozen=False, frozen_calendar=False, failed_repair=False):
     legacy = load("context_fixture_news", "scripts/tests/test_briefing_round_simulation.py")
     market = load("context_fixture_market", "scripts/tests/test_briefing_market_data.py")
     authored = load("context_fixture_summary", "scripts/tests/test_briefing_market_context.py")
@@ -77,13 +77,27 @@ def create(directory, frozen=False):
                 preview_args = runner.preview.parser().parse_args(["--market-bundle", str(directory / "comparison-baseline/bundle-v2.json"),
                     "--sources", str(fixture.sources), "--clocks", str(fixture.clocks), "--user-inbox-ref", "inbox/authored-market-context.md",
                     "--output", str(directory / "inputs"), "--write-inputs"])
+                if frozen_calendar:
+                    preview_args.session_calendar = str(calendar_path)
                 runner.preview.run(preview_args)
                 run_args = runner.parser().parse_args(["--inputs", str(directory / "inputs"), "--market-bundle", preview_args.market_bundle,
                     "--sources", str(fixture.sources), "--clocks", str(fixture.clocks), "--output", str(directory / "enriched"),
                     "--user-inbox-ref", "inbox/authored-market-execution.md", "--execute-authorized-generation"])
                 result = runner.run(run_args, authored.ContextTransport())
             else:
-                result = enrichment.run(enrichment.parser().parse_args(values), provider_shape, authored.ContextTransport())
+                counters = {"generation": 0, "verification": 0}
+                def mutate(stage, result):
+                    if not failed_repair:
+                        return
+                    phase = "generation" if stage.endswith("_generation") else "verification"
+                    counters[phase] += 1
+                    if phase == "verification" and counters[phase] == 1:
+                        for check in result["checks"].values():
+                            check["noUnsupportedNumbers"] = False
+                    if phase == "generation" and counters[phase] == 2:
+                        for claim in result["claims"]:
+                            claim["evidenceIds"] = []
+                result = enrichment.run(enrichment.parser().parse_args(values), provider_shape, authored.ContextTransport(mutate))
         calls = result.pop("newPaidCalls"); result.pop("newHttpCalls")
         return {"sources": str(fixture.sources), "clocks": str(fixture.clocks), **result,
                 "authoredTransportCalls": calls, "realHttpCalls": 0, "realPaidCalls": 0}
@@ -92,4 +106,4 @@ def create(directory, frozen=False):
 
 
 if __name__ == "__main__":
-    print(create(Path(sys.argv[1]), "--frozen" in sys.argv))
+    print(create(Path(sys.argv[1]), "--frozen" in sys.argv or "--frozen-calendar" in sys.argv, "--frozen-calendar" in sys.argv, "--failed-repair" in sys.argv))

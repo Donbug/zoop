@@ -8329,7 +8329,9 @@ components:
           type: array
           items: {"$ref": "#/components/schemas/CompanyPriceSource"}
         status: {type: string, enum: [available, unavailable]}
-        reason: {type: [string, 'null']}
+        reason:
+          type: [string, 'null']
+          description: eligible_price_missing은 정상 조회 후 적격 관측 없음, provider_request_failed는 관측이 없고 공급자 HTTP 요청 실패, provider_history_unverified는 이력 검증 실패입니다.
         latest:
           anyOf:
             - {"$ref": "#/components/schemas/CompanyPricePoint"}
@@ -9079,6 +9081,8 @@ components:
         previousRoundId: {type: "string"}
         previousPublishedAt: {type: "string", format: "date-time"}
         previousDataAsOf: {type: "string", format: "date-time"}
+        previousDate: {type: "string", format: "date", description: "실제 이전 발행본의 날짜. 과거 스냅샷에는 없을 수 있습니다."}
+        previousEdition: {type: "string", enum: ["morning", "evening"], description: "실제 이전 발행본의 회차. 부재 시 퇴근으로 추정하지 않습니다."}
         comparisonBasis: {type: "string", enum: ["event_identity"]}
         forecastEvaluation: {"$ref": "#/components/schemas/Unavailable"}
         items:

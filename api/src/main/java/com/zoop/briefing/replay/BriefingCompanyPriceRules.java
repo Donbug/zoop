@@ -83,10 +83,12 @@ final class BriefingCompanyPriceRules {
                 && id.currency().equals(price.string("currency")) && id.zone().getId().equals(price.string("exchangeTimezone"))
                 && "Yahoo Finance".equals(price.string("source")) && !price.bool("official"), "snapshot_identity");
         List<Point> rows = points(cid, cutoff, price.objects("sources"), output);
-        // Malformed archives fail import; HTTP failures/empty eligible histories are a genuine missing value.
+        // Preserve the distinction between a successful empty history and failed provider requests.
         if (rows.isEmpty()) {
+            boolean failed = price.objects("sources").stream().anyMatch(source -> source.count("httpStatus") != 200);
             require("unavailable".equals(price.string("status")) && price.isNull("latest") && price.isNull("baseline")
-                    && price.isNull("change") && price.isNull("changeRate"), "missing_projection");
+                    && price.isNull("change") && price.isNull("changeRate") && "unavailable".equals(price.string("comparisonStatus"))
+                    && (failed ? "provider_request_failed" : "eligible_price_missing").equals(price.string("reason")), "missing_projection");
             return (ObjectNode) price.node().deepCopy();
         }
         Point latest = rows.getLast();

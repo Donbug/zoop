@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -221,7 +222,7 @@ def result_projection(entries, receipts):
         "usage": used}
 
 
-def run(args, transport=None):
+def _run(args, transport=None):
     source = Path(args.base_bundle); raw = base.regular(source); bundle = base.strict_load(raw)
     require(bundle["schemaVersion"] == "zoop-briefing-grouped-simulation-v1" and "briefingRecovery" not in bundle,
             "recovery_requires_original_grouped_bundle")
@@ -378,6 +379,24 @@ def run(args, transport=None):
     else:
         base.write_once(completed, base.canonical(proof))
     return proof
+
+
+def run(args, transport=None):
+    output = Path(args.output).resolve()
+    source = Path(args.base_bundle).resolve().parent
+    require(output != source and source not in output.parents and output not in source.parents, "recovery_separate_output_required")
+    base.private_dir(output)
+    lock = output / ".recovery-execution.lock"
+    try:
+        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as error:
+        raise sim.ReplayError("recovery_execution_locked") from error
+    os.close(descriptor)
+    try:
+        # Own the complete reservation count/copy/allocate lifecycle across processes.
+        return _run(args, transport)
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def parser():

@@ -24,8 +24,14 @@ def copy_tree(source, destination):
 def prepare(args):
     inputs, prior_path = Path(args.inputs).resolve(), Path(args.market_bundle).resolve()
     manifest_raw = base.regular(inputs / "preview.json"); manifest = base.strict_load(manifest_raw)
+    calendar_sha = manifest.get("sessionCalendarSha256")
+    calendar_path = None
+    if calendar_sha is not None:
+        context.require(type(calendar_sha) is str and len(calendar_sha) == 64 and all(c in '0123456789abcdef' for c in calendar_sha), "frozen_calendar_digest")
+        calendar_path = inputs / ("session-calendar-" + calendar_sha + ".json")
+        context.require(base.digest(base.regular(calendar_path)) == calendar_sha, "frozen_calendar_changed")
     check = preview.run(argparse.Namespace(market_bundle=str(prior_path), sources=args.sources, clocks=args.clocks,
-        user_inbox_ref=manifest["userInboxRef"], session_calendar=None, output=None, write_inputs=False))
+        user_inbox_ref=manifest["userInboxRef"], session_calendar=str(calendar_path) if calendar_path else None, output=None, write_inputs=False))
     context.require(check == manifest, "frozen_preview_changed_or_not_reproducible")
     rows = []
     for r in manifest["rounds"]:
@@ -71,6 +77,11 @@ def run(args, transport=None):
                                  ("previews", plan["previewSha256"], manifest_raw)):
             base.private_dir(output / "market" / folder)
             base.write_once(output / "market" / folder / (sha + ".json"), raw)
+        if manifest.get("sessionCalendarSha256"):
+            sha = manifest["sessionCalendarSha256"]
+            base.private_dir(output / "market/calendars")
+            base.write_once(output / "market/calendars" / (sha + ".json"),
+                            base.regular(inputs / ("session-calendar-" + sha + ".json")))
         prompt_root = output / "summary-run/prompts"
         base.private_dir(prompt_root)
         for p in sorted(context.PROMPTS.iterdir()):

@@ -54,7 +54,7 @@ def create(directory, unknown=False, selection_mode="normal"):
             archive["held"] = [{"articleId": document["documentId"], "requestDigest": digest,
                 "stage": stage, "usageKnown": False, "reason": "operator_held_unresolved_paid_request"}]
             fixture.archive_path.write_bytes(module.base.canonical(archive))
-        if selection_mode not in {"normal", "held", "corrected"} or (unknown and selection_mode != "normal"):
+        if selection_mode not in {"normal", "held", "corrected", "unresolved", "unresolved-correction"} or (unknown and selection_mode != "normal"):
             raise ValueError("Unknown authored selection fixture mode")
         class AuthoredSelectionFailure(module.fixtures.AuthoredTransport):
             def __call__(self, raw):
@@ -75,8 +75,19 @@ def create(directory, unknown=False, selection_mode="normal"):
                 part["text"] = module.base.canonical(reply).decode()
                 return status, module.base.canonical(provider)
         transport = module.fixtures.AuthoredTransport() if selection_mode == "normal" else AuthoredSelectionFailure()
-        result = fixture.execute(transport)
-        expected = 13 if unknown or selection_mode == "held" else 14
+        if selection_mode in {"unresolved", "unresolved-correction"}:
+            first = module.UnknownStageTransport(module.fixtures.grouped.SELECTION_STAGE) if selection_mode == "unresolved" else module.UnknownCorrectionTransport()
+            try:
+                fixture.execute(first)
+            except module.base.ReplayError:
+                pass
+            else:
+                raise AssertionError("Authored unknown request unexpectedly completed")
+            transport = module.fixtures.AuthoredTransport()
+            result = fixture.execute(transport, hold_unresolved=True)
+        else:
+            result = fixture.execute(transport)
+        expected = 13 if unknown or selection_mode in {"held", "unresolved", "unresolved-correction"} else 14
         expected_calls = expected * 3 + (2 if selection_mode == "held" else 1 if selection_mode == "corrected" else 0)
         if result["selectedRounds"] != expected or result["selectedIssues"] != expected or len(transport.requests) != expected_calls:
             raise AssertionError("Authored grouped fixture did not produce all fourteen successful rounds")
@@ -90,5 +101,5 @@ def create(directory, unknown=False, selection_mode="normal"):
 
 
 if __name__ == "__main__":
-    mode = "held" if "--held-selection" in sys.argv else "corrected" if "--corrected-selection" in sys.argv else "normal"
+    mode = "unresolved-correction" if "--unresolved-correction" in sys.argv else "unresolved" if "--unresolved" in sys.argv else "held" if "--held-selection" in sys.argv else "corrected" if "--corrected-selection" in sys.argv else "normal"
     print(create(Path(sys.argv[1]), "--unknown" in sys.argv, mode))

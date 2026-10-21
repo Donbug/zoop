@@ -51,4 +51,19 @@ class BriefingCompanyPriceRulesTest {
         Files.writeString(output.resolve("company-prices/" + refs.getFirst().string("sha256") + ".bin"), "changed");
         assertThatThrownBy(() -> BriefingCompanyPriceRules.points("KRX:005930", Instant.parse("2026-10-08T08:30:00Z"), refs, output)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void providerFailuresCannotBeImportedAsSuccessfulEmptyHistories() throws Exception {
+        for (int status : new int[]{200, 503}) {
+            var refs = List.of(archive("5m", new long[]{}, new int[]{}), archive("1d", new long[]{}, new int[]{}));
+            var price = StrictJson.newObject().put("companyId", "KRX:005930").put("cutoff", "2026-10-08T00:20:00Z")
+                    .put("currency", "KRW").put("exchangeTimezone", "Asia/Seoul").put("source", "Yahoo Finance").put("official", false)
+                    .put("status", "unavailable").put("reason", status == 200 ? "eligible_price_missing" : "provider_request_failed")
+                    .put("comparisonStatus", "unavailable").putNull("latest").putNull("baseline").putNull("change").putNull("changeRate");
+            var sources = price.putArray("sources");
+            for (var ref : refs) sources.add(((tools.jackson.databind.node.ObjectNode) ref.node().deepCopy()).put("httpStatus", status));
+            assertThatCode(() -> BriefingCompanyPriceRules.apply(StrictJson.Obj.of(price), "KRX:005930", Instant.parse("2026-10-08T00:20:00Z"), output)).doesNotThrowAnyException();
+            price.put("reason", status == 200 ? "provider_request_failed" : "eligible_price_missing");
+            assertThatThrownBy(() -> BriefingCompanyPriceRules.apply(StrictJson.Obj.of(price), "KRX:005930", Instant.parse("2026-10-08T00:20:00Z"), output))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("missing_projection");
+        }
+    }
 }

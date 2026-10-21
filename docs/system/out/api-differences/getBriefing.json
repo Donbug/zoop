@@ -1753,6 +1753,19 @@
       "format": "date-time"
     },
     "response:200:application/json.previousComparison<anyOf:0>.previousDataAsOf:required": true,
+    "response:200:application/json.previousComparison<anyOf:0>.previousDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousDate:required": false,
+    "response:200:application/json.previousComparison<anyOf:0>.previousEdition": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "evening"
+      ]
+    },
+    "response:200:application/json.previousComparison<anyOf:0>.previousEdition:required": false,
     "response:200:application/json.previousComparison<anyOf:0>.previousPublishedAt": {
       "type": "string",
       "format": "date-time"

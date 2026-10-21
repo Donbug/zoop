@@ -321,6 +321,9 @@ final class BriefingSnapshotValidator {
         // Receipt wall clocks need not follow historical replay order; authority checks the stored prior timestamp.
         timestamp(value, "previousPublishedAt");
         check(timestamp(value, "previousDataAsOf").isBefore(row.windowTo()));
+        if (value.has("previousDate") || value.has("previousEdition")) {
+            LocalDate.parse(text(value, "previousDate")); choice(value, "previousEdition", Set.of("morning", "evening"));
+        }
         same(text(value, "comparisonBasis"), "event_identity");
         JsonNode evaluation = object(field(value, "forecastEvaluation"));
         same(text(evaluation, "status"), "unavailable"); text(evaluation, "reason");

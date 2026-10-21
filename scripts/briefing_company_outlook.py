@@ -109,57 +109,112 @@ def assess(client,frozen,initial_repair=None):
     return {'status':'WITHHELD','draft':None,'attempts':attempts}
 
 
+def execution_identity(args, baseline_raw, sources_raw, chosen):
+    return {'baselineSha256':base.digest(baseline_raw),'sourcesSha256':base.digest(sources_raw),
+        'dates':sorted(set(args.date)),'roundIds':[r['roundId'] for r in chosen],
+        'promptArtifacts':{p.name:base.digest(base.regular(p)) for p in sorted(PROMPTS.iterdir()) if p.is_file()},
+        'model':base.MODEL,'maximumPaidCalls':args.max_calls,'runId':args.run_id,'authorizationRef':args.authorization_ref}
+
+
+def company_plan(chosen, all_rows, old_rows, recovery, metadata):
+    selected={r['roundId'] for r in chosen};by_id={r['roundId']:r for r in all_rows}
+    require(set(old_rows)<=set(by_id),'prior_round_missing_from_news')
+    timeline=sorted([r for r in all_rows if r['roundId'] in selected or r['roundId'] in old_rows],
+                    key=lambda r:context.legacy._aware(r['marketEnrichment']['cutoff']))
+    require(len(timeline)<=4,'round_count')
+    history=[];changed=None
+    for row in timeline:
+        old=old_rows.get(row['roundId'])
+        frozen=freeze(row,recovery[row['roundId']],metadata,history)
+        if row['roundId'] not in selected:
+            require(old is not None and old['frozen']==frozen,'preserved_round_input_changed')
+        if row['roundId'] in selected and (not old or old['status']!='PASS' or old['frozen']!=frozen):
+            changed=changed or frozen['cutoff']
+        if old: history.append(old)
+    if changed:
+        boundary=context.legacy._aware(changed)
+        require(all(r['roundId'] in selected for r in timeline if r['roundId'] in old_rows
+                    and context.legacy._aware(r['marketEnrichment']['cutoff'])>boundary),
+                'dependent_rounds_must_be_selected_before_execution')
+    new_rounds=sum(r['roundId'] in selected and changed is not None and
+                  context.legacy._aware(r['marketEnrichment']['cutoff'])>=context.legacy._aware(changed) for r in timeline)
+    return timeline,new_rounds
+
+
 def _run(args,transport=None):
     baseline=Path(args.baseline).resolve();output=Path(args.output).resolve()
     require(output!=baseline and output not in baseline.parents and baseline not in output.parents,'separate_output')
-    bundle=base.strict_load(base.regular(baseline/'bundle-v2.json'));metadata={r['documentId']:r for r in (base.strict_load(line) for line in base.regular(Path(args.sources)).decode().splitlines() if line.strip())}
-    require(base.digest(base.regular(Path(args.sources)))==bundle['sourceFileSha256'],'source_digest')
-    chosen=sorted([r for r in bundle['presentationEnrichment']['rounds'] if r['date'] in args.date],key=lambda r:context.legacy._aware(r['marketEnrichment']['cutoff']))
-    require(chosen and len(chosen)<=4,'round_count');prior=len(list((baseline/'calls').glob('*.pending.json')))
-    require(prior<args.max_calls<=512,'call_limit')
-    old=bundle['presentationEnrichment'].get('companyOutlookLayer')
-    old_by_id={r['roundId']:r for r in old['rounds']} if old else {}
-    invalidated=False;new_rounds=0
-    for row in chosen:
-        invalidated=invalidated or old_by_id.get(row['roundId'],{}).get('status')!='PASS'
-        new_rounds+=int(invalidated)
-    plan={'priorReservations':prior,'minimumNewCalls':2*new_rounds,'maximumNewCalls':min(4*new_rounds,args.max_calls-prior),'maximumTotalCalls':args.max_calls,'roundIds':[r['roundId'] for r in chosen]}
+    raw=base.regular(baseline/'bundle-v2.json');bundle=base.strict_load(raw)
+    sources_raw=base.regular(Path(args.sources));metadata={r['documentId']:r for r in
+        (base.strict_load(line) for line in sources_raw.decode().splitlines() if line.strip())}
+    require(base.digest(sources_raw)==bundle['sourceFileSha256'],'source_digest')
+    all_rows=bundle['presentationEnrichment']['rounds']
+    chosen=sorted([r for r in all_rows if r['date'] in args.date],key=lambda r:context.legacy._aware(r['marketEnrichment']['cutoff']))
+    require(chosen and len(chosen)<=4,'round_count')
+    require(set(args.date)=={r['date'] for r in chosen},'requested_date_missing')
+    identity=execution_identity(args,raw,sources_raw,chosen)
+    if args.execute and (output/'company-proof.json').exists():
+        require((output/'company-execution.json').exists(),'completed_identity_missing_use_new_output')
+        require(base.strict_load(base.regular(output/'company-execution.json'))==identity,'completed_request_identity_changed')
+        proof=base.strict_load(base.regular(output/'company-proof.json'))
+        require(base.digest(base.regular(output/'bundle-v2.json'))==proof['bundleSha256'],'completed_bundle_changed')
+        return {**proof,'newPaidCalls':0,'reusedCompletedRun':True}
+    prior=len(list((baseline/'calls').glob('*.pending.json')));require(prior<=args.max_calls<=512,'call_limit')
+    old_layer=bundle['presentationEnrichment'].get('companyOutlookLayer')
+    old_rows={r['roundId']:r for r in old_layer['rounds']} if old_layer else {}
+    recovery={r['roundId']:r for r in bundle['briefingRecovery']['rounds']}
+    timeline,new_rounds=company_plan(chosen,all_rows,old_rows,recovery,metadata)
+    plan={**identity,'priorReservations':prior,'minimumNewCalls':2*new_rounds,
+          'maximumNewCalls':min(4*new_rounds,args.max_calls-prior),'maximumTotalCalls':args.max_calls}
+    require(not new_rounds or 'companyReadingLayer' not in bundle['presentationEnrichment'],
+            'downstream_company_reading_requires_separate_rebuild')
     if not args.execute: return {**plan,'status':'OFFLINE','newPaidCalls':0}
-    if (output/'company-proof.json').exists():
-        proof=base.strict_load(base.regular(output/'company-proof.json'));require(base.digest(base.regular(output/'bundle-v2.json'))==proof['bundleSha256'],'completed_bundle_changed');return {**proof,'newPaidCalls':0,'reusedCompletedRun':True}
     require(plan['minimumNewCalls']<=args.max_calls-prior,'call_limit')
-    require(not old or len(old.get('previousRuns',[]))<2 or new_rounds==0,'history_limit')
-    require(args.authorization_ref and (args.key_file or transport),'authorization');base.private_dir(output)
+    require(not new_rounds or not old_layer or len(old_layer.get('previousRuns',[]))<2,'history_limit')
+    require(args.authorization_ref and (new_rounds==0 or args.key_file or transport),'authorization')
+    base.private_dir(output);base.write_once(output/'company-execution.json',base.canonical(identity))
     for file in sorted(baseline.rglob('*')):
-        if file.is_file() and file.name not in {'bundle-v2.json','company-plan.json','company-proof.json'} and 'company-rounds' not in file.relative_to(baseline).parts:
+        if file.is_file() and file.name not in {'bundle-v2.json','company-plan.json','company-proof.json','company-execution.json'} and 'company-rounds' not in file.relative_to(baseline).parts:
             target=output/file.relative_to(baseline);base.private_dir(target.parent)
             if not target.exists(): os.link(file,target)
     base.write_once(output/('company-plan-'+base.digest(base.canonical(plan))+'.json'),base.canonical(plan))
     for file in PROMPTS.iterdir():
         base.private_dir(output/'company-prompts');base.write_once(output/'company-prompts'/file.name,base.regular(file))
-    client=context.legacy.MarketSummaryClient(output,transport or base.authenticated_transport(Path(args.key_file),timeout=600),args.max_calls,prompt_root=output/'company-prompts')
-    recovery={r['roundId']:r for r in bundle['briefingRecovery']['rounds']};completed=[]
-    old_layer=bundle['presentationEnrichment'].get('companyOutlookLayer');old_rows={r['roundId']:r for r in old_layer['rounds']} if old_layer else {}
-    for row in chosen:
+    def cache_only(_): raise base.ReplayError('company_cache_only_request_not_completed')
+    send=transport or (base.authenticated_transport(Path(args.key_file),timeout=600) if new_rounds else cache_only)
+    client=context.legacy.MarketSummaryClient(output,send,args.max_calls,prompt_root=output/'company-prompts')
+    completed=[];selected_ids={r['roundId'] for r in chosen}
+    for row in timeline:
         frozen=freeze(row,recovery[row['roundId']],metadata,completed)
-        finished=output/'company-rounds'/(row['roundId']+'.json')
+        finished=output/'company-rounds'/(row['roundId']+'.json');previous=old_rows.get(row['roundId'])
         if finished.exists():
             saved=base.strict_load(base.regular(finished));require(saved['frozen']==frozen,'resume_frozen_changed');completed.append(saved);continue
-        previous=old_rows.get(row['roundId'])
-        if previous and previous['status']=='PASS' and previous['frozen']==frozen:
+        if previous and previous['frozen']==frozen and (previous['status']=='PASS' or row['roundId'] not in selected_ids):
             completed.append(previous);continue
+        require(row['roundId'] in selected_ids,'dependent_round_not_selected')
         result=assess(client,frozen,previous['attempts'][-1] if previous and previous['status']=='WITHHELD' else None)
-        result.update(roundId=row['roundId'],date=row['date'],edition=row['edition'],cutoff=frozen['cutoff'],frozen=frozen,generatedAt=base.now(),resultVersion='company-v1-'+base.digest(base.canonical(result)))
-        completed.append(result);base.private_dir(output/'company-rounds');base.write_once(output/'company-rounds'/(row['roundId']+'.json'),base.canonical(result))
-        print(base.canonical({'round':row['date']+'-'+row['edition'],'status':result['status'],'companies':len(frozen['targets']),'newCalls':len(client.new_calls)}).decode(),flush=True)
+        result.update(roundId=row['roundId'],date=row['date'],edition=row['edition'],cutoff=frozen['cutoff'],frozen=frozen,
+                      generatedAt=base.now(),resultVersion='company-v1-'+base.digest(base.canonical(result)))
+        completed.append(result);base.private_dir(output/'company-rounds')
+        base.write_once(finished,base.canonical(result))
+        print(base.canonical({'round':row['date']+'-'+row['edition'],'status':result['status'],
+                             'companies':len(frozen['targets']),'newCalls':len(client.new_calls)}).decode(),flush=True)
     layer=bundle['presentationEnrichment'];layer['runId']=args.run_id;layer['maximumPaidCallsIncludingPrior']=args.max_calls
-    owned={a[d] for r in completed for a in r['attempts'] for d in ['generationRequestDigest','verificationRequestDigest'] if d in a};owned.update(r['requestDigest'] for r in old_layer['receipts']) if old_layer else None;receipts=[r for r in client.receipts() if r['requestDigest'] in owned]
-    layer['companyOutlookLayer']={'schemaVersion':SCHEMA,'authorizationRef':args.authorization_ref,'rounds':completed,'receipts':receipts}
-    if old_layer:
-        prior_layer=copy.deepcopy(old_layer);prior_runs=prior_layer.pop('previousRuns',[]);require(len(prior_runs)<2,'history_limit');layer['companyOutlookLayer']['previousRuns']=[*prior_runs,prior_layer]
+    owned={a[d] for r in completed for a in r['attempts'] for d in ['generationRequestDigest','verificationRequestDigest'] if d in a}
+    if old_layer: owned.update(r['requestDigest'] for r in old_layer['receipts'])
+    receipts=[r for r in client.receipts() if r['requestDigest'] in owned]
+    unchanged=old_layer and completed==old_layer['rounds']
+    if not unchanged:
+        layer['companyOutlookLayer']={'schemaVersion':SCHEMA,'authorizationRef':args.authorization_ref,'rounds':completed,'receipts':receipts}
+        if old_layer:
+            prior_layer=copy.deepcopy(old_layer);prior_runs=prior_layer.pop('previousRuns',[])
+            layer['companyOutlookLayer']['previousRuns']=[*prior_runs,prior_layer]
     base.write_once(output/'bundle-v2.json',base.canonical(bundle))
-    proof={**plan,'status':'COMPLETE','pass':sum(r['status']=='PASS' for r in completed),'newPaidCalls':len(client.new_calls),'totalReservations':len(list(client.calls.glob('*.pending.json'))),'bundleSha256':base.digest(base.regular(output/'bundle-v2.json')),
-        'inputTokens':sum(r['inputTokens'] for r in receipts if r['usageKnown'] and r['requestDigest'] in client.new_calls),'outputTokens':sum(r['outputTokens'] for r in receipts if r['usageKnown'] and r['requestDigest'] in client.new_calls),'newUsageKnown':all(r['usageKnown'] for r in receipts)}
+    proof={**plan,'status':'COMPLETE','pass':sum(r['status']=='PASS' for r in completed),'newPaidCalls':len(client.new_calls),
+        'totalReservations':len(list(client.calls.glob('*.pending.json'))),'bundleSha256':base.digest(base.regular(output/'bundle-v2.json')),
+        'inputTokens':sum(r['inputTokens'] for r in receipts if r['usageKnown'] and r['requestDigest'] in client.new_calls),
+        'outputTokens':sum(r['outputTokens'] for r in receipts if r['usageKnown'] and r['requestDigest'] in client.new_calls),
+        'newUsageKnown':all(r['usageKnown'] for r in receipts)}
     base.write_once(output/'company-proof.json',base.canonical(proof));return proof
 
 

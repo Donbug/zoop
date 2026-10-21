@@ -62,6 +62,37 @@ class FrozenMarketRunTest(unittest.TestCase):
             self.execute(transport)
         self.assertEqual([], transport.requests); self.assertFalse(self.output.exists())
 
+    def calendar_preview(self):
+        from datetime import date, timedelta
+        calendar = {"schemaVersion": "zoop-market-session-calendar-v1", "sessions": []}
+        for n in range(10):
+            d = date(2026, 10, 1) + timedelta(days=n)
+            calendar["sessions"].append({"date": str(d), "tradingDay": True, "nextTradingDate": str(d + timedelta(days=1)),
+                "closeAt": str(d) + "T15:30:00+09:00", "availableAt": "2026-09-30T00:00:00+09:00",
+                "sourceRef": "https://example.invalid/authored-calendar"})
+        path = self.fixture.root / "authored-calendar.json";path.write_bytes(run.base.canonical(calendar))
+        self.inputs = self.fixture.root / "calendar-inputs"; self.args.inputs = str(self.inputs)
+        p = run.preview.parser().parse_args(["--market-bundle", self.args.market_bundle, "--sources", self.args.sources,
+            "--clocks", self.args.clocks, "--user-inbox-ref", "inbox/authored-preparation.md", "--session-calendar", str(path),
+            "--output", str(self.inputs), "--write-inputs"])
+        manifest = run.preview.run(p)
+        return path, manifest
+
+    def test_calendar_is_preserved_and_exact_frozen_request_executes(self):
+        path, manifest = self.calendar_preview()
+        self.args.execute_authorized_generation = True
+        transport = fixtures.ContextTransport();self.execute(transport)
+        sha = manifest["sessionCalendarSha256"]
+        self.assertEqual(path.read_bytes(), (self.output / "market/calendars" / (sha + ".json")).read_bytes())
+        self.assertEqual((self.inputs / (manifest["rounds"][0]["requestSha256"] + ".request.json")).read_bytes(), transport.requests[0])
+
+    def test_changed_calendar_is_rejected_without_provider_calls(self):
+        _, manifest = self.calendar_preview()
+        (self.inputs / ("session-calendar-" + manifest["sessionCalendarSha256"] + ".json")).write_bytes(b'{}')
+        transport = fixtures.ContextTransport();self.args.execute_authorized_generation = True
+        with self.assertRaisesRegex(ValueError, "frozen_calendar_changed"):self.execute(transport)
+        self.assertEqual([],transport.requests);self.assertFalse(self.output.exists())
+
     def test_frozen_prior_version_is_not_replaced_by_new_summary(self):
         self.fixture.fixture.output = self.fixture.root / "baseline-three"
         self.fixture.prepare_baseline(3)

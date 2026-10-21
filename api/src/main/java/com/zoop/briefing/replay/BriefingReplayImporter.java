@@ -234,6 +234,14 @@ public final class BriefingReplayImporter {
                     require(suppliedIds.equals(resolvedIds), "grouped_company_catalog_identity");
                 }
                 BriefingGroupedSimulationRules.round(bundle, definition, groupedArchive, receipts, settings.bundle().getParent(), groupedHistory);
+                if (definition.has("groupedUnresolvedPaidRequest") && BriefingGroupedSimulationRules.SELECTION_STAGE.equals(
+                        definition.object("groupedUnresolvedPaidRequest").string("stage"))) {
+                    StrictJson.Obj disposition = definition.object("groupedUnresolvedPaidRequest");
+                    String digest = disposition.string("requestDigest"); Path calls = settings.bundle().getParent().resolve("calls");
+                    blobs.put(namespace + "-held-selection-request-" + digest, blob("ai_submit", read(calls.resolve(digest + ".request.json"))));
+                    blobs.put(namespace + "-held-selection-reservation-" + digest, blob("verification_receipt", read(calls.resolve(digest + ".pending.json"))));
+                    blobs.put(namespace + "-held-selection-disposition-" + digest, blob("verification_receipt", StrictJson.write(disposition.node())));
+                }
             }
             if (qualityV2) {
                 validateSimulationNovelty(definition, noveltyHistory, receipts);
@@ -454,6 +462,11 @@ public final class BriefingReplayImporter {
             StrictJson.Obj prior = StrictJson.parseObject(priorBytes);
             blobs.put(namespace + "-comparison-baseline", blob("briefing_input", priorBytes));
             blobs.put(namespace + "-frozen-preview", blob("briefing_input", read(output.resolve("market/previews/" + layer.string("frozenPreviewSha256") + ".json"))));
+            StrictJson.Obj preview = StrictJson.parseObject(read(output.resolve("market/previews/" + layer.string("frozenPreviewSha256") + ".json")));
+            if (preview.has("sessionCalendarSha256")) {
+                String sha = preview.string("sessionCalendarSha256");
+                blobs.put(namespace + "-frozen-calendar", blob("briefing_input", read(output.resolve("market/calendars/" + sha + ".json"))));
+            }
             for (var receipt : simulationReceiptLedger(prior.object("marketEnrichment").objects("receipts")).entrySet())
                 require(allReceipts.putIfAbsent(receipt.getKey(), receipt.getValue()) == null, "comparison_receipt_duplicate");
         }
@@ -770,6 +783,7 @@ public final class BriefingReplayImporter {
             require(published.putIfAbsent(round.string("roundId"), round) == null, "market_enrichment_duplicate_news_round");
         List<StrictJson.Obj> comparison = layer.objects("rounds");
         Map<String, StrictJson.Obj> prepared = new LinkedHashMap<>();
+        StrictJson.Obj frozenCalendar = null;
         boolean frozen = layer.has("comparisonBaselineSha256");
         if (frozen) {
             String sha = layer.string("comparisonBaselineSha256"); require(sha.matches("[0-9a-f]{64}"), "comparison_baseline_sha");
@@ -788,6 +802,13 @@ public final class BriefingReplayImporter {
                     && "zoop-market-context-preview-v1".equals(preview.string("schemaVersion"))
                     && userInboxRef.equals(preview.string("userInboxRef"))
                     && layer.string("executionAuthorizationRef").matches("inbox/[A-Za-z0-9_.-]+\\.md"), "frozen_preview_binding");
+            if (preview.has("sessionCalendarSha256")) {
+                String calendarSha = preview.string("sessionCalendarSha256");
+                require(calendarSha.matches("[0-9a-f]{64}"), "frozen_calendar_sha");
+                byte[] calendarRaw = read(output.resolve("market/calendars/" + calendarSha + ".json"));
+                require(Canonical.sha256(calendarRaw).equals(calendarSha), "frozen_calendar_bytes");
+                frozenCalendar = StrictJson.parseObject(calendarRaw);
+            }
             for (StrictJson.Obj row : preview.objects("rounds")) require(prepared.putIfAbsent(row.string("roundId"), row) == null, "frozen_preview_duplicate");
             require(prepared.keySet().equals(published.keySet()), "frozen_preview_population");
         }
@@ -800,6 +821,8 @@ public final class BriefingReplayImporter {
             require(frozen == record.has("frozenExecution"), "frozen_execution_mode");
             if (frozen) {
                 require(record.has("marketContext") && !record.isNull("summaryResult"), "frozen_context_required");
+                require(frozenCalendar == null ? record.object("marketContext").isNull("sessionCalendar")
+                        : frozenCalendar.node().equals(record.object("marketContext").object("sessionCalendar").node()), "frozen_calendar_binding");
                 StrictJson.Obj binding = record.object("frozenExecution"), row = prepared.get(id), summary = record.object("summaryResult");
                 for (String field : List.of("comparisonBaselineSha256", "executionAuthorizationRef"))
                     require(layer.string(field).equals(binding.string(field)), "frozen_execution_binding");

@@ -65,7 +65,7 @@ public final class BriefingHttpSchemas {
             description = "회차 마감 전 완료된 정규장 관측값입니다. 출근은 전일 종가 대비, 퇴근은 같은 날 09:20 기준 대비이며 전망 적중률이 아닙니다.")
     public record CompanyPrice(String companyId, Instant cutoff, String currency, String exchangeTimezone, String source,
             boolean official, String note, List<CompanyPriceSource> sources, String status,
-            @Schema(nullable = true) String reason, @Schema(nullable = true) CompanyPricePoint latest,
+            @Schema(nullable = true, description = "eligible_price_missing: 정상 조회 후 적격 관측 없음; provider_request_failed: 관측이 없고 공급자 HTTP 요청 실패; provider_history_unverified: 이력 검증 실패") String reason, @Schema(nullable = true) CompanyPricePoint latest,
             @Schema(nullable = true) CompanyPricePoint baseline, String baselineKind, String comparisonStatus,
             @Schema(nullable = true) String change, @Schema(nullable = true) String changeRate) { }
 
@@ -224,6 +224,7 @@ public final class BriefingHttpSchemas {
     @Schema(name = "PreviousComparison")
     public record PreviousComparison(@Schema(allowableValues = {"available"}) String status, String previousRoundId,
             Instant previousPublishedAt, Instant previousDataAsOf,
+            LocalDate previousDate, @Schema(allowableValues = {"morning", "evening"}) String previousEdition,
             @Schema(allowableValues = {"event_identity"}) String comparisonBasis, Unavailable forecastEvaluation,
             List<PreviousComparisonItem> items) { }
 

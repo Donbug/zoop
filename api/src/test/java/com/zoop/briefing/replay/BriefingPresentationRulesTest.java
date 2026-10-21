@@ -26,7 +26,7 @@ class BriefingPresentationRulesTest {
     }
     private static String slice(String value, int from, int to) { return value.substring(value.offsetByCodePoints(0, from), value.offsetByCodePoints(0, to)); }
     private ObjectNode payload(String id, String... events) {
-        ObjectNode payload = StrictJson.newObject().put("id", id); payload.putObject("metadata").put("requestId", "fixed-run").putArray("failures");
+        ObjectNode payload = StrictJson.newObject().put("id", id).put("date", "2026-10-02").put("edition", "morning"); payload.putObject("metadata").put("requestId", "fixed-run").putArray("failures");
         ArrayNode items = payload.putArray("items"); int rank = 1;
         for (String event : events) {
             ObjectNode item = items.addObject().put("eventId", event).put("rank", rank++).put("title", "제목 " + event).put("reason", "근거 있는 선정")
@@ -120,6 +120,8 @@ class BriefingPresentationRulesTest {
         assertEquals("dropped", result.path("items").get(2).path("change").stringValue());
         assertTrue(result.path("items").get(2).path("rank").isNull()); assertEquals(2, result.path("items").get(2).path("morningRank").intValue());
         var generic = BriefingPresentationRules.comparison(current, previous, false);
+        assertEquals("2026-10-02", generic.path("previousDate").stringValue());
+        assertEquals("morning", generic.path("previousEdition").stringValue());
         assertEquals("unavailable", generic.path("forecastEvaluation").path("status").stringValue());
         assertEquals("old", generic.path("previousRoundId").stringValue()); assertEquals("event_identity", generic.path("comparisonBasis").stringValue());
     }

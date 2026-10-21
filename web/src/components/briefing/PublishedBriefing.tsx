@@ -9,7 +9,6 @@ import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import type { FeedbackValue } from '@/types/feedback';
 import type { BriefingEdition, BriefingResponse } from '@/types/briefing';
 import { briefingTime } from '@/util/briefingTime';
-import BriefingQuickRead from './BriefingQuickRead';
 import CompanyOutlooks from './CompanyOutlooks';
 import BriefingReadingSection from './BriefingReadingSection';
 import MarketIndicators from './MarketIndicators';
@@ -269,9 +268,6 @@ export default function PublishedBriefing({
             <>
               {(!compact || !knownLimits) && partialInfo}
               <CompanyOutlooks result={result} compact={compact} />
-              {compact && !result.companyOutlooks && (
-                <BriefingQuickRead result={result} />
-              )}
               {compact && (
                 <MarketIndicators variables={result.marketVariables} compact />
               )}

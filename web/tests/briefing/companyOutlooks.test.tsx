@@ -61,6 +61,51 @@ const result = {
 } as BriefingResponse;
 
 describe('D-BRF-01·02 company outlook', () => {
+  it('distinguishes failed quote requests from a successful empty history', () => {
+    const price = {
+      companyId: 'KRX:TEST',
+      cutoff: layer.cutoff,
+      currency: 'KRW' as const,
+      exchangeTimezone: 'Asia/Seoul',
+      source: 'Yahoo Finance',
+      official: false,
+      note: '합성 시험',
+      sources: [],
+      status: 'unavailable' as const,
+      reason: 'provider_request_failed',
+      latest: null,
+      baseline: null,
+      comparisonStatus: 'unavailable' as const,
+      change: null,
+      changeRate: null,
+    };
+    const withPrice = (reason: string) => ({
+      ...result,
+      companyOutlooks: {
+        ...layer,
+        companies: [{ ...layer.companies[0], price: { ...price, reason } }],
+      },
+    });
+    const { rerender } = render(
+      <CompanyOutlooks result={withPrice('provider_request_failed')} compact />,
+    );
+    expect(
+      screen.getByText(
+        '시세 공급자 요청에 실패해 기업 시세를 확인하지 못했습니다.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('회차 마감까지 확인된 기업 시세가 없습니다.'),
+    ).toBeNull();
+    rerender(
+      <CompanyOutlooks result={withPrice('eligible_price_missing')} compact />,
+    );
+    expect(
+      screen.getByText('회차 마감까지 확인된 기업 시세가 없습니다.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/시세 공급자 요청에 실패해/)).toBeNull();
+  });
+
   it('leads with company outlook and preserves its conditions, risks and evidence', () => {
     render(<CompanyOutlooks result={result} compact={false} />);
     expect(

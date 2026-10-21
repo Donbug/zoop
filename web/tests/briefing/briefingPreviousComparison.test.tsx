@@ -28,9 +28,13 @@ const previousItem = (
   ...overrides,
 });
 
-const previous = (items = [previousItem()]): PreviousBriefingComparison => ({
+const previous = (
+  items = [previousItem()],
+): Extract<PreviousBriefingComparison, { status: 'available' }> => ({
   status: 'available',
   previousRoundId: 'brf-2026-10-07-evening',
+  previousDate: '2026-10-07',
+  previousEdition: 'evening',
   previousPublishedAt: '2026-10-07T08:31:00Z',
   previousDataAsOf: '2026-10-07T08:30:00Z',
   comparisonBasis: 'event_identity',
@@ -72,12 +76,16 @@ function briefing(overrides: Partial<BriefingResponse> = {}): BriefingResponse {
   };
 }
 
-function setup(response = briefing()) {
+function setup(response = briefing(), compact = false) {
   const server = createFakeServer();
   server.on('GET', '/api/v1/briefings', () => json(response));
   render(
     <MemoryRouter>
-      <PublishedBriefing date={response.date} edition={response.edition} />
+      <PublishedBriefing
+        date={response.date}
+        edition={response.edition}
+        compact={compact}
+      />
     </MemoryRouter>,
   );
   return server;
@@ -86,6 +94,61 @@ function setup(response = briefing()) {
 beforeEach(() => useAuthStore.getState().clearSession());
 
 describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
+  it('기업 전망이 없는 간단히 화면은 시장 요약을 기업 전망으로 대신 표시하지 않는다', async () => {
+    setup(
+      briefing({
+        marketSummary: {
+          text: '시장 지수 설명은 별도 시장 요약입니다.',
+          evidenceIds: [],
+          generatedAt: '2026-10-08T09:21:00+09:00',
+          resultVersion: 'market-only',
+        },
+      }),
+      true,
+    );
+    expect(
+      await screen.findByRole('heading', { name: '기업별 전망 미제공' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: '오늘의 전망' })).toBeNull();
+    expect(
+      screen.getByText('시장 지수 설명은 별도 시장 요약입니다.'),
+    ).toBeTruthy();
+  });
+
+  it('이전 성공 발행본이 출근이면 출근 제목과 실제 날짜로 연결한다', async () => {
+    setup(
+      briefing({
+        previousComparison: {
+          ...previous(),
+          previousRoundId: 'brf-2026-10-07-morning',
+          previousDate: '2026-10-07',
+          previousEdition: 'morning',
+        },
+      }),
+    );
+    const section = await screen.findByRole('region', {
+      name: /이전 출근 브리핑 대비/,
+    });
+    expect(
+      within(section)
+        .getByRole('link', { name: '이전 출근 브리핑 보기' })
+        .getAttribute('href'),
+    ).toBe('/briefing?date=2026-10-07&edition=morning');
+    expect(within(section).queryByText(/퇴근 브리핑/)).toBeNull();
+  });
+
+  it('이전 회차의 날짜·종류가 없는 과거 응답은 퇴근 링크를 추측하지 않는다', async () => {
+    const legacy = previous();
+    delete legacy.previousDate;
+    delete legacy.previousEdition;
+    setup(briefing({ previousComparison: legacy }));
+    const section = await screen.findByRole('region', {
+      name: /이전 브리핑 대비/,
+    });
+    expect(within(section).getByText('이어짐')).toBeTruthy();
+    expect(within(section).queryByRole('link')).toBeNull();
+  });
+
   it('출근 회차의 고정 이전 회차·기준시각·근거와 순위 변화를 조회 결과대로 표시한다', async () => {
     setup();
     const section = await screen.findByRole('region', {
@@ -160,7 +223,7 @@ describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
       }),
     );
     const section = await screen.findByRole('region', {
-      name: /이전 퇴근 브리핑 대비/,
+      name: /이전 브리핑 대비/,
     });
     expect(
       within(section).getByText('이전에 발행된 퇴근 브리핑이 없습니다.'),
@@ -172,10 +235,10 @@ describe('D-BRF-01 이전 퇴근 브리핑 대비', () => {
   it('과거 응답에 비교가 없을 때 비교 결과를 만들지 않는다', async () => {
     setup(briefing({ previousComparison: undefined }));
     const section = await screen.findByRole('region', {
-      name: /이전 퇴근 브리핑 대비/,
+      name: /이전 브리핑 대비/,
     });
     expect(
-      within(section).getByText('이전 퇴근 브리핑과 비교한 정보가 없어요.'),
+      within(section).getByText('이전 브리핑과 비교한 정보가 없어요.'),
     ).toBeTruthy();
     expect(within(section).queryByRole('list')).toBeNull();
   });

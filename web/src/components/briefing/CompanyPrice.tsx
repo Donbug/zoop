@@ -16,6 +16,21 @@ export default function CompanyPrice({
 }) {
   const price = company.price;
   if (
+    price?.status === 'unavailable' &&
+    price.companyId === company.companyId &&
+    Date.parse(price.cutoff) === Date.parse(cutoff) &&
+    ['provider_request_failed', 'provider_history_unverified'].includes(
+      price.reason ?? '',
+    )
+  )
+    return (
+      <p className={`${NOTE} mt-3`}>
+        {price.reason === 'provider_request_failed'
+          ? '시세 공급자 요청에 실패해 기업 시세를 확인하지 못했습니다.'
+          : '공급자 이력을 검증하지 못해 기업 시세를 확인하지 못했습니다.'}
+      </p>
+    );
+  if (
     !price ||
     price.status !== 'available' ||
     !price.latest ||

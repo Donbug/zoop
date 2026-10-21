@@ -4,9 +4,9 @@
 
 ## 저장·조회
 
-`briefing_company_reading.py`는 기존 불변 번들을 다른 출력 폴더에 재사용하고 `presentationEnrichment.companyReadingLayer`를 추가합니다. 완료 호출과 미응답 기록은 재사용하며 새 실행에 최대 호출 수를 명시해야 합니다. 입력 번들·시세 등록부·실행 ID·권한 참조·호출 상한이 바뀌면 완료 캐시를 거부합니다. 모델은 기존 `gpt-6-luna`를 유지합니다.
+`briefing_company_reading.py`는 기존 불변 번들을 다른 출력 폴더에 재사용하고 `presentationEnrichment.companyReadingLayer`를 추가합니다. 완료 호출과 미응답 기록은 재사용하며 새 실행에 최대 호출 수를 명시해야 합니다. 입력 번들·프롬프트·시세 등록부·실행 ID·권한 참조·호출 상한이 바뀌면 완료 캐시를 거부합니다. 모델은 기존 `gpt-6-luna`를 유지합니다.
 
-Java importer는 원래 기업 결과 버전·입력·실제 요청/응답·프롬프트·검증 기록·토큰 사용량을 결속하고, 원시 시세 파일의 SHA-256과 가격을 별도로 검증합니다. 새 표현은 불변 public snapshot의 `companyOutlooks.companies[].reading/price`에 저장됩니다. 시세 원본·읽기 입력·호출 영수증도 artifact로 등록합니다. 조회는 DB에 저장한 값만 복원하며 브라우저에서 최신 시세를 가져오지 않습니다. ERD·migration 변경은 없습니다.
+Java importer는 원래 기업 결과 버전·입력·실제 요청/응답·프롬프트·검증 기록·토큰 사용량을 결속하고, 생성·검증의 `text.format` 전체(type/name/strict/schema)를 frozen 입력에서 독립 재구성해 대조합니다. `supported`가 true만 허용하도록 바뀐 기록은 수락하지 않으며, 원시 시세 파일의 SHA-256과 가격을 별도로 검증합니다. 새 표현은 불변 public snapshot의 `companyOutlooks.companies[].reading/price`에 저장됩니다. 시세 원본·읽기 입력·호출 영수증도 artifact로 등록합니다. 조회는 DB에 저장한 값만 복원하며 브라우저에서 최신 시세를 가져오지 않습니다. ERD·migration 변경은 없습니다.
 
 ## 가격의 의미
 
@@ -15,6 +15,7 @@ Java importer는 원래 기업 결과 버전·입력·실제 요청/응답·프�
 - 퇴근은 **동일 기업의 같은 날 한국 시간 09:20 관측값 대비**입니다. 아침 브리핑에 선정되지 않은 기업도 시세 기준은 계산할 수 있습니다. 이것이 아침의 기업 전망이 있었다는 뜻은 아닙니다.
 - 미국 기업은 한국 시간 아침과 퇴근 사이에 새 정규장 거래가 없을 수 있습니다. `no_new_session`으로 표시하며 변동률을 0%로 만들지 않습니다.
 - 원시 응답에 섞인 현재 `regularMarketPrice`/미래 terminal row, 미완료 봉, 요청 구간 밖 값은 제외합니다. 다른 종목·통화·시간대·변조된 원본·미정의 분할 조정은 거부합니다.
+- 적격 관측이 없는 경우 정상 HTTP 조회의 빈 이력(`eligible_price_missing`)과 공급자 HTTP 요청 실패(`provider_request_failed`)를 구분합니다. 요청 실패의 상태·원본은 영수증에 보존하며 화면은 시세 확인 실패로 표시합니다. 최신 값 대체나 자동 재시도는 하지 않습니다.
 - 실제 가격 변화와 사업상 조건부 전망을 나란히 보여 줍니다. 주가 인과관계나 전망 적중률을 산출하지 않습니다.
 
 ## 개발 재생과 운영의 경계

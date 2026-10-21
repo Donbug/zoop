@@ -2872,7 +2872,7 @@ nullable은 미제공/미판정이고 숫자 0 또는 빈 문자열로 대신하
 | note | 필수 | string |  |
 | sources | 필수 | [CompanyPriceSource](#schema-companypricesource)[] |  |
 | status | 필수 | string {available, unavailable} |  |
-| reason | 필수 | string, null |  |
+| reason | 필수 | string, null | eligible_price_missing은 정상 조회 후 적격 관측 없음, provider_request_failed는 관측이 없고 공급자 HTTP 요청 실패, provider_history_unverified는 이력 검증 실패입니다. |
 | latest | 필수 | [CompanyPricePoint](#schema-companypricepoint) / null |  |
 | baseline | 필수 | [CompanyPricePoint](#schema-companypricepoint) / null |  |
 | baselineKind | 선택 | string {morning_cutoff, previous_close} |  |
@@ -3220,6 +3220,8 @@ answer from that state, never from the newest graph. Any status but ``available`
 | previousRoundId | 필수 | string |  |
 | previousPublishedAt | 필수 | string (date-time) |  |
 | previousDataAsOf | 필수 | string (date-time) |  |
+| previousDate | 선택 | string (date) | 실제 이전 발행본의 날짜. 과거 스냅샷에는 없을 수 있습니다. |
+| previousEdition | 선택 | string {morning, evening} | 실제 이전 발행본의 회차. 부재 시 퇴근으로 추정하지 않습니다. |
 | comparisonBasis | 필수 | string {event_identity} |  |
 | forecastEvaluation | 필수 | [Unavailable](#schema-unavailable) |  |
 | items | 필수 | [PreviousComparisonItem](#schema-previouscomparisonitem)[] |  |

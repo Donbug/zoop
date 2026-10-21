@@ -75,7 +75,8 @@ def run(args, transport=None):
     base.private_dir(output)
     identity = {'baselineSha256': base.digest(base.regular(baseline / 'bundle-v2.json')),
                 'pricesSha256': base.digest(base.regular(Path(args.prices).resolve() / 'receipts.json')),
-                'authorizationRef': args.authorization_ref, 'runId': args.run_id, 'maximumPaidCalls': args.max_calls}
+                'authorizationRef': args.authorization_ref, 'runId': args.run_id, 'maximumPaidCalls': args.max_calls,
+                'promptArtifacts': {p.name: base.digest(base.regular(p)) for p in sorted(company.context.PROMPTS.with_name(VERSION).iterdir()) if p.is_file()}}
     identity_file = output / 'reading-execution.json'
     if (output / 'reading-proof.json').exists():
         company.require(identity_file.exists() and base.strict_load(base.regular(identity_file)) == identity, 'reading_request_identity_changed')

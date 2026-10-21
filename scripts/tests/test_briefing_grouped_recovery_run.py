@@ -87,5 +87,56 @@ class ItemIsolationTest(unittest.TestCase):
             self.assertEqual(list(client.calls.glob("*.pending.json")), [])
 
 
+class RecoveryProcessBudgetTest(unittest.TestCase):
+    def test_two_processes_cannot_both_reserve_the_last_shared_slot(self):
+        import multiprocessing
+        import os
+        from types import SimpleNamespace
+        ctx = multiprocessing.get_context('fork')
+        ready, release, results = ctx.Event(), ctx.Event(), ctx.Queue()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'out'
+            args = SimpleNamespace(output=str(output), base_bundle=str(Path(directory)/'base/bundle.json'), execute_authorized=True)
+            class Client(run.base.ResponsesClient):
+                def request(self, stage, data, prompt_name, schema_name, max_output=8, schema_override=None):
+                    schema={'type':'object','properties':{'ok':{'type':'boolean'}},'required':['ok'],'additionalProperties':False}
+                    raw=run.base.canonical({'model':run.base.MODEL,'store':False,'instructions':'authored budget test','input':run.base.canonical(data).decode(),
+                        'max_output_tokens':8,'text':{'format':{'name':stage,'type':'json_schema','strict':True,'schema':schema}}})
+                    return raw,schema,run.base.digest(b'authored budget test')
+            def work(*_):
+                original=run.base.write_once
+                def boundary(path, data):
+                    if path.name.endswith('.pending.json'):
+                        ready.set()
+                        if not release.wait(5):raise AssertionError('authored boundary release timeout')
+                    return original(path,data)
+                def transport(raw):
+                    results.put('provider')
+                    return 200,run.base.canonical({'id':'authored-response','status':'completed','usage':{'input_tokens':1,'output_tokens':1},
+                        'output':[{'type':'message','content':[{'type':'output_text','text':'{"ok":true}'}]}]})
+                with patch.object(run.base,'write_once',boundary):
+                    client=Client(output,transport,max_calls=1)
+                    return client.call('authored_budget',{'process':os.getpid()},'unused','unused',max_output=8)
+            def worker():
+                try:run.run(args);results.put('completed')
+                except Exception as error:results.put(str(error))
+            with patch.object(run,'_run',work):
+                first=ctx.Process(target=worker);second=ctx.Process(target=worker)
+                try:
+                    first.start();self.assertTrue(ready.wait(5))
+                    self.assertEqual([],list((output/'calls').glob('*.pending.json')))
+                    second.start();self.assertEqual('recovery_execution_locked',results.get(timeout=3))
+                    self.assertTrue((output/'.recovery-execution.lock').exists())
+                    release.set();first.join(5);second.join(5)
+                    self.assertEqual(0,first.exitcode);self.assertEqual(0,second.exitcode)
+                    self.assertEqual({'provider','completed'},{results.get(timeout=2),results.get(timeout=2)})
+                    self.assertEqual(1,len(list((output/'calls').glob('*.pending.json'))))
+                    self.assertFalse((output/'.recovery-execution.lock').exists())
+                finally:
+                    release.set()
+                    for child in (first,second):
+                        if child.pid and child.is_alive():child.terminate();child.join()
+
+
 if __name__ == "__main__":
     unittest.main()
