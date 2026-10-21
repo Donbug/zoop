@@ -208,9 +208,11 @@ public class TossMarketClient {
     private Session session(boolean krx, LocalDate day, Instant at) {
         JsonNode calendar = get("/api/v1/market-calendar/" + (krx ? "KR" : "US"), Map.of("date", day.toString())).path("result");
         JsonNode today = calendar.path("today");
-        Session current = day.toString().equals(text(today.get("date"))) ? regular(krx, today) : null;
-        // at is the exclusive end (an exact to + 1ns): a to at the opening instant is still before the session.
-        if (current != null && current.open().isBefore(at.minusNanos(1))) return current;
+        // The calendar answers for the asked day; a missing or different date is a provider format failure, never a holiday.
+        if (!day.toString().equals(text(today.get("date")))) throw formatFailure();
+        Session current = regular(krx, today); // null: the asked day has no regular session (closed)
+        // at is the exclusive end (an exact to + 1ns), so a to at the opening instant is in the session and gets its bucket.
+        if (current != null && current.open().isBefore(at)) return current;
         Session previous = regular(krx, calendar.path("previousBusinessDay"));
         if (previous == null) throw formatFailure(); // a business day always has a regular session
         return previous;

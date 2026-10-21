@@ -40,6 +40,8 @@ class CompanyMarketClientsTest {
     private volatile boolean dstDaily;
     /** The calendar stub opens Friday 2026-10-16 (otherwise a holiday). */
     private volatile boolean fridayOpen;
+    /** The KR calendar stub answers for another day than the one asked (a provider format failure). */
+    private volatile boolean calendarDateMismatch;
     private final List<String> candleQueries = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @BeforeEach
@@ -311,7 +313,33 @@ class CompanyMarketClientsTest {
                 java.time.Instant.parse("2026-11-27T19:00:00Z").plusNanos(1));
         assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T13:00:00-05:00", "2026-11-27"),
                 result.range());
-        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T12:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30-05:00", 190, 191, 189, 190, 1.0),
+                new CompanyPriceResponse.Point("2026-11-27T12:00-05:00", 200, 202, 199, 201, 2.0)), result.points());
+    }
+
+    @Test
+    void aToAtTheOpeningInstantIsInThatSessionWithItsBucket() {
+        // An exact to is inclusive: to = 09:30:00 ET is that day's session with the 09:30 bucket, never the day before.
+        var us = tossClient("test-client", "test-secret").prices("NASDAQ:NVDA", "NASDAQ", "NVDA", "1d", null,
+                java.time.Instant.parse("2026-11-27T14:30:00Z").plusNanos(1));
+        assertEquals(new CompanyPriceResponse.Range("2026-11-27T09:30:00-05:00", "2026-11-27T09:30:00-05:00", "2026-11-27"),
+                us.range());
+        assertEquals(List.of(new CompanyPriceResponse.Point("2026-11-27T09:30-05:00", 190, 191, 189, 190, 1.0)), us.points());
+
+        // KRX 09:00:00 reads that day (10-15), not the previous business day (10-14).
+        tossClient("test-client", "test-secret").prices("KRX:005930", "KRX", "005930", "1d", null,
+                java.time.Instant.parse("2026-10-15T00:00:00Z").plusNanos(1));
+        assertTrue(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-15T15")));
+        assertFalse(candleQueries.stream().anyMatch(q -> q.contains("before=2026-10-14T15")));
+    }
+
+    @Test
+    void aCalendarAnsweringForAnotherDayIsAFormatFailureNotAHoliday() {
+        calendarDateMismatch = true;
+        var error = assertThrows(MarketDataException.class, () -> tossClient("test-client", "test-secret")
+                .prices("KRX:005930", "KRX", "005930", "1d", null, java.time.Instant.parse("2026-10-15T03:00:00Z").plusNanos(1)));
+        assertFalse(error.retryable());
+        assertTrue(candleQueries.stream().noneMatch(q -> q.contains("interval=1m")));
     }
 
     @Test
@@ -418,7 +446,7 @@ class CompanyMarketClientsTest {
                 """;
         boolean open = date.equals("2026-10-15") || (date.equals("2026-10-16") && fridayOpen);
         String previous = date.equals("2026-10-15") ? "2026-10-14" : fridayOpen && !date.equals("2026-10-16") ? "2026-10-16" : "2026-10-15";
-        return "{\"result\":{\"today\":" + krDay(date, open) + ",\"previousBusinessDay\":" + krDay(previous, true)
+        return "{\"result\":{\"today\":" + krDay(calendarDateMismatch ? "2026-10-19" : date, open) + ",\"previousBusinessDay\":" + krDay(previous, true)
                 + ",\"nextBusinessDay\":" + krDay("2026-10-19", true) + "}}";
     }
 
@@ -442,12 +470,13 @@ class CompanyMarketClientsTest {
                 ],"nextBefore":"2026-10-15T00:00:00+09:00"}}
                 """;
         if (path.startsWith("/api/v1/market-calendar/")) return calendar(path.endsWith("/KR"), rawQuery);
-        // NVDA on the 2026-11-27 early close (13:00 ET): one bar in the session, one at 13:30 ET after it.
+        // NVDA on the 2026-11-27 early close (13:00 ET): bars at the 09:30 open and 12:00, one at 13:30 ET after the close.
         if (path.equals("/api/v1/candles") && rawQuery.contains("interval=1m") && rawQuery.contains("symbol=NVDA")) {
             return rawQuery.contains("before=2026-11-28T05") ? """
                 {"result":{"candles":[
                   {"timestamp":"2026-11-27T18:31:00Z","openPrice":210,"highPrice":212,"lowPrice":209,"closePrice":211,"volume":3},
-                  {"timestamp":"2026-11-27T17:01:00Z","openPrice":200,"highPrice":202,"lowPrice":199,"closePrice":201,"volume":2}
+                  {"timestamp":"2026-11-27T17:01:00Z","openPrice":200,"highPrice":202,"lowPrice":199,"closePrice":201,"volume":2},
+                  {"timestamp":"2026-11-27T14:31:00Z","openPrice":190,"highPrice":191,"lowPrice":189,"closePrice":190,"volume":1}
                 ],"nextBefore":null}}
                 """ : """
                 {"result":{"candles":[],"nextBefore":null}}
