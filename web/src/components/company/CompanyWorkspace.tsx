@@ -35,6 +35,7 @@ import {
   impactEdges,
   number,
   requestTime,
+  versionOnlyAddress,
 } from './detail-model';
 
 const workspaceClasses =
@@ -176,6 +177,7 @@ export default function CompanyWorkspace() {
   const invalid = !!asOf && !exactTime(asOf);
   const snapshot = { asOf, graphVersion: version };
   const ready = !!asOf && !invalid;
+  const versionOnly = versionOnlyAddress(asOf, version);
   const range = ready ? timeRange(asOf!, period) : {};
   const company = useCompanyResource<Company>(
     invalid ? null : companyUrl(id, '', snapshot),
@@ -362,6 +364,19 @@ export default function CompanyWorkspace() {
         portfolio={portfolio}
       />
       <main className="min-w-0 bg-white p-6 max-md:p-4">
+        {versionOnly && (
+          <p role="alert" className="mb-4 text-[13px] text-zoop-alert">
+            이 주소에는 기준 시점 없이 그래프 버전({version})만 있어, 그 버전의
+            차트·사건·관계 그래프를 열 수 없어요.{' '}
+            <button
+              type="button"
+              className="font-semibold underline"
+              onClick={() => updateQuery({ graphVersion: null })}
+            >
+              최신 자료로 보기
+            </button>
+          </p>
+        )}
         <section aria-label="기업 개요">
           <Status resource={company} label="기업 정보" />
           {company.data && (
@@ -623,7 +638,7 @@ export default function CompanyWorkspace() {
           <section aria-label="사건 타임라인" data-screen-id="D-COM-05">
             <h2>사건 타임라인</h2>
             <Status resource={events} label="타임라인" />
-            {!ready && (
+            {!ready && !versionOnly && (
               <p role="status">타임라인의 기준 시점을 확인하고 있어요.</p>
             )}
             {events.data && (
@@ -840,7 +855,7 @@ export default function CompanyWorkspace() {
           ))}
         </nav>
         <Status resource={graph} label="관계 그래프" />
-        {!ready && (
+        {!ready && !versionOnly && (
           <p role="status">관계 그래프의 기준 시점을 확인하고 있어요.</p>
         )}
         {graph.data && (

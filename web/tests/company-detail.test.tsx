@@ -1270,8 +1270,9 @@ test('first entry pins the company reference time and version, not an older last
   );
 });
 
-test('a past view addressed by graphVersion alone is not given a reference time', async () => {
-  // In this mode metadata.asOf is the request time; adding it to an old version would be rejected (422).
+test('a graphVersion-only address explains it cannot open that version and moves to the latest data', async () => {
+  // The API answers this mode with the request time as metadata.asOf and no time for the version, so the page
+  // must not invent one (422) nor wait forever; it stops follow-up reads and offers the latest data.
   server.on('GET', '/api/v1/companies/:id', (r) =>
     json({
       ...company,
@@ -1284,11 +1285,37 @@ test('a past view addressed by graphVersion alone is not given a reference time'
   );
   open('?graphVersion=v-past');
   await screen.findByRole('heading', { name: '합성 기업' });
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const notice = await screen.findByText(/그래프 버전\(v-past\)만 있어/);
+  expect(
+    screen.queryByText('타임라인의 기준 시점을 확인하고 있어요.'),
+  ).toBeNull();
+  expect(
+    screen.queryByText('관계 그래프의 기준 시점을 확인하고 있어요.'),
+  ).toBeNull();
   expect(screen.getByTestId('address').textContent).not.toContain('asOf=');
+  expect(server.calls('GET', '/api/v1/events')).toHaveLength(0);
+  expect(server.calls('GET', '/api/v1/companies/:id/graph')).toHaveLength(0);
   expect(
     server
       .calls('GET', '/api/v1/companies/:id')
       .every((call) => !call.query.has('asOf')),
   ).toBe(true);
+
+  await userEvent.click(
+    within(notice.closest('p')!).getByRole('button', {
+      name: '최신 자료로 보기',
+    }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('address').textContent).toContain(
+      `asOf=${encodeURIComponent(time)}`,
+    ),
+  );
+  expect(screen.getByTestId('address').textContent).toContain(
+    'graphVersion=v1',
+  );
+  await waitFor(() =>
+    expect(server.calls('GET', '/api/v1/events').length).toBeGreaterThan(0),
+  );
+  expect(screen.queryByText(/그래프 버전\(v-past\)만 있어/)).toBeNull();
 });

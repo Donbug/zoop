@@ -23,6 +23,15 @@ export const exactTime = (value: string | null | undefined) =>
  */
 export const requestTime = (value: string) =>
   new Date(value).toISOString().replace(/\.000Z$/, 'Z');
+/**
+ * 주소에 graphVersion만 있고 기준 시점이 없다. 백엔드는 이 경우 metadata.asOf로 요청 시각을 주며 그 버전이
+ * 공개된 시점을 알려 주지 않으므로, 과거 버전에 맞는 기준 시점을 만들 수 없다(임의 시각은 422).
+ * 차트·타임라인·그래프·문서·재무 조회를 시작하지 않고 안내한다. 앱 안의 링크는 asOf와 함께 넘긴다.
+ */
+export const versionOnlyAddress = (
+  asOf: string | null,
+  version: string | null,
+) => !asOf && !!version;
 export function bucketKey(
   event: Pick<Event, 'eventTime' | 'timePrecision'>,
   period: ChartPeriod,
