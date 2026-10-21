@@ -18,7 +18,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcChatRepository implements ChatRepository {
     private static final String SESSION_COLUMNS = "id, member_id, created_at, updated_at";
-    private static final String JOB_SELECT = """
+    static final String JOB_SELECT = """
             SELECT j.id, j.session_id, s.member_id, j.seq, j.question, j.request_hash, j.asked_at,
                    j.frozen_context::text AS frozen_context, j.frozen_selection::text AS frozen_selection,
                    j.context_company_ids, j.graph_version_id, j.status, j.phase,
@@ -149,7 +149,7 @@ public class JdbcChatRepository implements ChatRepository {
     private static final RowMapper<ChatSessionRow> SESSION = (rs, index) -> new ChatSessionRow(rs.getString("id"),
             rs.getString("member_id"), instant(rs, "created_at"), instant(rs, "updated_at"));
 
-    private static final RowMapper<ChatJobRow> JOB = (rs, index) -> new ChatJobRow(rs.getString("id"),
+    static final RowMapper<ChatJobRow> JOB = (rs, index) -> new ChatJobRow(rs.getString("id"),
             rs.getString("session_id"), rs.getString("member_id"), rs.getInt("seq"), rs.getString("question"),
             rs.getString("request_hash"), instant(rs, "asked_at"), rs.getString("frozen_context"),
             rs.getString("frozen_selection"),

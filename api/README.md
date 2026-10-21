@@ -42,7 +42,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않습니다. 위 셸에서 환경�
 | `ZOOP_AUTH_ALLOWED_ORIGINS` | 가입·로그인·비회원 시작 및 회원/비회원 쿠키가 붙은 쓰기 요청을 허용할 정확한 Origin 목록(쉼표 구분). 일반 프로필은 HTTPS만, 로컬 프로필은 loopback HTTP도 허용. 빈 값은 전부 거절 |
 | `ZOOP_API_CORS_ALLOWED_ORIGINS` | `/api/**` 전체에 적용할 브라우저 CORS 허용 Origin 목록(쉼표 구분). 비어 있으면 CORS 매핑을 등록하지 않음 |
 | `ZOOP_AUTH_TRUSTED_PROXIES` | `X-Forwarded-For`를 제공할 수 있는 프록시의 숫자 IP 목록(쉼표 구분). 빈 값은 전달 헤더 무시 |
-| `ZOOP_CHAT_QUESTIONS_ENABLED` | 선택. AI 챗봇 질문·재시도 접수(기본 `false`). 작업 실행기가 아직 없으므로 꺼져 있으면 `submitQuestion`·`retryQuestionJob`이 503 `MODEL_UNAVAILABLE`을 반환해 실행되지 않을 작업을 만들지 않습니다. 대화 생성·조회·복원과 작업 조회·취소는 플래그와 무관하게 동작하며 모델을 호출하지 않습니다 |
+| `ZOOP_CHAT_QUESTIONS_ENABLED` | 선택. AI 챗봇 질문·재시도 접수(기본 `false`). 작업 실행기가 아직 없으므로 꺼져 있으면 `submitQuestion`·`retryQuestionJob`이 503 `MODEL_UNAVAILABLE`을 반환해 실행되지 않을 작업을 만들지 않습니다. 대화 생성·조회·복원과 작업 조회·취소는 플래그와 무관하게 동작하며 모델을 호출하지 않습니다. 켜려면 `ChatEngine`(오케스트레이터)이 등록돼 있어야 하며 없으면 기동을 거절합니다. `ZOOP_CHAT_EXECUTOR_ENABLED`(기본 `true`)·`ZOOP_CHAT_EXECUTOR_WORKERS`(기본 2)는 대기 작업을 집어 실행하고 만료된 lease를 회수하는 실행기이며, 엔진이 없으면 아무 작업도 집지 않습니다 |
 | `ZOOP_AI_CLIENT_*` `ZOOP_AI_EXTRACTION_CLIENT_*` `ZOOP_AI_RELATION_CLIENT_*` | 선택. 내부 AI transport 클라이언트(S1/S2/S3 가족별, 기본 비활성, 설정 없이도 기동). 이름·규칙은 [AI 연동](docs/AI_INTEGRATION.md#설정)과 [S2·S3 절](docs/AI_INTEGRATION.md#s2-추출s3-관계-클라이언트) |
 | `ZOOP_DOCUMENT_IMPORT_*` `ZOOP_INGESTION_*` `ZOOP_ARTIFACT_ROOT` | 선택. operator 전용 비웹 문서 import(기본 비활성, 설정 없이도 기동). 이름·규칙은 [문서 import](docs/DOCUMENT_IMPORT.md#실행) |
 | `ZOOP_DOCUMENT_ANALYSIS_*` | 선택. operator 전용 비웹 문서 분석(기본 비활성, 설정 없이도 기동). S1 AI 클라이언트(`ZOOP_AI_CLIENT_*`)와 위 `ZOOP_INGESTION_*`·`ZOOP_ARTIFACT_ROOT`도 필요하고 문서 import와 한 프로세스에서 함께 켤 수 없습니다. 이름·규칙은 [문서 분석](docs/DOCUMENT_ANALYSIS.md#실행) |
