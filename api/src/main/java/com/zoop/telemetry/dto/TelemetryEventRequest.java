@@ -1,5 +1,6 @@
 package com.zoop.telemetry.dto;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -12,6 +13,11 @@ public record TelemetryEventRequest(
         @Pattern(regexp = "[A-Za-z0-9._:/-]+") String targetId,
         @Size(max = 256) @Pattern(regexp = "[A-Za-z0-9._:/-]+") String roundId,
         @NotBlank @Pattern(regexp = "[A-Za-z0-9-]{8,40}") String viewId) {
+
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+        throw new IllegalArgumentException("Unknown telemetry event field");
+    }
 
     @AssertTrue(message = "event fields do not match the event type")
     public boolean isShapeValid() {

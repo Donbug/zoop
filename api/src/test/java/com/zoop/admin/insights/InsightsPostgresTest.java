@@ -120,25 +120,32 @@ class InsightsPostgresTest {
 
     @Test
     void aiQuestionCountCountsEventsWhileRateUsesDistinctSubmittedViews() throws Exception {
+        var beforeMetrics = insights.summary("7d", "ai-count-before").metrics();
+        var beforeCount = beforeMetrics.stream().filter(metric -> metric.key().equals("aiQuestions"))
+                .findFirst().orElseThrow().count();
+        var beforeRate = beforeMetrics.stream().filter(metric -> metric.key().equals("aiQuestionRate"))
+                .findFirst().orElseThrow();
+        String aiView = "view-ai-" + UUID.randomUUID().toString().substring(0, 8);
+        String noScreenView = "view-no-" + UUID.randomUUID().toString().substring(0, 8);
         var body = mapper.readValue("""
                 {"events":[
-                  {"type":"screen_view","screen":"ai","viewId":"view-ai-000001"},
-                  {"type":"ai_question","targetId":null,"viewId":"view-ai-000001"},
-                  {"type":"ai_question","targetId":null,"viewId":"view-ai-000001"},
-                  {"type":"ai_question","targetId":null,"viewId":"view-ai-000001"},
-                  {"type":"ai_question","targetId":null,"viewId":"view-no-screen-01"}
+                  {"type":"screen_view","screen":"ai","viewId":"%s"},
+                  {"type":"ai_question","targetId":null,"viewId":"%s"},
+                  {"type":"ai_question","targetId":null,"viewId":"%s"},
+                  {"type":"ai_question","targetId":null,"viewId":"%s"},
+                  {"type":"ai_question","targetId":null,"viewId":"%s"}
                 ]}
-                """, TelemetryBatchRequest.class);
+                """.formatted(aiView, aiView, aiView, aiView, noScreenView), TelemetryBatchRequest.class);
         telemetry.record(principal, "ai-count-" + UUID.randomUUID(), body, "ai-count-request");
 
         var metrics = insights.summary("7d", "ai-count-request").metrics();
         var count = metrics.stream().filter(metric -> metric.key().equals("aiQuestions")).findFirst().orElseThrow();
         var rate = metrics.stream().filter(metric -> metric.key().equals("aiQuestionRate")).findFirst().orElseThrow();
 
-        assertEquals(4L, count.count());
-        assertEquals(1L, rate.numerator());
-        assertEquals(1L, rate.denominator());
-        assertTrue(rate.sampleHidden());
+        assertEquals(beforeCount + 4L, count.count());
+        assertEquals(beforeRate.numerator() + 1L, rate.numerator());
+        assertEquals(beforeRate.denominator() + 1L, rate.denominator());
+        assertEquals(rate.denominator() < 5, rate.sampleHidden());
     }
 
     @Test
