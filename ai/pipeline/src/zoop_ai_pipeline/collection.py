@@ -569,7 +569,8 @@ def _target_item(target: Target, fetched: Fetched, collected: Collected) -> Item
     return Item.model_validate({"candidateId": target.candidate_id, "supplierDocumentId": target.supplier_document_id, "url": fetched.requested_url,
                                 "bodyRef": collected.body_sha256, "mediaType": fetched.media_type, "title": target.title,
                                 "publishedAt": collected.published.raw if collected.published.precision == "instant" else None,
-                                "modifiedAt": target.modified_at, "sourceRevision": target.source_revision, "collection": collected.wire()})
+                                "modifiedAt": target.modified_at, "sourceRevision": target.source_revision, "publisher": target.publisher,
+                                "collection": collected.wire()})
 
 
 def collect(registry: Path, policy: Policy, request: Request, resolver: Resolver = system_resolver) -> dict:

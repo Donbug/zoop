@@ -1,7 +1,7 @@
-"""Distinct offline topic-candidate producer contract (request/response/replay), separate from event extraction/SAME.
+"""Distinct topic-candidate producer contract (request/response/replay), separate from event extraction/SAME.
 
 Topics are broad groupings of events, never renamed event identities. A topic candidate is not an approved topic.
-Offline mode can only replay authored responses; it never infers a topic or fabricates an empty stub.
+Replay can only return authored responses and live can only return the provider's; neither infers a topic or fabricates an empty stub.
 """
 from __future__ import annotations
 

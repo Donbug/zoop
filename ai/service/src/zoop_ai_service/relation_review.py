@@ -1,5 +1,5 @@
 """Review operations over the pipeline's append-only event chain, as pure functions: the owner marker, the proof that a chain event is (or is
-not) the one an operation wrote, what a settled revalidation looks like, and the content-free view of an operation.
+not) the one an operation wrote, and the content-free view of an operation.
 
 The pipeline appends a relation's events in a transaction guarded by `expectedRevision` (the number of events the caller saw). So an event
 exists at sequence `expected + 1`, or the relation has moved past `expected`, or neither (nothing was appended yet). The service writes a
@@ -19,7 +19,10 @@ from .relation_wire import (RelationChain, RelationOperationStatus, RelationPubl
                             RelationRevalidationPhase, RtChainRelation)
 
 MARKER_PREFIX = "zoop-ai-service-review:"
-EFFECT = {"allow": "revalidation-requested", "reject": "excluded"}
+# The event a CURRENT-contract operation asks for: an `allow` is the operator's FINAL approval (no model call, no revalidation), a `reject` an
+# exclusion. The old effect `revalidation-requested` is history of a contract that no longer exists and is never matched here.
+EFFECT = {"allow": "approved", "reject": "excluded"}
+LIMITATION = "review_contract_changed"
 
 
 def marker(operation_id: str) -> str:
@@ -59,62 +62,30 @@ def evidence(chain: RelationChain, op: OperationRow) -> Evidence:
     return Evidence("absent" if relation.eligibility.revision == op.expected_source_revision else "moved")
 
 
-def settlement(chain: RelationChain, relation_candidate_id: str, review_revision: int) -> tuple[str, str | None] | None:
-    """What the event right after an accepted `allow` (sequence review_revision + 2) proves about its revalidation.
-
-    `verified` with the verdict's eligibility: a revalidation verdict was appended. `superseded`: an admin reject was appended first, so the
-    pending allow can never be revalidated and nothing may overwrite the rejection. None: the chain holds nothing after the review yet (or
-    something this operation cannot be credited with)."""
-    relation = relation_of(chain, relation_candidate_id)
-    if relation is None:
-        return None
-    event = next((item for item in relation.history if item.seq == review_revision + 2), None)
-    if event is None:
-        return None
-    if event.kind == "verdict" and event.attempt is not None and event.attempt.kind == "revalidation" and event.eligibility in ("eligible", "hold", "reject"):
-        return "verified", event.eligibility
-    if event.kind == "review" and event.decision == "reject":
-        return "superseded", None
-    return None
-
-
 def _revalidation(op: OperationRow) -> tuple[str, str | None, str | None]:
-    """(state, verdict eligibility, resulting source revision)."""
-    if op.decision == "reject" or op.review_state != "applied":
+    """(state, verdict eligibility, resulting source revision). Only a legacy `allow` ever requested a revalidation; what its own stored columns
+    settled is reported as history and anything unsettled is `contract_changed`: it is never dispatched or resent."""
+    if not op.legacy or op.decision == "reject" or op.review_state != "applied":
         return "not_requested", None, None
     after = str(op.expected_source_revision + 2)
     if op.settled == "verified":
         return "verified", op.settled_eligibility, after
     if op.settled == "superseded":
         return "superseded", None, after
-    if op.reval_state == "pending":
-        return "queued", None, None
-    if op.reval_state == "in_flight":
-        return "running", None, None
-    if op.last_outcome == "cancelled":
-        return "cancelled", None, None
-    if op.last_outcome in ("transport_unknown", "service_restarted"):
-        return "interrupted", None, None
-    return "failed", None, None
+    return "contract_changed", None, None
 
 
 def next_operation_action(op: OperationRow) -> str:
-    """Pure and ordered: what the caller should do next."""
-    if op.review_state != "applied":
-        return "retry_review"
-    state, _, _ = _revalidation(op)
-    if state in ("queued", "running"):
-        return "wait"
-    if state == "interrupted":
-        return "recover"
-    if state == "failed":
-        return "operator_reconcile" if op.last_runtime_code == "replay_response_unknown" else "recover"
-    return "none"
+    """Pure and ordered: what the caller should do next. A legacy operation has nothing to do: an unconfirmed legacy review is never retried and
+    a legacy revalidation is never run (a NEW decision at the relation's current revision is the way forward)."""
+    if op.legacy:
+        return "none"
+    return "none" if op.review_state == "applied" else "retry_review"
 
 
 def operation_status(op: OperationRow, observed_at: str) -> RelationOperationStatus:
     """The content-free view of one operation, read from the service ledger only: identity, the exact expectations the caller sent, the
-    acceptance of the decision, the verification it requested and (always) that nothing is published here."""
+    acceptance of the decision and (always) that nothing is published here. `limitation` names a legacy operation."""
     applied = op.review_state == "applied"
     state, verdict, resulting = _revalidation(op)
     return RelationOperationStatus(
@@ -125,4 +96,5 @@ def operation_status(op: OperationRow, observed_at: str) -> RelationOperationSta
         revalidation=RelationRevalidationPhase(state=state, dispatch_count=op.reval_count, last_outcome=op.last_outcome,
                                                last_runtime_code=op.last_runtime_code, verdict=verdict, resulting_source_revision=resulting,
                                                updated_at=op.reval_updated_at),
-        publication=RelationPublicationPhase(), next=next_operation_action(op), accepted_at=op.reserved_at, observed_at=observed_at)
+        publication=RelationPublicationPhase(), next=next_operation_action(op), limitation=LIMITATION if op.legacy else None,
+        accepted_at=op.reserved_at, observed_at=observed_at)

@@ -1,4 +1,4 @@
-"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-2` bundle.
+"""Wire models of the read-only handoff family (`zoop-ai-internal-handoff-1`) and the CLOSED model of the `zoop-graph-handoff-bundle-5` bundle.
 
 Three kinds of model live here:
   * `Hd*` models (extra forbidden) are what this service emits as status and what the generated OpenAPI documents;
@@ -21,15 +21,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic.alias_generators import to_camel
 
 from .relation_wire import Rel
-from .wire import ErrorBody, Safe
+from .wire import ErrorBody, Reviewer, Safe
 
 SCHEMA = "zoop-ai-internal-handoff-1"
 RUNTIME_SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5"
 POLICY = "zoop-public-projection-policy-1"
 HANDOFF_ID_PATTERN = r"^[A-Za-z0-9._:-]{1,200}$"
 HASH_PATTERN = r"^[a-f0-9]{64}$"
@@ -76,8 +76,14 @@ SourceKind = Literal["synthetic", "actual"]
 class BProvenance(Bx):
     declared_source_kind: SourceKind
     observed_source_kind: SourceKind
-    execution_mode: Literal["replay"]
-    recording_kind: Literal["authored-test"]
+    execution_mode: Literal["replay", "live"]
+    recording_kind: Literal["authored-test", "provider"]
+
+    @model_validator(mode="after")
+    def pair(self) -> BProvenance:
+        if (self.execution_mode, self.recording_kind) not in (("replay", "authored-test"), ("live", "provider")):
+            raise ValueError("executionMode and recordingKind disagree")
+        return self
 
 
 class BPolicyFiles(Bx):
@@ -94,6 +100,7 @@ class BPolicy(Bx):
     geography: Literal["operator-field-verdict"]
     structural: Literal["manual-operator-review"]
     sequence: Literal["s2-comparison-with-operator-decision"]
+    source_support: Literal["origin-or-exact-text-union"]
 
 
 class BJob(Bx):
@@ -132,15 +139,54 @@ class BAudit(Bx):
     eligible_not_public_by_type: CountMap
 
 
-ReviewUse = Annotated[tuple[Annotated[str, StringConstraints(pattern=RC_PATTERN)], Annotated[int, Field(ge=1)]], Field(strict=False)]
+class BApprovalBasis(Bx):
+    """Why one S3 relation was eligible when the producer used it: the automatic verifier's verdict (`reviewer` null) or an operator's final approval
+    (`reviewer` the approving principal). `revision` is the deciding chain event's sequence."""
+    kind: Literal["automatic-verifier", "operator-final-approval"]
+    revision: Annotated[int, Field(ge=1)]
+    reviewer: Reviewer | None
+    decided_at: Stamp
+
+    @model_validator(mode="after")
+    def reviewer_only_for_a_human(self) -> BApprovalBasis:
+        if (self.reviewer is None) != (self.kind == "automatic-verifier"):
+            raise ValueError("reviewer is null exactly for the automatic verifier")
+        return self
+
+
+class BReviewUse(Bx):
+    """The chain revision of one relation the bundle used, with the basis that made it eligible (`approvalBasis.revision` equals `revision`)."""
+    relation_candidate_id: Annotated[str, StringConstraints(pattern=RC_PATTERN)]
+    revision: Annotated[int, Field(ge=1)]
+    approval_basis: BApprovalBasis
+
+    @model_validator(mode="after")
+    def basis_is_the_used_revision(self) -> BReviewUse:
+        if self.approval_basis.revision != self.revision:
+            raise ValueError("approvalBasis.revision must equal the used revision")
+        return self
+
+
+class BSourceProvenance(Bx):
+    """The execution provenance of ONE S3 source job. Every source of a bundle carries exactly the bundle's own triple (the producer withholds a mix)."""
+    source_kind: SourceKind
+    execution_mode: Literal["replay", "live"]
+    recording_kind: Literal["authored-test", "provider"]
+
+    @model_validator(mode="after")
+    def pair(self) -> BSourceProvenance:
+        if (self.execution_mode, self.recording_kind) not in (("replay", "authored-test"), ("live", "provider")):
+            raise ValueError("executionMode and recordingKind disagree")
+        return self
 
 
 class BSource(Bx):
     relation: BJob
     upstream: BUpstream
     review_digest: Hash
+    provenance: BSourceProvenance
     policies: BSourcePolicies
-    review_used: Annotated[list[ReviewUse], Field(max_length=MAX_RELATIONS)]
+    review_used: Annotated[list[BReviewUse], Field(max_length=MAX_RELATIONS)]
     audit: BAudit
 
 
@@ -216,6 +262,79 @@ class BMention(Bx):
     evidence_ids: Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(min_length=1, max_length=MAX_EVIDENCE)]
 
 
+class BMentionRef(Bx):
+    """The identity of one original mention of the same issue (a reference, never a copy of its values)."""
+    document_id: Id
+    document_version: Hash
+    mention_id: Name
+
+
+SameValueList = Annotated[list[BMentionRef], Field(min_length=1, max_length=1000)]
+
+
+class BSameValueMentions(Bx):
+    """Per headline field, the mentions whose own value equals the issue's value exactly (null equals null, no normalisation). Shape only: the producer owns the
+    exactness, order and closure of these lists."""
+    title: SameValueList
+    action: SameValueList
+    target: SameValueList
+    event_time: SameValueList
+    period: SameValueList
+    assertion_status: SameValueList
+
+
+class BFieldVerdict(Bx):
+    """An operator's per-field verdict on one original mention's `eventTime` or `period` value, exactly as reviewed. Shape only: the producer owns binding,
+    evidence closure, order and the effect on the issue's headline. There is no free-text reason and never AI output."""
+    document_id: Id
+    document_version: Hash
+    mention_id: Name
+    field: Literal["eventTime", "period"]
+    value: MentionText
+    decision: Literal["ALLOW", "HOLD", "REJECT"]
+    reason_code: Literal["stated", "unstated", "ambiguous", "contradicted"]
+    evidence_ids: Annotated[list[Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]], Field(max_length=20)]
+    verification: Literal["operator-field-verdict"]
+    reviewer: Id
+    decision_ref: Id
+    decision_version: Id
+
+    @model_validator(mode="after")
+    def _code_and_evidence_shape(self) -> "BFieldVerdict":
+        allowed = {"ALLOW": ("stated", 1), "HOLD": None, "REJECT": ("contradicted", 1)}
+        spans = len(self.evidence_ids)
+        if self.decision == "HOLD":
+            ok = (self.reason_code == "unstated" and spans == 0) or (self.reason_code == "ambiguous" and spans >= 1)
+        else:
+            code, minimum = allowed[self.decision]  # type: ignore[misc]
+            ok = self.reason_code == code and spans >= minimum
+        if not ok:
+            raise ValueError("verdict decision, reasonCode and evidence count do not combine")
+        return self
+
+
+class BSourceSupport(Bx):
+    """How many independent sources the issue's cited article versions represent. `knownLineageCount` counts lineage groups that have a declared origin
+    (never articles), `duplicateGroups` are groups of articles whose prepared text is exactly equal (never transitive components) and
+    `independentSourceCount` is null whenever an origin is missing or conflicting. Shape only: the producer owns every count."""
+    article_count: Count
+    known_lineage_count: Count
+    unknown_lineage_articles: Annotated[list[Annotated[str, StringConstraints(pattern=ARTICLE_ID_PATTERN)]], Field(max_length=MAX_ARTICLES)]
+    independent_source_count: Count | None
+    duplicate_groups: Annotated[list[Annotated[list[Annotated[str, StringConstraints(pattern=ARTICLE_ID_PATTERN)]], Field(min_length=2, max_length=MAX_ARTICLES)]],
+                                Field(max_length=MAX_ARTICLES)]
+
+
+class BFieldProvenance(Bx):
+    """How the producer chose the issue's six headline values: `unanimous` (every mention states them) or `operator-representative` (the operator's single
+    representative decision). `verification` is always `none`: this is the actual selection, never a verification, support or approval of any value.
+    `withheld` lists the fields (`eventTime`, `period` order) whose headline the producer set to null because of an operator HOLD or REJECT."""
+    selection: Literal["unanimous", "operator-representative"]
+    verification: Literal["none"]
+    same_value_mentions: BSameValueMentions
+    withheld: Annotated[list[Literal["eventTime", "period"]], Field(max_length=2)]
+
+
 class BIssue(Bx):
     id: Id
     canonical_id: Id
@@ -232,6 +351,9 @@ class BIssue(Bx):
     mentions: Annotated[list[BMention], Field(max_length=1000)]
     decision_ref: Id
     representative: BSourceEvent | None
+    field_provenance: BFieldProvenance
+    field_verdicts: Annotated[list[BFieldVerdict], Field(max_length=2000)]
+    source_support: BSourceSupport
 
 
 class BSourceRef(Bx):
@@ -250,10 +372,16 @@ class BSourceArticle(Bx):
     article_version: Hash
 
 
+MAX_SCOPE = 500
+Scope = Annotated[str, StringConstraints(max_length=MAX_SCOPE)] | None
+
+
 class BBasis(Bx):
     source_relation: BSourceRelation
     relation_key: Hash
     relation_type: Literal["SUPPLIES"]
+    business_scope: Scope
+    product_scope: Scope
     valid_from: Stamp | None
     valid_until: Stamp | None
     countries: Countries
@@ -262,9 +390,39 @@ class BBasis(Bx):
     evidence_ids: EvidenceIds
 
 
+class BPathLink(Bx):
+    supplier_company_id: Id
+    customer_company_id: Id
+
+
+class BStructuralComplete(Bx):
+    """An ordered chain [participant, (mapped middle,) target] with one directed supplier→customer link per S3 basis. Operator-mapped basis chain only."""
+    status: Literal["complete"]
+    company_ids: Annotated[list[Id], Field(min_length=2, max_length=3)]
+    links: Annotated[list[BPathLink], Field(min_length=1, max_length=2)]
+
+    @model_validator(mode="after")
+    def chain_and_links_agree(self) -> BStructuralComplete:
+        ids = self.company_ids
+        if len(set(ids)) != len(ids) or len(self.links) != len(ids) - 1:
+            raise ValueError("companyIds must be distinct with exactly one link per adjacent pair")
+        for (left, right), link in zip(zip(ids, ids[1:]), self.links):
+            if {link.supplier_company_id, link.customer_company_id} != {left, right} or left == right:
+                raise ValueError("each link must join its adjacent companyIds")
+        return self
+
+
+class BStructuralUnavailable(Bx):
+    status: Literal["unavailable"]
+    reason: Literal["intermediate_company_unmapped"]
+
+
+StructuralPath = Annotated[Union[BStructuralComplete, BStructuralUnavailable], Field(discriminator="status")]
+
+
 class BInvolvesProvenance(Bx):
     origin: Literal["s3-relation"]
-    s3_semantic_validation: Literal["independent-verifier-supported-all-claims"]
+    s3_semantic_validation: Literal["independent-verifier-supported-all-claims", "manual-operator-final-approval"]
 
 
 class BStructuralProvenance(Bx):
@@ -275,7 +433,7 @@ class BStructuralProvenance(Bx):
     decision_ref: Id
     decision_version: Id
     binding_digest: Hash
-    basis_eligibility: Literal["s3-independent-verifier-supported-all-claims"]
+    basis_eligibility: Literal["s3-independent-verifier-supported-all-claims", "s3-operator-final-approval"]
 
 
 class BFollowsProvenance(Bx):
@@ -300,9 +458,22 @@ class BRelation(Bx):
     assertion_status: Text | None
     evidence_ids: EvidenceIds
     basis: Annotated[list[BBasis], Field(max_length=2)]
+    structural_path: StructuralPath | None
     provenance: Provenance
     decision_ref: Id | None
     source_refs: Annotated[list[BSourceRef], Field(max_length=MAX_RELATIONS)]
+
+    @model_validator(mode="after")
+    def path_only_for_a_structural_relation(self) -> BRelation:
+        path = self.structural_path
+        if (path is None) != (self.type != "STRUCTURALLY_RELATED_TO"):
+            raise ValueError("structuralPath is present exactly on STRUCTURALLY_RELATED_TO")
+        if isinstance(path, BStructuralComplete):
+            if len(path.links) != len(self.basis) or path.company_ids[-1] != self.target:
+                raise ValueError("a complete path has one link per basis and ends at the relation target")
+        elif path is not None and len(self.basis) != 2:
+            raise ValueError("an unavailable path is only possible for a two-basis relation")
+        return self
 
 
 class BEvidenceSource(Bx):
@@ -341,12 +512,23 @@ class BObservation(Bx):
     grant: BGrant
 
 
+class BArticleOrigin(Bx):
+    """The operator's declared origin of one article version (never inferred from a publisher, domain or source id)."""
+    origin_id: Id
+    reviewer: Id
+    decision_ref: Id
+    decision_version: Id
+    verification: Literal["operator-declared-origin"]
+
+
 class BArticle(Bx):
     article_id: Annotated[str, StringConstraints(pattern=ARTICLE_ID_PATTERN)]
     article_version: Hash
     document_id: Name
     document_version: Hash
     raw_version: Hash
+    text_sha256: Hash
+    origin: BArticleOrigin | None
     title: Annotated[str, StringConstraints(max_length=2000)]
     url: Annotated[str, StringConstraints(max_length=4000)]
     published_at: Stamp | None
@@ -383,6 +565,7 @@ class BRelationCounts(Bx):
 
 class BCounts(Bx):
     companies: Count
+    path_companies: Count
     issues: Count
     relations: BRelationCounts
     evidence: Count
@@ -411,13 +594,14 @@ class BDigests(Bx):
 
 class Bundle(Bx):
     """The producer's artifact. Key names, order-free content and every value are the producer's; this class only says which shapes are acceptable."""
-    schema_version: Literal["zoop-graph-handoff-bundle-2"]
+    schema_version: Literal["zoop-graph-handoff-bundle-5"]
     handoff_id: Id
     manifest_digest: Hash
     provenance: BProvenance
     policy: BPolicy
     sources: Annotated[list[BSource], Field(min_length=1, max_length=MAX_SOURCES)]
     companies: Annotated[list[BCompany], Field(max_length=MAX_COMPANIES)]
+    path_companies: Annotated[list[BCompany], Field(max_length=MAX_COMPANIES)]
     issues: Annotated[list[BIssue], Field(max_length=MAX_ISSUES)]
     relations: Annotated[list[BRelation], Field(max_length=MAX_RELATIONS)]
     evidence: Annotated[list[BEvidence], Field(max_length=MAX_EVIDENCE)]
@@ -427,6 +611,32 @@ class Bundle(Bx):
     checks: BChecks
     readiness: BReadiness
     digests: BDigests
+
+    @model_validator(mode="after")
+    def private_path_companies_close_over_the_complete_paths(self) -> Bundle:
+        main = [c.id for c in self.companies]
+        private = [c.id for c in self.path_companies]
+        if private != sorted(set(private)) or set(private) & set(main) or set(private) & {i.id for i in self.issues}:
+            raise ValueError("pathCompanies are sorted, unique and disjoint from companies and issues")
+        participants: dict[str, set[str]] = {}
+        for relation in self.relations:
+            if relation.type == "INVOLVES":
+                participants.setdefault(relation.source, set()).add(relation.target)
+        used: set[str] = set()
+        for relation in self.relations:
+            path = relation.structural_path
+            if not isinstance(path, BStructuralComplete):
+                continue
+            ids = path.company_ids
+            here = participants.get(relation.source, set())
+            if ids[0] not in here or ids[-1] in here or not {ids[0], ids[-1]} <= set(main):
+                raise ValueError("a path starts at an INVOLVES participant of the same issue and ends at a non-participant main company")
+            used.update(ids[1:-1])
+        if used - set(main) != set(private):
+            raise ValueError("pathCompanies must equal the mapped middle companies of complete paths that are not main companies")
+        if self.counts.companies != len(main) or self.counts.path_companies != len(private):
+            raise ValueError("counts.companies and counts.pathCompanies must equal the list lengths")
+        return self
 
 
 class BmSource(Bx):
@@ -516,7 +726,7 @@ class RtUsage(Projection):
 class RtReceipt(Projection):
     handoff_id: str
     manifest_digest: str = Field(pattern=HASH_PATTERN)
-    bundle_schema: Literal["zoop-graph-handoff-bundle-2"]
+    bundle_schema: Literal["zoop-graph-handoff-bundle-5"]
     bundle_digest: str = Field(pattern=HASH_PATTERN)
     content_digest: str = Field(pattern=HASH_PATTERN)
     bundle_bytes: int = Field(ge=1)

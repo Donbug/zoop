@@ -1,6 +1,8 @@
 """The review decision tree of `RelationJobs`, without an installed pipeline: a scripted stand-in for the one door to the pipeline, a real service
 ledger and the real configuration loader. What is proven here is every branch of "did my append land?": which outcome releases the reservation,
-which keeps it, when the chain is read before anything is written, and that an event is adopted only when every field of it is the operation's.
+which keeps it, when the chain is read before anything is written, that an event is adopted only when every field of it is the operation's, that
+an `allow` is the operator's FINAL approval (terminal, nothing dispatched, no call) and that an operation recorded under the earlier revalidation
+contract is history that is never dispatched, resent or read as an approval.
 
 The same flows against the real installed `zoop-ai-relation` live in `ai/service/pipeline_tests` (`make service-pipeline-test`).
 """
@@ -16,8 +18,7 @@ from support import Workspace, document_replay
 from test_relation_unit import RC, UPSTREAM_DIGEST, payload, relation_env, review_event, verdict_event
 from zoop_ai_service import relation_access
 from zoop_ai_service.config import load
-from zoop_ai_service.jobs import Observation
-from zoop_ai_service.relation_dispatch import RelationDispatcher
+from zoop_ai_service.jobs import Observation, request_digest
 from zoop_ai_service.relation_jobs import RelationError, RelationJobs
 from zoop_ai_service.relation_ledger import RelationLedger, Update
 from zoop_ai_service.relation_review import marker, operation_status
@@ -30,7 +31,8 @@ BINDING = {"schema": "x", "upstream": {"jobId": "s2-job", "inputDigest": UPSTREA
 
 
 class Scripted:
-    """Stands in for `RelationProcess`: each command answers from its own queue, and every call is recorded in order."""
+    """Stands in for `RelationProcess`: each command answers from its own queue, and every call is recorded in order. There is no `revalidate`:
+    the service has no such command any more, so a test that needed one would fail on the missing attribute."""
 
     def __init__(self, **queues: list[Outcome]):
         self.queues, self.calls, self.review_args = {name: list(items) for name, items in queues.items()}, [], None
@@ -47,14 +49,10 @@ class Scripted:
     def inspect(self, job_id: str) -> Outcome:
         return self._answer("inspect")
 
-    def revalidate(self, *args: Any) -> Outcome:
-        self.revalidate_args = args
-        return self._answer("revalidate")
 
-
-def view(*events: dict[str, Any], state: str = "ready", revision: int | None = None, pending: bool = False, **extra: Any) -> Outcome:
+def view(*events: dict[str, Any], state: str = "ready", revision: int | None = None, status: str = "hold", pending: bool = False, **extra: Any) -> Outcome:
     raw = {**payload(state, binding=BINDING, inputDigest=JOB_DIGEST, **extra), "relations": [{
-        "relationCandidateId": RC, "eligibility": {"status": "hold", "revision": len(events) if revision is None else revision, "reviewPending": pending},
+        "relationCandidateId": RC, "eligibility": {"status": status, "revision": len(events) if revision is None else revision, "reviewPending": pending},
         "history": list(events)}]}
     return Outcome("result", result=raw, exit_code=0)
 
@@ -64,8 +62,8 @@ def withheld(code: str = "source_unauthorized") -> Outcome:
 
 
 def landed(*extra: dict[str, Any]) -> Outcome:
-    """The chain after our allow was appended: the initial verdict, then the review carrying this operation's marker."""
-    return view(verdict_event(1), review_event(2), *extra, pending=not extra)
+    """The chain after our allow was appended: the initial HOLD verdict, then the review carrying this operation's marker and the effect `approved`."""
+    return view(verdict_event(1), review_event(2), *extra, status="eligible")
 
 
 def body(*, decision: str = "allow", revision: str = "1", version: str = JOB_DIGEST) -> RelationReview:
@@ -101,31 +99,42 @@ def refused(jobs: RelationJobs, *args: Any, **kwargs: Any) -> RelationError:
     return caught.value
 
 
-def test_a_review_the_pipeline_appended_is_adopted_from_the_chain_and_queues_one_revalidation(harness):
+def test_a_review_the_pipeline_appended_is_adopted_from_the_chain_as_a_terminal_final_approval(harness):
     process = Scripted(review=[landed()])
     jobs = harness.build(process)
     reply = run(jobs)
-    assert reply.status == 202 and reply.headers["Location"] == "/internal/v1/relation-jobs/job/reviews/op-1" and reply.headers["Retry-After"] == "2"
+    assert reply.status == 200 and reply.headers == {"Location": "/internal/v1/relation-jobs/job/reviews/op-1"}  # terminal: nothing to wait for
     status = reply.body
-    assert (status.review.state, status.review.resulting_source_revision, status.revalidation.state, status.next) == ("applied", "2", "queued", "wait")
-    assert process.calls == ["review"] and harness.woke.count == 1
+    assert (status.review.state, status.review.resulting_source_revision, status.revalidation.state, status.next, status.limitation) == (
+        "applied", "2", "not_requested", "none", None)
+    assert process.calls == ["review"] and harness.woke.count == 0
     # reviewer = the authenticated principal, note = the operation marker, revision = the expected SOURCE revision as an integer: nothing from the request body's text.
     assert process.review_args == ("job", RC, 1, "allow", "alpha", marker("op-1"))
     row = harness.ledger.operation("op-1")
-    assert row is not None and (row.applied_event_at, row.reval_state, row.review_attempts) == ("2026-10-13T00:00:02+00:00", "pending", 1)
+    assert row is not None and (row.applied_event_at, row.reval_state, row.review_attempts, row.contract) == (
+        "2026-10-13T00:00:02+00:00", None, 1, "final-approval")
+    assert harness.ledger.claim_next() is None  # an approval schedules no dispatch of any kind
 
 
 def test_a_reject_is_recorded_and_queues_nothing(harness):
-    process = Scripted(review=[view(verdict_event(1), review_event(2, decision="reject"), revision=2)])
+    process = Scripted(review=[view(verdict_event(1), review_event(2, decision="reject"), revision=2, status="reject")])
     reply = run(harness.build(process), review=body(decision="reject"))
     assert reply.status == 200 and (reply.body.revalidation.state, reply.body.next) == ("not_requested", "none")
     assert harness.ledger.operation("op-1").reval_state is None and harness.ledger.claim_next() is None
 
 
+def test_an_event_carrying_the_old_effect_is_never_adopted_as_the_approval(harness):
+    old = view(verdict_event(1), review_event(2, effect="revalidation-requested"), pending=True)
+    error = refused(harness.build(Scripted(review=[old])))
+    assert (error.status, error.code) == (500, "runtime_binding_mismatch")
+    assert harness.ledger.operation("op-1").review_state == "reserved"
+
+
 @pytest.mark.parametrize("code,status,mapped", [
     ("review_revision_conflict", 409, "source_revision_conflict"), ("review_target_not_hold", 409, "review_target_not_hold"),
-    ("review_already_pending", 409, "review_already_pending"), ("job_cancelled", 409, "job_cancelled"),
-    ("relation_candidate_not_found", 404, "relation_candidate_not_found"), ("source_unauthorized", 409, "upstream_unavailable"),
+    ("review_call_in_flight", 409, "review_call_in_flight"), ("review_candidate_ineligible", 409, "review_candidate_ineligible"),
+    ("job_cancelled", 409, "job_cancelled"), ("relation_candidate_not_found", 404, "relation_candidate_not_found"),
+    ("source_unauthorized", 409, "upstream_unavailable"), ("upstream_changed", 409, "upstream_unavailable"),
 ])
 def test_a_refusal_before_the_append_releases_the_reservation_and_records_nothing(harness, code, status, mapped):
     process = Scripted(review=[Outcome("error", code=code, exit_code=2)])
@@ -138,7 +147,7 @@ def test_a_refusal_frees_the_key_for_a_corrected_request(harness):
     process = Scripted(review=[Outcome("error", code="review_revision_conflict", exit_code=2), landed()])
     jobs = harness.build(process)
     assert refused(jobs, review=body(revision="2")).code == "source_revision_conflict"
-    assert run(jobs).status == 202 and process.calls == ["review", "review"]  # the first attempt left nothing to read first
+    assert run(jobs).status == 200 and process.calls == ["review", "review"]  # the first attempt left nothing to read first
 
 
 def test_a_busy_pipeline_keeps_the_reservation_and_the_retry_reads_the_chain_before_it_writes(harness):
@@ -147,7 +156,18 @@ def test_a_busy_pipeline_keeps_the_reservation_and_the_retry_reads_the_chain_bef
     error = refused(jobs)
     assert (error.status, error.code, error.headers["Retry-After"]) == (503, "runtime_busy", "2")
     assert harness.ledger.operation("op-1").review_attempts == 1 and harness.ledger.operation("op-1").review_state == "reserved"
-    assert run(jobs).status == 202 and process.calls == ["review", "inspect"]  # an event found by the read is adopted, never appended again
+    assert run(jobs).status == 200 and process.calls == ["review", "inspect"]  # an event found by the read is adopted, never appended again
+
+
+def test_a_lost_reply_is_reconciled_from_the_chain_and_never_replays_the_approval(harness):
+    """The approval was committed but the reply was lost (here: the child timed out): the exact marker/reviewer/revision/effect is found in the chain and
+    adopted, and the same request again answers from the stored operation without a second child."""
+    process = Scripted(review=[Outcome("timeout")], inspect=[landed()])
+    jobs = harness.build(process)
+    reply = run(jobs)
+    assert reply.status == 200 and process.calls == ["review", "inspect"] and harness.ledger.operation("op-1").review_state == "applied"
+    again = run(jobs)
+    assert again.status == 200 and process.calls == ["review", "inspect"]
 
 
 def test_a_retry_proves_absence_first_and_then_appends_exactly_once(harness):
@@ -156,7 +176,7 @@ def test_a_retry_proves_absence_first_and_then_appends_exactly_once(harness):
     error = refused(jobs)
     assert (error.status, error.code) == (503, "review_unconfirmed")
     assert error.headers["Retry-After"] == "2" and harness.ledger.operation("op-1").review_state == "reserved"
-    assert run(jobs).status == 202
+    assert run(jobs).status == 200
     # write (lost) -> read (nothing there) | retry: read (nothing there) -> write: the second write happens only after the chain proved the first never landed
     assert process.calls == ["review", "inspect", "inspect", "review"]
     assert harness.ledger.operation("op-1").review_attempts == 2
@@ -187,20 +207,18 @@ def retried_after_a_lost_child(harness, *, post_refusal_chain: Outcome, refusal:
 def test_a_retry_conflict_caused_by_an_orphan_that_appended_the_exact_event_is_adopted_not_released(harness):
     process, jobs = retried_after_a_lost_child(harness, post_refusal_chain=landed())
     reply = run(jobs)
-    assert reply.status == 202 and (reply.body.review.state, reply.body.review.resulting_source_revision, reply.body.revalidation.state) == (
-        "applied", "2", "queued")
+    assert reply.status == 200 and (reply.body.review.state, reply.body.review.resulting_source_revision, reply.body.revalidation.state) == (
+        "applied", "2", "not_requested")
     row = harness.ledger.operation("op-1")
-    assert row is not None and (row.review_state, row.reval_state, row.review_attempts) == ("applied", "pending", 2)
-    assert row.applied_event_at == "2026-10-13T00:00:02+00:00" and harness.woke.count == 1  # the queued revalidation survives, the key stays bound
-    claim = harness.ledger.claim_next()
-    assert claim is not None and claim.operation_id == "op-1"  # and the dispatcher really has the revalidation to run
+    assert row is not None and (row.review_state, row.reval_state, row.review_attempts) == ("applied", None, 2)
+    assert row.applied_event_at == "2026-10-13T00:00:02+00:00" and harness.woke.count == 0  # the key stays bound, nothing is queued
 
 
 @pytest.mark.parametrize("post_refusal_chain,status,code", [
     (Outcome("error", code="relation_busy", exit_code=2), 503, "review_unconfirmed"),
     (Outcome("timeout"), 503, "review_unconfirmed"),
     (withheld(), 503, "review_unconfirmed"),
-    (view(verdict_event(1), review_event(2, reviewer="beta"), pending=True), 500, "runtime_binding_mismatch"),   # the marker, but not our event
+    (view(verdict_event(1), review_event(2, reviewer="beta"), status="eligible"), 500, "runtime_binding_mismatch"),   # the marker, but not our event
     (view(verdict_event(1)), 503, "review_unconfirmed"),   # a revision conflict with a chain still at the expected revision contradicts itself
 ])
 def test_a_retry_conflict_with_an_unreadable_or_contradictory_chain_keeps_the_reservation(harness, post_refusal_chain, status, code):
@@ -209,33 +227,37 @@ def test_a_retry_conflict_with_an_unreadable_or_contradictory_chain_keeps_the_re
     assert (error.status, error.code) == (status, code)
     row = harness.ledger.operation("op-1")
     assert row is not None and (row.review_state, row.review_attempts) == ("reserved", 2) and harness.woke.count == 0  # nothing proven, nothing released
-    assert harness.ledger.claim_next() is None  # and no revalidation was queued for an unproven event
     assert refused(jobs, review=body(decision="reject", revision="2")).code == "idempotency_conflict"  # the key is still bound to the original request
 
 
 def test_a_retry_conflict_with_a_foreign_event_in_the_chain_releases_the_reservation_and_the_key_is_reusable(harness):
-    foreign = view(verdict_event(1), review_event(2, reviewer="operator", note="operator note"), pending=True)
+    foreign = view(verdict_event(1), review_event(2, reviewer="operator", note="operator note"), status="eligible")
     reused_chain = view(verdict_event(1), review_event(2, reviewer="operator", note="operator note"), review_event(3, decision="reject"), revision=3)
     process, jobs = retried_after_a_lost_child(harness, post_refusal_chain=foreign, then_review=(reused_chain,))
     error = refused(jobs)  # permanent absence is proven: the relation moved past the expected revision without our marker
     assert (error.status, error.code) == (409, "source_revision_conflict")
-    assert harness.ledger.operation("op-1") is None and harness.woke.count == 0  # actually released: nothing bound, nothing queued
-    # Reusable under the safe CURRENT revision (2, the operator's allow is pending): a reject on top. A retained reservation would answer
-    # idempotency_conflict here, because this body differs from the original one.
+    assert harness.ledger.operation("op-1") is None and harness.woke.count == 0  # actually released: nothing bound
     reused = run(jobs, review=body(decision="reject", revision="2"))
     assert reused.status == 200 and (reused.body.decision, reused.body.review.state, reused.body.review.resulting_source_revision) == ("reject", "applied", "3")
     row = harness.ledger.operation("op-1")
     assert row is not None and (row.decision, row.expected_source_revision, row.review_attempts) == ("reject", 2, 1)  # a fresh operation, not the old one
 
 
-@pytest.mark.parametrize("code", ["review_target_not_hold", "review_already_pending", "job_cancelled", "relation_candidate_not_found"])
+@pytest.mark.parametrize("code", ["review_target_not_hold", "job_cancelled", "relation_candidate_not_found"])
 def test_a_retry_refusal_that_is_a_pure_function_of_the_chain_releases_once_the_chain_shows_no_event_of_ours(harness, code):
     refusal = Outcome("error", code=code, exit_code=2)
     process, jobs = retried_after_a_lost_child(harness, post_refusal_chain=view(verdict_event(1)), refusal=refusal, then_review=(landed(),))
     error = refused(jobs)
     assert error.runtime_code == code and error.status in (404, 409)
     assert harness.ledger.operation("op-1") is None  # released: no child, orphaned or not, can append at a revision that refuses it
-    assert run(jobs).status == 202  # and the key is reusable at the unchanged revision
+    assert run(jobs).status == 200  # and the key is reusable at the unchanged revision
+
+
+@pytest.mark.parametrize("code", ["review_call_in_flight", "review_candidate_ineligible"])
+def test_a_retry_refusal_that_depends_on_the_moment_never_releases_the_reservation(harness, code):
+    """An in-flight call or a rights change can clear: the chain showing no event proves nothing about a later append, so the key stays bound."""
+    process, jobs = retried_after_a_lost_child(harness, post_refusal_chain=view(verdict_event(1)), refusal=Outcome("error", code=code, exit_code=2))
+    assert refused(jobs).code == "review_unconfirmed" and harness.ledger.operation("op-1") is not None
 
 
 @pytest.mark.parametrize("outcome", [Outcome("timeout"), Outcome("abnormal", exit_code=75), Outcome("unavailable"),
@@ -243,11 +265,11 @@ def test_a_retry_refusal_that_is_a_pure_function_of_the_chain_releases_once_the_
 def test_an_ambiguous_review_whose_event_is_in_the_chain_is_adopted(harness, outcome):
     process = Scripted(review=[outcome], inspect=[landed()])
     reply = run(harness.build(process))
-    assert reply.status == 202 and process.calls == ["review", "inspect"] and harness.ledger.operation("op-1").review_state == "applied"
+    assert reply.status == 200 and process.calls == ["review", "inspect"] and harness.ledger.operation("op-1").review_state == "applied"
 
 
 def test_an_ambiguous_review_whose_relation_moved_without_our_event_is_refused_and_released(harness):
-    foreign = view(verdict_event(1), review_event(2, reviewer="operator", note="operator note"), pending=True)
+    foreign = view(verdict_event(1), review_event(2, reviewer="operator", note="operator note"), status="eligible")
     process = Scripted(review=[Outcome("timeout")], inspect=[foreign])
     error = refused(harness.build(process))
     assert (error.status, error.code) == (409, "source_revision_conflict") and harness.ledger.operation("op-1") is None
@@ -262,7 +284,7 @@ def test_when_the_chain_cannot_be_read_nothing_is_decided(harness, probe):
 
 
 def test_an_event_with_the_marker_that_is_not_exactly_the_operations_is_never_adopted(harness):
-    process = Scripted(review=[Outcome("timeout")], inspect=[view(verdict_event(1), review_event(2, reviewer="beta"), pending=True)])
+    process = Scripted(review=[Outcome("timeout")], inspect=[view(verdict_event(1), review_event(2, reviewer="beta"), status="eligible")])
     error = refused(harness.build(process))
     assert (error.status, error.code) == (500, "runtime_binding_mismatch") and harness.ledger.operation("op-1").review_state == "reserved"
 
@@ -283,7 +305,7 @@ def test_a_candidate_missing_from_the_readable_chain_releases_the_reservation(ha
 def test_replays_conflicts_and_foreign_keys_never_reach_the_pipeline(harness):
     process = Scripted(review=[landed()])
     jobs = harness.build(process)
-    assert run(jobs).status == 202
+    assert run(jobs).status == 200
     again = run(jobs)
     assert again.status == 200 and again.body.review.state == "applied" and process.calls == ["review"]
     for other in (body(decision="reject"), body(revision="2"), body(version="0" * 64)):
@@ -316,184 +338,77 @@ def test_a_new_review_needs_the_upstream_listed_now(harness):
     assert refused(harness.build(process)).code == "service_configuration_invalid" and process.calls == []
 
 
-def test_a_full_queue_refuses_a_new_allow_before_the_pipeline_is_asked(harness):
+def test_a_full_dispatch_queue_does_not_refuse_a_review_because_a_review_queues_nothing(harness):
     import zoop_ai_service.relation_jobs as module
-    process = Scripted()
+    process = Scripted(review=[landed()])
     original, module.MAX_PENDING = module.MAX_PENDING, 0
     try:
-        error = refused(harness.build(process))
+        reply = run(harness.build(process))
     finally:
         module.MAX_PENDING = original
-    assert (error.status, error.code, error.headers["Retry-After"]) == (503, "queue_full", "30") and process.calls == []
-    assert harness.ledger.operation("op-1") is None
+    assert reply.status == 200 and process.calls == ["review"]
 
 
-# ---- recovery -----------------------------------------------------------------------------------------------------------------------------
+# ---- operations recorded under the earlier revalidation contract: history only -----------------------------------------------------------
 
-def applied_allow(harness, key: str = "op-1", *, outcome: str | None = "transport_unknown", decision: str = "allow") -> None:
-    """An accepted review whose revalidation dispatch already ended (or none for a reject)."""
-    assert harness.ledger.reserve_operation(key, "alpha", "job", RC, decision, JOB_DIGEST, 1, "d" * 64, 100) is not None
-    assert harness.ledger.apply_operation(key, "2026-10-13T00:00:02+00:00")
-    if outcome is not None:
-        claim = harness.ledger.claim_next()
-        assert claim is not None and claim.operation_id == key
-        assert harness.ledger.finish_operation(key, Update("idle", outcome if outcome in {"transport_unknown", "service_restarted"} else "runtime_error"))
-
-
-def recover(jobs: RelationJobs, key: str = "op-1", owner: str = "alpha"):
-    return jobs.recover_operation(owner, "job", key, Observation())
-
-
-def test_recover_settles_from_a_verdict_that_is_already_in_the_chain_without_dispatching(harness):
-    applied_allow(harness)
-    process = Scripted(inspect=[landed(verdict_event(3, "eligible", "revalidation"))])
-    reply = recover(harness.build(process))
-    assert reply.status == 200 and (reply.body.revalidation.state, reply.body.revalidation.verdict) == ("verified", "eligible")
-    assert process.calls == ["inspect"] and harness.ledger.claim_next() is None and harness.ledger.operation("op-1").settled == "verified"
+def legacy_operation(harness, key: str = "old", *, applied: bool = True, settled: str | None = None, state: str = "pending") -> None:
+    """Exactly what a `-2` ledger held for an `allow`: the row, its revalidation columns and (optionally) its settlement, written with the contract
+    the old code wrote. Raw SQL, because no current code path can create such a row any more."""
+    db = harness.ledger._db
+    columns = ("operation_id,owner,job_id,relation_candidate_id,decision,expected_source_version,expected_source_revision,request_digest,"
+               "review_state,reserved_at,applied_at,applied_event_at,reval_state,reval_seq,settled,settled_eligibility,settled_at,contract")
+    digest = request_digest({"jobId": "job", **body().wire()})  # the digest a replay of the same request computes
+    if applied:
+        values = (key, "alpha", "job", RC, "allow", JOB_DIGEST, 1, digest, "applied", "2026-10-13T00:00:00Z", "2026-10-13T00:00:01Z",
+                  "2026-10-13T00:00:02+00:00", state, 50, settled, "eligible" if settled == "verified" else None,
+                  "2026-10-13T00:00:09Z" if settled else None, "legacy-revalidation")
+    else:
+        values = (key, "alpha", "job", RC, "allow", JOB_DIGEST, 1, digest, "reserved", "2026-10-13T00:00:00Z", None, None, None, None, None, None,
+                  None, "legacy-revalidation")
+    db.execute(f"INSERT INTO relation_operations({columns}) VALUES ({','.join('?' * len(values))})", values)
 
 
-def test_recover_settles_a_superseded_allow_and_never_dispatches(harness):
-    applied_allow(harness)
-    process = Scripted(inspect=[landed(review_event(3, decision="reject", reviewer="beta", note="other"))])
-    reply = recover(harness.build(process))
-    assert reply.status == 200 and reply.body.revalidation.state == "superseded" and harness.ledger.claim_next() is None
+def test_a_legacy_pending_revalidation_is_never_dispatched_and_reads_as_contract_changed(harness):
+    legacy_operation(harness)
+    assert harness.ledger.claim_next() is None and harness.ledger.interrupt_in_flight() == 0  # nothing to claim, nothing to interrupt
+    process = Scripted()
+    status = harness.build(process).operation("alpha", "job", "old", Observation()).body
+    assert (status.limitation, status.revalidation.state, status.next, status.decision) == ("review_contract_changed", "contract_changed", "none", "allow")
+    row = harness.ledger.operation("old")
+    stored_seq = harness.ledger._db.execute("SELECT reval_seq FROM relation_operations WHERE operation_id='old'").fetchone()[0]   # a ledger column, not a row field
+    assert row is not None and (row.reval_state, stored_seq, row.settled, row.contract) == ("pending", 50, None, "legacy-revalidation")  # preserved, not rewritten
+    assert process.calls == []
 
 
-def test_recover_queues_the_revalidation_again_only_while_the_relation_waits_at_the_revision_the_review_left(harness):
-    applied_allow(harness)
-    process = Scripted(inspect=[landed()])
-    reply = recover(harness.build(process))
-    assert reply.status == 202 and reply.body.revalidation.state == "queued" and harness.woke.count == 1
-    assert harness.ledger.operation("op-1").reval_state == "pending"
-    again = recover(harness.build(Scripted()))  # pending: coalesced without touching the pipeline
-    assert again.status == 200 and again.body.revalidation.state == "queued"
+def test_a_legacy_settlement_stays_readable_history_and_is_not_an_approval(harness):
+    legacy_operation(harness, settled="verified", state="idle")
+    status = operation_status(harness.ledger.operation("old"), "2026-10-13T00:00:00Z")
+    assert (status.limitation, status.revalidation.state, status.revalidation.verdict, status.revalidation.resulting_source_revision) == (
+        "review_contract_changed", "verified", "eligible", "3")
 
 
-@pytest.mark.parametrize("chain,code", [
-    (view(verdict_event(1), review_event(2), review_event(3, reviewer="operator", note="x"), review_event(4, reviewer="operator", note="y"), pending=True), "operation_not_recoverable"),
-    (landed(), None),
-])
-def test_recover_refuses_a_relation_that_no_longer_waits_for_this_operation(harness, chain, code):
-    applied_allow(harness)
-    process = Scripted(inspect=[chain])
-    if code is None:
-        assert recover(harness.build(process)).status == 202
-        return
-    with pytest.raises(RelationError) as caught:
-        recover(harness.build(process))
-    assert (caught.value.status, caught.value.code) == (409, code) and caught.value.operation is not None and harness.ledger.claim_next() is None
-
-
-def test_recover_never_resends_a_call_the_pipeline_cannot_account_for(harness):
-    applied_allow(harness)
-    reconciling = landed().result
-    reconciling = {**reconciling, "state": "reconciling", "failure": {"code": "replay_response_unknown"}}
-    process = Scripted(inspect=[Outcome("result", result=reconciling, exit_code=0)])
-    with pytest.raises(RelationError) as caught:
-        recover(harness.build(process))
-    error = caught.value
-    assert (error.status, error.code) == (409, "reconcile_required") and error.operation is not None and error.relation_status is not None
-    assert harness.ledger.operation("op-1").reval_state == "idle" and harness.ledger.claim_next() is None
-
-
-def test_recover_refuses_a_cancelled_job_and_a_withheld_chain_with_stable_codes(harness):
-    applied_allow(harness)
-    cancelled = Outcome("result", result={**landed().result, "state": "cancelled", "delivery": {"status": "withheld", "code": "job_cancelled"}}, exit_code=2)
-    with pytest.raises(RelationError) as caught:
-        recover(harness.build(Scripted(inspect=[cancelled])))
-    assert (caught.value.status, caught.value.code) == (409, "job_cancelled")
-    with pytest.raises(RelationError) as caught:
-        recover(harness.build(Scripted(inspect=[withheld()])))
-    assert (caught.value.status, caught.value.code, caught.value.runtime_code) == (409, "upstream_unavailable", "source_unauthorized")
-
-
-def test_recover_has_nothing_to_do_for_a_reject_an_unconfirmed_review_or_a_waiting_revalidation(harness):
-    harness.ledger.reserve_operation("unconfirmed", "alpha", "job", RC, "allow", JOB_DIGEST, 1, "e" * 64, 100)
-    applied_allow(harness, "rejected", outcome=None, decision="reject")
-    applied_allow(harness, "waiting", outcome=None)
+def test_replaying_a_confirmed_legacy_key_answers_the_stored_history_and_a_reserved_one_is_refused_without_a_child(harness):
+    legacy_operation(harness, "confirmed", state="idle", settled="verified")
+    legacy_operation(harness, "unconfirmed", applied=False)
     process = Scripted()
     jobs = harness.build(process)
-    with pytest.raises(RelationError) as caught:
-        recover(jobs, "unconfirmed")
-    assert (caught.value.status, caught.value.code) == (409, "review_not_confirmed") and caught.value.operation.next == "retry_review"
-    with pytest.raises(RelationError) as caught:
-        recover(jobs, "rejected")
-    assert (caught.value.status, caught.value.code) == (409, "operation_not_recoverable")
-    assert recover(jobs, "waiting").status == 200 and process.calls == []  # pending: coalesced, and no authority or child is needed to say so
+    replay = run(jobs, "confirmed")
+    assert replay.status == 200 and replay.body.limitation == "review_contract_changed" and replay.body.revalidation.state == "verified"
+    error = refused(jobs, "unconfirmed")
+    assert (error.status, error.code) == (409, "review_contract_changed") and error.operation.limitation == "review_contract_changed"
+    assert error.operation.next == "none" and process.calls == []
+    assert harness.ledger.operation("unconfirmed").review_state == "reserved"  # kept, never adopted, never resent
 
 
-def test_recover_needs_the_upstream_listed_now_but_a_settled_operation_does_not(harness):
-    applied_allow(harness)
-    (harness.root / "upstreams.json").write_text(json.dumps({"schemaVersion": relation_access.SCHEMA, "upstreams": []}))
-    process = Scripted()
-    with pytest.raises(RelationError) as caught:
-        recover(harness.build(process))
-    assert (caught.value.status, caught.value.code) == (403, "upstream_not_allowed") and process.calls == []
-    assert harness.ledger.settle_operation("op-1", "superseded", None)
-    assert recover(harness.build(process)).body.revalidation.state == "superseded" and process.calls == []
+def test_a_new_decision_at_the_current_revision_is_allowed_next_to_a_legacy_one(harness):
+    legacy_operation(harness)
+    process = Scripted(review=[view(verdict_event(1), review_event(2, note=marker("new-key")), status="eligible")])   # the marker of the operation actually posted
+    reply = run(harness.build(process), "new-key")
+    assert reply.status == 200 and reply.body.limitation is None and reply.body.revalidation.state == "not_requested"
+    assert harness.ledger.claim_next() is None
 
 
-# ---- regression R2: the probe that settles a moved revalidation must be bound to the claim ------------------------------------------------
-#
-# When `revalidate` answers "the relation moved" the dispatcher reads the chain (`inspect`) to settle what happened. Relation candidate ids repeat
-# across jobs that share an upstream, so a probe that is a perfectly valid chain of ANOTHER job (or of another input digest, or another upstream)
-# can show the very verdict or reject the claimed operation is waiting for. Settlement is write-once and terminal, so such a probe must never
-# settle: the operation stays an unsettled, recoverable failure (`runtime_binding_mismatch`), exactly as every other read of the pipeline is bound
-# to the accepted job.
-
-VERDICT_CHAIN = landed(verdict_event(3, "eligible", "revalidation"))
-REJECT_CHAIN = landed(review_event(3, decision="reject", reviewer="beta", note="other"))
-
-
-def probe_of(chain: Outcome, **changes: Any) -> Outcome:
-    return Outcome("result", result={**chain.result, **changes}, exit_code=0)
-
-
-def dispatch_once(harness, revalidate: Outcome, probe: Outcome | None = None):
-    """One dispatcher step over an accepted allow whose revalidation is pending. Returns the scripted process and the operation row afterwards."""
-    applied_allow(harness, outcome=None)
-    process = Scripted(revalidate=[revalidate], inspect=[] if probe is None else [probe])
-    dispatcher = RelationDispatcher(harness.ledger, process, RelationGate(), lambda record: None, lambda owner, job_id, digest: None)
-    assert dispatcher.step() is True
-    row = harness.ledger.operation("op-1")
-    assert row is not None
-    return process, row
-
-
-def assert_an_unsettled_recoverable_failure(harness, row) -> None:
-    assert row.settled is None and row.settled_eligibility is None and row.settled_at is None
-    assert (row.reval_state, row.last_outcome, row.last_runtime_code) == ("idle", "runtime_error", "runtime_binding_mismatch")
-    status = operation_status(row, "2026-10-13T00:00:00Z")
-    assert (status.revalidation.state, status.revalidation.verdict, status.next) == ("failed", None, "recover")
-    assert harness.ledger.enqueue_operation("op-1", 100) == "enqueued"  # a false terminal state would answer "coalesced": it could never run again
-
-
-@pytest.mark.parametrize("moved", ["review_revision_conflict", "revalidation_not_requested"])
-@pytest.mark.parametrize("chain", [VERDICT_CHAIN, REJECT_CHAIN], ids=["verdict", "reject"])
-@pytest.mark.parametrize("changes", [{"jobId": "other-job"}, {"inputDigest": "e" * 64}, {"jobId": "other-job", "inputDigest": "e" * 64}],
-                         ids=["other-job", "other-inputDigest", "both"])
-def test_a_probe_of_another_job_or_input_digest_never_settles_a_moved_revalidation(harness, changes, chain, moved):
-    _, row = dispatch_once(harness, Outcome("error", code=moved, exit_code=2), probe_of(chain, **changes))
-    assert_an_unsettled_recoverable_failure(harness, row)
-
-
-@pytest.mark.parametrize("chain", [VERDICT_CHAIN, REJECT_CHAIN], ids=["verdict", "reject"])
-@pytest.mark.parametrize("upstream", [{"jobId": "other-s2", "inputDigest": UPSTREAM_DIGEST, "digest": "u" * 64},
-                                      {"jobId": "s2-job", "inputDigest": "e" * 64, "digest": "u" * 64}], ids=["other-upstream-job", "other-upstream-digest"])
-def test_a_probe_bound_to_another_upstream_never_settles_a_moved_revalidation(harness, upstream, chain):
-    probe = probe_of(chain, binding={"schema": "x", "upstream": upstream})
-    _, row = dispatch_once(harness, CONFLICT, probe)
-    assert_an_unsettled_recoverable_failure(harness, row)
-
-
-@pytest.mark.parametrize("chain,settled", [(VERDICT_CHAIN, ("verified", "eligible")), (REJECT_CHAIN, ("superseded", None))], ids=["verdict", "reject"])
-def test_a_probe_bound_to_the_claim_settles_a_moved_revalidation(harness, chain, settled):
-    _, row = dispatch_once(harness, CONFLICT, chain)
-    assert (row.settled, row.settled_eligibility) == settled and row.settled_at
-    assert (row.reval_state, row.last_outcome, row.last_runtime_code) == ("idle", "runtime_error", "review_revision_conflict")
-
-
-def test_a_revalidate_result_of_another_job_never_settles(harness):
-    foreign = probe_of(VERDICT_CHAIN, jobId="other-job")
-    _, row = dispatch_once(harness, foreign)
-    assert_an_unsettled_recoverable_failure(harness, row)
+def test_the_service_has_no_revalidate_or_operation_recover_path_any_more():
+    from zoop_ai_service import relation_dispatch, relation_runtime
+    assert not hasattr(relation_runtime.RelationProcess, "revalidate") and not hasattr(RelationJobs, "recover_operation")
+    assert not hasattr(relation_dispatch.RelationDispatcher, "_supervise_operation") and not hasattr(RelationLedger, "enqueue_operation")

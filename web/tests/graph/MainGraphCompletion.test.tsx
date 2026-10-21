@@ -379,3 +379,64 @@ describe('D-GRP-07b · 선택 기업 포커스', () => {
     expect(two.size).toBeGreaterThan(one.size);
   });
 });
+
+it('D-GRP-01/01b restores mode selection, consumes prefetched data once, and retains current state on failure', async () => {
+  member();
+  useAuthStore.setState((state) => ({
+    session: state.session
+      ? {
+          ...state.session,
+          setup: { completed: true, tutorialCompleted: true },
+        }
+      : null,
+  }));
+  vi.mocked(getGraph).mockImplementation(async (request) =>
+    createMockGraph(request),
+  );
+  const router = setup('/?mode=all&select=node%3ANASDAQ%3ANVDA');
+  await screen.findByTestId('graph-canvas');
+  await userEvent.click(
+    within(screen.getByLabelText('그래프 모드')).getByRole('button', {
+      name: '내 종목',
+    }),
+  );
+  await waitFor(() =>
+    expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
+      'personal',
+    ),
+  );
+  await waitFor(() =>
+    expect(
+      within(screen.getByLabelText('그래프 모드'))
+        .getByRole('button', { name: '내 종목' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true'),
+  );
+  await userEvent.click(screen.getByRole('button', { name: '시장 전체' }));
+  await waitFor(() =>
+    expect(
+      new URLSearchParams(router.state.location.search).get('select'),
+    ).toBe('node:NASDAQ:NVDA'),
+  );
+  await waitFor(() =>
+    expect(
+      within(screen.getByLabelText('그래프 모드'))
+        .getByRole('button', { name: '시장 전체' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true'),
+  );
+  expect(vi.mocked(getGraph)).toHaveBeenCalledTimes(3);
+  vi.mocked(getGraph).mockRejectedValueOnce(new Error('source offline'));
+  await userEvent.click(
+    within(screen.getByLabelText('그래프 모드')).getByRole('button', {
+      name: '내 종목',
+    }),
+  );
+  await screen.findByText(/지도 전환 실패/);
+  expect(new URLSearchParams(router.state.location.search).get('mode')).toBe(
+    'all',
+  );
+  expect(new URLSearchParams(router.state.location.search).get('select')).toBe(
+    'node:NASDAQ:NVDA',
+  );
+});

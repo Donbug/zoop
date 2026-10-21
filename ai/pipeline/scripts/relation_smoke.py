@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -23,8 +24,8 @@ from scripts.extraction_smoke import PROMPT, Kit, page, topic_replay, topic_resp
 from scripts.ingestion_smoke import json_bytes, ownership_env  # noqa: E402
 from zoop_ai_pipeline import relation_rules as rules  # noqa: E402
 from zoop_ai_pipeline.extraction_contracts import Catalogue  # noqa: E402
-from zoop_ai_pipeline.relation import document_view, next_attempt  # noqa: E402
-from zoop_ai_pipeline.relation_contracts import IMPACT_POLICY, SCHEMA, digest  # noqa: E402
+from zoop_ai_pipeline.relation import INITIAL_ATTEMPT, document_view  # noqa: E402
+from zoop_ai_pipeline.relation_contracts import IMPACT_POLICY, SCHEMA, canonical, digest  # noqa: E402
 
 CATALOGUE = {"revision": "catalogue-rel-1", "companies": [
     {"companyId": "SYNTH-1", "name": "합성기업", "aliases": [], "ticker": None},
@@ -129,7 +130,7 @@ class RelKit(Kit):
         return path
 
     def rel(self, command: str, request: dict, *, replay: Path | None = None, verifier: Path | None = None, state: str = "relation",
-            crash: str | None = None, expected: int = 0, raw: bool = False, forbid_execution: bool = False):
+            crash: str | None = None, expected: int = 0, raw: bool = False, forbid_execution: bool = False, initial_only: bool = False):
         """Actual relation JSON subprocess with a socket audit hook (any network attempt aborts the process)."""
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(Path.home()), "LANG": "en_US.UTF-8", **ownership_env(), **CUSTOM}
         guard = ("import os, sys, runpy\n"
@@ -156,6 +157,8 @@ class RelKit(Kit):
             argv += ["--replay", str(replay)]
         if verifier:
             argv += ["--verifier-replay", str(verifier)]
+        if initial_only:
+            argv += ["--initial-only"]
         child = subprocess.run(argv, input=json_bytes(request), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=PIPELINE, timeout=180)
         assert child.returncode == expected, (command, child.returncode, child.stdout.decode(), child.stderr.decode())
         assert not child.stderr or expected != 0, child.stderr.decode()
@@ -163,16 +166,17 @@ class RelKit(Kit):
             return child.stdout.decode()
         return json.loads(child.stdout) if child.stdout else None
 
-    def rel_job(self, command: str, request: dict, *, replay: Path | None = None, verifier: Path | None = None, state: str = "relation"):
-        """Same orchestration in-process (focused tests); errors surface as ExtractionFailure."""
+    def rel_job(self, command: str, request: dict, *, replay: Path | None = None, verifier: Path | None = None, state: str = "relation",
+                runtime_factory=None, initial_only: bool = False):
+        """Same orchestration in-process (focused tests); errors surface as ExtractionFailure. `runtime_factory` injects a live runtime (offline tests)."""
         from zoop_ai_pipeline.extraction import Sources
         from zoop_ai_pipeline.ingestion_contracts import Authority
         from zoop_ai_pipeline.relation import Engine, Fixtures, Store
-        from zoop_ai_pipeline.relation_contracts import Revalidate, Review, Selector, Submit
+        from zoop_ai_pipeline.relation_contracts import Review, Selector, Submit
         store = Store(self.root / state, self.root / "extraction", self.root / "ingestion")
         try:
             fixtures = Fixtures(replay.read_bytes() if replay else None, verifier.read_bytes() if verifier else None)
-            engine = Engine(store, Sources(self.root / "ingestion", Authority(self.registry_path)), self.root / "extraction", self.root / "ingestion")
+            engine = Engine(store, Sources(self.root / "ingestion", Authority(self.registry_path)), self.root / "extraction", self.root / "ingestion", runtime_factory)
             if command == "run":
                 return engine.run(Submit.model_validate(request), fixtures)
             if command == "submit":
@@ -181,10 +185,10 @@ class RelKit(Kit):
                 return engine.inspect(submit.job_id)
             if command == "review":
                 return engine.review(Review.model_validate(request))
-            if command == "revalidate":
-                return engine.revalidate(Revalidate.model_validate(request), fixtures)
             job_id = Selector.model_validate(request).job_id
-            return engine.resume(job_id, fixtures) if command == "resume" else getattr(engine, command)(job_id)
+            if command == "resume":
+                return engine.resume(job_id, fixtures, initial_only=initial_only)
+            return getattr(engine, command)(job_id)
         finally:
             store.close()
 
@@ -278,7 +282,7 @@ def converge(world: SimpleNamespace, job: str, proposals: list[dict], *, verify=
         for r in out.get("relations", []):
             if r["eligibility"]["status"] == "pending" and r["precheck"]["state"] == "pending":
                 reply = verify(r) if verify else None
-                add(verifier, ("verify-relation", digest(rules.verifier_request(r, next_attempt(r["history"], "initial"))),
+                add(verifier, ("verify-relation", digest(rules.verifier_request(r, INITIAL_ATTEMPT)),
                                reply if isinstance(reply, dict) and "claims" in reply else verifier_reply(r, **(reply or {}))))
             if r["eligibility"]["status"] == "eligible" and r["impact"]["status"] == "pending":
                 docs = [document_view(kit.export(next(ref for ref in world.refs.values() if ref["documentId"] == q["documentId"] and ref["documentVersion"] == q["documentVersion"])))
@@ -408,25 +412,34 @@ def smoke(root: Path) -> dict:
     assert find(out, "SUPPLIES", productScope="날짜 근거 없음")["eligibility"]["reasons"] == [{"code": "validity_uncited"}]
     checks.append("exact Korean/emoji/entity quote; fabricated span and generated separator rejected; validity unknown unless cited")
 
-    # 9. HOLD review allow only requests a new automatic attempt; it never publishes or bypasses verification.
+    # 9. HOLD review `allow` is the operator's FINAL approval: effect `approved`, no revalidation, no verifier/impact/replay call, deterministic gate re-run.
     held = comention
     revision = held["eligibility"]["revision"]
-    reviewed = kit.rel("review", {**kit.rsel("rel-main"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": revision, "decision": "allow",
+    calls_before = out["usage"]["replayCalls"]
+    approved = kit.rel("review", {**kit.rsel("rel-main"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": revision, "decision": "allow",
                                   "reviewer": "operator-a", "note": "authored review"})
-    item = next(r for r in reviewed["relations"] if r["relationCandidateId"] == held["relationCandidateId"])
-    assert item["eligibility"]["status"] == "hold" and item["eligibility"]["reviewPending"] is True and item["history"][-1]["effect"] == "revalidation-requested"
+    item = next(r for r in approved["relations"] if r["relationCandidateId"] == held["relationCandidateId"])
+    assert item["eligibility"]["status"] == "eligible" and item["eligibility"]["reviewPending"] is False and item["eligibility"]["revision"] == revision + 1
+    assert item["eligibility"]["approvalBasis"] == {"kind": "operator-final-approval", "revision": revision + 1, "reviewer": "operator-a", "decidedAt": item["history"][-1]["createdAt"]}
+    assert item["history"][-1]["effect"] == "approved" and item["history"][0]["eligibility"] == "hold" and item["history"][0] == held["history"][0] and item["approved"] is False
+    assert item["impact"]["status"] == "not-applicable" and approved["usage"]["replayCalls"] == calls_before == out["usage"]["replayCalls"]
+    assert good["eligibility"]["approvalBasis"]["kind"] == "automatic-verifier" and good["eligibility"]["approvalBasis"]["reviewer"] is None
     stale = kit.rel("review", {**kit.rsel("rel-main"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": revision, "decision": "allow",
                                "reviewer": "operator-a", "note": "stale"}, expected=2)
     assert stale["error"]["code"] == "review_revision_conflict"
-    request = rules.verifier_request(item, next_attempt(item["history"], "revalidation"))
-    again = kit.fixture("verifier", "reval", [("verify-relation", digest(request), verifier_reply(item, type="insufficient", direction="insufficient"))])
-    revalidated = kit.rel("revalidate", {**kit.rsel("rel-main"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": revision + 1}, verifier=again)
-    item = next(r for r in revalidated["relations"] if r["relationCandidateId"] == held["relationCandidateId"])
-    verdicts = [e for e in item["history"] if e["kind"] == "verdict"]
-    assert item["eligibility"]["status"] == "hold" and item["eligibility"]["reviewPending"] is False and len(verdicts) == 2 and verdicts[0]["attempt"] != verdicts[1]["attempt"]
-    assert verdicts[1]["attempt"]["policyVersion"] == "zoop-relation-revalidation-policy-1" and verdicts[1]["attempt"]["priorVerdictDigest"] is not None
-    assert verdicts[0]["requestDigest"] != verdicts[1]["requestDigest"] and item["approved"] is False
-    checks.append("HOLD admin allow only records a revalidation request; a distinct policy/attempt re-verifies and the prior verdict stays visible")
+    twice = kit.rel("review", {**kit.rsel("rel-main"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": revision + 1, "decision": "reject",
+                               "reviewer": "operator-a", "note": "reversal is out of scope"}, expected=2)
+    assert twice["error"]["code"] == "review_target_not_hold"
+    after_resume = kit.rel("resume", kit.rsel("rel-main"))
+    assert after_resume["usage"]["replayCalls"] == calls_before and find(after_resume, "SUPPLIES", "SYNTH-1", "SYNTH-2", productScope=None)["eligibility"]["status"] == "eligible"
+    deterministic = kit.rel("review", {**kit.rsel("rel-main"), "relationCandidateId": find(out, "SUPPLIES", "SYNTH-9", "SYNTH-1")["relationCandidateId"],
+                                       "expectedRevision": 1, "decision": "allow", "reviewer": "operator-a", "note": "cannot override"}, expected=2)
+    assert deterministic["error"] == {"code": "review_candidate_ineligible", "detail": {"reasons": [{"code": "target_unknown", "at": "subject"}]}}
+    excluded = kit.rel("review", {**kit.rsel("rel-main"), "relationCandidateId": reversed_["relationCandidateId"], "expectedRevision": 1, "decision": "reject",
+                                  "reviewer": "operator-a", "note": "authored reject"})
+    rejected = find(excluded, "SUPPLIES", "SYNTH-1", "SYNTH-3")
+    assert rejected["eligibility"]["status"] == "reject" and rejected["eligibility"]["approvalBasis"] is None and rejected["history"][-1]["effect"] == "excluded"
+    checks.append("HOLD allow is the final human approval (approved, operator basis, no call, no revalidation); stale/double/deterministic-hold refused; reject excludes")
 
     # 10. The upstream S2/ingestion state was only read; nothing app/S1 was written; ledger is private.
     after = {name: tree(root / name) for name in ("ingestion", "extraction")}
@@ -443,7 +456,7 @@ def smoke(root: Path) -> dict:
     assert resumed["state"] == "stopped" and resumed["failure"]["code"] == "verifier_replay_required" and sum(x["stage"] == "relation" for x in resumed["calls"]) == 1
     assert resumed["usage"]["replayCalls"] == 1 and resumed["stages"]["relation"]["relations"] == 1
     candidate = resumed["relations"][0]
-    verdict_file = kit.fixture("verifier", "mini-v", [("verify-relation", digest(rules.verifier_request(candidate, next_attempt(candidate["history"], "initial"))), verifier_reply(candidate))])
+    verdict_file = kit.fixture("verifier", "mini-v", [("verify-relation", digest(rules.verifier_request(candidate, INITIAL_ATTEMPT)), verifier_reply(candidate))])
     kit.rel("resume", kit.rsel("rel-crash"), verifier=verdict_file, crash="receipt:1", expected=75)
     after_crash = kit.rel("resume", kit.rsel("rel-crash"))
     assert after_crash["relations"][0]["eligibility"]["status"] == "eligible" and after_crash["usage"]["replayCalls"] == 2 and after_crash["failure"]["code"] == "producer_replay_required"
@@ -453,32 +466,32 @@ def smoke(root: Path) -> dict:
     assert lost["state"] == "reconciling" and lost["resumeMode"] == "reconcile_only" and lost["usage"]["replayCalls"] == 0 and lost["usage"]["startedWithoutReceipt"] == 1
     checks.append("process death after receipt resumes with zero additional calls and without the fixture; started-without-receipt is reconcile-only, never resent")
 
-    # 11b. Death after a revalidation receipt is saved but before its verdict commits: resume appends the verdict, no fixture, no extra call.
-    orphan = converge(world, "rel-orphan", [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(SUP)], product="scope-hold")],
+    # 11b. A legacy `revalidation-requested` event (written before the final-approval cutover) is readable history: the relation stays HOLD (never
+    #      approved, no revalidation command exists any more) and a NEW explicit final decision at the CURRENT revision is accepted.
+    legacy = converge(world, "rel-legacy", [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(SUP)], product="scope-hold")],
                       verify=lambda r: {"scope": "insufficient"}, process=True)
-    held = find(orphan, "SUPPLIES", productScope="scope-hold")
-    reviewed = kit.rel("review", {**kit.rsel("rel-orphan"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": held["eligibility"]["revision"],
-                                  "decision": "allow", "reviewer": "operator-a", "note": "authored review"})
-    allowed = find(reviewed, "SUPPLIES", productScope="scope-hold")
-    key = digest(rules.verifier_request(allowed, next_attempt(allowed["history"], "revalidation")))
-    revalidation = kit.fixture("verifier", "orphan", [("verify-relation", key, verifier_reply(allowed))])
-    kit.rel("revalidate", {**kit.rsel("rel-orphan"), "relationCandidateId": allowed["relationCandidateId"], "expectedRevision": allowed["eligibility"]["revision"]},
-            verifier=revalidation, crash="receipt:1", expected=75)
-    revalidation.unlink()
-    stuck = kit.rel("inspect", kit.rsel("rel-orphan"))
-    assert find(stuck, "SUPPLIES", productScope="scope-hold")["eligibility"]["status"] == "hold" and find(stuck, "SUPPLIES", productScope="scope-hold")["eligibility"]["reviewPending"] is True
-    recovered = kit.rel("resume", kit.rsel("rel-orphan"))
-    done = find(recovered, "SUPPLIES", productScope="scope-hold")
-    assert done["eligibility"]["status"] == "eligible" and [e["kind"] for e in done["history"]] == ["verdict", "review", "verdict"] and done["history"][-1]["attempt"]["kind"] == "revalidation"
-    assert recovered["usage"]["replayCalls"] == stuck["usage"]["replayCalls"] == 3 and done["history"][0] == find(stuck, "SUPPLIES", productScope="scope-hold")["history"][0]
-    checks.append("process death after a revalidation receipt: resume (and revalidate) append the verdict from the saved receipt with no fixture, no extra call and prior history intact")
+    held = find(legacy, "SUPPLIES", productScope="scope-hold")
+    raw_db = sqlite3.connect(root / "relation" / "relation.sqlite3")
+    raw_db.execute("INSERT INTO relation_events VALUES(?,?,?,?,?,?)", ("rel-legacy", held["relationCandidateId"], 2, "review", canonical(
+        {"decision": "allow", "reviewer": "operator-a", "note": "legacy request", "expectedRevision": 1, "effect": "revalidation-requested"}), "2026-10-13T00:01:00+00:00"))
+    raw_db.commit()
+    raw_db.close()
+    stuck = find(kit.rel("inspect", kit.rsel("rel-legacy")), "SUPPLIES", productScope="scope-hold")
+    assert stuck["eligibility"] == {"status": "hold", "reasons": held["eligibility"]["reasons"], "revision": 2, "reviewPending": True, "approvalBasis": None}
+    assert kit.rel("revalidate", {**kit.rsel("rel-legacy"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": 2}, expected=2) is None
+    final = find(kit.rel("review", {**kit.rsel("rel-legacy"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": 2, "decision": "allow",
+                                    "reviewer": "operator-b", "note": "final decision"}), "SUPPLIES", productScope="scope-hold")
+    assert final["eligibility"]["status"] == "eligible" and final["eligibility"]["reviewPending"] is False and final["eligibility"]["revision"] == 3
+    assert [e.get("effect") for e in final["history"]] == [None, "revalidation-requested", "approved"] and final["history"][0] == stuck["history"][0]
+    assert final["eligibility"]["approvalBasis"] == {"kind": "operator-final-approval", "revision": 3, "reviewer": "operator-b", "decidedAt": final["history"][2]["createdAt"]}
+    checks.append("legacy revalidation-requested history stays readable and non-approved; no revalidate command; a new final allow at the current revision approves")
 
     # 12. Forged upstream, bad fixture and revoked rights fail closed without exposing private text.
     forged = kit.rel("run", {**kit.rsubmit("rel-forged", world.s2), "upstream": {"jobId": "s2-job", "inputDigest": "0" * 64}}, expected=2)
     assert forged["error"]["code"] == "upstream_input_mismatch"
     duplicated = kit.fixture("producer", "dup", [("relation", generation, relation_reply([])), ("relation", generation, relation_reply([]))])
     assert kit.rel("run", kit.rsubmit("rel-dup", world.s2), replay=duplicated, expected=2)["error"]["code"] == "relation_replay_invalid"
-    assert kit.rel("run", kit.rsubmit("rel-live", world.s2) | {"provenance": {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "authored-test"}}, expected=2)["error"]["code"] == "live_mode_unsupported"
+    assert kit.rel("run", kit.rsubmit("rel-live", world.s2) | {"provenance": {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"}}, expected=2)["error"]["code"] == "provenance_conflict"
     kit.registry["sources"][0]["grant"]["enabled"] = False
     kit.save_registry()
     text = kit.rel("inspect", kit.rsel("rel-main"), expected=2, raw=True)
@@ -498,8 +511,8 @@ def smoke(root: Path) -> dict:
     request13, sel13 = kit.rsubmit("rel-submit", world.s2), kit.rsel("rel-submit")
     for fixtures in ({"replay": mini}, {"verifier": verdict_file}, {"replay": mini, "verifier": verdict_file}):
         assert kit.rel("submit", request13, expected=2, **fixtures)["error"]["code"] == "fixture_not_allowed"
-    live13 = {**request13, "provenance": {**request13["provenance"], "executionMode": "live"}}
-    assert kit.rel("submit", live13, expected=2)["error"]["code"] == "live_mode_unsupported"
+    live13 = {**request13, "provenance": {**request13["provenance"], "executionMode": "live", "recordingKind": "provider"}}
+    assert kit.rel("submit", live13, expected=2)["error"]["code"] == "provenance_conflict"
     assert kit.rel("inspect", sel13, expected=2)["error"]["code"] == "job_not_found"
     queued = kit.rel("submit", request13, forbid_execution=True)
     assert queued["state"] == "queued" and queued["phase"] == "relation" and queued["resumeMode"] == "resume" and queued["failure"] is None
@@ -536,6 +549,16 @@ def smoke(root: Path) -> dict:
     assert kit.rel("submit", cancel13, expected=2, forbid_execution=True) == cancelled13
     checks.append("submit-only: premature (non-ready) upstream refused without a job, fixtures refused, durable queued job with zero attempts, idempotent same submit, conflicting upstream, "
                   "rights revision change before execution stops resume without calls, duplicate submit never resumes a stopped/ready/cancelled job, resume completes with per-call fixtures, queued cancel")
+    # 14. First-dispatch gate (the service's under-lock initial-only resume): the first initial-only resume records the dispatch and executes; any later
+    #     initial-only resume is refused with NO effect (state, calls and result are byte-identical), while plain resume stays explicit operator recovery.
+    gate, gate_selector = kit.rsubmit("rel-gate", world.s2), kit.rsel("rel-gate")
+    kit.rel("submit", gate, forbid_execution=True)
+    assert kit.rel("inspect", gate_selector)["state"] == "queued"
+    first = kit.rel("resume", gate_selector, replay=producer13, verifier=verifier13, initial_only=True)
+    assert first["state"] == "ready" and first["usage"]["replayCalls"] == reference["usage"]["replayCalls"]
+    taken = kit.rel("resume", gate_selector, initial_only=True, expected=2, forbid_execution=True)
+    assert taken["error"]["code"] == "initial_dispatch_taken" and kit.rel("inspect", gate_selector) == first
+    checks.append("initial-only resume: first dispatch executes, a repeat is initial_dispatch_taken with no effect; plain resume stays explicit recovery")
     return {"status": "passed", "schemaVersion": SCHEMA, "checks": checks, "providerCalls": 0, "modelCalls": 0,
             "networkAttempts": "audit hook rejected socket use in every CLI subprocess; none occurred"}
 

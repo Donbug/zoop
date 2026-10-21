@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import { selectMemberId, useAuthStore } from '@/stores/useAuthStore';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import {
@@ -358,12 +359,11 @@ export default function WatchlistSelector() {
                 key={company.id}
                 className="flex items-center gap-2 p-3 md:gap-3"
               >
-                <span
-                  className="grid size-7 shrink-0 place-items-center rounded-full bg-gray-200"
-                  aria-hidden="true"
-                >
-                  {company.name.slice(0, 1)}
-                </span>
+                <CompanyLogo
+                  name={company.name}
+                  logoUrl={company.logoUrl}
+                  className="size-7 rounded-full bg-gray-200"
+                />
                 <div className="min-w-0 flex-1">
                   <strong className="text-sm">{company.name}</strong>
                   <small className="mt-1 block text-[11px] text-gray-500">

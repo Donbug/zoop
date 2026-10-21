@@ -8,11 +8,11 @@
 |---|---|---|
 | S1 문서 요약·감성 생성, 기존 outlook (`zoop-ai`) | live 가능 | **OpenAI-compatible `chat/completions`**. 요청당 정확히 한 번 송신, 재시도 없음, `json_schema` strict, effort는 비면 필드 생략 |
 | S1 의미 검증 (`semantic-verification`) | live 가능 | 기본은 위 chat adapter. `ZOOP_AI_VERIFY_PROVIDER=typesafe-native`를 고르면 네이티브 Jev(아래 행) |
-| S2 추출, S3 관계 | replay 전용 | live provider 경로 없음 |
+| S2 추출·비교·topic, S3 관계·impact·검증 (`zoop-ai-extract`, `zoop-ai-relation`) | 기본 replay. **live 경로 구현됨, 기본 꺼짐, 합성 데이터 1회 실측(§10.8)** | `ai/pipeline`의 `live_runtime`이 일곱 stage의 실제 요청 빌더와 한 번만 보내는 transport를 가진다(§10). 호출은 승인된 별도 실행에서만 한다 |
 | 네이티브 TypeSafe Jev | **`semantic-verification` 한정 live 가능(옵트인)** | `POST {TYPESAFE_BASE_URL}/systemone`, 검증 stage당 한 번, 재시도·redirect 없음. 생성·outlook은 Jev가 하지 않는다. Choice/Noul 임계치는 **잠정 공학값(미보정)** (§8) |
 | Responses API / 도구 호출 | 미구현 | S1은 도구를 보내지 않는다 |
 
-Jev를 OpenAI 호환 base URL이나 chat 모델 칸에 넣으면 동작하지 않는다. `config-check`는 이를 오류(`native_jev_model_on_openai_compatible_chat`, `native_jev_endpoint_not_openai_compatible`)로 보고한다. 가짜 Jev env를 OpenAI base에 두지 않는다. 기존 검증을 Jev로 자동 전환하지 않는다: `ZOOP_AI_VERIFY_PROVIDER`를 명시한 때만 바뀌고, 이미 저장된 job은 환경이 아니라 submit 때 고정한 설정을 따른다. 지금은 production profile이 없다(S2/S3 replay 전용, Jev 임계치 미보정).
+Jev를 OpenAI 호환 base URL이나 chat 모델 칸에 넣으면 동작하지 않는다. `config-check`는 이를 오류(`native_jev_model_on_openai_compatible_chat`, `native_jev_endpoint_not_openai_compatible`)로 보고한다. 가짜 Jev env를 OpenAI base에 두지 않는다. 기존 검증을 Jev로 자동 전환하지 않는다: `ZOOP_AI_VERIFY_PROVIDER`를 명시한 때만 바뀌고, 이미 저장된 job은 환경이 아니라 submit 때 고정한 설정을 따른다. S1 worker 설정(`ZOOP_AI_LIVE_ENABLED`, `ZOOP_AI_GLOBAL_MAX_CALLS`)과 S2/S3 파이프라인 live 설정(`ZOOP_AI_PIPELINE_LIVE_*`, §10)은 **별개**이며 한쪽을 켜도 다른 쪽이 켜지지 않는다. Jev 임계치는 두 경로 모두 미보정이다.
 
 ## 2. 오프라인 점검: `zoop-ai config-check`
 
@@ -60,7 +60,7 @@ ai/worker/.venv/bin/zoop-ai config-check [--require-live-prerequisites] [--profi
 | `TYPESAFE_BASE_URL` | https(loopback만 http), userinfo·query 없음, `/systemone`을 붙이지 않는다(adapter가 붙인다) | `https://api.typesafe.ai/v1` |
 | `TYPESAFE_VALIDATION_MODEL` | 네이티브 검증 모델. 정확히 `jev-1.14.0`만 허용한다(`jev-latest`/`jev-preview`·다른 버전은 `native_model_unsupported`) | 선택 프로필: `jev-1.14.0` |
 
-예산은 **호출 횟수**뿐이다. 호출 전에 원장에 예약(reservation)을 남기고, 상한은 줄일 수만 있으며(`budget_increase_requires_new_authorized_ledger`), 송신 결과가 불확실한 호출도 소비한 것으로 센다. 금액·토큰 상한은 없고(`budget.costCap=null`), 이 문서와 설정은 임의의 달러 예산이나 가격 상한을 만들지 않는다.
+**S1 worker의 예산은 호출 횟수뿐이다**(`ZOOP_AI_GLOBAL_MAX_CALLS`). 호출 전에 원장에 예약(reservation)을 남기고, 상한은 줄일 수만 있으며(`budget_increase_requires_new_authorized_ledger`), 송신 결과가 불확실한 호출도 소비한 것으로 센다. S1에는 금액·토큰 상한이 없고(`budget.costCap=null`), 이 문서와 설정은 임의의 달러 예산이나 가격 상한을 만들지 않는다. S2/S3 파이프라인 live 런타임은 이와 별개로 USD와 호출 수를 함께 세는 공유 예산을 쓴다(§10.5).
 
 ## 4. 선택한 프로필 (호출 승인 아님)
 
@@ -133,7 +133,7 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 
 ## 8. 네이티브 Jev 검증 (구현됨, 옵트인, 임계치 잠정)
 
-`ZOOP_AI_VERIFY_PROVIDER=typesafe-native`를 고른 live 작업의 `semantic-verification` stage만 `POST {TYPESAFE_BASE_URL}/systemone`(공식 문서: `model`·`state`·`questions` → Choice/Noul/Score, 응답은 `model`·`answers`·`usage`)로 간다. 기본(변수 없음)은 기존 chat 검증기이며 기존 job·replay는 달라지지 않는다. 문서 요약·감성 생성과 briefing-outlook은 계속 chat adapter이고 Jev가 하지 않는다. S2/S3는 replay 전용 그대로다.
+`ZOOP_AI_VERIFY_PROVIDER=typesafe-native`를 고른 live 작업의 `semantic-verification` stage만 `POST {TYPESAFE_BASE_URL}/systemone`(공식 문서: `model`·`state`·`questions` → Choice/Noul/Score, 응답은 `model`·`answers`·`usage`)로 간다. 기본(변수 없음)은 기존 chat 검증기이며 기존 job·replay는 달라지지 않는다. 문서 요약·감성 생성과 briefing-outlook은 계속 chat adapter이고 Jev가 하지 않는다. 이 절은 **S1 worker 경로**만 다룬다. S2/S3(추출·관계·impact와 그 검증)의 live 경로는 별개의 네이티브 파이프라인 런타임이며 §10이 다룬다(S1 worker 설정·원장·예산과 공유하지 않는다).
 
 - **요청**: 검증 stage당 정확히 한 번 POST, 재시도·redirect·SDK 없음, `Authorization: Bearer`만(장문·이미지 danger-zone 헤더 `TypeSafe-Danger-Zone-*`는 켜지 않는다). state는 문서 본문(`document.inputKind`·`text`), 기업 이름, 후보 claim(종류·문구·인용 구간)뿐이며 grant·key·설정·내부 식별자는 보내지 않는다. 질문은 claim마다 Choice 하나(`supported`/`contradicted`/`insufficient`)와 독립 Noul 둘(`prohibitedAdvice`, `unsupportedCausality`)이고 질문 문구마다 의미와 claim 참조(`candidate.claims[i]`)를 담는다. 모델은 정확히 `jev-1.14.0`(별칭·다른 버전 거부), reasoning effort는 해당 없다. 정확 검사(인용 위치·claim 커버리지)는 의미 검증보다 먼저이며 바뀌지 않았다.
 - **판정(잠정 임계치, 미보정)**: Choice는 승리 확률 ≥ 0.90 **그리고** confidence ≥ 0.80일 때만 `supported`/`contradicted`로 받고, 아니면 `insufficient`다. Noul은 ≥ 0.90이면 예(거부), ≤ 0.10이면 아니오, 그 사이는 **불확실**이라 발견으로 만들지 않고 아직 `supported`인 claim을 `insufficient`로 내려 `hold`가 된다(`contradicted`는 그대로). 결과는 변경 없는 `VerificationAnswer`이고 gate는 기존 `reject > hold > supported` 그대로이며, 불확실한 것은 어떤 경우에도 자동 승인되지 않는다. 사유(`reason`)는 숫자와 규칙으로 코드가 만든 문장(`native_policy: ...`)이며 모델 문장이 아니다. 이 값들은 공학적 잠정값이며 Zoop 한국어 평가셋으로 보정·검증되지 않았고 승인 기준이 아니다. 바꾸면 `promptVersion`이 달라져 job 입력 digest·캐시 키가 달라진다.
@@ -154,3 +154,129 @@ ai/worker/.venv/bin/python ai/worker/scripts/native_jev_smoke.py
 3. 운영/벤치마크 key 발급처 한도, 크레딧, 모델/endpoint 제한 지원 여부.
 4. 개인 Jev 계정 키·비용 부담 주체, Choice/Noul 임계치의 보정 방식(한국어 평가셋)과 네이티브 검증을 켤 문서 종류·시점.
 5. 도구/추론이 필요한 단계를 만들 때 Responses adapter를 구현할지 여부.
+
+## 10. S2/S3 live 파이프라인 런타임 (구현됨, 기본 꺼짐, 호출 승인 아님)
+
+`ai/pipeline/src/zoop_ai_pipeline/live_runtime.py`(+ `live_prompts.py`, `live_jev.py`, `live_budget.py`)가 S2/S3의 실제 모델 경로다. S1 worker 코드·설정·원장과 **공유하지 않으며** private PoC를 import하지 않는다(PoC 프롬프트는 읽기 전용 exemplar로만 참고했다). 단위 테스트는 가짜 HTTP(`httpx.MockTransport`와 loopback 서버)만 쓴다. 별도 승인을 받은 운영자가 합성 데이터로 실제 호출 한 번을 검증했다(§10.8). 지출은 승인된 별도 실행의 몫이며 환경변수가 채워진 것은 승인이 아니다.
+
+### 10.1 stage와 provider
+
+| stage | 소비자 | provider | 요청 |
+|---|---|---|---|
+| `extract`, `compare`, `topic` | S2 | OpenAI 호환 `chat/completions`, 모델 `gpt-6-luna` | strict `json_schema`, `reasoning_effort`, `max_completion_tokens`(추론 포함 출력 상한) |
+| `relation`, `impact` | S3 | 위와 같음 | 위와 같음 |
+| `verify-relation`, `verify-impact` | S3 | 네이티브 TypeSafe Jev `POST {TYPESAFE_BASE_URL}/systemone`, 모델 정확히 `jev-1.14.0` | 인용문 텍스트와 고정 사실만 보내는 Choice 질문(문서 본문·내부 id는 보내지 않는다) |
+
+provider는 stage가 정한다. endpoint나 모델 이름에서 권한을 추론하지 않는다. 생성 JSON schema는 기존 Pydantic 계약에서 만들되 OpenAI strict 제약에 맞게(모든 속성 required, 추가 속성 금지, 검증 키워드 제거, 인용 `start`/`end`는 null 허용) 변환한다. 검증 키워드를 뺀 만큼 **디코딩 뒤 기존 native 계약 검증이 그대로 소유**하고 응답은 보정하지 않는다. 모델이 문자 위치를 세지 않도록 인용 offset은 null로 받고, 소유자가 `live_prompts.resolve_citations`(유일한 literal quote에서만 offset 채움)로 채운 뒤 기존 정확 인용 검사를 한다.
+
+### 10.2 환경변수 (프로세스 환경만, dotenv 없음)
+
+| 구분 | 이름 | 필수 시점 | 값 |
+|---|---|---|---|
+| gate | `ZOOP_AI_PIPELINE_LIVE_ENABLED` | 모든 live 동작 | 정확히 `1` (S1의 `ZOOP_AI_LIVE_ENABLED`와 별개) |
+| 비밀 아님 | `ZOOP_AI_PIPELINE_LIVE_MODEL` | freeze 이상 | `gpt-6-luna`만(요금이 알려진 모델) |
+| 비밀 아님 | `ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT` | freeze 이상 | `none/low/medium/high/xhigh/max`, 기본값 없음(승인된 값은 `high`) |
+| 비밀 아님 | `TYPESAFE_VALIDATION_MODEL` | freeze 이상 | 정확히 `jev-1.14.0` |
+| 비밀 아님, 선택 | `ZOOP_AI_BASE_URL`, `TYPESAFE_BASE_URL` | | https(loopback만 http), userinfo·query 없음, `/systemone` 붙이지 않음. 기본 `https://api.openai.com/v1`, `https://api.typesafe.ai/v1` |
+| 비밀 아님, 선택 | `ZOOP_AI_PIPELINE_LIVE_MAX_OUTPUT_TOKENS`, `…_TIMEOUT_SECONDS` | | 기본 24000(1000–100000), 300초(10–900). 출력 상한은 binding에 고정된다 |
+| 비밀 아님 | `ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR` | freeze 이상(binding에 hash로 고정) | 절대 경로. S2·S3·submit·resume이 **같은 값**을 쓴다. 바꾸면 고정된 job이 거절된다 |
+| send 시점 | `ZOOP_AI_PIPELINE_LIVE_MAX_USD`, `…_MAX_CALLS` | 첫 실제 send | 양의 십진수 USD(소수 9자리까지), 양의 정수 |
+| 비밀 | `ZOOP_AI_API_KEY`, `TYPESAFE_API_KEY` | 첫 실제 send(자기 provider 것만) | `OPENAI_API_KEY`는 읽지 않는다 |
+
+- `LiveRuntime.from_env()`는 gate와 비밀 아님 설정만 검증하고 **`BUDGET_DIR`(절대 경로)를 freeze 때 필수로 고정**한다(어떤 디렉터리도 만들지 않고 realpath의 hash만 계산한다). **키와 상한(`MAX_USD`·`MAX_CALLS`)이 없어도** freeze, `binding()`, `accepts()`, `prepare()`, `answer()`가 되고 어떤 파일도 쓰지 않는다. 키·상한은 `send()`에서만 필요하며 없거나 형식이 틀리면 예약·소켓 전에 확정 실패한다(`live_api_key_required`, `live_typesafe_key_required`, `live_budget_config_invalid`). 값은 오류 문구에 나오지 않는다. 한 provider 키가 없어도 다른 provider stage는 자기 키로 동작한다.
+- 서비스 child 환경은 submit/freeze child에는 gate와 비밀 아님 설정만, send할 수 있는 resume child에만 키·예산 변수를 넘긴다. replay·graph·handoff·dependency·ingestion child에는 넘기지 않는다(전달 목록은 서비스 문서가 정한다).
+- HTTP client는 환경 proxy를 **따르지 않고**(`trust_env=False`) redirect를 따르지 않으며 재시도하지 않는다. 키는 해당 provider로 가는 요청의 `Authorization` 헤더에만 들어간다.
+
+오프라인 점검(네트워크 없음, 파일 생성 없음, 키는 있음/없음만):
+
+```sh
+python -m zoop_ai_pipeline.live_runtime binding   # 비밀 아님 설정 검증 + binding·identity·stage별 recipient/purpose
+python -m zoop_ai_pipeline.live_runtime check     # 위 + 예산 변수와 두 키 필요
+```
+
+### 10.3 고정(binding)과 권한
+
+`binding()`은 비밀 없는 정규 JSON으로 `version`, `generation`(endpoint·`endpointRevision`·모델·effort·출력 상한), `verifier`(endpoint·revision·모델·질문/임계치 identity), `stages`(stage별 `purpose`·`recipient`·`promptVersion`·`schemaDigest` 또는 `questionsDigest`), `pricing`, `budget{scope:"directory",directoryIdentity,unit}`, `limits`, `identity`를 담는다. `budget.directoryIdentity`는 검증된 절대 `BUDGET_DIR`의 realpath hash이며 경로 문자열은 담지 않는다. **상한(USD·호출 수)과 timeout은 의도적으로 제외**한다(상한은 줄일 수만 있고 같은 디렉터리 안에서만 의미가 있다). 소유자(S2/S3)는 이 값을 job에 그대로 고정하고, 새 호출 전에 `accepts(frozen)`로 현재 설정(예산 디렉터리 포함)이 같음을 확인하며, 저장된 receipt 복구는 `LiveRuntime.from_binding(frozen)`(환경·키 없이 decode/prepare만, send는 `live_send_unavailable`)을 쓴다.
+
+- `recipient(stage)`: 생성 stage `openai-compatible:<revision>`, 검증 stage `typesafe-native:<revision>`. revision은 S1과 같은 식(`sha256({"endpoint": url})`, 네이티브는 `{"api":"systemone","endpoint": url}`)이라 URL 끝 `/`만 정규화된다. `purpose(stage)`는 `pipeline:<stage>`다. 생성 recipient가 Jev 전송을 허가하지 않는다. 권한 판정(grant 현재 revision·read/quote-display/model-send·만료)은 소유자 S2의 Authority가 하며 이 런타임은 `authorize()` 콜백을 **소켓 직전**에 부를 뿐 권한을 추론하지 않는다.
+- 바깥으로 나가는 생성 요청은 별도로 고정된 정제 projection이다. Article의 `url`·`publisher`·`origin_id`·`withdrawn`·`synthetic`·`allow_model_send`, job id·grant·키·검토 메모는 포함하지 않으며 `Article.allow_model_send`가 권한을 만들지도 않는다. 프롬프트·schema·질문 문구·임계치를 바꾸면 identity가 달라진다.
+
+### 10.4 한 번의 호출과 receipt (소유자 순서)
+
+`prepare`(순수) → 소유자가 권한·고정 설정 재확인 → 소유자가 자기 attempt를 **먼저 durable 예약** → `send(prepared, attempt_id, authorize)` → 소유자가 **파싱 전에** receipt를 저장 → `answer(stage, receipt)` → 소유자의 정확 인용·계약 검증 → 권한 재확인 후 저장. `send`는 공유 예산을 예약하고 `authorize()`를 부른 뒤 **정확히 한 번** 보낸다. 어떤 HTTP 응답이든(비 2xx·형식 불량 포함) receipt를 돌려주며, receipt는 JSON이고 `format`, `stage`, `attemptId`, `recipient`, `purpose`, `bindingIdentity`, `requestDigest`, `http{status,contentType,bodySha256,bodyText,truncated}`, `model{requested,reported}`, `usage`, `cost{currency,tier,usageKnown,settled,estimatedUsd,chargedUsd,reservedUsd}`, `expect`를 가진다. `answer`·`usage`는 **receipt만** 읽으므로 키·환경이 달라져도 복구된다. 응답 본문은 8 MiB까지만 읽고 넘으면 `truncated` receipt가 된다. 같은 `attempt_id`는 예산 DB에서 유일하다(S2·S3·모든 프로세스). 한 번 쓰인 id는 예약이 풀려도 다시 쓰이지 않는다.
+
+| 코드 | 종류(`kind`) | uncertain | 시점·뜻 |
+|---|---|---|---|
+| `live_response_unknown` | unavailable | **true** | 전송 오류·timeout·끊김. 예약은 최악 비용으로 남고 재송신 없음 |
+| `live_http_<status>` | unavailable | false | `answer`에서. 비 2xx(429·5xx 포함, 자동 재시도 없음) |
+| `live_reply_not_json`, `live_answers_invalid`, `live_model_mismatch`, `live_output_truncated`, `live_response_oversize`, `live_receipt_invalid` | invalid | false | `answer`에서. 계약 위반·잘림. 보정·재요청 없음 |
+| `live_model_refusal` | refused | false | 모델 거절·content filter |
+| `live_budget_exhausted_usd/_calls`, `live_budget_attempt_duplicate`, `live_budget_ceiling_increase`, `live_budget_unavailable` | budget | false | 소켓 전 확정 실패 |
+| `live_config_changed` | config | false | send 시점의 예산 경로 realpath가 binding에 고정된 것과 다름. 소켓 전 확정 실패 |
+| `live_not_enabled`, `live_model_unsupported`, `live_reasoning_effort_invalid`, `live_jev_model_unsupported`, `live_endpoint_invalid`, `live_limit_invalid`, `live_budget_config_invalid`, `live_api_key_required`, `live_typesafe_key_required`, `live_stage_unsupported`, `live_payload_invalid`, `live_request_too_large`, `live_binding_mismatch`, `live_prepared_invalid`, `live_send_unavailable` | config | false | 소켓 전 확정 실패 |
+
+`authorize()`가 예외를 내면 아무것도 보내지 않고 예산 예약을 풀며 **그 예외를 그대로** 올린다. 요청 크기 상한은 생성 300,000 B, Jev 150,000 B이며 넘으면 자르지 않고 `live_request_too_large`다.
+
+### 10.5 예산 (USD와 호출 수, 전 stage 공유)
+
+SQLite 한 파일(`<budget dir>/live-budget.sqlite3`, 디렉터리 0700·파일 0600)에 예약을 남긴다. 금액은 정수 nano-USD로만 다룬다(float 없음). 단가 출처(2026-10-21 확인): OpenAI `gpt-6-luna` 표준 입력 0.10/출력 0.50 USD per 1M(≤272k), 0.20/0.75(초과) — <https://developers.openai.com/api/docs/pricing>; Jev 1.14 입력 0.042 USD per 1M, 출력 무료 — <https://docs.typesafe.ai/models.md>.
+
+- 예약은 **항상 보수적 long 단가(입력 0.20·출력 0.75)**, 캐시 할인 없음, 입력 상한 = 요청 바이트 수 + 1024 토큰(토큰은 최소 1바이트), 출력 상한 = 설정된 `max_completion_tokens`(추론 포함). **Jev**는 공유 `state`의 과금 횟수가 문서화되어 있지 않으므로 입력 상한을 `요청 바이트 × 질문 수 + 1024`로 잡아 질문마다 전체 요청이 과금되는 최악을 덮는다. 이 값은 청구서 보증이 아니라 **상한 추정**이다.
+- 정산은 **2xx 응답에 유효한 usage가 있을 때만** 최악 비용을 실제값(같은 보수 단가)으로 낮춘다. usage는 `[0, 100,000,000]` 정수일 때만 유효하고(bool·float·음수·초과는 블록 전체가 unknown) 그 밖에는 **최악 비용을 유지한다**(조용한 0원 없음). **비 2xx는 본문이 `usage` 0이나 그럴듯한 값을 담아도 항상 최악 비용을 유지**하고, 보고된 값은 receipt에 관찰값으로만 남는다. **요청 상한을 넘는 usage도 측정값으로 쓰지 않는다**(제3자 응답 검증이며 비용 정책 변경이 아니다): 보고된 입력이 예약의 입력 상한(Jev는 질문별 보수 상한)을, 출력이 설정된 `max_completion_tokens`를, cached가 입력을, reasoning이 출력을 넘으면 정산하지 않고 최악 비용을 유지하며 receipt에 `cost.usageRejected`(`input_exceeds_bound` 등)를 표시한다. 보고된 원값은 `usage`와 원문 본문에 그대로 남고 소유자가 receipt를 저장한 **뒤** `answer`가 `live_receipt_invalid`를 낸다. 상한 이하의 유효한 usage는 그대로 더 낮게 정산된다. 정산 자체가 실패하면(DB·overflow 등) 최악 비용이 그대로 남고 receipt가 `cost.settled=false`로 표시되며 `answer`가 같은 방식으로 `live_receipt_invalid`를 낸다. 응답을 받은 뒤의 어떤 파싱·usage·정산 실패도 받은 본문을 잃게 하지 않는다(깊이 중첩 JSON도 `RecursionError` 없이 raw receipt가 되고 `answer`만 `live_reply_not_json`).
+- 전송 오류·timeout·프로세스 사망은 `reserved` 상태로 최악 비용과 호출 1회를 영구히 센다. 예약을 재사용해 다시 보내지 않는다. 소켓 전에 거절된 예약만 해제(0원, 호출 수 미포함)된다.
+- 예산은 **디렉터리 identity(검증된 절대 realpath의 hash)**로 binding에 고정된다. 상한(USD·호출 수)은 binding 밖이며 첫 사용 때 그 디렉터리에 묶이고 **줄이기만** 할 수 있다(`live_budget_ceiling_increase`). 거절된 예약이어도 **줄어든 상한은 저장된다**(트랜잭션이 거절에서도 commit). `BEGIN IMMEDIATE` 트랜잭션이라 여러 스레드·프로세스·S2/S3가 같은 상한을 넘기지 못하고, 경쟁하는 핸들은 가장 낮은 상한으로 수렴한다.
+- **신뢰 경계(운영)**: 예산 DB 파일은 같은 호스트에서 그 디렉터리를 쓸 수 있는 소유자·특권 사용자가 지우거나 바꿀 수 있고, 이 런타임은 그것을 막지 못한다(변조 방지가 아니다). `BUDGET_DIR`를 바꾸면 identity가 달라져 고정된 job이 `accepts` 실패(또는 send의 `live_binding_mismatch`)로 막히고, 경로가 freeze 뒤 다른 곳(symlink 교체 등)을 가리키면 send가 `live_config_changed`로 소켓 전에 멈춘다. 파일 자체를 지우는 것은 별도의 운영 신뢰 경계다.
+
+### 10.6 Jev 검증 정책 (잠정, 미보정)
+
+S1과 같은 임계치(승리 확률 ≥ 0.90 **그리고** confidence ≥ 0.80)를 **잠정값**으로 쓴다. `verify-relation`은 요청된 claim마다 Choice 하나(`supported`/`contradicted`/`insufficient`, `direction`·`step:N`만 `reversed` 추가)를 묻고, 각 질문 문구가 claim의 전체 의미와 판단에 쓸 인용(Q1…)을 담는다. 이 adapter는 Jev에게 **인용 선택을 묻지 않는다**: 이는 Jev의 능력 한계가 아니라 설계 선택이다(알려진 허용 인용 id에 대한 typed 질문으로 선택을 물을 수도 있다). 그래서 `supported`는 그 claim의 허용 인용 **전체를 함께 판정한 결과**이고 `quoteIds`는 그 허용 집합 전체다. `verify-impact`는 target 하나(`supported`/`contradicted`/`insufficient`)와 인용별 효과 Choice(`positive`/`negative`/`neutral`/**`uncertain`**, 가격 예측 아님)를 묻는다. `uncertain`의 기준은 "효과가 섞여 있거나 판단할 수 없거나 이 회사에 대한 충분한 근거가 없음"이며 방향을 추측하지 말라고 질문에 명시한다. 확률·confidence가 낮으면 claim·target은 `insufficient`(HOLD)가 되고 **거부로 가지 않는다**. 인용 효과는 모델이 `uncertain`을 고르면 확률과 무관하게 항상 `uncertain`, `positive`/`negative`/`neutral`을 고르고도 임계치를 못 넘으면 역시 `uncertain`이다(검증된 `neutral`로 바꾸지 않는다). 소유자의 impact gate는 `uncertain` 인용이 하나라도 있으면 다른 인용이 확신 있는 positive/negative여도 라벨 없이 `undetermined`(`quote_effect_uncertain`)로 처리한다(target 판정 의미는 유지, `contradicted`는 그대로 reject). 분포와 생성된 정책 노트는 `runtime.audit(stage, receipt)`와 원문 receipt에 남는다. 합성 문서 실호출이 HOLD로 끝나는 것은 정상이며 임계치를 낮춰 통과시키지 않는다.
+
+### 10.7 smoke 활성화와 안전한 실패
+
+실호출 smoke는 Main이 승인한 예산(합성 문서, 총 USD 10, `gpt-6-luna`/`high`, `jev-1.14.0`)에서만 한 프로세스 환경에 아래를 넣고 실행한다. 키는 셸/secret store에서 주입하며 파일·로그·채팅에 쓰지 않는다.
+
+```sh
+export ZOOP_AI_PIPELINE_LIVE_ENABLED=1 ZOOP_AI_PIPELINE_LIVE_MODEL=gpt-6-luna ZOOP_AI_PIPELINE_LIVE_REASONING_EFFORT=high \
+       TYPESAFE_VALIDATION_MODEL=jev-1.14.0 \
+       ZOOP_AI_PIPELINE_LIVE_BUDGET_DIR=/abs/new/budget-dir ZOOP_AI_PIPELINE_LIVE_MAX_USD=10 ZOOP_AI_PIPELINE_LIVE_MAX_CALLS=<modest cap>   # BUDGET_DIR는 submit(freeze) 때도 같은 값이어야 한다
+# + ZOOP_AI_API_KEY, TYPESAFE_API_KEY (주입만, 여기에 값을 쓰지 않는다)
+python -m zoop_ai_pipeline.live_runtime check      # 오프라인: 설정·키 존재만 확인, 어떤 요청도 보내지 않는다
+```
+
+- 하나라도 빠지면 `check`와 실제 send가 소켓 전에 위 코드로 멈춘다. gate가 `1`이 아니면 어떤 live 동작도 시작하지 않는다.
+- 호출이 실패해도 자동 재시도·fallback·다른 모델 전환이 없다. 불확실 호출은 같은 attempt로 다시 보내지 않고 소유자의 reconciling 상태로 남는다. 예산 디렉터리를 새로 만들지 않으면 상한을 늘릴 수 없다.
+- 알려진 한계: 보수 단가와 실제 청구의 차이, Jev의 `state` 과금 횟수, 계정 한도는 확인되지 않았다(§10.8의 한 번의 합성 실행은 estimated USD만 기록했다). OpenAI strict schema가 일부 구조를 거절하면 그 stage는 400(`live_http_400`)으로 끝난다(자동 보정 없음). 한국어 금융 평가셋으로 보정한 임계치가 아니다.
+
+### 10.8 실제 호출 검증 기록과 `live_graph_smoke.py` (2026-10-21, Main 실행)
+
+**실행 명령.** 운영자 smoke는 `ai/pipeline/scripts/live_graph_smoke.py`다. 스케줄러·수집기·게시기가 아니며, `--live`·환경 gate·**새** 출력 루트·유한한 예산(승인 총액 이하)이 모두 있어야만 지출한다. 키·gate가 필요하며 어느 것도 파일·출력에 쓰지 않는다. 출력 루트는 새 절대 실경로여야 하고 상위에 symlink가 없어야 한다(macOS는 `/tmp`가 아니라 `/private/tmp/...`).
+
+```sh
+# 지출 없음·파일 생성 없음·모델 호출 없음: 설정·endpoint·console script·Neo4j 대상(읽기 전용 preflight)을 검증하고 계획을 출력한다
+.venv/bin/python scripts/live_graph_smoke.py --check --output-root /real/abs/new-dir --graph-uri bolt://127.0.0.1:7687 --usd-cap 10
+# 유료 실행(승인된 총액 이하의 예산, 비어 있는 전용 Neo4j 5 database)
+.venv/bin/python scripts/live_graph_smoke.py --live  --output-root /real/abs/new-dir --graph-uri bolt://127.0.0.1:7687 --usd-cap 10 [--exercise-manual-approval]
+```
+
+`--live` 없이(`--check`도 아니면) 실행은 `live_flag_required_for_a_paid_run`으로 거절된다. `--exercise-manual-approval`은 **진짜** Jev HOLD가 결정적 gate를 통과한 경우에만 합성 테스트 운영자의 `allow` 하나를 제출하고(모델 호출 추가 없음) 그렇지 않으면 coverage gap으로 보고한다.
+
+**한 번의 실제 실행(`ai/pipeline/var/live-graph-2026-10-21-01/summary.json`에 보존, 이 문서는 그 요약의 사람이 읽는 사본이다).**
+
+| 항목 | 관찰값 |
+|---|---|
+| 상태 | `passed`, 벽시계 135.2초 |
+| 입력 | **합성** 문서 2건(카탈로그·이전 event snapshot은 운영자 seed, 모델 답이 아님) |
+| 모델 | 실제 `gpt-6-luna`(reasoning `high`) 9회 + 실제 `jev-1.14.0` 5회 = 14회, endpoint는 `api.openai.com`·`api.typesafe.ai` |
+| S2 | event 후보 5, topic 후보 1(비교 5건 모두 `DIFFERENT`) |
+| S3 | 관계 후보 4: 자동 `eligible` 1 · `HOLD` 3 · `REJECT` 0(impact 후보 1개는 `undetermined`) |
+| 수동 승인 | **합성 테스트 운영자**(사람 아님)가 실제 HOLD 하나를 `allow`, 모델 호출 추가 0, 승인 뒤 `eligible` 2 |
+| 그래프 | 로컬 Neo4j(5.26 community, 빈 대상)에 append-only version 두 개를 투영: 자동 version(노드 2·edge 1, 자동 승인 1)과 수동 승인 version(노드 3·edge 2, 자동 1 + operator-final 1) |
+| 비용 | 추정 USD **0.013323880**(보수 long 단가 기준 **상한 추정이며 청구서가 아니다**), 승인 상한 USD 10 · 호출 40, 14회 모두 `settled`, 미확인(unknown) 호출 없음 |
+
+이 표의 수치는 보존된 `summary.json`의 값이다. 세부 수치는 `stages.graph`·`stages.s2`·`stages.s3`에서 읽는다.
+
+**이 기록이 증명하는 것과 증명하지 않는 것.**
+
+- 증명: 합성 문서에 대해 S2·S3 live 경로(`gpt-6-luna`/`high`, `jev-1.14.0`)가 한 번 끝까지 동작했고, receipt·공유 예산·수동 승인·Neo4j 투영이 이어졌다. 이 한 번의 실행에서 OpenAI strict schema와 Jev 질문 형식이 받아들여졌다.
+- 증명하지 않음: 실제 뉴스·운영 데이터에서의 품질, Jev 임계치의 보정(여전히 잠정), 청구서와 보수 추정의 일치(계정 대시보드와 비교한 적 없음), Jev의 공유 `state` 과금 횟수, 반복 실행의 안정성. 수동 승인은 사람이 한 것이 아니다.
+- **S1 worker의 유료 실행은 이 기록에 포함되지 않으며 검증되었다고 주장하지 않는다**(§7의 S1 smoke는 별개의 승인 대상이다).

@@ -14,13 +14,16 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from .extraction_contracts import ExtractionFailure, ObservationRef
+from .graph_projection_contracts import APPROVAL_KEYS, APPROVAL_KINDS
 from .ingestion_contracts import Wire, canonical, digest, timestamp
+from .source_support import KEYS as SOURCE_SUPPORT_KEYS
+from .source_support import source_support
 
 __all__ = ["ExtractionFailure", "canonical", "digest"]
 
 SCHEMA = "zoop-ai-handoff-1"
-BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-2"
-DECISIONS_SCHEMA = "zoop-public-decisions-1"
+BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5"
+DECISIONS_SCHEMA = "zoop-public-decisions-2"
 BINDINGS_SCHEMA = "zoop-app-document-bindings-1"
 LEDGER_VERSION = "zoop-handoff-ledger-1"
 POLICY = "zoop-public-projection-policy-1"
@@ -28,12 +31,37 @@ EVIDENCE_KIND = "graph-body-span"
 OFFSET_UNIT = "unicode_code_point"
 STRUCTURAL_BASIS_TYPES = ("SUPPLIES",)       # the only S3 type inside the PoC structural basis set (PRODUCES/SUPPLIES/USES/...); others are rejected
 PUBLIC_TYPES = ("INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS")
+STRUCTURAL_PATH_UNAVAILABLE = "intermediate_company_unmapped"      # the ONLY reason a structural path is unavailable: a middle company the operator did not map to a public id
+CONTENT_KEYS = ("companies", "pathCompanies", "issues", "relations", "evidence", "articles")      # the public collections `digests.content` covers
+MAX_SCOPE = 500                                                      # Unicode code points of an S3 `businessScope`/`productScope` (S3's own bound)
 TIME_PRECISIONS = ("year", "month", "day", "datetime", "unknown")
 ASSERTION_STATUSES = ("occurred", "announced", "planned", "forecast", "cancelled", "unknown")     # S2 `Mention.assertion_status`, copied as is
 MENTION_VERIFICATION = "none"             # S2 candidate or operator-frozen snapshot values: no field of a mention is verified, decided or approved here
 MENTION_KEYS = ("documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification", "title", "action", "target", "eventTime",
                 "timePrecision", "period", "assertionStatus", "background", "participants", "evidenceIds")
 PARTICIPANT_KEYS = ("sourceCompanyId", "companyId", "name", "role")
+MENTION_IDENTITY = ("documentId", "documentVersion", "mentionId")     # what names one original mention (a local mention id is unique only within one document version)
+# The six headline values of an issue, as (S2 mention field, bundle wire name). The planner reads them from the chosen source (the operator's representative, or any
+# member when all agree) and the validator checks them against the original mentions that state exactly the same value: ONE list, never two copies.
+ISSUE_FIELDS = (("title", "title"), ("action", "action"), ("target", "target"), ("event_time", "eventTime"), ("period", "period"),
+                ("assertion_status", "assertionStatus"))
+VERDICT_FIELDS = (("event_time", "eventTime"), ("period", "period"))      # the two fields an operator may judge, in canonical order (a subset of ISSUE_FIELDS)
+VERDICT_REASONS = {("ALLOW", "stated"), ("HOLD", "unstated"), ("HOLD", "ambiguous"), ("REJECT", "contradicted")}
+VERDICT_NO_SPAN = ("HOLD", "unstated")       # the only combination that states no text (the field is absent); every other combination needs >= 1 span
+VERDICT_KEYS = ("documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds", "verification", "reviewer", "decisionRef",
+                "decisionVersion")
+# What was actually run (never copied from the first source): one pair per bundle. A replay is an authored fixture response; `live`/`provider` is a real
+# provider call recorded by the S2/S3 ledgers. The source KIND (synthetic or actual material) is independent of the mode.
+EXECUTION_MODES = (("replay", "authored-test"), ("live", "provider"))
+# `s3SemanticValidation` of INVOLVES and `basisEligibility` of a structural edge, by the approvals of the S3 relations behind it. The automatic literal is true ONLY
+# when EVERY one of them was approved by the independent verifier; one operator final approval makes the whole edge `manual`.
+INVOLVES_AUTOMATIC = "independent-verifier-supported-all-claims"
+INVOLVES_MANUAL = "manual-operator-final-approval"
+BASIS_AUTOMATIC = "s3-independent-verifier-supported-all-claims"
+BASIS_MANUAL = "s3-operator-final-approval"
+SOURCE_SUPPORT_POLICY = "origin-or-exact-text-union"
+ORIGIN_VERIFICATION = "operator-declared-origin"
+ORIGIN_KEYS = ("originId", "reviewer", "decisionRef", "decisionVersion", "verification")
 
 MAX_COMMAND = 65_536
 MAX_OPERATOR_FILE = 4_000_000
@@ -126,6 +154,30 @@ class Span(Wire):
     quote_sha256: str = Field(pattern=HASH)
 
 
+class FieldVerdict(Wire):
+    """An operator verdict on ONE original mention's `eventTime` or `period` value (the PoC's per-field ALLOW/HOLD/REJECT). S2/S3 do not verify these fields,
+    so this is the only verification there is. `value` is the exact string the reviewer judged: it must equal the mention's current value. No free-text note."""
+    document_id: str = Field(min_length=1, max_length=200)
+    document_version: str = Field(pattern=HASH)
+    mention_id: str = Field(min_length=1, max_length=200)
+    field: Literal["eventTime", "period"]
+    value: str
+    decision: Literal["ALLOW", "HOLD", "REJECT"]
+    reason_code: Literal["stated", "unstated", "ambiguous", "contradicted"]
+    evidence: list[Span] = Field(max_length=20)
+    reviewer: str = Field(pattern=ID)
+    decision_ref: str = Field(pattern=ID)
+    decision_version: str = Field(pattern=ID)
+
+    @model_validator(mode="after")
+    def consistent(self):
+        if (self.decision, self.reason_code) not in VERDICT_REASONS:
+            raise ValueError("decision and reason code do not match")
+        if ((self.decision, self.reason_code) == VERDICT_NO_SPAN) != (not self.evidence):
+            raise ValueError("evidence count does not match the verdict")
+        return self
+
+
 class Geography(Wire):
     """An explicit field verdict (the PoC's field ALLOW equivalent) for the event's country field. S2/S3 do NOT verify country fields, so this is the
     only verification there is; it is bound to the exact country set, never inferred from language, ticker, exchange or company."""
@@ -159,6 +211,14 @@ class IssueDecision(Wire):
     geography: Geography
     representative: Representative | None
     decision_ref: str = Field(pattern=ID)
+    field_verdicts: list[FieldVerdict] = Field(max_length=2 * MAX_MENTIONS)
+
+    @model_validator(mode="after")
+    def distinct_verdicts(self):
+        keys = [(v.document_id, v.document_version, v.mention_id, v.field) for v in self.field_verdicts]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate field verdict")
+        return self
 
 
 class Applicability(Wire):
@@ -204,13 +264,25 @@ class FollowsDecision(Wire):
     decision_version: str = Field(pattern=ID)
 
 
+class Origin(Wire):
+    """An operator-DECLARED origin (the first publisher of a wire/press text) of ONE exact source document version. It is the only origin source: it is never
+    inferred from a publisher, URL, host, source id or title, and a version without a declaration is simply unknown. `originId` is an opaque operator label."""
+    document_id: str = Field(min_length=1, max_length=200)
+    document_version: str = Field(pattern=HASH)
+    origin_id: str = Field(pattern=ID)
+    reviewer: str = Field(pattern=ID)
+    decision_ref: str = Field(pattern=ID)
+    decision_version: str = Field(pattern=ID)
+
+
 class Decisions(Wire):
-    schema_version: Literal["zoop-public-decisions-1"]
+    schema_version: Literal["zoop-public-decisions-2"]
     policy_version: Literal["zoop-public-projection-policy-1"]
     companies: list[CompanyDecision] = Field(max_length=MAX_DECISIONS)
     issues: list[IssueDecision] = Field(max_length=MAX_DECISIONS)
     structural: list[StructuralDecision] = Field(max_length=MAX_DECISIONS)
     follows: list[FollowsDecision] = Field(max_length=MAX_DECISIONS)
+    origins: list[Origin] = Field(max_length=MAX_DECISIONS)
 
     @model_validator(mode="after")
     def unique(self):
@@ -219,7 +291,8 @@ class Decisions(Wire):
 
         if (dup([c.canonical_id for c in self.companies]) or dup([c.public_id for c in self.companies])
                 or dup([i.canonical_id for i in self.issues]) or dup([i.public_id for i in self.issues])
-                or dup([(s.issue, s.company) for s in self.structural]) or dup([(f.from_, f.to) for f in self.follows])):
+                or dup([(s.issue, s.company) for s in self.structural]) or dup([(f.from_, f.to) for f in self.follows])
+                or dup([(o.document_id, o.document_version) for o in self.origins])):
             raise ValueError("duplicate decision")
         if {c.public_id for c in self.companies} & {i.public_id for i in self.issues}:
             raise ValueError("company and issue public ids must be disjoint")
@@ -336,7 +409,7 @@ def countries_class(countries: list[str]) -> str:
 
 
 def content_digest(bundle: dict) -> str:
-    return digest({key: bundle[key] for key in ("companies", "issues", "relations", "evidence", "articles")})
+    return digest({key: bundle[key] for key in CONTENT_KEYS})
 
 
 # ---------------------------------------------------------------------------------------------- bundle validator --------------------
@@ -387,6 +460,34 @@ def _observation(value, at: str) -> None:
     _int(ref["ordinal"], at)
 
 
+def _approval(value, revision: int, at: str) -> dict:
+    """`approvalBasis` of one used S3 relation: closed, its revision is the revision it was used at, an automatic basis has no reviewer and an operator final
+    approval always names one."""
+    basis = _keys(value, APPROVAL_KEYS, at)
+    _need(basis["kind"] in APPROVAL_KINDS, f"{at}.kind")
+    _need(type(basis["revision"]) is int and basis["revision"] == revision, f"{at}.revision")
+    _need((basis["reviewer"] is None) == (basis["kind"] == "automatic-verifier"), f"{at}.reviewer")
+    _text(basis["reviewer"], f"{at}.reviewer", nullable=True)          # the S3 review wire's free text (1..200 characters), not an identifier pattern
+    _need(basis["reviewer"] is None or (bool(basis["reviewer"].strip()) and len(basis["reviewer"]) <= 200), f"{at}.reviewer")
+    _text(basis["decidedAt"], f"{at}.decidedAt")
+    try:
+        timestamp(basis["decidedAt"])          # the native rule (an ISO form WITH an offset), the same one the app's OffsetDateTime parse enforces
+    except (ValueError, TypeError):
+        _bad(f"{at}.decidedAt")
+    return basis
+
+
+def involves_validation(approvals: list[dict]) -> str:
+    """The honest `s3SemanticValidation` of an INVOLVES edge: the automatic literal only when EVERY S3 relation behind it was approved by the independent
+    verifier; one operator final approval makes the edge `manual`."""
+    return INVOLVES_AUTOMATIC if all(a["kind"] == "automatic-verifier" for a in approvals) else INVOLVES_MANUAL
+
+
+def basis_eligibility(approvals: list[dict]) -> str:
+    """Same rule for the `basisEligibility` of a structural edge, over its basis relations."""
+    return BASIS_AUTOMATIC if all(a["kind"] == "automatic-verifier" for a in approvals) else BASIS_MANUAL
+
+
 def _source_event(value, at: str, upstreams: set) -> None:
     event = _keys(value, ("upstream", "kind", "ref", "mentionId", "documentId", "documentVersion", "observation"), at)
     up = _keys(event["upstream"], ("jobId", "inputDigest"), f"{at}.upstream")
@@ -404,21 +505,103 @@ def _source_event(value, at: str, upstreams: set) -> None:
           f"{at}.documentClosure")
 
 
+def selected_basis(representative: dict | None, mentions: list) -> list:
+    """The identities whose value the issue headline is selected from: the operator's representative mention, or EVERY mention when none was named (`unanimous`)."""
+    if representative is None:
+        return [{key: m[key] for key in MENTION_IDENTITY} for m in mentions]
+    return [{key: representative[key] for key in MENTION_IDENTITY}]
+
+
+def withheld_fields(verdicts: list, basis: list) -> list:
+    """The judged fields whose issue headline the producer withholds: a HOLD or REJECT on a mention of the selection basis, in the canonical field order."""
+    bad = {v["field"] for v in verdicts if v["decision"] != "ALLOW" and {key: v[key] for key in MENTION_IDENTITY} in basis}
+    return [wire for _, wire in VERDICT_FIELDS if wire in bad]
+
+
+def _field_verdicts(issue: dict, mentions: list, evidence: dict, evidence_ids) -> list:
+    """`issue.fieldVerdicts`: the operator's per-field verdicts, each bound to one original mention of this issue and to the exact value that mention states. Closed
+    shape, one entry per (mention identity, field), in the canonical order (mention key, then field order), spans cited as app evidence of the mention's OWN article.
+    ALLOW/stated, HOLD/ambiguous and REJECT/contradicted need at least one span, HOLD/unstated none. Returns the withheld fields the verdicts imply."""
+    at = "issue.fieldVerdicts"
+    verdicts = _list(issue["fieldVerdicts"], at, 2 * MAX_MENTIONS)
+    by_identity = {mention_key(m["documentId"], m["documentVersion"], m["mentionId"]): m for m in mentions}
+    order = {wire: n for n, (_, wire) in enumerate(VERDICT_FIELDS)}
+    previous = None
+    for v in verdicts:
+        _keys(v, VERDICT_KEYS, at)
+        _text(v["documentId"], f"{at}.documentId", ID)
+        _text(v["documentVersion"], f"{at}.documentVersion", HASH)
+        _text(v["mentionId"], f"{at}.mentionId")
+        key = mention_key(v["documentId"], v["documentVersion"], v["mentionId"])
+        mention = by_identity.get(key)
+        _need(mention is not None, f"{at}.mentionClosure")
+        _need(v["field"] in order, f"{at}.field")
+        _text(v["value"], f"{at}.value")
+        _need(v["value"] == mention[v["field"]], f"{at}.value.exact")
+        _need((v["decision"], v["reasonCode"]) in VERDICT_REASONS, f"{at}.reasonCode")
+        _need(v["verification"] == "operator-field-verdict", f"{at}.verification")
+        for name in ("reviewer", "decisionRef", "decisionVersion"):
+            _text(v[name], f"{at}.{name}", ID)
+        unstated = (v["decision"], v["reasonCode"]) == VERDICT_NO_SPAN
+        ids = evidence_ids(v["evidenceIds"], f"{at}.evidenceIds", 0 if unstated else 1)
+        _need(len(ids) <= 20, f"{at}.evidenceIds")                    # the operator file's bound (`FieldVerdict.evidence` <= 20 spans), as in the service and the app
+        _need(bool(ids) != unstated, f"{at}.evidenceCount")
+        _need(all((evidence[x]["articleId"], evidence[x]["articleVersion"]) == (mention["articleId"], mention["articleVersion"]) for x in ids), f"{at}.evidenceClosure")
+        position = (key, order[v["field"]])
+        _need(previous is None or previous < position, f"{at}.order")
+        previous = position
+    return verdicts
+
+
+def _field_provenance(issue: dict, mentions: list, verdicts: list) -> None:
+    """`issue.fieldProvenance`: how the issue's six headline values were SELECTED and which original mentions state exactly each of them. It is a selection record,
+    never a verification: `verification` is `none`, and listing a mention says only that it states the same string (or the same absence), not that anything is
+    supported, approved or true. Every list must equal, in the mentions' own order, the identities of the mentions whose value equals the SELECTED value (the
+    representative's, or the shared one when `unanimous`) by exact JSON equality (`null` equals `null`; no trimming, no time normalisation), so order, uniqueness and
+    closure need no separate rule. It must be non-empty, equal to ALL mentions when no representative exists and contain the representative's mention in every field
+    when the operator named one. `withheld` is recomputed from the verdicts: the issue's value of a withheld field is `null` (and an event time's precision `unknown`),
+    otherwise exactly the selected value. Called after the mentions, the verdicts and the representative are closed."""
+    at = "issue.fieldProvenance"
+    provenance = _keys(issue["fieldProvenance"], ("selection", "verification", "withheld", "sameValueMentions"), at)
+    representative = issue["representative"]
+    _need(provenance["selection"] == ("unanimous" if representative is None else "operator-representative"), f"{at}.selection")
+    _need(provenance["verification"] == MENTION_VERIFICATION, f"{at}.verification")
+    basis = selected_basis(representative, mentions)
+    withheld = withheld_fields(verdicts, basis)
+    _need(provenance["withheld"] == withheld, f"{at}.withheld")
+    chosen = next(m for m in mentions if {key: m[key] for key in MENTION_IDENTITY} == basis[0])
+    same = _keys(provenance["sameValueMentions"], tuple(wire for _, wire in ISSUE_FIELDS), f"{at}.sameValueMentions")
+    identities = [{key: m[key] for key in MENTION_IDENTITY} for m in mentions]
+    for _, wire in ISSUE_FIELDS:
+        listed = _list(same[wire], f"{at}.{wire}", MAX_MENTIONS)
+        for ref in listed:
+            _keys(ref, MENTION_IDENTITY, f"{at}.{wire}")
+        _need(listed == [identity for identity, m in zip(identities, mentions) if m[wire] == chosen[wire]], f"{at}.{wire}.exact")
+        _need(bool(listed), f"{at}.{wire}.nonEmpty")
+        if representative is None:
+            _need(listed == identities, f"{at}.{wire}.unanimous")
+        else:
+            _need(basis[0] in listed, f"{at}.{wire}.representative")
+        _need(issue[wire] == (None if wire in withheld else chosen[wire]), f"{at}.{wire}.published")
+    _need("eventTime" not in withheld or issue["timePrecision"] == "unknown", "issue.timePrecision.withheld")
+    _need("eventTime" in withheld or issue["timePrecision"] == chosen["timePrecision"], "issue.timePrecision.selected")
+
+
 def validate_bundle(bundle: dict) -> None:
     """Strict, closed validation of a bundle: exact key sets, types, patterns, referential closure, id formulas, counts and the content digest. Anything
     else is `handoff_bundle_invalid` (a damaged or hand-edited artifact), never a partial read."""
-    _keys(bundle, ("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy", "sources", "companies", "issues", "relations", "evidence",
-                   "articles", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
+    _keys(bundle, ("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy", "sources", "companies", "pathCompanies", "issues", "relations",
+                   "evidence", "articles", "exclusions", "counts", "checks", "readiness", "digests"), "bundle")
     _need(bundle["schemaVersion"] == BUNDLE_SCHEMA, "schemaVersion")
     _text(bundle["handoffId"], "handoffId", ID)
     _text(bundle["manifestDigest"], "manifestDigest", HASH)
     prov = _keys(bundle["provenance"], ("declaredSourceKind", "observedSourceKind", "executionMode", "recordingKind"), "provenance")
     _need(prov["declaredSourceKind"] == prov["observedSourceKind"] and prov["declaredSourceKind"] in ("synthetic", "actual"), "provenance")
-    _need(prov["executionMode"] == "replay" and prov["recordingKind"] == "authored-test", "provenance")
-    policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence"), "policy")
+    _need((prov["executionMode"], prov["recordingKind"]) in EXECUTION_MODES, "provenance.mode")
+    policy = _keys(bundle["policy"], ("version", "files", "evidenceIdKind", "offsetUnit", "geography", "structural", "sequence", "sourceSupport"), "policy")
     _need(policy["version"] == POLICY and policy["evidenceIdKind"] == EVIDENCE_KIND and policy["offsetUnit"] == OFFSET_UNIT, "policy")
     for name, expected in (("geography", "operator-field-verdict"), ("structural", "manual-operator-review"),
-                           ("sequence", "s2-comparison-with-operator-decision")):
+                           ("sequence", "s2-comparison-with-operator-decision"), ("sourceSupport", SOURCE_SUPPORT_POLICY)):
         _need(policy[name] == expected, f"policy.{name}")
     files = _keys(policy["files"], ("canonical", "decisions", "bindings"), "policy.files")
     for value in files.values():
@@ -428,7 +611,9 @@ def validate_bundle(bundle: dict) -> None:
     _need(len(sources) >= 1, "sources")
     jobs, upstreams, used_reviews = set(), set(), {}
     for s in sources:
-        _keys(s, ("relation", "upstream", "reviewDigest", "policies", "reviewUsed", "audit"), "source")
+        _keys(s, ("relation", "upstream", "reviewDigest", "policies", "reviewUsed", "audit", "provenance"), "source")
+        sprov = _keys(s["provenance"], ("sourceKind", "executionMode", "recordingKind"), "source.provenance")
+        _need(sprov == {"sourceKind": prov["observedSourceKind"], "executionMode": prov["executionMode"], "recordingKind": prov["recordingKind"]}, "source.provenance.mixed")
         r = _keys(s["relation"], ("jobId", "inputDigest"), "source.relation")
         _text(r["jobId"], "source.relation", ID)
         _text(r["inputDigest"], "source.relation", HASH)
@@ -441,13 +626,14 @@ def validate_bundle(bundle: dict) -> None:
         for value in versions.values():
             _text(value, "source.policies")
             _need(bool(value), "source.policies")
-        used = set()
+        used, previous = {}, None
         for item in _list(s["reviewUsed"], "source.reviewUsed", MAX_RELATIONS):
-            _need(isinstance(item, list) and len(item) == 2, "source.reviewUsed")
-            _text(item[0], "source.reviewUsed", RC)
-            _int(item[1], "source.reviewUsed", 1)
-            _need(item[0] not in used, "source.reviewUsed.unique")
-            used.add(item[0])
+            _keys(item, ("relationCandidateId", "revision", "approvalBasis"), "source.reviewUsed")
+            _text(item["relationCandidateId"], "source.reviewUsed", RC)
+            _int(item["revision"], "source.reviewUsed", 1)
+            _need(previous is None or previous < item["relationCandidateId"], "source.reviewUsed.order")
+            previous = item["relationCandidateId"]
+            used[item["relationCandidateId"]] = _approval(item["approvalBasis"], item["revision"], "source.reviewUsed.approvalBasis")
         audit = _keys(s["audit"], ("s3Relations", "eligibility", "reviewPending", "impactCandidates", "eligibleNotPublicByType"), "source.audit")
         for name in ("s3Relations", "reviewPending", "impactCandidates"):
             _int(audit[name], f"source.audit.{name}")
@@ -489,7 +675,7 @@ def validate_bundle(bundle: dict) -> None:
     articles = {}
     for a in _list(bundle["articles"], "articles", MAX_ARTICLES):
         _keys(a, ("articleId", "articleVersion", "documentId", "documentVersion", "rawVersion", "title", "url", "publishedAt", "publicationPrecision",
-                  "observations"), "article")
+                  "textSha256", "origin", "observations"), "article")
         _text(a["articleId"], "article.articleId", ARTICLE_ID)
         _text(a["articleVersion"], "article.articleVersion", HASH)
         _text(a["documentId"], "article")
@@ -513,6 +699,12 @@ def validate_bundle(bundle: dict) -> None:
             _text(grant["grantId"], "observation.grant")
             _text(grant["revision"], "observation.grant")
         _need(observations == sorted({canonical(o): o for o in observations}.values(), key=canonical), "article.observations.unique")
+        _text(a["textSha256"], "article.textSha256", HASH)
+        if a["origin"] is not None:
+            origin = _keys(a["origin"], ORIGIN_KEYS, "article.origin")
+            for name in ("originId", "reviewer", "decisionRef", "decisionVersion"):
+                _text(origin[name], f"article.origin.{name}", ID)
+            _need(origin["verification"] == ORIGIN_VERIFICATION, "article.origin.verification")
         key = (a["articleId"], a["articleVersion"])
         _need(key not in articles, "articles.unique")
         articles[key] = a
@@ -531,14 +723,24 @@ def validate_bundle(bundle: dict) -> None:
         referenced.update(ids)
         return ids
 
+    def company(c, at: str) -> None:
+        _keys(c, ("id", "canonicalId", "label", "decisionRef"), at)
+        for name in ("id", "canonicalId", "decisionRef"):
+            _text(c[name], at, ID)
+        _text(c["label"], f"{at}.label")
+
     companies = {}
     for c in _list(bundle["companies"], "companies", MAX_DECISIONS):
-        _keys(c, ("id", "canonicalId", "label", "decisionRef"), "company")
-        for name in ("id", "canonicalId", "decisionRef"):
-            _text(c[name], "company", ID)
-        _text(c["label"], "company.label")
+        company(c, "company")
         _need(c["id"] not in companies, "companies.unique")
         companies[c["id"]] = c
+    # Private support references of structural paths: the same closed record as a company, never a graph node, disjoint from the public companies and the issues.
+    path_companies = {}
+    for c in _list(bundle["pathCompanies"], "pathCompanies", MAX_DECISIONS):
+        company(c, "pathCompany")
+        _need(c["id"] not in path_companies and c["id"] not in companies, "pathCompanies.unique")
+        path_companies[c["id"]] = c
+    _need(list(path_companies) == sorted(path_companies), "pathCompanies.order")
 
     by_document: dict = {}
     for article in articles.values():
@@ -581,7 +783,7 @@ def validate_bundle(bundle: dict) -> None:
     issues = {}
     for i in _list(bundle["issues"], "issues", MAX_ISSUES):
         _keys(i, ("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
-                  "sourceEvents", "decisionRef", "representative", "mentions"), "issue")
+                  "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport"), "issue")
         _text(i["id"], "issue.id", ID)
         _text(i["canonicalId"], "issue", ID)
         _text(i["decisionRef"], "issue", ID)
@@ -630,15 +832,27 @@ def validate_bundle(bundle: dict) -> None:
         _need(keys == sorted(set(keys)), "issue.mentions.order")
         _need({(m["documentId"], m["documentVersion"], m["mentionId"]) for m in mentions} ==
               {(s["documentId"], s["documentVersion"], s["mentionId"]) for s in source_events}, "issue.mentions.sourceClosure")
+        verdicts = _field_verdicts(i, mentions, evidence, evidence_ids)
+        for v in verdicts:
+            mentioned.update(v["evidenceIds"])
         _need(set(i["evidenceIds"]) == mentioned, "issue.evidenceClosure")
-        _need(i["id"] not in issues and i["id"] not in companies, "issues.unique")
+        cited = sorted({(evidence[x]["articleId"], evidence[x]["articleVersion"]) for x in i["evidenceIds"]})
+        _need(len({article for article, _ in cited}) == len(cited), "issue.articleVersions")        # exactly one cited version of each article
+        support = _keys(i["sourceSupport"], SOURCE_SUPPORT_KEYS, "issue.sourceSupport")
+        _need(support == source_support([{"articleId": a, "textSha256": articles[(a, v)]["textSha256"],
+                                          "originId": (articles[(a, v)]["origin"] or {}).get("originId")} for a, v in cited]), "issue.sourceSupport.exact")
+        _field_provenance(i, mentions, verdicts)
+        _need(i["id"] not in issues and i["id"] not in companies and i["id"] not in path_companies, "issues.unique")
         issues[i["id"]] = i
 
     relation_ids = set()
     counts = {name: 0 for name in PUBLIC_TYPES}
     linked: dict[str, set] = {name: set() for name in ("issue", "company")}
+    participants: dict[str, set] = {}          # public issue -> the companies an INVOLVES edge of that issue names
+    structural_paths: list = []                # (relation, path) of every STRUCTURALLY_RELATED_TO edge, checked once every INVOLVES edge is known
     for r in _list(bundle["relations"], "relations", MAX_RELATIONS):
-        _keys(r, ("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis", "provenance", "decisionRef", "sourceRefs"), "relation")
+        _keys(r, ("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis", "structuralPath", "provenance", "decisionRef",
+                  "sourceRefs"), "relation")
         _text(r["id"], "relation.id", ID)
         _need(r["type"] in PUBLIC_TYPES and r["id"] not in relation_ids, "relation.type")
         relation_ids.add(r["id"])
@@ -659,7 +873,7 @@ def validate_bundle(bundle: dict) -> None:
         _need((r["type"] == "STRUCTURALLY_RELATED_TO") == (len(basis) >= 1), "relation.basis")
         basis_refs = []
         for b in basis:
-            _keys(b, ("sourceRelation", "relationKey", "relationType", "validFrom", "validUntil", "countries", "verifiedAt",
+            _keys(b, ("sourceRelation", "relationKey", "relationType", "businessScope", "productScope", "validFrom", "validUntil", "countries", "verifiedAt",
                       "sourceArticles", "evidenceIds"), "basis")
             src = _keys(b["sourceRelation"], ("jobId", "relationCandidateId"), "basis.sourceRelation")
             _text(src["jobId"], "basis.sourceRelation", ID)
@@ -669,9 +883,13 @@ def validate_bundle(bundle: dict) -> None:
             _text(b["relationKey"], "basis.relationKey", HASH)
             _need(b["relationType"] in STRUCTURAL_BASIS_TYPES, "basis.relationType")
             _text(b["verifiedAt"], "basis.verifiedAt")
+            _need(b["verifiedAt"] == used_reviews[src["jobId"]][src["relationCandidateId"]]["decidedAt"], "basis.verifiedAt.approval")
             _text(b["validFrom"], "basis.validFrom", nullable=True)
             _text(b["validUntil"], "basis.validUntil", nullable=True)
             _strings(b["countries"], "basis.countries", maximum=10)
+            for name in ("businessScope", "productScope"):        # S3 text copied exactly (never an entity id), bounded in code points
+                _text(b[name], f"basis.{name}", nullable=True)
+                _need(b[name] is None or len(b[name]) <= MAX_SCOPE, f"basis.{name}.length")
             ids = evidence_ids(b["evidenceIds"], "basis.evidenceIds")
             links = _list(b["sourceArticles"], "basis.sourceArticles", 1000)
             for link in links:
@@ -699,21 +917,26 @@ def validate_bundle(bundle: dict) -> None:
         _need(len(set(reference_keys)) == len(refs), "relation.sourceRefs.unique")
         provenance = r["provenance"]
         preimage = {"type": r["type"], "source": r["source"], "target": r["target"]}
+        if r["type"] != "STRUCTURALLY_RELATED_TO":
+            _need(r["structuralPath"] is None, "relation.structuralPath")
         if r["type"] == "INVOLVES":
-            _need(_keys(provenance, ("origin", "s3SemanticValidation"), "relation.provenance") ==
-                  {"origin": "s3-relation", "s3SemanticValidation": "independent-verifier-supported-all-claims"}, "relation.provenance")
+            participants.setdefault(r["source"], set()).add(r["target"])
+            _keys(provenance, ("origin", "s3SemanticValidation"), "relation.provenance")
+            _need(provenance["origin"] == "s3-relation" and provenance["s3SemanticValidation"] ==
+                  involves_validation([used_reviews[ref["jobId"]][ref["id"]] for ref in refs]), "relation.provenance")
             _need(r["decisionRef"] is None and r["role"] is None and not basis, "relation.involves")
         elif r["type"] == "STRUCTURALLY_RELATED_TO":
             _keys(provenance, ("origin", "s3SemanticValidation", "status", "reviewer", "decisionRef", "decisionVersion",
                                "bindingDigest", "basisEligibility"), "relation.provenance")
             _need(provenance["origin"] == "manual-operator-review" and provenance["s3SemanticValidation"] == "none"
                   and provenance["status"] == "operator-asserted"
-                  and provenance["basisEligibility"] == "s3-independent-verifier-supported-all-claims", "relation.provenance")
+                  and provenance["basisEligibility"] == basis_eligibility([used_reviews[ref["jobId"]][ref["id"]] for ref in refs]), "relation.provenance")
             for name in ("reviewer", "decisionRef", "decisionVersion"):
                 _text(provenance[name], "relation.provenance", ID)
             _text(provenance["bindingDigest"], "relation.provenance", HASH)
             _need(r["decisionRef"] == provenance["decisionRef"] and r["role"] is None and reference_keys == basis_refs, "relation.structural")
             preimage["basis"] = [b["relationKey"] for b in basis]
+            structural_paths.append((r, r["structuralPath"]))
         else:
             _keys(provenance, ("origin", "s3SemanticValidation", "s2Relation", "evidenceGate", "groupDigest", "decisionRef",
                                "decisionVersion"), "relation.provenance")
@@ -731,6 +954,31 @@ def validate_bundle(bundle: dict) -> None:
     _need(set(companies) == linked["company"], "companies.noOrphan")
     _need(set(evidence) == referenced, "evidence.noOrphan")
 
+    # Structural paths: shape and connectivity per edge, then the closure of the private support companies over the complete paths.
+    middles: set = set()
+    for r, path in structural_paths:
+        size = len(r["basis"])
+        _need(isinstance(path, dict) and path.get("status") in ("complete", "unavailable"), "structuralPath")
+        if path["status"] == "unavailable":
+            _keys(path, ("status", "reason"), "structuralPath")
+            _need(path["reason"] == STRUCTURAL_PATH_UNAVAILABLE and size == 2, "structuralPath.unavailable")      # only a two-relation edge has a middle company to be unmapped
+            continue
+        _keys(path, ("status", "companyIds", "links"), "structuralPath")
+        chain = _strings(path["companyIds"], "structuralPath.companyIds", ID, 3)
+        _need(len(chain) == size + 1 and len(set(chain)) == len(chain), "structuralPath.companyIds")
+        _need(set(chain) <= set(companies) | set(path_companies), "structuralPath.catalogue")
+        _need(chain[0] in participants.get(r["source"], ()) and chain[-1] == r["target"] and r["target"] not in participants.get(r["source"], ()), "structuralPath.ends")
+        links = _list(path["links"], "structuralPath.links", 2)
+        _need(len(links) == size, "structuralPath.links")
+        for n, link in enumerate(links):          # one link per basis, in basis order, joining the two adjacent companies of the chain in either S3 direction
+            _keys(link, ("supplierCompanyId", "customerCompanyId"), "structuralPath.link")
+            _text(link["supplierCompanyId"], "structuralPath.link", ID)
+            _text(link["customerCompanyId"], "structuralPath.link", ID)
+            _need(link["supplierCompanyId"] != link["customerCompanyId"]
+                  and {link["supplierCompanyId"], link["customerCompanyId"]} == {chain[n], chain[n + 1]}, "structuralPath.link")
+        middles.update(chain[1:-1])
+    _need(set(path_companies) == middles - set(companies), "pathCompanies.closure")
+
     ex = _keys(bundle["exclusions"], ("counts", "items"), "exclusions")
     items = _list(ex["items"], "exclusions.items", MAX_EXCLUSIONS)
     tally: dict[str, int] = {}
@@ -745,7 +993,7 @@ def validate_bundle(bundle: dict) -> None:
                 detail = _keys(item["detail"], ("fields",), "exclusion.detail")
                 fields = _strings(detail["fields"], "exclusion.detail.fields")
                 _need(bool(fields) and len(fields) == len(set(fields)) and set(fields) <=
-                      {"title", "action", "target", "eventTime", "period", "assertionStatus"}, "exclusion.detail.fields")
+                      {wire for _, wire in ISSUE_FIELDS}, "exclusion.detail.fields")
             elif item["code"] == "applicability_binding_mismatch":
                 detail = _keys(item["detail"], ("expectedBindingDigest",), "exclusion.detail")
                 _text(detail["expectedBindingDigest"], "exclusion.detail.expectedBindingDigest", HASH)
@@ -753,8 +1001,8 @@ def validate_bundle(bundle: dict) -> None:
                 _bad("exclusion.detail")
         tally[item["code"]] = tally.get(item["code"], 0) + 1
     _need(ex["counts"] == tally, "exclusions.counts")
-    expected = {"companies": len(companies), "issues": len(issues), "relations": counts, "evidence": len(evidence), "articles": len(articles),
-                "exclusions": len(items)}
+    expected = {"companies": len(companies), "pathCompanies": len(path_companies), "issues": len(issues), "relations": counts, "evidence": len(evidence),
+                "articles": len(articles), "exclusions": len(items)}
     _need(bundle["counts"] == expected, "counts")
     checks = _keys(bundle["checks"], ("producerConfirmed", "appImportPending"), "checks")
     _need(checks["producerConfirmed"] == list(PRODUCER_CHECKS) and checks["appImportPending"] == list(APP_IMPORT_PENDING), "checks")

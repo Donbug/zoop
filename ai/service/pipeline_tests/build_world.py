@@ -6,11 +6,10 @@ authored HTML -> actual `zoop-ai-ingest` subprocess -> a READY S2 extraction job
 topic candidate) -> authored producer/verifier replay fixtures for the S3 stages, derived from the real stored candidates (never from a
 mock echo). The service tests then talk to the service only; they read this world's directories only to prove the service left them alone.
 
-The fixtures also carry the answers of a review's revalidation, authored the same way the pipeline's smoke authors them: the HOLD relation is
-reviewed (allow) in this builder's OWN private ledger, the exact verifier request of its revalidation attempt is derived from the real stored
-candidate, and an answer is recorded. That request holds no job id, so the same records serve the service's own job. Two answers exist: the
-default verifier fixture answers `supported` (the relation becomes eligible and its impact stage, also authored, follows) and the second
-fixture (`verifierHold`) answers `insufficient` again (the relation stays on hold).
+One relation ends eligible (with a mixed impact) and one is held by the independent verifier (`insufficient`). The held one is the only
+relation a review may target. A review's `allow` is the operator's FINAL approval: it calls no verifier and no producer, so unlike the
+earlier revalidation contract the world needs no authored answer for it. The empty fixtures prove that: a service started with them can still
+approve, because nothing is replayed.
 
 usage: build_world.py <pipeline project dir> <empty output dir>   (prints one JSON document describing the world)
 """
@@ -24,8 +23,8 @@ PIPELINE = Path(sys.argv[1]).resolve()
 ROOT = Path(sys.argv[2]).resolve()
 sys.path[:0] = [str(PIPELINE)]
 
-from scripts.relation_smoke import (BAD, CO, COMP, GOOD, SUP, SUP2, build_world, converge, digest, impact_item, main_proposals, next_attempt,  # noqa: E402
-                                    rules, verifier_reply, world_cite)
+from scripts.relation_smoke import (BAD, CO, COMP, GOOD, SUP, SUP2, build_world, converge, impact_item, main_proposals,  # noqa: E402
+                                    world_cite)
 
 
 def main() -> dict:
@@ -56,34 +55,8 @@ def main() -> dict:
     held = next(r for r in authored["relations"] if r["eligibility"]["status"] == "hold")
     held_id, held_revision = held["relationCandidateId"], held["eligibility"]["revision"]
 
-    # The allow -> revalidation path of the HOLD relation, authored in this builder's private ledger (never the service's).
-    reviewed = kit.rel_job("review", {**kit.rsel("author-reference"), "relationCandidateId": held_id, "expectedRevision": held_revision,
-                                      "decision": "allow", "reviewer": "author", "note": "author"})
-    allowed = next(r for r in reviewed["relations"] if r["relationCandidateId"] == held_id)
-    key = digest(rules.verifier_request(allowed, next_attempt(allowed["history"], "revalidation")))
-    verifier_hold = [*verifier, ("verify-relation", key, verifier_reply(allowed, type="insufficient", direction="insufficient"))]
-    verifier_eligible = [*verifier, ("verify-relation", key, verifier_reply(allowed))]
-    # A revalidation that makes the relation eligible continues into that relation's impact stage: author it as well. The first call stops
-    # with `producer_replay_missing` for it (nothing is sent), and `converge` answers that stop from the real stored candidate.
-    kit.rel_job("revalidate", {**kit.rsel("author-reference"), "relationCandidateId": held_id, "expectedRevision": allowed["eligibility"]["revision"]},
-                replay=kit.fixture("producer", "author-p", producer), verifier=kit.fixture("verifier", "author-v", verifier_eligible))
-
-    def impacts_with_held(relation: dict):
-        if relation["type"] == "SUPPLIES" and relation["subject"]["ref"] == "SYNTH-1" and relation["object"]["ref"] == "SYNTH-2":
-            return [impact_item("SYNTH-2", "undetermined", [], [])]   # no cited evidence: recorded as undetermined without a verifier call
-        return impacts(relation)
-
-    final = converge(world, "author-reference", chosen, verify=verify, impacts=impacts_with_held, effects=lambda impact: effects(impact),
-                     seed=(producer, verifier_eligible))
-    assert final["state"] == "ready" and final["usage"]["providerCalls"] == 0, final.get("failure")
-    producer, verifier_eligible = final["fixtures"]
-    revalidated = next(r for r in final["relations"] if r["relationCandidateId"] == held_id)
-    assert revalidated["eligibility"]["status"] == "eligible" and revalidated["eligibility"]["revision"] == held_revision + 2
-    assert revalidated["impact"]["status"] == "complete", revalidated["impact"]
-
     producer_path = kit.fixture("producer", "svc", producer)
-    verifier_path = kit.fixture("verifier", "svc", verifier_eligible)
-    verifier_hold_path = kit.fixture("verifier", "svc-hold", verifier_hold)
+    verifier_path = kit.fixture("verifier", "svc", verifier)
     empty_producer, empty_verifier = kit.fixture("producer", "svc-empty", []), kit.fixture("verifier", "svc-empty", [])
     return {
         "root": str(ROOT), "extraction": str(ROOT / "extraction"), "ingestion": str(ROOT / "ingestion"), "registry": str(kit.registry_path),
@@ -92,7 +65,7 @@ def main() -> dict:
         # operator job above was built from (so the job the service produces is byte-identical to it), plus a topic-less sibling.
         "s2Request": world.s2_request, "s2PlainRequest": kit.submit("s2-plain", world.refs["main"], [world.snapshot], topic=False),
         "s2Replay": str(world.s2_replay), "s2Topic": str(world.s2_topic), "s2Counts": world.s2["counts"], "s2ReplayCalls": world.s2["usage"]["replayCalls"],
-        "producer": str(producer_path), "verifier": str(verifier_path), "verifierHold": str(verifier_hold_path),
+        "producer": str(producer_path), "verifier": str(verifier_path),
         "emptyProducer": str(empty_producer), "emptyVerifier": str(empty_verifier),
         "relations": eligibility, "counts": authored["counts"], "replayCalls": authored["usage"]["replayCalls"],
         "held": held_id, "heldRevision": held_revision, "eligible": next(rc for rc, status in eligibility.items() if status == "eligible"),

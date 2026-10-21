@@ -3,13 +3,13 @@
 
 /* D-GRP-01 visual baseline shared by D-AUT-01, D-WAT-01/01b and D-BRF-01/02. */
 :root {
-  --zoop-ink: #1a1a1a;
-  --zoop-muted: #5f5f5b;
-  --zoop-faint: #94948f;
-  --zoop-line: #d6d6d2;
-  --zoop-paper: #ffffff;
-  --zoop-wash: #f7f7f5;
-  --zoop-soft: #f2f2f0;
+  --zoop-ink: var(--color-zoop-ink);
+  --zoop-muted: var(--color-zoop-muted);
+  --zoop-faint: var(--color-zoop-faint);
+  --zoop-line: var(--color-zoop-line);
+  --zoop-paper: var(--color-zoop-paper);
+  --zoop-wash: var(--color-zoop-wash);
+  --zoop-soft: var(--color-zoop-soft);
 }
 
 .service-surface {
@@ -128,7 +128,7 @@
 
 .service-bottom-nav {
   border-color: var(--zoop-line);
-  background: rgb(255 255 255 / 96%);
+  background: color-mix(in srgb, var(--color-zoop-paper) 96%, transparent);
   backdrop-filter: blur(8px);
 }
 

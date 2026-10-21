@@ -1,4 +1,7 @@
-"""Operator-only offline S3 relation/impact candidate process; never a BFF route, S1 command, graph writer or publisher."""
+"""Operator-only S3 relation/impact candidate process (authored replay or the bound live runtime); never a BFF route, S1 command, graph writer or publisher.
+
+Model keys exist only for `run`/`submit`/`resume` of a LIVE job (the runtime is built lazily from the environment); `inspect`, `review`, `cancel` and
+`live-binding` never read keys and never call a model. `review allow` is the operator's final approval of a HOLD: no model, verifier or impact call."""
 from __future__ import annotations
 
 import argparse
@@ -12,59 +15,64 @@ from pydantic import ValidationError
 from .extraction import Sources
 from .extraction_contracts import MAX_REPLAY
 from .ingestion_contracts import Authority, IngestionFailure, read_file
+from .live_runtime import LiveFailure, LiveRuntime
 from .relation import Engine, Fixtures, Store
-from .relation_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Review, Revalidate, Selector, Submit, canonical
+from .relation_contracts import MAX_COMMAND, SCHEMA, ExtractionFailure, Review, Selector, Submit, canonical, digest
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("run", "submit", "inspect", "resume", "review", "revalidate", "cancel"))
-    parser.add_argument("--state-dir", required=True, type=Path)
-    parser.add_argument("--extraction-state-dir", required=True, type=Path)
-    parser.add_argument("--ingestion-state-dir", required=True, type=Path)
-    parser.add_argument("--sources", required=True, type=Path)
-    parser.add_argument("--replay", type=Path, help="authored producer fixture (relation/impact stages)")
-    parser.add_argument("--verifier-replay", type=Path, help="independent authored verifier fixture (verify-relation/verify-impact stages)")
+    parser.add_argument("command", choices=("run", "submit", "inspect", "resume", "review", "cancel", "live-binding"))
+    parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--extraction-state-dir", type=Path)
+    parser.add_argument("--ingestion-state-dir", type=Path)
+    parser.add_argument("--sources", type=Path)
+    parser.add_argument("--replay", type=Path, help="authored producer fixture (relation/impact stages; replay jobs only)")
+    parser.add_argument("--verifier-replay", type=Path, help="independent authored verifier fixture (verify-relation/verify-impact stages; replay jobs only)")
+    parser.add_argument("--initial-only", action="store_true", help="resume only if this job has not taken its first dispatch (initial_dispatch_taken otherwise)")
     args = parser.parse_args()
+    if args.initial_only and args.command != "resume":
+        parser.error("--initial-only is only valid with resume")
+    if args.command != "live-binding" and not all((args.state_dir, args.extraction_state_dir, args.ingestion_state_dir, args.sources)):
+        parser.error("--state-dir, --extraction-state-dir, --ingestion-state-dir and --sources are required")
     store = None
     try:
+        if args.command == "live-binding":
+            # Offline and keyless: the exact non-secret runtime configuration a live job would freeze.
+            binding = LiveRuntime.from_env(need_send=False).binding()
+            print(canonical({"schemaVersion": SCHEMA, "binding": binding, "bindingDigest": digest(binding)}))
+            return 0
         raw = sys.stdin.buffer.read(MAX_COMMAND + 1)
         if len(raw) > MAX_COMMAND:
             raise ExtractionFailure("command_input_limit")
         incoming = json.loads(raw)
-        if args.command in {"run", "submit"}:
-            provenance = incoming.get("provenance") if isinstance(incoming, dict) else None
-            if isinstance(provenance, dict) and provenance.get("executionMode") == "live":
-                # No live path or fake fallback exists in the offline seam.
-                raise ExtractionFailure("live_mode_unsupported")
-        request = {"run": Submit, "submit": Submit, "review": Review, "revalidate": Revalidate}.get(args.command, Selector).model_validate(incoming)
+        request = {"run": Submit, "submit": Submit, "review": Review}.get(args.command, Selector).model_validate(incoming)
         if args.command in {"inspect", "cancel", "review", "submit"} and (args.replay or args.verifier_replay):
-            # Fixtures are per-call inputs of a later `run`/`resume`/`revalidate`; a submit freezes none of them.
+            # Fixtures are per-call inputs of a later `run`/`resume`; a submit freezes none of them.
             raise ExtractionFailure("fixture_not_allowed")
         fixtures = Fixtures(read_file(args.replay, MAX_REPLAY) if args.replay else None,
                             read_file(args.verifier_replay, MAX_REPLAY) if args.verifier_replay else None)
         authority = Authority(args.sources)
         store = Store(args.state_dir, args.extraction_state_dir, args.ingestion_state_dir)
-        engine = Engine(store, Sources(args.ingestion_state_dir, authority), args.extraction_state_dir, args.ingestion_state_dir)
+        factory = (lambda need_send: LiveRuntime.from_env(need_send=need_send)) if args.command in {"run", "submit", "resume"} else None
+        engine = Engine(store, Sources(args.ingestion_state_dir, authority), args.extraction_state_dir, args.ingestion_state_dir, factory)
         if args.command == "run":
             result = engine.run(request, fixtures)
         elif args.command == "submit":
-            # Registration only: freeze, then report the stored job. No execution, replay call or state change for an existing job.
+            # Registration only: freeze, then report the stored job. No execution, call or state change for an existing job.
             engine.freeze(request)
             result = engine.inspect(request.job_id)
         elif args.command == "resume":
-            result = engine.resume(request.job_id, fixtures)
+            result = engine.resume(request.job_id, fixtures, initial_only=args.initial_only)
         elif args.command == "inspect":
             result = engine.inspect(request.job_id)
         elif args.command == "cancel":
             result = engine.cancel(request.job_id)
-        elif args.command == "review":
-            result = engine.review(request)
         else:
-            result = engine.revalidate(request, fixtures)
+            result = engine.review(request)
         print(canonical(result))
         return 2 if result.get("delivery", {}).get("status") == "withheld" else 0
-    except (ExtractionFailure, IngestionFailure) as exc:
+    except (ExtractionFailure, IngestionFailure, LiveFailure) as exc:
         print(canonical({"schemaVersion": SCHEMA, "error": {"code": exc.code, **({"detail": exc.detail} if getattr(exc, "detail", None) else {})}}))
         return 2
     except (ValidationError, ValueError, TypeError, KeyError, OSError, AttributeError):

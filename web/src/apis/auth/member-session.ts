@@ -94,7 +94,6 @@ export async function memberDestination(
       'INCOMPLETE_PERSONAL_DATA',
       '종목을 확인하지 못했어요.',
     );
-  return settings.watchlistIds.length || portfolio.holdings.length
-    ? '/?mode=personal'
-    : '/?mode=all';
+  // D-AUT-01 → D-GRP-01: a completed login always starts at the market-wide map.
+  return '/?mode=all';
 }

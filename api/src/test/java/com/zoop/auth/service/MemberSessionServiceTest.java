@@ -63,7 +63,7 @@ class MemberSessionServiceTest {
         var row = repository.rows.get(hash);
         repository.rows.put(hash, new MemberSessionRow(row.id(), row.memberId(), row.kind(),
                 row.tokenHash(), row.csrfKeyId(), row.csrfVersion(), row.createdAt(), row.expiresAt(),
-                row.revokedAt(), row.memberStatus(), row.email(), row.displayName(), true, true));
+                row.revokedAt(), row.memberStatus(), row.email(), row.displayName(), true, true, row.analyticsKey()));
 
         var lookup = service.lookup(issued.token(), "setup-state-read");
 
@@ -182,7 +182,7 @@ class MemberSessionServiceTest {
         repository.rows.put(hash, new MemberSessionRow(row.id(), row.memberId(), row.kind(),
                 row.tokenHash(), row.csrfKeyId(), 2, row.createdAt(), row.expiresAt(),
                 row.revokedAt(), row.memberStatus(), row.email(), row.displayName(),
-                row.completed(), row.tutorialCompleted()));
+                row.completed(), row.tutorialCompleted(), row.analyticsKey()));
         assertCsrfDenied(first.token(), first.response().csrfToken());
         repository.rows.put(hash, copy(row, row.expiresAt(), NOW, row.csrfKeyId()));
         assertCsrfDenied(first.token(), first.response().csrfToken());
@@ -220,7 +220,7 @@ class MemberSessionServiceTest {
     private static MemberSessionRow copy(MemberSessionRow row, Instant expiry, Instant revoked, String keyId) {
         return new MemberSessionRow(row.id(), row.memberId(), row.kind(), row.tokenHash(), keyId,
                 row.csrfVersion(), row.createdAt(), expiry, revoked, row.memberStatus(),
-                row.email(), row.displayName(), row.completed(), row.tutorialCompleted());
+                row.email(), row.displayName(), row.completed(), row.tutorialCompleted(), row.analyticsKey());
     }
 
     private static class MemoryRepository implements MemberSessionRepository {
@@ -232,17 +232,18 @@ class MemberSessionServiceTest {
         }
 
         @Override
-        public void insertMemberSession(String id, String memberId, String hash,
+        public boolean insertMemberSession(String id, String memberId, String hash,
                 String keyId, Instant created, Instant expiry) {
             rows.put(hash, new MemberSessionRow(id, memberId, "member", hash, keyId, 1,
-                    created, expiry, null, "active", "a@example.com", "User", false, false));
+                    created, expiry, null, "active", "a@example.com", "User", false, false, "analytics-member"));
+            return true;
         }
 
         @Override
         public void insertGuestSession(String id, String analyticsKey, String hash,
                 String keyId, Instant created, Instant expiry) {
             rows.put(hash, new MemberSessionRow(id, null, "guest", hash, keyId, 1,
-                    created, expiry, null, null, null, null, false, false));
+                    created, expiry, null, null, null, null, false, false, "analytics-guest"));
         }
 
         @Override

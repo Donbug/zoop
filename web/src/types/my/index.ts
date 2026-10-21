@@ -28,6 +28,7 @@ export type WatchlistSectionProps = {
 export type StockRowProps = {
   id: string;
   name: string;
+  logoUrl?: string | null;
   description?: ReactNode;
   /** 오른쪽 끝 값(예: 시세) */
   trailing?: ReactNode;

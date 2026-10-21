@@ -39,7 +39,8 @@ public final class HttpRelationClient implements RelationClient, AutoCloseable {
         String jobId = submission.jobId();
         byte[] body = ("{\"schemaVersion\":\"" + RelationSubmission.SCHEMA_VERSION + "\",\"jobId\":\"" + jobId
                 + "\",\"provenance\":{\"sourceKind\":\"" + PipelineWire.wire(submission.sourceKind())
-                + "\",\"executionMode\":\"replay\",\"recordingKind\":\"authored-test\"},\"upstream\":{\"jobId\":\""
+                + "\",\"executionMode\":\"" + submission.executionMode().wire() + "\",\"recordingKind\":\""
+                + (submission.executionMode() == com.zoop.ai.ExecutionMode.LIVE ? "provider" : "authored-test") + "\"},\"upstream\":{\"jobId\":\""
                 + submission.upstream().jobId() + "\",\"inputDigest\":\"" + submission.upstream().inputDigest() + "\"}}")
                 .getBytes(StandardCharsets.UTF_8);
         Reply reply = transport.exchange(AiOperation.SUBMIT, "POST", transport.uri(JOBS), body, jobId, jobRejections(jobId), 200, 202);
@@ -47,7 +48,8 @@ public final class HttpRelationClient implements RelationClient, AutoCloseable {
                 : PipelineJob.Disposition.ALREADY_ACCEPTED;
         return new RelationAcknowledgement(disposition, AiHttpTransport.decode(reply, () -> {
             RelationJobStatus status = RelationWire.status(reply.body(), "status", jobId, reply.retryAfter());
-            if (status.sourceKind() != submission.sourceKind() || !status.upstream().equals(submission.upstream())) {
+            if (status.sourceKind() != submission.sourceKind() || status.executionMode() != submission.executionMode()
+                    || !status.upstream().equals(submission.upstream())) {
                 throw new Malformed("status.provenance/upstream");
             }
             return status;
@@ -93,20 +95,18 @@ public final class HttpRelationClient implements RelationClient, AutoCloseable {
                 + request.expectedSourceVersion() + "\",\"expectedSourceRevision\":\"" + request.expectedSourceRevision()
                 + "\",\"decision\":\"" + PipelineWire.wire(request.decision()) + "\"}").getBytes(StandardCharsets.UTF_8);
         Reply reply = transport.exchange(AiOperation.REVIEW, "POST", job(jobId, "/reviews"), body, operationId,
-                operationRejections(jobId, operationId), 200, 202);
-        RelationOperationAcknowledgement.Disposition disposition = reply.status() == 202
-                ? RelationOperationAcknowledgement.Disposition.REVIEW_ACCEPTED
-                : RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED;
-        return new RelationOperationAcknowledgement(disposition, AiHttpTransport.decode(reply, () -> {
-            RelationOperationStatus operation = RelationWire.reviewAccepted(
-                    RelationWire.operation(reply.body(), "operation", jobId, operationId, reply.retryAfter()), reply.status() == 202);
-            if (!operation.relationCandidateId().equals(request.relationCandidateId()) || operation.decision() != request.decision()
-                    || !operation.expectedSourceVersion().equals(request.expectedSourceVersion())
-                    || !operation.expectedSourceRevision().equals(request.expectedSourceRevision())) {
-                throw new Malformed("operation.request");
-            }
-            return operation;
-        }));
+                operationRejections(jobId, operationId), 200);
+        return new RelationOperationAcknowledgement(RelationOperationAcknowledgement.Disposition.REVIEW_RECORDED_OR_REPLAYED,
+                AiHttpTransport.decode(reply, () -> {
+                    RelationOperationStatus operation = RelationWire.reviewAccepted(
+                            RelationWire.operation(reply.body(), "operation", jobId, operationId, reply.retryAfter()));
+                    if (!operation.relationCandidateId().equals(request.relationCandidateId()) || operation.decision() != request.decision()
+                            || !operation.expectedSourceVersion().equals(request.expectedSourceVersion())
+                            || !operation.expectedSourceRevision().equals(request.expectedSourceRevision())) {
+                        throw new Malformed("operation.request");
+                    }
+                    return operation;
+                }));
     }
 
     @Override
@@ -118,19 +118,6 @@ public final class HttpRelationClient implements RelationClient, AutoCloseable {
         return AiHttpTransport.decode(reply, () -> RelationWire.operation(reply.body(), "operation", jobId, operationId, reply.retryAfter()));
     }
 
-    @Override
-    public RelationOperationAcknowledgement recoverOperation(String jobId, String operationId) {
-        PipelineJob.requireId("jobId", jobId);
-        PipelineJob.requireId("operationId", operationId);
-        Reply reply = transport.exchange(AiOperation.RECOVER_OPERATION, "POST", operation(jobId, operationId, "/recover"), new byte[0],
-                null, operationRejections(jobId, operationId), 200, 202);
-        RelationOperationAcknowledgement.Disposition disposition = reply.status() == 202
-                ? RelationOperationAcknowledgement.Disposition.RECOVERY_ENQUEUED
-                : RelationOperationAcknowledgement.Disposition.RECOVERY_COALESCED;
-        return new RelationOperationAcknowledgement(disposition, AiHttpTransport.decode(reply,
-                () -> RelationWire.recoveryAccepted(
-                        RelationWire.operation(reply.body(), "operation", jobId, operationId, reply.retryAfter()))));
-    }
 
     @Override
     public void close() {

@@ -1,4 +1,5 @@
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import { useEffect, useRef, useState } from 'react';
 import { useEventData } from '@/hooks/useEventData';
 import type { EventContext, EventDetail } from '@/types/map/event';
@@ -15,6 +16,8 @@ interface Props {
   id: string;
   context: EventContext;
   geography: GraphNode['geography'];
+  /** 지도에 있는 기업 노드의 로고 */
+  logoOf?: (companyId: string) => string | null | undefined;
   onClose: () => void;
   onAction: (action: EventAction, event: EventDetail) => void;
 }
@@ -24,6 +27,7 @@ export default function EventDetailPanel({
   id,
   context,
   geography,
+  logoOf,
   onClose,
   onAction,
 }: Props) {
@@ -63,9 +67,11 @@ export default function EventDetailPanel({
       >
         {items.map((company, index) => (
           <li key={`${company.id}-${index}`}>
-            <span className={ui.avatar} aria-hidden="true">
-              {company.name.slice(0, 1)}
-            </span>
+            <CompanyLogo
+              name={company.name}
+              logoUrl={logoOf?.(company.id)}
+              className={ui.avatar}
+            />
             <div>
               <strong>{company.name}</strong>
               <p>

@@ -528,6 +528,9 @@ class Ingestor:
             "url": parsers.normalize_url(item.url, source.allowed_hosts), "title": item.title, "publishedAt": item.published_at,
             "modifiedAt": item.modified_at, "sourceRevision": item.source_revision, "mediaType": item.media_type},
             "grant": {"grantId": grant.grant_id, "revision": grant.revision}, "document": projection, "locatorMetadata": metadata}
+        if item.publisher is not None:
+            # Only a declared outlet is exported: absence means unspecified, never null, so an unspecified export keeps its exact earlier keys.
+            result["observation"]["publisher"] = item.publisher
         if item.collection is not None:
             # Collected observations alone add provenance + acquisition facts. An authored export keeps exactly the keys the closed
             # application importer (IngestionExportParser) accepts, so its absence of these keys means "authored control".

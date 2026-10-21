@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { panelStyles as ui } from '@/components/common/detail-panel-styles';
+import CompanyLogo from '@/components/common/CompanyLogo';
 import { useRelationData } from '@/hooks/useRelationData';
 import type { EventContext } from '@/types/map/event';
 import type { RelationDetail } from '@/types/map/relation';
@@ -9,6 +10,8 @@ import GraphIcon from './GraphIcon';
 interface Props {
   id: string;
   context: EventContext;
+  /** 지도에 있는 기업 노드의 로고 */
+  logoOf?: (companyId: string) => string | null | undefined;
   onClose: () => void;
   onSelectNode: (id: string) => void;
   onAction: (
@@ -22,6 +25,7 @@ interface Props {
 export default function RelationDetailPanel({
   id,
   context,
+  logoOf,
   onClose,
   onSelectNode,
   onAction,
@@ -156,9 +160,13 @@ export default function RelationDetailPanel({
                       onClick={() => onSelectNode(node.id)}
                       className="flex w-full items-center gap-2 text-left"
                     >
-                      <span aria-hidden="true" className={ui.avatar}>
-                        {node.label.slice(0, 1)}
-                      </span>
+                      <CompanyLogo
+                        name={node.label}
+                        logoUrl={
+                          node.kind === 'company' ? logoOf?.(node.id) : null
+                        }
+                        className={ui.avatar}
+                      />
                       <span>
                         <span className={ui.muted}>
                           {node.kind === 'company' ? '기업' : '사건'}

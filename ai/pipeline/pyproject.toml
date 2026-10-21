@@ -1,7 +1,7 @@
 [project]
 name = "zoop-ai-pipeline"
 version = "0.1.0"
-description = "Zoop one-off document URL collection, S2-1 offline source preparation, S2-2 event/topic candidates, S3 relation/impact candidates, S4 dependents, private graph projection and handoff (native replay-only, public dependencies only)"
+description = "Zoop native document collection and preparation, replay/live event and relation analysis, final operator review, private graph projection and application handoff"
 requires-python = ">=3.12"
 dependencies = [
   "pydantic==2.13.5",

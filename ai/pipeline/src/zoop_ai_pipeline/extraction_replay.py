@@ -1,9 +1,10 @@
 """Native, pure S2-2 analysis rules: article projection, request identities, authored-replay parsing and grounding, SAME rules.
 
 No I/O, network, model or repository is touched. A replay response is an authored answer looked up by the exact digest of
-the request it answers; it is validated against the strict contracts of `extraction_contracts` and is not AI inference.
-`ADAPTER_VERSION` covers everything below that changes a stored identity or verdict: the article projection, the request
-preimages, quote resolution, strict parsing/grounding and the effective/disposition rules. Change one, bump the version.
+the request it answers; it is validated against the strict contracts of `extraction_contracts` and is not AI inference. A live
+job answers the same requests through the provider runtime and is parsed, grounded and ruled by exactly these functions.
+`ADAPTER_VERSION` and `LIVE_ADAPTER_VERSION` both cover everything below that changes a stored identity or verdict: the article
+projection, the request preimages, quote resolution, strict parsing/grounding and the effective/disposition rules. Change one, bump both.
 """
 from __future__ import annotations
 
@@ -81,9 +82,10 @@ def compare_input(mention: Mention, event_id: str, members: list[Mention], artic
             "article": incoming.model_dump(mode="json")}
 
 
-def fingerprint(replay: dict, catalogue: Catalogue) -> str:
-    """Identity of this analysis context, embedded in every candidate id. Native rules, authored labels and the exact catalogue."""
-    return digest({"adapter": ADAPTER_VERSION, "candidate": CANDIDATE_VERSION, "promptVersion": replay["promptVersion"],
+def fingerprint(replay: dict, catalogue: Catalogue, adapter: str = ADAPTER_VERSION) -> str:
+    """Identity of this analysis context, embedded in every candidate id. Native rules, authored/frozen labels and the exact catalogue.
+    `replay` only needs promptVersion and analysisVersion; a live job passes its adapter version and its frozen runtime identity as analysisVersion."""
+    return digest({"adapter": adapter, "candidate": CANDIDATE_VERSION, "promptVersion": replay["promptVersion"],
                    "analysisVersion": replay["analysisVersion"], "catalogue": digest(catalogue.wire())})
 
 

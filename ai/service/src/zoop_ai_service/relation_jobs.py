@@ -29,7 +29,7 @@ from .jobs import ApiError, KeyedLocks, Observation, Reply, request_digest
 from .relation_dispatch import BUSY_CODES as DISPATCH_BUSY
 from .relation_dispatch import RelationDispatcher
 from .relation_ledger import DispatchRow, OperationRow, RelationLedger, RelationRow, stamp
-from .relation_review import Evidence, evidence, marker, operation_status, relation_of, settlement
+from .relation_review import Evidence, evidence, marker, operation_status
 from .relation_runtime import GateBusy, RelationGate, RelationProcess
 from .relation_wire import (RETRYABLE, RelationChain, RelationDelivery, RelationDispatch, RelationErrorEnvelope, RelationFailure,
                             RelationJobContent, RelationJobStatus, RelationOperationStatus, RelationProvenance, RelationReceipt,
@@ -45,7 +45,10 @@ BUSY_WAIT = 10.0
 BUSY_CODES = DISPATCH_BUSY | {"extraction_busy", "ingestion_busy"}
 CONFIG_CODES = frozenset({"input_or_configuration_invalid", "persistence_failed", "relation_internal_failure", "ledger_version_unknown",
                           "analysis_contract_changed", "state_ownership_unconfigured"})
-CONFIG_PATTERN = re.compile(r"state_[a-z_]+|[a-z]+_state_(missing|invalid)|[a-z]+_recovery_required")
+# `live_*` pipeline refusals are the live runtime's own configuration/gate errors (gate off, incomplete or invalid settings, budget unavailable).
+CONFIG_PATTERN = re.compile(r"state_[a-z_]+|[a-z]+_state_(missing|invalid)|[a-z]+_recovery_required|live_[a-z_]+")
+# A job whose call was sent and never answered is reconcile-only; the pipeline names that failure per execution mode.
+UNANSWERED = frozenset({"replay_response_unknown", "live_response_unknown"})
 
 
 class RelationError(ApiError):
@@ -171,13 +174,27 @@ class RelationJobs:
             outcome = self.process.inspect(row.job_id)
         return self._parse(outcome, row, seen, "inspect")
 
+    def _live_refusal(self, row: RelationRow, access: relation_access.Access) -> str | None:
+        """None when a LIVE job's pinned runtime identity is still exactly what the operator's allowlist approves for this owner and upstream."""
+        if row.live_binding is not None and access.live_identity(row.owner, row.upstream_job_id, row.upstream_input_digest) != row.live_binding:
+            return "live_not_approved"
+        return None
+
     def _delivery(self, row: RelationRow, view: RelationView, seen: Observation) -> RelationDelivery:
         if view.delivery.status == "withheld":
             return RelationDelivery(state="withheld", reason=view.delivery.code or "withheld")
         if view.state != "ready":
             return RelationDelivery(state="withheld", reason="job_not_ready")
-        if not self._access(seen).allows(row.owner, row.upstream_job_id, row.upstream_input_digest):
+        access = self._access(seen)
+        if not access.allows(row.owner, row.upstream_job_id, row.upstream_input_digest):
             return RelationDelivery(state="withheld", reason="upstream_not_allowed")
+        if row.live_binding is not None:
+            runtime = view.binding.runtime
+            if runtime is None or runtime.identity != row.live_binding:
+                return RelationDelivery(state="withheld", reason="live_binding_changed")
+            refusal = self._live_refusal(row, access)
+            if refusal is not None:
+                return RelationDelivery(state="withheld", reason=refusal)
         return RelationDelivery(state="available")
 
     def _status(self, row: RelationRow, view: RelationView, seen: Observation, dispatch: DispatchRow | None = None,
@@ -196,7 +213,7 @@ class RelationJobs:
             delivery=delivery or self._delivery(row, view, seen),
             dispatch=RelationDispatch(state=dispatch.state, dispatch_count=dispatch.dispatch_count, last_outcome=dispatch.last_outcome,
                                       last_runtime_code=dispatch.last_runtime_code, updated_at=dispatch.updated_at),
-            next=next_action(view.state, "pending" if self.ledger.revalidating(row.job_id) else dispatch.state),
+            next=next_action(view.state, dispatch.state),
             accepted_at=row.accepted_at, observed_at=stamp(self._clock()))
 
     def _owned(self, owner: str, job_id: str) -> RelationRow:
@@ -218,6 +235,7 @@ class RelationJobs:
     def submit(self, owner: str, job_id: str, body: RelationSubmit, seen: Observation) -> Reply:
         wire = body.wire()
         digest = request_digest(wire)
+        live = body.provenance.execution_mode == "live"
         location = {"Location": f"/internal/v1/relation-jobs/{job_id}"}
         with self._locks.hold(job_id):
             row = self.ledger.job(job_id)
@@ -231,8 +249,18 @@ class RelationJobs:
                     status = self._status(row, view, seen)
                     return Reply(200, status, self._headers(status, **location))
             # Unknown upstream: refused before any ledger row or child exists, and the same answer whether or not it exists.
-            if not self._access(seen).allows(owner, body.upstream.job_id, body.upstream.input_digest):
+            access = self._access(seen)
+            if not access.allows(owner, body.upstream.job_id, body.upstream.input_digest):
                 raise RelationError(403, "upstream_not_allowed")
+            pin = None
+            if live:
+                # A live job spends money: the service must have the live group, and the operator's allowlist must pin the runtime identity it
+                # approved for exactly this owner and upstream (a reservation made earlier keeps the pin it was made under).
+                if self.config.pipeline_live is None:
+                    raise RelationError(409, "live_unavailable")
+                pin = access.live_identity(owner, body.upstream.job_id, body.upstream.input_digest)
+                if pin is None or (row is not None and row.live_binding != pin):
+                    raise RelationError(403, "live_not_approved")
             if self.ledger.active_count() >= MAX_PENDING:
                 raise RelationError(503, "queue_full", retry_after=30)
             problem = self.preflight()
@@ -240,11 +268,11 @@ class RelationJobs:
                 raise self._fault(seen, problem)
             with self._cli():
                 # Owner intent first (durable). Then the pipeline registers, then accepted + dispatch intent, then 202.
-                row = row or self.ledger.reserve(job_id, owner, digest, body.upstream.job_id, body.upstream.input_digest)
+                row = row or self.ledger.reserve(job_id, owner, digest, body.upstream.job_id, body.upstream.input_digest, pin)
                 if row.submit_attempts == 0:
                     self._refuse_adoption(job_id, owner, digest, seen)
                 self.ledger.begin_attempt(job_id)
-                outcome = self.process.submit(wire)
+                outcome = self.process.submit(wire, live=live)
                 self._log(seen, "submit", outcome)
                 if outcome.kind != "result":
                     outcome = self._reconcile(job_id, owner, digest, outcome, seen)
@@ -300,6 +328,10 @@ class RelationJobs:
                                                "recording_kind": body.provenance.recording_kind}
                 or view.state != "queued" or view.calls):
             raise RelationError(500, "runtime_binding_mismatch")  # the reservation is kept: this is not a registration the service made
+        if row.live_binding is not None and (view.binding.runtime is None or view.binding.runtime.identity != row.live_binding):
+            # The pipeline froze this job under a runtime other than the one the operator approved. It will never be dispatched or delivered; the
+            # reservation is kept, so only a NEW job id (under the approved configuration) can ever be used.
+            raise RelationError(409, "live_binding_mismatch")
         return view
 
     def status(self, owner: str, job_id: str, seen: Observation) -> Reply:
@@ -348,12 +380,20 @@ class RelationJobs:
         dispatch = self.ledger.dispatch(job_id)
         assert dispatch is not None
         status = self._status(row, view, seen, dispatch=dispatch)
-        if dispatch.state in ("pending", "in_flight") or self.ledger.revalidating(job_id):
+        if row.live_binding is not None and self.config.pipeline_live is None:
+            # A live job on a service started without the live group can neither be coalesced into a pending dispatch nor queued: nothing may run.
+            raise RelationError(409, "live_unavailable", job_status=status)
+        if dispatch.state in ("pending", "in_flight"):
             return Reply(200, status, self._headers(status))
-        if view.state == "reconciling" or (view.failure is not None and view.failure.code == "replay_response_unknown"):
+        if view.state == "reconciling" or (view.failure is not None and view.failure.code in UNANSWERED):
             raise RelationError(409, "reconcile_required", job_status=status)
         if view.state not in ("queued", "running", "stopped"):
             raise RelationError(409, "job_not_recoverable", job_status=status)
+        if row.live_binding is not None:
+            # A live recover spends money again: the owner and the pinned runtime must still be approved NOW.
+            refusal = self._live_refusal(row, self._access(seen))
+            if refusal is not None:
+                raise RelationError(403, refusal, job_status=status)
         queued = self.ledger.enqueue(job_id, MAX_PENDING)
         if queued == "full":
             raise RelationError(503, "queue_full", retry_after=30)
@@ -363,16 +403,17 @@ class RelationJobs:
 
     # ---- review operations ----
     #
-    # One operation per Idempotency-Key. The review is a synchronous, quick pipeline command (a compare-and-set append of one event); the
-    # revalidation it requests is a queued dispatch of the same dispatcher. Acceptance, verification and publication are separate facts: the
-    # POST answers once the decision is proven in the chain, the verdict arrives later, and nothing here ever publishes.
+    # One operation per Idempotency-Key. The review is a synchronous, quick pipeline command (a compare-and-set append of one event). `allow` is the
+    # operator's FINAL approval of a HOLD relation (no verifier or model call follows it, nothing is dispatched) and `reject` an exclusion: the POST
+    # answers 200 once the exact event is proven in the chain, and nothing here ever publishes. An operation recorded under the earlier contract (an
+    # `allow` that meant "revalidate") is history: it stays readable and is never dispatched, resent or read as an approval (`review_contract_changed`).
     _REVIEW_REFUSALS = {"review_revision_conflict": (409, "source_revision_conflict"), "review_target_not_hold": (409, "review_target_not_hold"),
-                        "review_already_pending": (409, "review_already_pending"), "job_cancelled": (409, "job_cancelled"),
-                        "relation_candidate_not_found": (404, "relation_candidate_not_found")}
+                        "review_call_in_flight": (409, "review_call_in_flight"), "review_candidate_ineligible": (409, "review_candidate_ineligible"),
+                        "job_cancelled": (409, "job_cancelled"), "relation_candidate_not_found": (404, "relation_candidate_not_found")}
     # Refusals that are a pure function of the chain and the job at the revision the operation expected: no child, orphaned or not, can append
     # there later, so once the chain is read and shows no event of ours the reservation can go. A revision conflict is not one of them: it says
     # the chain moved, and only the chain can say whether it moved because of this operation.
-    _PERMANENT_REFUSALS = frozenset({"review_target_not_hold", "review_already_pending", "job_cancelled", "relation_candidate_not_found"})
+    _PERMANENT_REFUSALS = frozenset({"review_target_not_hold", "job_cancelled", "relation_candidate_not_found"})
 
     def _permit(self, owner: str, row: RelationRow, seen: Observation) -> None:
         """A write to the AI ledger (a review or a recovery) needs the upstream to be listed for the owner NOW. A plain lookup does not."""
@@ -415,14 +456,13 @@ class RelationJobs:
         return self._evidence(view, raw, op)
 
     def _adopt(self, op: OperationRow, found: Evidence, location: dict[str, str]) -> Reply:
-        """The exact event is proven: record it and, for an allow, the one revalidation intent, in one transaction. The decision is never
-        withdrawn because the dispatcher is busy."""
+        """The exact event is proven: record it. A final approval or an exclusion is terminal: nothing is queued and no call follows."""
         assert found.event_at is not None
-        self.ledger.apply_operation(op.operation_id, found.event_at)
-        self.dispatcher.wake()
+        if not self.ledger.apply_operation(op.operation_id, found.event_at):
+            raise RelationError(500, "internal_error")  # only a current-contract reservation reaches here
         done = self.ledger.operation(op.operation_id)
         assert done is not None and done.review_state == "applied"
-        return self._operation_reply(202 if done.decision == "allow" else 200, done, location)
+        return self._operation_reply(200, done, location)
 
     def _unproven(self, op: OperationRow, found: Evidence) -> RelationError:
         """The chain does not show this operation's event. The reservation is released only when the event can never appear (the relation
@@ -492,12 +532,14 @@ class RelationJobs:
         raise self._unproven(op, found)
 
     def review(self, owner: str, job_id: str, key: str, body: RelationReview, seen: Observation) -> Reply:
-        """Record one allow/reject decision on one relation candidate, exactly once per Idempotency-Key.
+        """Record one allow (final approval) / reject (exclusion) decision on one relation candidate, exactly once per Idempotency-Key.
 
         The same key and body return the existing operation, even after the relation has since moved on; the same key with another body
-        or job is `idempotency_conflict`; another principal's key is `operation_id_unavailable`. A NEW decision needs the upstream still listed
+        or job is `idempotency_conflict`; another principal's key is `operation_id_unavailable`; a key reserved under the earlier revalidation
+        contract is `review_contract_changed` (use a new key). A NEW decision needs the upstream still listed
         for the owner, the job's `sourceVersion` and the relation's `sourceRevision` to match exactly (the revision is enforced by the pipeline
-        inside its append transaction), and records nothing at all when any of that fails."""
+        inside its append transaction), and records nothing at all when any of that fails. The pipeline itself re-runs the deterministic checks
+        and re-reads the current source rights, so a human `allow` can never override them."""
         digest = request_digest({"jobId": job_id, **body.wire()})
         location = {"Location": f"/internal/v1/relation-jobs/{job_id}/reviews/{key}"}
         with self._locks.hold("review:" + key):
@@ -510,6 +552,8 @@ class RelationJobs:
                     raise RelationError(409, "idempotency_conflict")
                 if op.review_state == "applied":
                     return self._operation_reply(200, op, location)
+                if op.legacy:
+                    raise RelationError(409, "review_contract_changed", operation=operation_status(op, stamp(self._clock())))
             self._permit(owner, row, seen)
             if op is None and body.expected_source_version != row.input_digest:
                 raise RelationError(409, "source_version_conflict")
@@ -519,9 +563,7 @@ class RelationJobs:
             with self._cli():
                 # Owner intent first (durable, a reserved row), then the pipeline appends, then the exact event is proven and recorded.
                 op = self.ledger.reserve_operation(key, owner, job_id, body.relation_candidate_id, body.decision, body.expected_source_version,
-                                                   int(body.expected_source_revision), digest, MAX_PENDING)
-                if op is None:
-                    raise RelationError(503, "queue_full", retry_after=30)
+                                                   int(body.expected_source_revision), digest)
                 return self._drive(row, op, seen, location)
 
     def operation(self, owner: str, job_id: str, key: str, seen: Observation) -> Reply:
@@ -529,48 +571,3 @@ class RelationJobs:
         crash: an operation reserved but not yet proven is reported `unconfirmed` with `next=retry_review`."""
         row = self._owned(owner, job_id)
         return self._operation_reply(200, self._operation_of(owner, row, key))
-
-    def recover_operation(self, owner: str, job_id: str, key: str, seen: Observation) -> Reply:
-        """Explicit recovery of the revalidation an accepted allow requested. It reads the chain FIRST: a verdict (or a superseding reject) that
-        is already there settles the operation without any child; only an operation whose relation still waits at the revision the review left
-        is queued again. `revalidate` never resends a call the pipeline already started, so this can at most finish a saved receipt or send the
-        one call that never started; an unanswered call is `reconcile_required`."""
-        row = self._owned(owner, job_id)
-        op = self._operation_of(owner, row, key)
-        status = operation_status(op, stamp(self._clock()))
-        if op.review_state != "applied":
-            raise RelationError(409, "review_not_confirmed", operation=status)
-        if op.decision != "allow":
-            raise RelationError(409, "operation_not_recoverable", operation=status)
-        if op.settled is not None or op.reval_state in ("pending", "in_flight"):
-            return self._operation_reply(200, op)
-        self._permit(owner, row, seen)
-        with self._cli():
-            view, raw = self._parse(self.process.inspect(row.job_id), row, seen, "inspect")
-        if view.state == "cancelled":
-            raise RelationError(409, "job_cancelled", operation=status)
-        if view.delivery.status != "current":
-            raise RelationError(409, "upstream_unavailable", runtime_code=view.delivery.code or "withheld", operation=status)
-        try:
-            chain = RelationChain.model_validate(raw)
-        except ValidationError:
-            raise RelationError(503, "runtime_unavailable", retry_after=2) from None
-        settled = settlement(chain, op.relation_candidate_id, op.expected_source_revision)
-        if settled is not None:
-            self.ledger.settle_operation(op.operation_id, *settled)
-            return self._operation_reply(200, self._applied(key))
-        relation = relation_of(chain, op.relation_candidate_id)
-        if relation is None or relation.eligibility.revision != op.expected_source_revision + 1 or not relation.eligibility.review_pending:
-            raise RelationError(409, "operation_not_recoverable", operation=status)
-        if view.state == "reconciling" or (view.failure is not None and view.failure.code == "replay_response_unknown"):
-            raise RelationError(409, "reconcile_required", job_status=self._status(row, view, seen), operation=status)
-        queued = self.ledger.enqueue_operation(op.operation_id, MAX_PENDING)
-        if queued == "full":
-            raise RelationError(503, "queue_full", retry_after=30)
-        self.dispatcher.wake()
-        return self._operation_reply(202 if queued == "enqueued" else 200, self._applied(key))
-
-    def _applied(self, key: str) -> OperationRow:
-        found = self.ledger.operation(key)
-        assert found is not None
-        return found

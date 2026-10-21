@@ -48,7 +48,8 @@ def test_submit_status_and_result_over_the_real_pipeline(start_extraction, world
     final = service.ewait(states={"ready"}, dispatch={"idle"})
     assert set(final) == STATUS_KEYS and final["next"] == "fetch_result" and final["failure"] is None
     assert final["dispatch"]["dispatchCount"] == 1 and final["dispatch"]["lastOutcome"] == "exited" and final["dispatch"]["lastRuntimeCode"] is None
-    assert final["usage"] == {"replayCalls": world.s2_replay_calls, "startedWithoutReceipt": 0, "providerCalls": 0, "paidModelCalls": 0}
+    assert final["usage"] == {"replayCalls": world.s2_replay_calls, "startedWithoutReceipt": 0, "providerCalls": 0, "paidModelCalls": 0, "receivedCalls": 0,
+                              "unsentCalls": 0, "inputTokens": None, "outputTokens": None, "reasoningTokens": None, "estimatedUsd": None, "chargedUsd": None}
     assert final["stages"] == [{"stage": "extract", "state": "complete"}, {"stage": "compare", "state": "complete"}, {"stage": "topic", "state": "complete"}]
     assert final["delivery"] == {"state": "available", "reason": None} and final["inputDigest"] == world.upstream["inputDigest"]
     assert not set(walk_keys(final)) & PRIVATE_KEYS
