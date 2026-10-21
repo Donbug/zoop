@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.zoop.admin.audit.AuditReasonPolicy;
 import com.zoop.admin.auth.repository.AdminAuditRepository;
@@ -18,6 +19,7 @@ import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionList;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.json.Canonical;
+import com.zoop.common.json.StrictJson;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.read.DisclosureExclusionReader;
@@ -34,6 +36,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Lists public graph versions and moves the public pointer for an administrator (FS059). A version is activated only
@@ -124,8 +127,7 @@ public class AdminGraphVersionService {
         }
         String path = "/api/v1/admin/graph/versions/" + versionId + "/activate";
         String expected = request.expectedActiveVersionId();
-        // Version ids are never empty, so "" stands for an explicit null without colliding with any id.
-        String requestHash = Canonical.sha256(versionId + "\n" + (expected == null ? "" : expected) + "\n" + reason);
+        String requestHash = requestHash(versionId, expected, reason);
         Instant requestedAt = clock.instant();
         try {
             boolean claimed = repository.claimIdempotency(UUID.randomUUID().toString(), admin.adminId(), path,
@@ -146,7 +148,7 @@ public class AdminGraphVersionService {
                     .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
             PublicGraphSnapshot snapshot = snapshots.load(version);
             var activation = versions.activateByAdmin(versionId, expected, admin.adminId(), admin.email(), reason,
-                    () -> requirePublishableNow(version, snapshot, requestId));
+                    () -> publishableNow(version, snapshot, requestId));
             audit.recordGraphActivation(admin.adminId(), admin.email(), versionId, activation.previousVersionId(),
                     activation.pointerChanged(), reason, requestId, activation.activatedAt());
             ActivateResponse result = new ActivateResponse(versionId, activation.previousVersionId(),
@@ -167,16 +169,17 @@ public class AdminGraphVersionService {
      * read readiness right before the switch). A synthetic fixture is publishable only where the snapshot source itself is
      * the local/dev fixture source: an artifact deployment can still read old fixture rows, and "[합성]" data must never become
      * its public graph. Fixtures carry no rights and no stored evidence, so only imported versions get the rights checks.
-     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in.
+     * Without an exclusion store "nothing excluded" is unknown: refused unless the operator opted in. Returns the last check,
+     * which the repository runs at the activation time: grant pins are judged at the moment the version becomes public.
      */
-    private void requirePublishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
+    private Consumer<Instant> publishableNow(GraphVersionRecord version, PublicGraphSnapshot snapshot, String requestId) {
         if (!IMPORTED.equals(version.kind())) {
             if (!FIXTURE_SOURCE.equals(snapshotSource)) {
                 log.info("Graph activation refused (graphVersion={}, reason=fixture_outside_fixture_source, source={}, "
                         + "requestId={})", version.id(), snapshotSource, requestId);
                 throw new CustomException(ErrorCode.INVALID_REQUEST);
             }
-            return;
+            return at -> { };
         }
         if (!exclusions.authoritative() && !allowWithoutExclusionStore) {
             log.info("Graph activation refused (graphVersion={}, reason=exclusion_store_unavailable, requestId={})",
@@ -195,7 +198,19 @@ public class AdminGraphVersionService {
             }
         }
         repository.shareLockArticles(articles);
-        evidence.requireGraphEvidenceServable(version.id(), found, requestId);
+        return evidence.prepareGraphActivation(version.id(), found, requestId);
+    }
+
+    /**
+     * Canonical JSON of what the request asks for, so an explicit null and an empty string stay different bodies (a joined
+     * string with a sentinel made them collide: PR #275 follow-up review).
+     */
+    static String requestHash(String versionId, String expectedActiveVersionId, String reason) {
+        ObjectNode body = StrictJson.newObject();
+        body.put("versionId", versionId);
+        body.put("expectedActiveVersionId", expectedActiveVersionId);
+        body.put("reason", reason);
+        return Canonical.digest(body);
     }
 
     private static void validateKey(String key) {

@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -136,21 +138,24 @@ public class JdbcGraphVersionRepository implements GraphVersionRepository {
 
     /**
      * Moves the pointer for an administrator under the publication lock. When the current pointer is not
-     * {@code expectedActiveVersionId} (null: none active) another change won the race: 409. {@code publishable} then runs inside
-     * the lock and the same transaction (the caller's current-eligibility checks); it throws to keep the old pointer. The
-     * activation time is read only after both, so a later asOf never selects a version before it was really public. The first
-     * pointer change also stamps {@code published_at}. Unknown ids are the caller's 404.
+     * {@code expectedActiveVersionId} (null: none active) another change won the race: 409. The caller's current-eligibility
+     * checks then run inside the lock and the same transaction: {@code publishable} runs the slow, time-independent part and
+     * returns the part that depends on time. The activation time is read only after the slow part, that last part judges the
+     * version at exactly that time (a grant expiring meanwhile is refused), and the same time stamps the history, the first
+     * {@code published_at} and the caller's audit. Either part throws to keep the old pointer. So a later asOf never selects a
+     * version before it was really public. Unknown ids are the caller's 404.
      */
     @Transactional
     public Activation activateByAdmin(String versionId, String expectedActiveVersionId, String adminId,
-            String adminEmail, String reason, Runnable publishable) {
+            String adminEmail, String reason, Supplier<Consumer<Instant>> publishable) {
         jdbc.getJdbcTemplate().execute("SELECT pg_advisory_xact_lock(" + PUBLICATION_LOCK + ")");
         if (find(versionId).isEmpty()) throw new IllegalArgumentException("Unknown graph version " + versionId);
         if (!Objects.equals(expectedActiveVersionId, active().map(GraphVersionRecord::id).orElse(null))) {
             throw new CustomException(ErrorCode.REVISION_CONFLICT);
         }
-        publishable.run();
+        Consumer<Instant> atActivation = publishable.get();
         Instant at = clock.instant();
+        atActivation.accept(at);
         Activation activation = activateLocked(versionId, "activate", adminId, adminEmail, reason, at);
         if (activation.pointerChanged()) {
             jdbc.update("UPDATE graph_versions SET published_at = :at WHERE id = :id AND published_at IS NULL",

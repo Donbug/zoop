@@ -1086,8 +1086,34 @@ class GraphEvidenceServiceTest {
 
     // ---- activation precheck (FS059, PR #275 review 1) -------------------------------------------------------------------
 
+    /** Both steps, the last one at the clock's now (the activation time when nothing else is going on). */
     private void precheck() {
-        service().requireGraphEvidenceServable(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a");
+        service().prepareGraphActivation(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a").accept(NOW);
+    }
+
+    @Test
+    void aGrantValidWhenTheChecksStartButExpiredAtActivationIsRefused() throws Exception {
+        setUp();
+        // Valid at NOW, ends one second later (an expiry equal to the judged time already denies).
+        writeSources(source(PROVIDER, SOURCE_GRANT, SOURCE_REVISION, true, "known", List.of("read", "store", "quote-display"),
+                "e", "2026-10-15T01:00:01Z"));
+        var atActivation = service().prepareGraphActivation(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a");
+
+        atActivation.accept(NOW);
+        assertEquals(ErrorCode.REVISION_CONFLICT, assertThrows(CustomException.class,
+                () -> atActivation.accept(NOW.plusSeconds(2))).getErrorCode(),
+                "the slow step judged nothing by time; the activation time decides");
+    }
+
+    @Test
+    void theSlowStepNeverReadsTheRegistry() throws Exception {
+        setUp();
+        Files.delete(sources);
+
+        var atActivation = service().prepareGraphActivation(GRAPH_VERSION, Map.of(EVIDENCE_ID, found), "req-a");
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, assertThrows(CustomException.class,
+                () -> atActivation.accept(NOW)).getErrorCode(), "the registry is read once, at the activation time");
     }
 
     private ErrorCode precheckRefused() {

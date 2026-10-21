@@ -8,6 +8,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import com.zoop.admin.auth.repository.AdminAuditRepository;
 import com.zoop.admin.auth.service.AdminPrincipal;
@@ -16,7 +18,6 @@ import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionOut;
 import com.zoop.admin.graph.JdbcAdminGraphVersionRepository.IdempotencyRow;
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
-import com.zoop.common.json.Canonical;
 import com.zoop.document.evidence.graph.GraphEvidence;
 import com.zoop.document.evidence.service.EvidenceService;
 import com.zoop.graph.read.DisclosureExclusionReader;
@@ -41,7 +42,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -71,6 +71,8 @@ class AdminGraphVersionServiceTest {
         when(versions.find("gv-1")).thenReturn(Optional.of(IMPORTED));
         when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
         activating("gv-1", ACTIVE, "go live", new Activation(ACTIVE, true, LATER));
+        List<Instant> judgedAt = new java.util.ArrayList<>();
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("request-1"))).thenReturn(judgedAt::add);
 
         var result = service(storeExists(), false).activate("gv-1", request(" go live ", ACTIVE), "key-1", ADMIN,
                 "request-1");
@@ -78,9 +80,10 @@ class AdminGraphVersionServiceTest {
         assertEquals("gv-1", result.activeVersionId());
         assertEquals(ACTIVE, result.previousActiveVersionId());
         assertFalse(result.idempotent());
+        assertEquals(List.of(LATER), judgedAt, "grants are judged at the activation time, not when the checks began");
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, GraphEvidence>> visible = ArgumentCaptor.forClass(Map.class);
-        verify(evidence).requireGraphEvidenceServable(eq("gv-1"), visible.capture(), eq("request-1"));
+        verify(evidence).prepareGraphActivation(eq("gv-1"), visible.capture(), eq("request-1"));
         assertFalse(visible.getValue().isEmpty());
         verify(repository).shareLockArticles(argThat(ids -> !ids.isEmpty()));
         // The audit carries the time the pointer moved, not the time the request arrived (review 2).
@@ -112,10 +115,11 @@ class AdminGraphVersionServiceTest {
         when(versions.find("gv-1")).thenReturn(Optional.of(IMPORTED));
         when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
         activating("gv-1", ACTIVE, "go live", new Activation(ACTIVE, true, LATER));
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("r"))).thenReturn(at -> { });
 
         service(noStore(), true).activate("gv-1", request("go live", ACTIVE), "key-1", ADMIN, "r");
 
-        verify(evidence).requireGraphEvidenceServable(eq("gv-1"), anyMap(), eq("r"));
+        verify(evidence).prepareGraphActivation(eq("gv-1"), anyMap(), eq("r"));
     }
 
     @Test
@@ -124,8 +128,28 @@ class AdminGraphVersionServiceTest {
         when(versions.find("gv-1")).thenReturn(Optional.of(IMPORTED));
         when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
         activating("gv-1", ACTIVE, "go live", new Activation(ACTIVE, true, LATER));
-        doThrow(new CustomException(ErrorCode.REVISION_CONFLICT))
-                .when(evidence).requireGraphEvidenceServable(eq("gv-1"), anyMap(), eq("r"));
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("r")))
+                .thenThrow(new CustomException(ErrorCode.REVISION_CONFLICT));
+
+        var error = assertThrows(CustomException.class, () -> service(storeExists(), false).activate("gv-1",
+                request("go live", ACTIVE), "key-1", ADMIN, "r"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
+        verifyNoInteractions(audit);
+        verify(repository, never()).completeIdempotency(any(), any());
+    }
+
+    @Test
+    void aGrantThatExpiresWhileTheChecksRunIsRefusedAtTheActivationTime() {
+        claim("gv-1", ACTIVE, "go live");
+        when(versions.find("gv-1")).thenReturn(Optional.of(IMPORTED));
+        when(snapshots.load(IMPORTED)).thenReturn(fixtureSnapshot());
+        activating("gv-1", ACTIVE, "go live", new Activation(ACTIVE, true, LATER));
+        // The slow step passes (it judges nothing by time); the grant ends between NOW and LATER.
+        Instant expiry = NOW.plusSeconds(3);
+        when(evidence.prepareGraphActivation(eq("gv-1"), anyMap(), eq("r"))).thenReturn(at -> {
+            if (!at.isBefore(expiry)) throw new CustomException(ErrorCode.REVISION_CONFLICT);
+        });
 
         var error = assertThrows(CustomException.class, () -> service(storeExists(), false).activate("gv-1",
                 request("go live", ACTIVE), "key-1", ADMIN, "r"));
@@ -252,8 +276,25 @@ class AdminGraphVersionServiceTest {
     }
 
     @Test
-    void explicitNullAndAnIdHashDifferently() {
+    void explicitNullAnEmptyStringAndAnIdHashDifferently() {
         assertFalse(hash("gv-1", null, "go").equals(hash("gv-1", "gv-0", "go")));
+        assertFalse(hash("gv-1", null, "go").equals(hash("gv-1", "", "go")),
+                "a sentinel string must not make null and \"\" the same request");
+    }
+
+    @Test
+    void anEmptyExpectedVersionAfterANullSuccessWithTheSameKeyIsAConflict() {
+        when(repository.claimIdempotency(anyString(), eq("admin-1"), anyString(), eq("key-1"), eq("gv-1"),
+                anyString(), eq(NOW))).thenReturn(false);
+        when(repository.findIdempotencyForUpdate(eq("admin-1"), anyString(), eq("key-1")))
+                .thenReturn(Optional.of(new IdempotencyRow("idem-1", hash("gv-1", null, "go live"), "completed",
+                        "{\"activeVersionId\":\"gv-1\",\"previousActiveVersionId\":null,\"idempotent\":false}")));
+
+        var error = assertThrows(CustomException.class, () -> service(storeExists(), false).activate("gv-1",
+                request("go live", ""), "key-1", ADMIN, "r"));
+
+        assertEquals(ErrorCode.IDEMPOTENCY_CONFLICT, error.getErrorCode(), "\"\" is not the null that succeeded");
+        verifyNoInteractions(versions, snapshots, audit);
     }
 
     @Test
@@ -294,11 +335,14 @@ class AdminGraphVersionServiceTest {
         verifyNoInteractions(repository);
     }
 
-    /** The repository mock runs the caller's checks where the real one does: under the lock, before the pointer moves. */
+    /**
+     * The repository mock runs the caller's checks where the real one does: the slow part under the lock, then the last part at
+     * the activation time it reports, before the pointer moves.
+     */
     private void activating(String versionId, String expected, String reason, Activation activation) {
         when(versions.activateByAdmin(eq(versionId), eq(expected), eq("admin-1"), eq("admin@example.com"), eq(reason),
                 any())).thenAnswer(invocation -> {
-                    invocation.<Runnable>getArgument(5).run();
+                    invocation.<Supplier<Consumer<Instant>>>getArgument(5).get().accept(activation.activatedAt());
                     return activation;
                 });
     }
@@ -316,7 +360,7 @@ class AdminGraphVersionServiceTest {
     }
 
     private static String hash(String versionId, String expected, String reason) {
-        return Canonical.sha256(versionId + "\n" + (expected == null ? "" : expected) + "\n" + reason);
+        return AdminGraphVersionService.requestHash(versionId, expected, reason);
     }
 
     private static PublicGraphSnapshot fixtureSnapshot() {

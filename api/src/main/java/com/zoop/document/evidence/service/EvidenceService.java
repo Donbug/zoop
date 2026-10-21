@@ -5,11 +5,12 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Supplier;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import com.zoop.artifact.storage.ArtifactStoreException;
@@ -294,7 +295,7 @@ public class EvidenceService {
             // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one. Its
             // bytes are read and parsed once for the grant pins and, for a basis-only span, for the basis membership.
             StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(found.graphVersion(), requestId), found.graphVersion());
-            requireCurrentGrants(receiptBundle, row, found, article, () -> sources.registry(requestId), now);
+            requireAllowed(pinnedGrants(receiptBundle, row, found, article), sources.registry(requestId), now);
         } catch (GraphReceiptGrants.Malformed malformed) {
             log.info("Graph evidence withheld (evidenceId={}, reason={}, requestId={})", row.id(), malformed.getMessage(), requestId);
             throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
@@ -318,17 +319,19 @@ public class EvidenceService {
 
     /**
      * Activation precheck (FS059, graph read contract section 0): the same gates {@link #read} applies to a graph body citation,
-     * run against a version that is not active yet. {@code visible} maps each evidence id the version would show to what its
-     * snapshot says about it; the caller holds the publication lock and has share-locked the cited articles. The version's
-     * receipt is read once. A withheld citation (access, grant or registry changed since the import) is REVISION_CONFLICT; a
-     * store or registry that cannot be read is SOURCE_UNAVAILABLE. Nothing is written.
+     * run against a version that is not active yet, in two steps. This call runs every time-independent gate (row, verified
+     * body span, article access, version text, receipt pins, basis, provider) over all of {@code visible}, which maps each
+     * evidence id the version would show to what its snapshot says about it, and reads the version's receipt once. It returns
+     * the time-dependent last step: given the activation time, it reads the S2-1 registry and judges every collected grant pin
+     * at exactly that time, so a grant that expires while the slow step runs is caught (PR #275 follow-up review). The caller
+     * holds the publication lock and has share-locked the cited articles. A withheld citation is REVISION_CONFLICT; a store or
+     * registry that cannot be read is SOURCE_UNAVAILABLE. Nothing is written.
      */
-    public void requireGraphEvidenceServable(String versionId, Map<String, GraphEvidence> visible, String requestId) {
-        Instant now = clock.instant();
+    public Consumer<Instant> prepareGraphActivation(String versionId, Map<String, GraphEvidence> visible, String requestId) {
         String id = null;
+        Set<GraphReceiptGrants.Pin> pins = new LinkedHashSet<>();
         try {
             StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(versionId, requestId), versionId);
-            SourceRegistry current = sources.registry(requestId);
             for (Map.Entry<String, GraphEvidence> entry : visible.entrySet()) {
                 id = entry.getKey();
                 EvidenceView row = evidence.findEvidence(id).orElseThrow(() -> new Denied("evidence_row_missing"));
@@ -338,13 +341,25 @@ public class EvidenceService {
                     throw new Denied("not_graph_citation");
                 }
                 Readable readable = readableCitation(row, entry.getValue().span());
-                requireCurrentGrants(receiptBundle, row, entry.getValue(), readable.article(), () -> current, now);
+                pins.addAll(pinnedGrants(receiptBundle, row, entry.getValue(), readable.article()));
             }
         } catch (GraphReceiptGrants.Malformed | Denied withheld) {
-            log.info("Graph activation refused (graphVersion={}, evidenceId={}, reason={}, requestId={})", versionId, id,
-                    withheld.getMessage(), requestId);
-            throw new CustomException(ErrorCode.REVISION_CONFLICT);
+            throw activationRefused(versionId, id, withheld, requestId);
         }
+        return at -> {
+            try {
+                requireAllowed(pins, sources.registry(requestId), at);
+            } catch (Denied withheld) {
+                throw activationRefused(versionId, null, withheld, requestId);
+            }
+        };
+    }
+
+    private static CustomException activationRefused(String versionId, String evidenceId, RuntimeException withheld,
+            String requestId) {
+        log.info("Graph activation refused (graphVersion={}, evidenceId={}, reason={}, requestId={})", versionId, evidenceId,
+                withheld.getMessage(), requestId);
+        return new CustomException(ErrorCode.REVISION_CONFLICT);
     }
 
     /** The app's own article rows still let this verified body quote be read at the span the snapshot pins. */
@@ -376,9 +391,9 @@ public class EvidenceService {
         return new Readable(article, version);
     }
 
-    /** The selected version's receipt pins grants for this article version, and the CURRENT S2-1 registry still allows them. */
-    private static void requireCurrentGrants(StrictJson.Obj receiptBundle, EvidenceView row, GraphEvidence found,
-            ArticleRow article, Supplier<SourceRegistry> registryNow, Instant now) {
+    /** The grants the selected version's receipt pins for this article version (basis membership and provider checked). */
+    private static Set<GraphReceiptGrants.Pin> pinnedGrants(StrictJson.Obj receiptBundle, EvidenceView row,
+            GraphEvidence found, ArticleRow article) {
         Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
         if (!found.basisRefs().isEmpty()) {
             GraphReceiptBasis.require(receiptBundle, row.id(), found.basisRefs());
@@ -388,9 +403,13 @@ public class EvidenceService {
                 throw new Denied("pin_source_differs_from_article_provider");
             }
         }
-        SourceRegistry current = registryNow.get();
+        return pins;
+    }
+
+    /** The CURRENT S2-1 registry still allows every pinned grant at {@code at} (expiry included). */
+    private static void requireAllowed(Set<GraphReceiptGrants.Pin> pins, SourceRegistry current, Instant at) {
         for (GraphReceiptGrants.Pin pin : pins) {
-            String denial = current.denial(pin.sourceId(), pin.grantId(), pin.revision(), now);
+            String denial = current.denial(pin.sourceId(), pin.grantId(), pin.revision(), at);
             if (denial != null) {
                 throw new Denied("source_" + denial);
             }
