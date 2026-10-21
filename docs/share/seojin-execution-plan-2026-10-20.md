@@ -4,7 +4,7 @@
 
 **원격 반영 확인:** [PR #247](https://github.com/Donbug/zoop/pull/247)이 `e26a8c7`로 main에 병합됐다. PR CI 9개가 통과했으며, 병합 직후 실행은 후속 main push로 자동 취소됐다. 해당 변경을 포함하는 `d87262f`의 [main CI 9개 통과](https://github.com/Donbug/zoop/actions/runs/39390679330)를 확인했다. 코드 인계가 가능해진 상태이며 수령자 실행·운영 배포 완료를 뜻하지 않는다.
 
-**10/21 원격 기준선:** 선택 이력·발행처 전달의 [PR #259](https://github.com/Donbug/zoop/pull/259)는 `9af911d`로 병합됐고 [main CI 9개](https://github.com/Donbug/zoop/actions/runs/39525429347)가 모두 통과했다. 필드 판정·출처 지지도·실모델·최종 승인 변경은 [PR #266](https://github.com/Donbug/zoop/pull/266)으로 게시했으며, 최신 main을 통합한 `78e4b89`의 [CI 전체](https://github.com/Donbug/zoop/actions/runs/39542268228)가 통과했다. PR #266은 아직 병합하지 않았다. 아래 10/20의 ‘로컬·미게시’는 당시 기록이다.
+**10/21 원격 기준선:** 선택 이력·발행처 전달의 [PR #259](https://github.com/Donbug/zoop/pull/259)는 `9af911d`로 병합됐고 [main CI 9개](https://github.com/Donbug/zoop/actions/runs/39525429347)가 모두 통과했다. 필드 판정·출처 지지도·실모델·최종 승인 변경의 [PR #266](https://github.com/Donbug/zoop/pull/266)은 최신 main을 통합한 `b9ed817`의 [CI 전체 통과](https://github.com/Donbug/zoop/actions/runs/39547467242)를 확인한 뒤 `b1f046d`로 병합했다. 구조 경로·근거 조회 후속은 [PR #269](https://github.com/Donbug/zoop/pull/269)로 게시했으며 base는 `main`이다. 아래 ‘로컬·미게시’는 당시 기록이다.
 
 ## 1. 목적·권위 경계와 정본 출처
 
@@ -169,7 +169,7 @@
 - **서비스 검사 범위:** 전체 단위 검사에서 1,105개가 통과하고 테스트용 operation marker 불일치 1건이 실패했으며, 수정 뒤 관련 단위 425개가 통과했다. 실제 파이프라인 연동 전체에서는 115개 통과·7개 fixture/계약 기대값 오류가 있었고, 수정한 두 모듈 13개 및 S2/S3·handoff 스모크가 통과했다. 실제 live 런타임을 쓰는 HTTP 시험의 provider는 loopback 시뮬레이터이며, 유료 실행 경로는 CLI였다. 수정 후 두 전체 suite를 다시 실행한 것으로 기록하지 않는다.
 - **병렬 리뷰:** 02:38 UTC 큐 기준 #260~#265와 Infra #44·#45를 병렬 검토해 모두 GitHub에 등록했다. 이후 새 head·요청은 다음 검토 대상이다. 시험용 Neo4j/PostgreSQL 컨테이너는 종료했고, 실모델 영수증·예산 원장은 보존했다. 와치독은 유지한다.
 
-### 10/21 영향 경로 선행 인계(#65·#66, 로컬·미게시)
+### 10/21 영향 경로 선행 인계(#65·#66, PR #269 게시·미병합)
 
 - **구조 경로:** 브랜치 `feat/65-structural-path-handoff`에서 묶음을 `zoop-graph-handoff-bundle-5`로 올렸다. 구조 간선마다 참여 기업 → (중간 기업 →) 대상 기업 순서와 근거별 공급자·고객 방향, S3 사업·제품 범위 문구를 보존한다. 중간 기업이 공개 그래프에 없으면 비공개 `pathCompanies`로만 전달하고 카탈로그에서 확인한다. 운영자가 매핑하지 않은 중간 기업은 추정하지 않고 `unavailable`(`intermediate_company_unmapped`)로 둔다. 간선 ID와 운영자 판정 형식은 바꾸지 않았다.
 - **근거 조회:** 관계 근거를 `relation.evidenceIds`에 합치지 않았다. 합치면 나중에 검증된 근거가 이전 시점 조회에 새어 나가기 때문이다. 그 대신 선택된 버전의 수입 영수증에서 해당 관계·근거가 정확히 한 번 인용한 경우에만 공개 `getEvidence`가 200을 반환한다. 시점·제외·현재 권한·비공개 문서 검사는 그대로 적용하며, 이미 수입된 묶음 `-4`의 영수증도 같은 조건에서 읽힌다.
