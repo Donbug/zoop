@@ -2,7 +2,6 @@ package com.zoop.admin.members;
 
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -14,7 +13,9 @@ import com.zoop.admin.auth.service.AdminSessionCookie;
 import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.members.dto.MemberStatusRequest;
 import com.zoop.admin.members.service.AdminMemberStatusService;
+import com.zoop.auth.service.MemberSessionService;
 import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import com.zoop.common.request.RequestIdFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -26,10 +27,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -53,6 +57,8 @@ class AdminMemberPostgresTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired AdminProvisioningService provisioning;
     @Autowired AdminMemberStatusService statuses;
+    @Autowired MemberSessionService memberSessions;
+    @Autowired PlatformTransactionManager transactions;
 
     private MockMvc mvc;
 
@@ -111,8 +117,9 @@ class AdminMemberPostgresTest {
         insertMemberSessionAt(memberId, "session-before-" + suffix, memberCreatedAt.minusSeconds(1));
         insertMemberSessionAt(memberId, "session-at-boundary-" + suffix, memberCreatedAt);
         insertMemberSessionAt(memberId, "session-after-" + suffix, memberCreatedAt.plusSeconds(1));
-        String expectedLastActiveAt = memberCreatedAt.plusSeconds(1)
-                .truncatedTo(ChronoUnit.MICROS).toString();
+        String expectedLastActiveAt = jdbc.queryForObject(
+                "SELECT created_at FROM member_sessions WHERE id = ?", Timestamp.class,
+                "session-after-" + suffix).toInstant().toString();
 
         mvc.perform(get("/api/v1/admin/members").cookie(login.cookie())
                         .param("q", email).param("limit", "10"))
@@ -241,6 +248,73 @@ class AdminMemberPostgresTest {
         assertEquals(2L, jdbc.queryForObject("SELECT status_revision FROM members WHERE id = ?",
                 Long.class, memberId));
         assertEquals(1, auditCount(memberId));
+    }
+
+    @Test
+    void sessionIssuanceRacingWithBlockCannotSurviveUnblock() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        String memberId = "member-session-race-" + suffix;
+        insertMember(memberId, "session-race-" + suffix + "@example.com", "active");
+        var lockHeld = new CountDownLatch(1);
+        var allowBlockCommit = new CountDownLatch(1);
+        var issuanceStarted = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        var transaction = new TransactionTemplate(transactions);
+        try {
+            var blocker = executor.submit(() -> transaction.execute(status -> {
+                jdbc.queryForObject("SELECT id FROM members WHERE id = ? FOR UPDATE", String.class, memberId);
+                jdbc.update("UPDATE members SET status = 'blocked', status_revision = 2, blocked_at = now() WHERE id = ?",
+                        memberId);
+                lockHeld.countDown();
+                try {
+                    if (!allowBlockCommit.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Timed out waiting to commit member block");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while holding member block lock", exception);
+                }
+                return null;
+            }));
+            assertTrue(lockHeld.await(10, TimeUnit.SECONDS));
+
+            var issuance = executor.submit(() -> {
+                issuanceStarted.countDown();
+                return memberSessions.issue(memberId, null, "session-race-request");
+            });
+            assertTrue(issuanceStarted.await(10, TimeUnit.SECONDS));
+            awaitSessionIssuanceLockWait();
+            allowBlockCommit.countDown();
+            blocker.get(10, TimeUnit.SECONDS);
+
+            var failure = assertThrows(java.util.concurrent.ExecutionException.class,
+                    () -> issuance.get(10, TimeUnit.SECONDS));
+            assertTrue(failure.getCause() instanceof CustomException);
+            assertEquals(ErrorCode.MEMBER_BLOCKED, ((CustomException) failure.getCause()).getErrorCode());
+
+            jdbc.update("UPDATE members SET status = 'active', status_revision = 3, blocked_at = NULL WHERE id = ?",
+                    memberId);
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM member_sessions WHERE member_id = ?",
+                    Integer.class, memberId));
+        } finally {
+            allowBlockCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private void awaitSessionIssuanceLockWait() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiters = jdbc.queryForObject("""
+                    SELECT count(*) FROM pg_stat_activity
+                    WHERE datname = current_database() AND wait_event_type = 'Lock'
+                      AND state = 'active' AND pid <> pg_backend_pid()
+                      AND (query ILIKE '%member_sessions%' OR query ILIKE '%FROM members%')
+                    """, Integer.class);
+            if (waiters != null && waiters > 0) return;
+            Thread.sleep(10);
+        }
+        throw new AssertionError("Session issuance did not wait for the member row lock");
     }
 
     private Login loginAdmin(String suffix) throws Exception {

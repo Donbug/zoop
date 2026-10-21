@@ -6,7 +6,7 @@ import java.util.Optional;
 public interface MemberSessionRepository {
     Optional<MemberSessionRow> findByTokenHash(String tokenHash);
 
-    void insertMemberSession(String id, String memberId, String tokenHash,
+    boolean insertMemberSession(String id, String memberId, String tokenHash,
             String csrfKeyId, Instant createdAt, Instant expiresAt);
 
     void insertGuestSession(String id, String analyticsKey, String tokenHash,

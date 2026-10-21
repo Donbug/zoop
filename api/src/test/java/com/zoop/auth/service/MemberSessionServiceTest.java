@@ -232,10 +232,11 @@ class MemberSessionServiceTest {
         }
 
         @Override
-        public void insertMemberSession(String id, String memberId, String hash,
+        public boolean insertMemberSession(String id, String memberId, String hash,
                 String keyId, Instant created, Instant expiry) {
             rows.put(hash, new MemberSessionRow(id, memberId, "member", hash, keyId, 1,
                     created, expiry, null, "active", "a@example.com", "User", false, false));
+            return true;
         }
 
         @Override

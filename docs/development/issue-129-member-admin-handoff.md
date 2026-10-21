@@ -32,6 +32,7 @@
 - `members.status_revision`은 1부터 시작하고 실제 상태 변경 때만 증가한다. 요청의 `expectedRevision`이 현재 값과 다르면 `409 REVISION_CONFLICT`다.
 - 최신 revision에서 이미 목표 상태이면 `changed=false`이고 revision·세션·감사 변경은 없다. 오래된 요청을 no-op 성공으로 처리하지 않는다.
 - 차단은 활성 `kind=member` 세션을 같은 트랜잭션에서 회수한다. guest와 oauth pending은 대상이 아니다. 현재 저장소에 진행 중 회원 작업 원천이 없으므로 작업 취소를 가장하지 않는다.
+- 회원 세션 발급은 회원 행을 `FOR UPDATE`로 잠근 뒤 현재 상태 확인과 세션 INSERT를 같은 트랜잭션에서 수행한다. 발급이 먼저면 차단이 기다렸다가 새 세션까지 회수하고, 차단이 먼저면 뒤의 발급은 `MEMBER_BLOCKED`로 거절한다. 해제 후에도 차단 경합 중 발급된 세션이 되살아나지 않는다.
 - 해제는 새 로그인을 허용하지만 과거에 회수한 세션은 복구하지 않는다.
 - `idempotency_records`의 범위는 `(admin, adminId, POST, path, Idempotency-Key)`다. 같은 key와 같은 canonical 요청은 최초 응답을 재현하고, 본문이 다르면 `409 IDEMPOTENCY_CONFLICT`다. 현재 관리자 회원 작업 레코드는 자동 만료하지 않는다.
 - 상태 변경·세션 회수·성공 감사·완료 응답 저장은 하나의 DB 트랜잭션으로 commit 또는 rollback된다. 감사 detail에는 변경 전후 상태와 revision만 기록하고 회원 이메일·세션 정보는 넣지 않는다.
