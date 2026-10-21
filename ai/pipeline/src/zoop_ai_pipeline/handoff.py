@@ -6,7 +6,7 @@ ONE canonical public issue-centric projection, validates it strictly and stores 
 `recover` settles a `reserved` handoff from the stored artifact only (it never regenerates). `inspect` is ledger + artifact integrity.
 `export` re-validates CURRENT authority, then prints the bundle; any drift is a content-free `withheld` result.
 
-A ledger row whose stored receipt names another bundle schema than this build's (every `-1` and `-2` row) is HISTORY: `inspect` shows its stored state, receipt and
+A ledger row whose stored receipt names another bundle schema than this build's (every `-1`, `-2` and `-3` row) is HISTORY: `inspect` shows its stored state, receipt and
 attempts, `export` is `withheld` (`handoff_contract_changed`), `recover` and a same-id `freeze` are refused with that code. Decided from the ledger alone before
 any operator file, source authority, artifact or writable ledger is touched, and repeated under the lock; the row, its attempts and its artifact are never read
 as a current bundle, resumed, settled or rewritten.
@@ -21,7 +21,6 @@ import json
 import os
 import shutil
 import sqlite3
-import stat
 import tempfile
 import uuid
 from contextlib import closing, contextmanager
@@ -34,12 +33,15 @@ from .extraction import Extractor, Sources, cite_exact, upstream_digest
 from .extraction import Store as ExtractionStore
 from .extraction_contracts import CitationFailure, ExtractionFailure, Mention, ObservationRef
 from .graph_projection import Paths as SourcePaths
-from .graph_projection import Registry, Source, gate, load_registry, review_state
+from .graph_projection import Registry, Source, approval_basis, gate, load_registry, review_state
 from .graph_projection_contracts import MAX_REGISTRY, Withheld, entry_key
-from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, ISSUE_FIELDS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE, MAX_EVIDENCE, MAX_EXCLUSIONS,
-    MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, POLICY, PRODUCER_CHECKS, SCHEMA, STRUCTURAL_BASIS_TYPES, Bindings,
-    Decisions, Manifest, Selector, app_evidence_id, content_digest, countries_class, mention_key, mention_time_precision, text_sha256, time_precision, validate_bundle)
-from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, digest, now, read_file, reserved_state_roots
+from .handoff_contracts import (APP_IMPORT_PENDING, BUNDLE_SCHEMA, EVIDENCE_KIND, EXECUTION_MODES, ISSUE_FIELDS, LEDGER_VERSION, MAX_ATTEMPTS, MAX_BUNDLE,
+    MAX_EVIDENCE, MAX_EXCLUSIONS, MAX_ISSUES, MAX_OPERATOR_FILE, MAX_RELATIONS, MENTION_IDENTITY, MENTION_VERIFICATION, OFFSET_UNIT, ORIGIN_VERIFICATION, POLICY,
+    PRODUCER_CHECKS, SCHEMA, SOURCE_SUPPORT_POLICY, STRUCTURAL_BASIS_TYPES, Bindings, Decisions, Manifest, Selector, VERDICT_FIELDS, app_evidence_id,
+    basis_eligibility, content_digest, countries_class, involves_validation, mention_key, mention_time_precision, selected_basis, text_sha256, time_precision,
+    validate_bundle, withheld_fields)
+from .ingestion_contracts import Authority, IngestionFailure, byte_hash, canonical, copy_bounded, digest, now, read_file, reserved_state_roots
+from .source_support import source_support
 
 _SQL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -63,7 +65,8 @@ _TRIGGERS = (
 _FILES = {"handoff.sqlite3", "handoff.sqlite3-wal", "handoff.sqlite3-shm", "handoff.lock", "bundles"}
 NEXT = {"reserved": "recover", "ready": "export", "failed": None}
 USAGE = {"providerCalls": 0, "modelCalls": 0}
-POLICIES = {"geography": "operator-field-verdict", "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision"}
+POLICIES = {"geography": "operator-field-verdict", "structural": "manual-operator-review", "sequence": "s2-comparison-with-operator-decision",
+            "sourceSupport": SOURCE_SUPPORT_POLICY}
 
 
 # ---------------------------------------------------------------------------------------------- ledger -------------------------------
@@ -245,35 +248,11 @@ def contract_current(row) -> bool:
     return schema == BUNDLE_SCHEMA
 
 
-MAX_LEDGER_COPY = 128 * 1024 * 1024         # the ledger holds receipts and manifests only (artifacts are files): a main file or WAL beyond this is not ours to copy
-
-
-def copy_bounded(source: Path, target: Path) -> None:
-    """A bounded private copy of one regular, non-symlink ledger file. The source is only read."""
+def copy_ledger_file(source: Path, target: Path) -> None:
     try:
-        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
-    except OSError:
+        copy_bounded(source, target)
+    except ValueError:
         raise ExtractionFailure("handoff_state_invalid") from None
-    try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_LEDGER_COPY:
-            raise ExtractionFailure("handoff_state_invalid")
-        out = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        try:
-            copied = 0
-            while chunk := os.read(fd, 1 << 20):
-                copied += len(chunk)
-                if copied > MAX_LEDGER_COPY:
-                    raise ExtractionFailure("handoff_state_invalid")
-                view, written = memoryview(chunk), 0
-                while written < len(view):
-                    written += os.write(out, view[written:])
-        finally:
-            os.close(out)
-    except OSError:
-        raise ExtractionFailure("handoff_state_invalid") from None
-    finally:
-        os.close(fd)
 
 
 class WalHistory:
@@ -295,7 +274,7 @@ class WalHistory:
                 raise ExtractionFailure("handoff_busy") from exc
             self.scratch = Path(tempfile.mkdtemp(prefix="zoop-handoff-history-"))
             for name in ("handoff.sqlite3", "handoff.sqlite3-wal"):
-                copy_bounded(root / name, self.scratch / name)
+                copy_ledger_file(root / name, self.scratch / name)
             self.db = sqlite3.connect(self.scratch / "handoff.sqlite3", isolation_level=None)
             self.db.row_factory = sqlite3.Row
             ledger = self.db.execute("SELECT value FROM meta WHERE key='ledger'").fetchone()
@@ -509,6 +488,27 @@ class Loaded:
     relations: dict       # relationCandidateId -> S3 relation payload
 
 
+def mode_of(provenance: dict) -> tuple:
+    """(executionMode, recordingKind) of one S2/S3 job. Only the two truthful pairs exist (an authored replay, or a recorded provider call); anything else
+    is refused, so a bundle can never claim a mode that no ledger actually ran."""
+    try:
+        pair = (provenance["executionMode"], provenance["recordingKind"])
+    except (KeyError, TypeError):
+        raise ExtractionFailure("provenance_conflict") from None
+    if pair not in EXECUTION_MODES:
+        raise ExtractionFailure("provenance_conflict")
+    return pair
+
+
+def single_mode(loaded: list) -> tuple:
+    """The ONE (executionMode, recordingKind) of every constituent S3 job. A bundle states one execution mode: a mix of replay and live jobs is refused
+    (`provenance_mode_conflict`), never reported as the first source's mode."""
+    modes = {mode_of(item.s3["provenance"]) for item in loaded}
+    if len(modes) != 1:
+        raise ExtractionFailure("provenance_mode_conflict")
+    return next(iter(modes))
+
+
 def load_source(source: Source, paths: HandoffPaths, manifest: Manifest, pin, *, strict: bool) -> Loaded:
     """The S3 result only while it is ready, currently delivered and bound to the pinned upstream (grant revision included) and, when `strict`, the exactly
     pinned whole review state. The S2 upstream is re-read through its own owner and must be the exact one S3 consumed (its digest equals the pin)."""
@@ -526,6 +526,8 @@ def load_source(source: Source, paths: HandoffPaths, manifest: Manifest, pin, *,
     for kind in (result["provenance"]["sourceKind"], s2["provenance"]["sourceKind"]):
         if kind != manifest.source_kind:
             raise ExtractionFailure("provenance_conflict")
+    if mode_of(result["provenance"]) != mode_of(s2["provenance"]):
+        raise ExtractionFailure("provenance_mode_conflict")          # an S3 job never reports a mode its own S2 upstream did not run
     docs: dict = {}
     for _, bound in sorted(s2["binding"]["documents"].items()):
         ref = ObservationRef.model_validate(bound["observation"])
@@ -541,7 +543,9 @@ def current(source: Source, paths: HandoffPaths, manifest: Manifest, op: Operato
     for name, value in op.hashes().items():
         if value != getattr(manifest.files, name):
             raise ExtractionFailure("operator_file_pin_mismatch", {"file": name}) if strict else Withheld(names[name])
-    return [load_source(source, paths, manifest, pin, strict=strict) for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id)]
+    loaded = [load_source(source, paths, manifest, pin, strict=strict) for pin in sorted(manifest.sources, key=lambda p: p.relation.job_id)]
+    single_mode(loaded)
+    return loaded
 
 
 # ---------------------------------------------------------------------------------------------- planning ---------------------------
@@ -610,8 +614,8 @@ class Resolver:
     source payload recorded. The app evidence id comes from the explicit app document binding only; a binding whose text digest is not the source text's
     is refused, so an arbitrarily mapped articleVersion can never be reported as verified."""
 
-    def __init__(self, bindings: dict):
-        self.bindings = bindings
+    def __init__(self, bindings: dict, origins: dict):
+        self.bindings, self.origins = bindings, origins
         self.memo: dict = {}
         self.by_id: dict = {}
         self.docs: dict = {}      # (documentId, documentVersion) -> list[(ref, export)]
@@ -670,7 +674,16 @@ class Resolver:
                                for e in entries for o in (e[1]["observation"],)), key=canonical)
         return {"articleId": record["articleId"], "articleVersion": record["articleVersion"], "documentId": key[0], "documentVersion": key[1],
                 "rawVersion": record["source"]["rawVersion"], "title": title, "url": url, "publishedAt": published,
-                "publicationPrecision": precision, "observations": observations}
+                "publicationPrecision": precision, "textSha256": self.bindings[key].text_sha256, "origin": self.origin(key), "observations": observations}
+
+    def origin(self, key: tuple) -> dict | None:
+        """The operator-DECLARED origin of this exact document version, or None (unknown). Nothing else ever supplies an origin: not the publisher, URL, host,
+        source id, title or raw hash."""
+        declared = self.origins.get(key)
+        if declared is None:
+            return None
+        return {"originId": declared.origin_id, "reviewer": declared.reviewer, "decisionRef": declared.decision_ref,
+                "decisionVersion": declared.decision_version, "verification": ORIGIN_VERIFICATION}
 
 
 def outside_validity(when: str, validity: dict) -> bool:
@@ -692,7 +705,7 @@ class Planner:
         self.by_upstream: dict = {}
         for item in self.loaded:
             self.by_upstream.setdefault(item.upstream_key, item)
-        self.resolver = Resolver(op.bindings)
+        self.resolver = Resolver(op.bindings, {(o.document_id, o.document_version): o for o in op.decisions.origins})
         for item in self.loaded:
             self.resolver.add(item)
         self.companies = {c.canonical_id: c for c in op.decisions.companies}
@@ -703,7 +716,7 @@ class Planner:
         self.involves: dict = {}          # (public issue, public company) -> accumulated INVOLVES
         self.involved: dict = {}          # public issue -> {canonical company -> public company}
         self.relations: list[dict] = []
-        self.used_review: dict = {}       # (jobId, rc) -> revision of every S3 relation behind an emitted edge
+        self.used_review: dict = {}       # (jobId, rc) -> approvalBasis (revision included) of every S3 relation behind an emitted edge
         self.not_public: dict = {item.pin.relation.job_id: {} for item in self.loaded}
 
     # ---- helpers ------------------------------------------------------------------------------------------------------------------------
@@ -792,32 +805,88 @@ class Planner:
                 "verification": "operator-field-verdict", "evidenceIds": sorted(set(evidence)),
                 "basis": sorted(basis, key=canonical)}
 
+    def field_verdicts(self, decision, members: list[Member], mentions: list[dict]) -> list[dict]:
+        """The operator's per-field verdicts, each bound to one original mention of THIS issue and to the exact value that mention states (a null field has nothing
+        to judge). Every span must lie in the verdict's own document version, match the exact text the reviewer saw and is cited as app evidence of that document's
+        article. Any failure excludes the issue visibly; a verdict is never repaired, dropped or reinterpreted."""
+        by_identity = {mention_key(m["documentId"], m["documentVersion"], m["mentionId"]): m for m in mentions}
+        order = {wire: n for n, (_, wire) in enumerate(VERDICT_FIELDS)}
+        out = []
+        for v in decision.field_verdicts:
+            mention = by_identity.get(mention_key(v.document_id, v.document_version, v.mention_id))
+            if mention is None:
+                raise Skip("field_verdict_unbound")
+            if v.value != mention[v.field]:
+                raise Skip("field_verdict_stale")
+            evidence = []
+            for span in v.evidence:
+                if (span.document_id, span.document_version) != (v.document_id, v.document_version):
+                    raise Skip("field_verdict_evidence_unbound")
+                member = next((m for m in members if m.doc == (span.document_id, span.document_version)), None)
+                if member is None:
+                    raise Skip("field_verdict_evidence_unbound")
+                text = member.loaded.docs[member.doc][0][1]["document"]["text"]
+                if not (0 <= span.start < span.end <= len(text)) or text_sha256(text[span.start:span.end]) != span.quote_sha256:
+                    raise Skip("field_verdict_evidence_mismatch")
+                evidence.append(self.cite(member.loaded, {"documentId": span.document_id, "documentVersion": span.document_version, "start": span.start,
+                                                          "end": span.end, "quote": text[span.start:span.end]}))
+            out.append({"documentId": v.document_id, "documentVersion": v.document_version, "mentionId": v.mention_id, "field": v.field, "value": v.value,
+                        "decision": v.decision, "reasonCode": v.reason_code, "evidenceIds": sorted(set(evidence)), "verification": "operator-field-verdict",
+                        "reviewer": v.reviewer, "decisionRef": v.decision_ref, "decisionVersion": v.decision_version})
+        return sorted(out, key=lambda v: (mention_key(v["documentId"], v["documentVersion"], v["mentionId"]), order[v["field"]]))
+
     def issue(self, decision, members: list[Member]) -> tuple[dict, dict]:
-        fields = self.fields(decision, members)
-        if not isinstance(fields["title"], str) or not fields["title"].strip():
+        selected = self.fields(decision, members)
+        if not isinstance(selected["title"], str) or not selected["title"].strip():
             raise Skip("issue_title_missing")
         try:
-            precision = time_precision(fields["eventTime"])
+            time_precision(selected["eventTime"])
         except ValueError:
             raise Skip("event_time_unsupported") from None
         geography = self.geography(decision, members)
         mentions, carrying = self.mentions(members)
+        verdicts = self.field_verdicts(decision, members, mentions)
+        representative = decision.representative.wire() if decision.representative else None
+        withheld = withheld_fields(verdicts, selected_basis(representative, mentions))
+        fields = {wire: None if wire in withheld else value for wire, value in selected.items()}
+        precision = "unknown" if "eventTime" in withheld else time_precision(fields["eventTime"])
         event_evidence = sorted({i for mention in mentions for i in mention["evidenceIds"]})
+        verdict_evidence = {i for v in verdicts for i in v["evidenceIds"]}
+        evidence = sorted(set(event_evidence) | set(geography["evidenceIds"]) | verdict_evidence)
+        support = self.support(evidence)
         issue = {"id": decision.public_id, "canonicalId": decision.canonical_id, **fields, "timePrecision": precision, "geography": geography,
-                 "evidenceIds": sorted(set(event_evidence) | set(geography["evidenceIds"])),
+                 "evidenceIds": evidence,
                  "sourceEvents": sorted({canonical(m.source_event()): m.source_event() for m in members}.values(), key=canonical),
-                 "decisionRef": decision.decision_ref, "representative": decision.representative.wire() if decision.representative else None,
-                 "fieldProvenance": self.field_provenance(decision, fields, mentions), "mentions": mentions}
+                 "decisionRef": decision.decision_ref, "representative": representative,
+                 "fieldProvenance": self.field_provenance(decision, selected, mentions, withheld), "fieldVerdicts": verdicts, "mentions": mentions,
+                 "sourceSupport": support}
         return issue, {"decision": decision, "members": members, "eventEvidence": event_evidence, "mentionUpstreams": carrying}
 
+    def support(self, evidence_ids: list[str]) -> dict:
+        """The source-support summary of the articles an issue cites. An issue must cite exactly ONE version of each article (the public article read carries no
+        version, so two versions of one article cannot be told apart there): otherwise the issue is excluded, never resolved by choosing a version. The origin of
+        an article is the operator's declaration for its exact document version, or unknown; it is never inferred."""
+        documents: dict = {}
+        for ident in evidence_ids:
+            record = self.resolver.by_id[ident]
+            documents[(record["articleId"], record["articleVersion"])] = (record["source"]["documentId"], record["source"]["documentVersion"])
+        if len({article for article, _ in documents}) != len(documents):
+            raise Skip("issue_article_versions_multiple")
+        rows = []
+        for (article, _), document in sorted(documents.items()):
+            origin = self.resolver.origin(document)
+            rows.append({"articleId": article, "textSha256": self.resolver.bindings[document].text_sha256, "originId": origin["originId"] if origin else None})
+        return source_support(rows)
+
     @staticmethod
-    def field_provenance(decision, fields: dict, mentions: list[dict]) -> dict:
-        """How `fields` were SELECTED (the rule `fields` applied), never whether they are true: `selection` is `operator-representative` when the operator named
-        the representative whose six values the issue carries, otherwise `unanimous` (every member said the same, or the issue is excluded). Each field lists, in the
-        mentions' own order, EVERY original mention whose value equals the issue's by exact JSON equality (null equals null, nothing trimmed or normalised); a mention
-        that differs is not listed and the representative is always listed. `verification` is `none`: no field was verified, supported or approved."""
-        return {"selection": "operator-representative" if decision.representative else "unanimous", "verification": MENTION_VERIFICATION,
-                "sameValueMentions": {wire: [{key: m[key] for key in MENTION_IDENTITY} for m in mentions if m[wire] == fields[wire]] for _, wire in ISSUE_FIELDS}}
+    def field_provenance(decision, selected: dict, mentions: list[dict], withheld: list[str]) -> dict:
+        """How `selected` was SELECTED (the rule `fields` applied), never whether it is true: `selection` is `operator-representative` when the operator named
+        the representative whose six values the issue starts from, otherwise `unanimous` (every member said the same, or the issue is excluded). Each field lists, in the
+        mentions' own order, EVERY original mention whose value equals the SELECTED value (never the redacted null) by exact JSON equality (null equals null, nothing
+        trimmed or normalised); a mention that differs is not listed and the representative is always listed. `withheld` names the fields an operator HOLD/REJECT on
+        the selection basis removed from the issue headline. `verification` is `none`: no field was verified, supported or approved here."""
+        return {"selection": "operator-representative" if decision.representative else "unanimous", "verification": MENTION_VERIFICATION, "withheld": withheld,
+                "sameValueMentions": {wire: [{key: m[key] for key in MENTION_IDENTITY} for m in mentions if m[wire] == selected[wire]] for _, wire in ISSUE_FIELDS}}
 
     def mention_values(self, m: Member) -> dict:
         """What ONE source member says about its mention: the carried S2 fields exactly as the source holds them and the app ids of its own exact citations.
@@ -938,7 +1007,7 @@ class Planner:
                 edge = self.involves.setdefault((issue_id, company.public_id), {"evidence": set(), "refs": set(), "canonicalCompany": company_canonical})
                 edge["evidence"].update(evidence)
                 edge["refs"].add((job, rc))
-                self.used_review[(job, rc)] = state["revision"]
+                self.used_review[(job, rc)] = approval_basis(r)
         involved_issues = {issue_id for issue_id, _ in self.involves}
         for issue_id in sorted(set(self.issues) - involved_issues):
             self.exclude("issue", self.issues[issue_id]["canonicalId"], "issue_without_involvement")
@@ -950,7 +1019,8 @@ class Planner:
             self.relations.append({
                 "id": "edge-" + digest({"type": "INVOLVES", "source": issue_id, "target": company_id}), "type": "INVOLVES", "source": issue_id, "target": company_id,
                 "role": None, "assertionStatus": self.issues[issue_id]["assertionStatus"], "evidenceIds": sorted(edge["evidence"]), "basis": [],
-                "provenance": {"origin": "s3-relation", "s3SemanticValidation": "independent-verifier-supported-all-claims"}, "decisionRef": None,
+                "provenance": {"origin": "s3-relation", "s3SemanticValidation": involves_validation([self.used_review[ref] for ref in sorted(edge["refs"])])},
+                "decisionRef": None,
                 "sourceRefs": [{"kind": "s3-relation", "jobId": j, "id": rc} for j, rc in sorted(edge["refs"])]})
 
     # ---- STRUCTURALLY_RELATED_TO (manual operator assertion over eligible S3 SUPPLIES basis) -------------------------------------------------
@@ -997,27 +1067,26 @@ class Planner:
                                       "revision": r["eligibility"]["revision"]} for ref, (_, r, _, _) in zip(decision.basis, rows)]})
         if a.binding_digest != expected:
             raise Skip("applicability_binding_mismatch", {"expectedBindingDigest": expected})
-        basis = []
+        basis, approvals = [], []
         for ref, (loaded, r, _, _) in zip(decision.basis, rows):
-            verdicts = [e for e in r["history"] if e["kind"] == "verdict" and e["eligibility"] == "eligible"]
-            if not verdicts:
-                raise Skip("basis_verification_missing")
+            approval = approval_basis(r)             # the automatic verdict OR the operator's final approval that made this relation eligible, proven from its history
+            approvals.append(approval)
             evidence = sorted({self.cite(loaded, c) for c in (*r["citations"], *r["validity"]["citations"])})
             articles = sorted({(self.resolver.by_id[i]["articleId"], self.resolver.by_id[i]["articleVersion"]) for i in evidence})
             basis.append({"sourceRelation": {"jobId": ref.job_id, "relationCandidateId": ref.relation_candidate_id},
                           "relationKey": r["relationKey"], "relationType": r["type"],
                           "validFrom": r["validity"]["from"], "validUntil": r["validity"]["until"], "countries": sorted(r["countries"]),
-                          "verifiedAt": max(verdicts, key=lambda e: e["seq"])["createdAt"],
+                          "verifiedAt": approval["decidedAt"],
                           "sourceArticles": [{"articleId": x, "articleVersion": y} for x, y in articles], "evidenceIds": evidence})
-        for ref, (_, r, _, _) in zip(decision.basis, rows):
-            self.used_review[(ref.job_id, ref.relation_candidate_id)] = r["eligibility"]["revision"]
+        for ref, approval in zip(decision.basis, approvals):
+            self.used_review[(ref.job_id, ref.relation_candidate_id)] = approval
         return {"id": "edge-" + digest({"type": "STRUCTURALLY_RELATED_TO", "source": issue_id, "target": company.public_id,
                                          "basis": [r["relationKey"] for _, r, _, _ in rows]}),
                 "type": "STRUCTURALLY_RELATED_TO", "source": issue_id, "target": company.public_id, "role": None, "assertionStatus": issue["assertionStatus"],
                 "evidenceIds": sorted(self.info[issue_id]["eventEvidence"]), "basis": basis,
                 "provenance": {"origin": "manual-operator-review", "s3SemanticValidation": "none", "status": a.status, "reviewer": a.reviewer,
                                "decisionRef": a.decision_ref, "decisionVersion": a.decision_version, "bindingDigest": a.binding_digest,
-                               "basisEligibility": "s3-independent-verifier-supported-all-claims"},
+                               "basisEligibility": basis_eligibility(approvals)},
                 "decisionRef": a.decision_ref,
                 "sourceRefs": [{"kind": "s3-relation", "jobId": ref.job_id, "id": ref.relation_candidate_id} for ref in decision.basis]}
 
@@ -1119,21 +1188,23 @@ class Planner:
         for item in self.exclusions:
             tally[item["code"]] = tally.get(item["code"], 0) + 1
         items = sorted(self.exclusions, key=canonical)
+        execution_mode, recording_kind = single_mode(self.loaded)
+        observed = {item.s3["provenance"]["sourceKind"] for item in self.loaded}
         sources = []
         for loaded in self.loaded:
             counts = loaded.s3["counts"]
             job = loaded.pin.relation.job_id
             sources.append({"relation": loaded.pin.relation.wire(), "upstream": loaded.pin.upstream.wire(), "reviewDigest": digest(review_state(loaded.s3)),
                             "policies": loaded.s3["binding"]["versions"],
-                            "reviewUsed": sorted([rc, revision] for (j, rc), revision in self.used_review.items() if j == job),
+                            "provenance": {"sourceKind": loaded.s3["provenance"]["sourceKind"], "executionMode": execution_mode, "recordingKind": recording_kind},
+                            "reviewUsed": [{"relationCandidateId": rc, "revision": approval["revision"], "approvalBasis": approval}
+                                           for (j, rc), approval in sorted(self.used_review.items()) if j == job],
                             "audit": {"s3Relations": len(loaded.relations), "eligibility": {k: counts["eligibility"][k] for k in ("eligible", "hold", "reject", "pending")},
                                       "reviewPending": sum(bool(r["eligibility"]["reviewPending"]) for r in loaded.relations.values()),
                                       "impactCandidates": counts["impactCandidates"], "eligibleNotPublicByType": dict(sorted(self.not_public[job].items()))}})
-        observed = {item.s3["provenance"]["sourceKind"] for item in self.loaded}
-        first = self.loaded[0].s3["provenance"]
         bundle = {"schemaVersion": BUNDLE_SCHEMA, "handoffId": self.handoff_id, "manifestDigest": self.input_digest,
                   "provenance": {"declaredSourceKind": self.manifest.source_kind, "observedSourceKind": next(iter(observed)) if len(observed) == 1 else "mixed",
-                                 "executionMode": first["executionMode"], "recordingKind": first["recordingKind"]},
+                                 "executionMode": execution_mode, "recordingKind": recording_kind},
                   "policy": {"version": POLICY, "files": self.manifest.files.wire(), "evidenceIdKind": EVIDENCE_KIND, "offsetUnit": OFFSET_UNIT, **POLICIES},
                   "sources": sources, "companies": companies, "issues": issues, "relations": relations, "evidence": evidence, "articles": articles,
                   "exclusions": {"counts": dict(sorted(tally.items())), "items": items},
@@ -1307,13 +1378,21 @@ class Handoff:
 
     @staticmethod
     def used_reviews(loaded: list[Loaded], bundle: dict) -> None:
-        """Every S3 relation behind an emitted edge is still eligible, not review-pending and at the revision the bundle was built from."""
+        """Every S3 relation behind an emitted edge is still eligible, not review-pending, at the revision the bundle was built from AND decided by exactly
+        the recorded approval (kind, reviewer, decision time), proven against its history again: an approval that changed or no longer proves is drift."""
         by_job = {item.pin.relation.job_id: item for item in loaded}
         for source in bundle["sources"]:
             item = by_job.get(source["relation"]["jobId"])
             if item is None:
                 raise Withheld("source_pin_missing")
-            for rc, revision in source["reviewUsed"]:
-                state = item.relations.get(rc, {}).get("eligibility")
-                if state is None or state["status"] != "eligible" or state["reviewPending"] or state["revision"] != revision:
+            for used in source["reviewUsed"]:
+                relation = item.relations.get(used["relationCandidateId"])
+                state = relation["eligibility"] if relation is not None else None
+                if state is None or state["status"] != "eligible" or state["reviewPending"] or state["revision"] != used["revision"]:
+                    raise Withheld("review_revision_changed")
+                try:
+                    current_basis = approval_basis(relation)
+                except ExtractionFailure:
+                    raise Withheld("review_revision_changed") from None
+                if current_basis != used["approvalBasis"]:
                     raise Withheld("review_revision_changed")

@@ -19,7 +19,7 @@ from scripts import graph_handoff_smoke as hs
 
 CONTRACT_CHANGED = {"status": "withheld", "code": "handoff_contract_changed"}
 ROWS = {"ready": ("ready", "written"), "reserved": ("reserved", "missing"), "failed": ("failed", "garbage")}
-SCHEMAS = [hs.BUNDLE_1, hs.BUNDLE_2]
+SCHEMAS = [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3]
 
 
 @pytest.fixture(scope="module")

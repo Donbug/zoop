@@ -48,9 +48,16 @@ public final class PipelineJob {
         WAIT, FETCH_RESULT, OPERATOR_RECONCILE, RECOVER, NONE
     }
 
-    /** Whether the source material is a synthetic fixture or actual material. Only replay with an authored recording is accepted. */
+    /** Whether the source material is a synthetic fixture or actual material. */
     public enum SourceKind {
         SYNTHETIC, ACTUAL
+    }
+
+    /**
+     * How a job executed: {@code REPLAY} of an authored recording (no network) or {@code LIVE} (a real model call, recording kind
+     * {@code provider}). The service enforces the pair; a job is live only when the operator pinned it server-side.
+     */
+    public record Provenance(SourceKind sourceKind, ExecutionMode executionMode) {
     }
 
     /** The runtime's short machine failure code; never a message. */

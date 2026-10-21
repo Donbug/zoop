@@ -107,7 +107,8 @@ def test_a_child_that_dies_after_reserving_a_call_is_never_resent(start_extracti
     ambiguous = service.ewait(dispatch={"idle"})
     assert (ambiguous["dispatch"]["lastOutcome"], ambiguous["dispatch"]["dispatchCount"], ambiguous["state"], ambiguous["next"]) == (
         "transport_unknown", 1, "running", "recover")
-    assert ambiguous["usage"] == {"replayCalls": 0, "startedWithoutReceipt": 1, "providerCalls": 0, "paidModelCalls": 0}
+    assert ambiguous["usage"] == {"replayCalls": 0, "startedWithoutReceipt": 1, "providerCalls": 0, "paidModelCalls": 0, "receivedCalls": 0, "unsentCalls": 0,
+                                  "inputTokens": None, "outputTokens": None, "reasoningTokens": None, "estimatedUsd": None, "chargedUsd": None}
     quiet = service.estay(JOB, 3.0)
     assert quiet["dispatch"]["dispatchCount"] == 1 and quiet["usage"]["startedWithoutReceipt"] == 1  # nothing continued it
     assert service.erecover().status_code == 202  # explicit, and the pipeline itself refuses to resend an unreceipted call

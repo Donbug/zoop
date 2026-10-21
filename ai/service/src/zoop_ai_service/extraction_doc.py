@@ -13,32 +13,39 @@ DIGEST = "0" * 64
 JOB = "extraction-synthetic-SYNTH-1"
 SUBMIT = {"schemaVersion": "zoop-extraction-s2-2", "jobId": JOB, "approvedRequestDigest": "4" * 64}
 PROVENANCE = {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
-USAGE = {"replayCalls": 0, "startedWithoutReceipt": 0, "providerCalls": 0, "paidModelCalls": 0}
+USAGE = {"replayCalls": 0, "startedWithoutReceipt": 0, "providerCalls": 0, "paidModelCalls": 0, "receivedCalls": 0, "unsentCalls": 0,
+         "inputTokens": None, "outputTokens": None, "reasoningTokens": None, "estimatedUsd": None, "chargedUsd": None}
 PENDING = [{"stage": "extract", "state": "pending"}, {"stage": "compare", "state": "pending"}, {"stage": "topic", "state": "pending"}]
 COMPLETE = [{"stage": "extract", "state": "complete"}, {"stage": "compare", "state": "complete"}, {"stage": "topic", "state": "complete"}]
 
 DESCRIPTION = """\
 **S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the
-installed `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same
+installed `zoop-ai-extract` pipeline: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same
 single gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is
 set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly
 `{schemaVersion: "zoop-extraction-s2-2", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +
-approvedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay
-fixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the
-job exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.
+approvedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and EITHER the digests of the authored replay
+fixtures it runs against (a replay request) OR the identity of the live runtime binding it may spend money under (`liveRuntimeIdentity`, a request with
+`executionMode: live`, `recordingKind: provider`: a real model call, no fixture); anything not listed is 403 `request_not_approved` before a ledger row or child
+exists, and the same answer whether or not the job exists. A live approval also needs the service's live group (409 `live_unavailable` otherwise). An approval
+only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command, and, for a live request,
+the model-send rights of every document it transmits.
 The principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is
 `job_id_unavailable`: an operator's job is never adopted.
 
-The first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must
-report (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is
-`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the
-job id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.
+The first reservation freezes the approved digest, the producer fixture digest (replay) or the live runtime identity, the optional topic fixture digest and the
+`inputDigest` the pipeline must report (computed from the approved bytes and the pin, not echoed). The same request again keeps all of it; the same job with another
+approved digest is `idempotency_conflict`; an approval entry, runtime identity or fixture file that has since changed is `approval_changed` /
+`fixture_changed` / `live_binding_changed` (or a withheld result) and the job id is never rebound. The pipeline must freeze a live job under exactly the pinned
+identity (409 `live_binding_mismatch` otherwise). The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.
 
-The initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run
+The initial dispatch runs once, under the pipeline's own under-lock initial-only restriction (a job that already took its first dispatch is refused with no
+effect). A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run
 again automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the
 pipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw
-answered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and
-is idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event
+answered ends `reconciling` and is never resent (`reconcile_required`; for a live job the failure is `live_response_unknown`). Only an explicit `recover` dispatches again (and, for a live job, may spend again). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and
+is idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `usage` counts `providerCalls` (transmitted or possibly
+transmitted), `receivedCalls`, `unsentCalls` (definitively not sent), reported tokens and the estimated/charged USD (null while unknown): never a guess. `GET /{jobId}/result` returns event
 candidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the
 approval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is
 `withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content

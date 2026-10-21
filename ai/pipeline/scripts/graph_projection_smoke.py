@@ -146,15 +146,26 @@ def effects(_impact: dict) -> dict:
     return {GOOD: "positive", BAD: "negative"}
 
 
+def p_scoped(world, scope: str):
+    """The same supplier pair as `p_supplies` under another product scope: a DIFFERENT relation (and graph edge) whose claim the authored verifier holds as insufficient."""
+    return proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [cites(world)(SUP)], product=scope)
+
+
+def verify_scoped(relation: dict):
+    """The authored independent verifier cannot support the scope of the two scoped relations: they are HOLD (claim_insufficient), `p_supplies` stays eligible."""
+    return {"scope": "insufficient"} if relation["productScope"] in ("scope-hold", "scope-reject") else None
+
+
 def build_relations(world, *, process: bool, only: tuple[str, ...] | None = None) -> dict:
     """S3 jobs over the one S2 upstream, through the existing relation CLI (process=True) or the same engine in-process."""
     spec = {"rel-main": proposals_main(world), "rel-two": proposals_two(world), "rel-path": [p_indirect(world)], "rel-empty": [p_hold(world)],
-            "rel-review": [p_supplies(world), p_hold(world)]}
+            "rel-review": [p_supplies(world), p_hold(world), p_scoped(world, "scope-hold"), p_scoped(world, "scope-reject")]}
     jobs = {}
     for job, proposals in spec.items():
         if only is not None and job not in only:
             continue
-        jobs[job] = converge(world, job, proposals, impacts=impacts(world) if job == "rel-main" else None, effects=effects if job == "rel-main" else None, process=process)
+        jobs[job] = converge(world, job, proposals, impacts=impacts(world) if job == "rel-main" else None, effects=effects if job == "rel-main" else None, process=process,
+                             verify=verify_scoped if job == "rel-review" else None)
         assert jobs[job]["state"] == "ready", (job, jobs[job].get("failure"))
     return jobs
 
@@ -191,7 +202,7 @@ def expected_main(world, jobs: dict) -> dict:
     return {"nodes": {"ZgCompany": {"kr-000050", "kr-000100", "kr-000300", "kr-000400"}, "ZgEvent": {"event:main-event"}, "ZgTopic": {"topic:ev-supply-chain"}},
             "edges": edges, "evidence": sorted(e.values()),
             "audit": {"s3Relations": 9, "eligibility": {"eligible": 7, "hold": 1, "reject": 1, "pending": 0}, "reviewPending": 0, "projectedCandidates": 7,
-                      "canonicalMerges": 1, "impactCandidatesNotProjected": 2}}
+                      "approvals": {"automatic": 7, "operatorFinal": 0}, "canonicalMerges": 1, "impactCandidatesNotProjected": 2}}
 
 
 def expected_two(world, jobs: dict) -> dict:
@@ -708,7 +719,7 @@ def smoke(root: Path, uri: str, database: str, run: str) -> dict:
         empty = op.freeze("v-empty", "rel-empty")
         assert empty["counts"] == {"nodes": {"company": 0, "event": 0, "topic": 0}, "edges": {k: 0 for k in ("SUPPLIES", "INVESTS_IN", "COMPETES_WITH", "PARTICIPATES_IN", "RELATES_TO_TOPIC")}, "evidence": 0}
         assert empty["audit"] == {"s3Relations": 1, "eligibility": {"eligible": 0, "hold": 1, "reject": 0, "pending": 0}, "reviewPending": 0, "projectedCandidates": 0,
-                                  "canonicalMerges": 0, "impactCandidatesNotProjected": 0}, empty["audit"]
+                                  "approvals": {"automatic": 0, "operatorFinal": 0}, "canonicalMerges": 0, "impactCandidatesNotProjected": 0}, empty["audit"]
         assert op.graph("project", op.sel("v-empty"))["state"] == "ready"
         out = op.graph("read", op.sel("v-empty"))
         assert out["delivery"]["status"] == "current" and out["graph"] == {"nodes": [], "edges": []} and out["evidence"] == [] and out["verification"]["nodes"] == 0
@@ -718,21 +729,48 @@ def smoke(root: Path, uri: str, database: str, run: str) -> dict:
         op.withheld(op.graph("read", op.sel("v-empty"), expected=2), "v-empty", "graph_version_corrupt")
         checks.append("empty: zero eligible relations is a valid empty version (marker with 0/0, read returns empty lists with verification); a missing marker is a withheld failure, not an empty result")
 
-        # 13. Review state: a newer review never mutates a ready version and never lets a frozen one be written.
+        # 13. Review state and the operator's FINAL approval. The authored verifier holds two scoped relations; a newer review never mutates a ready version and never
+        # lets a frozen one be written; a NEW version projects the approved relation next to the automatic one with its own basis, the rejected one stays out, and
+        # neither decision called a model or a verifier.
         op.freeze("v-rv-ready", "rel-review")
         op.graph("project", op.sel("v-rv-ready"))
+        before_ready = raw.dump(op.vid("v-rv-ready"))
         op.freeze("v-rv-frozen", "rel-review")
-        held = find(jobs["rel-review"], "SHARES_ISSUE")
+        auto = find(jobs["rel-review"], "SUPPLIES", "SYNTH-3", "SYNTH-1", productScope="배터리 부품")
+        held = find(jobs["rel-review"], "SUPPLIES", "SYNTH-3", "SYNTH-1", productScope="scope-hold")
+        refused = find(jobs["rel-review"], "SUPPLIES", "SYNTH-3", "SYNTH-1", productScope="scope-reject")
+        assert auto["eligibility"]["approvalBasis"]["kind"] == "automatic-verifier" and held["eligibility"]["status"] == refused["eligibility"]["status"] == "hold"
+        calls = jobs["rel-review"]["usage"]["replayCalls"]
         reviewed = op.kit.rel("review", {**op.kit.rsel("rel-review"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": held["eligibility"]["revision"],
                                          "decision": "allow", "reviewer": "operator-a", "note": "authored review"})
-        assert find(reviewed, "SHARES_ISSUE")["eligibility"]["reviewPending"] is True
+        approved = find(reviewed, "SUPPLIES", "SYNTH-3", "SYNTH-1", productScope="scope-hold")
+        assert approved["eligibility"]["status"] == "eligible" and approved["eligibility"]["reviewPending"] is False
+        assert approved["eligibility"]["approvalBasis"] == {"kind": "operator-final-approval", "revision": held["eligibility"]["revision"] + 1, "reviewer": "operator-a",
+                                                            "decidedAt": approved["history"][-1]["createdAt"]}
+        excluded = op.kit.rel("review", {**op.kit.rsel("rel-review"), "relationCandidateId": refused["relationCandidateId"], "expectedRevision": refused["eligibility"]["revision"],
+                                         "decision": "reject", "reviewer": "operator-a", "note": "authored reject"})
+        assert find(excluded, "SUPPLIES", "SYNTH-3", "SYNTH-1", productScope="scope-reject")["eligibility"]["status"] == "reject"
+        assert excluded["usage"]["replayCalls"] == reviewed["usage"]["replayCalls"] == calls          # a human decision never calls a model, a verifier or a replay
         out = op.graph("read", op.sel("v-rv-ready"))
         assert out["delivery"]["status"] == "current" and out["current"] == {"s3ReviewDigestMatches": False}, out["current"]
+        assert raw.dump(op.vid("v-rv-ready")) == before_ready          # the ready version was never rewritten
         op.error(op.graph("project", op.sel("v-rv-frozen"), expected=2), "review_revision_changed")
         failed = op.state("v-rv-frozen")
         assert failed["state"] == "frozen" and failed["failure"]["code"] == "review_revision_changed" and raw.nodes_of(op.vid("v-rv-frozen")) == {}
-        checks.append("review: after an admin allow on the HOLD candidate the ready version stays served (s3ReviewDigestMatches=false) while the frozen one refuses to project "
-                      "(review_revision_changed) and writes nothing")
+        newer = op.freeze("v-rv-2", "rel-review")
+        assert newer["audit"]["projectedCandidates"] == 2 and newer["audit"]["approvals"] == {"automatic": 1, "operatorFinal": 1} and newer["audit"]["eligibility"] == {
+            "eligible": 2, "hold": 1, "reject": 1, "pending": 0}, newer["audit"]
+        assert op.graph("project", op.sel("v-rv-2"))["state"] == "ready" and op.state("v-rv-2")["attempts"] == [{"n": 1, "outcome": "committed", "code": None}]
+        second = op.graph("read", op.sel("v-rv-2"))
+        assert second["delivery"]["status"] == "current" and second["current"] == {"s3ReviewDigestMatches": True}
+        kinds = {e["productScope"]: [(a["relationCandidateId"], a["kind"]) for a in e["sourceApprovals"]] for e in second["graph"]["edges"]}
+        assert kinds == {"배터리 부품": [(auto["relationCandidateId"], "automatic-verifier")], "scope-hold": [(held["relationCandidateId"], "operator-final-approval")]}, kinds
+        assert sorted(e["p"].get("productScope") for e in raw.edges_of(op.vid("v-rv-2"))) == ["scope-hold", "배터리 부품"]       # the rejected relation is not in the graph
+        assert all(set(e["p"]) <= {"vk", "v", "id", *EDGE_KEYS} for e in raw.edges_of(op.vid("v-rv-2")))                  # approvals live in the frozen plan, not on any edge
+        assert raw.dump(op.vid("v-rv-ready")) == before_ready
+        checks.append("review: a scoped HOLD the operator finally approves is eligible with an operator-final-approval basis and the rejected one is excluded, neither calling anything; "
+                      "the ready version stays served (s3ReviewDigestMatches=false) and unrewritten, the frozen one refuses to project (review_revision_changed) and writes nothing, and "
+                      "a NEW version projects automatic and manual relations as two edges whose per-source approval kinds read back (automatic-verifier / operator-final-approval)")
 
         # 14. Hostile identifiers are data: refused before any state, or stored literally and never executed.
         ledger_before, graph_before = op.ledger(), raw.count("MATCH (n) RETURN count(n) AS c")

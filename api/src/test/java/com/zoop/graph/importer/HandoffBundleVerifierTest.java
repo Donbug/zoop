@@ -17,6 +17,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -119,6 +120,146 @@ class HandoffBundleVerifierTest {
     }
 
     @Test
+    void theProducersOwnVerdictNegativeFixturesAreRefusedWithTheirContentDigestRecomputed() throws Exception {
+        // Each file is the hand-reviewed export with ONE verdict rule broken; the producer recomputed the content digest, so only the
+        // verdict rule can refuse it.
+        for (String name : List.of("bundle-verdict-headline-not-withheld.json", "bundle-verdict-withheld-forged.json",
+                "bundle-verdict-withheld-missing.json", "bundle-verdict-precision-not-unknown.json", "bundle-verdict-stale-value.json",
+                "bundle-verdict-foreign-evidence.json", "bundle-verdict-duplicate.json", "bundle-verdict-unsorted.json",
+                "bundle-verdict-note.json", "bundle-verdict-unstated-with-evidence.json", "bundle-verdict-unknown-mention.json",
+                "bundle-verdict-title-field.json", "bundle-verdict-evidence-orphan.json")) {
+            byte[] export = resource(name);
+            assertEquals(HandoffBundleVerifier.contentDigest(HandoffFixtures.parse(export).get("bundle")),
+                    HandoffFixtures.parse(export).get("bundle").get("digests").get("content").stringValue(), name);
+            assertEquals(GraphHandoffFailure.BUNDLE_INVALID, failureOf(export), name);
+        }
+    }
+
+    @Test
+    void theProducersHandReviewedExportsCarryTheHandWrittenVerdictsWithheldListsAndPublicHeadlines() throws Exception {
+        // All four files are real producer exports; every expectation is written by hand in graph_handoff_smoke.py (never derived from
+        // the planner): the verdicts as exported, the field provenance with its withheld list, the public headline values and the
+        // ORIGINAL mentions, which no verdict may change.
+        JsonNode verdicts = HandoffFixtures.parse(resource("expected-field-verdicts.json"));
+        JsonNode provenance = HandoffFixtures.parse(resource("expected-field-provenance.json"));
+        JsonNode headlines = HandoffFixtures.parse(resource("expected-headline-values.json"));
+        JsonNode mentions = HandoffFixtures.parse(resource("expected-mentions.json"));
+        int withheldFields = 0;
+        int verdictCount = 0;
+        for (String name : List.of("export-valid.json", "export-collision.json", "export-field-verdicts.json",
+                "export-field-verdicts-time.json")) {
+            byte[] export = resource(name);
+            HandoffBundle verified = new HandoffExportParser().parse(export, pinning(export)).bundle();
+            JsonNode bundle = HandoffFixtures.parse(export).get("bundle");
+            assertEquals("zoop-graph-handoff-bundle-4", bundle.get("schemaVersion").stringValue(), name);
+            assertEquals(headlines.get(name).size(), bundle.get("issues").size(), name);
+            for (JsonNode issue : bundle.get("issues")) {
+                String id = issue.get("id").stringValue();
+                String at = name + " " + id;
+                assertEquals(verdicts.get(name).get(id), issue.get("fieldVerdicts"), at);
+                assertEquals(provenance.get(name).get(id), issue.get("fieldProvenance"), at);
+                assertEquals(mentions.get(name).get(id), issue.get("mentions"), at);
+                JsonNode expected = headlines.get(name).get(id);
+                assertEquals(expected.get("eventTime"), issue.get("eventTime"), at);
+                assertEquals(expected.get("timePrecision"), issue.get("timePrecision"), at);
+                assertEquals(expected.get("period"), issue.get("period"), at);
+                HandoffBundle.Issue typed = verified.issues().stream().filter(i -> i.id().equals(id)).findFirst().orElseThrow();
+                assertEquals(expected.get("eventTime").isNull() ? null : expected.get("eventTime").stringValue(), typed.eventTime(), at);
+                assertEquals(expected.get("timePrecision").stringValue(), typed.timePrecision(), at);
+                withheldFields += issue.get("fieldProvenance").get("withheld").size();
+                verdictCount += issue.get("fieldVerdicts").size();
+                // A verdict never changes an original mention: where a field is withheld the mention still states the reviewed value.
+                for (JsonNode verdict : issue.get("fieldVerdicts")) {
+                    boolean found = false;
+                    for (JsonNode mention : issue.get("mentions")) {
+                        if (mention.get("documentId").equals(verdict.get("documentId")) && mention.get("mentionId").equals(verdict.get("mentionId"))) {
+                            found = true;
+                            assertEquals(verdict.get("value"), mention.get(verdict.get("field").stringValue()), at);
+                        }
+                    }
+                    assertTrue(found, at);
+                }
+            }
+        }
+        assertTrue(withheldFields >= 3 && verdictCount >= 5, "the fixtures never withheld anything: " + withheldFields + "/" + verdictCount);
+    }
+
+    @Test
+    void aForgedSuppressionOrALeakedSelectedValueInARealVerdictExportIsRefused() throws Exception {
+        byte[] export = resource("export-field-verdicts.json");
+        new HandoffExportParser().parse(export, pinning(export));
+        JsonNode original = HandoffFixtures.parse(export).get("bundle");
+        // The reviewed world: the representative's event time is REJECTed (withheld), its period ALLOWed; the factory's only mention has
+        // a HOLD on its period (withheld).
+        assertEquals(1, withheldOf(original, "issue:supply-2026q3").size());
+
+        assertForged("a leaked rejected event time", original, bundle -> {
+            issue(bundle, "issue:supply-2026q3").put("eventTime", "2026-09-30");
+            issue(bundle, "issue:supply-2026q3").put("timePrecision", "day");
+        });
+        assertForged("a leaked held period", original, bundle -> issue(bundle, "issue:factory-2026q4").put("period", "2026Q4"));
+        assertForged("a suppression nobody reviewed (the factory event time)", original, bundle -> {
+            issue(bundle, "issue:factory-2026q4").putNull("eventTime");
+            issue(bundle, "issue:factory-2026q4").put("timePrecision", "unknown");
+            ((ObjectNode) issue(bundle, "issue:factory-2026q4").get("fieldProvenance")).putArray("withheld").add("eventTime").add("period");
+        });
+        assertForged("a withheld event time whose verdict was dropped", original, bundle -> {
+            ArrayNode list = (ArrayNode) issue(bundle, "issue:supply-2026q3").get("fieldVerdicts");
+            for (int index = list.size() - 1; index >= 0; index--) {
+                if (list.get(index).get("decision").stringValue().equals("REJECT") && list.get(index).get("field").stringValue().equals("eventTime")) {
+                    list.remove(index);
+                }
+            }
+        });
+        assertForged("the REJECT turned into an ALLOW while the headline stays withheld", original, bundle -> {
+            for (JsonNode verdict : issue(bundle, "issue:supply-2026q3").get("fieldVerdicts")) {
+                if (verdict.get("decision").stringValue().equals("REJECT") && verdict.get("field").stringValue().equals("eventTime")) {
+                    ((ObjectNode) verdict).put("decision", "ALLOW").put("reasonCode", "stated");
+                }
+            }
+        });
+        assertForged("a non-representative verdict made to withhold the supply period", original, bundle -> {
+            issue(bundle, "issue:supply-2026q3").putNull("period");
+            ((ObjectNode) issue(bundle, "issue:supply-2026q3").get("fieldProvenance")).putArray("withheld").add("eventTime").add("period");
+        });
+        assertForged("the held period's verdict evidence dropped from the issue evidence", original, bundle -> {
+            ArrayNode ids = (ArrayNode) issue(bundle, "issue:factory-2026q4").get("evidenceIds");
+            String cited = issue(bundle, "issue:factory-2026q4").get("fieldVerdicts").get(0).get("evidenceIds").get(0).stringValue();
+            for (int index = ids.size() - 1; index >= 0; index--) {
+                if (ids.get(index).stringValue().equals(cited)) {
+                    ids.remove(index);
+                }
+            }
+        });
+    }
+
+    private static ObjectNode issue(ObjectNode bundle, String id) {
+        for (JsonNode candidate : bundle.get("issues")) {
+            if (candidate.get("id").stringValue().equals(id)) {
+                return (ObjectNode) candidate;
+            }
+        }
+        throw new AssertionError("no issue " + id);
+    }
+
+    private static JsonNode withheldOf(JsonNode bundle, String id) {
+        for (JsonNode candidate : bundle.get("issues")) {
+            if (candidate.get("id").stringValue().equals(id)) {
+                return candidate.get("fieldProvenance").get("withheld");
+            }
+        }
+        throw new AssertionError("no issue " + id);
+    }
+
+    /** The real bundle with one forgery and the content digest recomputed, so only the verdict and withholding rules can refuse it. */
+    private static void assertForged(String rule, JsonNode original, Consumer<ObjectNode> forge) {
+        ObjectNode copy = (ObjectNode) original.deepCopy();
+        forge.accept(copy);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(copy), rule);
+    }
+
+    @Test
     void aWithheldEnvelopeIsNotAnExport() throws Exception {
         byte[] withheld = resource("export-withheld.json");
         GraphHandoffRequest request = new GraphHandoffRequest("handoff-1", "0".repeat(64), "0".repeat(64), "operator-a");
@@ -161,10 +302,13 @@ class HandoffBundleVerifierTest {
         assertRefused("unknown nested key", b -> ((ObjectNode) b.get("provenance")).put("extra", "x"));
         assertRefused("missing key", b -> b.remove("readiness"));
         assertRefused("the first schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-1"));
-        assertRefused("the earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-2"));
-        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-4"));
+        assertRefused("an earlier schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-2"));
+        assertRefused("the schema version before field verdicts", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-3"));
+        assertRefused("a later schema version", b -> b.put("schemaVersion", "zoop-graph-handoff-bundle-5"));
         assertRefused("wrong policy version", b -> ((ObjectNode) b.get("policy")).put("version", "zoop-public-projection-policy-2"));
-        assertRefused("an actual-model run is not producible", b -> ((ObjectNode) b.get("provenance")).put("executionMode", "live"));
+        assertRefused("live without a provider recording", b -> setMode(b, "live", "authored-test"));
+        assertRefused("a provider recording of a replay", b -> setMode(b, "replay", "provider"));
+        assertRefused("an unknown execution mode", b -> setMode(b, "recorded", "provider"));
         assertRefused("declared and observed kind differ", b -> ((ObjectNode) b.get("provenance")).put("observedSourceKind", "actual"));
         assertRefused("offset as a string", b -> ((ObjectNode) b.get("evidence").get(0)).put("start", "0"));
         assertRefused("offset not before end", b -> ((ObjectNode) b.get("evidence").get(0)).put("end", 0));
@@ -230,6 +374,300 @@ class HandoffBundleVerifierTest {
         });
     }
 
+    // ------------------------------------------------------------------------------------ provenance, approval, support ---
+
+    private static final HandoffFixtures.Built MANUAL = HandoffFixtures.build(
+            HandoffFixtures.Spec.standard().withManualApproval().withLive().withOrigin());
+
+    private static JsonNode mutatedFrom(HandoffFixtures.Built built, Consumer<ObjectNode> change) {
+        ObjectNode copy = built.bundle().deepCopy();
+        change.accept(copy);
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        return copy;
+    }
+
+    private static void assertRefusedFrom(HandoffFixtures.Built built, String rule, Consumer<ObjectNode> change) {
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(mutatedFrom(built, change)), rule);
+    }
+
+    /** Sets the pair on the bundle AND on every source, so that only the pairing rule can fail. */
+    private static void setMode(ObjectNode bundle, String mode, String recording) {
+        ((ObjectNode) bundle.get("provenance")).put("executionMode", mode).put("recordingKind", recording);
+        for (JsonNode source : bundle.get("sources").values()) {
+            ((ObjectNode) source.get("provenance")).put("executionMode", mode).put("recordingKind", recording);
+        }
+    }
+
+    private static ObjectNode relationOfType(ObjectNode bundle, String type) {
+        for (JsonNode relation : bundle.get("relations").values()) {
+            if (relation.get("type").stringValue().equals(type)) {
+                return (ObjectNode) relation;
+            }
+        }
+        throw new IllegalStateException(type);
+    }
+
+    private static ObjectNode reviewUsedOf(ObjectNode bundle) {
+        return (ObjectNode) bundle.get("sources").get(0).get("reviewUsed").get(0);
+    }
+
+    private static ObjectNode approvalBasisOf(ObjectNode bundle) {
+        return (ObjectNode) reviewUsedOf(bundle).get("approvalBasis");
+    }
+
+    private static ObjectNode supportOf(ObjectNode bundle) {
+        return (ObjectNode) bundle.get("issues").get(0).get("sourceSupport");
+    }
+
+    private static ObjectNode articleNode(ObjectNode bundle, int index) {
+        return (ObjectNode) bundle.get("articles").get(index);
+    }
+
+    @Test
+    void aLiveProviderBundleWithAnOperatorFinalApprovalAndADeclaredOriginIsAcceptedAndStatedAsWhatItIs() {
+        HandoffBundle live = HandoffBundleVerifier.verify(MANUAL.bundle());
+
+        assertEquals("live", live.executionMode());
+        assertEquals("provider", live.recordingKind());
+        assertEquals("synthetic", live.sourceKind(), "the source kind is independent of the execution mode");
+        assertEquals(1, live.approvals().size());
+        HandoffBundle.Approval approval = live.approvals().get(0);
+        assertEquals(HandoffBundleVerifier.OPERATOR_FINAL, approval.kind());
+        assertEquals("reviewer-final", approval.reviewer());
+        assertEquals(1, approval.revision());
+        assertEquals(HandoffFixtures.VERIFIED_AT, approval.decidedAt());
+        assertEquals("origin-wire-1", live.articles().get(0).origin().originId());
+        assertEquals(Canonical.sha256(HandoffFixtures.TEXT), live.articles().get(0).textSha256());
+
+        HandoffBundle replay = HandoffBundleVerifier.verify(BUILT.bundle());
+        assertEquals("replay", replay.executionMode());
+        assertEquals("authored-test", replay.recordingKind());
+        assertEquals(HandoffBundleVerifier.AUTOMATIC, replay.approvals().get(0).kind());
+        assertNull(replay.approvals().get(0).reviewer(), "an automatic verdict has no reviewer");
+        assertNull(replay.articles().get(0).origin(), "no declared origin is an unknown lineage, never an inferred one");
+    }
+
+    @Test
+    void theExecutionModeIsOneOfTheTwoTruthfulPairsAndEverySourceRepeatsTheBundlesOwnProvenance() {
+        HandoffBundleVerifier.verify(mutated(b -> setMode(b, "live", "provider")));
+        assertRefused("a source that records another mode",
+                b -> ((ObjectNode) b.get("sources").get(0).get("provenance")).put("executionMode", "live"));
+        assertRefused("a source that records another recording kind",
+                b -> ((ObjectNode) b.get("sources").get(0).get("provenance")).put("recordingKind", "provider"));
+        assertRefused("a source of another kind",
+                b -> ((ObjectNode) b.get("sources").get(0).get("provenance")).put("sourceKind", "actual"));
+        assertRefused("a source without its provenance", b -> ((ObjectNode) b.get("sources").get(0)).remove("provenance"));
+        assertRefused("an unknown key in the source provenance",
+                b -> ((ObjectNode) b.get("sources").get(0).get("provenance")).put("model", "x"));
+        assertRefused("a second source of another mode than the first", b -> {
+            ObjectNode second = ((ArrayNode) b.get("sources")).addObject();
+            second.setAll((ObjectNode) b.get("sources").get(0).deepCopy());
+            ((ObjectNode) second.get("relation")).put("jobId", "rel-2");
+            ((ObjectNode) second.get("provenance")).put("executionMode", "live").put("recordingKind", "provider");
+        });
+    }
+
+    @Test
+    void anApprovalBasisIsRecomputedAndAForgedOrRelabelledOneIsRefused() {
+        HandoffBundleVerifier.verify(MANUAL.bundle());
+        // An operator's approval must never read as the independent verifier's verdict, on either edge.
+        assertRefusedFrom(MANUAL, "an operator approval presented as an automatic verdict on INVOLVES",
+                b -> ((ObjectNode) relationOfType(b, "INVOLVES").get("provenance"))
+                        .put("s3SemanticValidation", "independent-verifier-supported-all-claims"));
+        assertRefusedFrom(MANUAL, "an operator approval presented as an automatic verdict on the structural basis",
+                b -> ((ObjectNode) relationOfType(b, "STRUCTURALLY_RELATED_TO").get("provenance"))
+                        .put("basisEligibility", "s3-independent-verifier-supported-all-claims"));
+        assertRefusedFrom(MANUAL, "an operator approval relabelled as automatic",
+                b -> approvalBasisOf(b).put("kind", HandoffBundleVerifier.AUTOMATIC));
+        assertRefused("an automatic verdict presented as a manual approval", b -> ((ObjectNode) relationOfType(b, "INVOLVES")
+                .get("provenance")).put("s3SemanticValidation", "manual-operator-final-approval"));
+        assertRefused("an automatic verdict presented as a manual structural basis",
+                b -> ((ObjectNode) relationOfType(b, "STRUCTURALLY_RELATED_TO").get("provenance"))
+                        .put("basisEligibility", "s3-operator-final-approval"));
+        assertRefused("an automatic verdict with a reviewer", b -> approvalBasisOf(b).put("reviewer", "reviewer-x"));
+        assertRefusedFrom(MANUAL, "an operator approval without its reviewer", b -> approvalBasisOf(b).putNull("reviewer"));
+        assertRefusedFrom(MANUAL, "an operator approval with a blank reviewer", b -> approvalBasisOf(b).put("reviewer", " "));
+        assertRefused("the structural origin literal reused as an approval kind",
+                b -> approvalBasisOf(b).put("kind", "manual-operator-review"));
+        assertRefused("an unknown approval kind", b -> approvalBasisOf(b).put("kind", "human"));
+        assertRefused("an approval decided at another revision than the pinned one", b -> approvalBasisOf(b).put("revision", 2));
+        assertRefused("a pinned revision that is not positive", b -> {
+            reviewUsedOf(b).put("revision", 0);
+            approvalBasisOf(b).put("revision", 0);
+        });
+        assertRefused("a decision time that is no timestamp", b -> approvalBasisOf(b).put("decidedAt", "yesterday"));
+        assertRefused("a structural verification time that is not the deciding event's",
+                b -> ((ObjectNode) relationOfType(b, "STRUCTURALLY_RELATED_TO").get("basis").get(0))
+                        .put("verifiedAt", "2026-10-16T12:00:00.123457+00:00"));
+        assertRefusedFrom(MANUAL, "a structural verification time older than the approval",
+                b -> ((ObjectNode) relationOfType(b, "STRUCTURALLY_RELATED_TO").get("basis").get(0))
+                        .put("verifiedAt", "2026-10-15T00:00:00+00:00"));
+        assertRefused("an unknown key in the approval basis", b -> approvalBasisOf(b).put("note", "x"));
+        assertRefused("a review pin without its approval basis", b -> reviewUsedOf(b).remove("approvalBasis"));
+        assertRefused("a review pin in the earlier pair shape", b -> {
+            ArrayNode pair = StrictJson.newArray();
+            pair.add("rc-" + "2".repeat(64)).add(1);
+            ((ObjectNode) b.get("sources").get(0)).set("reviewUsed", StrictJson.newArray().add(pair));
+        });
+        assertRefused("a review used twice", b -> ((ArrayNode) b.get("sources").get(0).get("reviewUsed"))
+                .add(reviewUsedOf(b).deepCopy()));
+    }
+
+    @Test
+    void oneOperatorApprovedRelationAmongSeveralMakesTheEdgeManualAndTheAutomaticLiteralIsRefused() {
+        Consumer<ObjectNode> addApprovedReview = b -> {
+            ObjectNode extra = ((ArrayNode) b.get("sources").get(0).get("reviewUsed")).addObject();
+            extra.put("relationCandidateId", "rc-" + "3".repeat(64)).put("revision", 4);
+            ObjectNode basis = extra.putObject("approvalBasis");
+            basis.put("kind", HandoffBundleVerifier.OPERATOR_FINAL).put("revision", 4).put("reviewer", "reviewer-final");
+            basis.put("decidedAt", "2026-10-17T00:00:00+00:00");
+            ObjectNode ref = ((ArrayNode) relationOfType(b, "INVOLVES").get("sourceRefs")).addObject();
+            ref.put("kind", "s3-relation").put("jobId", "rel-1").put("id", "rc-" + "3".repeat(64));
+        };
+        assertRefused("the automatic literal over a contributing operator approval", addApprovedReview::accept);
+        HandoffBundle bundle = HandoffBundleVerifier.verify(mutated(b -> {
+            addApprovedReview.accept(b);
+            ((ObjectNode) relationOfType(b, "INVOLVES").get("provenance"))
+                    .put("s3SemanticValidation", "manual-operator-final-approval");
+        }));
+        assertEquals(List.of(HandoffBundleVerifier.AUTOMATIC, HandoffBundleVerifier.OPERATOR_FINAL),
+                bundle.approvals().stream().map(HandoffBundle.Approval::kind).toList());
+    }
+
+    @Test
+    void sourceSupportIsRecomputedFromDeclaredOriginsAndExactTextNeverTakenFromTheProducer() {
+        HandoffBundleVerifier.verify(BUILT.bundle());
+        HandoffBundleVerifier.verify(MANUAL.bundle());
+        assertRefused("a lineage nobody declared", b -> supportOf(b).put("knownLineageCount", 1));
+        assertRefused("independence claimed over an unknown article", b -> supportOf(b).put("independentSourceCount", 1));
+        assertRefused("another number of articles", b -> supportOf(b).put("articleCount", 2));
+        assertRefused("the unknown article forgotten", b -> ((ArrayNode) supportOf(b).get("unknownLineageArticles")).removeAll());
+        assertRefused("an invented duplicate group", b -> ((ArrayNode) supportOf(b).get("duplicateGroups"))
+                .addArray().add(HandoffFixtures.ARTICLE_ID));
+        assertRefused("a different article id as the unknown one",
+                b -> {
+                    ArrayNode unknown = (ArrayNode) supportOf(b).get("unknownLineageArticles");
+                    unknown.removeAll();
+                    unknown.add("doc-" + "0".repeat(64));
+                });
+        assertRefused("an unknown key", b -> supportOf(b).put("publisherCount", 1));
+        assertRefused("a missing key", b -> supportOf(b).remove("duplicateGroups"));
+        assertRefused("a missing sourceSupport", b -> ((ObjectNode) b.get("issues").get(0)).remove("sourceSupport"));
+        assertRefused("a count as a string", b -> supportOf(b).put("articleCount", "1"));
+        assertRefusedFrom(MANUAL, "the declared origin dropped while its lineage is still counted",
+                b -> articleNode(b, 0).putNull("origin"));
+        assertRefusedFrom(MANUAL, "independence withheld for a declared origin", b -> supportOf(b).putNull("independentSourceCount"));
+        assertRefusedFrom(MANUAL, "an origin that is not an operator declaration",
+                b -> ((ObjectNode) articleNode(b, 0).get("origin")).put("verification", "operator-final-approval"));
+        assertRefusedFrom(MANUAL, "an origin with a publisher in it",
+                b -> ((ObjectNode) articleNode(b, 0).get("origin")).put("publisher", "example"));
+        assertRefusedFrom(MANUAL, "an origin without its decision",
+                b -> ((ObjectNode) articleNode(b, 0).get("origin")).remove("decisionRef"));
+        assertRefused("the policy without sourceSupport", b -> ((ObjectNode) b.get("policy")).remove("sourceSupport"));
+        assertRefused("another sourceSupport policy", b -> ((ObjectNode) b.get("policy")).put("sourceSupport", "publisher-domain"));
+        assertRefused("an article without its text digest", b -> articleNode(b, 0).remove("textSha256"));
+        assertRefused("a malformed text digest", b -> articleNode(b, 0).put("textSha256", "XYZ"));
+    }
+
+    private static void setSupport(ObjectNode bundle, int known, Integer independent, List<String> unknown,
+            List<List<String>> groups) {
+        ObjectNode support = supportOf(bundle);
+        support.put("articleCount", 2).put("knownLineageCount", known);
+        if (independent == null) {
+            support.putNull("independentSourceCount");
+        } else {
+            support.put("independentSourceCount", independent);
+        }
+        ArrayNode unknownNodes = support.putArray("unknownLineageArticles");
+        unknown.forEach(unknownNodes::add);
+        ArrayNode groupNodes = support.putArray("duplicateGroups");
+        for (List<String> group : groups) {
+            ArrayNode node = groupNodes.addArray();
+            group.forEach(node::add);
+        }
+    }
+
+    private static void twoArticles(ObjectNode bundle, String firstText, ObjectNode firstOrigin, String secondText,
+            ObjectNode secondOrigin) {
+        addSecondDocument(bundle);
+        setText(articleNode(bundle, 0), firstText, firstOrigin);
+        setText(articleNode(bundle, 1), secondText, secondOrigin);
+    }
+
+    private static void setText(ObjectNode article, String text, ObjectNode origin) {
+        article.put("textSha256", text);
+        if (origin == null) {
+            article.putNull("origin");
+        } else {
+            article.set("origin", origin);
+        }
+    }
+
+    private static ObjectNode origin(String id) {
+        ObjectNode node = HandoffFixtures.origin();
+        node.put("originId", id);
+        return node;
+    }
+
+    @Test
+    void knownLineageCountsLineageGroupsNotArticlesAndDuplicateGroupsAreExactTextEqualityOnly() {
+        String a = HandoffFixtures.ARTICLE_ID;
+        String d = SECOND_ARTICLE;
+        String same = "c".repeat(64);
+        // Two reprints of one declared origin: two articles, ONE lineage, independent count 1, and no duplicate group because
+        // their texts differ (the shared origin joins the lineage but is not exact-text equality).
+        Consumer<ObjectNode> reprints = b -> {
+            twoArticles(b, "d".repeat(64), origin("origin-x"), "e".repeat(64), origin("origin-x"));
+            setSupport(b, 1, 1, List.of(), List.of());
+        };
+        HandoffBundleVerifier.verify(mutated(reprints));
+        assertRefused("known lineages counted as articles", reprints.andThen(b -> supportOf(b).put("knownLineageCount", 2)));
+        assertRefused("independence counted as articles", reprints.andThen(b -> supportOf(b).put("independentSourceCount", 2)));
+        assertRefused("a lineage group reported as a duplicate group",
+                reprints.andThen(b -> ((ArrayNode) supportOf(b).get("duplicateGroups")).addArray().add(a).add(d)));
+
+        // Exactly equal text and no declared origin: an honest duplicate group, both unknown, independence unknown.
+        HandoffBundleVerifier.verify(mutated(b -> {
+            twoArticles(b, same, null, same, null);
+            setSupport(b, 0, null, List.of(a, d), List.of(List.of(a, d)));
+        }));
+        assertRefused("exact duplicates not reported", b -> {
+            twoArticles(b, same, null, same, null);
+            setSupport(b, 0, null, List.of(a, d), List.of());
+        });
+
+        // Equal text under two different declared origins: one connected component with two origins, never independent.
+        HandoffBundleVerifier.verify(mutated(b -> {
+            twoArticles(b, same, origin("origin-x"), same, origin("origin-y"));
+            setSupport(b, 1, null, List.of(), List.of(List.of(a, d)));
+        }));
+        assertRefused("conflicting origins counted as two independent sources", b -> {
+            twoArticles(b, same, origin("origin-x"), same, origin("origin-y"));
+            setSupport(b, 2, 2, List.of(), List.of(List.of(a, d)));
+        });
+
+        // Two declared origins on different texts: two lineages, two independent sources.
+        HandoffBundleVerifier.verify(mutated(b -> {
+            twoArticles(b, "d".repeat(64), origin("origin-x"), "e".repeat(64), origin("origin-y"));
+            setSupport(b, 2, 2, List.of(), List.of());
+        }));
+
+        // One declared and one unknown article on different texts: the known lineage counts, independence stays unknown.
+        HandoffBundleVerifier.verify(mutated(b -> {
+            twoArticles(b, "d".repeat(64), origin("origin-x"), "e".repeat(64), null);
+            setSupport(b, 1, null, List.of(d), List.of());
+        }));
+        assertRefused("independence claimed with one article of unknown origin", b -> {
+            twoArticles(b, "d".repeat(64), origin("origin-x"), "e".repeat(64), null);
+            setSupport(b, 1, 1, List.of(d), List.of());
+        });
+    }
+
+    @Test
+    void anIssueThatCitesTwoVersionsOfOneArticleIsRefusedNotMerged() {
+        assertRefused("a second version of the same public article", b -> addSecondDocument(b, HandoffFixtures.ARTICLE_ID));
+    }
+
     @Test
     void theContentDigestIsRebuiltNotTrusted() {
         ObjectNode copy = BUILT.bundle().deepCopy();
@@ -260,11 +698,16 @@ class HandoffBundleVerifierTest {
      * @return the id of the second document's evidence row
      */
     private static String addSecondDocument(ObjectNode b) {
-        String evidenceId = HandoffBundleVerifier.appEvidenceId(SECOND_ARTICLE, SECOND_VERSION, 0, 3);
+        return addSecondDocument(b, SECOND_ARTICLE);
+    }
+
+    /** The same with an explicit public article id: the first article's id makes the issue cite a SECOND VERSION of one article. */
+    private static String addSecondDocument(ObjectNode b, String id) {
+        String evidenceId = HandoffBundleVerifier.appEvidenceId(id, SECOND_VERSION, 0, 3);
         ObjectNode row = ((ArrayNode) b.get("evidence")).addObject();
         row.put("id", evidenceId);
         row.put("kind", HandoffBundleVerifier.EVIDENCE_KIND);
-        row.put("articleId", SECOND_ARTICLE);
+        row.put("articleId", id);
         row.put("articleVersion", SECOND_VERSION);
         row.put("start", 0);
         row.put("end", 3);
@@ -272,7 +715,7 @@ class HandoffBundleVerifierTest {
         row.put("quoteSha256", "a".repeat(64));
         row.putArray("rawLocatorIds").add("loc-1");
         ObjectNode rowSource = row.putObject("source");
-        rowSource.put("documentId", SECOND_ARTICLE);
+        rowSource.put("documentId", id);
         rowSource.put("documentVersion", SECOND_VERSION);
         rowSource.put("rawVersion", SECOND_RAW);
         rowSource.put("textArtifactId", "text-" + SECOND_VERSION);
@@ -280,15 +723,17 @@ class HandoffBundleVerifierTest {
         rowSource.put("inputKind", "body");
 
         ObjectNode article = ((ArrayNode) b.get("articles")).addObject();
-        article.put("articleId", SECOND_ARTICLE);
+        article.put("articleId", id);
         article.put("articleVersion", SECOND_VERSION);
-        article.put("documentId", SECOND_ARTICLE);
+        article.put("documentId", id);
         article.put("documentVersion", SECOND_VERSION);
         article.put("rawVersion", SECOND_RAW);
         article.put("title", "후속 보도");
         article.put("url", "https://example.invalid/b");
         article.put("publishedAt", "2026-10-09T09:00:00+09:00");
         article.put("publicationPrecision", "datetime");
+        article.put("textSha256", "b".repeat(64));
+        article.putNull("origin");
         ObjectNode observed = article.putArray("observations").addObject();
         observed.put("roundId", HandoffFixtures.SELECTOR.roundId());
         observed.put("sourceId", HandoffFixtures.SELECTOR.sourceId());
@@ -300,11 +745,11 @@ class HandoffBundleVerifierTest {
         ObjectNode issue = (ObjectNode) b.get("issues").get(0);
         ObjectNode event = ((ObjectNode) issue.get("sourceEvents").get(0)).deepCopy();
         event.put("ref", "evc-" + "4".repeat(64));
-        event.put("documentId", SECOND_ARTICLE);
+        event.put("documentId", id);
         event.put("documentVersion", SECOND_VERSION);
         ObjectNode observation = (ObjectNode) event.get("observation");
         observation.put("ordinal", 1);
-        observation.put("documentId", SECOND_ARTICLE);
+        observation.put("documentId", id);
         observation.put("rawVersion", SECOND_RAW);
         observation.put("documentVersion", SECOND_VERSION);
         ((ArrayNode) issue.get("sourceEvents")).add(event);
@@ -313,9 +758,9 @@ class HandoffBundleVerifierTest {
         ((ArrayNode) issue.get("geography").get("basis")).add(basis);
 
         ObjectNode second = mention(b, 0).deepCopy();
-        second.put("documentId", SECOND_ARTICLE);
+        second.put("documentId", id);
         second.put("documentVersion", SECOND_VERSION);
-        second.put("articleId", SECOND_ARTICLE);
+        second.put("articleId", id);
         second.put("articleVersion", SECOND_VERSION);
         second.put("title", "후속 보도 원문 제목");
         second.putNull("target");
@@ -334,6 +779,7 @@ class HandoffBundleVerifierTest {
         ObjectNode provenance = issue.putObject("fieldProvenance");
         provenance.put("selection", "operator-representative");
         provenance.put("verification", "none");
+        provenance.putArray("withheld");
         ObjectNode same = provenance.putObject("sameValueMentions");
         for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
             ArrayNode list = same.putArray(field);
@@ -343,6 +789,11 @@ class HandoffBundleVerifierTest {
             }
         }
         addEvidenceId(issue, evidenceId);
+        // Two articles, no declared origin, different texts: both unknown, independence cannot be counted.
+        ObjectNode support = issue.putObject("sourceSupport");
+        support.put("articleCount", 2).put("knownLineageCount", 0).putNull("independentSourceCount");
+        support.putArray("unknownLineageArticles").add(HandoffFixtures.ARTICLE_ID).add(SECOND_ARTICLE);
+        support.putArray("duplicateGroups");
         ((ObjectNode) b.get("counts")).put("evidence", 4).put("articles", 2);
         return evidenceId;
     }
@@ -538,7 +989,7 @@ class HandoffBundleVerifierTest {
         assertRefused("an unknown provenance key", b -> provenance(b).put("approval", "none"));
         assertRefused("field decisions are no provenance key", b -> provenance(b).putObject("fieldDecisions"));
         assertRefused("field decisions are no issue key", b -> issueOf(b).putObject("fieldDecisions"));
-        for (String key : List.of("selection", "verification", "sameValueMentions")) {
+        for (String key : List.of("selection", "verification", "withheld", "sameValueMentions")) {
             assertRefused("provenance without " + key, b -> provenance(b).remove(key));
         }
         assertRefused("an unknown selection", b -> provenance(b).put("selection", "consensus"));
@@ -641,6 +1092,369 @@ class HandoffBundleVerifierTest {
         HandoffBundleVerifier.verify(copy);
     }
 
+    // ------------------------------------------------------------------------------------------------ operator field verdicts -
+
+    private static ArrayNode verdictsOf(ObjectNode bundle) {
+        return (ArrayNode) issueOf(bundle).get("fieldVerdicts");
+    }
+
+    private static String eventEvidence(ObjectNode bundle, int mention) {
+        return mention(bundle, mention).get("evidenceIds").get(0).stringValue();
+    }
+
+    /** The one evidence row of the standard article that the issue's mentions and geography do not cite (the structural basis sentence). */
+    private static String uncitedEvidence(ObjectNode bundle) {
+        List<String> cited = new ArrayList<>();
+        issueOf(bundle).get("evidenceIds").values().forEach(id -> cited.add(id.stringValue()));
+        return BUILT.evidenceIds().stream().filter(id -> !cited.contains(id)).findFirst().orElseThrow();
+    }
+
+    /** A verdict on the issue's {@code mention}-th mention in the closed bundle shape; its value is that mention's own string. SYNTHETIC. */
+    private static ObjectNode verdictOn(ObjectNode bundle, int mention, String field, String decision, String reason,
+            String... evidenceIds) {
+        ObjectNode original = mention(bundle, mention);
+        ObjectNode node = reference(bundle, mention);
+        node.put("field", field);
+        node.set("value", original.get(field).deepCopy());
+        node.put("decision", decision);
+        node.put("reasonCode", reason);
+        ArrayNode ids = node.putArray("evidenceIds");
+        List<String> sorted = new ArrayList<>(List.of(evidenceIds));
+        Collections.sort(sorted);
+        sorted.forEach(ids::add);
+        node.put("verification", "operator-field-verdict");
+        node.put("reviewer", "reviewer-a");
+        node.put("decisionRef", "fverdict-1:" + mention + ":" + field);
+        node.put("decisionVersion", "fv1");
+        return node;
+    }
+
+    /** What the producer does for a HOLD/REJECT on the selection basis: lists the field as withheld and redacts the issue's headline. */
+    private static void withhold(ObjectNode bundle, String... fields) {
+        ArrayNode list = provenance(bundle).putArray("withheld");
+        for (String field : fields) {
+            list.add(field);
+            issueOf(bundle).putNull(field);
+            if (field.equals("eventTime")) {
+                issueOf(bundle).put("timePrecision", "unknown");
+            }
+        }
+    }
+
+    /** The same two-document issue whose mentions agree in every value, selected by the operator's representative or unanimously. */
+    private static ObjectNode agreeingTwoDocuments(boolean unanimous) {
+        ObjectNode agreeing = BUILT.bundle().deepCopy();
+        addSecondDocument(agreeing);
+        ObjectNode first = mention(agreeing, 0);
+        ObjectNode second = mention(agreeing, 1);
+        second.put("timePrecision", first.get("timePrecision").stringValue());
+        for (String field : List.of("title", "action", "target", "eventTime", "period", "assertionStatus")) {
+            second.set(field, first.get(field).deepCopy());
+            setList(agreeing, field, 0, 1);
+        }
+        if (unanimous) {
+            issueOf(agreeing).putNull("representative");
+            provenance(agreeing).put("selection", "unanimous");
+        }
+        return agreeing;
+    }
+
+    private static JsonNode verifiedAfter(ObjectNode bundle) {
+        ((ObjectNode) bundle.get("digests")).put("content", HandoffBundleVerifier.contentDigest(bundle));
+        HandoffBundleVerifier.verify(bundle);
+        return bundle;
+    }
+
+    @Test
+    void aRejectedEventTimeOnTheSelectedMentionIsWithheldFromTheIssueAndTheMentionKeepsItsOriginal() {
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        verdictsOf(copy).add(verdictOn(copy, 0, "eventTime", "REJECT", "contradicted", eventEvidence(copy, 0)));
+        withhold(copy, "eventTime");
+
+        JsonNode accepted = verifiedAfter(copy);
+
+        HandoffBundle.Issue issue = HandoffBundleVerifier.verify(accepted).issues().get(0);
+        assertNull(issue.eventTime());
+        assertEquals("unknown", issue.timePrecision());
+        JsonNode raw = accepted.get("issues").get(0);
+        assertEquals("2026Q3", raw.get("period").stringValue(), "the period had no verdict");
+        // The original mention value and the reviewed value stay in the bundle (and so in the receipt): nothing is deleted.
+        assertEquals("2026-09-30", raw.get("mentions").get(0).get("eventTime").stringValue());
+        assertEquals("day", raw.get("mentions").get(0).get("timePrecision").stringValue());
+        assertEquals("2026-09-30", raw.get("fieldVerdicts").get(0).get("value").stringValue());
+        // The selection record still compares the ORIGINAL selected value, never the redacted null.
+        assertEquals(1, raw.get("fieldProvenance").get("sameValueMentions").get("eventTime").size());
+
+        // Forged: the verdict is there but the headline still shows the rejected value, or the withheld list is silent.
+        assertRefused("a leaked rejected event time", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "REJECT", "contradicted", eventEvidence(b, 0)));
+            provenance(b).putArray("withheld").add("eventTime");
+        });
+        assertRefused("a rejected event time that is not listed as withheld", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "REJECT", "contradicted", eventEvidence(b, 0)));
+            issueOf(b).putNull("eventTime");
+            issueOf(b).put("timePrecision", "unknown");
+        });
+        assertRefused("a withheld event time that keeps a precision", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "REJECT", "contradicted", eventEvidence(b, 0)));
+            withhold(b, "eventTime");
+            issueOf(b).put("timePrecision", "day");
+        });
+        assertRefused("a withheld event time with another time in the issue", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "REJECT", "contradicted", eventEvidence(b, 0)));
+            withhold(b, "eventTime");
+            issueOf(b).put("eventTime", "2026-10-01");
+        });
+    }
+
+    @Test
+    void aHeldPeriodIsNullInTheIssueAndItsVerdictEvidenceBelongsToTheIssueEvidence() {
+        String basisEvidence = uncitedEvidence(BUILT.bundle().deepCopy());
+        ObjectNode copy = BUILT.bundle().deepCopy();
+        verdictsOf(copy).add(verdictOn(copy, 0, "period", "HOLD", "ambiguous", basisEvidence));
+        withhold(copy, "period");
+        addEvidenceId(issueOf(copy), basisEvidence);
+
+        JsonNode accepted = verifiedAfter(copy);
+
+        JsonNode raw = accepted.get("issues").get(0);
+        assertTrue(raw.get("period").isNull());
+        assertEquals("2026-09-30", raw.get("eventTime").stringValue(), "the event time had no verdict");
+        assertEquals("day", raw.get("timePrecision").stringValue());
+        assertEquals("2026Q3", raw.get("mentions").get(0).get("period").stringValue());
+        assertEquals(basisEvidence, raw.get("fieldVerdicts").get(0).get("evidenceIds").get(0).stringValue());
+
+        // The issue's evidence is the union of its mentions', its geography's and its verdicts': a verdict span the issue does not list
+        // is refused, and so is an issue that lists a span nothing of the issue cites.
+        assertRefused("verdict evidence missing from the issue evidence", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "ambiguous", basisEvidence));
+            withhold(b, "period");
+        });
+        assertRefused("a period that is held but still shown", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "ambiguous", basisEvidence));
+            provenance(b).putArray("withheld").add("period");
+            addEvidenceId(issueOf(b), basisEvidence);
+        });
+        assertRefused("a precision that changes without an event time verdict", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "ambiguous", basisEvidence));
+            withhold(b, "period");
+            addEvidenceId(issueOf(b), basisEvidence);
+            issueOf(b).put("timePrecision", "unknown");
+        });
+    }
+
+    @Test
+    void anUnstatedHoldNeedsNoSpanAndAnAllowChangesNothing() {
+        ObjectNode held = BUILT.bundle().deepCopy();
+        verdictsOf(held).add(verdictOn(held, 0, "eventTime", "HOLD", "unstated"));
+        verdictsOf(held).add(verdictOn(held, 0, "period", "HOLD", "unstated"));
+        withhold(held, "eventTime", "period");
+        JsonNode raw = verifiedAfter(held).get("issues").get(0);
+        assertTrue(raw.get("eventTime").isNull() && raw.get("period").isNull());
+        assertEquals("unknown", raw.get("timePrecision").stringValue());
+        assertEquals(2, raw.get("fieldVerdicts").size());
+        assertEquals("eventTime", raw.get("fieldVerdicts").get(0).get("field").stringValue(), "field order eventTime then period");
+
+        ObjectNode allowed = BUILT.bundle().deepCopy();
+        verdictsOf(allowed).add(verdictOn(allowed, 0, "eventTime", "ALLOW", "stated", eventEvidence(allowed, 0)));
+        verdictsOf(allowed).add(verdictOn(allowed, 0, "period", "ALLOW", "stated", eventEvidence(allowed, 0)));
+        JsonNode shown = verifiedAfter(allowed).get("issues").get(0);
+        assertEquals("2026-09-30", shown.get("eventTime").stringValue());
+        assertEquals("2026Q3", shown.get("period").stringValue());
+        assertEquals(0, shown.get("fieldProvenance").get("withheld").size());
+
+        // A forged suppression: an ALLOW (or no verdict at all) is no ground to withhold a value.
+        assertRefused("a withheld event time that an ALLOW stated", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "ALLOW", "stated", eventEvidence(b, 0)));
+            withhold(b, "eventTime");
+        });
+        assertRefused("a withheld period nobody judged", b -> withhold(b, "period"));
+        assertRefused("a redacted event time nobody judged", b -> {
+            issueOf(b).putNull("eventTime");
+            issueOf(b).put("timePrecision", "unknown");
+        });
+        assertRefused("a withheld list without any verdict", b -> provenance(b).putArray("withheld").add("eventTime"));
+    }
+
+    @Test
+    void onlyAHoldOrRejectOnTheSelectionBasisWithholdsAndNeverAnotherMentionsValue() {
+        // The operator's representative is mention 0; a REJECT on the non-representative mention 1 withholds nothing.
+        ObjectNode other = BUILT.bundle().deepCopy();
+        addSecondDocument(other);
+        verdictsOf(other).add(verdictOn(other, 1, "eventTime", "REJECT", "contradicted", eventEvidence(other, 1)));
+        JsonNode kept = verifiedAfter(other).get("issues").get(0);
+        assertEquals("2026-09-30", kept.get("eventTime").stringValue());
+        assertEquals("day", kept.get("timePrecision").stringValue());
+        assertEquals(0, kept.get("fieldProvenance").get("withheld").size());
+        assertRefused("a non-representative reject that withholds the headline", b -> {
+            addSecondDocument(b);
+            verdictsOf(b).add(verdictOn(b, 1, "eventTime", "REJECT", "contradicted", eventEvidence(b, 1)));
+            withhold(b, "eventTime");
+        });
+
+        // A HOLD on the representative withholds that field (and only that field); the second mention's value is not a fallback.
+        ObjectNode representative = BUILT.bundle().deepCopy();
+        addSecondDocument(representative);
+        verdictsOf(representative).add(verdictOn(representative, 0, "period", "HOLD", "unstated"));
+        verdictsOf(representative).add(verdictOn(representative, 1, "eventTime", "HOLD", "unstated"));
+        withhold(representative, "period");
+        JsonNode held = verifiedAfter(representative).get("issues").get(0);
+        assertTrue(held.get("period").isNull());
+        assertEquals("2026-09-30", held.get("eventTime").stringValue());
+        assertRefused("the withheld period replaced by the other mention's value", b -> {
+            addSecondDocument(b);
+            verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "unstated"));
+            withhold(b, "period");
+            issueOf(b).put("period", "2026Q4");
+        });
+
+        // Unanimous: every mention is the selection basis, so a HOLD on the SECOND mention withholds the headline; with the
+        // operator's representative the same verdict on the second mention withholds nothing.
+        ObjectNode unanimous = agreeingTwoDocuments(true);
+        verdictsOf(unanimous).add(verdictOn(unanimous, 1, "period", "HOLD", "unstated"));
+        withhold(unanimous, "period");
+        JsonNode unanimousRaw = verifiedAfter(unanimous).get("issues").get(0);
+        assertTrue(unanimousRaw.get("period").isNull());
+        assertEquals(2, unanimousRaw.get("fieldProvenance").get("sameValueMentions").get("period").size(), "the original selected value");
+        ObjectNode heldSecond = agreeingTwoDocuments(true);
+        verdictsOf(heldSecond).add(verdictOn(heldSecond, 1, "period", "HOLD", "unstated"));
+        provenance(heldSecond).putArray("withheld").add("period");
+        assertRefusedOn("a unanimous issue whose second mention was held but keeps its period", heldSecond);
+        ObjectNode represented = agreeingTwoDocuments(false);
+        verdictsOf(represented).add(verdictOn(represented, 1, "period", "HOLD", "unstated"));
+        JsonNode representedRaw = verifiedAfter(represented).get("issues").get(0);
+        assertEquals("2026Q3", representedRaw.get("period").stringValue());
+    }
+
+    @Test
+    void everyFieldVerdictRuleIsEnforced() {
+        // The shape: an ALLOW/stated on the period changes no headline, so each edit below is the only thing that can fail.
+        HandoffBundleVerifier.verify(mutated(b -> verdictsOf(b).add(verdictOn(b, 0, "period", "ALLOW", "stated", eventEvidence(b, 0)))));
+        assertRefused("an issue without its verdict list", b -> issueOf(b).remove("fieldVerdicts"));
+        assertRefused("verdicts that are not an array", b -> issueOf(b).put("fieldVerdicts", "x"));
+        assertRefused("a null verdict list", b -> issueOf(b).putNull("fieldVerdicts"));
+        assertRefused("a null verdict", b -> verdictsOf(b).addNull());
+        for (String key : List.of("documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds",
+                "verification", "reviewer", "decisionRef", "decisionVersion")) {
+            assertVerdictRefused("a verdict without " + key, v -> v.remove(key));
+        }
+        assertVerdictRefused("an unknown verdict key", v -> v.put("note", "free text"));
+        assertVerdictRefused("a review note", v -> v.put("reason", "free text"));
+        assertVerdictRefused("a verdict on a field outside eventTime and period", v -> v.put("field", "title"));
+        assertVerdictRefused("a verdict on the time precision", v -> v.put("field", "timePrecision"));
+        assertVerdictRefused("a null value", v -> v.putNull("value"));
+        assertVerdictRefused("a numeric value", v -> v.put("value", 2026));
+        assertVerdictRefused("a value that is not the mention's own", v -> v.put("value", "2026Q4"));
+        assertVerdictRefused("a trimmed value", v -> v.put("value", "2026Q3 "));
+        assertRefused("a verdict on a mention value that is null", b -> {
+            mention(b, 0).putNull("period");
+            issueOf(b).putNull("period");
+            verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "unstated"));
+            provenance(b).putArray("withheld").add("period");
+        });
+        assertVerdictRefused("an unknown decision", v -> v.put("decision", "APPROVE"));
+        assertVerdictRefused("a lowercase decision", v -> v.put("decision", "allow"));
+        assertVerdictRefused("an unknown reason code", v -> v.put("reasonCode", "supported"));
+        assertVerdictRefused("an ALLOW that is unstated", v -> v.put("reasonCode", "unstated"));
+        assertVerdictRefused("an ALLOW that is ambiguous", v -> v.put("reasonCode", "ambiguous"));
+        assertVerdictRefused("an ALLOW that is contradicted", v -> v.put("reasonCode", "contradicted"));
+        assertVerdictRefused("an ALLOW without a span", v -> v.putArray("evidenceIds"));
+        assertVerdictRefused("a verification that is none", v -> v.put("verification", "none"));
+        assertVerdictRefused("a verified verification", v -> v.put("verification", "verified"));
+        for (String key : List.of("reviewer", "decisionRef", "decisionVersion")) {
+            assertVerdictRefused("an empty " + key, v -> v.put(key, ""));
+            assertVerdictRefused("a " + key + " with a space", v -> v.put(key, "a b"));
+            assertVerdictRefused("a null " + key, v -> v.putNull(key));
+        }
+        assertVerdictRefused("a verdict on another document", v -> v.put("documentId", "doc-" + "9".repeat(64)));
+        assertVerdictRefused("a verdict on another document version", v -> v.put("documentVersion", "9".repeat(64)));
+        assertVerdictRefused("a verdict on a mention the issue does not have", v -> v.put("mentionId", "m-9"));
+        assertVerdictRefused("a verdict with an empty mention id", v -> v.put("mentionId", ""));
+        assertVerdictRefused("evidence that is unknown", v -> v.putArray("evidenceIds").add("ev-" + "0".repeat(64)));
+        assertVerdictRefused("evidence that is not an id", v -> v.putArray("evidenceIds").add("x"));
+        assertVerdictRefused("evidence given as spans", v -> v.putArray("evidenceIds").addObject().put("start", 0));
+        assertVerdictRefused("evidence listed twice", v -> {
+            ArrayNode ids = v.putArray("evidenceIds");
+            ids.add(eventEvidence(BUILT.bundle().deepCopy(), 0));
+            ids.add(eventEvidence(BUILT.bundle().deepCopy(), 0));
+        });
+        assertVerdictRefused("evidence not in ascending order", v -> {
+            List<String> descending = new ArrayList<>(BUILT.evidenceIds());
+            Collections.sort(descending, Collections.reverseOrder());
+            ArrayNode ids = v.putArray("evidenceIds");
+            descending.forEach(ids::add);
+        });
+
+        // The decision and reason pairs: only these four are legal, and a span is needed exactly when text is claimed.
+        assertRefused("a HOLD that is stated", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "stated", eventEvidence(b, 0))));
+        assertRefused("a HOLD that is contradicted", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "contradicted", eventEvidence(b, 0))));
+        assertRefused("an unstated HOLD with a span", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "unstated", eventEvidence(b, 0))));
+        assertRefused("an ambiguous HOLD without a span", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "ambiguous")));
+        assertRefused("a REJECT that is unstated", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "REJECT", "unstated")));
+        assertRefused("a REJECT that is ambiguous", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "REJECT", "ambiguous", eventEvidence(b, 0))));
+        assertRefused("a contradicted REJECT without a span", b -> verdictsOf(b).add(verdictOn(b, 0, "period", "REJECT", "contradicted")));
+
+        // A span of another document's article is not evidence of this mention.
+        assertRefusedWithTwoDocuments("a verdict citing the other document's evidence", b ->
+                verdictsOf(b).add(verdictOn(b, 0, "period", "ALLOW", "stated", eventEvidence(b, 1))));
+        assertRefusedWithTwoDocuments("a verdict of the second mention citing the first document's evidence", b ->
+                verdictsOf(b).add(verdictOn(b, 1, "eventTime", "ALLOW", "stated", eventEvidence(b, 0))));
+
+        // One verdict per (mention, field), strictly ascending by mention identity and then field order.
+        assertRefused("the same mention field judged twice", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "period", "ALLOW", "stated", eventEvidence(b, 0)));
+            verdictsOf(b).add(verdictOn(b, 0, "period", "ALLOW", "stated", eventEvidence(b, 0)));
+        });
+        assertRefused("a period verdict before the event time verdict", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "period", "ALLOW", "stated", eventEvidence(b, 0)));
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "ALLOW", "stated", eventEvidence(b, 0)));
+        });
+        assertRefusedWithTwoDocuments("verdicts out of mention order", b -> {
+            verdictsOf(b).add(verdictOn(b, 1, "eventTime", "ALLOW", "stated", eventEvidence(b, 1)));
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "ALLOW", "stated", eventEvidence(b, 0)));
+        });
+        ObjectNode ordered = BUILT.bundle().deepCopy();
+        addSecondDocument(ordered);
+        verdictsOf(ordered).add(verdictOn(ordered, 0, "eventTime", "ALLOW", "stated", eventEvidence(ordered, 0)));
+        verdictsOf(ordered).add(verdictOn(ordered, 0, "period", "ALLOW", "stated", eventEvidence(ordered, 0)));
+        verdictsOf(ordered).add(verdictOn(ordered, 1, "eventTime", "ALLOW", "stated", eventEvidence(ordered, 1)));
+        verifiedAfter(ordered);
+
+        // The withheld list: closed field names in field order, recomputed from the verdicts.
+        ObjectNode both = BUILT.bundle().deepCopy();
+        verdictsOf(both).add(verdictOn(both, 0, "eventTime", "HOLD", "ambiguous", eventEvidence(both, 0)));
+        verdictsOf(both).add(verdictOn(both, 0, "period", "REJECT", "contradicted", eventEvidence(both, 0)));
+        withhold(both, "eventTime", "period");
+        verifiedAfter(both);
+        assertRefused("withheld fields out of order", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "eventTime", "HOLD", "ambiguous", eventEvidence(b, 0)));
+            verdictsOf(b).add(verdictOn(b, 0, "period", "REJECT", "contradicted", eventEvidence(b, 0)));
+            withhold(b, "period", "eventTime");
+        });
+        assertRefused("a withheld field listed twice", b -> {
+            verdictsOf(b).add(verdictOn(b, 0, "period", "HOLD", "unstated"));
+            withhold(b, "period", "period");
+        });
+        assertRefused("a withheld title", b -> provenance(b).putArray("withheld").add("title"));
+        assertRefused("withheld that is not an array", b -> provenance(b).put("withheld", "period"));
+        assertRefused("a null withheld", b -> provenance(b).putNull("withheld"));
+    }
+
+    /** A bundle that is already as the forger wrote it: only its content digest is recomputed, so the verdict rules alone can refuse it. */
+    private static void assertRefusedOn(String rule, ObjectNode base) {
+        ObjectNode copy = base.deepCopy();
+        ((ObjectNode) copy.get("digests")).put("content", HandoffBundleVerifier.contentDigest(copy));
+        assertThrows(StrictJson.Malformed.class, () -> HandoffBundleVerifier.verify(copy), rule);
+    }
+
+    private static void assertVerdictRefused(String rule, Consumer<ObjectNode> edit) {
+        assertRefused(rule, b -> {
+            ObjectNode verdict = verdictOn(b, 0, "period", "ALLOW", "stated", eventEvidence(b, 0));
+            verdictsOf(b).add(verdict);
+            edit.accept(verdict);
+        });
+    }
+
     @Test
     void aParticipantKeepsItsSourceIdAndRoleTextWithOrWithoutAPublicCompany() {
         JsonNode participants = BUILT.bundle().get("issues").get(0).get("mentions").get(0).get("participants");
@@ -733,17 +1547,24 @@ class HandoffBundleVerifierTest {
             mention(b, 0).put("eventTime", "2026-09-30T09:00:00+09:00");
             mention(b, 0).put("timePrecision", "datetime");
             ((ObjectNode) b.get("issues").get(0)).put("eventTime", "2026-09-30T09:00:00+09:00");
+            ((ObjectNode) b.get("issues").get(0)).put("timePrecision", "datetime");
         }));
     }
 
     @Test
     void anExportOfAnEarlierBundleSchemaIsRefusedAsAnInvalidBundleBeforeAnyWrite() {
-        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2")) {
+        for (String schema : List.of("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3")) {
             byte[] earlier = HandoffFixtures.envelopeAfter(BUILT, root -> {
                 ObjectNode bundle = (ObjectNode) root.get("bundle");
                 bundle.put("schemaVersion", schema);
                 ObjectNode issue = (ObjectNode) bundle.get("issues").get(0);
-                issue.remove("fieldProvenance");
+                // What each earlier build wrote: -3 has provenance without `withheld` and no verdicts, -2 no provenance, -1 no mentions.
+                issue.remove("fieldVerdicts");
+                if (schema.endsWith("-3")) {
+                    ((ObjectNode) issue.get("fieldProvenance")).remove("withheld");
+                } else {
+                    issue.remove("fieldProvenance");
+                }
                 if (schema.endsWith("-1")) {
                     issue.remove("mentions");
                 }

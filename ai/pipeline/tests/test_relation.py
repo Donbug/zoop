@@ -1,5 +1,5 @@
 """Offline S3 relation/impact candidate behavior: typed vocabulary, path/evidence gates, independent verification, impact labels,
-HOLD review -> revalidation, receipt recovery, rights and isolation.
+HOLD review -> final human approval, receipt recovery, rights and isolation.
 
 Replay (producer AND verifier) is authored-response replay, never independent AI inference. No network, model, PoC database or app state.
 The upstream is a REAL ingestion + S2 extraction job read through the owner seam; nothing is mocked or echoed.
@@ -21,8 +21,8 @@ from scripts.relation_smoke import (BAD, COMP, CO, EVT, GOOD, INV, QB, SUP, SUP2
 from tests.legacy_ledger import copy_as_legacy
 from zoop_ai_pipeline import relation_rules as rules
 from zoop_ai_pipeline.extraction_contracts import ExtractionFailure
-from zoop_ai_pipeline.relation import Engine, Store, next_attempt
-from zoop_ai_pipeline.relation_contracts import Revalidate, Review, Submit, digest
+from zoop_ai_pipeline.relation import INITIAL_ATTEMPT, Engine, Store
+from zoop_ai_pipeline.relation_contracts import Review, Submit, digest
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def test_direction_reversal_is_held_by_the_independent_verifier_and_never_flippe
     assert right["eligibility"]["status"] == "eligible" and right["relationCandidateId"] != wrong["relationCandidateId"]
     assert wrong["eligibility"]["status"] == "hold" and codes(wrong) == [("direction_reversed", "direction")]
     assert (wrong["subject"]["ref"], wrong["object"]["ref"]) == ("SYNTH-1", "SYNTH-3") and wrong["impact"]["status"] == "not-applicable"
-    request = json.dumps(rules.verifier_request(wrong, next_attempt([], "initial")), ensure_ascii=False)
+    request = json.dumps(rules.verifier_request(wrong, INITIAL_ATTEMPT), ensure_ascii=False)
     assert "생성기 사유" not in request and "reason" not in request.lower() and wrong["relationCandidateId"] not in request
     assert SUP in request and "배터리 부품" in request  # fixed facts + exact quotes only
 
@@ -332,9 +332,9 @@ def test_verifier_receives_only_fixed_facts_and_quotes_so_generator_wording_cann
     w = world
     out = converge(w, "j", [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="p", reason="이 관계는 틀림없다")])
     r = out["relations"][0]
-    request = rules.verifier_request(r, next_attempt([], "initial"))
+    request = rules.verifier_request(r, INITIAL_ATTEMPT)
     assert set(request) == {"schemaVersion", "stage", "verifierVersion", "policyVersion", "attempt", "relation", "quotes", "claims"}
-    assert digest(request) == digest(rules.verifier_request({**r, "generatorReasons": ["전혀 다른 사유"], "relationCandidateId": "rc-x", "proposalCount": 9}, next_attempt([], "initial")))
+    assert digest(request) == digest(rules.verifier_request({**r, "generatorReasons": ["전혀 다른 사유"], "relationCandidateId": "rc-x", "proposalCount": 9}, INITIAL_ATTEMPT))
     assert [x["quoteId"] for x in request["quotes"]] == sorted(x["quoteId"] for x in request["quotes"])
     verifier_calls = [x for x in out["calls"] if x["stage"] == "verify-relation"]
     assert verifier_calls[0]["requestDigest"] == digest(request) and verifier_calls[0]["fixtureHash"] != next(x for x in out["calls"] if x["stage"] == "relation")["fixtureHash"]
@@ -387,6 +387,20 @@ def test_insufficient_direction_is_undetermined_without_invalidating_the_verifie
     assert sum(x["stage"] == "verify-impact" for x in run_impact(w, "no-evidence", cases["no-evidence"][0])["calls"]) == 0
 
 
+def test_one_uncertain_quote_effect_gives_no_label_even_beside_a_confident_positive_quote(world):
+    w = world
+    _, cites = impact_cases(w)
+    out = run_impact(w, "uncertain", [impact_item("SYNTH-1", "positive", [cites["good"]], [cites["bad"]])], effects=lambda i: impact_verifier_reply(i, {GOOD: "positive", BAD: "uncertain"}))
+    relation, (impact,) = only(out)
+    verdict = impact["verdict"]
+    assert relation["eligibility"]["status"] == "eligible" and verdict["status"] == "verified" and verdict["label"] == "undetermined"
+    assert [r["code"] for r in verdict["reasons"]] == ["quote_effect_uncertain"] and len(verdict["mapped"]["uncertain"]) == 1 and len(verdict["mapped"]["positive"]) == 1
+    assert out["counts"]["impactLabels"]["positive"] == 0
+    # All-confident answers keep their exact earlier shape (no `uncertain` key) and label.
+    confident = only(run_impact(w, "confident", [impact_item("SYNTH-1", "positive", [cites["good"]], [cites["bad"]])], effects=lambda i: {GOOD: "positive", BAD: "negative"}))[1][0]["verdict"]
+    assert confident["label"] == "mixed" and set(confident["mapped"]) == {"positive", "negative", "neutral"}
+
+
 def test_wrong_impact_target_fabricated_citation_or_contradicted_target_cannot_pass(world):
     w = world
     _, cites = impact_cases(w)
@@ -435,94 +449,131 @@ def test_two_company_impacts_are_independent_and_sorted(world):
     assert len({i["impactCandidateId"] for i in impacts}) == 2 and all(i["impactCandidateId"].startswith("ic-") and i["relationCandidateId"] == relation["relationCandidateId"] for i in impacts)
 
 
-# ---------------------------------------------------------------- HOLD review -> revalidation -------------------------
+# ---------------------------------------------------------------- HOLD review -> final human approval -----------------
 
 def scope_hold(w, job="j", extra=()):
     props = [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="scope-hold"), *extra]
     return converge(w, job, props, verify=lambda r: {"scope": "insufficient"} if r["productScope"] == "scope-hold" else None)
 
 
-def test_admin_allow_only_requests_revalidation_and_never_makes_a_relation_eligible(world):
+def test_admin_allow_is_the_final_approval_and_calls_nothing(world):
     w = world
     out = scope_hold(w)
     held = find(out, "SUPPLIES", productScope="scope-hold")
-    assert held["eligibility"] == {"status": "hold", "reasons": [{"code": "claim_insufficient", "at": "scope"}], "revision": 1, "reviewPending": False}
-    with pytest.raises(ExtractionFailure, match="revalidation_not_requested"):
-        w.kit.rel_job("revalidate", {**w.kit.rsel("j"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": 1}, verifier=w.kit.fixture("verifier", "none", []))
+    assert held["eligibility"] == {"status": "hold", "reasons": [{"code": "claim_insufficient", "at": "scope"}], "revision": 1, "reviewPending": False, "approvalBasis": None}
     with pytest.raises(ExtractionFailure, match="review_revision_conflict"):
         w.kit.rel_job("review", review(w, "j", held, revision=7))
     allowed = w.kit.rel_job("review", review(w, "j", held))
     item = find(allowed, "SUPPLIES", productScope="scope-hold")
-    assert item["eligibility"]["status"] == "hold" and item["eligibility"]["reviewPending"] is True and item["eligibility"]["revision"] == 2 and item["approved"] is False
-    assert item["history"][-1] | {"createdAt": None, "seq": None} == {"kind": "review", "seq": None, "createdAt": None, "decision": "allow", "reviewer": "operator-a", "note": "authored review",
-                                                                       "expectedRevision": 1, "effect": "revalidation-requested"}
-    assert allowed["counts"]["eligibility"] == {"pending": 0, "eligible": 0, "hold": 1, "reject": 0} and allowed["counts"]["impactCandidates"] == 0
-    with pytest.raises(ExtractionFailure, match="review_already_pending"):
-        w.kit.rel_job("review", review(w, "j", item))
-    rejected = find(w.kit.rel_job("review", review(w, "j", item, "reject")), "SUPPLIES", productScope="scope-hold")
-    assert rejected["eligibility"] == {"status": "reject", "reasons": [{"code": "admin_rejected"}], "revision": 3, "reviewPending": False}
-
-
-def test_revalidation_is_a_distinct_automatic_attempt_that_keeps_prior_history_and_never_regenerates(world):
-    w = world
-    out = scope_hold(w)
-    held = find(out, "SUPPLIES", productScope="scope-hold")
-    allowed = find(w.kit.rel_job("review", review(w, "j", held)), "SUPPLIES", productScope="scope-hold")
-    request = {**w.kit.rsel("j"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": 2}
-    attempt = next_attempt(allowed["history"], "revalidation")
-    assert attempt["kind"] == "revalidation" and attempt["seq"] == 1 and attempt["policyVersion"] == "zoop-relation-revalidation-policy-1" and attempt["priorVerdictDigest"]
-    key = digest(rules.verifier_request(allowed, attempt))
-    assert key != allowed["history"][0]["requestDigest"]
-    # No authored record for this distinct request: nothing is called, nothing is written, the job is unchanged.
-    before = database(w).execute("SELECT COUNT(*) FROM relation_events").fetchone()[0]
-    with pytest.raises(ExtractionFailure, match="verifier_replay_missing"):
-        w.kit.rel_job("revalidate", request, verifier=w.kit.fixture("verifier", "empty", [("verify-relation", "0" * 64, verifier_reply(allowed))]))
-    assert database(w).execute("SELECT COUNT(*) FROM relation_events").fetchone()[0] == before == 2
-    assert w.kit.rel_job("inspect", w.kit.rsel("j"))["state"] == "ready"
+    assert item["eligibility"] == {"status": "eligible", "reasons": [], "revision": 2, "reviewPending": False,
+                                   "approvalBasis": {"kind": "operator-final-approval", "revision": 2, "reviewer": "operator-a", "decidedAt": item["history"][-1]["createdAt"]}}
+    assert item["history"][-1] | {"createdAt": None, "seq": None} == {"kind": "review", "seq": None, "createdAt": None, "decision": "allow", "reviewer": "operator-a",
+                                                                       "note": "authored review", "expectedRevision": 1, "effect": "approved"}
+    assert item["history"][0] == held["history"][0] and item["approved"] is False and item["impact"] == {"status": "not-applicable", "labelNote": item["impact"]["labelNote"], "candidates": []}
+    assert allowed["counts"]["eligibility"] == {"pending": 0, "eligible": 1, "hold": 0, "reject": 0} and allowed["counts"]["impactCandidates"] == 0
+    assert allowed["calls"] == out["calls"] and allowed["usage"] == out["usage"]  # no model, verifier or impact call
+    assert w.kit.rel_job("resume", w.kit.rsel("j"))["calls"] == out["calls"]
+    for decision in ("allow", "reject"):  # a decided relation is not a HOLD any more: no second decision, no reversal
+        with pytest.raises(ExtractionFailure, match="review_target_not_hold"):
+            w.kit.rel_job("review", review(w, "j", item, decision))
     with pytest.raises(ExtractionFailure, match="review_revision_conflict"):
-        w.kit.rel_job("revalidate", {**request, "expectedRevision": 1}, verifier=w.kit.fixture("verifier", "empty", []))
-    # Still insufficient on re-verification: remains HOLD (admin allow bypassed nothing) and a third attempt needs a new review.
-    again = w.kit.fixture("verifier", "again", [("verify-relation", key, verifier_reply(allowed, scope="insufficient"))])
-    second = find(w.kit.rel_job("revalidate", request, verifier=again), "SUPPLIES", productScope="scope-hold")
-    verdicts = [e for e in second["history"] if e["kind"] == "verdict"]
-    assert second["eligibility"]["status"] == "hold" and second["eligibility"]["reviewPending"] is False and len(verdicts) == 2 and second["eligibility"]["revision"] == 3
-    assert verdicts[0]["attempt"] != verdicts[1]["attempt"] and verdicts[0]["requestDigest"] != verdicts[1]["requestDigest"] and verdicts[1]["attempt"]["priorVerdictDigest"]
-    with pytest.raises(ExtractionFailure, match="revalidation_not_requested"):
-        w.kit.rel_job("revalidate", {**request, "expectedRevision": 3}, verifier=again)
-    # A second review + revalidation that is now fully supported: eligible, with impact analysis still pending its own producer receipt.
-    w.kit.rel_job("review", review(w, "j", second))
-    third_item = find(w.kit.rel_job("inspect", w.kit.rsel("j")), "SUPPLIES", productScope="scope-hold")
-    attempt3 = next_attempt(third_item["history"], "revalidation")
-    assert attempt3["seq"] == 2 and attempt3["priorVerdictDigest"] != attempt["priorVerdictDigest"]
-    ok = w.kit.fixture("verifier", "ok", [("verify-relation", digest(rules.verifier_request(third_item, attempt3)), verifier_reply(third_item))])
-    final = w.kit.rel_job("revalidate", {**request, "expectedRevision": 4}, verifier=ok)
-    done = find(final, "SUPPLIES", productScope="scope-hold")
-    assert done["eligibility"]["status"] == "eligible" and [e["kind"] for e in done["history"]] == ["verdict", "review", "verdict", "review", "verdict"]
-    assert [e["eligibility"] for e in done["history"] if e["kind"] == "verdict"] == ["hold", "hold", "eligible"] and done["history"][0]["reasons"] == [{"code": "claim_insufficient", "at": "scope"}]
-    assert final["state"] == "stopped" and final["failure"]["code"] == "producer_replay_required" and done["impact"]["status"] == "pending"
-    finished = converge(w, "j", [], impacts=lambda r: [impact_item("SYNTH-1", "positive", [c(w, GOOD)], [])], effects=lambda i: {GOOD: "positive"})
-    assert finished["state"] == "ready" and finished["counts"]["impactLabels"]["positive"] == 1
-    assert sum(x["stage"] == "relation" for x in finished["calls"]) == 1  # never regenerated
+        w.kit.rel_job("review", review(w, "j", held, "reject"))  # the same-revision race: the first decision won
 
 
-def test_admin_reject_only_excludes_and_deterministic_holds_stay_held_through_revalidation(world):
+def test_automatic_eligibility_has_the_automatic_basis_with_no_reviewer(world):
+    w = world
+    out = converge(w, "j", [proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="p")])
+    item = out["relations"][0]
+    assert item["eligibility"]["status"] == "eligible" and item["eligibility"]["approvalBasis"] == {
+        "kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": item["history"][0]["createdAt"]}
+
+
+def test_a_human_approval_never_starts_impact_while_the_automatic_relation_still_does(world):
+    w = world
+    fine = proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="fine")
+    producer, verifier = scope_hold(w, "ref", (fine,))["fixtures"]
+    partial = w.kit.fixture("producer", "partial", [r for r in producer if r[0] != "impact"])
+    verifier_file = w.kit.fixture("verifier", "vv", verifier)
+    stopped = w.kit.rel_job("run", w.kit.rsubmit("k", w.s2), replay=partial, verifier=verifier_file)
+    assert stopped["state"] == "stopped" and stopped["failure"]["code"] == "producer_replay_missing"
+    w.kit.rel_job("review", review(w, "k", find(stopped, "SUPPLIES", productScope="scope-hold")))
+    done = w.kit.rel_job("resume", w.kit.rsel("k"), replay=w.kit.fixture("producer", "whole", producer), verifier=verifier_file)
+    assert done["state"] == "ready" and [x["stage"] for x in done["calls"]].count("impact") == 1
+    assert find(done, "SUPPLIES", productScope="scope-hold")["impact"]["status"] == "not-applicable" and find(done, "SUPPLIES", productScope="fine")["impact"]["status"] == "complete"
+
+
+def test_the_deterministic_gate_cannot_be_overridden_by_a_human_allow(world):
+    w = world
+    out = scope_hold(w, extra=(proposal("SUPPLIES", co("SYNTH-9"), co("SYNTH-1"), [c(w, SUP)], product="unknown"),
+                                proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [forged_span(w, "main", SUP)], product="forged"),
+                                proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="fine")))
+    unknown, forged, fine = (find(out, "SUPPLIES", productScope=name) for name in ("unknown", "forged", "fine"))
+    with pytest.raises(ExtractionFailure, match="review_candidate_ineligible") as info:
+        w.kit.rel_job("review", review(w, "j", unknown))
+    assert info.value.detail == {"reasons": [{"code": "target_unknown", "at": "subject"}]}
+    assert forged["eligibility"]["status"] == "reject"
+    with pytest.raises(ExtractionFailure, match="review_target_not_hold"):
+        w.kit.rel_job("review", review(w, "j", forged))
+    with pytest.raises(ExtractionFailure, match="review_target_not_hold"):
+        w.kit.rel_job("review", review(w, "j", fine))
+    assert find(w.kit.rel_job("inspect", w.kit.rsel("j")), "SUPPLIES", productScope="unknown")["eligibility"]["revision"] == 1  # nothing was appended
+
+
+def test_a_candidate_that_no_longer_matches_its_deterministic_precheck_is_not_approvable(world, monkeypatch):
+    w = world
+    held = find(scope_hold(w), "SUPPLIES", productScope="scope-hold")
+    original = rules.reevaluate
+    monkeypatch.setattr(rules, "reevaluate", lambda stored, view: {**original(stored, view), "countries": ["XX"]})
+    with pytest.raises(ExtractionFailure, match="review_candidate_ineligible") as info:
+        w.kit.rel_job("review", review(w, "j", held))
+    assert info.value.detail == {"reasons": [{"code": "candidate_changed"}]}
+
+
+def test_final_approval_needs_current_rights_and_appends_nothing_without_them(world):
+    w = world
+    held = find(scope_hold(w), "SUPPLIES", productScope="scope-hold")
+    grant = w.kit.registry["sources"][0]["grant"]
+    grant["enabled"] = False
+    w.kit.save_registry()
+    with pytest.raises(ExtractionFailure, match="source_unauthorized"):
+        w.kit.rel_job("review", review(w, "j", held))
+    grant["enabled"] = True
+    w.kit.save_registry()
+    db = database(w)
+    assert db.execute("SELECT COUNT(*) FROM relation_events").fetchone()[0] == 1
+    db.close()
+    assert find(w.kit.rel_job("review", review(w, "j", held)), "SUPPLIES", productScope="scope-hold")["eligibility"]["status"] == "eligible"
+
+
+def test_allow_is_refused_while_a_call_for_that_relation_is_unknown_but_a_refused_attempt_does_not_block(world):
+    w = world
+    held = find(scope_hold(w), "SUPPLIES", productScope="scope-hold")
+    db = database(w)
+    db.execute("INSERT INTO calls(attempt_id,job_id,stage,ref,request_digest,fixture_hash,state,started_at) VALUES(?,?,?,?,?,?,'started',?)",
+               ("attempt-unknown", "j", "verify-relation", held["relationCandidateId"] + "|initial|9", "a" * 64, "b" * 64, "2026-10-13T00:00:00+00:00"))
+    db.commit()
+    with pytest.raises(ExtractionFailure, match="review_call_in_flight"):
+        w.kit.rel_job("review", review(w, "j", held))
+    db.execute("INSERT INTO stages VALUES(?,?,?,?,?)", ("j", "refusal", "attempt-unknown", json.dumps({"code": "live_budget_exhausted_usd"}), "2026-10-13T00:00:01+00:00"))
+    db.commit()
+    db.close()
+    assert find(w.kit.rel_job("review", review(w, "j", held)), "SUPPLIES", productScope="scope-hold")["eligibility"]["status"] == "eligible"
+
+
+def test_admin_reject_only_excludes_and_deterministic_holds_stay_held(world):
     w = world
     out = scope_hold(w, extra=(proposal("SUPPLIES", co("SYNTH-9"), co("SYNTH-1"), [c(w, SUP)], product="unknown"),
                                 proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)], product="fine")))
-    held, unknown, fine = (find(out, "SUPPLIES", productScope=name) for name in ("scope-hold", "unknown", "fine"))
+    held, fine = (find(out, "SUPPLIES", productScope=name) for name in ("scope-hold", "fine"))
     with pytest.raises(ExtractionFailure, match="review_target_not_hold"):
         w.kit.rel_job("review", review(w, "j", fine))
     rejected = find(w.kit.rel_job("review", review(w, "j", held, "reject")), "SUPPLIES", productScope="scope-hold")
-    assert rejected["eligibility"]["status"] == "reject" and rejected["eligibility"]["reasons"] == [{"code": "admin_rejected"}] and rejected["history"][0]["eligibility"] == "hold"
+    assert rejected["eligibility"] == {"status": "reject", "reasons": [{"code": "admin_rejected"}], "revision": 2, "reviewPending": False, "approvalBasis": None}
+    assert rejected["history"][0]["eligibility"] == "hold" and rejected["history"][-1]["effect"] == "excluded"
     with pytest.raises(ExtractionFailure, match="review_target_not_hold"):
         w.kit.rel_job("review", review(w, "j", rejected))
-    # An unknown endpoint cannot be turned eligible by any admin allow: revalidation re-derives the same private hold, no verifier call.
-    allowed = find(w.kit.rel_job("review", review(w, "j", unknown)), "SUPPLIES", productScope="unknown")
-    redone = find(w.kit.rel_job("revalidate", {**w.kit.rsel("j"), "relationCandidateId": unknown["relationCandidateId"], "expectedRevision": allowed["eligibility"]["revision"]},
-                                verifier=w.kit.fixture("verifier", "none", [])), "SUPPLIES", productScope="unknown")
-    last = redone["history"][-1]
-    assert redone["eligibility"]["status"] == "hold" and codes(redone) == [("target_unknown", "subject")] and last["verifier"] == "not-called" and last["attempt"]["kind"] == "revalidation"
-    assert redone["history"][0]["attempt"]["kind"] == "initial" and last["attempt"]["seq"] == 1
+    with pytest.raises(ExtractionFailure, match="review_target_not_hold"):
+        w.kit.rel_job("review", review(w, "j", rejected, "allow"))  # a final reject is never reversed
 
 
 # ---------------------------------------------------------------- fixtures / upstream / rights -------------------------
@@ -646,7 +697,8 @@ def test_rights_lost_after_a_receipt_leave_a_valid_receipt_and_commit_nothing_un
     assert stopped["state"] == "stopped" and stopped["failure"]["code"] == "registry_changed" and stopped["delivery"]["status"] == "withheld"
     db = database(w)
     assert db.execute("SELECT state,verdict FROM calls").fetchall()[0]["state"] == "received" and db.execute("SELECT COUNT(*) FROM relation_candidates").fetchone()[0] == 0
-    assert db.execute("SELECT COUNT(*) FROM stages").fetchone()[0] == 0
+    # Only the first-dispatch markers (one per job that ever ran: `probe` and `late`) exist: no stage, candidate or event was materialized after the rights change.
+    assert db.execute("SELECT COUNT(*) FROM stages WHERE stage!='dispatch'").fetchone()[0] == 0 and db.execute("SELECT COUNT(*) FROM relation_events").fetchone()[0] == 0
     db.close()
     w.kit.registry["sources"][0]["grant"]["enabled"] = True
     w.kit.save_registry()
@@ -669,7 +721,7 @@ def test_registry_removal_or_expiry_also_denies_the_relation_job(world):
     assert ready["delivery"]["status"] == "current" and w.kit.rel_job("inspect", w.kit.rsel("done"))["delivery"]["status"] == "current"
 
 
-def test_cancel_fences_a_stopped_job_and_blocks_review_and_revalidation(world):
+def test_cancel_fences_a_stopped_job_and_blocks_review(world):
     w = world
     d = stop_at_generation(w, "c")
     producer = w.kit.fixture("producer", "c", [("relation", d, relation_reply([proposal("SUPPLIES", co("SYNTH-3"), co("SYNTH-1"), [c(w, SUP)])]))])
@@ -680,137 +732,45 @@ def test_cancel_fences_a_stopped_job_and_blocks_review_and_revalidation(world):
     assert again["state"] == "cancelled" and again["calls"] == first["calls"]
     with pytest.raises(ExtractionFailure, match="job_cancelled"):
         w.kit.rel_job("review", {**w.kit.rsel("c"), "relationCandidateId": "rc-" + "0" * 64, "decision": "allow", "reviewer": "r", "note": "n", "expectedRevision": 1})
-    with pytest.raises(ExtractionFailure, match="job_not_revalidatable"):
-        w.kit.rel_job("revalidate", {**w.kit.rsel("c"), "relationCandidateId": "rc-" + "0" * 64, "expectedRevision": 1}, verifier=w.kit.fixture("verifier", "v", []))
 
 
 # ---------------------------------------------------------------- recovery (actual processes) --------------------------
 
-def orphaned_revalidation(w, job="j", crash="receipt:1"):
-    """HOLD(scope insufficient) -> review allow (actual CLI) -> revalidate dies right after its verifier receipt is saved."""
-    out = scope_hold(w, job)
-    held = find(out, "SUPPLIES", productScope="scope-hold")
-    allowed = find(w.kit.rel("review", review(w, job, held)), "SUPPLIES", productScope="scope-hold")
-    key = digest(rules.verifier_request(allowed, next_attempt(allowed["history"], "revalidation")))
-    fixture = w.kit.fixture("verifier", "reval", [("verify-relation", key, verifier_reply(allowed))])
-    request = {**w.kit.rsel(job), "relationCandidateId": allowed["relationCandidateId"], "expectedRevision": allowed["eligibility"]["revision"]}
-    w.kit.rel("revalidate", request, verifier=fixture, crash=crash, expected=75)
-    fixture.unlink()
-    return allowed, request
+def legacy_request(w, job, held, *, seq=2):
+    """A `revalidation-requested` review event exactly as a pre-cutover ledger stored it (history only; nothing writes this any more)."""
+    db = database(w)
+    db.execute("INSERT INTO relation_events VALUES(?,?,?,?,?,?)", (job, held["relationCandidateId"], seq, "review", json.dumps(
+        {"decision": "allow", "reviewer": "operator-a", "note": "legacy request", "expectedRevision": seq - 1, "effect": "revalidation-requested"}), "2026-10-13T00:01:00+00:00"))
+    db.commit()
+    db.close()
 
 
-def received(out):
-    return [(x["stage"], x["requestDigest"], x["verdict"]) for x in out["calls"] if x["state"] == "received"]
-
-
-def test_a_saved_revalidation_receipt_whose_verdict_was_never_committed_resumes_without_fixture_or_extra_call(world):
-    w = world
-    allowed, request = orphaned_revalidation(w)
-    crashed = w.kit.rel("inspect", w.kit.rsel("j"))
-    stuck = find(crashed, "SUPPLIES", productScope="scope-hold")
-    assert stuck["eligibility"]["status"] == "hold" and stuck["eligibility"]["reviewPending"] is True and stuck["eligibility"]["revision"] == 2
-    assert crashed["state"] == "running" and len(received(crashed)) == 3 and stuck["history"][-1]["kind"] == "review"
-    resumed = w.kit.rel("resume", w.kit.rsel("j"))
-    item = find(resumed, "SUPPLIES", productScope="scope-hold")
-    verdicts = [e for e in item["history"] if e["kind"] == "verdict"]
-    assert item["eligibility"]["status"] == "eligible" and item["eligibility"]["reviewPending"] is False and item["eligibility"]["revision"] == 3
-    assert [e["kind"] for e in item["history"]] == ["verdict", "review", "verdict"] and [e["eligibility"] for e in verdicts] == ["hold", "eligible"]
-    assert verdicts[0] == stuck["history"][0] and verdicts[1]["attempt"]["kind"] == "revalidation" and verdicts[1]["attempt"]["seq"] == 1 and verdicts[1]["verifier"] == "called"
-    assert received(resumed) == received(crashed) and resumed["usage"]["replayCalls"] == crashed["usage"]["replayCalls"] == 3
-    assert resumed["failure"]["code"] == "producer_replay_required" and item["impact"]["status"] == "pending" and item["approved"] is False
-    again = w.kit.rel("resume", w.kit.rsel("j"))
-    assert again["calls"] == resumed["calls"] and find(again, "SUPPLIES", productScope="scope-hold")["history"] == item["history"]
-
-
-def test_rights_lost_after_a_revalidation_receipt_resume_consumes_it_but_a_new_allow_never_auto_executes(world, monkeypatch):
-    from zoop_ai_pipeline.relation import Engine
+def test_legacy_revalidation_history_is_readable_never_approved_and_takes_a_new_final_decision_at_the_current_revision(world):
     w = world
     held = find(scope_hold(w), "SUPPLIES", productScope="scope-hold")
-    allowed = find(w.kit.rel_job("review", review(w, "j", held)), "SUPPLIES", productScope="scope-hold")
-    assert w.kit.rel_job("resume", w.kit.rsel("j"))["usage"]["replayCalls"] == 2  # allow alone executes nothing, even on a ready job
-    key = digest(rules.verifier_request(allowed, next_attempt(allowed["history"], "revalidation")))
-    fixture = w.kit.fixture("verifier", "reval", [("verify-relation", key, verifier_reply(allowed))])
-    request = {**w.kit.rsel("j"), "relationCandidateId": allowed["relationCandidateId"], "expectedRevision": allowed["eligibility"]["revision"]}
-    original = Engine._receive
-
-    def revoke_after_receipt(self, attempt, raw):
-        original(self, attempt, raw)
-        w.kit.registry["sources"][0]["grant"]["enabled"] = False
-        w.kit.save_registry()
-
-    monkeypatch.setattr(Engine, "_receive", revoke_after_receipt)
-    with pytest.raises(ExtractionFailure, match="registry_changed"):
-        w.kit.rel_job("revalidate", request, verifier=fixture)
-    monkeypatch.setattr(Engine, "_receive", original)
-    w.kit.registry["sources"][0]["grant"]["enabled"] = True
-    w.kit.save_registry()
-    fixture.unlink()
-    stuck = w.kit.rel_job("inspect", w.kit.rsel("j"))
-    assert stuck["state"] == "ready" and find(stuck, "SUPPLIES", productScope="scope-hold")["eligibility"]["reviewPending"] is True and stuck["usage"]["replayCalls"] == 3
-    resumed = w.kit.rel_job("resume", w.kit.rsel("j"))
-    item = find(resumed, "SUPPLIES", productScope="scope-hold")
-    assert item["eligibility"]["status"] == "eligible" and [e["kind"] for e in item["history"]] == ["verdict", "review", "verdict"] and resumed["usage"]["replayCalls"] == 3
+    legacy_request(w, "j", held)
+    before = w.kit.rel_job("inspect", w.kit.rsel("j"))
+    stuck = find(before, "SUPPLIES", productScope="scope-hold")
+    assert stuck["eligibility"] == {"status": "hold", "reasons": held["eligibility"]["reasons"], "revision": 2, "reviewPending": True, "approvalBasis": None}
+    assert stuck["history"][-1]["effect"] == "revalidation-requested" and stuck["approved"] is False
+    assert w.kit.rel("revalidate", {**w.kit.rsel("j"), "relationCandidateId": held["relationCandidateId"], "expectedRevision": 2}, expected=2) is None
+    with pytest.raises(ExtractionFailure, match="review_revision_conflict"):
+        w.kit.rel_job("review", review(w, "j", stuck, revision=1))  # the old intent is never retroactively accepted at an older revision
+    ready = w.kit.rel_job("resume", w.kit.rsel("j"))
+    assert ready["calls"] == before["calls"] and ready["usage"] == before["usage"] and ready["state"] == "ready"  # a ready job with a legacy request executes nothing
+    done = find(w.kit.rel_job("review", review(w, "j", stuck)), "SUPPLIES", productScope="scope-hold")
+    assert done["eligibility"] == {"status": "eligible", "reasons": [], "revision": 3, "reviewPending": False,
+                                   "approvalBasis": {"kind": "operator-final-approval", "revision": 3, "reviewer": "operator-a", "decidedAt": done["history"][2]["createdAt"]}}
+    assert [e.get("effect") for e in done["history"]] == [None, "revalidation-requested", "approved"]
 
 
-def test_revalidate_without_a_fixture_recovers_the_saved_receipt_but_a_new_attempt_still_needs_one(world):
+def test_a_legacy_pending_hold_can_still_be_rejected_by_a_new_decision(world):
     w = world
-    allowed, request = orphaned_revalidation(w)
-    recovered = w.kit.rel("revalidate", request)
-    item = find(recovered, "SUPPLIES", productScope="scope-hold")
-    assert item["eligibility"]["status"] == "eligible" and [e["kind"] for e in item["history"]] == ["verdict", "review", "verdict"] and recovered["usage"]["replayCalls"] == 3
-    with pytest.raises(ExtractionFailure, match="revalidation_not_requested"):
-        w.kit.rel_job("revalidate", {**request, "expectedRevision": 3})
-    # No saved receipt and no fixture: a fresh attempt is refused with the request digest to author, never invented.
-    fresh = world_fresh_hold(w)
-    refused = w.kit.rel("revalidate", fresh, expected=2)
-    assert refused["error"]["code"] == "verifier_replay_required" and refused["error"]["detail"]["stage"] == "verify-relation"
-    assert find(w.kit.rel("inspect", w.kit.rsel("k")), "SUPPLIES", productScope="scope-hold")["eligibility"]["status"] == "hold"
-
-
-def world_fresh_hold(w):
-    out = scope_hold(w, "k")
-    held = find(out, "SUPPLIES", productScope="scope-hold")
-    allowed = find(w.kit.rel("review", review(w, "k", held)), "SUPPLIES", productScope="scope-hold")
-    return {**w.kit.rsel("k"), "relationCandidateId": allowed["relationCandidateId"], "expectedRevision": allowed["eligibility"]["revision"]}
-
-
-def test_pending_revalidation_resume_honors_rights_revision_and_fence(world):
-    w = world
-    allowed, request = orphaned_revalidation(w)
-    before = w.kit.rel("inspect", w.kit.rsel("j"))
-    w.kit.registry["sources"][0]["grant"]["enabled"] = False
-    w.kit.save_registry()
-    denied = w.kit.rel("resume", w.kit.rsel("j"), expected=2)
-    assert denied["state"] == "stopped" and denied["failure"]["code"] == "source_unauthorized" and denied["delivery"]["code"] == "source_unauthorized"
-    w.kit.registry["sources"][0]["grant"]["enabled"] = True
-    w.kit.save_registry()
-    after = w.kit.rel("inspect", w.kit.rsel("j"))
-    assert find(after, "SUPPLIES", productScope="scope-hold")["history"] == find(before, "SUPPLIES", productScope="scope-hold")["history"] and received(after) == received(before)
-    assert find(w.kit.rel("resume", w.kit.rsel("j")), "SUPPLIES", productScope="scope-hold")["eligibility"]["status"] == "eligible"
-
-
-def test_admin_reject_after_an_orphaned_revalidation_wins_and_the_saved_receipt_is_never_consumed(world):
-    w = world
-    allowed, request = orphaned_revalidation(w)
-    stuck = find(w.kit.rel("inspect", w.kit.rsel("j")), "SUPPLIES", productScope="scope-hold")
-    rejected = find(w.kit.rel("review", review(w, "j", stuck, "reject")), "SUPPLIES", productScope="scope-hold")
-    assert rejected["eligibility"] == {"status": "reject", "reasons": [{"code": "admin_rejected"}], "revision": 3, "reviewPending": False}
-    done = w.kit.rel("resume", w.kit.rsel("j"))
-    item = find(done, "SUPPLIES", productScope="scope-hold")
-    assert item["eligibility"]["status"] == "reject" and [e["kind"] for e in item["history"]] == ["verdict", "review", "review"] and done["state"] == "ready"
-    assert len(received(done)) == 3 and done["counts"]["impactCandidates"] == 0
-
-
-def test_cancel_fences_an_orphaned_revalidation(world):
-    w = world
-    orphaned_revalidation(w)
-    cancelled = w.kit.rel("cancel", w.kit.rsel("j"), expected=2)
-    assert cancelled["state"] == "cancelled"
-    again = w.kit.rel("resume", w.kit.rsel("j"), expected=2)
-    assert again["state"] == "cancelled" and again["delivery"] == {"status": "withheld", "code": "job_cancelled"}
-    db = database(w)
-    assert db.execute("SELECT COUNT(*) FROM relation_events WHERE kind='verdict'").fetchone()[0] == 1
-    db.close()
+    held = find(scope_hold(w), "SUPPLIES", productScope="scope-hold")
+    legacy_request(w, "j", held)
+    stuck = find(w.kit.rel_job("inspect", w.kit.rsel("j")), "SUPPLIES", productScope="scope-hold")
+    rejected = find(w.kit.rel_job("review", review(w, "j", stuck, "reject")), "SUPPLIES", productScope="scope-hold")
+    assert rejected["eligibility"] == {"status": "reject", "reasons": [{"code": "admin_rejected"}], "revision": 3, "reviewPending": False, "approvalBasis": None}
 
 
 def test_process_death_after_receipt_resumes_without_fixture_or_additional_call_and_unknown_is_never_resent(world):
@@ -823,7 +783,7 @@ def test_process_death_after_receipt_resumes_without_fixture_or_additional_call_
     resumed = kit.rel("resume", kit.rsel("crash"))
     assert resumed["failure"]["code"] == "verifier_replay_required" and [x["stage"] for x in resumed["calls"]] == ["relation"] and resumed["usage"]["replayCalls"] == 1
     candidate = resumed["relations"][0]
-    verifier = kit.fixture("verifier", "v", [("verify-relation", digest(rules.verifier_request(candidate, next_attempt([], "initial"))), verifier_reply(candidate))])
+    verifier = kit.fixture("verifier", "v", [("verify-relation", digest(rules.verifier_request(candidate, INITIAL_ATTEMPT)), verifier_reply(candidate))])
     kit.rel("resume", kit.rsel("crash"), verifier=verifier, crash="receipt:1", expected=75)
     verifier.unlink()
     producer.unlink()
@@ -840,9 +800,6 @@ def test_process_death_after_receipt_resumes_without_fixture_or_additional_call_
     lost = kit.rel("resume", kit.rsel("lost"), replay=kit.fixture("producer", "p3", [("relation", d, relation_reply([]))]))
     assert lost["state"] == "reconciling" and lost["resumeMode"] == "reconcile_only" and lost["usage"]["replayCalls"] == 0 and lost["usage"]["startedWithoutReceipt"] == 1
     assert lost["failure"]["code"] == "replay_response_unknown"
-    revalidate = lambda: kit.rel_job("revalidate", {**kit.rsel("lost"), "relationCandidateId": "rc-" + "0" * 64, "expectedRevision": 1}, verifier=kit.fixture("verifier", "q", []))  # noqa: E731
-    with pytest.raises(ExtractionFailure, match="job_not_revalidatable"):
-        revalidate()
 
 
 def test_receipts_candidates_events_and_verdicts_are_immutable(world):
@@ -946,17 +903,14 @@ def test_wire_is_closed_versioned_and_review_cannot_name_a_publication_decision(
             Review.model_validate({**base, "decision": decision, "reviewer": "r", "note": "n"})
     for bad in ({"schemaVersion": "zoop-relation-s2"}, {"extra": 1}, {"expectedRevision": 0}, {"relationCandidateId": "evc-" + "0" * 64}, {"jobId": "bad id"}):
         with pytest.raises(ValidationError):
-            Revalidate.model_validate({**base, **bad})
-        with pytest.raises(ValidationError):
             Review.model_validate({**base, "decision": "allow", "reviewer": "r", "note": "n", **bad})
     with pytest.raises(ValidationError):
         Review.model_validate({**base, "decision": "allow", "reviewer": "", "note": "n"})
-    assert Revalidate.model_validate(base).expected_revision == 1
-    process = w.kit.rel("run", {**w.kit.rsubmit("live", w.s2), "provenance": {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "authored-test"}}, expected=2)
-    assert process == {"schemaVersion": "zoop-relation-s3", "error": {"code": "live_mode_unsupported"}}
+    process = w.kit.rel("run", {**w.kit.rsubmit("live", w.s2), "provenance": {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"}}, expected=2)
+    assert process == {"schemaVersion": "zoop-relation-s3", "error": {"code": "provenance_conflict"}}  # a live S3 job needs a live S2 upstream
     forbidden = w.kit.rel("inspect", w.kit.rsel("x"), replay=w.kit.fixture("producer", "x", []), expected=2)
     assert forbidden["error"]["code"] == "fixture_not_allowed"
-    assert w.kit.rel("revalidate", {**base}, expected=2)["error"]["code"] == "job_not_found"
+    assert w.kit.rel("revalidate", {**base}, expected=2) is None  # the command no longer exists
     assert w.kit.rel("inspect", w.kit.rsel("nope"), expected=2)["error"]["code"] == "job_not_found"
     assert w.kit.rel("inspect", {"nonsense": True}, expected=2)["error"]["code"] == "input_or_configuration_invalid"
     assert w.kit.rel("inspect", {**w.kit.rsel("j"), "pad": "x" * 2_000_100}, expected=2)["error"]["code"] == "command_input_limit"
@@ -1058,8 +1012,11 @@ def test_submit_conflict_and_cli_fixture_rules_leave_the_stored_job_untouched(wo
     producer, verifier = w.kit.fixture("producer", "p", []), w.kit.fixture("verifier", "v", [])
     for fixtures in ({"replay": producer}, {"verifier": verifier}, {"replay": producer, "verifier": verifier}):
         assert w.kit.rel("submit", request, expected=2, **fixtures)["error"]["code"] == "fixture_not_allowed"
-    live = {**request, "provenance": {**request["provenance"], "executionMode": "live"}}
-    assert w.kit.rel("submit", live, expected=2)["error"]["code"] == "live_mode_unsupported"
+    live = {**request, "provenance": {**request["provenance"], "executionMode": "live", "recordingKind": "provider"}}
+    assert w.kit.rel("submit", live, expected=2)["error"]["code"] == "job_input_conflict"  # same jobId, different frozen input: the stored job wins
+    fresh = {**live, "jobId": "sub-live"}
+    assert w.kit.rel("submit", fresh, expected=2)["error"]["code"] == "provenance_conflict"  # a new live job over a replay S2 upstream
+    assert w.kit.rel("inspect", w.kit.rsel("sub-live"), expected=2)["error"]["code"] == "job_not_found"
     assert w.kit.rel("submit", {**request, "unknown": 1}, expected=2)["error"]["code"] == "input_or_configuration_invalid"
     assert jobs(w) == stored and w.kit.rel_job("inspect", w.kit.rsel("sub")) == queued
     assert database(w).execute("SELECT COUNT(*) FROM calls").fetchone()[0] == 0

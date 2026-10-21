@@ -1,7 +1,8 @@
-"""Dispatch policy (pure) and the single supervised dispatcher thread for S3 relation jobs and the revalidations their reviews request.
+"""Dispatch policy (pure) and the single supervised dispatcher thread for S3 relation jobs.
 
-The initial intent of an accepted job is one `resume`, claimed once; the intent of an accepted `allow` review is one `revalidate`, claimed once.
-Everything after that is an explicit `recover`:
+The initial intent of an accepted job is one `resume`, claimed once, and run under the pipeline's own under-lock INITIAL-ONLY restriction: a job that
+already took its first dispatch is refused (`initial_dispatch_taken`, no effect) however the service came to ask again. Everything after that is an
+explicit `recover`, which is the only dispatch that runs without the restriction:
 
   * a child that timed out, died or produced unreadable output, and a row a dead service left in flight, are AMBIGUOUS: the child may
     already have reserved or sent a call. They end `idle` (`transport_unknown`, `service_restarted`) and are never run again
@@ -10,30 +11,22 @@ Everything after that is an explicit `recover`:
   * `relation_busy` is the one automatic retry. The pipeline raises it while opening its ledger lock, before any command effect, so
     nothing ran; it is retried with a bounded backoff and then left for an explicit recover.
 
-Revalidations share the dispatcher, the gate, the FIFO sequence, the cap and these rules with jobs, and add two more:
-
-  * authority first: before any child the owner must still be listed for the job's upstream (the allowlist is re-read), otherwise the
-    dispatch ends idle as `upstream_not_allowed` with no child started, and a later recover (after the operator restores access) is explicit;
-  * a revalidation answered by "the relation moved" (`review_revision_conflict`, `revalidation_not_requested`) is settled by READING the chain
-    in the same gate hold: a verdict at the next sequence means it was already verified, a reject there means the allow was superseded and
-    nothing may overwrite the rejection. Whatever the chain does not prove stays unsettled for an explicit recover.
-
-This is sound because the pipeline is replay-only (`live_mode_unsupported`): a repeated attempt can cost nothing, and the rules above
-do not depend on that. Before any live S3 the pipeline needs an under-lock initial-only flag like the S1 worker's.
+A LIVE job (a model call that costs money) adds two rules: when the service was started without the live group the dispatch ends idle `live_unavailable` with no child; otherwise,
+before any child, the owner must still be listed for the job's upstream with the same
+pinned runtime identity (the allowlist is re-read), otherwise the dispatch ends idle with the refusal code and no child is started. A review
+(`allow` is the operator's final approval) never dispatches anything: there is no revalidation to run.
 """
 from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from dataclasses import replace
 from typing import Any
 
 from pydantic import ValidationError
 
 from .relation_ledger import Claim, RelationLedger, Update
-from .relation_review import settlement
 from .relation_runtime import RelationGate, RelationProcess
-from .relation_wire import RelationChain, RelationView
+from .relation_wire import RelationView
 from .runtime import Outcome
 
 MAX_BUSY = 8
@@ -41,8 +34,6 @@ MAX_BACKOFF = 60.0
 IDLE_POLL = 0.25
 GATE_POLL = 0.25
 BUSY_CODES = frozenset({"relation_busy"})
-# The pipeline's answers to a revalidation of a relation that is no longer at the revision the review left.
-MOVED_CODES = frozenset({"review_revision_conflict", "revalidation_not_requested"})
 
 
 def busy_delay(busy_count: int) -> float:
@@ -68,9 +59,9 @@ def policy(outcome: Outcome, view: object | None, *, busy_count: int, busy_codes
 
 class RelationDispatcher:
     def __init__(self, ledger: RelationLedger, process: RelationProcess, gate: RelationGate, log: Callable[[dict[str, Any]], None],
-                 authorize: Callable[[str, str, str], str | None] | None = None):
-        """`authorize(owner, upstream job id, upstream input digest)` returns None when the owner may still use that upstream, otherwise a stable
-        refusal code. It is asked before every revalidation child (never for a job resume, whose authority was checked at submit)."""
+                 authorize: Callable[[str, str, str, str], str | None] | None = None):
+        """`authorize(owner, upstream job id, upstream input digest, pinned runtime identity)` returns None when the owner may still run this LIVE
+        job, otherwise a stable refusal code. It is asked before every live child (never for a replay job, whose authority was checked at submit)."""
         self._ledger, self._process, self._gate, self._log = ledger, process, gate, log
         self._authorize = authorize
         self._wake, self._stop = threading.Event(), threading.Event()
@@ -103,27 +94,21 @@ class RelationDispatcher:
             self._wake.wait(IDLE_POLL)
             self._wake.clear()
 
-    def _record(self, claim: Claim, update: Update) -> None:
-        if claim.operation_id is None:
-            self._ledger.finish(claim.job_id, update)
-        else:
-            self._ledger.finish_operation(claim.operation_id, update)
-
     def step(self) -> bool:
         """Claim and supervise at most one dispatch. The outcome of a finished child is held until its ledger write succeeds, and only
         that write is retried: a ledger fault never reruns the child."""
         if self._unrecorded is not None:
             claim, update = self._unrecorded
-            self._record(claim, update)
+            self._ledger.finish(claim.job_id, update)
             self._unrecorded = None
             return True
         claim = self._ledger.claim_next()
         if claim is None:
             return False
-        update = self._supervise_operation(claim) if claim.operation_id is not None else self._supervise(claim)
+        update = self._supervise(claim)
         if update is not None:
             self._unrecorded = (claim, update)
-            self._record(claim, update)
+            self._ledger.finish(claim.job_id, update)
             self._unrecorded = None
         return True
 
@@ -135,17 +120,15 @@ class RelationDispatcher:
         return True
 
     def _view(self, claim: Claim, outcome: Outcome) -> tuple[Outcome, RelationView | None, Update | None]:
-        """Parse a result outcome and bind it to the claim. A payload that does not parse is unreadable; one bound to another job, another
-        input digest or (for a revalidation claim, which carries it) another upstream is a binding mismatch and is never used for anything."""
+        """Parse a result outcome and bind it to the claim. A payload that does not parse is unreadable; one bound to another job or input
+        digest is a binding mismatch and is never used for anything."""
         if outcome.kind != "result":
             return outcome, None, None
         try:
             view = RelationView.model_validate(outcome.result)
         except ValidationError:
             return Outcome("abnormal", exit_code=outcome.exit_code), None, None
-        upstream = view.binding.upstream
-        bound_upstream = claim.upstream_job_id is None or (upstream.job_id, upstream.input_digest) == (claim.upstream_job_id, claim.upstream_input_digest)
-        if view.job_id != claim.job_id or view.input_digest != claim.input_digest or not bound_upstream:
+        if view.job_id != claim.job_id or view.input_digest != claim.input_digest:
             self._log({"event": "relation_dispatch", "jobId": claim.job_id, "outcome": "binding_mismatch"})
             return outcome, view, Update("idle", "runtime_error", "runtime_binding_mismatch")
         return outcome, view, None
@@ -154,7 +137,19 @@ class RelationDispatcher:
         if not self._hold_gate():
             return None
         try:
-            outcome = self._process.resume(claim.job_id, self._stop)
+            if claim.live and not self._process.live_available:
+                # The service was restarted without the live group while this job's dispatch was pending: nothing was sent, no child (and so
+                # no model environment) is built, and the row ends idle so the operator can recover it once live is configured again.
+                self._log({"event": "relation_dispatch", "jobId": claim.job_id, "outcome": "live_unavailable"})
+                return Update("idle", "runtime_error", "live_unavailable")
+            if claim.live:
+                assert claim.owner is not None and claim.upstream_job_id is not None and claim.upstream_input_digest is not None
+                refusal = ("live_binding_unpinned" if claim.live_binding is None or self._authorize is None else
+                           self._authorize(claim.owner, claim.upstream_job_id, claim.upstream_input_digest, claim.live_binding))
+                if refusal is not None:
+                    self._log({"event": "relation_dispatch", "jobId": claim.job_id, "outcome": refusal})
+                    return Update("idle", "runtime_error", refusal)
+            outcome = self._process.resume(claim.job_id, self._stop, live=claim.live, initial_only=not claim.explicit)
         finally:
             self._gate.release()
         if outcome.kind == "abandoned":
@@ -165,63 +160,4 @@ class RelationDispatcher:
         update = policy(outcome, view, busy_count=claim.busy_count)
         self._log({"event": "relation_dispatch", "jobId": claim.job_id, "runtime": outcome.kind, "runtimeExit": outcome.exit_code,
                    "runtimeCode": outcome.code, "outcome": update.last_outcome})
-        return update
-
-    @staticmethod
-    def _settled(claim: Claim, raw: dict[str, Any] | None) -> tuple[str, str | None] | None:
-        """What the chain proves. `raw` has already been bound to the claim and reported delivery current; the chain's own identity is
-        checked once more here, so no caller can settle from a chain of another job or input."""
-        if raw is None:
-            return None
-        try:
-            chain = RelationChain.model_validate(raw)
-        except ValidationError:
-            return None
-        if chain.job_id != claim.job_id or chain.input_digest != claim.input_digest:
-            return None
-        assert claim.relation_candidate_id is not None and claim.review_revision is not None
-        return settlement(chain, claim.relation_candidate_id, claim.review_revision)
-
-    def _supervise_operation(self, claim: Claim) -> Update | None:
-        """One `revalidate` for an accepted allow, under the gate. Authority first, then the one child, then (only when the pipeline says the
-        relation moved) a read of the chain to settle what happened. Nothing here appends a review or sends a second call."""
-        if not self._hold_gate():
-            return None
-        try:
-            assert claim.owner is not None and claim.upstream_job_id is not None and claim.upstream_input_digest is not None
-            refusal = None if self._authorize is None else self._authorize(claim.owner, claim.upstream_job_id, claim.upstream_input_digest)
-            if refusal is not None:
-                self._log({"event": "relation_revalidation", "operationId": claim.operation_id, "outcome": refusal})
-                return Update("idle", "runtime_error", refusal)
-            assert claim.relation_candidate_id is not None
-            outcome = self._process.revalidate(claim.job_id, claim.relation_candidate_id, claim.expected_revision, self._stop)
-            if outcome.kind == "abandoned":
-                return None
-            probe: Outcome | None = None
-            if outcome.kind == "error" and outcome.code in MOVED_CODES:
-                probe = self._process.inspect(claim.job_id)  # same gate hold: nothing else runs between the refusal and this read
-        finally:
-            self._gate.release()
-        outcome, view, mismatch = self._view(claim, outcome)
-        if mismatch is not None:
-            return mismatch
-        raw: dict[str, Any] | None = outcome.result if view is not None and view.delivery.status == "current" else None
-        if probe is not None:
-            # The probe is a read of the pipeline like any other: bound to the claimed job, input digest and upstream before ANY use. A valid
-            # chain of another job (candidate ids repeat across jobs over one upstream) must never settle this operation: settlement is terminal.
-            probe, probe_view, probe_mismatch = self._view(claim, probe)
-            if probe_mismatch is not None:
-                self._log({"event": "relation_revalidation", "operationId": claim.operation_id, "outcome": "probe_binding_mismatch"})
-                return probe_mismatch
-            if probe_view is not None and probe_view.delivery.status == "current":
-                raw = probe.result
-        update = policy(outcome, view, busy_count=claim.busy_count)
-        settled = self._settled(claim, raw)
-        if settled is not None:
-            update = replace(update, settled=settled[0], settled_eligibility=settled[1])
-        elif view is not None and update.runtime_code is None:
-            # The child answered but the chain proves no verdict: keep the reason (the job's failure or the delivery gate) for the operator.
-            update = replace(update, runtime_code=view.failure.code if view.failure is not None else view.delivery.code)
-        self._log({"event": "relation_revalidation", "operationId": claim.operation_id, "runtime": outcome.kind, "runtimeExit": outcome.exit_code,
-                   "runtimeCode": outcome.code, "outcome": update.last_outcome, "settled": update.settled})
         return update

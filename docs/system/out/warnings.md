@@ -82,7 +82,7 @@
 | TEAM_DECISION_REQUIRED | warning | logOutAdmin | 정식 소셜/SSO 제공자와 계정 연결 정책, 관리자 권한 등급·회수 정책을 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | listAnalysisCandidates | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | getAnalysisCandidate | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |  |
-| TEAM_DECISION_REQUIRED | warning | decideAnalysisCandidate | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |  |
+| TEAM_DECISION_REQUIRED | warning | decideAnalysisCandidate | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. / allow=HOLD 최종 승인(재검증 아님)은 2026-10-21 사용자 정책이다. 원문 FS067-02의 '재검증' 문구와 팀 합의로 확인되지 않았으므로 팀이 원문 정정 또는 확정을 해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | setPublicationRule | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | publishGraphVersion | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |  |
 | TEAM_DECISION_REQUIRED | warning | activateGraphVersion | 대화록 열람/검수 권한, 마스킹 목록, 감사 기록 보존기간과 자동 검증 정책의 지위를 팀이 확정해야 한다. |  |
@@ -308,7 +308,7 @@
 | BFF_PATH_DIFFERENCE | difference | getAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id} ↔ BFF /api/admin/pipeline/candidates/{candidate_id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getAnalysisCandidate | 목표만 123 · BFF만 30 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | decideAnalysisCandidate | 목표 /api/v1/admin/pipeline/candidates/{candidate_id}/decision ↔ BFF /api/admin/pipeline/candidates/{candidate_id}/decision |  |
-| BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 176 · BFF만 38 · 형식/필수/권한 변경 11 |  |
+| BFF_FIELD_DIFFERENCE | difference | decideAnalysisCandidate | 목표만 174 · BFF만 38 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | listPublicationRules | 목표 /api/v1/admin/pipeline/rules ↔ BFF /api/admin/pipeline/rules |  |
 | BFF_FIELD_DIFFERENCE | difference | listPublicationRules | 목표만 120 · BFF만 21 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | setPublicationRule | 목표 /api/v1/admin/pipeline/rules/{rule_id} ↔ BFF /api/admin/pipeline/rules/{rule_id} |  |

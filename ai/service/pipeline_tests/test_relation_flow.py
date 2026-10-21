@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 
-from relation_support import JOB, PRIVATE_KEYS, SCHEMA, inspect_direct, walk_keys
+from relation_support import JOB, PRIVATE_KEYS, SCHEMA, delivered_keys, inspect_direct, walk_keys
 
 STATUS_KEYS = {"schemaVersion", "jobId", "inputDigest", "provenance", "upstream", "state", "phase", "resumeMode", "failure", "usage", "delivery",
                "dispatch", "next", "acceptedAt", "observedAt"}
@@ -48,7 +48,7 @@ def test_submit_status_and_result_over_the_real_pipeline(start_relation, world):
     envelope = result.json()
     assert envelope["schemaVersion"] == SCHEMA and envelope["delivery"] == {"state": "available", "reason": None}
     assert set(envelope) == {"schemaVersion", "status", "delivery", "job", "receipts"} and set(envelope["status"]) == STATUS_KEYS
-    assert not set(walk_keys(envelope)) & PRIVATE_KEYS
+    assert not set(delivered_keys(envelope)) & PRIVATE_KEYS   # `approvalBasis` (closed, checked exactly) is the only place a reviewer may appear
     job = envelope["job"]
     assert job["jobId"] == JOB and job["counts"] == world.counts
     assert {r["relationCandidateId"]: r["eligibility"]["status"] for r in job["relations"]} == world.relations

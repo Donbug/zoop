@@ -423,7 +423,7 @@ def test_a_bundle_whose_own_digest_or_identity_disagrees_with_its_content_is_ref
     service = start(workspace=ws)
     for change, code in ((lambda b: b["digests"].update(content="4" * 64), "runtime_binding_mismatch"),
                          (lambda b: b.update(handoffId=OTHER_HANDOFF), "runtime_binding_mismatch"),
-                         (lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-4"), "runtime_contract_mismatch")):
+                         (lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-unsupported"), "runtime_contract_mismatch")):
         bundle = example_bundle()
         change(bundle)
         serve(ws, bundle)
@@ -507,10 +507,23 @@ WRONG_MENTION = [_set((*MENTION, "verification"), "verified"), _set((*MENTION, "
                  _set((*MENTION, "participants", 0, "companyId"), 5), _set((*MENTION, "participants", 0, "companyId"), "bad id with space"),
                  _set((*MENTION, "participants", 0, "role"), None), _set((*MENTION, "participants", 0, "name"), None),
                  _set((*MENTION, "participants", 0, "sourceCompanyId"), 5),
-                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-1"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-2")]
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-1"), _set(("schemaVersion",), "zoop-graph-handoff-bundle-2"),
+                 _set(("schemaVersion",), "zoop-graph-handoff-bundle-3")]
+VERDICTS = ("issues", 0, "fieldVerdicts")
+VERDICT = (*VERDICTS, 0)
+UNKNOWN_VERDICT = [_set((*VERDICT, "extra"), 1), _set((*VERDICT, "note"), "review prose"), _set((*VERDICT, "evidence"), []), _set((*VERDICT, "notes"), "x"),
+                   _set((*VERDICT, "candidateId"), "c-1")]
+MISSING_VERDICT = [_drop(VERDICTS), _drop((*PROVENANCE, "withheld")),
+                   *[_drop((*VERDICT, key)) for key in ("documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds", "verification",
+                                                         "reviewer", "decisionRef", "decisionVersion")]]
+WRONG_VERDICT = [_set(VERDICTS, None), _set(VERDICTS, {}), _set((*VERDICT, "field"), "title"), _set((*VERDICT, "value"), None), _set((*VERDICT, "decision"), "PASS"),
+                 _set((*VERDICT, "reasonCode"), "free text"), _set((*VERDICT, "verification"), "none"), _set((*VERDICT, "evidenceIds"), []),
+                 _set((*VERDICT, "evidenceIds"), [{"start": 0, "end": 1}]), _set((*VERDICT, "evidenceIds"), ["ev-bad"]),
+                 _set((*VERDICT, "decision"), "REJECT"), _set((*VERDICT, "reviewer"), "bad reviewer"), _set((*PROVENANCE, "withheld"), None),
+                 _set((*PROVENANCE, "withheld"), ["title"]), _set((*PROVENANCE, "withheld"), ["eventTime", "period", "period"])]
 
 
-@pytest.mark.parametrize("change", [*UNKNOWN, *UNKNOWN_MENTION, *UNKNOWN_PROVENANCE], ids=lambda change: "unknown")
+@pytest.mark.parametrize("change", [*UNKNOWN, *UNKNOWN_MENTION, *UNKNOWN_PROVENANCE, *UNKNOWN_VERDICT], ids=lambda change: "unknown")
 def test_an_unknown_nested_field_is_refused_even_when_every_digest_and_pin_was_updated_to_match(tmp_path, start, change):
     ws = workspace(tmp_path)
     bundle = serve(ws, mutated(change))        # content digest, receipt, bundle digest and the operator's pin all describe THIS bundle
@@ -519,7 +532,8 @@ def test_an_unknown_nested_field_is_refused_even_when_every_digest_and_pin_was_u
     assert "bundle" not in response.json() and "KRX:005930" not in response.text and pins(bundle)["bundleDigest"] not in response.text
 
 
-@pytest.mark.parametrize("change", [*WRONG_TYPE, *WRONG_MENTION, *MISSING_MENTION, *MISSING_PROVENANCE, *WRONG_PROVENANCE], ids=lambda change: "type")
+@pytest.mark.parametrize("change", [*WRONG_TYPE, *WRONG_MENTION, *MISSING_MENTION, *MISSING_PROVENANCE, *WRONG_PROVENANCE, *MISSING_VERDICT, *WRONG_VERDICT],
+                         ids=lambda change: "type")
 def test_a_wrongly_typed_or_out_of_contract_value_is_refused_even_with_updated_digests(tmp_path, start, change):
     ws = workspace(tmp_path)
     serve(ws, mutated(change))
@@ -530,13 +544,16 @@ def test_a_wrongly_typed_or_out_of_contract_value_is_refused_even_with_updated_d
 
 
 def test_a_current_answer_in_an_earlier_bundle_schema_is_refused_and_a_legacy_handoff_is_withheld_without_any_old_content(tmp_path, start):
-    """The service knows only `zoop-graph-handoff-bundle-3`: a bundle-1 shaped export (no mentions) or a bundle-2 shaped export (mentions, no `fieldProvenance`) is
-    never relayed, and the producer's own withheld answer for a handoff frozen under either reaches the caller as a 200 with that reason and nothing of the old
-    receipt."""
+    """The service knows only `zoop-graph-handoff-bundle-4`: a bundle-1 shaped export (no mentions), a bundle-2 shaped export (mentions, no `fieldProvenance`) or a
+    bundle-3 shaped export (provenance, no `fieldVerdicts`/`withheld`) is never relayed, and the producer's own withheld answer for a handoff frozen under any of
+    them reaches the caller as a 200 with that reason and nothing of the old receipt."""
     ws = workspace(tmp_path)
     service = start(workspace=ws)
-    earlier = (mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [(issue.pop("mentions"), issue.pop("fieldProvenance")) for issue in b["issues"]])),
-               mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [issue.pop("fieldProvenance") for issue in b["issues"]])))
+    earlier = (mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-1"), [(issue.pop("mentions"), issue.pop("fieldProvenance"), issue.pop("fieldVerdicts"))
+                                                                                       for issue in b["issues"]])),
+               mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-2"), [(issue.pop("fieldProvenance"), issue.pop("fieldVerdicts")) for issue in b["issues"]])),
+               mutated(lambda b: (b.update(schemaVersion="zoop-graph-handoff-bundle-3"), [(issue.pop("fieldVerdicts"), issue["fieldProvenance"].pop("withheld"))
+                                                                                       for issue in b["issues"]])))
     for legacy in earlier:
         serve(ws, legacy)
         for url in (bundle_url(), status_url()):

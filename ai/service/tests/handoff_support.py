@@ -204,8 +204,12 @@ def full_bundle() -> dict[str, Any]:
     # operator's representative, and only the action list names both mentions (exact equality, null equals null)
     refs = [{key: mention[key] for key in ("documentId", "documentVersion", "mentionId")} for mention in bundle["issues"][0]["mentions"]]
     bundle["issues"][0]["fieldProvenance"] = {
-        "selection": "operator-representative", "verification": "none",
+        "selection": "operator-representative", "verification": "none", "withheld": [],
         "sameValueMentions": {"title": [refs[0]], "action": list(refs), "target": [refs[0]], "eventTime": [refs[0]], "period": [refs[0]], "assertionStatus": [refs[0]]}}
+    # one more operator verdict, on the NON-selected mention's period (HOLD/ambiguous keeps spans); it changes no headline value
+    bundle["issues"][0]["fieldVerdicts"].append({
+        **refs[1], "field": "period", "value": "2026Q4", "decision": "HOLD", "reasonCode": "ambiguous", "evidenceIds": [evidence_id],
+        "verification": "operator-field-verdict", "reviewer": "reviewer-2", "decisionRef": "field-2026-10-21:2", "decisionVersion": "v1"})
     bundle["sources"].append({**copy.deepcopy(bundle["sources"][0]), "relation": {"jobId": "s3-synthetic-relation-2", "inputDigest": "7" * 64}})
     relation_candidate = "rc-" + "4" * 64
     bundle["relations"].append({

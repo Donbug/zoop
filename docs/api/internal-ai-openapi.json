@@ -3,7 +3,7 @@
   "info": {
     "title": "Zoop internal AI analysis transport",
     "version": "1.0.0",
-    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline, replay only: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture, registry or live mode. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. The principal owns the job it submits: another principal's job answers like a missing one.\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review and revalidation (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate. The\n`Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. Acceptance, verification and publication\nare separate facts in the operation status. `review` says whether the decision is recorded: `unconfirmed` means the request was reserved but the service has no\nproof yet that the event was appended, so retry the same request, which reads the chain for a marker only this operation can have written and never appends\ntwice. `revalidation` says what the automatic re-check an accepted `allow` requested did: `queued`, `running`, `verified` with the verdict's eligibility,\n`superseded` when a later reject won (a stale allow can never overwrite a rejection), `interrupted`, `failed` or `cancelled`. `publication` is always\n`not_published`. The revalidation is dispatched once, like a job: an ambiguous end waits for the explicit `POST /{jobId}/reviews/{operationId}/recover`, which\nreads the chain first, settles whatever it already proves and otherwise queues the revalidation again. The pipeline never resends a call it already started, so a\nrecover can only finish a saved receipt or send a call that never started; an unanswered call is `reconcile_required`. A revalidation runs only while the owner\nis still listed for the job's upstream. While it runs the job is `running` and its result is withheld. Verification replays authored fixtures only: no model is\ncalled. Operation status is read from the service ledger and carries no content. This slice has no list route, and `eligible` is an automatic evidence gate,\nnever approval or publication.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline, replay only: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and the digests of the authored replay\nfixtures it runs against; anything not listed is 403 `request_not_approved` before a ledger row or child exists, and the same answer whether or not the\njob exists. An approval only narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest, the optional topic fixture digest and the `inputDigest` the pipeline must\nreport (computed from the approved bytes, not echoed). The same request again keeps all of it; the same job with another approved digest is\n`idempotency_conflict`; an approval entry or fixture file that has since changed is `approval_changed` / `fixture_changed` (or a withheld result) and the\njob id is never rebound. The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once. A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph.\n\n**Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only\nfamily over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle\n(`zoop-graph-handoff-bundle-3`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It\nwrites nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied\npath, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409\n`execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side\nartifact; the application's article/text/evidence/catalog verification, snapshot registration and activation are the backend's and are not claimed here.\n\n**Which handoffs a caller may read.** A handoff id is only a label, so the operator lists per principal the exact `{handoffId, manifestDigest, bundleDigest}`\n(both SHA-256 pins are required) in a server-owned allowlist that is re-read on every request and again before anything of the answer is used. A handoff that is\nnot listed for the caller answers 403 `handoff_not_allowed` before any child process is touched, with one answer for \"unknown\", \"exists but not yours\" and\n\"listed for another principal\". A listed handoff that the ledger does not have answers 404 `handoff_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the handoff verifies *now*: the producer re-checks on every export the S3 authority and S2 upstream pins, grants and\nrights, the used review revisions, the three operator files against the manifest pins and the rebuilt content digest; the service then hashes the canonical\nbytes of the bundle it received, requires the result to equal the producer's receipt **and** the operator's pins, parses it through a closed model (unknown\nfields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with\n`delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,\n`canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,\n`handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the\nhandoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1` or `-2`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.\nA withheld answer is not an error and not an empty bundle; do not import it and do not treat it as \"no data\". The checks are separate reads at separate instants,\nso a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.\n\n**Original mentions.** Every `issues[].mentions[]` item is one S2 mention exactly as extracted (`documentId`, `documentVersion` and the S2 local `mentionId`\nidentify it; a local id is unique only within one document version), with the app article it belongs to and the evidence ids of its own citations. Its\n`verification` is always `none`: title, action, target, time, period, assertion status, background flag and participants are candidate or snapshot values of S2,\nnever verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the\nS2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id\nto the same company of this bundle, otherwise null.\n\n**Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,\n`target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or\n`operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`\nlists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the\nissue's value (null equals null; no trimming or time normalisation). `verification` is always `none`: this is the actual selection, never a fact verification, a\nsupport or an approval, and it is not a `fieldDecisions` verdict. The producer proves list exactness and closure; this service checks only the shapes.\n\n**The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical\nUTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python\n`json.dumps(sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False)`). All numbers are non-negative integers and all keys ASCII, so any JSON parser followed by that\nserialisation reproduces the same bytes and the same digest, whatever the language; do not normalise, drop or add a field before hashing. Every key the service\nadds (`appImport`, `observedAt`, `verification`, `delivery`) is a sibling of `bundle`, never inside it. Strings that came from sources (titles, URLs, labels,\nobservation and grant metadata, `sourceKind`) are data the producer recorded, never an authority: nothing in them proves or extends a right, and the pins and the\ncurrent `delivery.state` are the only delivery gates.\n\n**The manifest bytes.** `manifest` is the operator's frozen manifest exactly as the producer's ledger stored it at freeze time (never rebuilt from today's files or\nconfiguration): schema, handoff id, source-kind declaration, policy version, the S3/S2 source pins with their review digests and the three operator-file SHA-256\nhashes. It holds no path and no secret. Its canonical bytes (same canonicalisation as the bundle) hash to `verification.manifestDigest`, which equals\n`bundle.manifestDigest`. The service refuses (500 `runtime_binding_mismatch`) a manifest whose digest, handoff id, declaration, policy version, file hashes or\nsource pins disagree with the bundle or the producer's receipt, and (500 `runtime_contract_mismatch`) a missing manifest or any unknown field at any level. A\nbackend therefore recomputes both digests from ONE authenticated response. `manifest` is a sibling of `bundle`; status and withheld answers never carry it.\n\n**Status.** `GET /{handoffId}` runs the same full export gate chain and returns identity, `state`, `delivery`, `appImport` and, only when current,\n`verification` (manifest, bundle and content digests, bundle size, the bundle's own counts, number of source jobs, provenance declaration). It carries no\nnode, source id, text or title.\n\n**Bundle.** `GET /{handoffId}/bundle` returns the same fields plus `manifest` and `bundle`. The response is bounded by the producer's 6 MiB bundle limit; the\nservice reads at most 16 MiB from its child, so an oversized answer is a 503 (`runtime_unavailable`), never a truncated bundle.\n\n**Busy and unavailable.** An operator writer holding a ledger (`handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`;\nunusable server configuration or operator state (damaged or altered artifact, operator file, ownership, ledger recovery needed) is 503\n`service_configuration_invalid`; too many concurrent reads (at most 2 children) is 503 `service_busy`; a missed 45 s deadline or an unreadable answer is 503\n`runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service\nknows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle."
+    "description": "Internal app-to-AI transport for the S1 analysis family (`zoop-ai-s1-1`): document-summary, document-sentiment,\nsemantic-verification and briefing-outlook. It is a thin, durable HTTP layer over the installed `zoop-ai` CLI; the runtime ledger\nstays the only source of job state, and every state shown here is read from the runtime during the same request.\n\n**Network.** The service binds `127.0.0.1` only. Production reach is an HTTPS reverse proxy co-located with it (same host or network\nnamespace) that terminates TLS, caps bodies at 2,000,000 bytes, never logs `Authorization`, and is reachable only from the app\nbackend's security group. That proxy is an assumption: nothing here was deployed or observed.\n\n**Authentication.** `Authorization: Bearer <token>`. Tokens are operator-issued; the service stores only SHA-256 digests. The\nauthenticated principal is the owner of every job it registers; there is no end-user identity in v1. A job owned by another\nprincipal answers exactly like a missing job (404).\n\n**Idempotency.** `Idempotency-Key` is required on submit and must equal `body.jobId`. Retry any ambiguous submit with the *same* key\nand body; never mint a new jobId to retry. 202 = newly accepted (the runtime registered the job and the service made its owner\nbinding and dispatch intent durable); 200 = idempotent replay of an accepted job.\n\n**Lifecycle.** `202` does not mean the job is authorized, budgeted or that any model call happened. Poll `GET /{jobId}` and follow\n`next`: `wait` (a dispatch is pending or running), `fetch_result`, `recover` (call the recover route), `operator_reconcile` (stop and\nescalate: an attempt has an unknown provider outcome that may have been charged; starting a new jobId accepts that cost) or `none`.\nA job interrupted between two stages (some receipt stored, a later stage never sent) is never continued automatically: its dispatch\nends idle with `lastOutcome=needs_recover`, and only an explicit recover sends the next stage.\nInternal `ready` is not the public `completed`: the app import must still succeed and re-check its own current authority.\n\n**Results.** `GET /{jobId}/result` returns the runtime's `get` payload (`job`, see `ai-contract.schema.json#/$defs/JobResult`) only\nwhile the server's *current* grant registry still permits delivery; otherwise `delivery.state` is `withheld`, `job` is null and only\ncontent-free per-attempt `receipts` are returned for usage accounting. A live job is withheld with `reason=recipient_unproven` until the\nruntime has recorded an attempt for every stage it needs, because only then is the recipient provable. `job.grant` is an execution snapshot, never current authority.\n\n**S3 relation jobs (`/internal/v1/relation-jobs`, schema `zoop-ai-internal-relation-1`, scopes `relation.*`).** A separate family over the\ninstalled `zoop-ai-relation` pipeline: it shares nothing with the S1 wire contract or state machine. It is off unless its\nall-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication). A caller\ncannot name a path, fixture or registry. The body is the S3 `Submit` (`zoop-relation-s3`) naming an operator-prepared S2 extraction\njob as `upstream {jobId, inputDigest}`; that pair must be listed for the calling principal in a server-owned allowlist, otherwise 403\n`upstream_not_allowed` before anything is stored. `provenance.executionMode` is `replay` (authored fixtures, no network) or `live`\n(`recordingKind: provider`: a real model call that costs money). A live job needs the service's live group (409 `live_unavailable` otherwise) AND an\nallowlist entry that pins the runtime identity the operator approved (403 `live_not_approved` otherwise); the pipeline must freeze the job under exactly\nthat identity (409 `live_binding_mismatch` otherwise), and the pin is re-read before every live child and every delivery. The principal owns the job it\nsubmits: another principal's job answers like a missing one.\nThe initial dispatch runs once, under the pipeline's own under-lock initial-only restriction (a job that already took its first dispatch is refused with no\neffect). A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service,\nare never run again automatically (`next=recover`); a call the pipeline reserved but never saw answered ends `reconciling` and is never\nresent. Only an explicit `recover` dispatches again (and, for a live job, spends again). Cancel refuses a ready job (409 `job_already_terminal`); the pipeline would otherwise withhold it for good. Status never carries content.\n`GET /{jobId}/result` returns candidates only for a ready job while the owner is still the principal the allowlist lists for that upstream and the\npipeline reports delivery current (it re-reads the operator source registry on every call); otherwise `delivery.state` is `withheld` with a\nreason code. Delivery is checked at one instant: content already sent cannot be recalled, and a revocation after the check is not observed.\n\n**Review (`relation.review`).** `POST /{jobId}/reviews` records one `allow` or `reject` decision on one relation candidate that is on HOLD. `allow` is the\noperator's FINAL approval: it is not a re-verification, it appends the event with effect `approved`, it runs no verifier or model call, and the operation is\nterminal (200, `revalidation.state=not_requested`, `next=none`). The pipeline still re-runs the deterministic checks (schema, endpoints, exact citations)\nand re-reads the current source rights, so an approval can never override an unsupported candidate, an invalid citation or a withdrawn source\n(409 `review_candidate_ineligible`, or the pipeline's own refusal), and it is refused while a model call for the job is in flight (409 `review_call_in_flight`).\nThe earlier automatic verdict and claim distributions stay in the history unchanged. `reject` excludes. The result then shows\n`eligibility.approvalBasis` (`automatic-verifier` or `operator-final-approval` with the reviewer, the deciding event's revision and time): internal audit\nmetadata, never an application approval or a publication.\nThe `Idempotency-Key` is the stable operation id and the body is exactly `{relationCandidateId, expectedSourceVersion, expectedSourceRevision, decision}`; the\nreviewer is always the authenticated principal and cannot be sent. `sourceVersion` is the job's `inputDigest` and `sourceRevision` is the relation's runtime\nevent-chain revision as a decimal string, both read from `GET /{jobId}/result`. They are runtime values, never the application's own review revision (the\npublic decision API's `expectedRevision`), which this service does not see and which must never be forwarded. A new decision is checked against both values\nexactly, the revision inside the pipeline's own append transaction, and anything that does not match records nothing: 409 `source_version_conflict` or\n`source_revision_conflict`, and a relation that is not on hold is `review_target_not_hold`. The same key and body return the existing operation even after the\nrelation has moved on; another body is `idempotency_conflict`, another principal's key is `operation_id_unavailable`. `review` says whether the decision is\nrecorded: `unconfirmed` means the request was reserved but the service has no proof yet that the event was appended (a lost reply included), so retry the same\nrequest, which reads the chain for a marker only this operation can have written and never appends twice. `publication` is always `not_published`.\nOperation status is read from the service ledger and carries no content. An operation recorded under the EARLIER contract (where `allow` asked for an\nautomatic revalidation) is history: it stays readable with `limitation=review_contract_changed`, its `revalidation` is `verified`/`superseded` only where its\nstored history settled it and `contract_changed` otherwise, it is never dispatched or resent and never read as an approval, and its key answers 409\n`review_contract_changed` while unconfirmed: a NEW decision with a new key at the relation's current revision is how to proceed. This slice has no list route.\n\n**S2 extraction jobs (`/internal/v1/extraction-jobs`, schema `zoop-ai-internal-extraction-1`, scopes `extraction.*`).** A separate family over the\ninstalled `zoop-ai-extract` pipeline: it shares no wire contract, ledger or state machine with S1 or S3, but its children run behind the same\nsingle gate as S3's, so an S2 write and an S3 read of its ledger can never overlap. It is off unless its own all-or-nothing server configuration group is\nset (otherwise every route answers 409 `execution_unavailable` after authentication). A caller never sends the S2 `Submit`: the body is exactly\n`{schemaVersion: \"zoop-extraction-s2-2\", jobId, approvedRequestDigest}`. The operator's server-owned approval file maps `principal + jobId +\napprovedRequestDigest` to the exact S2 request (snapshot, catalogue, incoming observation, topic request) and EITHER the digests of the authored replay\nfixtures it runs against (a replay request) OR the identity of the live runtime binding it may spend money under (`liveRuntimeIdentity`, a request with\n`executionMode: live`, `recordingKind: provider`: a real model call, no fixture); anything not listed is 403 `request_not_approved` before a ledger row or child\nexists, and the same answer whether or not the job exists. A live approval also needs the service's live group (409 `live_unavailable` otherwise). An approval\nonly narrows what the pipeline allows: the pipeline still re-reads the operator source registry on every content-bearing command, and, for a live request,\nthe model-send rights of every document it transmits.\nThe principal owns the job it submits (another principal's job answers like a missing one) and a job id that already exists in the pipeline ledger is\n`job_id_unavailable`: an operator's job is never adopted.\n\nThe first reservation freezes the approved digest, the producer fixture digest (replay) or the live runtime identity, the optional topic fixture digest and the\n`inputDigest` the pipeline must report (computed from the approved bytes and the pin, not echoed). The same request again keeps all of it; the same job with another\napproved digest is `idempotency_conflict`; an approval entry, runtime identity or fixture file that has since changed is `approval_changed` /\n`fixture_changed` / `live_binding_changed` (or a withheld result) and the job id is never rebound. The pipeline must freeze a live job under exactly the pinned\nidentity (409 `live_binding_mismatch` otherwise). The approval is re-read, and the fixtures re-hashed, at submit, at every dispatch, at recover and at delivery.\n\nThe initial dispatch runs once, under the pipeline's own under-lock initial-only restriction (a job that already took its first dispatch is refused with no\neffect). A child that timed out, died or answered unreadably, and a dispatch left in flight by a restarted service, are never run\nagain automatically (`next=recover`); a pipeline `extraction_busy`/`ingestion_busy` refusal before any effect is retried a few times, but a job that the\npipeline recorded as `stopped` (for example `ingestion_busy` during execution) waits for an explicit recover. A call the pipeline reserved but never saw\nanswered ends `reconciling` and is never resent (`reconcile_required`; for a live job the failure is `live_response_unknown`). Only an explicit `recover` dispatches again (and, for a live job, may spend again). Cancel makes a queued, running, stopped or reconciling job `cancelled` for good and\nis idempotent; a ready job is refused with 409 `job_already_terminal` and stays ready. Status never carries content. `usage` counts `providerCalls` (transmitted or possibly\ntransmitted), `receivedCalls`, `unsentCalls` (definitively not sent), reported tokens and the estimated/charged USD (null while unknown): never a guess. `GET /{jobId}/result` returns event\ncandidates (with their comparisons, citations and disposition) and topic candidates only for a ready job while the pipeline reports delivery current, the\napproval is still the reserved one, the fixtures are still the pinned bytes and every receipt was answered by them; otherwise `delivery.state` is\n`withheld` with a reason code. Nothing is ever approved by this family: every candidate carries `approved: false`. Delivery is checked at one instant: content\nalready sent cannot be recalled. Listing a delivered S2 job as an S3 upstream is a separate, explicit operator decision in the S3 allowlist; an S2 result never\nwidens S3 authority by itself.\n\n**Graph versions (`/internal/v1/graph-versions`, schema `zoop-ai-internal-graph-1`, scope `graph.read`).** A third, separate, strictly read-only family over the\ninstalled `zoop-ai-graph read|focus` pipeline commands: a verified status of one version and the bounded neighbourhood of one company. It writes nothing\n(no version, no pointer, no graph ledger, Neo4j or source ledger write, no model call), runs no caller-supplied query and has no list route. It is off unless\nits all-or-nothing server configuration group is set (otherwise every route answers 409 `execution_unavailable` after authentication) and it is **not**\npublic: nothing here activates, publishes or withdraws a version, and `publication` is always `not-published`.\n\n**Which versions a caller may read.** The version id is only a label, so the operator lists per principal the exact `{versionId, graphDigest, payloadDigest}` (and\noptionally the frozen S3 relation job as `sourceRelation`) in a server-owned allowlist that is re-read on every request. A version that is not listed answers 403\n`version_not_allowed` before any ledger or child process is touched, with one answer for \"unknown\" and \"exists but not yours\"; the service never adopts a version\nthe operator did not list. A listed version that the graph ledger does not have answers 404 `version_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the version verifies *now*: the pipeline re-checks the S3/S2 authority and source grants, every canonical decision, the S3\nreview state, the Neo4j store binding and the **full stored graph** against the frozen digest on every call, the digests it reports must equal the listed ones, and\nthe listed entry must be unchanged when read again just before the response. Otherwise the answer is **200 with `delivery.state=withheld`**, a reason code\n(`source_unauthorized`, `upstream_changed`, `canonical_mapping_changed`, `review_revision_changed`, `graph_version_corrupt`, `graph_store_identity_mismatch`,\n`version_not_ready`, `version_pin_mismatch`, `source_pin_mismatch` ...) and nothing else: no `verification`, `graph` or `evidence`. A withheld answer is not an\nerror and not an empty graph. These checks are separate reads at separate instants, so a revocation that lands between them and the response is not covered and\nnothing recalls content a caller already received. `current` means \"verified now\", never \"the version the application shows\": there is no active pointer.\n\n**Status.** `GET /{versionId}` runs the same gate chain and returns identity, `state` (`frozen|reserved|unknown|ready|failed`), `delivery` and, only when current,\n`verification` (graph and payload digests, node and edge counts). It carries no node, edge or evidence and no Issue counts: the graph is built from S3\nrelations, not from Issues.\n\n**Focus.** `GET /{versionId}/focus?companyId=&depth=` takes exactly these two query parameters, each once; `depth` is exactly 1, 2 or 3 and anything else (an unknown\nor repeated key, `01`, `4`, a list) is 422. The neighbourhood is breadth-first over the undirected edges of the verified version; an edge is shown iff one endpoint is\ncloser than `depth`. `focus.found=false` (with empty `graph.nodes`, `graph.edges` and `evidence`) means the company is not a node of the verified version; it is a\nverified answer, not an error. `evidence` lists only the records the shown edges reference, as IDs and document/version/span coordinates: the graph holds no quote,\ntitle, URL, rationale or review note, and none is returned.\n\n**Busy and unavailable.** An operator writer holding a ledger (`graph_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`, a graph\ndatabase that does not answer is 503 `runtime_unavailable`, unusable server configuration or state (credentials, unbound store, damaged ledger) is 503\n`service_configuration_invalid`, and too many concurrent reads is 503 `service_busy`; all carry `Retry-After`. A 503 is never an empty graph.\n\n**Graph handoff bundles (`/internal/v1/graph-handoffs`, schema `zoop-ai-internal-handoff-1`, scope `handoff.read`).** A fourth, separate, strictly read-only\nfamily over the installed `zoop-ai-handoff export` command: the verified status of one AI handoff and, only while it verifies now, the whole versioned bundle\n(`zoop-graph-handoff-bundle-4`) the application imports. It is **not** the `graph.read` family above and shares none of its variables, scope or allowlist. It\nwrites nothing (no handoff, no ledger, no cache, no source write, no model or network call), cannot freeze, recover, activate or publish, runs no caller-supplied\npath, command or query and has no list route. It is off unless its all-or-nothing server configuration group is set (otherwise both routes answer 409\n`execution_unavailable` after authentication). `publication` is always `not-published` and `appImport` always `pending`: this service delivers the AI-side\nartifact; the application's article/text/evidence/catalog verification, snapshot registration and activation are the backend's and are not claimed here.\n\n**Which handoffs a caller may read.** A handoff id is only a label, so the operator lists per principal the exact `{handoffId, manifestDigest, bundleDigest}`\n(both SHA-256 pins are required) in a server-owned allowlist that is re-read on every request and again before anything of the answer is used. A handoff that is\nnot listed for the caller answers 403 `handoff_not_allowed` before any child process is touched, with one answer for \"unknown\", \"exists but not yours\" and\n\"listed for another principal\". A listed handoff that the ledger does not have answers 404 `handoff_not_found` (an operator configuration gap).\n\n**Delivery.** Content leaves only while the handoff verifies *now*: the producer re-checks on every export the S3 authority and S2 upstream pins, grants and\nrights, the used review revisions, the three operator files against the manifest pins and the rebuilt content digest; the service then hashes the canonical\nbytes of the bundle it received, requires the result to equal the producer's receipt **and** the operator's pins, parses it through a closed model (unknown\nfields are refused at every level) and requires the model to dump back to exactly those canonical bytes. Otherwise the answer is **200 with\n`delivery.state=withheld`**, a reason code (`source_unauthorized`, `upstream_changed`, `source_pin_missing`, `review_revision_changed`,\n`canonical_mapping_changed`, `decisions_changed`, `bindings_changed`, `handoff_content_changed`, `handoff_not_ready`, `handoff_pin_mismatch`,\n`handoff_contract_changed` ...) and nothing else: no `verification` (so no count, source id or digest) and no `bundle`. `handoff_contract_changed` means the\nhandoff was frozen under an earlier bundle schema (`zoop-graph-handoff-bundle-1`, `-2` or `-3`): it is never reinterpreted or relayed, and the operator freezes a new handoff id.\nA withheld answer is not an error and not an empty bundle; do not import it and do not treat it as \"no data\". The checks are separate reads at separate instants,\nso a revocation that lands between them and the response is not covered and nothing recalls content a caller already received.\n\n**Original mentions.** Every `issues[].mentions[]` item is one S2 mention exactly as extracted (`documentId`, `documentVersion` and the S2 local `mentionId`\nidentify it; a local id is unique only within one document version), with the app article it belongs to and the evidence ids of its own citations. Its\n`verification` is always `none`: title, action, target, time, period, assertion status, background flag and participants are candidate or snapshot values of S2,\nnever verified, decided or approved fields, and they are not derived from the merged issue. A participant carries the S2 `sourceCompanyId`, the S2 `name` and the\nS2 `role` text as is (not a confirmed role, not an `INVOLVES` relation); `companyId` is the public company only where every carrying upstream mapped the source id\nto the same company of this bundle, otherwise null.\n\n**Field provenance.** Every issue carries a closed `fieldProvenance` that records how the producer chose the issue's six headline values (`title`, `action`,\n`target`, `eventTime`, `period`, `assertionStatus`): `selection` is `unanimous` (no operator representative; every mention states all six values) or\n`operator-representative` (the operator's single representative decision; it is one choice for all six fields, never a per-field decision). `sameValueMentions`\nlists per field, in the order of `mentions[]`, the identities (`documentId`, `documentVersion`, `mentionId`) of exactly those mentions whose own value equals the\nissue's value (null equals null; no trimming or time normalisation) where \"the issue's value\" is the SELECTED value, never a redacted null. `verification` is always\n`none`: this is the actual selection, never a fact verification, support or approval. `withheld` lists (`eventTime`, `period` order) the fields whose headline the\nproducer nulled because of an operator HOLD or REJECT on the selected basis. The producer proves list exactness and closure; this service checks only the shapes.\n\n**Field verdicts.** `issues[].fieldVerdicts` holds the operator's own per-field decisions on one original mention's `eventTime` or `period` (`field`, the exact\nreviewed `value`, `decision` ALLOW|HOLD|REJECT, a closed `reasonCode`, `evidenceIds` of the mention's own document, `reviewer`, `decisionRef`, `decisionVersion`,\n`verification` always `operator-field-verdict`). They are never AI output, carry no free-text note, and exist only where an operator reviewed; an empty list means\n\"no field verdict exists\", not \"verified\". This service neither derives nor judges them and checks only the shapes (decision/reason/evidence-count combinations:\nALLOW+stated needs spans, HOLD+unstated none, HOLD+ambiguous spans, REJECT+contradicted spans). Original `mentions[]` values are never changed.\n\n**The bundle bytes.** `bundle` is the producer's artifact, relayed with exactly its keys and values. `verification.bundleDigest` is the SHA-256 of its canonical\nUTF-8 bytes, where canonical means JSON with keys sorted by code point, separators `,` and `:` without whitespace and non-ASCII characters not escaped (Python\n`json.dumps(sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False)`). All numbers are non-negative integers and all keys ASCII, so any JSON parser followed by that\nserialisation reproduces the same bytes and the same digest, whatever the language; do not normalise, drop or add a field before hashing. Every key the service\nadds (`appImport`, `observedAt`, `verification`, `delivery`) is a sibling of `bundle`, never inside it. Strings that came from sources (titles, URLs, labels,\nobservation and grant metadata, `sourceKind`) are data the producer recorded, never an authority: nothing in them proves or extends a right, and the pins and the\ncurrent `delivery.state` are the only delivery gates.\n\n**The manifest bytes.** `manifest` is the operator's frozen manifest exactly as the producer's ledger stored it at freeze time (never rebuilt from today's files or\nconfiguration): schema, handoff id, source-kind declaration, policy version, the S3/S2 source pins with their review digests and the three operator-file SHA-256\nhashes. It holds no path and no secret. Its canonical bytes (same canonicalisation as the bundle) hash to `verification.manifestDigest`, which equals\n`bundle.manifestDigest`. The service refuses (500 `runtime_binding_mismatch`) a manifest whose digest, handoff id, declaration, policy version, file hashes or\nsource pins disagree with the bundle or the producer's receipt, and (500 `runtime_contract_mismatch`) a missing manifest or any unknown field at any level. A\nbackend therefore recomputes both digests from ONE authenticated response. `manifest` is a sibling of `bundle`; status and withheld answers never carry it.\n\n**Status.** `GET /{handoffId}` runs the same full export gate chain and returns identity, `state`, `delivery`, `appImport` and, only when current,\n`verification` (manifest, bundle and content digests, bundle size, the bundle's own counts, number of source jobs, provenance declaration). It carries no\nnode, source id, text or title.\n\n**Bundle.** `GET /{handoffId}/bundle` returns the same fields plus `manifest` and `bundle`. The response is bounded by the producer's 6 MiB bundle limit; the\nservice reads at most 16 MiB from its child, so an oversized answer is a 503 (`runtime_unavailable`), never a truncated bundle.\n\n**Busy and unavailable.** An operator writer holding a ledger (`handoff_busy`, `relation_busy`, `extraction_busy`, `ingestion_busy`) is 503 `runtime_busy`;\nunusable server configuration or operator state (damaged or altered artifact, operator file, ownership, ledger recovery needed) is 503\n`service_configuration_invalid`; too many concurrent reads (at most 2 children) is 503 `service_busy`; a missed 45 s deadline or an unreadable answer is 503\n`runtime_unavailable`. All carry `Retry-After`; there is exactly one child per request and no automatic retry. A child answer that is not the contract this service\nknows is 500 `runtime_contract_mismatch` or `runtime_binding_mismatch` (not retryable). A 503 or 500 is never an empty bundle."
   },
   "paths": {
     "/internal/v1/analysis-jobs": {
@@ -1943,6 +1943,21 @@
                       "status": null,
                       "operation": null
                     }
+                  },
+                  "liveNotApproved": {
+                    "summary": "A live job needs an allowlist entry pinning the runtime identity",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "error": {
+                        "code": "live_not_approved",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null,
+                      "operation": null
+                    }
                   }
                 }
               }
@@ -2010,6 +2025,21 @@
                         "retryable": false,
                         "requestId": "req-0001",
                         "runtimeCode": "upstream_not_ready",
+                        "field": null
+                      },
+                      "status": null,
+                      "operation": null
+                    }
+                  },
+                  "liveUnavailable": {
+                    "summary": "The service has no live group",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "error": {
+                        "code": "live_unavailable",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
                         "field": null
                       },
                       "status": null,
@@ -2870,7 +2900,13 @@
                               "status": "eligible",
                               "reasons": [],
                               "revision": 1,
-                              "reviewPending": false
+                              "reviewPending": false,
+                              "approvalBasis": {
+                                "kind": "automatic-verifier",
+                                "revision": 1,
+                                "reviewer": null,
+                                "decidedAt": "2026-10-12T03:00:00Z"
+                              }
                             },
                             "history": [
                               {
@@ -3950,7 +3986,7 @@
         "tags": [
           "relation-jobs"
         ],
-        "summary": "Record one allow/reject review of a relation candidate (one operation per Idempotency-Key)",
+        "summary": "Record one allow (final approval) / reject (exclusion) review of a HOLD relation candidate (one operation per Idempotency-Key)",
         "operationId": "submitRelationReview",
         "parameters": [
           {
@@ -3987,16 +4023,16 @@
           }
         ],
         "responses": {
-          "202": {
-            "description": "An allow is recorded in the runtime ledger and its revalidation is queued. Acceptance only: the verdict comes later and nothing is published.",
+          "200": {
+            "description": "The decision is recorded in the runtime ledger and is terminal: an allow is the final approval (nothing is revalidated or called), a reject an exclusion. Also the answer to the same key and body sent again (the existing operation, whatever the relation did since).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RelationOperationStatus"
                 },
                 "examples": {
-                  "allowQueued": {
-                    "summary": "An allow is recorded in the runtime ledger and its revalidation is queued: acceptance only, nothing verified or published",
+                  "allowApproved": {
+                    "summary": "An allow is the operator's final approval, recorded in the runtime ledger: terminal, nothing is revalidated, queued or called, nothing is published",
                     "value": {
                       "schemaVersion": "zoop-ai-internal-relation-1",
                       "operationId": "review-decision-0001",
@@ -4012,18 +4048,121 @@
                         "recordedAt": "2026-10-12T03:00:00Z"
                       },
                       "revalidation": {
-                        "state": "queued",
+                        "state": "not_requested",
                         "dispatchCount": 0,
                         "lastOutcome": null,
                         "lastRuntimeCode": null,
                         "verdict": null,
                         "resultingSourceRevision": null,
+                        "updatedAt": null
+                      },
+                      "publication": {
+                        "state": "not_published"
+                      },
+                      "next": "none",
+                      "limitation": null,
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "rejectRecorded": {
+                    "summary": "A reject is recorded and the relation is excluded",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "operationId": "review-decision-0001",
+                      "jobId": "relation-synthetic-SYNTH-1",
+                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
+                      "decision": "reject",
+                      "reviewer": "app",
+                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "expectedSourceRevision": "1",
+                      "review": {
+                        "state": "applied",
+                        "resultingSourceRevision": "2",
+                        "recordedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "revalidation": {
+                        "state": "not_requested",
+                        "dispatchCount": 0,
+                        "lastOutcome": null,
+                        "lastRuntimeCode": null,
+                        "verdict": null,
+                        "resultingSourceRevision": null,
+                        "updatedAt": null
+                      },
+                      "publication": {
+                        "state": "not_published"
+                      },
+                      "next": "none",
+                      "limitation": null,
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "replay": {
+                    "summary": "The same key and body again: the existing operation, whatever the relation did since",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "operationId": "review-decision-0001",
+                      "jobId": "relation-synthetic-SYNTH-1",
+                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
+                      "decision": "allow",
+                      "reviewer": "app",
+                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "expectedSourceRevision": "1",
+                      "review": {
+                        "state": "applied",
+                        "resultingSourceRevision": "2",
+                        "recordedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "revalidation": {
+                        "state": "not_requested",
+                        "dispatchCount": 0,
+                        "lastOutcome": null,
+                        "lastRuntimeCode": null,
+                        "verdict": null,
+                        "resultingSourceRevision": null,
+                        "updatedAt": null
+                      },
+                      "publication": {
+                        "state": "not_published"
+                      },
+                      "next": "none",
+                      "limitation": null,
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "legacyReplay": {
+                    "summary": "A key recorded under the earlier contract (allow meant revalidate): history only, its stored settlement is shown and never reinterpreted as an approval",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "operationId": "review-decision-0001",
+                      "jobId": "relation-synthetic-SYNTH-1",
+                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
+                      "decision": "allow",
+                      "reviewer": "app",
+                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "expectedSourceRevision": "1",
+                      "review": {
+                        "state": "applied",
+                        "resultingSourceRevision": "2",
+                        "recordedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "revalidation": {
+                        "state": "verified",
+                        "dispatchCount": 1,
+                        "lastOutcome": "exited",
+                        "lastRuntimeCode": null,
+                        "verdict": "eligible",
+                        "resultingSourceRevision": "3",
                         "updatedAt": "2026-10-12T03:00:00Z"
                       },
                       "publication": {
                         "state": "not_published"
                       },
-                      "next": "wait",
+                      "next": "none",
+                      "limitation": "review_contract_changed",
                       "acceptedAt": "2026-10-12T03:00:00Z",
                       "observedAt": "2026-10-12T03:00:00Z"
                     }
@@ -4036,12 +4175,6 @@
                 "description": "Status URL of the operation.",
                 "schema": {
                   "type": "string"
-                }
-              },
-              "Retry-After": {
-                "description": "Seconds to wait before polling; present while next is wait.",
-                "schema": {
-                  "type": "integer"
                 }
               }
             }
@@ -4168,98 +4301,6 @@
               }
             }
           },
-          "200": {
-            "description": "A reject is recorded, or the same key and body were sent again (the existing operation, whatever the relation did since).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationOperationStatus"
-                },
-                "examples": {
-                  "rejectRecorded": {
-                    "summary": "A reject is recorded; nothing is revalidated and the relation is excluded",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "reject",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "not_requested",
-                        "dispatchCount": 0,
-                        "lastOutcome": null,
-                        "lastRuntimeCode": null,
-                        "verdict": null,
-                        "resultingSourceRevision": null,
-                        "updatedAt": null
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "none",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  },
-                  "replay": {
-                    "summary": "The same key and body again, after the revalidation finished: the existing operation, whatever the relation did since",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "verified",
-                        "dispatchCount": 1,
-                        "lastOutcome": "exited",
-                        "lastRuntimeCode": null,
-                        "verdict": "eligible",
-                        "resultingSourceRevision": "3",
-                        "updatedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "none",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Location": {
-                "description": "Status URL of the operation.",
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Retry-After": {
-                "description": "Seconds to wait before polling; present while next is wait.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
           "403": {
             "description": "scope_denied, or upstream_not_allowed: the job's upstream is not (any more) listed for this principal.",
             "content": {
@@ -4345,7 +4386,7 @@
             }
           },
           "409": {
-            "description": "source_version_conflict, source_revision_conflict, review_target_not_hold, review_already_pending, job_cancelled, idempotency_conflict, operation_id_unavailable, upstream_unavailable or execution_unavailable. A refusal records nothing.",
+            "description": "source_version_conflict, source_revision_conflict, review_target_not_hold, review_call_in_flight, review_candidate_ineligible, review_contract_changed, job_cancelled, idempotency_conflict, operation_id_unavailable, upstream_unavailable or execution_unavailable. A refusal records nothing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4395,6 +4436,81 @@
                       },
                       "status": null,
                       "operation": null
+                    }
+                  },
+                  "reviewCallInFlight": {
+                    "summary": "A model call for this job has no answer yet: nothing is approved until it is reconciled",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "error": {
+                        "code": "review_call_in_flight",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "review_call_in_flight",
+                        "field": null
+                      },
+                      "status": null,
+                      "operation": null
+                    }
+                  },
+                  "reviewCandidateIneligible": {
+                    "summary": "The deterministic checks or the current source rights no longer hold for this candidate: a human decision cannot override them",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "error": {
+                        "code": "review_candidate_ineligible",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": "review_candidate_ineligible",
+                        "field": null
+                      },
+                      "status": null,
+                      "operation": null
+                    }
+                  },
+                  "reviewContractChanged": {
+                    "summary": "The key was reserved under the earlier revalidation contract and never confirmed: history only, use a new key",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "error": {
+                        "code": "review_contract_changed",
+                        "retryable": false,
+                        "requestId": "req-0001",
+                        "runtimeCode": null,
+                        "field": null
+                      },
+                      "status": null,
+                      "operation": {
+                        "schemaVersion": "zoop-ai-internal-relation-1",
+                        "operationId": "review-decision-0001",
+                        "jobId": "relation-synthetic-SYNTH-1",
+                        "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
+                        "decision": "allow",
+                        "reviewer": "app",
+                        "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "expectedSourceRevision": "1",
+                        "review": {
+                          "state": "unconfirmed",
+                          "resultingSourceRevision": null,
+                          "recordedAt": null
+                        },
+                        "revalidation": {
+                          "state": "not_requested",
+                          "dispatchCount": 0,
+                          "lastOutcome": null,
+                          "lastRuntimeCode": null,
+                          "verdict": null,
+                          "resultingSourceRevision": null,
+                          "updatedAt": null
+                        },
+                        "publication": {
+                          "state": "not_published"
+                        },
+                        "next": "none",
+                        "limitation": "review_contract_changed",
+                        "acceptedAt": "2026-10-12T03:00:00Z",
+                        "observedAt": "2026-10-12T03:00:00Z"
+                      }
                     }
                   },
                   "idempotencyConflict": {
@@ -4498,7 +4614,7 @@
               },
               "examples": {
                 "allow": {
-                  "summary": "Allow: request a revalidation. Quote the values read from the result; the reviewer is the authenticated principal",
+                  "summary": "Allow: the operator's FINAL approval of a HOLD relation (no revalidation). Quote the values read from the result; the reviewer is the authenticated principal",
                   "value": {
                     "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
                     "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -4566,15 +4682,15 @@
         ],
         "responses": {
           "200": {
-            "description": "The operation, identified exactly by its key: candidate, decision, reviewer and the two expectations sent, plus acceptance, verification and publication. Read from the service ledger; no content.",
+            "description": "The operation, identified exactly by its key: candidate, decision, reviewer and the two expectations sent, plus acceptance, the (legacy-only) revalidation state and publication. Read from the service ledger; no content.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RelationOperationStatus"
                 },
                 "examples": {
-                  "queued": {
-                    "summary": "Accepted, revalidation waiting for the single dispatcher",
+                  "approved": {
+                    "summary": "A recorded final approval: revalidation not_requested, next none",
                     "value": {
                       "schemaVersion": "zoop-ai-internal-relation-1",
                       "operationId": "review-decision-0001",
@@ -4590,30 +4706,31 @@
                         "recordedAt": "2026-10-12T03:00:00Z"
                       },
                       "revalidation": {
-                        "state": "queued",
+                        "state": "not_requested",
                         "dispatchCount": 0,
                         "lastOutcome": null,
                         "lastRuntimeCode": null,
                         "verdict": null,
                         "resultingSourceRevision": null,
-                        "updatedAt": "2026-10-12T03:00:00Z"
+                        "updatedAt": null
                       },
                       "publication": {
                         "state": "not_published"
                       },
-                      "next": "wait",
+                      "next": "none",
+                      "limitation": null,
                       "acceptedAt": "2026-10-12T03:00:00Z",
                       "observedAt": "2026-10-12T03:00:00Z"
                     }
                   },
-                  "running": {
-                    "summary": "The revalidation child is running; the job is `running` and its result withheld meanwhile",
+                  "rejected": {
+                    "summary": "A recorded exclusion",
                     "value": {
                       "schemaVersion": "zoop-ai-internal-relation-1",
                       "operationId": "review-decision-0001",
                       "jobId": "relation-synthetic-SYNTH-1",
                       "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
+                      "decision": "reject",
                       "reviewer": "app",
                       "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
                       "expectedSourceRevision": "1",
@@ -4623,90 +4740,25 @@
                         "recordedAt": "2026-10-12T03:00:00Z"
                       },
                       "revalidation": {
-                        "state": "running",
-                        "dispatchCount": 1,
+                        "state": "not_requested",
+                        "dispatchCount": 0,
                         "lastOutcome": null,
                         "lastRuntimeCode": null,
                         "verdict": null,
                         "resultingSourceRevision": null,
-                        "updatedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "wait",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  },
-                  "verified": {
-                    "summary": "A verdict was appended: the verification is done and the relation's revision moved by two. Still not published",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "verified",
-                        "dispatchCount": 1,
-                        "lastOutcome": "exited",
-                        "lastRuntimeCode": null,
-                        "verdict": "eligible",
-                        "resultingSourceRevision": "3",
-                        "updatedAt": "2026-10-12T03:00:00Z"
+                        "updatedAt": null
                       },
                       "publication": {
                         "state": "not_published"
                       },
                       "next": "none",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  },
-                  "superseded": {
-                    "summary": "A reject was recorded first: this allow can never be revalidated and nothing overwrote the rejection",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "superseded",
-                        "dispatchCount": 1,
-                        "lastOutcome": "runtime_error",
-                        "lastRuntimeCode": "review_revision_conflict",
-                        "verdict": null,
-                        "resultingSourceRevision": "3",
-                        "updatedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "none",
+                      "limitation": null,
                       "acceptedAt": "2026-10-12T03:00:00Z",
                       "observedAt": "2026-10-12T03:00:00Z"
                     }
                   },
                   "unconfirmed": {
-                    "summary": "Reserved but not proven in the chain (a crash or an unanswered review): retry the same POST",
+                    "summary": "Reserved but not proven in the chain (a crash or a lost reply): retry the same POST",
                     "value": {
                       "schemaVersion": "zoop-ai-internal-relation-1",
                       "operationId": "review-decision-0001",
@@ -4734,12 +4786,13 @@
                         "state": "not_published"
                       },
                       "next": "retry_review",
+                      "limitation": null,
                       "acceptedAt": "2026-10-12T03:00:00Z",
                       "observedAt": "2026-10-12T03:00:00Z"
                     }
                   },
-                  "interrupted": {
-                    "summary": "The child timed out, died or the service restarted: nothing is run again automatically; call recover",
+                  "legacySettled": {
+                    "summary": "Recorded under the earlier contract and settled by its own stored history",
                     "value": {
                       "schemaVersion": "zoop-ai-internal-relation-1",
                       "operationId": "review-decision-0001",
@@ -4755,7 +4808,41 @@
                         "recordedAt": "2026-10-12T03:00:00Z"
                       },
                       "revalidation": {
-                        "state": "interrupted",
+                        "state": "verified",
+                        "dispatchCount": 1,
+                        "lastOutcome": "exited",
+                        "lastRuntimeCode": null,
+                        "verdict": "eligible",
+                        "resultingSourceRevision": "3",
+                        "updatedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "publication": {
+                        "state": "not_published"
+                      },
+                      "next": "none",
+                      "limitation": "review_contract_changed",
+                      "acceptedAt": "2026-10-12T03:00:00Z",
+                      "observedAt": "2026-10-12T03:00:00Z"
+                    }
+                  },
+                  "legacyUnsettled": {
+                    "summary": "Recorded under the earlier contract and never settled: contract_changed, nothing is dispatched or resent",
+                    "value": {
+                      "schemaVersion": "zoop-ai-internal-relation-1",
+                      "operationId": "review-decision-0001",
+                      "jobId": "relation-synthetic-SYNTH-1",
+                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
+                      "decision": "allow",
+                      "reviewer": "app",
+                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
+                      "expectedSourceRevision": "1",
+                      "review": {
+                        "state": "applied",
+                        "resultingSourceRevision": "2",
+                        "recordedAt": "2026-10-12T03:00:00Z"
+                      },
+                      "revalidation": {
+                        "state": "contract_changed",
                         "dispatchCount": 1,
                         "lastOutcome": "transport_unknown",
                         "lastRuntimeCode": null,
@@ -4766,40 +4853,8 @@
                       "publication": {
                         "state": "not_published"
                       },
-                      "next": "recover",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  },
-                  "unansweredCall": {
-                    "summary": "A verification call was reserved but never answered: it is never resent; stop and escalate",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "failed",
-                        "dispatchCount": 2,
-                        "lastOutcome": "runtime_error",
-                        "lastRuntimeCode": "replay_response_unknown",
-                        "verdict": null,
-                        "resultingSourceRevision": null,
-                        "updatedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "operator_reconcile",
+                      "next": "none",
+                      "limitation": "review_contract_changed",
                       "acceptedAt": "2026-10-12T03:00:00Z",
                       "observedAt": "2026-10-12T03:00:00Z"
                     }
@@ -5021,510 +5076,6 @@
         ]
       }
     },
-    "/internal/v1/relation-jobs/{jobId}/reviews/{operationId}/recover": {
-      "post": {
-        "tags": [
-          "relation-jobs"
-        ],
-        "summary": "Explicitly re-queue the revalidation of an accepted allow, after reading the chain (idempotent)",
-        "operationId": "recoverRelationReviewOperation",
-        "parameters": [
-          {
-            "name": "jobId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Runtime job id; equals the Idempotency-Key used at submit.",
-              "pattern": "^[A-Za-z0-9_.-]{1,120}$",
-              "title": "Jobid"
-            },
-            "description": "Runtime job id; equals the Idempotency-Key used at submit."
-          },
-          {
-            "name": "operationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "The review operation's id: the Idempotency-Key of the POST that created it.",
-              "pattern": "^[A-Za-z0-9_.-]{1,120}$",
-              "title": "Operationid"
-            },
-            "description": "The review operation's id: the Idempotency-Key of the POST that created it."
-          },
-          {
-            "name": "X-Request-ID",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9._-]{1,128}$"
-            },
-            "description": "Optional correlation id, echoed on every response and never used as an idempotency key."
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "The chain still waits at the revision the review left: the revalidation was queued again.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationOperationStatus"
-                },
-                "examples": {
-                  "enqueued": {
-                    "summary": "The chain still waits at the revision the review left: the revalidation was queued again",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "queued",
-                        "dispatchCount": 0,
-                        "lastOutcome": null,
-                        "lastRuntimeCode": null,
-                        "verdict": null,
-                        "resultingSourceRevision": null,
-                        "updatedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "wait",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "authentication_required: missing, malformed or unknown bearer token.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                },
-                "examples": {
-                  "example": {
-                    "summary": "Missing, malformed or unknown bearer token",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "authentication_required",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "WWW-Authenticate": {
-                "description": "Bearer",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "invalid_request: header, path or JSON envelope validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                },
-                "examples": {
-                  "example": {
-                    "summary": "Header, path or JSON envelope validation",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "invalid_request",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": "body"
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "runtime_binding_mismatch or internal_error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "runtime_unavailable, runtime_busy, service_configuration_invalid, service_busy or queue_full (retryable).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                },
-                "examples": {
-                  "example": {
-                    "summary": "The pipeline is busy: retry with the same key and body",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "runtime_busy",
-                        "retryable": true,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds before retrying with the same key and body.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Nothing to add: a revalidation is already pending or running, or the chain shows it already settled.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationOperationStatus"
-                },
-                "examples": {
-                  "settled": {
-                    "summary": "Nothing to add: the chain already proved the outcome, or a revalidation is already pending or running",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "operationId": "review-decision-0001",
-                      "jobId": "relation-synthetic-SYNTH-1",
-                      "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                      "decision": "allow",
-                      "reviewer": "app",
-                      "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                      "expectedSourceRevision": "1",
-                      "review": {
-                        "state": "applied",
-                        "resultingSourceRevision": "2",
-                        "recordedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "revalidation": {
-                        "state": "verified",
-                        "dispatchCount": 1,
-                        "lastOutcome": "exited",
-                        "lastRuntimeCode": null,
-                        "verdict": "eligible",
-                        "resultingSourceRevision": "3",
-                        "updatedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "publication": {
-                        "state": "not_published"
-                      },
-                      "next": "none",
-                      "acceptedAt": "2026-10-12T03:00:00Z",
-                      "observedAt": "2026-10-12T03:00:00Z"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "scope_denied, or upstream_not_allowed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                },
-                "examples": {
-                  "scopeDenied": {
-                    "summary": "Principal lacks the route's scope",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "scope_denied",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  },
-                  "upstreamNotAllowed": {
-                    "summary": "The upstream job and digest are not listed for this principal; the same answer whether or not they exist",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "upstream_not_allowed",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "job_not_found or operation_not_found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                },
-                "examples": {
-                  "jobNotFound": {
-                    "summary": "Unknown job, another principal's job, or never accepted",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "job_not_found",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  },
-                  "operationNotFound": {
-                    "summary": "Unknown operation, another principal's, or another job's",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "operation_not_found",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "review_not_confirmed, operation_not_recoverable, reconcile_required, job_cancelled, upstream_unavailable or execution_unavailable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RelationErrorEnvelope"
-                },
-                "examples": {
-                  "reviewNotConfirmed": {
-                    "summary": "Recover of a review that is not proven yet: retry the review request with the same key and body first",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "review_not_confirmed",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": {
-                        "schemaVersion": "zoop-ai-internal-relation-1",
-                        "operationId": "review-decision-0001",
-                        "jobId": "relation-synthetic-SYNTH-1",
-                        "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                        "decision": "allow",
-                        "reviewer": "app",
-                        "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                        "expectedSourceRevision": "1",
-                        "review": {
-                          "state": "unconfirmed",
-                          "resultingSourceRevision": null,
-                          "recordedAt": null
-                        },
-                        "revalidation": {
-                          "state": "not_requested",
-                          "dispatchCount": 0,
-                          "lastOutcome": null,
-                          "lastRuntimeCode": null,
-                          "verdict": null,
-                          "resultingSourceRevision": null,
-                          "updatedAt": null
-                        },
-                        "publication": {
-                          "state": "not_published"
-                        },
-                        "next": "retry_review",
-                        "acceptedAt": "2026-10-12T03:00:00Z",
-                        "observedAt": "2026-10-12T03:00:00Z"
-                      }
-                    }
-                  },
-                  "operationNotRecoverable": {
-                    "summary": "A reject, or a revalidation the chain no longer allows, has nothing to recover",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "operation_not_recoverable",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": {
-                        "schemaVersion": "zoop-ai-internal-relation-1",
-                        "operationId": "review-decision-0001",
-                        "jobId": "relation-synthetic-SYNTH-1",
-                        "relationCandidateId": "rc-1111111111111111111111111111111111111111111111111111111111111111",
-                        "decision": "reject",
-                        "reviewer": "app",
-                        "expectedSourceVersion": "0000000000000000000000000000000000000000000000000000000000000000",
-                        "expectedSourceRevision": "1",
-                        "review": {
-                          "state": "applied",
-                          "resultingSourceRevision": "2",
-                          "recordedAt": "2026-10-12T03:00:00Z"
-                        },
-                        "revalidation": {
-                          "state": "not_requested",
-                          "dispatchCount": 0,
-                          "lastOutcome": null,
-                          "lastRuntimeCode": null,
-                          "verdict": null,
-                          "resultingSourceRevision": null,
-                          "updatedAt": null
-                        },
-                        "publication": {
-                          "state": "not_published"
-                        },
-                        "next": "none",
-                        "acceptedAt": "2026-10-12T03:00:00Z",
-                        "observedAt": "2026-10-12T03:00:00Z"
-                      }
-                    }
-                  },
-                  "reconcileRequired": {
-                    "summary": "Recover of a reconciling job",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "reconcile_required",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": {
-                        "schemaVersion": "zoop-ai-internal-relation-1",
-                        "jobId": "relation-synthetic-SYNTH-1",
-                        "inputDigest": "0000000000000000000000000000000000000000000000000000000000000000",
-                        "provenance": {
-                          "sourceKind": "synthetic",
-                          "executionMode": "replay",
-                          "recordingKind": "authored-test"
-                        },
-                        "upstream": {
-                          "jobId": "s2-synthetic-extraction",
-                          "inputDigest": "2222222222222222222222222222222222222222222222222222222222222222"
-                        },
-                        "state": "reconciling",
-                        "phase": "relation",
-                        "resumeMode": "reconcile_only",
-                        "failure": {
-                          "code": "replay_response_unknown"
-                        },
-                        "usage": {
-                          "replayCalls": 0,
-                          "startedWithoutReceipt": 1,
-                          "providerCalls": 0,
-                          "modelCalls": 0
-                        },
-                        "delivery": {
-                          "state": "withheld",
-                          "reason": "job_not_ready"
-                        },
-                        "dispatch": {
-                          "state": "idle",
-                          "dispatchCount": 1,
-                          "lastOutcome": "exited",
-                          "lastRuntimeCode": null,
-                          "updatedAt": "2026-10-12T03:00:00Z"
-                        },
-                        "next": "operator_reconcile",
-                        "acceptedAt": "2026-10-12T03:00:00Z",
-                        "observedAt": "2026-10-12T03:00:00Z"
-                      },
-                      "operation": null
-                    }
-                  },
-                  "executionUnavailable": {
-                    "summary": "The relation configuration group is not enabled",
-                    "value": {
-                      "schemaVersion": "zoop-ai-internal-relation-1",
-                      "error": {
-                        "code": "execution_unavailable",
-                        "retryable": false,
-                        "requestId": "req-0001",
-                        "runtimeCode": null,
-                        "field": null
-                      },
-                      "status": null,
-                      "operation": null
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [
-              "relation.recover"
-            ]
-          }
-        ]
-      }
-    },
     "/internal/v1/extraction-jobs": {
       "post": {
         "tags": [
@@ -5585,7 +5136,14 @@
                         "replayCalls": 0,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -5891,7 +5449,14 @@
                         "replayCalls": 3,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -6053,7 +5618,14 @@
                         "replayCalls": 3,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -6107,7 +5679,14 @@
                         "replayCalls": 1,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -6163,7 +5742,14 @@
                         "replayCalls": 2,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -6219,7 +5805,14 @@
                         "replayCalls": 0,
                         "startedWithoutReceipt": 1,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -6273,7 +5866,14 @@
                         "replayCalls": 3,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -6565,7 +6165,14 @@
                           "replayCalls": 3,
                           "startedWithoutReceipt": 0,
                           "providerCalls": 0,
-                          "paidModelCalls": 0
+                          "paidModelCalls": 0,
+                          "receivedCalls": 0,
+                          "unsentCalls": 0,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "reasoningTokens": null,
+                          "estimatedUsd": null,
+                          "chargedUsd": null
                         },
                         "stages": [
                           {
@@ -6765,7 +6372,14 @@
                           "replayCalls": 3,
                           "startedWithoutReceipt": 0,
                           "providerCalls": 0,
-                          "paidModelCalls": 0
+                          "paidModelCalls": 0,
+                          "receivedCalls": 0,
+                          "unsentCalls": 0,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "reasoningTokens": null,
+                          "estimatedUsd": null,
+                          "chargedUsd": null
                         },
                         "stages": [
                           {
@@ -7068,7 +6682,14 @@
                         "replayCalls": 0,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -7229,7 +6850,14 @@
                           "replayCalls": 3,
                           "startedWithoutReceipt": 0,
                           "providerCalls": 0,
-                          "paidModelCalls": 0
+                          "paidModelCalls": 0,
+                          "receivedCalls": 0,
+                          "unsentCalls": 0,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "reasoningTokens": null,
+                          "estimatedUsd": null,
+                          "chargedUsd": null
                         },
                         "stages": [
                           {
@@ -7422,7 +7050,14 @@
                         "replayCalls": 0,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -7618,7 +7253,14 @@
                         "replayCalls": 0,
                         "startedWithoutReceipt": 0,
                         "providerCalls": 0,
-                        "paidModelCalls": 0
+                        "paidModelCalls": 0,
+                        "receivedCalls": 0,
+                        "unsentCalls": 0,
+                        "inputTokens": null,
+                        "outputTokens": null,
+                        "reasoningTokens": null,
+                        "estimatedUsd": null,
+                        "chargedUsd": null
                       },
                       "stages": [
                         {
@@ -7735,7 +7377,14 @@
                           "replayCalls": 0,
                           "startedWithoutReceipt": 1,
                           "providerCalls": 0,
-                          "paidModelCalls": 0
+                          "paidModelCalls": 0,
+                          "receivedCalls": 0,
+                          "unsentCalls": 0,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "reasoningTokens": null,
+                          "estimatedUsd": null,
+                          "chargedUsd": null
                         },
                         "stages": [
                           {
@@ -7799,7 +7448,14 @@
                           "replayCalls": 3,
                           "startedWithoutReceipt": 0,
                           "providerCalls": 0,
-                          "paidModelCalls": 0
+                          "paidModelCalls": 0,
+                          "receivedCalls": 0,
+                          "unsentCalls": 0,
+                          "inputTokens": null,
+                          "outputTokens": null,
+                          "reasoningTokens": null,
+                          "estimatedUsd": null,
+                          "chargedUsd": null
                         },
                         "stages": [
                           {
@@ -8657,9 +8313,9 @@
                       },
                       "verification": {
                         "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
-                        "bundleDigest": "5ca1afb6afefafae8e77cd644e03691fb8e282a2f2abccc65150792e0f160316",
-                        "contentDigest": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153",
-                        "bundleBytes": 8873,
+                        "bundleDigest": "aa9ea768a493e70d9fd1512526352ef4ef093d45d05fd1302f828ba132d52347",
+                        "contentDigest": "9424b46c372d4f572afe60bd1993326f4025b447347ec7e1d000f959f6483d4c",
+                        "bundleBytes": 9931,
                         "counts": {
                           "companies": 1,
                           "issues": 1,
@@ -9050,9 +8706,9 @@
                       },
                       "verification": {
                         "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
-                        "bundleDigest": "5ca1afb6afefafae8e77cd644e03691fb8e282a2f2abccc65150792e0f160316",
-                        "contentDigest": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153",
-                        "bundleBytes": 8873,
+                        "bundleDigest": "aa9ea768a493e70d9fd1512526352ef4ef093d45d05fd1302f828ba132d52347",
+                        "contentDigest": "9424b46c372d4f572afe60bd1993326f4025b447347ec7e1d000f959f6483d4c",
+                        "bundleBytes": 9931,
                         "counts": {
                           "companies": 1,
                           "issues": 1,
@@ -9100,7 +8756,7 @@
                         }
                       },
                       "bundle": {
-                        "schemaVersion": "zoop-graph-handoff-bundle-3",
+                        "schemaVersion": "zoop-graph-handoff-bundle-4",
                         "handoffId": "handoff-synthetic-1",
                         "manifestDigest": "d5272f7ff1b073b01dd6afeb7b8cff41bc7c2366e2bf76b76b8a8d45ffbe3abb",
                         "provenance": {
@@ -9120,7 +8776,8 @@
                           "offsetUnit": "unicode_code_point",
                           "geography": "operator-field-verdict",
                           "structural": "manual-operator-review",
-                          "sequence": "s2-comparison-with-operator-decision"
+                          "sequence": "s2-comparison-with-operator-decision",
+                          "sourceSupport": "origin-or-exact-text-union"
                         },
                         "sources": [
                           {
@@ -9134,6 +8791,11 @@
                               "digest": "9999999999999999999999999999999999999999999999999999999999999999"
                             },
                             "reviewDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                            "provenance": {
+                              "sourceKind": "synthetic",
+                              "executionMode": "replay",
+                              "recordingKind": "authored-test"
+                            },
                             "policies": {
                               "producer": "zoop-relation-producer-1",
                               "verifier": "zoop-relation-verifier-1",
@@ -9144,10 +8806,16 @@
                               "impactPolicy": "zoop-impact-policy-1"
                             },
                             "reviewUsed": [
-                              [
-                                "rc-4444444444444444444444444444444444444444444444444444444444444444",
-                                1
-                              ]
+                              {
+                                "relationCandidateId": "rc-4444444444444444444444444444444444444444444444444444444444444444",
+                                "revision": 1,
+                                "approvalBasis": {
+                                  "kind": "automatic-verifier",
+                                  "revision": 1,
+                                  "reviewer": null,
+                                  "decidedAt": "2026-10-13T00:00:01+00:00"
+                                }
+                              }
                             ],
                             "audit": {
                               "s3Relations": 1,
@@ -9330,7 +8998,35 @@
                                     "mentionId": "m-synthetic-1"
                                   }
                                 ]
+                              },
+                              "withheld": []
+                            },
+                            "fieldVerdicts": [
+                              {
+                                "documentId": "synthetic-doc-1",
+                                "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                "mentionId": "m-synthetic-1",
+                                "field": "eventTime",
+                                "value": "2026-09-30",
+                                "decision": "ALLOW",
+                                "reasonCode": "stated",
+                                "evidenceIds": [
+                                  "ev-42653dea0914a988e520375d517b36b0e237305e3e53fc2a9992c5953424fe8d"
+                                ],
+                                "verification": "operator-field-verdict",
+                                "reviewer": "reviewer-1",
+                                "decisionRef": "field-2026-10-21:1",
+                                "decisionVersion": "v1"
                               }
+                            ],
+                            "sourceSupport": {
+                              "articleCount": 1,
+                              "knownLineageCount": 0,
+                              "unknownLineageArticles": [
+                                "doc-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                              ],
+                              "independentSourceCount": null,
+                              "duplicateGroups": []
                             }
                           }
                         ],
@@ -9390,6 +9086,8 @@
                             "documentId": "synthetic-doc-1",
                             "documentVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                             "rawVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                            "textSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+                            "origin": null,
                             "title": "합성 공급 계약 체결",
                             "url": "https://example.invalid/news/1",
                             "publishedAt": "2026-09-30T01:00:00+00:00",
@@ -9456,7 +9154,7 @@
                           "graphDb": "none"
                         },
                         "digests": {
-                          "content": "11a5e1a79c510e765c6b0337969cdae95960636a951f7b944c24026232254153"
+                          "content": "9424b46c372d4f572afe60bd1993326f4025b447347ec7e1d000f959f6483d4c"
                         }
                       }
                     }
@@ -9727,6 +9425,49 @@
   },
   "components": {
     "schemas": {
+      "BApprovalBasis": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "automatic-verifier",
+              "operator-final-approval"
+            ],
+            "title": "Kind"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "reviewer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer"
+          },
+          "decidedAt": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Decidedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "revision",
+          "reviewer",
+          "decidedAt"
+        ],
+        "title": "BApprovalBasis",
+        "description": "Why one S3 relation was eligible when the producer used it: the automatic verifier's verdict (`reviewer` null) or an operator's final approval\n(`reviewer` the approving principal). `revision` is the deciding chain event's sequence."
+      },
       "BArticle": {
         "properties": {
           "articleId": {
@@ -9754,6 +9495,21 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$",
             "title": "Rawversion"
+          },
+          "textSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Textsha256"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BArticleOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "title": {
             "type": "string",
@@ -9804,6 +9560,8 @@
           "documentId",
           "documentVersion",
           "rawVersion",
+          "textSha256",
+          "origin",
           "title",
           "url",
           "publishedAt",
@@ -9811,6 +9569,46 @@
           "observations"
         ],
         "title": "BArticle"
+      },
+      "BArticleOrigin": {
+        "properties": {
+          "originId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Originid"
+          },
+          "reviewer": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Reviewer"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          },
+          "decisionVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionversion"
+          },
+          "verification": {
+            "type": "string",
+            "const": "operator-declared-origin",
+            "title": "Verification"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "originId",
+          "reviewer",
+          "decisionRef",
+          "decisionVersion",
+          "verification"
+        ],
+        "title": "BArticleOrigin",
+        "description": "The operator's declared origin of one article version (never inferred from a publisher, domain or source id)."
       },
       "BAudit": {
         "properties": {
@@ -10358,6 +10156,18 @@
           },
           "sameValueMentions": {
             "$ref": "#/components/schemas/BSameValueMentions"
+          },
+          "withheld": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "eventTime",
+                "period"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Withheld"
           }
         },
         "additionalProperties": false,
@@ -10365,10 +10175,110 @@
         "required": [
           "selection",
           "verification",
-          "sameValueMentions"
+          "sameValueMentions",
+          "withheld"
         ],
         "title": "BFieldProvenance",
-        "description": "How the producer chose the issue's six headline values: `unanimous` (every mention states them) or `operator-representative` (the operator's single\nrepresentative decision). `verification` is always `none`: this is the actual selection, never a verification, support or approval of any value."
+        "description": "How the producer chose the issue's six headline values: `unanimous` (every mention states them) or `operator-representative` (the operator's single\nrepresentative decision). `verification` is always `none`: this is the actual selection, never a verification, support or approval of any value.\n`withheld` lists the fields (`eventTime`, `period` order) whose headline the producer set to null because of an operator HOLD or REJECT."
+      },
+      "BFieldVerdict": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Documentid"
+          },
+          "documentVersion": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Documentversion"
+          },
+          "mentionId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Mentionid"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "eventTime",
+              "period"
+            ],
+            "title": "Field"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 6291456,
+            "title": "Value"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ALLOW",
+              "HOLD",
+              "REJECT"
+            ],
+            "title": "Decision"
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "unstated",
+              "ambiguous",
+              "contradicted"
+            ],
+            "title": "Reasoncode"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string",
+              "pattern": "^ev-[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Evidenceids"
+          },
+          "verification": {
+            "type": "string",
+            "const": "operator-field-verdict",
+            "title": "Verification"
+          },
+          "reviewer": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Reviewer"
+          },
+          "decisionRef": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionref"
+          },
+          "decisionVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,200}$",
+            "title": "Decisionversion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentId",
+          "documentVersion",
+          "mentionId",
+          "field",
+          "value",
+          "decision",
+          "reasonCode",
+          "evidenceIds",
+          "verification",
+          "reviewer",
+          "decisionRef",
+          "decisionVersion"
+        ],
+        "title": "BFieldVerdict",
+        "description": "An operator's per-field verdict on one original mention's `eventTime` or `period` value, exactly as reviewed. Shape only: the producer owns binding,\nevidence closure, order and the effect on the issue's headline. There is no free-text reason and never AI output."
       },
       "BFollowsProvenance": {
         "properties": {
@@ -10586,7 +10496,10 @@
           },
           "s3SemanticValidation": {
             "type": "string",
-            "const": "independent-verifier-supported-all-claims",
+            "enum": [
+              "independent-verifier-supported-all-claims",
+              "manual-operator-final-approval"
+            ],
             "title": "S3Semanticvalidation"
           }
         },
@@ -10731,6 +10644,17 @@
           },
           "fieldProvenance": {
             "$ref": "#/components/schemas/BFieldProvenance"
+          },
+          "fieldVerdicts": {
+            "items": {
+              "$ref": "#/components/schemas/BFieldVerdict"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "title": "Fieldverdicts"
+          },
+          "sourceSupport": {
+            "$ref": "#/components/schemas/BSourceSupport"
           }
         },
         "additionalProperties": false,
@@ -10751,7 +10675,9 @@
           "mentions",
           "decisionRef",
           "representative",
-          "fieldProvenance"
+          "fieldProvenance",
+          "fieldVerdicts",
+          "sourceSupport"
         ],
         "title": "BIssue"
       },
@@ -11134,6 +11060,11 @@
             "type": "string",
             "const": "s2-comparison-with-operator-decision",
             "title": "Sequence"
+          },
+          "sourceSupport": {
+            "type": "string",
+            "const": "origin-or-exact-text-union",
+            "title": "Sourcesupport"
           }
         },
         "additionalProperties": false,
@@ -11145,7 +11076,8 @@
           "offsetUnit",
           "geography",
           "structural",
-          "sequence"
+          "sequence",
+          "sourceSupport"
         ],
         "title": "BPolicy"
       },
@@ -11196,12 +11128,18 @@
           },
           "executionMode": {
             "type": "string",
-            "const": "replay",
+            "enum": [
+              "replay",
+              "live"
+            ],
             "title": "Executionmode"
           },
           "recordingKind": {
             "type": "string",
-            "const": "authored-test",
+            "enum": [
+              "authored-test",
+              "provider"
+            ],
             "title": "Recordingkind"
           }
         },
@@ -11403,6 +11341,32 @@
         ],
         "title": "BRelationCounts"
       },
+      "BReviewUse": {
+        "properties": {
+          "relationCandidateId": {
+            "type": "string",
+            "pattern": "^rc-[a-f0-9]{64}$",
+            "title": "Relationcandidateid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "approvalBasis": {
+            "$ref": "#/components/schemas/BApprovalBasis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "relationCandidateId",
+          "revision",
+          "approvalBasis"
+        ],
+        "title": "BReviewUse",
+        "description": "The chain revision of one relation the bundle used, with the basis that made it eligible (`approvalBasis.revision` equals `revision`)."
+      },
       "BSameValueMentions": {
         "properties": {
           "title": {
@@ -11486,24 +11450,15 @@
             "pattern": "^[a-f0-9]{64}$",
             "title": "Reviewdigest"
           },
+          "provenance": {
+            "$ref": "#/components/schemas/BSourceProvenance"
+          },
           "policies": {
             "$ref": "#/components/schemas/BSourcePolicies"
           },
           "reviewUsed": {
             "items": {
-              "prefixItems": [
-                {
-                  "type": "string",
-                  "pattern": "^rc-[a-f0-9]{64}$"
-                },
-                {
-                  "type": "integer",
-                  "minimum": 1.0
-                }
-              ],
-              "type": "array",
-              "maxItems": 2,
-              "minItems": 2
+              "$ref": "#/components/schemas/BReviewUse"
             },
             "type": "array",
             "maxItems": 10000,
@@ -11519,6 +11474,7 @@
           "relation",
           "upstream",
           "reviewDigest",
+          "provenance",
           "policies",
           "reviewUsed",
           "audit"
@@ -11656,6 +11612,43 @@
         ],
         "title": "BSourcePolicies"
       },
+      "BSourceProvenance": {
+        "properties": {
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "actual"
+            ],
+            "title": "Sourcekind"
+          },
+          "executionMode": {
+            "type": "string",
+            "enum": [
+              "replay",
+              "live"
+            ],
+            "title": "Executionmode"
+          },
+          "recordingKind": {
+            "type": "string",
+            "enum": [
+              "authored-test",
+              "provider"
+            ],
+            "title": "Recordingkind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceKind",
+          "executionMode",
+          "recordingKind"
+        ],
+        "title": "BSourceProvenance",
+        "description": "The execution provenance of ONE S3 source job. Every source of a bundle carries exactly the bundle's own triple (the producer withholds a mix)."
+      },
       "BSourceRef": {
         "properties": {
           "kind": {
@@ -11708,6 +11701,66 @@
         ],
         "title": "BSourceRelation"
       },
+      "BSourceSupport": {
+        "properties": {
+          "articleCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Articlecount"
+          },
+          "knownLineageCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Knownlineagecount"
+          },
+          "unknownLineageArticles": {
+            "items": {
+              "type": "string",
+              "pattern": "^doc-[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Unknownlineagearticles"
+          },
+          "independentSourceCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independentsourcecount"
+          },
+          "duplicateGroups": {
+            "items": {
+              "items": {
+                "type": "string",
+                "pattern": "^doc-[a-f0-9]{64}$"
+              },
+              "type": "array",
+              "maxItems": 1000,
+              "minItems": 2
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Duplicategroups"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "articleCount",
+          "knownLineageCount",
+          "unknownLineageArticles",
+          "independentSourceCount",
+          "duplicateGroups"
+        ],
+        "title": "BSourceSupport",
+        "description": "How many independent sources the issue's cited article versions represent. `knownLineageCount` counts lineage groups that have a declared origin\n(never articles), `duplicateGroups` are groups of articles whose prepared text is exactly equal (never transitive components) and\n`independentSourceCount` is null whenever an origin is missing or conflicting. Shape only: the producer owns every count."
+      },
       "BStructuralProvenance": {
         "properties": {
           "origin": {
@@ -11747,7 +11800,10 @@
           },
           "basisEligibility": {
             "type": "string",
-            "const": "s3-independent-verifier-supported-all-claims",
+            "enum": [
+              "s3-independent-verifier-supported-all-claims",
+              "s3-operator-final-approval"
+            ],
             "title": "Basiseligibility"
           }
         },
@@ -11819,7 +11875,7 @@
         "properties": {
           "schemaVersion": {
             "type": "string",
-            "const": "zoop-graph-handoff-bundle-3",
+            "const": "zoop-graph-handoff-bundle-4",
             "title": "Schemaversion"
           },
           "handoffId": {
@@ -13239,12 +13295,18 @@
           },
           "executionMode": {
             "type": "string",
-            "const": "replay",
+            "enum": [
+              "replay",
+              "live"
+            ],
             "title": "Executionmode"
           },
           "recordingKind": {
             "type": "string",
-            "const": "authored-test",
+            "enum": [
+              "authored-test",
+              "provider"
+            ],
             "title": "Recordingkind"
           }
         },
@@ -13376,6 +13438,69 @@
           "paidModelCalls": {
             "type": "integer",
             "title": "Paidmodelcalls"
+          },
+          "receivedCalls": {
+            "type": "integer",
+            "title": "Receivedcalls"
+          },
+          "unsentCalls": {
+            "type": "integer",
+            "title": "Unsentcalls"
+          },
+          "inputTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputtokens"
+          },
+          "outputTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputtokens"
+          },
+          "reasoningTokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoningtokens"
+          },
+          "estimatedUsd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimatedusd"
+          },
+          "chargedUsd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chargedusd"
           }
         },
         "additionalProperties": false,
@@ -13384,9 +13509,17 @@
           "replayCalls",
           "startedWithoutReceipt",
           "providerCalls",
-          "paidModelCalls"
+          "paidModelCalls",
+          "receivedCalls",
+          "unsentCalls",
+          "inputTokens",
+          "outputTokens",
+          "reasoningTokens",
+          "estimatedUsd",
+          "chargedUsd"
         ],
-        "title": "ExtractionUsage"
+        "title": "ExtractionUsage",
+        "description": "Accounting. `providerCalls` counts calls transmitted or possibly transmitted (a started call without receipt included), `receivedCalls` the\nones a reply was stored for, `unsentCalls` the ones definitively NOT sent. A replay job reports 0/null for the live-only fields."
       },
       "Failure": {
         "properties": {
@@ -14426,6 +14559,46 @@
         ],
         "title": "JobStatus"
       },
+      "RcApprovalBasis": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "automatic-verifier",
+              "operator-final-approval"
+            ],
+            "title": "Kind"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "reviewer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer"
+          },
+          "decidedAt": {
+            "type": "string",
+            "title": "Decidedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "revision",
+          "reviewer",
+          "decidedAt"
+        ],
+        "title": "RcApprovalBasis",
+        "description": "Why a relation is `eligible`: the automatic verifier's verdict or the operator's final approval, with the deciding chain event."
+      },
       "RcCitation": {
         "properties": {
           "documentId": {
@@ -14554,6 +14727,16 @@
           "reviewPending": {
             "type": "boolean",
             "title": "Reviewpending"
+          },
+          "approvalBasis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RcApprovalBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -14561,7 +14744,8 @@
           "status",
           "reasons",
           "revision",
-          "reviewPending"
+          "reviewPending",
+          "approvalBasis"
         ],
         "title": "RcEligibility"
       },
@@ -15527,13 +15711,22 @@
           "next": {
             "type": "string",
             "enum": [
-              "wait",
-              "recover",
               "retry_review",
-              "operator_reconcile",
               "none"
             ],
             "title": "Next"
+          },
+          "limitation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "review_contract_changed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitation"
           },
           "acceptedAt": {
             "type": "string",
@@ -15558,6 +15751,7 @@
           "revalidation",
           "publication",
           "next",
+          "limitation",
           "acceptedAt",
           "observedAt"
         ],
@@ -15576,12 +15770,18 @@
           },
           "executionMode": {
             "type": "string",
-            "const": "replay",
+            "enum": [
+              "replay",
+              "live"
+            ],
             "title": "Executionmode"
           },
           "recordingKind": {
             "type": "string",
-            "const": "authored-test",
+            "enum": [
+              "authored-test",
+              "provider"
+            ],
             "title": "Recordingkind"
           }
         },
@@ -15688,13 +15888,9 @@
             "type": "string",
             "enum": [
               "not_requested",
-              "queued",
-              "running",
               "verified",
               "superseded",
-              "interrupted",
-              "failed",
-              "cancelled"
+              "contract_changed"
             ],
             "title": "State"
           },
@@ -15784,7 +15980,7 @@
           "updatedAt"
         ],
         "title": "RelationRevalidationPhase",
-        "description": "Verification: the automatic re-check that an accepted `allow` requests. A verdict is not approval, and `eligible` is not publication."
+        "description": "Legacy only. A final approval (`allow`) or exclusion (`reject`) requests no revalidation (`not_requested`). The two other states describe an\noperation recorded under the earlier contract, where an `allow` asked for an automatic re-check: `verified`/`superseded` are what its stored\nhistory settled, `contract_changed` that it never settled and never will (nothing is dispatched or resent)."
       },
       "RelationReviewPhase": {
         "properties": {
@@ -16004,7 +16200,7 @@
       },
       "RelationSubmit": {
         "additionalProperties": false,
-        "description": "The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries, paths and live mode cannot be named.",
+        "description": "The S3 `Submit` contract (`zoop-relation-s3`). Fixtures, registries and paths cannot be named. `executionMode: live` is accepted only for an upstream the operator listed as live-approved.",
         "properties": {
           "schemaVersion": {
             "const": "zoop-relation-s3",
@@ -16124,11 +16320,11 @@
     },
     {
       "name": "relation-jobs",
-      "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay only)."
+      "description": "S3 relation/impact candidate jobs over an operator-prepared S2 upstream, through the installed zoop-ai-relation pipeline (replay, or live for an operator-pinned upstream)."
     },
     {
       "name": "extraction-jobs",
-      "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay only)."
+      "description": "S2 event/topic candidate jobs over an operator-approved request, through the installed zoop-ai-extract pipeline (replay, or live for an operator-pinned approval)."
     },
     {
       "name": "graph-versions",
