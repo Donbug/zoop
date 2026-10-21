@@ -2243,7 +2243,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 ## getInsightsOverview · 사용 통계 개요 조회
 
-사용 통계 개요 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+7일 사용 통계 개요를 조회한다. 기준 시각은 응답 asOf이며 기간은 asOf가 속한 KST 날짜를 포함한 최근 7개 달력일이다. 원천이 미연결·조회 불가인 지표는 0 대신 availability 상태와 null 값으로 표현한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2269,7 +2269,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 ## getInsightsSummary · 사용 통계와 산식 조회
 
-사용 통계와 산식 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기간별 사용 통계와 산식을 조회한다. 7d는 asOf가 속한 KST 날짜를 포함한 최근 7개 달력일, 30d는 최근 30개 달력일, all은 첫 원천 기록부터 asOf까지다. 시작일 00:00 KST는 포함하고 asOf는 제외한다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2289,14 +2289,14 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| window | query | 선택 | string {7d, 30d, all} |  |
+| window | query | 선택 | string {7d, 30d, all} | 기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="listcompanyinsights"></a>
 
 ## listCompanyInsights · 기업별 활동 집계 조회
 
-기업별 활동 집계 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업별 활동 집계를 조회한다. 활동은 선택한 기간 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다. 첫 페이지에서 정렬 결과 전체를 스냅샷으로 고정하며 nextCursor는 30분 동안 같은 스냅샷의 다음 페이지를 반환한다. limit은 1~100이며 기본값은 50이다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2316,16 +2316,16 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
-| window | query | 선택 | string {7d, 30d, all} |  |
+| window | query | 선택 | string {7d, 30d, all} | 기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 | cursor | query | 선택 | string | 이전 페이지의 불투명 nextCursor. 조회 조건에 결합한다. |
-| limit | query | 선택 | integer | 요청 페이지 크기. 기본값/상한은 운영 정책 미정이며 임의 전체 결과 상한이 아니다. |
+| limit | query | 선택 | integer | 페이지 크기. 기본값 50, 허용 범위 1~100. |
 
 <a id="getcompanyinsights"></a>
 
 ## getCompanyInsights · 기업별 일별 활동 조회
 
-기업별 일별 활동 조회.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기업별 일별 활동을 조회한다. 일별 활동은 KST 달력일 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -2346,7 +2346,7 @@ AI 결과 평가 목표 상태 설정.  공통 규칙 및 x-zoop의 팀 확인 �
 | 이름 | 위치 | 필수 | 형식 | 설명 |
 | --- | --- | --- | --- | --- |
 | company_id | path | 필수 | string |  |
-| window | query | 선택 | string {7d, 30d, all} |  |
+| window | query | 선택 | string {7d, 30d, all} | 기간. 생략하면 7d. KST 달력일 기준이며 all은 원천의 첫 기록부터 asOf까지다. |
 | X-Request-ID | header | 선택 | string | 전송별 추적 ID. 생략하면 서버가 생성한다. |
 
 <a id="getfeedbacksummary"></a>
@@ -3755,10 +3755,10 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | date | 필수 | string (date) |  |
-| nodeViews | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| issueSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| nodeViews | 필수 | integer | Accepted graph_node_select events for this company, deduplicated by idempotency key. Despite the legacy field name, this is a selection count, not an impression count. |
+| edgeSelections | 필수 | integer, null | Accepted graph_edge_select events attributable to this company; null until a reliable edge-to-company mapping source is integrated. |
+| issueSelections | 필수 | integer, null | Briefing issue opens attributed to this company only when the issue-to-company mapping is unambiguous; null when that mapping source is unavailable. |
+| aiQuestions | 필수 | integer, null | Number of AI question submissions attributed to this company; null until a source is integrated, zero when the source is available and has no events. |
 
 <a id="schema-companystatrow"></a>
 
@@ -3771,11 +3771,11 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 | companyId | 필수 | string |  |
 | name | 필수 | string |  |
 | ticker | 필수 | string / null |  |
-| watchlistMembers | 필수 | integer |  |
-| holdingMembers | 필수 | integer |  |
-| nodeViews | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| watchlistMembers | 필수 | integer | Distinct members with this company in their current watchlist at asOf; not a historical snapshot. |
+| holdingMembers | 필수 | integer | Distinct members connected to a mock portfolio currently holding this company at asOf; not a historical snapshot. |
+| nodeViews | 필수 | integer | Accepted graph_node_select events for this company in the selected window; this is a selection count, not an impression count. |
+| edgeSelections | 필수 | integer, null | Accepted graph_edge_select events attributable to this company in the selected window; null until a reliable edge-to-company mapping source is integrated. |
+| aiQuestions | 필수 | integer, null | Number of AI question submissions attributed to this company; null until a source is integrated, zero when the source is available and has no events. |
 
 <a id="schema-companysummary"></a>
 
@@ -3865,12 +3865,12 @@ answered 결과에서 답하지 않은 요구 하나와 그 이유.
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| date | 필수 | string (date) | KST calendar day |
-| activeUsers | 필수 | integer |  |
-| nodeSelections | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| briefingViews | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| date | 필수 | string (date) | KST calendar day; periods include asOf's day, and the final day may be partial. |
+| activeUsers | 필수 | integer | Distinct pseudonymous member or guest analytics principals with at least one accepted interaction event that day. |
+| nodeSelections | 필수 | integer | Accepted graph_node_select events that day, deduplicated by idempotency key. |
+| edgeSelections | 필수 | integer | Accepted graph_edge_select events that day, deduplicated by idempotency key. |
+| briefingViews | 필수 | integer | Accepted briefing_view events that day, deduplicated by idempotency key. |
+| aiQuestions | 필수 | integer, null | AI question submission count; null until a source is integrated, zero when the source is available and has no events. |
 
 <a id="schema-dashboard"></a>
 
@@ -4745,12 +4745,12 @@ and the baseline stays where it was.
 | name | 필수 | string |  |
 | ticker | 필수 | string / null |  |
 | inCatalog | 필수 | boolean |  |
-| watchlistMembers | 필수 | integer |  |
-| holdingMembers | 필수 | integer |  |
+| watchlistMembers | 필수 | integer | Distinct members whose current watchlist contains this company at asOf. This is a current-state count, not a historical value for the selected window. |
+| holdingMembers | 필수 | integer | Distinct members whose connected mock portfolio currently holds this company at asOf. This is a current-state count, not a historical value for the selected window. |
 | nodeViews | 필수 | integer |  |
-| edgeSelections | 필수 | integer |  |
-| issueSelections | 필수 | integer |  |
-| aiQuestions | 필수 | integer |  |
+| edgeSelections | 필수 | integer, null |  |
+| issueSelections | 필수 | integer, null | Briefing issue opens attributed to this company only when the issue-to-company mapping is unambiguous; null when that mapping source is unavailable. |
+| aiQuestions | 필수 | integer, null | AI question submission count attributed to this company; null while its source is unavailable, zero when the source is available and has no events. |
 | viewers | 필수 | integer |  |
 | minSample | 필수 | integer |  |
 | series | 필수 | [CompanySeriesPoint](#schema-companyseriespoint)[] |  |
@@ -4781,7 +4781,7 @@ and the baseline stays where it was.
 | --- | --- | --- | --- |
 | window | 필수 | string |  |
 | asOf | 필수 | string (date-time) |  |
-| minSample | 필수 | integer |  |
+| minSample | 필수 | integer | Minimum denominator for showing a ratio; currently 5. |
 | metrics | 필수 | [StatsMetric](#schema-statsmetric)[] |  |
 | feedback | 필수 | [OverviewFeedback](#schema-overviewfeedback) |  |
 | members | 필수 | [OverviewMembers](#schema-overviewmembers) |  |
@@ -5290,10 +5290,12 @@ FS062: one project mock profile with its account id, cash and holdings (no real 
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| up | 필수 | integer |  |
-| down | 필수 | integer |  |
+| up | 필수 | integer, null |  |
+| down | 필수 | integer, null |  |
 | rate | 필수 | number / null |  |
-| sampleHidden | 필수 | boolean |  |
+| sampleHidden | 필수 | boolean | True only when an available rating rate is hidden because its denominator is below minSample. |
+| availability | 필수 | string {available, unavailable} | Whether the feedback source is integrated and readable. |
+| unavailableReason | 필수 | string {not_integrated, source_unavailable} / null |  |
 
 <a id="schema-overviewjobs"></a>
 
@@ -5317,9 +5319,9 @@ Analysis jobs next to the ledger state: what is in progress and what failed (det
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| registered | 필수 | integer |  |
-| active | 필수 | integer |  |
-| blocked | 필수 | integer |  |
+| registered | 필수 | integer | All member accounts created before asOf, including blocked accounts. |
+| active | 필수 | integer | Registered accounts with active status at asOf. |
+| blocked | 필수 | integer | Registered accounts with blocked status at asOf. |
 
 <a id="schema-participantout"></a>
 
@@ -5751,11 +5753,11 @@ A publication rule (``review_rules.py``); the id carries its version, e.g. ``R1@
 | roundId | 필수 | string |  |
 | date | 필수 | string (date) |  |
 | edition | 필수 | string {morning, evening} |  |
-| views | 필수 | integer |  |
-| viewers | 필수 | integer |  |
-| issueOpens | 필수 | integer |  |
-| likes | 필수 | integer |  |
-| dislikes | 필수 | integer |  |
+| views | 필수 | integer | Distinct (analytics principal, roundId, viewId) briefing detail views. Repeated events within the same view count once. |
+| viewers | 필수 | integer | Distinct pseudonymous analytics principals with a briefing_view event for this round. |
+| issueOpens | 필수 | integer | Accepted briefing_issue_open events for this round, deduplicated by idempotency key. |
+| likes | 필수 | integer, null | Current valid positive ratings when an FS066 feedback source is connected; null otherwise. |
+| dislikes | 필수 | integer, null | Current valid negative ratings when an FS066 feedback source is connected; null otherwise. |
 
 <a id="schema-rulechangeout"></a>
 
@@ -6024,17 +6026,19 @@ Key issues of an evening round compared with the same day's published morning ro
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| key | 필수 | string |  |
+| key | 필수 | string {activeUsers, onboarding, nodeCtr, edgeCtr, briefingRate, briefingIssueOpens, aiQuestions, aiQuestionRate} | Stable metric identifier. activeUsers: distinct active principals; onboarding: completed members / members registered in the selected window; nodeCtr and edgeCtr: distinct map views with a selection / distinct map views; briefingRate: distinct briefing detail views / distinct briefing screen views; briefingIssueOpens: accepted issue-open events; aiQuestions: accepted question submissions; aiQuestionRate: distinct AI views with a submission / distinct AI views. |
 | group | 필수 | string {usage, interest, ai} |  |
 | label | 필수 | string |  |
 | kind | 필수 | string {count, ratio} |  |
 | unit | 필수 | string | Unit of the count, or of numerator and denominator |
 | definition | 필수 | string | How the figure is computed, shown next to it |
-| count | 필수 | integer / null | kind=count |
-| numerator | 필수 | integer / null | kind=ratio |
-| denominator | 필수 | integer / null | kind=ratio |
-| rate | 필수 | number / null | 0..1; null for counts and for ratios below the sample threshold |
-| sampleHidden | 필수 | boolean | True when the denominator is below minSample, so only counts are shown |
+| availability | 필수 | string {available, unavailable} | Whether this metric has an integrated, readable source. An available metric with value zero means the source was read and no matching activity was found. |
+| unavailableReason | 필수 | string {not_integrated, source_unavailable, insufficient_history} / null | Reason when availability is unavailable; null when the metric is available. |
+| count | 필수 | integer / null | Count metric value; null when unavailable and zero only when its source was read with no matching events. |
+| numerator | 필수 | integer / null | Ratio numerator; null when unavailable. |
+| denominator | 필수 | integer / null | Ratio denominator; null when unavailable. |
+| rate | 필수 | number / null | 0..1; null for counts, unavailable metrics, and ratios below the sample threshold. |
+| sampleHidden | 필수 | boolean | True only for an available ratio whose denominator is below minSample; unavailable sources use availability/unavailableReason. |
 
 <a id="schema-statssummary"></a>
 
@@ -6046,9 +6050,9 @@ Key issues of an evening round compared with the same day's published morning ro
 | --- | --- | --- | --- |
 | window | 필수 | string {7d, 30d, all} |  |
 | asOf | 필수 | string (date-time) |  |
-| since | 필수 | string / null |  |
-| minSample | 필수 | integer |  |
-| membersScope | 필수 | string | Which members the onboarding figure covers |
+| since | 필수 | string / null | Inclusive KST start date; null for all. |
+| minSample | 필수 | integer | Minimum ratio denominator required to show a rate; 5. |
+| membersScope | 필수 | string | The onboarding cohort: member accounts created during the selected window; completion is read as of asOf. |
 | metrics | 필수 | [StatsMetric](#schema-statsmetric)[] |  |
 | trend | 필수 | [DailyActivity](#schema-dailyactivity)[] |  |
 | rounds | 필수 | [RoundStat](#schema-roundstat)[] |  |
@@ -6100,15 +6104,82 @@ Key issues of an evening round compared with the same day's published morning ro
 
 ### TelemetryEvent
 
-One user action. Only these fields exist; anything else (e-mail, free text) is rejected.
+One allowed user action. Event-specific schemas reject unknown fields, including names, email addresses, and question text.
+
+[TelemetryScreenView](#schema-telemetryscreenview) / [TelemetryGraphNodeSelect](#schema-telemetrygraphnodeselect) / [TelemetryGraphEdgeSelect](#schema-telemetrygraphedgeselect) / [TelemetryBriefingView](#schema-telemetrybriefingview) / [TelemetryBriefingIssueOpen](#schema-telemetrybriefingissueopen) / [TelemetryAiQuestion](#schema-telemetryaiquestion)
+
+<a id="schema-telemetryscreenview"></a>
+
+### TelemetryScreenView
+
+
 
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
-| type | 필수 | string {screen_view, graph_node_select, graph_edge_select, briefing_view, briefing_issue_open} |  |
-| screen | 선택 | string {main, briefing} / null |  |
+| type | 필수 | string |  |
+| screen | 필수 | string {main, briefing, ai} |  |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrygraphnodeselect"></a>
+
+### TelemetryGraphNodeSelect
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Selected graph node identifier; no label or user-entered text. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrygraphedgeselect"></a>
+
+### TelemetryGraphEdgeSelect
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Selected graph edge identifier; no label or user-entered text. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrybriefingview"></a>
+
+### TelemetryBriefingView
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Briefing round identifier. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetrybriefingissueopen"></a>
+
+### TelemetryBriefingIssueOpen
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
+| targetId | 필수 | string | Opened issue identifier. |
+| roundId | 필수 | string | Briefing round identifier only: 1-256 ASCII letters, digits, or . _ : / -. Do not include personal data or free text. |
+| viewId | 필수 | string |  |
+
+<a id="schema-telemetryaiquestion"></a>
+
+### TelemetryAiQuestion
+
+Count a validated user submission attempt. Never include question text or generated content.
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| type | 필수 | string |  |
 | targetId | 선택 | string / null |  |
-| roundId | 선택 | string / null |  |
-| viewId | 선택 | string / null |  |
+| viewId | 필수 | string |  |
 
 <a id="schema-termout"></a>
 

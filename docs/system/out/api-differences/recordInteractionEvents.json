@@ -16,6 +16,121 @@
       "type": "string"
     },
     "header.X-Request-ID:required": false,
+    "request:application/json.events[]<oneOf:0>": {
+      "type": "object"
+    },
+    "request:application/json.events[]<oneOf:0>.screen": {
+      "type": "string",
+      "enum": [
+        "main",
+        "briefing",
+        "ai"
+      ]
+    },
+    "request:application/json.events[]<oneOf:0>.screen:required": true,
+    "request:application/json.events[]<oneOf:0>.type": {
+      "type": "string",
+      "const": "screen_view"
+    },
+    "request:application/json.events[]<oneOf:0>.type:required": true,
+    "request:application/json.events[]<oneOf:0>.viewId": {
+      "type": "string"
+    },
+    "request:application/json.events[]<oneOf:0>.viewId:required": true,
+    "request:application/json.events[]<oneOf:1>": {
+      "type": "object"
+    },
+    "request:application/json.events[]<oneOf:1>.targetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.events[]<oneOf:1>.targetId:required": true,
+    "request:application/json.events[]<oneOf:1>.type": {
+      "type": "string",
+      "const": "graph_node_select"
+    },
+    "request:application/json.events[]<oneOf:1>.type:required": true,
+    "request:application/json.events[]<oneOf:1>.viewId": {
+      "type": "string"
+    },
+    "request:application/json.events[]<oneOf:1>.viewId:required": true,
+    "request:application/json.events[]<oneOf:2>": {
+      "type": "object"
+    },
+    "request:application/json.events[]<oneOf:2>.targetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.events[]<oneOf:2>.targetId:required": true,
+    "request:application/json.events[]<oneOf:2>.type": {
+      "type": "string",
+      "const": "graph_edge_select"
+    },
+    "request:application/json.events[]<oneOf:2>.type:required": true,
+    "request:application/json.events[]<oneOf:2>.viewId": {
+      "type": "string"
+    },
+    "request:application/json.events[]<oneOf:2>.viewId:required": true,
+    "request:application/json.events[]<oneOf:3>": {
+      "type": "object"
+    },
+    "request:application/json.events[]<oneOf:3>.targetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.events[]<oneOf:3>.targetId:required": true,
+    "request:application/json.events[]<oneOf:3>.type": {
+      "type": "string",
+      "const": "briefing_view"
+    },
+    "request:application/json.events[]<oneOf:3>.type:required": true,
+    "request:application/json.events[]<oneOf:3>.viewId": {
+      "type": "string"
+    },
+    "request:application/json.events[]<oneOf:3>.viewId:required": true,
+    "request:application/json.events[]<oneOf:4>": {
+      "type": "object"
+    },
+    "request:application/json.events[]<oneOf:4>.roundId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "request:application/json.events[]<oneOf:4>.roundId:required": true,
+    "request:application/json.events[]<oneOf:4>.targetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.events[]<oneOf:4>.targetId:required": true,
+    "request:application/json.events[]<oneOf:4>.type": {
+      "type": "string",
+      "const": "briefing_issue_open"
+    },
+    "request:application/json.events[]<oneOf:4>.type:required": true,
+    "request:application/json.events[]<oneOf:4>.viewId": {
+      "type": "string"
+    },
+    "request:application/json.events[]<oneOf:4>.viewId:required": true,
+    "request:application/json.events[]<oneOf:5>": {
+      "type": "object"
+    },
+    "request:application/json.events[]<oneOf:5>.targetId:required": false,
+    "request:application/json.events[]<oneOf:5>.targetId<anyOf:0>": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request:application/json.events[]<oneOf:5>.targetId<anyOf:1>": {
+      "type": "null"
+    },
+    "request:application/json.events[]<oneOf:5>.type": {
+      "type": "string",
+      "const": "ai_question"
+    },
+    "request:application/json.events[]<oneOf:5>.type:required": true,
+    "request:application/json.events[]<oneOf:5>.viewId": {
+      "type": "string"
+    },
+    "request:application/json.events[]<oneOf:5>.viewId:required": true,
     "response:202:header:X-Request-ID": {
       "type": "string"
     },
@@ -413,6 +528,55 @@
     }
   },
   "bffOnly": {
+    "request:application/json.events[]": {
+      "type": "object"
+    },
+    "request:application/json.events[].roundId:required": false,
+    "request:application/json.events[].roundId<anyOf:0>": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "request:application/json.events[].roundId<anyOf:1>": {
+      "type": "null"
+    },
+    "request:application/json.events[].screen:required": false,
+    "request:application/json.events[].screen<anyOf:0>": {
+      "type": "string",
+      "enum": [
+        "main",
+        "briefing"
+      ]
+    },
+    "request:application/json.events[].screen<anyOf:1>": {
+      "type": "null"
+    },
+    "request:application/json.events[].targetId:required": false,
+    "request:application/json.events[].targetId<anyOf:0>": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "request:application/json.events[].targetId<anyOf:1>": {
+      "type": "null"
+    },
+    "request:application/json.events[].type": {
+      "type": "string",
+      "enum": [
+        "screen_view",
+        "graph_node_select",
+        "graph_edge_select",
+        "briefing_view",
+        "briefing_issue_open"
+      ]
+    },
+    "request:application/json.events[].type:required": true,
+    "request:application/json.events[].viewId:required": false,
+    "request:application/json.events[].viewId<anyOf:0>": {
+      "type": "string"
+    },
+    "request:application/json.events[].viewId<anyOf:1>": {
+      "type": "null"
+    },
     "response:401:application/json.error.details<anyOf:0>": {
       "type": "object"
     },
@@ -452,37 +616,6 @@
     }
   },
   "changed": {
-    "request:application/json.events": {
-      "target": {
-        "type": "array",
-        "minItems": 1
-      },
-      "bff": {
-        "type": "array",
-        "minItems": 1,
-        "maxItems": 20
-      }
-    },
-    "request:application/json.events[].roundId<anyOf:0>": {
-      "target": {
-        "type": "string"
-      },
-      "bff": {
-        "type": "string",
-        "maxLength": 40
-      }
-    },
-    "request:application/json.events[].targetId<anyOf:0>": {
-      "target": {
-        "type": "string",
-        "minLength": 1
-      },
-      "bff": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 100
-      }
-    },
     "response:401:application/json.error.code": {
       "target": {
         "type": "string",
