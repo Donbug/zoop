@@ -1050,7 +1050,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## listEvents · 기업·기간별 사건 타임라인 조회
 
-기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다.
+기업·기간·탐색 깊이에 맞는 사건 타임라인을 조회한다. depth는 기업 시점별 관계 그래프와 같은 1-hop/2-hop 범위로 적용하여 지도에서 고른 간접 사건도 해당 타임라인 카드로 연결되게 한다. from/to·asOf·graphVersion은 조회 조건과 공개 자료 기준을 고정하며 미래 공개 문서를 섞지 않는다. items와 unknownTimeItems의 relationTypes는 같은 공개 버전/asOf에서 요청 companyId와 각 사건 사이의 직접 승인 간선 INVOLVES/STRUCTURALLY_RELATED_TO만 중복 없이 반환한다. companyId가 없거나 직접 간선이 없으면 []이며 2-hop으로만 도달한 사건도 []다. 다른 회사의 간선, 감성·공급/경쟁 관계를 대신 넣지 않는다. from/to는 KST 날짜(그날 전체) 또는 오프셋이 있는 시각이며 오프셋이 있는 to는 그 시각을 포함한다(getCompanyPrices와 같음). 승인된 사건 시각이 있는 사건은 그 기간(연·월·일은 KST 그 기간 전체, 시각은 그 시각)이 범위와 겹치면 items에 든다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -4251,7 +4251,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | 필드 | 필수 | 형식/참조 | 설명 |
 | --- | --- | --- | --- |
 | items | 필수 | [EventSummary](#schema-eventsummary)[] |  |
-| unknownTimeItems | 필수 | [EventSummary](#schema-eventsummary)[] | With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. |
+| unknownTimeItems | 필수 | [EventSummary](#schema-eventsummary)[] | With from/to: events without an approved event time whose reportedAt (KST date) falls in the range, newest report first. Without from/to they are in `items` and this is empty. Paging treats `items` then `unknownTimeItems` as one sequence: limit counts both arrays together and nextCursor continues into the unknown-time events. |
 | metadata | 필수 | [EventListMetadata](#schema-eventlistmetadata) |  |
 | nextCursor | 필수 | string, null |  |
 
@@ -4270,6 +4270,7 @@ details에는 승인된 검증 정보만 제공한다. 스택·원문·개인정
 | eventTime | 필수 | string / null |  |
 | timePrecision | 필수 | string {year, month, day, datetime, unknown} |  |
 | period | 필수 | string / null |  |
+| assertionStatus | 필수 | string {occurred, announced, planned, forecast, cancelled, unknown} / null | AI 인계 묶음(zoop-graph-handoff-bundle-2) 이슈의 사건 상태를 그대로 전달한다. 일어난 사건과 발표·예정·전망·취소된 사건을 구분하며, 상태를 바꾸거나 추정하지 않는다. 스냅샷에 상태가 없으면 null이다. |
 | companyIds | 필수 | string[] |  |
 | relationTypes | 필수 | string {INVOLVES, STRUCTURALLY_RELATED_TO}[] (uniqueItems) | 이 응답의 요청 companyId와 사건 사이의 직접 승인 간선 유형만 포함한다. items/unknownTimeItems 모두 같은 공개 graphVersion/asOf를 사용한다. 두 유형이 함께 있으면 각각 한 번 포함한다. companyId 없음·직접 승인 간선 없음·간접 2-hop 전용 사건은 []다. companyIds 전체의 관계 합집합, 감성/영향 방향, 기업 간 공급/경쟁 유형이 아니다. |
 | articleCount | 필수 | integer |  |

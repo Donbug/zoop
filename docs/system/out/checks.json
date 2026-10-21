@@ -1838,7 +1838,7 @@
       "code": "BFF_FIELD_DIFFERENCE",
       "target": "listEvents",
       "severity": "difference",
-      "message": "목표만 113 · BFF만 39 · 형식/필수/권한 변경 13",
+      "message": "목표만 119 · BFF만 39 · 형식/필수/권한 변경 13",
       "source": ""
     },
     {

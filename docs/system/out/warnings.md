@@ -266,7 +266,7 @@
 | BFF_PATH_DIFFERENCE | difference | listCompanyDocuments | 목표 /api/v1/companies/{id}/documents ↔ BFF /api/companies/{id}/documents |  |
 | BFF_FIELD_DIFFERENCE | difference | listCompanyDocuments | 목표만 118 · BFF만 64 · 형식/필수/권한 변경 19 |  |
 | BFF_PATH_DIFFERENCE | difference | listEvents | 목표 /api/v1/events ↔ BFF /api/events |  |
-| BFF_FIELD_DIFFERENCE | difference | listEvents | 목표만 113 · BFF만 39 · 형식/필수/권한 변경 13 |  |
+| BFF_FIELD_DIFFERENCE | difference | listEvents | 목표만 119 · BFF만 39 · 형식/필수/권한 변경 13 |  |
 | BFF_PATH_DIFFERENCE | difference | getEvent | 목표 /api/v1/events/{id} ↔ BFF /api/events/{id} |  |
 | BFF_FIELD_DIFFERENCE | difference | getEvent | 목표만 134 · BFF만 52 · 형식/필수/권한 변경 6 |  |
 | BFF_PATH_DIFFERENCE | difference | getEvidence | 목표 /api/v1/evidence/{id} ↔ BFF /api/evidence/{id} |  |
