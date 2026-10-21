@@ -1,10 +1,17 @@
 package com.zoop.graph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.zoop.ZoopApplication;
+import com.zoop.admin.auth.service.AdminPrincipal;
 import com.zoop.admin.dashboard.repository.AdminDashboardRepository;
+import com.zoop.admin.graph.AdminGraphVersionService;
+import com.zoop.admin.graph.GraphVersionActivateRequest;
+import com.zoop.admin.graph.GraphVersionAdminResponse.GraphVersionOut;
+import com.zoop.common.exception.CustomException;
+import com.zoop.common.exception.ErrorCode;
 import com.zoop.graph.read.GraphQueryService;
 import com.zoop.graph.snapshot.FixtureGraphVersionSeeder;
 import com.zoop.graph.snapshot.GraphSnapshotStore;
@@ -13,6 +20,8 @@ import com.zoop.graph.version.GraphVersionSelector;
 import com.zoop.graph.version.JdbcGraphVersionRepository;
 import com.zoop.graph.version.JdbcGraphVersionRepository.NewGraphVersion;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +75,7 @@ class GraphVersionPostgresIntegrationTest {
         jdbc.update("DELETE FROM graph_activations");
         jdbc.update("DELETE FROM graph_versions");
         jdbc.update("DELETE FROM artifacts WHERE kind = 'graph_snapshot' AND id LIKE 'artifact-fixture-%'");
+        jdbc.update("DELETE FROM idempotency_records WHERE resource_type = 'graph_version'");
         seeder.run(null);
     }
 
@@ -170,5 +180,91 @@ class GraphVersionPostgresIntegrationTest {
     @Test
     void theDatabaseRejectsTwoActiveVersions() {
         assertThrows(DataAccessException.class, () -> jdbc.update("UPDATE graph_versions SET active = true"));
+    }
+
+    @Test
+    void adminActivationMovesThePointerOnceAndRecordsTheAdmin() {
+        AdminPrincipal admin = admin();
+        var service = context.getBean(AdminGraphVersionService.class);
+
+        var result = service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08"),
+                "graph-key-1", admin, "it-activate");
+        var replay = service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("rollback check", "fixture-2026-10-08"),
+                "graph-key-1", admin, "it-activate-replay");
+
+        assertEquals("fixture-2026-10-08", result.previousActiveVersionId());
+        assertFalse(result.idempotent());
+        assertEquals(result, replay);
+        assertEquals("fixture-2026-10-01", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM graph_activations
+                WHERE actor_kind = 'admin' AND admin_id = ? AND admin_email_snapshot = ? AND pointer_changed
+                """, Integer.class, admin.adminId(), admin.email()));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_logs WHERE action = 'graph.version.activate' AND admin_id = ?
+                  AND target_id = 'fixture-2026-10-01' AND detail->>'previousVersionId' = 'fixture-2026-10-08'
+                """, Integer.class, admin.adminId()));
+        assertEquals(Boolean.TRUE, jdbc.queryForObject(
+                "SELECT published_at IS NOT NULL FROM graph_versions WHERE id = 'fixture-2026-10-01'", Boolean.class));
+
+        var list = service.list(null, null);
+        assertEquals("fixture-2026-10-01", list.activeVersionId());
+        assertEquals(List.of("fixture-2026-10-08", "fixture-2026-10-01"),
+                list.items().stream().map(GraphVersionOut::id).toList());
+        assertEquals("fixture", list.items().get(0).kind());
+        assertEquals("activate", list.activations().get(0).action());
+        assertEquals(admin.email(), list.activations().get(0).adminEmail());
+        var page1 = service.list(null, 1);
+        var page2 = service.list(page1.nextCursor(), 1);
+        assertEquals("fixture-2026-10-08", page1.items().get(0).id());
+        assertEquals("fixture-2026-10-01", page2.items().get(0).id());
+        assertEquals(null, page2.nextCursor());
+    }
+
+    @Test
+    void adminActivationWithAStaleExpectedVersionIsAConflictAndMovesNothing() {
+        var service = context.getBean(AdminGraphVersionService.class);
+        // Another admin already moved the pointer to 10-01; this admin still saw 10-08 as active.
+        service.activate("fixture-2026-10-01", new GraphVersionActivateRequest("first", "fixture-2026-10-08"),
+                "graph-key-race-1", admin(), "it-race-1");
+
+        var error = assertThrows(CustomException.class, () -> service.activate("fixture-2026-10-08",
+                new GraphVersionActivateRequest("second", "fixture-2026-10-08"), "graph-key-race-2", admin(), "it"));
+
+        assertEquals(ErrorCode.REVISION_CONFLICT, error.getErrorCode());
+        assertEquals("fixture-2026-10-01", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM graph_activations WHERE reason = 'second'", Integer.class));
+    }
+
+    @Test
+    void adminActivationRefusesAVersionWhoseSnapshotCannotBeRead() {
+        jdbc.update("""
+                INSERT INTO artifacts (id, kind, storage_uri, sha256, bytes, media_type, created_at)
+                VALUES ('artifact-fixture-unreadable', 'graph_snapshot', 'artifact:unreadable', ?, 1, 'application/json', now())
+                """, "3".repeat(64));
+        jdbc.update("""
+                INSERT INTO graph_versions (id, sequence, kind, created_at, created_by, source_label, issue_count,
+                    relation_count, article_count, snapshot_artifact_id, review_revision)
+                VALUES ('fixture-unreadable', 98, 'fixture', now(), 'system', 'unreadable', 0, 0, 0,
+                    'artifact-fixture-unreadable', 0)
+                """);
+
+        var error = assertThrows(CustomException.class, () -> context.getBean(AdminGraphVersionService.class)
+                .activate("fixture-unreadable", new GraphVersionActivateRequest("try", "fixture-2026-10-08"), "graph-key-2", admin(), "it"));
+
+        assertEquals(ErrorCode.SOURCE_UNAVAILABLE, error.getErrorCode());
+        assertEquals("fixture-2026-10-08", jdbc.queryForObject("SELECT id FROM graph_versions WHERE active", String.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM idempotency_records WHERE resource_id = 'fixture-unreadable'", Integer.class));
+    }
+
+    private static AdminPrincipal admin() {
+        String id = "graph-admin-" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO admins (id, email, email_key, display_name, password_hash, role, status, created_at)
+                VALUES (?, ?, ?, 'Graph Admin', 'test-hash', 'admin', 'active', now())
+                """, id, id + "@example.com", id + "@example.com");
+        return new AdminPrincipal(id, id + "@example.com", "Graph Admin", "admin", "session-" + id);
     }
 }

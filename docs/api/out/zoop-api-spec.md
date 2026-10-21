@@ -1829,13 +1829,13 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 
 ## activateGraphVersion · 기존 공개 버전 활성화
 
-기존 공개 버전 활성화.  공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
+기존 공개 버전 활성화. 공개 포인터를 수입·등록된 버전으로 옮긴다(FS059). 서버는 공유 publication lock 안에서 expectedActiveVersionId를 현재 활성 버전과 비교하고 다르면 REVISION_CONFLICT/409로 거절한다(그래프 조회 계약 §0 '기대 활성 버전 비교'). 포인터를 옮기기 전에 선택한 스냅샷을 읽고 hash를 검증하며 실패하면 SOURCE_UNAVAILABLE/503이고 활성 버전은 그대로다. 이미 활성인 버전이면 idempotent=true이고 포인터는 움직이지 않는다. 같은 Idempotency-Key·같은 본문은 최초 응답을 재현하고 다른 본문은 IDEMPOTENCY_CONFLICT다. 첫 포인터 이동 시 published_at을 기록한다. 공통 규칙 및 x-zoop의 팀 확인 필요 사항을 함께 적용한다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 메서드·경로 | `POST /api/v1/admin/graph/versions/{version_id}/activate` |
 | 권한·우선순위 | 관리자(작업별 권한) · P1 |
-| 요청 본문 | [ReasonRequest](#schema-reasonrequest) |
+| 요청 본문 | [GraphVersionActivateRequest](#schema-graphversionactivaterequest) |
 | 응답 | 200: [ActivateResponse](#schema-activateresponse), 401: [ErrorResponse](#schema-errorresponse), 403: [ErrorResponse](#schema-errorresponse), 404: [ErrorResponse](#schema-errorresponse), 409: [ErrorResponse](#schema-errorresponse), 422: [ErrorResponse](#schema-errorresponse), 429: [ErrorResponse](#schema-errorresponse), 500: [ErrorResponse](#schema-errorresponse), 503: [ErrorResponse](#schema-errorresponse) |
 | 오류 코드 | INVALID_REQUEST, RESOURCE_NOT_FOUND, SOURCE_UNAVAILABLE, INTERNAL_ERROR, AUTH_REQUIRED, MEMBER_REQUIRED, ACCESS_DENIED, REVISION_CONFLICT, IDEMPOTENCY_CONFLICT, RATE_LIMITED |
 | FS/NFS | [FS059](../../system/out/feature-FS059.md) · [FS067-02](../../system/out/feature-FS067-02.md) · [NFS001](../../system/out/feature-NFS001.md) · [NFS002](../../system/out/feature-NFS002.md) · [NFS004](../../system/out/feature-NFS004.md) · [NFS008](../../system/out/feature-NFS008.md) · [NFS003](../../system/out/feature-NFS003.md) · [NFS009](../../system/out/feature-NFS009.md) |
@@ -1854,7 +1854,7 @@ callback이 검증·보관한 신규 소셜 인증 결과와 pending 쿠키, 허
 | X-CSRF-Token | header | 필수 | string | 현재 인증 세션에 결합된 CSRF 토큰. Origin도 검증한다. |
 | Idempotency-Key | header | 필수 | string | 같은 주체·작업의 중복 실행 방지 키. 보존 기간은 팀 확인 필요다. |
 
-본문 스키마: [ReasonRequest](#schema-reasonrequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
+본문 스키마: [GraphVersionActivateRequest](#schema-graphversionactivaterequest). 중첩 필드와 nullable/enum은 아래 공통 스키마를 확인한다.
 
 <a id="listanalysisjobs"></a>
 
@@ -4891,6 +4891,17 @@ same request again never toggles anything.
 | id | 필수 | string |  |
 | kind | 필수 | string {company, issue, edge} |  |
 
+<a id="schema-graphversionactivaterequest"></a>
+
+### GraphVersionActivateRequest
+
+
+
+| 필드 | 필수 | 형식/참조 | 설명 |
+| --- | --- | --- | --- |
+| reason | 필수 | string |  |
+| expectedActiveVersionId | 필수 | string / null | 관리자가 목록에서 확인한 현재 활성 버전 ID. 활성 버전이 없었으면 null. 현재 값과 다르면 REVISION_CONFLICT/409. |
+
 <a id="schema-graphversionlist"></a>
 
 ### GraphVersionList
@@ -4914,7 +4925,7 @@ same request again never toggles anything.
 | --- | --- | --- | --- |
 | id | 필수 | string |  |
 | sequence | 필수 | integer |  |
-| kind | 필수 | string {seed, ledger} |  |
+| kind | 필수 | string {fixture, snapshot} |  |
 | createdAt | 필수 | string (date-time) |  |
 | createdBy | 필수 | string |  |
 | reason | 필수 | string / null |  |

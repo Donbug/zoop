@@ -315,11 +315,11 @@
 | BFF_PATH_DIFFERENCE | difference | setPublicationRule | 목표 /api/v1/admin/pipeline/rules/{rule_id} ↔ BFF /api/admin/pipeline/rules/{rule_id} |  |
 | BFF_FIELD_DIFFERENCE | difference | setPublicationRule | 목표만 160 · BFF만 12 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | listGraphVersions | 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions |  |
-| BFF_FIELD_DIFFERENCE | difference | listGraphVersions | 목표만 120 · BFF만 23 · 형식/필수/권한 변경 8 |  |
+| BFF_FIELD_DIFFERENCE | difference | listGraphVersions | 목표만 120 · BFF만 23 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | publishGraphVersion | 목표 /api/v1/admin/graph/versions ↔ BFF /api/admin/graph/versions |  |
-| BFF_FIELD_DIFFERENCE | difference | publishGraphVersion | 목표만 162 · BFF만 14 · 형식/필수/권한 변경 10 |  |
+| BFF_FIELD_DIFFERENCE | difference | publishGraphVersion | 목표만 162 · BFF만 14 · 형식/필수/권한 변경 11 |  |
 | BFF_PATH_DIFFERENCE | difference | activateGraphVersion | 목표 /api/v1/admin/graph/versions/{version_id}/activate ↔ BFF /api/admin/graph/versions/{version_id}/activate |  |
-| BFF_FIELD_DIFFERENCE | difference | activateGraphVersion | 목표만 162 · BFF만 12 · 형식/필수/권한 변경 9 |  |
+| BFF_FIELD_DIFFERENCE | difference | activateGraphVersion | 목표만 165 · BFF만 12 · 형식/필수/권한 변경 9 |  |
 | BFF_PATH_DIFFERENCE | difference | listAnalysisJobs | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
 | BFF_FIELD_DIFFERENCE | difference | listAnalysisJobs | 목표만 118 · BFF만 92 · 형식/필수/권한 변경 19 |  |
 | BFF_PATH_DIFFERENCE | difference | createAnalysisJob | 목표 /api/v1/admin/jobs ↔ BFF /api/admin/jobs |  |
