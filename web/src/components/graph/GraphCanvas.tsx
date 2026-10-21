@@ -99,12 +99,25 @@ export default function GraphCanvas({
   const fitPending = useRef(false);
   const followFit = useRef(true);
   const minimapShown = useRef(false);
-  // 사이드바에서 고른 기업. 상세 패널이 열려 지도 크기가 바뀌어도 이 기업을 가운데에 둔다.
+  // D-GRP-01/03: 상세 패널을 제외한 지도 영역의 중앙에 선택 노드를 유지한다.
   const centerTarget = useRef<string | null>(null);
+  const previousSelected = useRef<string | null>(null);
+  const preservePositions = useRef(false);
+  const [centerSequence, setCenterSequence] = useState(0);
   const renderedData = useRef<ReturnType<typeof toG6Data> | null>(null);
-  const selectNode = useEffectEvent((id: string | null) =>
-    id === '__isolated__' ? onOpenIsolated?.() : onSelect?.(id),
-  );
+  function handleNodeSelect(id: string | null) {
+    if (id === '__isolated__') return onOpenIsolated?.();
+    // 이미 선택한 노드를 다시 눌러도 수동 이동한 지도에서 중앙으로 돌아온다.
+    centerTarget.current = id;
+    if (id) {
+      preservePositions.current = false;
+      followFit.current = false;
+      fitPending.current = false;
+      setCenterSequence((sequence) => sequence + 1);
+    }
+    onSelect?.(id);
+  }
+  const selectNode = useEffectEvent(handleNodeSelect);
   const selectEdge = useEffectEvent((id: string) => {
     if (data.edges.some((edge) => edge.id === id && isSelectableRelation(edge)))
       onSelectEdge?.(id);
@@ -204,28 +217,52 @@ export default function GraphCanvas({
   const retainFocus = useEffectEvent(() => {
     lastFocused.current = focusId;
   });
-  useEffect(() => {
-    if (!centerRequest) return;
-    const graph = instance.current;
-    if (!graph) return;
-    drawing.current = drawing.current
-      .then(async () => {
-        if (graph.destroyed || instance.current !== graph) return;
-        if (
-          !renderedData.current?.nodes?.some(
-            (node) => String(node.id) === centerRequest.id,
-          )
-        )
-          return;
-        // 사용자가 고른 위치이므로 자동 맞춤을 멈춘다.
-        followFit.current = false;
-        centerTarget.current = centerRequest.id;
-        await graph.focusElement(centerRequest.id, false);
-      })
-      .catch(() => {
-        if (!graph.destroyed) setRenderError(true);
-      });
-  }, [centerRequest]);
+  async function centerSelectedNode(
+    graph: Graph,
+    rendered: ReturnType<typeof toG6Data>,
+  ) {
+    const host = container.current;
+    const target = rendered.nodes?.find(
+      (node) =>
+        node.id === centerTarget.current && node.style?.visibility !== 'hidden',
+    );
+    if (!host || !target || !host.clientWidth || !host.clientHeight) return;
+    // Desktop rails already reduce the host width. Mobile details overlay the
+    // canvas, so use the part above the sheet instead of centering behind it.
+    const hostRect = host.getBoundingClientRect();
+    const sheet = document.querySelector<HTMLElement>(
+      '[data-screen-id="M-GRP-01"]',
+    );
+    const rect = sheet?.getClientRects().length
+      ? sheet.getBoundingClientRect()
+      : null;
+    const safe = freeViewport(
+      host.clientWidth,
+      host.clientHeight,
+      rect
+        ? [
+            {
+              x: rect.left - hostRect.left,
+              y: rect.top - hostRect.top,
+              width: rect.width,
+              height: rect.height,
+            },
+          ]
+        : [],
+    );
+    if (safe.width < 40 || safe.height < 40) return;
+    // Use the circle/diamond position, rather than label/halo bounds.
+    const point = graph.getViewportByCanvas([
+      Number(target.style?.x ?? 0),
+      Number(target.style?.y ?? 0),
+    ]);
+    followFit.current = false;
+    fitPending.current = false;
+    await graph.translateBy(
+      [safe.x + safe.width / 2 - point[0], safe.y + safe.height / 2 - point[1]],
+      false,
+    );
+  }
   async function fitVisibleGraph(graph: Graph) {
     const host = container.current;
     if (!host || graph.destroyed || !host.clientWidth || !host.clientHeight)
@@ -394,6 +431,22 @@ export default function GraphCanvas({
             .filter((edge) => highlightedEdgeIds.includes(edge.id))
             .flatMap((edge) => [edge.source, edge.target]),
         );
+        // Closing details changes the available width, but must not rearrange
+        // the graph the user just centered (including its surrounding nodes).
+        if (preservePositions.current && renderedData.current) {
+          const positions = new Map(
+            renderedData.current.nodes?.map((node) => [node.id, node.style]),
+          );
+          rendered.nodes = rendered.nodes?.map((node) => {
+            const position = positions.get(node.id);
+            return position
+              ? {
+                  ...node,
+                  style: { ...node.style, x: position.x, y: position.y },
+                }
+              : node;
+          });
+        }
         const hiddenNodes = new Set(
           data.nodes
             .filter(
@@ -462,6 +515,9 @@ export default function GraphCanvas({
         )
           await graph.focusElement(focusId, false);
         lastFocused.current = focusId;
+        // Resize changes layout coordinates. Center only after the new draw,
+        // never on the previous layout before the detail rail has resized it.
+        if (centerTarget.current) await centerSelectedNode(graph, rendered);
         if (fitPending.current) {
           fitPending.current = false;
           await fitVisibleGraph(graph);
@@ -472,9 +528,28 @@ export default function GraphCanvas({
       });
   });
   useEffect(() => {
+    if (previousSelected.current && !selected) preservePositions.current = true;
+    previousSelected.current = selected;
+    centerTarget.current = selected;
+    if (selected) {
+      preservePositions.current = false;
+      followFit.current = false;
+      fitPending.current = false;
+    }
+  }, [selected]);
+  useEffect(() => {
+    if (!centerRequest) return;
+    preservePositions.current = false;
+    followFit.current = false;
+    fitPending.current = false;
+    centerTarget.current = centerRequest.id;
+    syncSelection();
+  }, [centerRequest]);
+  useEffect(() => {
     syncSelection();
   }, [
     selected,
+    centerSequence,
     selectedEdgeId,
     focusId,
     focusHops,
@@ -514,6 +589,10 @@ export default function GraphCanvas({
       centerTarget.current = null;
     };
     const viewportChanged = () => {
+      if (centerTarget.current) {
+        syncSelection();
+        return;
+      }
       if (followFit.current) {
         fitPending.current = true;
         syncSelection();
@@ -527,6 +606,7 @@ export default function GraphCanvas({
     window.addEventListener('zoop:graph-viewport-change', viewportChanged);
     hovered.current = null;
     renderedData.current = null;
+    preservePositions.current = false;
     const graphMode = data.metadata.mode;
     const rememberCamera = () => {
       if (!graph || disposed || graph.destroyed || instance.current !== graph)
@@ -662,18 +742,24 @@ export default function GraphCanvas({
           if (!graph || disposed || graph.destroyed) return;
           if (host.clientWidth <= 0 || host.clientHeight <= 0) return;
           const [width, height] = [host.clientWidth, host.clientHeight];
+          const origin = preservePositions.current
+            ? graph.getViewportByCanvas([0, 0])
+            : null;
           graph.setSize(width, height);
-          // 사이드바·패널이 열려 지도 크기가 바뀌면, 사이드바에서 고른 기업은 다시 가운데에
-          // 두고, 그 밖에 사용자가 둔 위치는 화면 가운데를 유지한다.
-          const target = centerTarget.current;
+          // Some renderers shift their projection on resize. Preserve screen
+          // pixels when the detail rail closes, rather than recentering the view.
+          if (origin) {
+            const next = graph.getViewportByCanvas([0, 0]);
+            if (origin[0] !== next[0] || origin[1] !== next[1])
+              void graph.translateBy(
+                [origin[0] - next[0], origin[1] - next[1]],
+                false,
+              );
+          }
+          // 선택 노드의 중앙 이동은 아래 syncSelection의 새 좌표로 처리한다.
           if (
-            target &&
-            renderedData.current?.nodes?.some(
-              (node) => String(node.id) === target,
-            )
-          )
-            void graph.focusElement(target, false);
-          else if (
+            !centerTarget.current &&
+            !preservePositions.current &&
             !followFit.current &&
             (width !== lastSize[0] || height !== lastSize[1])
           )
@@ -710,11 +796,12 @@ export default function GraphCanvas({
     const graph = instance.current;
     if (!graph || graph.destroyed) return;
     try {
+      centerTarget.current = null;
       if (action === 'fit') {
+        preservePositions.current = false;
         followFit.current = true;
-        await drawing.current;
-        if (!graph.destroyed && instance.current === graph)
-          await fitVisibleGraph(graph);
+        fitPending.current = true;
+        setCenterSequence((sequence) => sequence + 1);
       } else {
         followFit.current = false;
         await graph.zoomTo(
@@ -845,7 +932,7 @@ export default function GraphCanvas({
             <button
               key={node.id}
               aria-pressed={selected === node.id}
-              onClick={() => onSelect?.(node.id)}
+              onClick={() => handleNodeSelect(node.id)}
             >
               {node.kind === 'issue' ? '사건: ' : '기업: '}
               {node.label}

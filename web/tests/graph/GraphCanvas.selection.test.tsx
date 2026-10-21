@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GraphCanvas from '@/components/graph/GraphCanvas';
@@ -182,14 +188,204 @@ describe('D-GRP-02 · canvas selection bridge', () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     const { rerender } = render(<GraphCanvas data={data} />);
     await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
-    canvas.focusElement.mockClear();
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { value: 900, configurable: true },
+      clientHeight: { value: 600, configurable: true },
+    });
+    canvas.translateBy.mockClear();
     rerender(
       <GraphCanvas data={data} centerRequest={{ id: 'KRX:005930', seq: 1 }} />,
     );
-    await waitFor(() =>
-      expect(canvas.focusElement).toHaveBeenCalledWith('KRX:005930', false),
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    const node = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+      (node) => node.id === 'KRX:005930',
+    )!;
+    expect(canvas.translateBy).toHaveBeenLastCalledWith(
+      [450 - Number(node.style!.x), 300 - Number(node.style!.y)],
+      false,
     );
   });
+  it('D-GRP-01/03 centers the clicked node after the detail rail resizes and redraws the map, preserving zoom', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <GraphCanvas data={data} onSelect={onSelect} />,
+    );
+    await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+    const host = screen.getByRole('img');
+    Object.defineProperties(host, {
+      clientWidth: { value: 1200, configurable: true },
+      clientHeight: { value: 700, configurable: true },
+    });
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() => expect(canvas.setSize).toHaveBeenCalledWith(1200, 700));
+    await act(async () => {});
+    canvas.zoomTo.mockClear();
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+    );
+    expect(onSelect).toHaveBeenCalledWith('KRX:005930');
+    rerender(
+      <GraphCanvas data={data} onSelect={onSelect} selectedId="KRX:005930" />,
+    );
+    await act(async () => {});
+    // The rail opens after selection, changing the responsive node positions.
+    Object.defineProperty(host, 'clientWidth', {
+      value: 868,
+      configurable: true,
+    });
+    canvas.translateBy.mockClear();
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    const node = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+      (node) => node.id === 'KRX:005930',
+    )!;
+    expect(canvas.translateBy).toHaveBeenLastCalledWith(
+      [434 - Number(node.style!.x), 350 - Number(node.style!.y)],
+      false,
+    );
+    expect(canvas.translateBy.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      canvas.draw.mock.invocationCallOrder.at(-1)!,
+    );
+    expect(canvas.zoomTo).not.toHaveBeenCalled();
+    expect(canvas.created).toHaveBeenCalledOnce();
+
+    // A deliberate pan/zoom releases the selected-node anchor on later resize.
+    fireEvent.wheel(host);
+    Object.defineProperty(host, 'clientWidth', {
+      value: 800,
+      configurable: true,
+    });
+    canvas.translateBy.mockClear();
+    act(() => canvas.resizeCallbacks[0]());
+    await waitFor(() =>
+      expect(canvas.translateBy).toHaveBeenCalledWith([-34, 0], false),
+    );
+    await act(async () => {});
+    expect(canvas.translateBy).toHaveBeenCalledTimes(1);
+
+    // Clicking the same node again centers it, even though the URL is unchanged.
+    canvas.translateBy.mockClear();
+    act(() =>
+      canvas.handlers.get('node:click')!({ target: { id: 'KRX:005930' } }),
+    );
+    await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+    const latest = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+      (node) => node.id === 'KRX:005930',
+    )!;
+    expect(canvas.translateBy).toHaveBeenLastCalledWith(
+      [400 - Number(latest.style!.x), 350 - Number(latest.style!.y)],
+      false,
+    );
+  });
+  it('M-GRP-01 centers selection above an overlapping mobile detail sheet', async () => {
+    const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+    const sheet = document.createElement('aside');
+    sheet.dataset.screenId = 'M-GRP-01';
+    document.body.append(sheet);
+    const rect = {
+      left: 0,
+      top: 400,
+      right: 390,
+      bottom: 700,
+      width: 390,
+      height: 300,
+    } as DOMRect;
+    vi.spyOn(sheet, 'getClientRects').mockReturnValue([
+      rect,
+    ] as unknown as DOMRectList);
+    vi.spyOn(sheet, 'getBoundingClientRect').mockReturnValue(rect);
+    const { rerender, unmount } = render(<GraphCanvas data={data} />);
+    try {
+      await waitFor(() => expect(canvas.setData).toHaveBeenCalled());
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { value: 390, configurable: true },
+        clientHeight: { value: 700, configurable: true },
+      });
+      rerender(<GraphCanvas data={data} selectedId="KRX:005930" />);
+      await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+      const node = (canvas.setData.mock.lastCall![0] as GraphData).nodes!.find(
+        (node) => node.id === 'KRX:005930',
+      )!;
+      expect(canvas.translateBy).toHaveBeenLastCalledWith(
+        // freeViewport reserves 20px at the canvas edge and 12px above the sheet.
+        [195 - Number(node.style!.x), 204 - Number(node.style!.y)],
+        false,
+      );
+    } finally {
+      unmount();
+      sheet.remove();
+    }
+  });
+  it.each(['canvas click', 'external selection clear'])(
+    'D-GRP-01/03 keeps every node and the camera in place after %s closes the rail',
+    async (method) => {
+      const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
+      const onSelect = vi.fn();
+      const { rerender } = render(
+        <GraphCanvas data={data} onSelect={onSelect} />,
+      );
+      await waitFor(() => expect(canvas.resizeCallbacks).toHaveLength(1));
+      const host = screen.getByRole('img');
+      Object.defineProperties(host, {
+        clientWidth: { value: 868, configurable: true },
+        clientHeight: { value: 700, configurable: true },
+      });
+      rerender(
+        <GraphCanvas data={data} onSelect={onSelect} selectedId="KRX:005930" />,
+      );
+      await waitFor(() => expect(canvas.translateBy).toHaveBeenCalled());
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setSize).toHaveBeenCalledWith(868, 700),
+      );
+      await act(async () => {});
+      const positions = () =>
+        new Map(
+          (canvas.setData.mock.lastCall![0] as GraphData).nodes!.map((node) => [
+            node.id,
+            [node.style!.x, node.style!.y],
+          ]),
+        );
+      const before = positions();
+      canvas.translateBy.mockClear();
+      canvas.zoomTo.mockClear();
+      canvas.focusElement.mockClear();
+      if (method === 'canvas click') {
+        act(() => canvas.handlers.get('canvas:click')!({ target: { id: '' } }));
+        expect(onSelect).toHaveBeenLastCalledWith(null);
+      }
+      // Esc and the close button clear selectedId through MapPage, bypassing
+      // the canvas click handler. Both must preserve the same screen position.
+      rerender(<GraphCanvas data={data} onSelect={onSelect} />);
+      Object.defineProperty(host, 'clientWidth', {
+        value: 1200,
+        configurable: true,
+      });
+      act(() => canvas.resizeCallbacks[0]());
+      await waitFor(() =>
+        expect(canvas.setSize).toHaveBeenLastCalledWith(1200, 700),
+      );
+      await act(async () => {});
+      expect(positions()).toEqual(before);
+      expect(canvas.translateBy).not.toHaveBeenCalled();
+      expect(canvas.zoomTo).not.toHaveBeenCalled();
+      expect(canvas.focusElement).not.toHaveBeenCalled();
+      expect(canvas.setElementState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ 'KRX:005930': [] }),
+      );
+      expect(canvas.created).toHaveBeenCalledOnce();
+
+      // An explicit fit can still use the full, newly expanded graph surface.
+      await userEvent.click(
+        screen.getByRole('button', { name: '전체 그래프 맞춤' }),
+      );
+      await waitFor(() => expect(canvas.zoomTo).toHaveBeenCalled());
+      expect(positions()).not.toEqual(before);
+    },
+  );
   it('keeps a user-placed view centered when a sidebar narrows the map', async () => {
     const data = createMockGraph({ mode: 'all', personalFilter: 'all' });
     sessionStorage.setItem(
