@@ -14,6 +14,27 @@ it('shows the logo when the company has one', () => {
     '/graph-assets/samsung.svg',
   );
   expect(container.textContent).toBe('');
+  expect(
+    (container.firstElementChild as HTMLElement).style.backgroundColor,
+  ).toBe('rgb(255, 255, 255)');
+});
+
+it('uses each logo background without leaking it into the text fallback', () => {
+  const { container, rerender } = render(
+    <CompanyLogo
+      name="마이크론"
+      logoUrl="/graph-assets/micron.svg"
+      className="size-8 bg-red-500"
+    />,
+  );
+  expect(
+    (container.firstElementChild as HTMLElement).style.backgroundColor,
+  ).toBe('rgb(0, 0, 0)');
+
+  rerender(<CompanyLogo name="새 기업" logoUrl={null} className="size-8" />);
+  expect(
+    (container.firstElementChild as HTMLElement).style.backgroundColor,
+  ).toBe('');
 });
 
 it('falls back to the first letter without a logo or when it fails to load', () => {

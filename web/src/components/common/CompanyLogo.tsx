@@ -20,7 +20,10 @@ export default function CompanyLogo({
   return (
     <span
       aria-hidden="true"
-      className={`grid shrink-0 place-items-center overflow-hidden ${className} ${background === '#000000' ? 'bg-black!' : background === '#232f3e' ? 'bg-[#232f3e]!' : ''}`}
+      className={`grid shrink-0 place-items-center overflow-hidden ${className}`}
+      style={
+        showLogo && background ? { backgroundColor: background } : undefined
+      }
     >
       {showLogo ? (
         <img
