@@ -9,7 +9,7 @@ public record TelemetryEventRequest(
         @NotBlank @Pattern(regexp = "screen_view|graph_node_select|graph_edge_select|briefing_view|briefing_issue_open|ai_question")
         String type,
         @Pattern(regexp = "main|briefing|ai") String screen,
-        @Size(max = 256) @Pattern(regexp = "[A-Za-z0-9._:/-]+") String targetId,
+        @Pattern(regexp = "[A-Za-z0-9._:/-]+") String targetId,
         @Size(max = 256) @Pattern(regexp = "[A-Za-z0-9._:/-]+") String roundId,
         @NotBlank @Pattern(regexp = "[A-Za-z0-9-]{8,40}") String viewId) {
 

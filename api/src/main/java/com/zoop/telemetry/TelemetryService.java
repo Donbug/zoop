@@ -3,6 +3,8 @@ package com.zoop.telemetry;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 import com.zoop.common.exception.CustomException;
@@ -32,13 +34,23 @@ public class TelemetryService {
 
     @Transactional
     public Accepted record(String principal, String idempotencyKey, TelemetryBatchRequest body, String requestId) {
-        if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9._:-]{8,128}")
+        if (idempotencyKey == null || idempotencyKey.isEmpty()
                 || body == null || body.events() == null || body.events().isEmpty()
                 || body.events().size() > 20) throw invalid();
         var events = new ArrayList<TelemetryRepository.Event>();
+        var digestEvents = new ArrayList<Map<String, Object>>();
         Instant now = clock.instant();
-        for (TelemetryEventRequest event : body.events()) events.add(parse(event, now));
-        String digest = Canonical.sha256(Canonical.bytes(mapper.valueToTree(body)));
+        for (TelemetryEventRequest event : body.events()) {
+            events.add(parse(event, now));
+            var digestEvent = new LinkedHashMap<String, Object>();
+            digestEvent.put("type", event.type());
+            digestEvent.put("screen", event.screen());
+            digestEvent.put("targetId", event.targetId());
+            digestEvent.put("roundId", event.roundId());
+            digestEvent.put("viewId", event.viewId());
+            digestEvents.add(digestEvent);
+        }
+        String digest = Canonical.sha256(Canonical.bytes(mapper.valueToTree(Map.of("events", digestEvents))));
         try {
             return new Accepted(repository.record(principal, idempotencyKey, digest, events, now));
         } catch (CustomException exception) {
@@ -53,7 +65,7 @@ public class TelemetryService {
                 || !EVENT_TYPES.contains(event.type()) || !event.isShapeValid()
                 || (event.screen() != null && !SCREENS.contains(event.screen()))
                 || !event.viewId().matches("[A-Za-z0-9-]{8,40}")
-                || (event.targetId() != null && !event.targetId().matches("[A-Za-z0-9._:/-]{1,256}"))
+                || (event.targetId() != null && !event.targetId().matches("[A-Za-z0-9._:/-]+"))
                 || (event.roundId() != null && !event.roundId().matches("[A-Za-z0-9._:/-]{1,256}"))) {
             throw invalid();
         }

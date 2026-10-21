@@ -1,5 +1,8 @@
 package com.zoop.admin.insights;
 
+import java.sql.Timestamp;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 
 import com.zoop.auth.service.MemberSessionService;
@@ -51,7 +54,7 @@ class InsightsPostgresTest {
                 ]}
                 """.formatted(view, view);
         var body = mapper.readValue(request, TelemetryBatchRequest.class);
-        String key = "issue130-" + UUID.randomUUID();
+        String key = "k";
 
         assertEquals(2, telemetry.record(principal, key, body, "request-a").accepted());
         assertEquals(2, telemetry.record(principal, key, body, "request-b").accepted());
@@ -103,5 +106,76 @@ class InsightsPostgresTest {
         assertEquals("INVALID_REQUEST", exception.getErrorCode().name());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM telemetry_events WHERE principal_key=?",
                 Integer.class, principal));
+    }
+
+    @Test
+    void telemetryAcceptsIdentifierLengthAllowedByContract() throws Exception {
+        String targetId = "n".repeat(300);
+        var body = mapper.readValue("""
+                {"events":[{"type":"graph_node_select","targetId":"%s","viewId":"view-long-id-01"}]}
+                """.formatted(targetId), TelemetryBatchRequest.class);
+
+        assertEquals(1, telemetry.record(principal, "k", body, "long-target-request").accepted());
+    }
+
+    @Test
+    void aiQuestionCountCountsEventsWhileRateUsesDistinctSubmittedViews() throws Exception {
+        var body = mapper.readValue("""
+                {"events":[
+                  {"type":"screen_view","screen":"ai","viewId":"view-ai-000001"},
+                  {"type":"ai_question","targetId":null,"viewId":"view-ai-000001"},
+                  {"type":"ai_question","targetId":null,"viewId":"view-ai-000001"},
+                  {"type":"ai_question","targetId":null,"viewId":"view-ai-000001"},
+                  {"type":"ai_question","targetId":null,"viewId":"view-no-screen-01"}
+                ]}
+                """, TelemetryBatchRequest.class);
+        telemetry.record(principal, "ai-count-" + UUID.randomUUID(), body, "ai-count-request");
+
+        var metrics = insights.summary("7d", "ai-count-request").metrics();
+        var count = metrics.stream().filter(metric -> metric.key().equals("aiQuestions")).findFirst().orElseThrow();
+        var rate = metrics.stream().filter(metric -> metric.key().equals("aiQuestionRate")).findFirst().orElseThrow();
+
+        assertEquals(4L, count.count());
+        assertEquals(1L, rate.numerator());
+        assertEquals(1L, rate.denominator());
+        assertTrue(rate.sampleHidden());
+    }
+
+    @Test
+    void companyCursorReadsTheOriginalAggregateSnapshotAfterCatalogChanges() {
+        var first = insights.companies("7d", null, 1, "snapshot-first");
+        assertTrue(first.nextCursor() != null);
+        String snapshotId = new String(Base64.getUrlDecoder().decode(first.nextCursor()), StandardCharsets.UTF_8)
+                .split("\\|", -1)[0];
+        String secondCompanyId = jdbc.queryForObject("""
+                SELECT company_id FROM admin_insights_company_snapshot_rows
+                WHERE snapshot_id=? AND ordinal=1
+                """, String.class, snapshotId);
+        String originalName = jdbc.queryForObject("SELECT name FROM companies WHERE id=?", String.class, secondCompanyId);
+        Long originalNodeViews = jdbc.queryForObject("""
+                SELECT node_views FROM admin_insights_company_snapshot_rows
+                WHERE snapshot_id=? AND ordinal=1
+                """, Long.class, snapshotId);
+        String latePrincipal = "late-snapshot-" + UUID.randomUUID();
+        String lateView = "late-view-" + UUID.randomUUID().toString().substring(0, 12);
+
+        try {
+            jdbc.update("UPDATE companies SET name=? WHERE id=?", "late-catalog-change", secondCompanyId);
+            jdbc.update("""
+                    INSERT INTO telemetry_events
+                        (principal_key,event_type,screen,target_id,round_id,view_id,occurred_at)
+                    VALUES (?, 'graph_node_select', NULL, ?, NULL, ?, ?)
+                    """, latePrincipal, secondCompanyId, lateView,
+                    Timestamp.from(first.asOf().minusMillis(1)));
+            var second = insights.companies("7d", first.nextCursor(), 1, "snapshot-second");
+
+            assertEquals(first.asOf(), second.asOf());
+            assertEquals(secondCompanyId, second.items().getFirst().companyId());
+            assertEquals(originalName, second.items().getFirst().name());
+            assertEquals(originalNodeViews, second.items().getFirst().nodeViews());
+        } finally {
+            jdbc.update("DELETE FROM telemetry_events WHERE principal_key=?", latePrincipal);
+            jdbc.update("UPDATE companies SET name=? WHERE id=?", originalName, secondCompanyId);
+        }
     }
 }

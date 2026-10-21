@@ -6835,7 +6835,7 @@ paths:
       tags:
         - "admin-insights"
       summary: "기업별 활동 집계 조회"
-      description: "기업별 활동 집계를 조회한다. 활동은 선택한 기간 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다."
+      description: "기업별 활동 집계를 조회한다. 활동은 선택한 기간 기준이며 관심·Mock 보유 회원 수는 응답 asOf 시점의 현재 상태다. 첫 페이지에서 정렬 결과 전체를 스냅샷으로 고정하며 nextCursor는 30분 동안 같은 스냅샷의 다음 페이지를 반환한다. limit은 1~100이며 기본값은 50이다."
       operationId: "listCompanyInsights"
       parameters:
         -
@@ -6854,7 +6854,14 @@ paths:
         -
           "$ref": "#/components/parameters/Cursor"
         -
-          "$ref": "#/components/parameters/Limit"
+          name: "limit"
+          in: "query"
+          required: false
+          description: "페이지 크기. 기본값 50, 허용 범위 1~100."
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 100
       responses:
         "200":
           description: "정상 응답"
@@ -15981,6 +15988,8 @@ components:
           const: "briefing_view"
         targetId:
           type: "string"
+          minLength: 1
+          pattern: "^[A-Za-z0-9._:/\\-]+$"
           description: "Briefing round identifier."
         viewId:
           type: "string"

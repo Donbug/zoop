@@ -5,17 +5,23 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import com.zoop.common.exception.CustomException;
 import com.zoop.common.exception.ErrorCode;
+import com.zoop.portfolio.service.MockPortfolioCatalog;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import com.zoop.portfolio.service.MockPortfolioCatalog;
 
 @Service
 public class AdminInsightsService {
@@ -90,37 +96,89 @@ public class AdminInsightsService {
                 List.copyOf(trend), rounds);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public CompanyRanking companies(String requestedWindow, String cursor, Integer requestedLimit, String requestId) {
-        Instant now = clock.instant();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         int limit = requestedLimit == null ? 50 : requestedLimit;
         if (limit < 1 || limit > 100) throw invalid();
-        Cursor position = decodeCursor(cursor, requestedWindow, limit);
-        Instant asOf = position == null ? now : position.asOf();
-        if (asOf.isAfter(now)) throw new CustomException(ErrorCode.INVALID_CURSOR);
-        Window w = window(requestedWindow, asOf);
-        int offset = position == null ? 0 : position.offset();
-        Long total = jdbc.queryForObject("SELECT count(*) FROM companies", new MapSqlParameterSource(), Long.class);
-        var p = params(w, asOf).addValue("limit", limit + 1).addValue("offset", offset);
-        List<CompanyRow> rows = jdbc.query("""
+        if (cursor == null) {
+            Window w = window(requestedWindow, now);
+            String snapshotId = UUID.randomUUID().toString();
+            var p = params(w, now);
+            List<CompanyRow> ranked = jdbc.query("""
                 SELECT c.id,c.name,c.ticker,
                     (SELECT count(DISTINCT member_id) FROM member_watchlist WHERE company_id=c.id) AS watches,
                     count(e.id) FILTER (WHERE e.event_type='graph_node_select') AS nodes,
-                    count(e.id) FILTER (WHERE e.event_type='graph_edge_select') AS edges,
                     count(e.id) FILTER (WHERE e.event_type='ai_question') AS ai
                 FROM companies c LEFT JOIN telemetry_events e ON e.target_id=c.id
                     AND (CAST(:start AS timestamptz) IS NULL OR e.occurred_at >= :start) AND e.occurred_at < :asOf
                 GROUP BY c.id,c.name,c.ticker ORDER BY nodes DESC, c.id
-                LIMIT :limit OFFSET :offset
                 """, p, (rs,n) -> new CompanyRow(rs.getString("id"), rs.getString("name"), rs.getString("ticker"),
-                rs.getLong("watches"), 0L, rs.getLong("nodes"), null, rs.getLong("ai")));
+                        rs.getLong("watches"), 0L, rs.getLong("nodes"), null, rs.getLong("ai")));
+            Map<String, Long> holdings = holdingMembersByCompany(ranked.stream()
+                    .map(CompanyRow::companyId).collect(java.util.stream.Collectors.toSet()));
+            List<CompanyRow> snapshotRows = ranked.stream().map(row -> new CompanyRow(row.companyId(), row.name(),
+                    row.ticker(), row.watchlistMembers(), holdings.getOrDefault(row.companyId(), 0L),
+                    row.nodeViews(), null, row.aiQuestions())).toList();
+            jdbc.update("DELETE FROM admin_insights_company_snapshots WHERE expires_at <= :now",
+                    new MapSqlParameterSource("now", Timestamp.from(now)));
+            jdbc.update("""
+                    INSERT INTO admin_insights_company_snapshots
+                        (id,window_name,page_size,as_of,total_companies,created_at,expires_at)
+                    VALUES (:id,:window,:pageSize,:asOf,:total,:now,:expiresAt)
+                    """, new MapSqlParameterSource().addValue("id", snapshotId).addValue("window", w.name())
+                    .addValue("pageSize", limit).addValue("asOf", Timestamp.from(now))
+                    .addValue("total", snapshotRows.size()).addValue("now", Timestamp.from(now))
+                    .addValue("expiresAt", Timestamp.from(now.plus(30, ChronoUnit.MINUTES))));
+            var rowParams = new ArrayList<MapSqlParameterSource>();
+            for (int ordinal = 0; ordinal < snapshotRows.size(); ordinal++) {
+                CompanyRow row = snapshotRows.get(ordinal);
+                rowParams.add(new MapSqlParameterSource().addValue("snapshot", snapshotId)
+                        .addValue("ordinal", ordinal).addValue("company", row.companyId())
+                        .addValue("name", row.name()).addValue("ticker", row.ticker())
+                        .addValue("watches", row.watchlistMembers()).addValue("holdings", row.holdingMembers())
+                        .addValue("nodes", row.nodeViews()).addValue("ai", row.aiQuestions()));
+            }
+            if (!rowParams.isEmpty()) jdbc.batchUpdate("""
+                    INSERT INTO admin_insights_company_snapshot_rows
+                        (snapshot_id,ordinal,company_id,name,ticker,watchlist_members,holding_members,node_views,ai_questions)
+                    VALUES (:snapshot,:ordinal,:company,:name,:ticker,:watches,:holdings,:nodes,:ai)
+                    """, rowParams.toArray(MapSqlParameterSource[]::new));
+            return companySnapshotPage(snapshotId, 0, requestedWindow, limit);
+        }
+
+        Cursor position = decodeCursor(cursor, requestedWindow, limit);
+        return companySnapshotPage(position.snapshotId(), position.offset(), requestedWindow, limit);
+    }
+
+    private CompanyRanking companySnapshotPage(String snapshotId, int offset, String requestedWindow, int limit) {
+        Instant now = clock.instant();
+        List<SnapshotMetadata> snapshots = jdbc.query("""
+                SELECT window_name,page_size,as_of,total_companies FROM admin_insights_company_snapshots
+                WHERE id=:id AND expires_at>:now
+                """, new MapSqlParameterSource().addValue("id", snapshotId).addValue("now", Timestamp.from(now)),
+                (rs, n) -> new SnapshotMetadata(rs.getString("window_name"), rs.getInt("page_size"),
+                        rs.getTimestamp("as_of").toInstant(), rs.getLong("total_companies")));
+        if (snapshots.isEmpty()) throw new CustomException(ErrorCode.INVALID_CURSOR);
+        SnapshotMetadata snapshot = snapshots.getFirst();
+        if (!snapshot.window().equals(requestedWindow) || snapshot.pageSize() != limit
+                || offset < 0 || (offset != 0 && (offset >= snapshot.totalCompanies() || offset % limit != 0))) {
+            throw new CustomException(ErrorCode.INVALID_CURSOR);
+        }
+        var rows = jdbc.query("""
+                SELECT company_id,name,ticker,watchlist_members,holding_members,node_views,ai_questions
+                FROM admin_insights_company_snapshot_rows
+                WHERE snapshot_id=:snapshot AND ordinal>=:offset
+                ORDER BY ordinal LIMIT :limit
+                """, new MapSqlParameterSource().addValue("snapshot", snapshotId).addValue("offset", offset)
+                .addValue("limit", limit + 1), (rs, n) -> new CompanyRow(rs.getString("company_id"),
+                rs.getString("name"), rs.getString("ticker"), rs.getLong("watchlist_members"),
+                rs.getLong("holding_members"), rs.getLong("node_views"), null, rs.getLong("ai_questions")));
         boolean more = rows.size() > limit;
-        List<CompanyRow> items = (more ? rows.subList(0, limit) : rows).stream()
-                .map(row -> new CompanyRow(row.companyId(), row.name(), row.ticker(), row.watchlistMembers(),
-                        holdingMembers(row.companyId()), row.nodeViews(), null, row.aiQuestions())).toList();
-        return new CompanyRanking(w.name(), asOf, total == null ? 0 : total, items,
-                "Mock 포트폴리오 연결 기준의 현재 보유 회원 수이며 선택 기간의 과거 상태가 아닙니다.",
-                more ? encodeCursor(w.name(), limit, offset + limit, asOf) : null);
+        List<CompanyRow> items = more ? rows.subList(0, limit) : rows;
+        return new CompanyRanking(snapshot.window(), snapshot.asOf(), snapshot.totalCompanies(), items,
+                "기업 순위와 집계는 첫 페이지 조회 시점에 고정됩니다. Mock 포트폴리오 연결 기준의 현재 보유 회원 수입니다.",
+                more ? encodeCursor(snapshotId, snapshot.window(), limit, offset + limit) : null);
     }
 
     @Transactional(readOnly = true)
@@ -185,11 +243,13 @@ public class AdminInsightsService {
                   count(DISTINCT (v.principal_key,v.view_id)) FILTER (WHERE v.screen='ai') ai_views,
                   count(DISTINCT (v.principal_key,v.view_id)) FILTER (WHERE v.screen='ai' AND EXISTS
                     (SELECT 1 FROM events e WHERE e.principal_key=v.principal_key AND e.view_id=v.view_id
-                     AND e.event_type='ai_question')) ai_questions
+                     AND e.event_type='ai_question')) ai_question_views,
+                  (SELECT count(*) FROM events WHERE event_type='ai_question') ai_question_events
                 FROM views v
                 """, p, (rs,n) -> new EventCounts(rs.getLong("active"),rs.getLong("main_views"),rs.getLong("nodes"),
                         rs.getLong("edges"),rs.getLong("briefing_views"),rs.getLong("briefing_detail_views"),
-                        rs.getLong("issue_opens"),rs.getLong("ai_views"),rs.getLong("ai_questions")));
+                        rs.getLong("issue_opens"),rs.getLong("ai_views"),rs.getLong("ai_question_views"),
+                        rs.getLong("ai_question_events")));
         var members = jdbc.queryForObject("""
                 SELECT count(*) total, count(*) FILTER (WHERE completed) completed FROM members
                 WHERE (CAST(:start AS timestamptz) IS NULL OR created_at>=:start) AND created_at<:asOf
@@ -200,8 +260,8 @@ public class AdminInsightsService {
                 metric("edgeCtr","usage","간선 클릭률","ratio","화면 조회","main 화면 조회 중 간선 선택이 있는 비율",null,values.edges(),values.mainViews(),values.mainViews()<MIN_SAMPLE?null:ratio(values.edges(),values.mainViews()),values.mainViews()<MIN_SAMPLE),
                 metric("briefingRate","interest","브리핑 조회율","ratio","화면 조회","브리핑 화면 조회 중 상세 조회가 있는 비율",null,values.briefingDetailViews(),values.briefingViews(),values.briefingViews()<MIN_SAMPLE?null:ratio(values.briefingDetailViews(),values.briefingViews()),values.briefingViews()<MIN_SAMPLE),
                 metric("briefingIssueOpens","interest","브리핑 사건 열기","count","건","접수된 사건 열기 이벤트 수",values.issueOpens(),null,null,null,false),
-                metric("aiQuestions","ai","AI 질문 제출","count","건","질문 본문 없이 수집된 제출 이벤트 수",values.aiQuestions(),null,null,null,false),
-                metric("aiQuestionRate","ai","AI 질문 이용률","ratio","화면 조회","AI 화면 조회 중 질문 제출이 있는 비율",null,values.aiQuestions(),values.aiViews(),values.aiViews()<MIN_SAMPLE?null:ratio(values.aiQuestions(),values.aiViews()),values.aiViews()<MIN_SAMPLE));
+                metric("aiQuestions","ai","AI 질문 제출","count","건","질문 본문 없이 수집된 제출 이벤트 수",values.aiQuestionEvents(),null,null,null,false),
+                metric("aiQuestionRate","ai","AI 질문 이용률","ratio","화면 조회","AI 화면 조회 중 질문 제출이 있는 비율",null,values.aiQuestionViews(),values.aiViews(),values.aiViews()<MIN_SAMPLE?null:ratio(values.aiQuestionViews(),values.aiViews()),values.aiViews()<MIN_SAMPLE));
     }
 
     private static Metric metric(String key,String group,String label,String kind,String unit,String definition,Long count,
@@ -235,29 +295,46 @@ public class AdminInsightsService {
     }
     private static Cursor decodeCursor(String cursor,String window,int limit) {
         if (cursor==null) return null;
-        try { String[] p=new String(Base64.getUrlDecoder().decode(cursor)).split(":",-1);
-            if(p.length!=4||!p[0].equals(window)||Integer.parseInt(p[1])!=limit)throw new IllegalArgumentException();
-            int offset=Integer.parseInt(p[2]); if(offset<0||offset>1000000)throw new IllegalArgumentException();
-            return new Cursor(offset, Instant.ofEpochMilli(Long.parseLong(p[3])));
+        try { String[] p=new String(Base64.getUrlDecoder().decode(cursor), java.nio.charset.StandardCharsets.UTF_8)
+                    .split("\\|",-1);
+            if(p.length!=4||!p[1].equals(window)||Integer.parseInt(p[2])!=limit)throw new IllegalArgumentException();
+            UUID.fromString(p[0]);
+            int offset=Integer.parseInt(p[3]); if(offset<1||offset>1000000)throw new IllegalArgumentException();
+            return new Cursor(p[0], offset);
         } catch(Exception e) { throw new CustomException(ErrorCode.INVALID_CURSOR,e); }
     }
-    private static String encodeCursor(String window,int limit,int offset,Instant asOf) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString((window+":"+limit+":"+offset+":"+asOf.toEpochMilli()).getBytes());
+    private static String encodeCursor(String snapshotId, String window,int limit,int offset) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(
+                (snapshotId+"|"+window+"|"+limit+"|"+offset).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
     private static CustomException invalid(){return new CustomException(ErrorCode.INVALID_REQUEST);}
     private long holdingMembers(String companyId) {
-        var ids = portfolios.all().stream().filter(portfolio -> portfolio.holdings().stream()
-                .anyMatch(holding -> holding.companyId().equals(companyId)))
+        return holdingMembersByCompany(Set.of(companyId)).getOrDefault(companyId, 0L);
+    }
+
+    private Map<String, Long> holdingMembersByCompany(Set<String> companyIds) {
+        if (companyIds.isEmpty()) return Map.of();
+        var portfolioIds = portfolios.all().stream().filter(portfolio -> portfolio.holdings().stream()
+                .anyMatch(holding -> companyIds.contains(holding.companyId())))
                 .map(com.zoop.portfolio.model.MockPortfolio::id).toList();
-        if (ids.isEmpty()) return 0;
-        Long count = jdbc.queryForObject("SELECT count(DISTINCT member_id) FROM member_portfolio_connections "
-                + "WHERE mock_portfolio_id IN (:ids)", new MapSqlParameterSource("ids", ids), Long.class);
-        return count == null ? 0 : count;
+        if (portfolioIds.isEmpty()) return Map.of();
+        var counts = new HashMap<String, Long>();
+        jdbc.query("""
+                SELECT company_id,count(DISTINCT member_id) AS members
+                FROM member_portfolio_connections WHERE mock_portfolio_id IN (:portfolios)
+                AND company_id IN (:companies) GROUP BY company_id
+                """, new MapSqlParameterSource().addValue("portfolios", portfolioIds)
+                .addValue("companies", companyIds), rs -> {
+                    counts.put(rs.getString("company_id"), rs.getLong("members"));
+                });
+        return counts;
     }
 
     private record Window(String name,Instant start,LocalDate startDate,int days) { }
-    private record Cursor(int offset,Instant asOf) { }
-    private record EventCounts(long active,long mainViews,long nodes,long edges,long briefingViews,long briefingDetailViews,long issueOpens,long aiViews,long aiQuestions) { }
+    private record Cursor(String snapshotId,int offset) { }
+    private record SnapshotMetadata(String window,int pageSize,Instant asOf,long totalCompanies) { }
+    private record EventCounts(long active,long mainViews,long nodes,long edges,long briefingViews,long briefingDetailViews,
+            long issueOpens,long aiViews,long aiQuestionViews,long aiQuestionEvents) { }
     private record CompanyCounts(long watches,long holdings,long viewers,long nodes,long edges,long ai) { }
     public record Overview(String window,Instant asOf,int minSample,List<Metric> metrics,Feedback feedback,MemberCounts members) { }
     public record Summary(String window,Instant asOf,String since,int minSample,String membersScope,List<Metric> metrics,List<DailyActivity> trend,List<RoundStat> rounds) { }
