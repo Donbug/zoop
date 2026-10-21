@@ -13,6 +13,8 @@ public enum ErrorCode {
     SOCIAL_LINK_REQUIRED(HttpStatus.CONFLICT, "기존 계정으로 로그인한 후 소셜 계정을 연결해 주세요.", false),
     REVISION_CONFLICT(HttpStatus.CONFLICT, "설정이 변경되었습니다. 최신 상태를 확인해 주세요.", false),
     IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 요청 키에 다른 내용이 사용되었습니다.", false),
+    JOB_IN_PROGRESS(HttpStatus.CONFLICT, "이 대화에서 아직 처리 중인 질문이 있습니다.", false),
+    JOB_NOT_RETRYABLE(HttpStatus.CONFLICT, "이 작업은 다시 실행할 수 없습니다.", false),
     TERMS_REQUIRED(HttpStatus.UNPROCESSABLE_CONTENT, "필수 약관 동의를 확인해 주세요.", false),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", true),
     INVALID_CURSOR(HttpStatus.UNPROCESSABLE_CONTENT, "유효하지 않은 커서입니다.", false),
@@ -20,6 +22,7 @@ public enum ErrorCode {
     EVIDENCE_UNAVAILABLE(HttpStatus.NOT_FOUND, "근거를 제공할 수 없습니다.", false),
     VERSION_UNAVAILABLE(HttpStatus.CONFLICT, "요청한 고정 버전을 조회할 수 없습니다.", false),
     SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "요청한 정보를 일시적으로 사용할 수 없습니다.", true),
+    MODEL_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "답변 기능을 일시적으로 사용할 수 없습니다.", true),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.", false);
 
     private final HttpStatus status;

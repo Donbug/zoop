@@ -52,6 +52,15 @@ zoop:
       # (snapshots staged by the operator graph handoff import, read-only and verified; needs artifact-root).
       source: ${ZOOP_GRAPH_SNAPSHOT_SOURCE:none}
       artifact-root: ${ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT:}
+  chat:
+    # Accepting new questions and retries needs a ChatEngine (the orchestrator), which is not deployed yet. Off by default:
+    # submit and retry answer 503 MODEL_UNAVAILABLE instead of leaving a job queued forever, and startup refuses intake on
+    # without an engine. Reading conversations and jobs always works.
+    questions-enabled: ${ZOOP_CHAT_QUESTIONS_ENABLED:false}
+    executor:
+      # Claims queued jobs and recovers expired leases in the web application; runs nothing while no ChatEngine exists.
+      enabled: ${ZOOP_CHAT_EXECUTOR_ENABLED:true}
+      workers: ${ZOOP_CHAT_EXECUTOR_WORKERS:2}
   ai:
     client:
       # Internal S1 AI transport client. Disabled by default; the application starts without any AI setting.

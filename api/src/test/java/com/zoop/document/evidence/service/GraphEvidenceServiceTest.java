@@ -42,6 +42,7 @@ import static com.zoop.document.evidence.service.EvidenceWorld.QUOTE;
 import static com.zoop.document.evidence.service.EvidenceWorld.TEXT;
 import static com.zoop.document.evidence.service.EvidenceWorld.VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -715,6 +716,25 @@ class GraphEvidenceServiceTest {
         }
         rewriteRegisteredReceipt(basisReceipt());
         assertNotNull(get(), "the exact receipt serves it again");
+    }
+
+    @Test
+    void readableIsTheSameJudgementAsTheReadForAPinnedBasisOnlySpan() throws Exception {
+        basisOnly();
+        // What chat jobs use to accept a selected evidence id and to re-check a stored citation.
+        assertTrue(service().readable(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+
+        ObjectNode notProven = basisReceipt();
+        basisOf(notProven).putArray("evidenceIds").add("ev-" + "d".repeat(64));
+        rewriteRegisteredReceipt(notProven);
+        assertEquals(ErrorCode.EVIDENCE_UNAVAILABLE, refused());
+        assertFalse(service().readable(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"));
+
+        rewriteRegisteredReceipt(basisReceipt());
+        graphFailure = new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        assertFalse(service().readable(EVIDENCE_ID, GRAPH_VERSION, null, "req-r"), "unverifiable is not readable");
+        assertFalse(service().readable("ev-" + "0".repeat(64), GRAPH_VERSION, null, "req-r"));
+        assertFalse(service().readable("not-an-evidence-id", GRAPH_VERSION, null, "req-r"));
     }
 
     @Test
