@@ -100,7 +100,8 @@ class ChatPostgresTest {
         assertEquals(1, jdbc.queryForObject("SELECT clarification_depth FROM chat_jobs WHERE id = ?", Integer.class, reply));
         assertEquals(1, jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.table_constraints
-                 WHERE table_name = 'ai_executions' AND constraint_name = 'fk_ai_executions_chat_job'
+                 WHERE table_schema = current_schema() AND table_name = 'ai_executions'
+                   AND constraint_name = 'fk_ai_executions_chat_job'
                 """, Integer.class));
     }
 
