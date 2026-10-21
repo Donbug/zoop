@@ -31,6 +31,28 @@ class TossPricesLiveTest {
         }
     }
 
+    /**
+     * The 1d session comes from Toss's market calendar: a normal KRX day, the 2025 CSAT day (KRX 10:00–16:30), a KR holiday,
+     * the US Thanksgiving holiday and the next day's 13:00 ET early close. Prints every range so a mismatch is visible.
+     */
+    @Test
+    void dayFollowsTheMarketCalendar() {
+        String[][] cases = {
+                {"KRX:005930", "KRX", "005930", "2025-10-21T16:00:00+09:00", "2025-10-21T09:00:00+09:00", "2025-10-21T15:30:00+09:00"},
+                {"KRX:005930", "KRX", "005930", "2025-11-13T17:00:00+09:00", "2025-11-13T10:00:00+09:00", "2025-11-13T16:30:00+09:00"},
+                {"KRX:005930", "KRX", "005930", "2025-10-06T12:00:00+09:00", "2025-10-02T09:00:00+09:00", "2025-10-02T15:30:00+09:00"},
+                {"NASDAQ:NVDA", "NASDAQ", "NVDA", "2025-11-27T12:00:00-05:00", "2025-11-26T09:30:00-05:00", "2025-11-26T16:00:00-05:00"},
+                {"NASDAQ:NVDA", "NASDAQ", "NVDA", "2025-11-28T14:00:00-05:00", "2025-11-28T09:30:00-05:00", "2025-11-28T13:00:00-05:00"},
+        };
+        for (String[] c : cases) {
+            CompanyPriceResponse r = toss.prices(c[0], c[1], c[2], "1d", null, OffsetDateTime.parse(c[3]).toInstant().plusNanos(1));
+            System.out.printf("%s to %s -> %s %s%n", c[0], c[3], r.status(),
+                    r.range() == null ? r.reasonCode() : r.range().from() + " .. " + r.range().to() + " (" + r.range().sessionDate() + ")");
+            assertEquals("available", r.status(), c[0] + " " + c[3]);
+            assertEquals(c[4] + " .. " + c[5], r.range().from() + " .. " + r.range().to(), c[0] + " " + c[3]);
+        }
+    }
+
     @Test
     void aFinishedWeekIsReadOnceThenServedFromTheCache() {
         long before = toss.requests.get();
