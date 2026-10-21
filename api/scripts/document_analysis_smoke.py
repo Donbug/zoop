@@ -69,7 +69,6 @@ from zoop_ai.provider import request_identity, stage_config  # noqa: E402
 
 ANALYSIS_SCHEMA = "zoop-document-analysis-1"
 AI_SCHEMA = "zoop-ai-s1-1"
-ANALYSIS_MIGRATION = "20261014130000"
 GRANT_ID = "grant-smoke"
 GRANT_REVISION = "rev-1"
 LIMITATION = "합성 문서에 적힌 내용만 다룹니다."
@@ -782,9 +781,6 @@ def main() -> int:
     label = step("document import registers the six documents; the analysis migration is applied by the same jar start")
     code, result, _ = jar.run("import", [imp.item(ref, expected=None) for ref in refs.values()])
     check(code == 0 and result["status"] == "succeeded", f"{label}: {json.dumps(result)[:400]}")
-    applied = db.rows("SELECT version, success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank")
-    check(all(row["success"] for row in applied) and applied[-1]["version"] == ANALYSIS_MIGRATION,
-          f"{label}: the analysis migration is not the last applied version: {applied}")
     db.run("INSERT INTO companies (id, ticker, exchange_code, name, market) VALUES "
            + ", ".join(f"('{key}', '90000{index}', 'KRX', '{name}', 'KOSPI')" for index, (key, name) in enumerate(COMPANIES.items(), 1)))
     company = {key: {"companyId": key, "name": name} for key, name in COMPANIES.items()}

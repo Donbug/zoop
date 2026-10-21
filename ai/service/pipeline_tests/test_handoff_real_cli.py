@@ -20,7 +20,7 @@ from typing import Any, Callable
 import pytest
 
 from handoff_support import bundle_url, status_url
-from real_handoff_support import RealWorkspace, digest_of, pin_entry, producer_accepts, producer_accepts_manifest
+from real_handoff_support import (VERDICT_HANDOFF, RealWorkspace, digest_of, pin_entry, producer_accepts, producer_accepts_manifest, verdict_problems)
 from relation_support import PIPELINE
 from support import canonical
 from zoop_ai_service.handoff_doc import example_bundle, example_manifest
@@ -80,6 +80,42 @@ def test_the_http_bundle_is_the_real_cli_export_of_a_two_job_world_and_the_produ
     assert sorted([r["type"], r["source"], r["target"], r["evidenceIds"]] for r in bundle["relations"]) == handoff_world.relation_edges
     assert bundle["exclusions"]["counts"] == handoff_world.exclusions and sorted(a["articleId"] for a in bundle["articles"]) == handoff_world.article_ids
     assert {r["type"] for r in bundle["relations"]} == {"INVOLVES", "STRUCTURALLY_RELATED_TO", "FOLLOWS"}   # every provenance variant of the closed model, from the real producer
+    for issue in bundle["issues"]:     # the contract's partition rule, stated here independently of the producer's validator: every source event is one original mention and no other exists
+        identity = lambda item: canonical({k: item[k] for k in ("documentId", "documentVersion", "mentionId")})  # noqa: E731
+        assert [identity(m) for m in issue["mentions"]] == sorted({identity(e) for e in issue["sourceEvents"]}) and all(m["verification"] == "none" for m in issue["mentions"])
+        # the selection rule's closure, stated independently of the producer's validator: exact equality against the SELECTED original value (the representative's
+        # mention, else the unanimous one; null equals null, no normalisation, never the redacted null), nonempty, ordered as the mentions
+        provenance, fields = issue["fieldProvenance"], ("title", "action", "target", "eventTime", "period", "assertionStatus")
+        assert "fieldDecisions" not in issue and "fieldDecisions" not in provenance
+        assert set(provenance) == {"selection", "verification", "withheld", "sameValueMentions"} and provenance["verification"] == "none"
+        assert provenance["selection"] == ("operator-representative" if issue["representative"] is not None else "unanimous")
+        assert set(provenance["sameValueMentions"]) == set(fields)
+        ident = lambda item: {k: item[k] for k in ("documentId", "documentVersion", "mentionId")}  # noqa: E731
+        by_identity = {canonical(ident(m)): m for m in issue["mentions"]}
+        basis = [by_identity[canonical(ident(issue["representative"]))]] if issue["representative"] is not None else list(issue["mentions"])
+        verdicts = issue["fieldVerdicts"]
+        # operator verdicts: closed keys, own mention, the exact reviewed value, own-document evidence, the legal decision/reason/span combinations, canonical order
+        assert [(canonical(ident(v)), ("eventTime", "period").index(v["field"])) for v in verdicts] == sorted((canonical(ident(v)), ("eventTime", "period").index(v["field"])) for v in verdicts)
+        assert len({(canonical(ident(v)), v["field"]) for v in verdicts}) == len(verdicts)
+        article_of = {e["id"]: e["articleId"] for e in bundle["evidence"]}
+        for verdict in verdicts:
+            assert set(verdict) == {"documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds", "verification", "reviewer",
+                                    "decisionRef", "decisionVersion"} and verdict["verification"] == "operator-field-verdict"
+            mention = by_identity[canonical(ident(verdict))]
+            assert verdict["value"] == mention[verdict["field"]] is not None
+            assert (verdict["decision"], verdict["reasonCode"], bool(verdict["evidenceIds"])) in {("ALLOW", "stated", True), ("HOLD", "unstated", False), ("HOLD", "ambiguous", True),
+                                                                                                 ("REJECT", "contradicted", True)}
+            assert all(article_of[e] == mention["articleId"] and e in issue["evidenceIds"] for e in verdict["evidenceIds"])
+        suppressed = [f for f in ("eventTime", "period") if any(v["field"] == f and v["decision"] != "ALLOW" and any(canonical(ident(v)) == canonical(ident(m)) for m in basis) for v in verdicts)]
+        assert provenance["withheld"] == suppressed
+        for name in fields:
+            selected = basis[0][name]
+            assert all(m[name] == selected for m in basis)
+            expected = [ident(m) for m in issue["mentions"] if m[name] == selected]
+            assert expected and provenance["sameValueMentions"][name] == expected, (issue["id"], name)
+            assert issue[name] == (None if name in suppressed else selected)
+        assert issue["timePrecision"] == ("unknown" if "eventTime" in suppressed else issue["timePrecision"])
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
     assert (bundle["readiness"], wire["verification"]["provenance"]) == ({"app": "import-pending", "evidenceRegistration": "not-registered", "publicActivation": "none",
                                                                           "graphDb": "none"}, bundle["provenance"])
     assert producer_accepts(response.content)
@@ -209,3 +245,66 @@ def test_nothing_private_reaches_a_response_header_or_log_and_no_credential_or_p
         blob = response.text + json.dumps(dict(response.headers))
         assert not [s for s in forbidden if s in blob]
     assert not [s for s in (*ws.private_strings(), *handoff_world.private) if s in service.logs()]
+
+
+def test_the_http_bundle_carries_the_operators_real_field_verdicts_with_the_suppressed_headlines_null_and_the_original_mentions_intact(verdict_world, start_verdict_handoff: Start):
+    """NOT the empty default world: the installed command exports a reviewed world (SYNTHETIC verdicts authored in the pipeline smoke) and the service relays it. Every
+    expectation is the pipeline smoke's hand-written one (`verdict_world.expect`), the delivered bytes equal the direct CLI export and the producer's own validator accepts
+    them, so a service that echoed, defaulted, dropped or reshaped a verdict could not pass."""
+    pins = verdict_world.handoffs[VERDICT_HANDOFF]
+    ws, service = start_verdict_handoff(listed(verdict_world, VERDICT_HANDOFF))
+    code, oracle, _ = ws.direct(VERDICT_HANDOFF)
+    assert code == 0 and oracle["delivery"]["status"] == "current" and oracle["usage"] == {"providerCalls": 0, "modelCalls": 0}
+    response = get(service, bundle_url(VERDICT_HANDOFF))
+    wire = response.json()
+    assert response.status_code == 200 and wire["delivery"]["state"] == "current", response.text[:300]
+    bundle = wire["bundle"]
+    assert bundle == oracle["bundle"] and canonical(bundle) == canonical(oracle["bundle"]) and bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert digest_of(bundle) == pins["bundleDigest"] == wire["verification"]["bundleDigest"] == oracle["receipt"]["bundleDigest"]
+    delivered = [v for issue in bundle["issues"] for v in issue["fieldVerdicts"]]
+    assert len(delivered) == 5 and {v["decision"] for v in delivered} == {"ALLOW", "HOLD", "REJECT"}      # non-empty, every decision, from the real producer
+    assert {i["id"]: i["fieldProvenance"]["withheld"] for i in bundle["issues"]} == {"issue:supply-2026q3": ["eventTime"], "issue:factory-2026q4": ["period"]}
+    assert verdict_problems(bundle, verdict_world) == []
+    supply = next(i for i in bundle["issues"] if i["id"] == "issue:supply-2026q3")
+    assert supply["eventTime"] is None and supply["timePrecision"] == "unknown" and any(m["eventTime"] == "2026-09-30" for m in supply["mentions"])
+    assert producer_accepts(response.content)
+    assert wire["verification"]["counts"] == bundle["counts"] == verdict_world.counts
+    status = get(service, status_url(VERDICT_HANDOFF))
+    assert status.status_code == 200 and "fieldVerdicts" not in status.text and "bundle" not in status.json()                 # the status never carries a verdict
+    for private in (*ws.private_strings(), "operator-field-verdict"):
+        assert private not in status.text
+
+
+def test_verdict_content_follows_the_current_rights_and_the_pinned_operator_files_and_returns_exactly_when_they_are_restored(verdict_world, start_verdict_handoff: Start):
+    ws, service = start_verdict_handoff(listed(verdict_world, VERDICT_HANDOFF))
+    first = get(service, bundle_url(VERDICT_HANDOFF))
+    assert first.json()["delivery"]["state"] == "current" and verdict_problems(first.json()["bundle"], verdict_world) == []
+    refs = {v["decisionRef"] for issue in verdict_world.expect["verdicts"].values() for v in issue}
+    assert len(refs) >= 2
+
+    def withheld() -> str:
+        code, oracle, _ = ws.direct(VERDICT_HANDOFF)
+        assert code == 2 and oracle["delivery"]["status"] == "withheld" and "bundle" not in oracle
+        for url in (status_url(VERDICT_HANDOFF), bundle_url(VERDICT_HANDOFF)):
+            response = get(service, url)
+            wire = response.json()
+            assert response.status_code == 200 and wire["delivery"]["state"] == "withheld" and wire["delivery"]["reason"] == oracle["delivery"]["code"]
+            assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
+            for text in (*verdict_world.private, *refs, "operator-field-verdict", "fieldVerdicts", "2026-09-30", "REJECT", "contradicted"):
+                assert text not in response.text, text
+        return oracle["delivery"]["code"]
+
+    registry = json.loads(ws.originals["sources"])
+    registry["sources"][0]["grant"]["enabled"] = False                        # the source right is revoked: no verdict leaves although the pins and files are unchanged
+    ws.sources.write_text(canonical(registry), encoding="utf-8")
+    try:
+        withheld()
+    finally:
+        ws.restore("sources")
+    ws.decisions.write_bytes(ws.originals["decisions"] + b"\n")               # the review file the verdicts live in is hash-pinned by the manifest
+    try:
+        assert withheld() == "decisions_changed"
+    finally:
+        ws.restore("decisions")
+    again = get(service, bundle_url(VERDICT_HANDOFF)).json()
+    assert again["delivery"]["state"] == "current" and canonical(again["bundle"]) == canonical(first.json()["bundle"])       # restored: the very same verdict bytes come back

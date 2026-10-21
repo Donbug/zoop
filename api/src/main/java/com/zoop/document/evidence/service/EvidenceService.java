@@ -21,6 +21,8 @@ import com.zoop.document.analysis.ExactReceiptProof;
 import com.zoop.document.analysis.GrantRegistry;
 import com.zoop.document.evidence.dto.EvidenceArticle;
 import com.zoop.document.evidence.dto.EvidenceResponse;
+import com.zoop.document.evidence.graph.GraphEvidence;
+import com.zoop.document.evidence.graph.GraphEvidenceReader;
 import com.zoop.document.evidence.repository.AnalysisIdentity;
 import com.zoop.document.evidence.repository.EvidenceReadRepository;
 import com.zoop.document.evidence.repository.EvidenceView;
@@ -29,6 +31,7 @@ import com.zoop.document.repository.ArticleRow;
 import com.zoop.document.repository.ArtifactRow;
 import com.zoop.document.repository.DocumentRegistryRepository;
 import com.zoop.document.repository.VersionRow;
+import com.zoop.document.importer.SourceRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -37,14 +40,16 @@ import org.springframework.transaction.support.TransactionOperations;
 import tools.jackson.databind.JsonNode;
 
 /**
- * {@code GET /api/v1/evidence/{id}}: one verified body citation of a stored S1 document summary, served from immutable SQL rows
- * under the CURRENT document state and the CURRENT grant registry. It never calls a model or the AI service and never writes
- * (no database write, no file created, repaired or deleted). The rules are in {@code api/docs/DOCUMENT_ANALYSIS.md}.
+ * {@code GET /api/v1/evidence/{id}}: one verified body citation, either of a stored S1 document summary or of a pinned public graph
+ * version, always under the CURRENT document state and the CURRENT operator authority. It never calls a model or the AI service
+ * and never writes (no database write, no file created, repaired or deleted, nothing activated). The rules are in
+ * {@code api/docs/DOCUMENT_ANALYSIS.md} (S1) and {@code api/docs/GRAPH_READ_HANDOFF.md} (graph).
  *
- * <p>The graph is not connected, so the response is an honest partial one: {@code eventIds} is a failed section, there is no
- * graph version, and a company context cannot be verified, so {@code sentiment} stays null. A pinned read (round, graph
- * version, as-of) is refused rather than answered with the current state. A withheld citation is
- * {@code EVIDENCE_UNAVAILABLE} without a reason on the wire; the reason is logged with the request id.
+ * <p>Which one it is follows from what is stored: a row verified by a graph import {@code verification_receipt} is a graph
+ * citation, every other row an S1 citation. S1 citations have no pinned form, so a graph version or as-of is refused for them
+ * ({@code VERSION_UNAVAILABLE}) before the S1 registry is read, and {@code eventIds} is a failed section. Graph citations are
+ * answered from the version the shared selector pins, authorized by the S2-1 source registry and not by the S1 one. A withheld
+ * citation is {@code EVIDENCE_UNAVAILABLE} without a reason on the wire; the reason is logged with the request id.
  */
 public class EvidenceService {
     static final String SOURCE = "document-analysis";
@@ -52,6 +57,8 @@ public class EvidenceService {
     static final String SENTIMENT = "sentiment";
     static final String EVENT_IDS_MESSAGE = "그래프 저장소가 연결되지 않아 사건 연결을 확인하지 못했습니다.";
     static final String SENTIMENT_MESSAGE = "그래프 저장소가 연결되지 않아 기업 연결을 검증하지 못했습니다. 기업별 판정을 제공하지 않습니다.";
+    static final String GRAPH_SOURCE = "public_graph_snapshot";
+    static final String GRAPH_SENTIMENT_MESSAGE = "기업 연결은 이 근거 읽기에서 검증하지 않습니다. 기업별 판정을 제공하지 않습니다.";
 
     private static final Logger log = LoggerFactory.getLogger(EvidenceService.class);
     private static final Pattern EVIDENCE_ID = Pattern.compile("ev-[0-9a-f]{64}");
@@ -60,6 +67,7 @@ public class EvidenceService {
     private static final String AVAILABLE = "available";
     private static final String EXACT_RECEIPT = "exact_receipt";
     private static final String JSON_MEDIA_TYPE = "application/json";
+    private static final String GRAPH_RECEIPT = "verification_receipt";
     private static final Set<String> SUMMARY_KEYS = Set.of("schemaVersion", "artifactId", "documentId", "documentVersion",
             "resultVersion", "text", "claims", "citations", "limitations", "producedAt", "provenance");
     private static final Set<String> CLAIM_KEYS = Set.of("claimId", "text", "assertionKind", "evidenceIds");
@@ -70,15 +78,20 @@ public class EvidenceService {
     private final EvidenceReadRepository evidence;
     private final DocumentRegistryRepository registry;
     private final DocumentReadGrants grants;
+    private final DocumentReadSources sources;
+    private final GraphEvidenceReader graph;
     private final EvidenceArtifactReader artifacts;
     private final Clock clock;
     private final TransactionOperations transaction;
 
     public EvidenceService(EvidenceReadRepository evidence, DocumentRegistryRepository registry, DocumentReadGrants grants,
-            EvidenceArtifactReader artifacts, Clock clock, TransactionOperations transaction) {
+            DocumentReadSources sources, GraphEvidenceReader graph, EvidenceArtifactReader artifacts, Clock clock,
+            TransactionOperations transaction) {
         this.evidence = evidence;
         this.registry = registry;
         this.grants = grants;
+        this.sources = sources;
+        this.graph = graph;
         this.artifacts = artifacts;
         this.clock = clock;
         this.transaction = transaction;
@@ -106,31 +119,52 @@ public class EvidenceService {
                 throw new CustomException(ErrorCode.INVALID_REQUEST);
             }
         }
+        Instant requestedAsOf = null;
         if (asOf != null) {
             try {
-                OffsetDateTime.parse(asOf);
+                requestedAsOf = OffsetDateTime.parse(asOf).toInstant();
             } catch (DateTimeException error) {
                 throw new CustomException(ErrorCode.INVALID_REQUEST);
             }
         }
-        if (round != null || graphVersion != null || asOf != null) {
+        if (round != null) {
+            // Briefing rounds pin no graph version yet: refused for every kind of evidence, before any lookup.
             throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
         }
         if (!EVIDENCE_ID.matcher(id).matches()) {
             throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         Instant now = clock.instant();
-        GrantRegistry current = grants.registry(requestId);
+        Instant pinnedAt = requestedAsOf;
         try {
-            return transaction.execute(status -> serve(id, companyId, requestId, now, current));
+            return transaction.execute(status -> dispatch(id, graphVersion, pinnedAt, companyId, requestId, now));
         } catch (DataAccessException | TransactionException error) {
             log.warn("Evidence read failed in the database (cause={}, requestId={})", error.getClass().getSimpleName(), requestId);
             throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE, error);
         }
     }
 
-    private EvidenceResponse serve(String id, String companyId, String requestId, Instant now, GrantRegistry current) {
+    /**
+     * The registry is chosen by what is STORED, never by a request parameter: a row whose verification artifact is a graph
+     * import {@code verification_receipt} is a graph body citation; every other row is an S1 summary citation. S1 citations
+     * have no pinned form: a graph version or as-of is refused before the S1 registry is read.
+     */
+    private EvidenceResponse dispatch(String id, String graphVersion, Instant asOf, String companyId, String requestId,
+            Instant now) {
         EvidenceView row = evidence.findEvidence(id).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+        ArtifactRow verification = row.verificationArtifactId() == null ? null
+                : registry.findArtifact(row.verificationArtifactId()).orElse(null);
+        if (verification != null && GRAPH_RECEIPT.equals(verification.kind())) {
+            return serveGraph(row, graphVersion, asOf, companyId, requestId, now);
+        }
+        if (graphVersion != null || asOf != null) {
+            throw new CustomException(ErrorCode.VERSION_UNAVAILABLE);
+        }
+        return serve(row, companyId, requestId, now, grants.registry(requestId));
+    }
+
+    private EvidenceResponse serve(EvidenceView row, String companyId, String requestId, Instant now, GrantRegistry current) {
+        String id = row.id();
         ArticleRow article;
         VersionRow version;
         SummaryView owner;
@@ -214,6 +248,111 @@ public class EvidenceService {
                 row.articleVersion(), articleOut, Boolean.TRUE, List.of(),
                 new Metadata(SOURCE, now, null, requestId, true, List.copyOf(failures)), null, row.articleVersion(), summary,
                 null, summary == null ? null : summary.get("provenance"), resultVersion);
+    }
+
+    // ---- graph body evidence ---------------------------------------------------------------------------------------------
+
+    /**
+     * One verified body citation of a pinned public graph version. The pinned, filtered snapshot decides visibility and the span;
+     * the app's own article rows decide that the quote is still readable (access, selected version, stored text); the selected
+     * version's own import receipt, verified against its registered hash and size and read ONCE, names the grants the version was
+     * imported under (and, for a span no visible issue or relation cites but a visible structural basis references, proves that
+     * exactly that relation's basis cites it: such a basis-only citation has no {@code eventIds}); and the CURRENT S2-1 source
+     * registry, read now, decides whether those grants still allow it. The receipt grants nothing and the S1 registry is not
+     * involved. Any denial is {@code EVIDENCE_UNAVAILABLE} without a reason on the wire.
+     */
+    private EvidenceResponse serveGraph(EvidenceView row, String graphVersion, Instant asOf, String companyId, String requestId,
+            Instant now) {
+        // A selector failure keeps its own status: 409 unavailable or staged, 422 inconsistent, 503 unreadable snapshot.
+        GraphEvidence found = graph.read(graphVersion, asOf, row.id());
+        ArticleRow article;
+        VersionRow version;
+        try {
+            GraphEvidence.Span span = found.span();
+            if (span == null) {
+                throw new Denied("evidence_not_visible_in_version");
+            }
+            if (!"body".equals(row.inputKind()) || !Boolean.TRUE.equals(row.quoteVerified())) {
+                throw new Denied("not_verified_body_evidence");
+            }
+            if (!span.articleId().equals(row.articleId()) || !span.articleVersion().equals(row.articleVersion())
+                    || span.start() != row.startOffset() || span.end() != row.endOffset()) {
+                throw new Denied("span_mismatch");
+            }
+            article = registry.findArticle(row.articleId()).orElseThrow(() -> new Denied("article_missing"));
+            if (!AVAILABLE.equals(article.accessStatus())) {
+                throw new Denied("article_access_" + article.accessStatus());
+            }
+            // The version is pinned by the snapshot, so it is not required to be the article's newest one.
+            version = registry.findVersion(row.articleId(), row.articleVersion())
+                    .orElseThrow(() -> new Denied("version_missing"));
+            if (!row.textArtifactId().equals(version.textArtifactId())) {
+                throw new Denied("text_artifact_mismatch");
+            }
+            if (row.startOffset() < 0 || row.endOffset() <= row.startOffset()
+                    || row.quote().codePointCount(0, row.quote().length()) != row.endOffset() - row.startOffset()) {
+                throw new Denied("quote_offsets_inconsistent");
+            }
+            // The receipt of the SELECTED version, not the row's own: a row shared by several imports points at the first one. Its
+            // bytes are read and parsed once for the grant pins and, for a basis-only span, for the basis membership.
+            StrictJson.Obj receiptBundle = GraphReceiptGrants.bundle(receipt(found.graphVersion(), requestId), found.graphVersion());
+            Set<GraphReceiptGrants.Pin> pins = GraphReceiptGrants.pins(receiptBundle, row.articleId(), row.articleVersion());
+            if (!found.basisRefs().isEmpty()) {
+                GraphReceiptBasis.require(receiptBundle, row.id(), found.basisRefs());
+            }
+            for (GraphReceiptGrants.Pin pin : pins) {
+                if (!pin.sourceId().equals(article.provider())) {
+                    throw new Denied("pin_source_differs_from_article_provider");
+                }
+            }
+            SourceRegistry current = sources.registry(requestId);
+            for (GraphReceiptGrants.Pin pin : pins) {
+                String denial = current.denial(pin.sourceId(), pin.grantId(), pin.revision(), now);
+                if (denial != null) {
+                    throw new Denied("source_" + denial);
+                }
+            }
+        } catch (GraphReceiptGrants.Malformed malformed) {
+            log.info("Graph evidence withheld (evidenceId={}, reason={}, requestId={})", row.id(), malformed.getMessage(), requestId);
+            throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+        } catch (Denied denied) {
+            log.info("Graph evidence withheld (evidenceId={}, reason={}, requestId={})", row.id(), denied.getMessage(), requestId);
+            throw new CustomException(ErrorCode.EVIDENCE_UNAVAILABLE);
+        }
+        if (companyId != null && !evidence.companyExists(companyId)) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        List<SectionFailure> failures = companyId == null ? List.of()
+                : List.of(new SectionFailure(SENTIMENT, ErrorCode.SOURCE_UNAVAILABLE.name(), GRAPH_SENTIMENT_MESSAGE, false, null));
+        EvidenceArticle articleOut = new EvidenceArticle(version.title(), version.publisher(), version.url(),
+                "datetime".equals(version.publicationPrecision()) ? version.publishedAt() : null);
+        return new EvidenceResponse(row.id(), row.quote(), row.startOffset(), row.endOffset(), row.articleId(),
+                row.articleVersion(), articleOut, Boolean.TRUE, found.eventIds(),
+                new Metadata(GRAPH_SOURCE, found.asOf(), found.graphVersion(), requestId, companyId != null, failures), null,
+                row.articleVersion(), null, null, null, null);
+    }
+
+    /**
+     * The verified bytes of the selected version's import receipt. A registry mismatch (missing, wrong kind, changed file) is a
+     * denial; an unset artifact root or an unreadable store is {@code SOURCE_UNAVAILABLE}, never a denial that reads like absence.
+     */
+    private byte[] receipt(String versionId, String requestId) {
+        ArtifactRow receipt = registry.findArtifact("artifact-receipt-" + versionId)
+                .orElseThrow(() -> new Denied("receipt_unregistered"));
+        if (!GRAPH_RECEIPT.equals(receipt.kind()) || !JSON_MEDIA_TYPE.equals(receipt.mediaType())) {
+            throw new Denied("receipt_kind_invalid");
+        }
+        try {
+            return artifacts.read(receipt);
+        } catch (ArtifactStoreException error) {
+            if (error.reason() == ArtifactStoreException.Reason.CONFLICT) {
+                throw new Denied("receipt_file_" + error.detail());
+            }
+            log.warn("Graph receipt cannot be read (artifactId={}, reason={}, detail={}, requestId={})", receipt.id(),
+                    error.reason(), error.detail(), requestId);
+            throw new CustomException(ErrorCode.SOURCE_UNAVAILABLE);
+        }
     }
 
     // ---- current authority ------------------------------------------------------------------------------------------------

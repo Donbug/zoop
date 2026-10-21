@@ -19,8 +19,7 @@ ZOOP_TEST_RELATION_CRASH_AT = after_reserve  S3: after the owner reservation com
                      after_child       after the real `resume` child exited, before its outcome is recorded
                      after_review_reserve  review: after the operation reservation commits, before the pipeline is asked to append the event
                      after_review_child    review: after the real `review` child appended the event, before the service records it
-                     after_review_applied  review: after the operation is recorded (and its revalidation queued), before any response is sent
-                     after_revalidation_child  revalidation: after the real `revalidate` child exited, before its outcome is recorded
+                     after_review_applied  review: after the operation is recorded (terminal: nothing is queued), before any response is sent
 ZOOP_TEST_RELATION_HOLD_FILE = path    the relation dispatcher claims nothing until this file exists (keeps accepted jobs queued)
 ZOOP_TEST_EXTRACTION_CRASH_AT = after_reserve  S2: after the owner reservation commits, before the pipeline is asked to register
                      after_registration  after the real pipeline registered the job, before the service accepts it
@@ -85,10 +84,10 @@ def main() -> int:
         assert service.relation is not None and service.relation_ledger is not None
         process, ledger = service.relation.process, service.relation_ledger
         if relation_crash == "after_reserve":
-            process.submit = lambda body: die()
+            process.submit = lambda body, **kwargs: die()
         elif relation_crash == "after_registration":
             real_register = process.submit
-            process.submit = lambda body: (real_register(body), die())[0]
+            process.submit = lambda body, **kwargs: (real_register(body, **kwargs), die())[0]
         elif relation_crash == "before_response":
             real_relation_accept = ledger.accept
             ledger.accept = lambda *args: (real_relation_accept(*args), die())[0]
@@ -106,9 +105,8 @@ def main() -> int:
         elif relation_crash == "after_review_applied":
             real_apply = ledger.apply_operation
             ledger.apply_operation = lambda *args: (real_apply(*args), die())[0]
-        elif relation_crash == "after_revalidation_child":
-            real_revalidate = process.revalidate
-            process.revalidate = lambda *args, **kwargs: (real_revalidate(*args, **kwargs), die())[0]
+        else:
+            raise AssertionError(f"unknown relation crash point {relation_crash}")  # `after_revalidation_child` died with the revalidation command
     hold = os.environ.get("ZOOP_TEST_RELATION_HOLD_FILE")
     if hold:
         assert service.relation_ledger is not None
@@ -119,10 +117,10 @@ def main() -> int:
         assert service.extraction is not None and service.extraction_ledger is not None
         extraction_process, extraction_ledger = service.extraction.process, service.extraction_ledger
         if extraction_crash == "after_reserve":
-            extraction_process.submit = lambda body: die()
+            extraction_process.submit = lambda body, **kwargs: die()
         elif extraction_crash == "after_registration":
             real_extraction_submit = extraction_process.submit
-            extraction_process.submit = lambda body: (real_extraction_submit(body), die())[0]
+            extraction_process.submit = lambda body, **kwargs: (real_extraction_submit(body, **kwargs), die())[0]
         elif extraction_crash == "before_response":
             real_extraction_accept = extraction_ledger.accept
             extraction_ledger.accept = lambda *args: (real_extraction_accept(*args), die())[0]

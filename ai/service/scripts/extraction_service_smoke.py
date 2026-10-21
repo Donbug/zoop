@@ -57,7 +57,9 @@ def flow_part(root: Path, world: World, started: list[ExtractionService]) -> str
     accepted = service.esubmit()
     check(accepted.status_code == 202 and accepted.json()["inputDigest"] == world.upstream["inputDigest"], "accepted; the input digest equals the operator job's")
     done = service.ewait(states={"ready"}, dispatch={"idle"})
-    check(done["usage"] == {"replayCalls": world.s2_replay_calls, "startedWithoutReceipt": 0, "providerCalls": 0, "paidModelCalls": 0}, "replay accounting")
+    check(done["usage"] == {"replayCalls": world.s2_replay_calls, "startedWithoutReceipt": 0, "providerCalls": 0, "paidModelCalls": 0, "receivedCalls": 0,
+                            "unsentCalls": 0, "inputTokens": None, "outputTokens": None, "reasoningTokens": None, "estimatedUsd": None, "chargedUsd": None},
+          "replay accounting")
     check(done["dispatch"]["dispatchCount"] == 1 and done["next"] == "fetch_result", "one dispatch, then fetch_result")
     envelope = service.eresult().json()
     job = envelope["job"]

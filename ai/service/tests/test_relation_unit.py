@@ -20,8 +20,8 @@ from zoop_ai_service import relation_access
 from zoop_ai_service.config import RELATION_VARS, ConfigError, load
 from zoop_ai_service.openapi_doc import RELATION_REVIEW, RELATION_SUBMIT, relation_examples
 from zoop_ai_service.relation_dispatch import MAX_BACKOFF, MAX_BUSY, busy_delay, policy
-from zoop_ai_service.relation_ledger import LEDGER_SCHEMA, MIGRATES_FROM, OperationRow, RelationLedger, Update
-from zoop_ai_service.relation_review import evidence, marker, next_operation_action, operation_status, settlement
+from zoop_ai_service.relation_ledger import LEDGER_SCHEMA, LEGACY, MIGRATES_FROM, OperationRow, RelationLedger, Update
+from zoop_ai_service.relation_review import evidence, marker, next_operation_action, operation_status
 from zoop_ai_service.relation_runtime import interpret
 from zoop_ai_service.relation_wire import (SCHEMA, RelationChain, RelationErrorEnvelope, RelationJobContent, RelationJobStatus,
                                            RelationOperationStatus, RelationResultEnvelope, RelationReview, RelationSubmit, RelationView,
@@ -281,7 +281,8 @@ def relation_item(**overrides: Any) -> dict[str, Any]:
             "countries": [], "context": {"market": "unknown", "check": "unknown", "knownCountries": []}, "citations": [citation], "path": [],
             "generatorReasons": ["why"], "proposalCount": 1, "precheck": {"state": "pending", "reasons": []}, "approved": False,
             "facts": {"private": "claim table"}, "quotes": [{"text": "SOURCE-QUOTE"}], "claims": [{"claimId": "subject"}],
-            "eligibility": {"status": "hold", "reasons": [{"code": "claim_insufficient", "at": "type"}], "revision": 3, "reviewPending": True},
+            "eligibility": {"status": "hold", "reasons": [{"code": "claim_insufficient", "at": "type"}], "revision": 3, "reviewPending": True,
+                            "approvalBasis": None},
             "history": [
                 {"seq": 1, "kind": "verdict", "createdAt": "2026-10-13T00:00:00+00:00", "attempt": {"kind": "initial", "seq": 0}, "eligibility": "hold",
                  "reasons": [{"code": "claim_insufficient"}], "claims": [], "verifier": "called", "requestDigest": "q" * 64},
@@ -342,6 +343,20 @@ def test_the_submit_model_is_exact_and_names_no_path_fixture_or_live_mode():
         mutate(value)
         with pytest.raises(ValidationError):
             RelationSubmit.model_validate(value)
+    live = json.loads(json.dumps(RELATION_SUBMIT))
+    live["provenance"].update(executionMode="live", recordingKind="provider")
+    assert RelationSubmit.model_validate(live).wire() == live  # the pair is a legal request; the service decides whether this principal may run it
+
+
+def test_a_live_pair_must_agree_in_every_projection():
+    for value in ({"executionMode": "live", "recordingKind": "authored-test"}, {"executionMode": "replay", "recordingKind": "provider"}):
+        with pytest.raises(ValidationError):
+            RelationView.model_validate(payload(provenance={"sourceKind": "synthetic", **value}))
+    live = RelationView.model_validate(payload(provenance={"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"},
+                                               binding={"schema": "x", "upstream": {"jobId": "s2", "inputDigest": UPSTREAM_DIGEST, "digest": "u" * 64},
+                                                        "runtime": {"identity": "9" * 64, "model": "private"}}))
+    assert live.provenance.execution_mode == "live" and live.binding.runtime is not None and live.binding.runtime.identity == "9" * 64
+    assert "private" not in json.dumps(live.wire())  # the runtime binding's other keys are never relayed
 
 
 # ---- the service ledger ------------------------------------------------------------------------------------------------------
@@ -469,13 +484,13 @@ def settled_job(ledger: RelationLedger, job_id: str = "job-1") -> None:
     reserve(ledger, job_id)
     assert ledger.accept(job_id, "alpha", JOB_DIGEST, 100) == "accepted"
     claim = ledger.claim_next()
-    assert claim is not None and claim.job_id == job_id and claim.operation_id is None
+    assert claim is not None and claim.job_id == job_id
     assert ledger.finish(job_id, Update("idle", "exited"))
 
 
 def reserve_operation(ledger: RelationLedger, key: str = "op-1", *, decision: str = "allow", job_id: str = "job-1", revision: int = 1,
-                      digest: str = "a" * 64, owner: str = "alpha", limit: int = 100):
-    return ledger.reserve_operation(key, owner, job_id, RC, decision, JOB_DIGEST, revision, digest, limit)
+                      digest: str = "a" * 64, owner: str = "alpha"):
+    return ledger.reserve_operation(key, owner, job_id, RC, decision, JOB_DIGEST, revision, digest)
 
 
 def test_an_operation_reservation_is_durable_idempotent_and_keeps_its_identity(ledger, tmp_path):
@@ -484,7 +499,7 @@ def test_an_operation_reservation_is_durable_idempotent_and_keeps_its_identity(l
     assert first is not None and (first.review_state, first.review_attempts, first.reval_state, first.settled) == ("reserved", 0, None, None)
     assert (first.owner, first.job_id, first.relation_candidate_id, first.decision, first.expected_source_version,
             first.expected_source_revision) == ("alpha", "job-1", RC, "allow", JOB_DIGEST, 1)
-    again = ledger.reserve_operation("op-1", "beta", "other", "rc-" + "2" * 64, "reject", "j" * 64, 5, "b" * 64, 100)
+    again = ledger.reserve_operation("op-1", "beta", "other", "rc-" + "2" * 64, "reject", "j" * 64, 5, "b" * 64)
     assert again == first  # an existing key is returned untouched, whoever asks
     assert ledger.begin_review_attempt("op-1") == 1 and ledger.begin_review_attempt("op-1") == 2  # counted before the pipeline is asked
     raw = sqlite3.connect(tmp_path / "service" / "relation-jobs.sqlite3")
@@ -495,33 +510,23 @@ def test_an_operation_reservation_is_durable_idempotent_and_keeps_its_identity(l
     raw.close()
 
 
-def test_confirming_an_allow_records_the_event_and_queues_exactly_one_revalidation(ledger):
+def test_confirming_an_allow_records_the_event_and_queues_nothing(ledger):
     settled_job(ledger)
     reserve_operation(ledger)
     assert ledger.apply_operation("op-1", "2026-10-13T00:01:00Z") is True and ledger.apply_operation("op-1", "x") is False
     row = ledger.operation("op-1")
-    assert (row.review_state, row.applied_event_at, row.reval_state, row.reval_count) == ("applied", "2026-10-13T00:01:00Z", "pending", 0) and row.applied_at
-    assert ledger.revalidating("job-1") is True
-    claim = ledger.claim_next()
-    assert claim is not None and claim.operation_id == "op-1" and (claim.job_id, claim.input_digest, claim.relation_candidate_id) == ("job-1", JOB_DIGEST, RC)
-    assert (claim.review_revision, claim.expected_revision, claim.owner, claim.upstream_job_id, claim.upstream_input_digest) == (
-        1, 2, "alpha", "s2", UPSTREAM_DIGEST)  # the revalidate command must see the revision the review left
-    assert ledger.claim_next() is None and ledger.operation("op-1").reval_state == "in_flight" and ledger.operation("op-1").reval_count == 1
-    assert ledger.finish_operation("op-1", Update("idle", "exited", settled="verified", settled_eligibility="eligible"))
-    done = ledger.operation("op-1")
-    assert (done.reval_state, done.settled, done.settled_eligibility, done.last_outcome) == ("idle", "verified", "eligible", "exited") and done.settled_at
-    assert not ledger.finish_operation("op-1", Update("idle", "exited")) and ledger.revalidating("job-1") is False
-    assert ledger.settle_operation("op-1", "superseded", None) is False  # write-once
-    assert ledger.enqueue_operation("op-1", 10) == "coalesced"  # a settled operation has nothing left to run
+    assert (row.review_state, row.applied_event_at, row.reval_state, row.reval_count, row.contract) == (
+        "applied", "2026-10-13T00:01:00Z", None, 0, "final-approval") and row.applied_at
+    assert ledger.claim_next() is None and ledger.active_count() == 0  # an approval is terminal: nothing waits to run
 
 
-def test_a_confirmed_reject_has_no_revalidation_at_all(ledger):
+def test_a_confirmed_reject_is_the_same_terminal_record(ledger):
     settled_job(ledger)
     reserve_operation(ledger, decision="reject")
     assert ledger.apply_operation("op-1", "2026-10-13T00:01:00Z")
     row = ledger.operation("op-1")
-    assert (row.review_state, row.reval_state, row.settled) == ("applied", None, None)
-    assert ledger.claim_next() is None and ledger.revalidating("job-1") is False and ledger.enqueue_operation("op-1", 10) == "coalesced"
+    assert (row.review_state, row.reval_state, row.settled, row.contract) == ("applied", None, None, "final-approval")
+    assert ledger.claim_next() is None
 
 
 def test_a_reservation_can_be_released_and_a_confirmed_operation_cannot(ledger, tmp_path):
@@ -541,71 +546,37 @@ def test_a_reservation_can_be_released_and_a_confirmed_operation_cannot(ledger, 
     raw.close()
 
 
-def test_the_cap_counts_waiting_dispatches_of_both_kinds_and_a_reserved_allow(ledger):
+def test_a_review_never_counts_against_the_dispatch_cap_and_never_waits(ledger):
     settled_job(ledger)
-    assert reserve_operation(ledger, "a", limit=1) is not None and ledger.active_count() == 1  # a reserved allow will wait to run
-    assert reserve_operation(ledger, "b", limit=1) is None  # full: refused before anything is bound
-    assert ledger.operation("b") is None and reserve_operation(ledger, "r", decision="reject", limit=1) is not None  # a reject never waits
-    assert ledger.apply_operation("a", "t") and ledger.active_count() == 1  # reserved -> pending: the same single slot
-    assert reserve_operation(ledger, "c", limit=1) is None
-    claim = ledger.claim_next()
-    assert claim is not None and claim.operation_id == "a" and ledger.active_count() == 1  # in flight still holds it
-    assert ledger.finish_operation("a", Update("idle", "exited")) and ledger.active_count() == 0
+    assert reserve_operation(ledger, "a") is not None and ledger.active_count() == 0
+    assert ledger.apply_operation("a", "t") and ledger.active_count() == 0 and ledger.claim_next() is None
     reserve(ledger, "job-2")
-    assert ledger.accept("job-2", "alpha", "j" * 64, 0) == "full" and ledger.job("job-2").state == "reserved"  # a job respects the same cap
+    assert ledger.accept("job-2", "alpha", "j" * 64, 1) == "accepted" and ledger.active_count() == 1  # only a job's dispatch fills a slot
+    assert ledger.accept("job-2", "alpha", "j" * 64, 0) == "conflict"
 
 
-def test_revalidations_and_job_dispatches_share_one_fifo_sequence(ledger):
-    settled_job(ledger)
-    reserve(ledger, "job-2")
-    assert ledger.accept("job-2", "alpha", "j" * 64, 100) == "accepted"
-    reserve_operation(ledger, "op-1")
-    ledger.apply_operation("op-1", "t")
-    reserve(ledger, "job-3")
-    assert ledger.accept("job-3", "alpha", "k" * 64, 100) == "accepted"
-    order = []
-    for _ in range(3):
-        claim = ledger.claim_next()
-        assert claim is not None
-        order.append(claim.operation_id or claim.job_id)
-    assert order == ["job-2", "op-1", "job-3"] and ledger.claim_next() is None
-
-
-def test_a_busy_revalidation_waits_for_its_time_and_explicit_enqueue_needs_an_idle_unsettled_row(ledger):
-    clock = [1000.0]
-    ledger._clock = lambda: clock[0]
-    settled_job(ledger)
-    reserve_operation(ledger)
-    ledger.apply_operation("op-1", "t")
-    claim = ledger.claim_next()
-    assert claim is not None and claim.operation_id == "op-1"
-    assert ledger.finish_operation("op-1", Update("pending", "busy", "relation_busy", 2.0, 1))
-    assert ledger.claim_next() is None
-    clock[0] += 2.5
+def test_a_live_job_keeps_its_runtime_pin_and_the_dispatch_knows_it_and_whether_it_is_explicit(ledger):
+    reserve(ledger, "job-1")
+    live = ledger.reserve("live-1", "alpha", "c" * 64, "s2", UPSTREAM_DIGEST, "9" * 64)
+    assert (live.execution_mode, live.live_binding) == ("live", "9" * 64) and ledger.job("job-1").execution_mode == "replay"
+    assert ledger.reserve("live-1", "alpha", "c" * 64, "s2", UPSTREAM_DIGEST, "8" * 64).live_binding == "9" * 64  # the first pin is never replaced
+    assert ledger.accept("job-1", "alpha", "i" * 64, 10) == "accepted" and ledger.accept("live-1", "alpha", "l" * 64, 10) == "accepted"
+    first, second = ledger.claim_next(), ledger.claim_next()
+    assert (first.job_id, first.live, first.explicit, first.live_binding) == ("job-1", False, False, None)
+    assert (second.job_id, second.live, second.explicit, second.live_binding, second.owner, second.upstream_job_id) == (
+        "live-1", True, False, "9" * 64, "alpha", "s2")  # the automatic initial dispatch is never explicit
+    assert ledger.finish("live-1", Update("idle", "transport_unknown"))
+    assert ledger.enqueue("live-1", 10) == "enqueued"
     again = ledger.claim_next()
-    assert again is not None and again.busy_count == 1 and ledger.operation("op-1").reval_count == 2
-    assert ledger.finish_operation("op-1", Update("idle", "transport_unknown"))
-    assert ledger.enqueue_operation("op-1", 0) == "full" and ledger.operation("op-1").reval_state == "idle"
-    assert ledger.enqueue_operation("op-1", 10) == "enqueued" and ledger.enqueue_operation("op-1", 10) == "coalesced"
+    assert again is not None and again.explicit is True  # only an operator's recover runs without the initial-only restriction
+    raw = sqlite3.connect(ledger._db.execute("PRAGMA database_list").fetchone()[2])
+    for statement in ("UPDATE relation_jobs SET live_binding='x' WHERE job_id='live-1'", "UPDATE relation_jobs SET execution_mode='replay' WHERE job_id='live-1'"):
+        with pytest.raises(sqlite3.DatabaseError):
+            raw.execute(statement)
+    raw.close()
 
 
-def test_a_revalidation_a_dead_process_left_in_flight_ends_idle_and_a_cancelled_job_ends_its_queued_ones(ledger):
-    settled_job(ledger)
-    for key in ("running", "waiting"):
-        reserve_operation(ledger, key)
-        ledger.apply_operation(key, "t")
-    claim = ledger.claim_next()
-    assert claim is not None and claim.operation_id == "running"
-    assert ledger.interrupt_in_flight() == 1
-    running, waiting = ledger.operation("running"), ledger.operation("waiting")
-    assert (running.reval_state, running.last_outcome, running.reval_count) == ("idle", "service_restarted", 1)
-    assert (waiting.reval_state, waiting.reval_count) == ("pending", 0)  # the original intent that never started still runs, once
-    ledger.cancel_pending("job-1")
-    cancelled = ledger.operation("waiting")
-    assert (cancelled.reval_state, cancelled.last_outcome) == ("idle", "cancelled") and ledger.claim_next() is None
-
-
-def test_a_ledger_of_the_previous_schema_migrates_forward_and_an_unknown_schema_is_refused(tmp_path):
+def test_a_ledger_of_the_first_schema_migrates_forward_and_an_unknown_schema_is_refused(tmp_path):
     directory = tmp_path / "service"
     directory.mkdir()
     first = RelationLedger(directory, tmp_path / "relation")
@@ -613,14 +584,20 @@ def test_a_ledger_of_the_previous_schema_migrates_forward_and_an_unknown_schema_
     assert first.accept("job-1", "alpha", JOB_DIGEST, 100) == "accepted"
     first.close()
     path = directory / "relation-jobs.sqlite3"
-    raw = sqlite3.connect(path)  # what a `-1` ledger looks like: no operations table, the previous schema id
+    raw = sqlite3.connect(path)  # what a `-1` ledger looks like: no operations table, none of the later columns, the first schema id
     raw.execute("DROP TABLE relation_operations")
+    raw.execute("DROP TRIGGER relation_jobs_immutable")
+    raw.execute("ALTER TABLE relation_jobs DROP COLUMN execution_mode")
+    raw.execute("ALTER TABLE relation_jobs DROP COLUMN live_binding")
+    raw.execute("ALTER TABLE relation_dispatch DROP COLUMN explicit")
     raw.execute("UPDATE meta SET value=? WHERE key='schema'", (MIGRATES_FROM[0],))
     raw.commit()
     raw.close()
     migrated = RelationLedger(directory, tmp_path / "relation")
-    assert migrated.job("job-1").state == "accepted" and migrated.dispatch("job-1").state == "pending"  # nothing older was rewritten
-    assert migrated.reserve_operation("op-1", "alpha", "job-1", RC, "allow", JOB_DIGEST, 1, "a" * 64, 10) is not None
+    job = migrated.job("job-1")
+    assert (job.state, job.execution_mode, job.live_binding) == ("accepted", "replay", None) and migrated.dispatch("job-1").state == "pending"
+    assert migrated.claim_next().explicit is False  # an old dispatch row reads as the automatic initial dispatch
+    assert migrated.reserve_operation("op-1", "alpha", "job-1", RC, "allow", JOB_DIGEST, 1, "a" * 64) is not None
     migrated.close()
     raw = sqlite3.connect(path)
     assert raw.execute("SELECT value FROM meta WHERE key='schema'").fetchone() == (LEDGER_SCHEMA,)
@@ -632,6 +609,64 @@ def test_a_ledger_of_the_previous_schema_migrates_forward_and_an_unknown_schema_
     assert (caught.value.field, caught.value.reason) == ("ZOOP_AI_SERVICE_STATE_DIR", "relation_ledger_schema_mismatch")
 
 
+OLD_OPERATIONS = """CREATE TABLE relation_operations (
+ operation_id TEXT PRIMARY KEY, owner TEXT NOT NULL, job_id TEXT NOT NULL REFERENCES relation_jobs(job_id), relation_candidate_id TEXT NOT NULL,
+ decision TEXT NOT NULL CHECK (decision IN ('allow','reject')), expected_source_version TEXT NOT NULL,
+ expected_source_revision INTEGER NOT NULL CHECK (expected_source_revision>=1), request_digest TEXT NOT NULL,
+ review_state TEXT NOT NULL CHECK (review_state IN ('reserved','applied')), review_attempts INTEGER NOT NULL DEFAULT 0, reserved_at TEXT NOT NULL,
+ applied_at TEXT, applied_event_at TEXT,
+ reval_state TEXT CHECK (reval_state IS NULL OR reval_state IN ('pending','in_flight','idle')), reval_seq INTEGER UNIQUE,
+ reval_count INTEGER NOT NULL DEFAULT 0, busy_count INTEGER NOT NULL DEFAULT 0, not_before REAL, last_outcome TEXT, last_runtime_code TEXT,
+ reval_updated_at TEXT, settled TEXT CHECK (settled IS NULL OR settled IN ('verified','superseded')), settled_eligibility TEXT, settled_at TEXT,
+ CHECK ((review_state='reserved' AND applied_at IS NULL AND applied_event_at IS NULL AND reval_state IS NULL AND reval_seq IS NULL)
+     OR (review_state='applied' AND applied_at IS NOT NULL AND applied_event_at IS NOT NULL
+         AND ((decision='allow' AND reval_state IS NOT NULL AND reval_seq IS NOT NULL) OR (decision='reject' AND reval_state IS NULL AND reval_seq IS NULL)))),
+ CHECK (settled IS NULL OR (decision='allow' AND review_state='applied' AND settled_at IS NOT NULL)))"""
+
+
+def test_a_second_schema_ledger_keeps_every_operation_as_history_and_none_becomes_an_approval(tmp_path):
+    """The `-2` operations table (an `allow` meant revalidation, with dispatch columns) is rebuilt in place: every row survives byte-for-byte in the
+    columns it had, is marked `legacy-revalidation`, and no queued or in-flight revalidation is ever claimed again."""
+    directory = tmp_path / "service"
+    directory.mkdir()
+    first = RelationLedger(directory, tmp_path / "relation")
+    settled_job(first)
+    first.close()
+    path = directory / "relation-jobs.sqlite3"
+    raw = sqlite3.connect(path)
+    raw.execute("DROP TABLE relation_operations")
+    raw.execute(OLD_OPERATIONS)
+    rows = (("pending", "p", "pending", 1, None), ("flying", "f", "in_flight", 2, None), ("done", "d", "idle", 3, "verified"), ("held", "h", None, None, None))
+    for key, digit, state, seq, settled in rows:
+        applied = state is not None
+        raw.execute("INSERT INTO relation_operations(operation_id,owner,job_id,relation_candidate_id,decision,expected_source_version,expected_source_revision,"
+                    "request_digest,review_state,reserved_at,applied_at,applied_event_at,reval_state,reval_seq,settled,settled_eligibility,settled_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (key, "alpha", "job-1", RC, "allow", JOB_DIGEST, 1, digit * 64, "applied" if applied else "reserved", "2026-10-13T00:00:00Z",
+                     "2026-10-13T00:00:01Z" if applied else None, "2026-10-13T00:00:02+00:00" if applied else None, state, seq,
+                     settled, "eligible" if settled else None, "2026-10-13T00:00:09Z" if settled else None))
+    raw.execute("UPDATE meta SET value=? WHERE key='schema'", (MIGRATES_FROM[1],))
+    raw.commit()
+    raw.close()
+    migrated = RelationLedger(directory, tmp_path / "relation")
+    assert migrated.claim_next() is None and migrated.interrupt_in_flight() == 0 and migrated.active_count() == 0  # nothing of the old queue runs or counts
+    old = {key: migrated.operation(key) for key, *_ in rows}
+    assert all(row.contract == LEGACY and row.legacy for row in old.values())
+    stored_seq = migrated._db.execute("SELECT reval_seq FROM relation_operations WHERE operation_id='pending'").fetchone()[0]   # a ledger column, not a row field
+    assert (old["pending"].reval_state, stored_seq) == ("pending", 1) and (old["flying"].reval_state, old["flying"].reval_count) == ("in_flight", 0)
+    assert (old["done"].settled, old["done"].settled_eligibility) == ("verified", "eligible") and old["held"].review_state == "reserved"
+    assert migrated.apply_operation("held", "t") is False  # a legacy reservation is never adopted
+    assert migrated.reserve_operation("fresh", "alpha", "job-1", RC, "allow", JOB_DIGEST, 1, "f" * 64).contract == "final-approval"
+    assert migrated.apply_operation("fresh", "2026-10-13T01:00:00Z") and migrated.operation("fresh").reval_state is None
+    for key in ("pending", "flying", "done"):
+        status = operation_status(old[key], "2026-10-13T00:00:00Z")
+        assert status.limitation == "review_contract_changed" and status.next == "none"
+    migrated.close()
+    again = RelationLedger(directory, tmp_path / "relation")  # a second start finds the current schema and changes nothing
+    assert again.operation("pending").contract == LEGACY and again.operation("fresh").contract == "final-approval"
+    again.close()
+
+
 # ---- review operations: the chain, the status and the wire --------------------------------------------------------------------------
 
 def operation_row(**overrides: Any) -> OperationRow:
@@ -639,8 +674,9 @@ def operation_row(**overrides: Any) -> OperationRow:
         "operation_id": "op-1", "owner": "alpha", "job_id": "job-1", "relation_candidate_id": RC, "decision": "allow",
         "expected_source_version": JOB_DIGEST, "expected_source_revision": 1, "request_digest": "a" * 64, "review_state": "applied",
         "review_attempts": 1, "reserved_at": "2026-10-13T00:00:00Z", "applied_at": "2026-10-13T00:00:01Z",
-        "applied_event_at": "2026-10-13T00:00:02+00:00", "reval_state": "pending", "reval_count": 0, "busy_count": 0, "last_outcome": None,
-        "last_runtime_code": None, "reval_updated_at": "2026-10-13T00:00:01Z", "settled": None, "settled_eligibility": None, "settled_at": None}
+        "applied_event_at": "2026-10-13T00:00:02+00:00", "reval_state": None, "reval_count": 0, "busy_count": 0, "last_outcome": None,
+        "last_runtime_code": None, "reval_updated_at": None, "settled": None, "settled_eligibility": None, "settled_at": None,
+        "contract": "final-approval"}
     return OperationRow(**{**base, **overrides})
 
 
@@ -652,7 +688,7 @@ def review_event(seq: int, *, decision: str = "allow", reviewer: str = "alpha", 
                  effect: str | None = None) -> dict[str, Any]:
     return {"seq": seq, "kind": "review", "createdAt": f"2026-10-13T00:00:0{seq}+00:00", "decision": decision, "reviewer": reviewer,
             "note": marker(note) if note.startswith("op-") else note, "expectedRevision": seq - 1 if expected is None else expected,
-            "effect": effect or ("revalidation-requested" if decision == "allow" else "excluded")}
+            "effect": effect or ("approved" if decision == "allow" else "excluded")}
 
 
 def chain_of(*events: dict[str, Any], relation: str = RC) -> RelationChain:
@@ -677,50 +713,39 @@ def test_the_chain_proves_an_operations_event_only_when_every_field_matches(even
 
 
 def test_a_candidate_that_is_not_in_the_chain_is_missing():
-    found = evidence(chain_of(verdict_event(1), relation="rc-" + "2" * 64), operation_row(review_state="reserved", applied_at=None, applied_event_at=None, reval_state=None))
-    assert found.kind == "missing" and settlement(chain_of(verdict_event(1), relation="rc-" + "2" * 64), RC, 1) is None
+    found = evidence(chain_of(verdict_event(1), relation="rc-" + "2" * 64), operation_row(review_state="reserved", applied_at=None, applied_event_at=None))
+    assert found.kind == "missing"
 
 
-@pytest.mark.parametrize("events,expected", [
-    ([verdict_event(1), review_event(2), verdict_event(3, "eligible", "revalidation")], ("verified", "eligible")),
-    ([verdict_event(1), review_event(2), verdict_event(3, "hold", "revalidation")], ("verified", "hold")),
-    ([verdict_event(1), review_event(2), verdict_event(3, "reject", "revalidation")], ("verified", "reject")),
-    ([verdict_event(1), review_event(2), review_event(3, decision="reject", reviewer="beta", note="other")], ("superseded", None)),
-    ([verdict_event(1), review_event(2)], None),
-    ([verdict_event(1), review_event(2), verdict_event(3, "eligible", "initial")], None),
-    ([verdict_event(1), review_event(2), verdict_event(3, "pending", "revalidation")], None),
-    ([verdict_event(1), review_event(2), review_event(3, decision="allow")], None),
+@pytest.mark.parametrize("overrides,state,next_,limitation", [
+    ({"review_state": "reserved", "applied_at": None, "applied_event_at": None}, "not_requested", "retry_review", None),
+    ({"decision": "reject"}, "not_requested", "none", None),
+    ({}, "not_requested", "none", None),                                         # a final approval: terminal, nothing requested, nothing to wait for
+    ({"contract": "legacy-revalidation", "review_state": "reserved", "applied_at": None, "applied_event_at": None}, "not_requested", "none", "review_contract_changed"),
+    ({"contract": "legacy-revalidation", "reval_state": "pending"}, "contract_changed", "none", "review_contract_changed"),
+    ({"contract": "legacy-revalidation", "reval_state": "in_flight", "reval_count": 1}, "contract_changed", "none", "review_contract_changed"),
+    ({"contract": "legacy-revalidation", "reval_state": "idle", "reval_count": 1, "last_outcome": "transport_unknown"}, "contract_changed", "none", "review_contract_changed"),
+    ({"contract": "legacy-revalidation", "reval_state": "idle", "last_outcome": "cancelled"}, "contract_changed", "none", "review_contract_changed"),
+    ({"contract": "legacy-revalidation", "reval_state": "idle", "reval_count": 1, "last_outcome": "exited", "settled": "verified",
+      "settled_eligibility": "hold", "settled_at": "t"}, "verified", "none", "review_contract_changed"),
+    ({"contract": "legacy-revalidation", "reval_state": "idle", "reval_count": 1, "last_outcome": "runtime_error", "last_runtime_code": "review_revision_conflict",
+      "settled": "superseded", "settled_at": "t"}, "superseded", "none", "review_contract_changed"),
 ])
-def test_only_the_event_right_after_an_accepted_allow_settles_its_revalidation(events, expected):
-    assert settlement(chain_of(*events), RC, 1) == expected
-
-
-@pytest.mark.parametrize("overrides,state,next_", [
-    ({"review_state": "reserved", "applied_at": None, "applied_event_at": None, "reval_state": None, "reval_updated_at": None}, "not_requested", "retry_review"),
-    ({"decision": "reject", "reval_state": None, "reval_updated_at": None}, "not_requested", "none"),
-    ({}, "queued", "wait"),
-    ({"reval_state": "in_flight", "reval_count": 1}, "running", "wait"),
-    ({"reval_state": "idle", "reval_count": 1, "last_outcome": "transport_unknown"}, "interrupted", "recover"),
-    ({"reval_state": "idle", "reval_count": 1, "last_outcome": "service_restarted"}, "interrupted", "recover"),
-    ({"reval_state": "idle", "reval_count": 1, "last_outcome": "runtime_error", "last_runtime_code": "verifier_replay_missing"}, "failed", "recover"),
-    ({"reval_state": "idle", "reval_count": 2, "last_outcome": "runtime_error", "last_runtime_code": "replay_response_unknown"}, "failed", "operator_reconcile"),
-    ({"reval_state": "idle", "reval_count": 8, "last_outcome": "busy", "last_runtime_code": "relation_busy"}, "failed", "recover"),
-    ({"reval_state": "idle", "reval_count": 1, "last_outcome": "exited"}, "failed", "recover"),
-    ({"reval_state": "idle", "last_outcome": "cancelled"}, "cancelled", "none"),
-    ({"reval_state": "idle", "reval_count": 1, "last_outcome": "exited", "settled": "verified", "settled_eligibility": "hold", "settled_at": "t"}, "verified", "none"),
-    ({"reval_state": "idle", "reval_count": 1, "last_outcome": "runtime_error", "last_runtime_code": "review_revision_conflict", "settled": "superseded",
-      "settled_at": "t"}, "superseded", "none"),
-])
-def test_operation_status_is_derived_from_the_ledger_row_and_next_is_a_pure_rule(overrides, state, next_):
+def test_operation_status_is_derived_from_the_ledger_row_and_next_is_a_pure_rule(overrides, state, next_, limitation):
     row = operation_row(**overrides)
     status = operation_status(row, "2026-10-13T00:00:00Z")
-    assert (status.revalidation.state, status.next, next_operation_action(row)) == (state, next_, next_)
+    assert (status.revalidation.state, status.next, next_operation_action(row), status.limitation) == (state, next_, next_, limitation)
     assert status.publication.state == "not_published" and status.reviewer == "alpha"
     assert (status.expected_source_version, status.expected_source_revision, status.accepted_at) == (JOB_DIGEST, "1", "2026-10-13T00:00:00Z")
     assert (status.review.state, status.review.resulting_source_revision) == (("unconfirmed", None) if overrides.get("review_state") == "reserved" else ("applied", "2"))
     assert RelationOperationStatus.model_validate(status.wire()).wire() == status.wire()
     if state == "verified":
         assert (status.revalidation.verdict, status.revalidation.resulting_source_revision) == ("hold", "3")
+
+
+def test_the_old_effect_is_never_matched_as_the_current_approval():
+    legacy_event = chain_of(verdict_event(1), review_event(2, effect="revalidation-requested"))
+    assert evidence(legacy_event, operation_row(review_state="reserved", applied_at=None, applied_event_at=None)).kind == "mismatch"
 
 
 def test_the_review_model_is_exact_and_names_no_reviewer():
@@ -755,7 +780,7 @@ def test_relation_routes_answer_409_after_authentication_when_the_group_is_not_e
     for method, path in (("POST", "/internal/v1/relation-jobs"), ("GET", "/internal/v1/relation-jobs/j1"),
                          ("GET", "/internal/v1/relation-jobs/j1/result"), ("POST", "/internal/v1/relation-jobs/j1/cancel"),
                          ("POST", "/internal/v1/relation-jobs/j1/recover"), ("POST", "/internal/v1/relation-jobs/j1/reviews"),
-                         ("GET", "/internal/v1/relation-jobs/j1/reviews/op-1"), ("POST", "/internal/v1/relation-jobs/j1/reviews/op-1/recover")):
+                         ("GET", "/internal/v1/relation-jobs/j1/reviews/op-1")):
         denied = service.request(method, path, as_=None)
         assert denied.status_code == 401 and denied.json()["schemaVersion"] == SCHEMA
         assert service.request(method, path, as_="reader").status_code == 403
@@ -779,15 +804,18 @@ def test_authored_relation_examples_validate_against_the_models_and_the_next_rul
         for example in sample[group].values():
             status = RelationJobStatus.model_validate(example["value"])
             assert status.next == next_action(status.state, status.dispatch.state)
-    for group in ("review.202", "review.200", "operation.200", "operation.recover.202", "operation.recover.200"):
+    for group in ("review.200", "operation.200"):
         for example in sample[group].values():
             operation = RelationOperationStatus.model_validate(example["value"])
             assert operation.publication.state == "not_published" and operation.reviewer == "app" and operation.expected_source_revision == "1"
+            assert operation.next in ("none", "retry_review") and operation.limitation in (None, "review_contract_changed")
             assert operation.revalidation.state != "verified" or (operation.revalidation.verdict, operation.revalidation.resulting_source_revision) == ("eligible", "3")
-    assert sample["review.202"]["allowQueued"]["value"]["next"] == "wait" and sample["review.200"]["rejectRecorded"]["value"]["revalidation"]["state"] == "not_requested"
-    assert sample["operation.200"]["unconfirmed"]["value"]["next"] == "retry_review" and sample["operation.200"]["unansweredCall"]["value"]["next"] == "operator_reconcile"
-    assert sample["operation.200"]["interrupted"]["value"]["next"] == "recover"
-    assert sample["errors"]["409.reviewNotConfirmed"]["value"]["operation"]["review"]["state"] == "unconfirmed"
+    assert sample["review.200"]["allowApproved"]["value"]["next"] == "none" and sample["review.200"]["allowApproved"]["value"]["limitation"] is None
+    assert sample["review.200"]["allowApproved"]["value"]["revalidation"]["state"] == "not_requested"
+    assert sample["review.200"]["rejectRecorded"]["value"]["revalidation"]["state"] == "not_requested"
+    assert sample["operation.200"]["unconfirmed"]["value"]["next"] == "retry_review"
+    assert sample["operation.200"]["legacyUnsettled"]["value"]["revalidation"]["state"] == "contract_changed"
+    assert sample["errors"]["409.reviewContractChanged"]["value"]["operation"]["limitation"] == "review_contract_changed"
     for example in sample["result.200"].values():
         envelope = RelationResultEnvelope.model_validate(example["value"])
         assert (envelope.job is None) == (envelope.delivery.state == "withheld")
@@ -838,3 +866,47 @@ def test_an_unexpected_exception_answers_with_the_envelope_of_the_family_that_wa
         assert set(error) == {"code", "retryable", "requestId", "runtimeCode", "field"}
         assert "secret text" not in response.text and "/private/path" not in response.text and "Traceback" not in response.text
     RelationErrorEnvelope.model_validate(relation.json())
+
+
+class _NoLiveProcess:
+    """A relation door of a service started WITHOUT the live group. It has no `_env` at all: reaching it (or `resume`) is the defect."""
+    live_available = False
+
+    def __init__(self):
+        self.resumes: list[tuple] = []
+
+    def resume(self, *args, **kwargs):
+        self.resumes.append((args, kwargs))
+        raise AssertionError("a live job must not start a child when the service has no live group")
+
+
+class _OpenGate:
+    def acquire(self, timeout: float) -> bool:
+        return True
+
+    def release(self) -> None:
+        pass
+
+
+def test_a_pending_live_dispatch_survives_a_restart_without_live_and_ends_idle_unavailable_with_no_child(tmp_path):
+    """Restart regression: a live job accepted and left `pending`, then the service restarted with the pipeline live group OFF. The claim must finish
+    `idle`/`live_unavailable` without a child (the old path claimed `in_flight`, then hit RelationProcess._env's assert and stayed in flight forever)."""
+    from zoop_ai_service.relation_dispatch import RelationDispatcher
+    directory = tmp_path / "service"
+    directory.mkdir()
+    first = RelationLedger(directory, tmp_path / "relation")
+    first.reserve("live-1", "alpha", "c" * 64, "s2", UPSTREAM_DIGEST, "9" * 64)
+    assert first.accept("live-1", "alpha", "l" * 64, 10) == "accepted" and first.dispatch("live-1").state == "pending"
+    first.close()
+
+    ledger = RelationLedger(directory, tmp_path / "relation")      # the restart: the pending row is still pending
+    assert ledger.dispatch("live-1").state == "pending" and ledger.interrupt_in_flight() == 0
+    process, logged = _NoLiveProcess(), []
+    dispatcher = RelationDispatcher(ledger, process, _OpenGate(), logged.append, authorize=lambda *args: pytest.fail("authority is not even asked"))
+    assert dispatcher.step() is True
+    row = ledger.dispatch("live-1")
+    assert (row.state, row.last_outcome, row.last_runtime_code) == ("idle", "runtime_error", "live_unavailable") and process.resumes == []
+    assert {"event": "relation_dispatch", "jobId": "live-1", "outcome": "live_unavailable"} in logged
+    assert dispatcher.step() is False                                # nothing is left to claim: the row is not stuck in flight
+    assert ledger.enqueue("live-1", 1000) == "enqueued"              # an explicit recover (after live is configured again) can still queue it
+    ledger.close()

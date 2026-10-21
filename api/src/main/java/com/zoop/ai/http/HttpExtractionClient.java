@@ -38,7 +38,7 @@ public final class HttpExtractionClient implements ExtractionClient, AutoCloseab
                 : PipelineJob.Disposition.ALREADY_ACCEPTED;
         return new ExtractionAcknowledgement(disposition, AiHttpTransport.decode(reply, () -> {
             ExtractionJobStatus status = ExtractionWire.status(reply.body(), "status", jobId, reply.retryAfter());
-            if (!status.approvedRequestDigest().equals(submission.approvedRequestDigest())) {
+            if (!status.approvedRequestDigest().equals(submission.approvedRequestDigest()) || status.executionMode() != submission.executionMode()) {
                 throw new Malformed("status.approval");
             }
             return status;

@@ -251,6 +251,76 @@ class IngestionExportParserTest {
         assertEquals("https://example.invalid/한글/\uD83D\uDE00", document.url());
     }
 
+    @Test
+    void aPublisherIsOptionalAndAbsentOrExplicitNullBothMeanNoneDeclared() {
+        ObjectNode absent = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        assertTrue(!observationOf(absent).has("publisher"), "the fixture of an older export must not carry the key");
+        assertNull(parser.parse(ExportFixtures.bytes(absent), observation).publisher());
+
+        ObjectNode none = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(none).putNull("publisher");
+        assertNull(parser.parse(ExportFixtures.bytes(none), observation).publisher());
+
+        // The key never turns into a source id, host or title guess when it is missing.
+        assertNull(parser.parse(ExportFixtures.bytes(collectedExport("instant", "2026-10-14T09:00:00+09:00")), observation).publisher());
+    }
+
+    @Test
+    void aDeclaredPublisherIsKeptExactlyWithoutTrimmingOrNormalisation() {
+        String emoji200 = "\uD83D\uDE00".repeat(IngestionExportParser.MAX_PUBLISHER_CODE_POINTS);
+        for (String declared : List.of("합성일보", "  합성일보 \uD83D\uDE00 ", NFD_TEXT, NFC_TEXT, "a b", "a\u00a0b", emoji200)) {
+            ObjectNode export = export(observation, PLAIN_TEXT, PLAIN_HASH);
+            observationOf(export).put("publisher", declared);
+            assertEquals(declared, parser.parse(ExportFixtures.bytes(export), observation).publisher());
+        }
+        ObjectNode collectedWithPublisher = collectedExport("day", "2026-10-14");
+        observationOf(collectedWithPublisher).put("publisher", "합성일보");
+        VerifiedDocument document = parser.parse(ExportFixtures.bytes(collectedWithPublisher), observation);
+        assertEquals("합성일보", document.publisher());
+        assertNotNull(document.collected());
+        assertEquals(LocalDate.of(2026, 10, 14), document.publishedDate());
+    }
+
+    @Test
+    void aPublisherMustBeANonBlankStorableStringOfAtMostTwoHundredCodePoints() {
+        String emoji201 = "\uD83D\uDE00".repeat(IngestionExportParser.MAX_PUBLISHER_CODE_POINTS + 1);
+        for (String refused : List.of("", " ", "\u00a0\u2003\u2028\u2029", "a\u0000b", "a\tb", "a\nb", "a\rb", "a\u007fb", "a\u0085b",
+                "a".repeat(IngestionExportParser.MAX_PUBLISHER_CODE_POINTS + 1), emoji201)) {
+            assertEquals(DocumentImportFailure.METADATA_UNSUPPORTED,
+                    failureOf(e -> observationOf(e).put("publisher", refused)), "publisher " + refused.length());
+        }
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("publisher", 7)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).put("publisher", true)));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putArray("publisher").add("합성일보")));
+        assertEquals(DocumentImportFailure.EXPORT_INVALID, failureOf(e -> observationOf(e).putObject("publisher")));
+    }
+
+    /** The export's bytes with the publisher written as the given RAW JSON string body (escapes included), bypassing any Java string. */
+    private byte[] exportWithRawPublisher(String rawJsonStringBody) {
+        ObjectNode export = export(observation, PLAIN_TEXT, PLAIN_HASH);
+        observationOf(export).put("publisher", "RAWPUBLISHERMARK");
+        String json = new String(ExportFixtures.bytes(export), StandardCharsets.UTF_8);
+        assertEquals(1, json.split("RAWPUBLISHERMARK", -1).length - 1, "the marker must occur exactly once");
+        return json.replace("RAWPUBLISHERMARK", rawJsonStringBody).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void aLoneSurrogateWrittenAsAJsonEscapeIsNeverStoredAsAPublisher() {
+        // Written as escapes inside the JSON text itself (a Java string could not even hold them reliably): a high or low surrogate
+        // alone, inside text, in the wrong order, or cut off by the next character. The parser must refuse every one of them, either
+        // when the JSON is read (export_invalid) or at the storable check (metadata_unsupported); none may reach a VerifiedDocument.
+        for (String raw : List.of("\\ud800", "\\udc00", "a\\ud800b", "a\\udc00b", "\\udc00\\ud800", "\\ud83d", "\\ud83dx",
+                "\\ud83d\\ud83d\\ude00", "\\udE00")) {
+            byte[] bytes = exportWithRawPublisher(raw);
+            DocumentImportFailure refused = failure(bytes);
+            assertTrue(refused == DocumentImportFailure.EXPORT_INVALID || refused == DocumentImportFailure.METADATA_UNSUPPORTED,
+                    raw + " -> " + refused);
+        }
+        // Control: the same escapes as a well-formed pair are the emoji, so the refusals above are about the lone surrogate only.
+        assertEquals("\uD83D\uDE00", parser.parse(exportWithRawPublisher("\\ud83d\\ude00"), observation).publisher());
+        assertEquals("a\uD83D\uDE00b", parser.parse(exportWithRawPublisher("a\\uD83D\\uDE00b"), observation).publisher());
+    }
+
     private ObjectNode collectedExport(String precision, String raw) {
         return collected(export(observation, PLAIN_TEXT, PLAIN_HASH), "news", precision, raw);
     }

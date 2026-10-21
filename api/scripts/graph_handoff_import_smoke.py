@@ -26,11 +26,37 @@ not cleaned):
     make api-graph-handoff-import-smoke
 
 (the Make target runs this script with --jar/--handoff-cli/--ingest-cli; the direct python invocation with those flags and
---psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217). A second, legal producer
-world is imported last: documents a and a2 of one issue both use the local mention id `m-a`, which the app maps to two distinct mention ids.
+--psql-container/--db-user/--db-name still works.) The staged snapshot is the app's current format 3 (PR #217) and carries no original mention value:
+the retained receipt keeps the complete `zoop-graph-handoff-bundle-5` bundle, whose `issues[].mentions[]` the script compares with hand-written S2 values, whose
+`issues[].fieldProvenance` (which mentions state each selected headline value, whether the operator's representative or unanimity selected it, and which of
+`eventTime`/`period` an operator verdict withheld; never a verification) it compares with hand-written selection facts and whose `issues[].fieldVerdicts` it compares
+with hand-written operator verdicts.
+A second, legal producer world is imported next: documents a and a2 of one issue both use the local mention id `m-a`, which the app maps to two distinct
+mention ids and the receipt keeps as two original mentions.
+A third, producer-authored VERDICT world (`graph_handoff_smoke.verdict_export`, a SYNTHETIC review, handoff `handoff-verdicts-1`) is imported last: the supply
+representative's REJECTed event time and the factory's HELD period are null in the staged snapshot (event time with unknown precision) while the receipt retains
+every original mention value, each verdict and its exact evidence; a non-representative HOLD/REJECT and an ALLOW withhold nothing. With the evidence-read phase
+(the default) a SECOND TEST-HARNESS activation then reads that version through the real public graph, derived-edge and evidence routes to show the withheld values are absent.
+A fourth, producer-authored APPROVED world (`graph_handoff_smoke.approved_export`, replay, SYNTHETIC, handoff `handoff-approved-1`) is imported after the verdict world: an
+operator's FINAL approval of an S3 HOLD beside automatic verdicts, and operator-declared document origins. The receipt keeps every used relation's `approvalBasis`
+(an operator approval never reads as the independent verifier on the INVOLVES or structural literal, `verifiedAt` is the deciding event's time), every article's
+`textSha256` equals the stored text's hash, and each issue's `sourceSupport` equals the hand-written lineage groups (`knownLineageCount` counts groups, not articles)
+and exact-text duplicate groups; none of it is in the staged snapshot or any public read (a THIRD TEST-HARNESS activation serves it through the real graph and evidence routes).
+A fifth, producer-authored STRUCTURAL-PATH world (`build_world(chain=True)`, SYNTHETIC; three handoffs `path-{private,known,unmapped}-1`, built LAST) is imported after the others: a complete
+two-relation path through a mapped but unpublished middle company (a private `pathCompanies` entry, catalogue-checked with an equal label under the import's lock: a renamed one is
+`company_mismatch` with nothing written), through a published middle, and an unavailable path through an unmapped middle. The staged snapshots carry no path, no path company and no scope
+text; the receipts keep the complete bundle, the `structural_path_closed_over_involves_basis_and_catalog` check and the operator-mapped-chain note. With the evidence-read phase a FOURTH
+TEST-HARNESS activation (BACK-DATED to just after the last activation, so an asOf can fall before the structural basis was verified) serves the private-middle version: the spans only a
+structural basis cites are 200 without eventIds from the selected version's receipt, 404 before the basis was verified or the article published, under a revoked grant, a private article,
+tampered receipt bytes or another version, and no public body names the private company. Disclosure exclusions have no store in the built application, so they are proven by the Java tests.
 
 On success the last stdout line is {"status": "passed", "steps": N, "providerCalls": 0, "modelCalls": 0, ...}; any failed
-expectation exits non-zero.
+
+An evidence-read phase runs by default (turn it off with --no-with-evidence-read): after the collision import it starts the web jar on loopback
+(artifact source, ZOOP_DOCUMENT_READ_INGESTION_SOURCES = the same registry file, S1 grants unset), makes ONE explicit TEST-HARNESS psql activation of the
+second staged version (the import itself never activates; production has no activation route) and reads GET /api/v1/evidence/{id} for the graph body
+evidence, with CLI parity for the source registry and failure cases; the verdict world then gets its own one TEST-HARNESS activation and public graph reads. The final line
+reports importActivationsWritten: 0 and harnessActivations: 2 separately, plus evidenceReads and verdictGraphReads.
 """
 from __future__ import annotations
 
@@ -49,7 +75,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 API_SCRIPTS = Path(__file__).resolve().parent
@@ -64,6 +90,9 @@ PUBLIC_IDS = {"KRX:005930": "SYNTH:000001", "KRX:000660": "SYNTH:000002"}   # th
 SCHEMA = "zoop-graph-handoff-import-1"
 COMPANIES = (("SYNTH:000001", "합성기업"), ("SYNTH:000002", "합성부품"))
 HANDOFFS = ("handoff-smoke-1", "handoff-smoke-2")
+# The operator-declared publishing outlets of the authored world, written out by hand. Only document "a" declares one; "a2" and "b" do not, so their
+# stored versions keep a NULL publisher and the public read must answer null. The AI world must have been generated with exactly this declaration.
+DECLARED_PUBLISHERS = {"a": "합성일보 Synthetic Daily"}
 
 
 def sha256(raw: bytes) -> str:
@@ -79,6 +108,48 @@ def mention_id(article: dict, source_mention_id: str) -> str:
     spaces) of the resolved article id and version and the producer's local mention id. Local ids repeat across documents; this one does not."""
     return "mention-" + sha256(hs.canonical({"articleId": article["articleId"], "articleVersion": article["articleVersion"],
                                               "sourceMentionId": source_mention_id}).encode("utf-8"))
+
+
+def participant(source_id: str | None, name: str, role: str, public_id: str | None = None) -> dict:
+    """One participant as the authored S2 replay states it; `public_id` is the AUTHORED public id (KRX:*), remapped to this smoke's catalog ids, or None when the
+    contract says the company is unmapped (no source id, no canonical entry, or no public decision)."""
+    return {"sourceCompanyId": source_id, "companyId": PUBLIC_IDS[public_id] if public_id else None, "name": name, "role": role}
+
+
+MAPPED = participant("SYNTH-1", "합성기업", "issuer", "KRX:005930")
+# The contract's mapping cases, hand-written from the authored world: mapped (two public companies), no source id, no public decision, no canonical entry.
+DOC_A = [MAPPED, participant("SYNTH-3", "합성부품", "supplier", "KRX:000660"), participant(None, "미상 거래처", "counterparty")]
+DOC_B = [MAPPED, participant("SYNTH-2", "합성협력", "partner"), participant("SYNTH-9", "미등록 법인", "observer")]
+
+
+def expected_mentions(world, *items: tuple) -> list:
+    """The original S2 mentions of one issue, written out by hand from the authored extraction replay (`extraction_smoke.Kit.mention` defaults plus what
+    `graph_handoff_smoke.build_world` overrides) and the operator's canonical/decisions files: every item is (document name, S2 local mention id, cited quote,
+    title, action, event time, period, participants). `verification` is always `none`; participants are the S2 text as extracted, in S2 order, with the public
+    company only where the contract maps it. Ordered as the bundle orders them: by the canonical JSON of the identity."""
+    found = []
+    for name, local_id, quote, title, action, event_time, period, participants in items:
+        ref = world.refs[name]
+        found.append({"documentId": ref["documentId"], "documentVersion": ref["documentVersion"], "mentionId": local_id,
+                      "articleId": ref["documentId"], "articleVersion": ref["documentVersion"], "verification": "none", "title": title, "action": action,
+                      "target": "공급 계약", "eventTime": event_time, "timePrecision": "day", "period": period, "assertionStatus": "announced", "background": False,
+                      "participants": participants, "evidenceIds": [hs.evidence_id(world, name, quote)]})
+    return sorted(found, key=lambda m: hs.canonical({k: m[k] for k in ("documentId", "documentVersion", "mentionId")}))
+
+
+def expected_field_provenance(world, selection: str, every: tuple, *, withheld: tuple = (), **different: tuple) -> dict:
+    """One issue's `fieldProvenance`, written out by hand: `every` is the (document name, S2 local mention id) pairs that state the SELECTED value (the representative's,
+    or the shared one) in each of the six headline fields, and a keyword overrides one field's pairs where fewer mentions state it. Ordered like the mentions: by the
+    canonical JSON of the identity. `withheld` is the hand-written subset of `eventTime`/`period` an operator HOLD/REJECT on the selection basis removed from the
+    issue headline; the lists still compare the ORIGINAL selected value, never the redacted null. It records selection, never that the value is verified
+    (`verification` is always `none`)."""
+    def references(pairs: tuple) -> list:
+        found = [{"documentId": world.refs[name]["documentId"], "documentVersion": world.refs[name]["documentVersion"], "mentionId": local_id}
+                 for name, local_id in pairs]
+        return sorted(found, key=hs.canonical)
+    fields = ("title", "action", "target", "eventTime", "period", "assertionStatus")
+    return {"selection": selection, "verification": "none", "withheld": list(withheld),
+            "sameValueMentions": {field: references(different.get(field, every)) for field in fields}}
 
 
 def fingerprint(path: Path) -> dict:
@@ -253,6 +324,724 @@ class WebRun:
             return error.code, error.read().decode("utf-8", "replace")
 
 
+def evidence_read_phase(smoke, db, layout, world, vid2: str, never_activated: tuple, active_before: str) -> dict:
+    """Public GET /api/v1/evidence/{id} over real HTTP for the graph body evidence of the second staged handoff.
+
+    The import never activates, and no production activation exists, so a staged version is unreadable by design. This phase therefore adds
+    ONE explicit TEST-HARNESS activation of `vid2` by psql, mirroring JdbcGraphVersionRepository.activateSystem (same advisory lock, pointer move
+    and a `system` history row), in the smoke's own throwaway database. It is reported separately (`harnessActivations`) and is not an import
+    result. The evidence rows of `vid2` are shared with the first import, whose receipt they still point at: reading proves the SELECTED version's
+    receipt (not the row's own, older one) supplies the grant pins. Expectations come from the authored world, never from the reader under test."""
+    import urllib.parse
+    from datetime import timezone
+    reads = 0
+    spans = [("a", hs.EVT_A), ("a", hs.GEO_A), ("a", hs.SUP), ("a2", hs.EVT_A2), ("b", hs.QB), ("b", hs.GEO_B)]
+    snapshot = json.loads((layout.artifacts / "graph_snapshot" / f"{vid2}.json").read_text("utf-8"))
+    expected = {}
+    for name, quote in spans:
+        eid, span = hs.evidence_id(world, name, quote), hs.span(world, name, quote)
+        citing = [i["issueId"] for i in snapshot["issues"] if eid in i["evidenceIds"] or eid in i["geographyEvidenceIds"]]
+        expected[eid] = {"name": name, "quote": quote, "span": span, "events": citing}
+    main_id = hs.evidence_id(world, "a", hs.EVT_A)
+    check(expected[main_id]["events"], "the authored world's main evidence is cited by no issue of the snapshot")
+    ref = base.item(world.refs["a"])["observation"]
+    artifact_tree = fingerprint(layout.artifacts)
+    registry_bytes = layout.registry_path.read_bytes()
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout.registry_path)}
+
+    def get(web, evidence_id: str, **params) -> tuple[int, dict]:
+        nonlocal reads
+        reads += 1
+        query = urllib.parse.urlencode(params)
+        code, body = web.get(f"/api/v1/evidence/{evidence_id}" + (f"?{query}" if query else ""))
+        return code, (json.loads(body) if body.startswith("{") else {})
+
+    def error_code(body: dict) -> str:
+        return (body.get("error") or {}).get("code", "")
+
+    with smoke.web(web_env) as web:
+        # before any activation: the staged version cannot be pinned, and the active fixture version does not show this evidence ----
+        code, body = get(web, main_id, graphVersion=vid2)
+        check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"a staged version was readable through the evidence read: {code} {body}")
+        code, body = get(web, main_id)
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"the unpinned read before any activation: {code} {body}")
+        before_reads = smoke.table_fingerprint()
+
+        # the one explicit test-harness activation ------------------------------------------------------------------------------
+        at = datetime.now(timezone.utc)
+        check(at.year >= 2026 and db.scalar("SELECT count(*) FROM graph_activations") == 2, "unexpected activation history before the harness")
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid2}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid2}', '{active_before}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic activation', '{at.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid2 and db.scalar("SELECT count(*) FROM graph_activations") == 3,
+              "the harness activation did not apply")
+        harness_fingerprint = smoke.table_fingerprint()
+
+        # reads after the harness activation ---------------------------------------------------------------------------------------
+        publishers_read: dict = {}
+        for eid, fact in expected.items():
+            if not fact["events"]:
+                # Cited by no issue and no relation: only the structural basis rests on it. A BASIS-ONLY span is served when the selected version's
+                # receipt proves exactly that relation's basis cites it, and carries no eventIds.
+                check((fact["name"], fact["quote"]) == ("a", hs.SUP), f"an unexpected evidence cited by nothing: {fact['name']} {fact['quote']!r}")
+            code, body = get(web, eid)
+            span = fact["span"]
+            check(code == 200 and body["id"] == eid and body["quote"] == fact["quote"] and body["start"] == span["start"]
+                  and body["end"] == span["end"] and body["articleId"] == span["documentId"] and body["articleVersion"] == span["documentVersion"]
+                  and body["documentVersion"] == span["documentVersion"] and body["quoteVerified"] is True,
+                  f"graph evidence {fact['name']}: {code} {str(body)[:300]}")
+            check(body["eventIds"] == fact["events"] and body["sentiment"] is None and body["documentSummary"] is None
+                  and body["analysisStatus"] is None and body["analysisProvenance"] is None and body["resultVersion"] is None,
+                  f"graph evidence body fields {fact['name']}: {body}")
+            article = body["article"]
+            check(set(article) == {"title", "publisher", "url", "publishedAt"}, f"graph evidence article keys {fact['name']}: {article}")
+            check(article["publisher"] == DECLARED_PUBLISHERS.get(fact["name"]),
+                  f"graph evidence {fact['name']}: article.publisher {article['publisher']!r} is not the declared {DECLARED_PUBLISHERS.get(fact['name'])!r}")
+            publishers_read[fact["name"]] = article["publisher"]
+            meta = body["metadata"]
+            check(meta["source"] == "public_graph_snapshot" and meta["graphVersion"] == vid2 and meta["partial"] is False and meta["failures"] == [],
+                  f"graph evidence metadata: {meta}")
+            check(abs((datetime.now(timezone.utc) - datetime.fromisoformat(meta["asOf"].replace("Z", "+00:00"))).total_seconds()) < 300,
+                  f"the unpinned read's asOf is not the request time: {meta['asOf']}")
+        code, body = get(web, main_id, graphVersion=vid2)
+        check(code == 200 and body["metadata"]["graphVersion"] == vid2, f"graphVersion read: {code} {body}")
+        later = (at + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        code, body = get(web, main_id, asOf=later)
+        check(code == 200 and body["metadata"]["graphVersion"] == vid2 and body["metadata"]["asOf"] == later, f"later asOf read: {code} {body}")
+        code, body = get(web, main_id, asOf="2026-10-09T00:00:00Z")
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"an asOf before the activation must not show the evidence: {code} {body}")
+        code, body = get(web, main_id, asOf="2026-10-09T00:00:00Z", graphVersion=vid2)
+        check(code == 422 and error_code(body) == "INVALID_REQUEST", f"inconsistent graphVersion and asOf: {code} {body}")
+        code, body = get(web, main_id, round="brf-1")
+        check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"round: {code} {body}")
+        for other in never_activated:
+            code, body = get(web, main_id, graphVersion=other)
+            check(code == 409 and error_code(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {other} {code}")
+        code, body = get(web, main_id, asOf="yesterday")
+        check(code == 422 and error_code(body) == "INVALID_REQUEST", f"an invalid asOf: {code} {body}")
+        code, body = get(web, main_id, companyId="SYNTH:000001")
+        check(code == 200 and body["metadata"]["partial"] is True and body["sentiment"] is None
+              and [f["section"] for f in body["metadata"]["failures"]] == ["sentiment"], f"known company: {code} {body}")
+        code, body = get(web, main_id, companyId="NOPE:1")
+        check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown company: {code} {body}")
+        code, body = get(web, "ev-" + "0" * 64)
+        check(code == 404 and error_code(body) == "RESOURCE_NOT_FOUND", f"unknown evidence id: {code} {body}")
+        check(publishers_read.get("a") == DECLARED_PUBLISHERS["a"] and publishers_read.get("a2", "missing") is None
+              and publishers_read.get("b", "missing") is None,
+              f"the public reads did not cover the declared and the undeclared documents: {publishers_read}")
+        for name, quote in spans:
+            span = hs.span(world, name, quote)
+            stored = db.scalar(f"SELECT json_build_object('publisher', publisher) FROM article_versions WHERE article_id = '{span['documentId']}' AND version = '{span['documentVersion']}'")["publisher"]
+            check(stored == DECLARED_PUBLISHERS.get(name), f"the stored article_versions.publisher of {name} is {stored!r}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        check(fingerprint(layout.artifacts) == artifact_tree, "a public read changed the artifact tree")
+        check(before_reads["evidence"] == harness_fingerprint["evidence"] and before_reads["artifacts"] == harness_fingerprint["artifacts"],
+              "the harness changed evidence or artifacts")
+        step("evidence read (web, artifact source, S1 grants unset): staged 409 / unpinned 404 before the harness activation; after it the six-field body, "
+             "selected graphVersion and asOf, eventIds, later asOf 200, earlier asOf 404, 422/409/404 paths, partial company context; nothing written")
+
+        # parity with the CLI: the same current registry decides the import's --require-store and this read ------------------------
+        original = json.loads(layout.registry_path.read_text("utf-8"))["sources"][0]["grant"]
+        now_past = "2020-01-01T00:00:00Z"
+        denied = {
+            "drop read": lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "read"]}),
+            "drop store": lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "store"]}),
+            "drop quote-display": lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "quote-display"]}),
+            "disabled": lambda g: g.update({"enabled": False}),
+            "rights unknown": lambda g: g.update({"rights": "unknown"}),
+            "rights denied": lambda g: g.update({"rights": "denied"}),
+            "blank evidence": lambda g: g.update({"evidence": ["  "]}),
+            "expired": lambda g: g.update({"expiresAt": now_past}),
+        }
+        for label, change in denied.items():
+            smoke.set_registry(change)
+            code, body = get(web, main_id)
+            cli = smoke.ingest_export(ref, require_store=True)
+            check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE" and cli != 0,
+                  f"parity {label}: the read answered {code} but the CLI exit was {cli}")
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+            code, body = get(web, main_id)
+            check(code == 200 and smoke.ingest_export(ref, require_store=True) == 0, f"parity {label}: restoring did not restore both")
+        # a changed revision or grant id is not something the CLI sees (its export takes no expected pin); the read compares the receipt's pins
+        for label, change in (("revision", lambda g: g.update({"revision": g["revision"] + "-next"})),
+                              ("grant id", lambda g: g.update({"grantId": g["grantId"] + "-other"}))):
+            smoke.set_registry(change)
+            code, body = get(web, main_id)
+            check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"a changed {label} did not withhold the evidence: {code} {body}")
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+        # control: model-send is not part of the rule (nothing is sent to a model); both with and without it the read and the CLI pass
+        for operations in (["read", "store", "quote-display"], ["read", "store", "model-send", "quote-display"]):
+            smoke.set_registry(lambda g: g.update({"allowedOperations": operations}))
+            code, body = get(web, main_id)
+            check(code == 200 and smoke.ingest_export(ref, require_store=True) == 0, f"control model-send {operations}: {code}")
+        smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+        step("parity: for every denial (missing read/store/quote-display, disabled, rights unknown/denied, blank evidence, expiry) the GET is 404 exactly when "
+             "`zoop-ai-ingest export --require-store` fails; a changed revision/grant id is 404; model-send in or out of the grant does not matter")
+
+        # failures: each is restored afterwards ---------------------------------------------------------------------------------
+        layout.registry_path.write_bytes(b"{")
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"a malformed source registry: {code} {body}")
+        parked = layout.registry_path.with_name("parked-sources.json")
+        layout.registry_path.replace(parked)
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"a missing source registry: {code} {body}")
+        parked.replace(layout.registry_path)
+        layout.registry_path.write_bytes(registry_bytes)
+        check(get(web, main_id)[0] == 200, "restoring the registry file did not restore the read")
+        # An expiresAt the S2-1 Python model rejects (a lowercase `z`) makes the WHOLE registry invalid: 503, never a per-source denial,
+        # whether it sits on the requested source or on an unrelated one. Each is restored byte-for-byte.
+        bad_expiry = "2030-01-01T00:00:00z"
+        requested = json.loads(registry_bytes.decode("utf-8"))
+        requested["sources"][0]["grant"]["expiresAt"] = bad_expiry
+        layout.registry_path.write_bytes(hs.json_bytes(requested))
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"an invalid expiresAt on the requested source: {code} {body}")
+        layout.registry_path.write_bytes(registry_bytes)
+        check(get(web, main_id)[0] == 200, "restoring the registry after an invalid requested-source expiry did not restore the read")
+        unrelated = json.loads(registry_bytes.decode("utf-8"))
+        other = json.loads(json.dumps(unrelated["sources"][0]))
+        other["sourceId"] = other["grant"]["sourceId"] = "unrelated-smoke-source"
+        other["grant"]["grantId"] = "unrelated-smoke-grant"
+        other["grant"]["expiresAt"] = bad_expiry
+        unrelated["sources"].append(other)
+        layout.registry_path.write_bytes(hs.json_bytes(unrelated))
+        code, body = get(web, main_id)
+        check(code == 503 and error_code(body) == "SOURCE_UNAVAILABLE", f"an invalid expiresAt on an unrelated source: {code} {body}")
+        layout.registry_path.write_bytes(registry_bytes)
+        check(get(web, main_id)[0] == 200, "restoring the registry after an invalid unrelated-source expiry did not restore the read")
+        receipt_path = layout.artifacts / "verification_receipt" / f"{vid2}.json"
+        receipt_info = receipt_path.stat()
+        receipt_original = receipt_path.read_bytes()
+        receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
+        check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
+        code, body = get(web, main_id)
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"tampered receipt bytes: {code} {body}")
+        receipt_path.write_bytes(receipt_original)
+        os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
+        check(get(web, main_id)[0] == 200, "restoring the receipt did not restore the read")
+        article_id = expected[main_id]["span"]["documentId"]
+        db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{article_id}'")
+        code, body = get(web, main_id)
+        db.run(f"UPDATE articles SET access_status = 'available' WHERE id = '{article_id}'")
+        check(code == 404 and error_code(body) == "EVIDENCE_UNAVAILABLE", f"a private article stayed readable: {code} {body}")
+        check(get(web, main_id)[0] == 200, "restoring article access did not restore the read")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout.registry_path.read_bytes() == registry_bytes,
+              "a failure scenario was not restored exactly (artifact tree or registry file)")
+        step("failures: malformed or deleted source registry 503; an invalid expiresAt ('...00z') on the requested source or on an unrelated source 503; "
+             "tampered receipt bytes 404; a private article 404; each restored byte-for-byte")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 1,
+          "the harness activation count is not exactly one")
+    return {"harnessActivations": 1, "evidenceReads": reads}
+
+def verdict_read_phase(smoke, db, layout, layout4, world, vid4: str, previous: str, ev4) -> dict:
+    """Public graph reads over real HTTP of the VERDICT world's staged version: the rejected/held `eventTime` and `period` are hidden in the real graph output.
+
+    The import never activates, and no production activation exists, so this phase adds ONE explicit TEST-HARNESS activation of `vid4` by psql (the same
+    statement shape as `evidence_read_phase`, moving the pointer from `previous`) in the smoke's own throwaway database. It is reported separately
+    (`harnessActivations`) and is not an import result. The web application reads the retained receipt of `vid4` with the verdict world's OWN source registry
+    (`layout4`). Everything expected is written out by hand from the authored (SYNTHETIC) review: the supply representative's event time is REJECTed (no time,
+    unknown precision), its period ALLOWed (still read as stated); the factory's only mention keeps its time while its period is HELD. No public read exposes
+    a period, so that one is proven absent from the snapshot artifact (`main`) and from every public body here."""
+    import urllib.parse
+    from datetime import timezone
+    supply, factory = "issue:supply-2026q3", "issue:factory-2026q4"
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout4.registry_path)}
+    graph_reads = evidence_reads = 0
+    spans = [("a", hs.PERIOD_A, supply), ("a2", hs.PERIOD_A2, supply), ("b", hs.PERIOD_B, factory)]
+    bodies: list[str] = []
+
+    def get_json(web, path: str) -> tuple[int, dict]:
+        code, text = web.get(path)
+        bodies.append(text)
+        return code, (json.loads(text) if text.startswith("{") else {})
+
+    with smoke.web(web_env) as web:
+        code, graph = get_json(web, f"/api/v1/graph?graphVersion={vid4}")
+        check(code == 409 and (graph.get("error") or {}).get("code") == "VERSION_UNAVAILABLE", f"the staged verdict version was readable before the harness activation: {code} {graph}")
+        at = datetime.now(timezone.utc)
+        check(db.scalar("SELECT count(*) FROM graph_activations") == 3, "unexpected activation history before the verdict harness")
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid4}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid4}', '{previous}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic verdict activation', '{at.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid4 and db.scalar("SELECT count(*) FROM graph_activations") == 4,
+              "the verdict harness activation did not apply")
+        harness_fingerprint = smoke.table_fingerprint()
+
+        # the real graph output: the pinned version and the default (active) read both hide the rejected time -------------------
+        for path in (f"/api/v1/graph?graphVersion={vid4}", "/api/v1/graph"):
+            code, graph = get_json(web, path)
+            graph_reads += 1
+            check(code == 200 and graph["metadata"]["graphVersion"] == vid4, f"{path}: {code} {str(graph)[:300]}")
+            nodes = {n["id"]: n for n in graph["nodes"] if n["kind"] == "issue"}
+            check(set(nodes) == {supply, factory}, f"{path}: issue nodes {sorted(nodes)}")
+            check((nodes[supply]["eventTime"], nodes[supply]["timePrecision"]) == (None, "unknown")
+                  and (nodes[factory]["eventTime"], nodes[factory]["timePrecision"]) == ("2026-11-15", "day"),
+                  f"{path}: the rejected supply time is not hidden or the unreviewed factory time is not kept: "
+                  f"{[(n['id'], n['eventTime'], n['timePrecision']) for n in nodes.values()]}")
+        # an issue shared by two companies is read again through the derived edge's `via`: the same withheld time there
+        derived = [e for e in graph["edges"] if e["derived"]]
+        seen_via = 0
+        for edge in derived:
+            code, detail = get_json(web, f"/api/v1/graph/edges/{urllib.parse.quote(edge['id'], safe='')}")
+            graph_reads += 1
+            check(code == 200, f"derived edge detail {edge['id']}: {code} {detail}")
+            for via in detail["via"]:
+                if via["id"] == supply:
+                    check((via["eventTime"], via["timePrecision"]) == (None, "unknown"), f"a derived edge shows the rejected supply time: {via}")
+                    seen_via += 1
+                if via["id"] == factory:
+                    check((via["eventTime"], via["timePrecision"]) == ("2026-11-15", "day"), f"a derived edge changed the factory time: {via}")
+                    seen_via += 1
+        # no public body carries a rejected or held ORIGINAL value, a verdict or a review word ------------------------------------
+        joined = "\n".join(bodies)
+        check("2026-09-30" not in joined and "2026Q4" not in joined
+              and not any(word in joined for word in ("fieldVerdicts", "withheld", "operator-field-verdict", "contradicted", "ambiguous", "unstated", hs.REVIEWER)),
+              "a rejected or held original value, or a verdict, reached a public graph read")
+
+        # the verdict spans are part of their issues' evidence, so the existing public evidence read serves them like geography evidence ----------
+        for name, quote, issue_id in spans:
+            eid, span = ev4(name, quote), hs.span(world, name, quote)
+            code, body = get_json(web, f"/api/v1/evidence/{eid}")
+            evidence_reads += 1
+            check(code == 200 and body["id"] == eid and body["quote"] == quote and body["start"] == span["start"] and body["end"] == span["end"]
+                  and body["articleId"] == span["documentId"] and body["articleVersion"] == span["documentVersion"] and body["quoteVerified"] is True
+                  and body["eventIds"] == [issue_id] and body["metadata"]["graphVersion"] == vid4,
+                  f"verdict evidence {name}: {code} {str(body)[:300]}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step(f"verdict world, real graph output (web, artifact source; ONE test-harness activation of the staged verdict version): GET /api/v1/graph pinned and default show the "
+             f"supply issue without an event time (unknown precision) and the factory time kept, {seen_via} derived-edge `via` entries agree, no public body carries a rejected or "
+             f"held original value or a verdict word, and the three verdict spans are served as evidence of their issues; nothing written")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 2,
+          "the harness activation count is not exactly two (evidence phase and verdict phase)")
+    return {"harnessActivations": 1, "evidenceReads": evidence_reads, "graphReads": graph_reads}
+
+# Words that belong to the retained receipt only: the staged snapshot and every public read must never carry them.
+INTERNAL_WORDS = ("operator-final-approval", "automatic-verifier", "approvalBasis", "manual-operator-final-approval", "s3-operator-final-approval",
+                  "sourceSupport", "knownLineageCount", "independentSourceCount", "unknownLineageArticles", "duplicateGroups", "operator-declared-origin",
+                  "textSha256", "originId")
+
+
+def approved_world_phase(args, db, layout, scratch: Path) -> dict:
+    """A producer-authored world where an operator FINALLY APPROVED a HOLD relation (beside automatic ones) and declared document origins, imported over real processes.
+
+    SYNTHETIC and replay-only (`executionMode: replay`, `recordingKind: authored-test`): a live provider recording needs a paid run and is covered by the Java unit
+    tests only. Everything expected is written out by hand in `hs.expected_approvals`, `hs.expected_support` and `hs.expected_origins`; nothing is read back from the
+    importer or the verifier under test. It proves that the receipt keeps the approval basis of every used relation, that an operator approval never reads as an
+    automatic verdict (on the INVOLVES literal and on the structural basis), that `verifiedAt` is the deciding event's time, that each article's `textSha256` is the
+    stored text's hash, that `sourceSupport` counts lineage GROUPS (not articles) and exact-text duplicate groups only, and that none of it reaches the snapshot."""
+    from collections import Counter
+    world5, env = hs.approved_export(scratch / "approved", PUBLIC_IDS)
+    layout5 = Layout(world5, args.ingest_cli)
+    layout5.artifacts = layout.artifacts
+    smoke5 = Smoke(args, db, layout5)
+    status, result, _ = smoke5.jar.run("documents-approved", [base.item(ref) for ref in world5.refs.values()], artifact_root=layout.artifacts)
+    check(status == 0 and result and result["status"] == "succeeded", f"the approved world's document import failed: {result}")
+    ledgers_before = {name: fingerprint(path) for name, path in layout5.ledgers.items()}
+    hid, vid = hs.APPROVED_HANDOFF, version_id(hs.APPROVED_HANDOFF)
+    manifest_digest, bundle_digest = hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))
+    bundle = env["bundle"]
+    status, result, output = smoke5.graph_import("approved", smoke5.request(hid, manifest_digest, bundle_digest))
+    check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid,
+          f"the approved handoff was not staged: {result} {output[-800:]}")
+
+    # approval bases: the result states how the staged edges' S3 relations became eligible, from hand-written expectations ---------------
+    approvals = hs.expected_approvals(world5)
+    kinds = dict(Counter(want["kind"] for want in approvals.values()))
+    check(kinds.get("operator-final-approval", 0) >= 1 and kinds.get("automatic-verifier", 0) >= 1,
+          f"the authored world must hold at least one operator-approved and one automatic relation: {kinds}")
+    check(result["provenance"]["sourceKind"] == "synthetic" and result["provenance"]["executionMode"] == "replay"
+          and result["provenance"]["recordingKind"] == "authored-test" and result["provenance"]["approvalBases"] == kinds
+          and result["provenance"]["structuralRelationOrigin"] == "manual-operator-review", f"provenance: {result['provenance']}")
+    receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
+    check(receipt["bundle"] == bundle and receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5", "the approved receipt does not retain the producer's bundle")
+    check(receipt["appVerification"]["approvalBasis"] == "audit-metadata-not-a-verifier-verdict", "the receipt overclaims what an approval basis is")
+    used = {(source["relation"]["jobId"], use["relationCandidateId"]): use for source in bundle["sources"] for use in source["reviewUsed"]}
+    check(set(used) == set(approvals), f"the used reviews differ from the hand-written approvals: {sorted(used)} vs {sorted(approvals)}")
+    for key, want in approvals.items():
+        got = used[key]["approvalBasis"]
+        check(got["kind"] == want["kind"] and got["reviewer"] == want["reviewer"] and got["revision"] == want["revision"] == used[key]["revision"]
+              and isinstance(got["decidedAt"], str) and got["decidedAt"],
+              f"the approval basis of {key} is not the hand-written one: {got} vs {want}")
+    literals = set()
+    for relation in bundle["relations"]:
+        if relation["type"] == "FOLLOWS":
+            continue
+        refs = [(ref["jobId"], ref["id"]) for ref in relation["sourceRefs"]]
+        manual = any(approvals[ref]["kind"] == "operator-final-approval" for ref in refs)
+        if relation["type"] == "INVOLVES":
+            expected = "manual-operator-final-approval" if manual else "independent-verifier-supported-all-claims"
+            check(relation["provenance"]["s3SemanticValidation"] == expected, f"an INVOLVES edge mislabels its approval basis: {relation['provenance']}")
+            literals.add(expected)
+        else:
+            expected = "s3-operator-final-approval" if manual else "s3-independent-verifier-supported-all-claims"
+            check(relation["provenance"]["origin"] == "manual-operator-review" and relation["provenance"]["basisEligibility"] == expected,
+                  f"a structural edge mislabels its approval basis: {relation['provenance']}")
+            for basis in relation["basis"]:
+                decided = used[(basis["sourceRelation"]["jobId"], basis["sourceRelation"]["relationCandidateId"])]["approvalBasis"]["decidedAt"]
+                check(basis["verifiedAt"] == decided, "a structural verification time is not the deciding event's time")
+    check("manual-operator-final-approval" in literals, "no INVOLVES edge rests on an operator approval in the authored world")
+
+    # sourceSupport and origins: hand-written, never recomputed with the code under test -------------------------------------------------
+    check({i["id"]: i["sourceSupport"] for i in bundle["issues"]} == hs.expected_support(world5), "the issues' sourceSupport is not the hand-written one")
+    origins = hs.expected_origins(world5)
+    for name, ref in world5.refs.items():
+        article = next(a for a in bundle["articles"] if a["documentId"] == ref["documentId"] and a["documentVersion"] == ref["documentVersion"])
+        want = origins[name]
+        check(article["origin"] == (None if want is None else {**want, "verification": "operator-declared-origin"}),
+              f"the origin of {name} is not the operator's declaration: {article['origin']}")
+        stored = db.scalar(f"SELECT sha256 FROM artifacts WHERE id = 'text-{ref['documentVersion']}'")
+        check(article["textSha256"] == stored, f"the text digest of {name} is not the stored text's hash")
+    supports = list(hs.expected_support(world5).values())
+    check(any(s["independentSourceCount"] is None for s in supports) and any(s["independentSourceCount"] is not None for s in supports)
+          and any(s["articleCount"] > s["knownLineageCount"] > 0 for s in supports),
+          "the authored world must hold an unknown and a counted independence and a lineage group with several articles")
+
+    # the snapshot stays format 3 and carries none of it ---------------------------------------------------------------------------
+    snapshot_file = layout.artifacts / "graph_snapshot" / f"{vid}.json"
+    snapshot_bytes = snapshot_file.read_bytes()
+    snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+    check(snapshot["snapshotFormat"] == 3 and set(snapshot) == {"snapshotFormat", "versionId", "sourceBundleId", "companies", "issues", "relations", "articles", "evidence"},
+          "the approved snapshot is not format 3")
+    snapshot_text = snapshot_bytes.decode("utf-8")
+    leaked = [word for word in (*INTERNAL_WORDS, *(want["reviewer"] for want in approvals.values() if want["reviewer"]),
+                                *(want["originId"] for want in origins.values() if want))
+              if word in snapshot_text]
+    check(not leaked, f"an approval, an origin or a support count reached the public snapshot: {leaked}")
+    status, again, _ = smoke5.graph_import("approved-again", smoke5.request(hid, manifest_digest, bundle_digest))
+    check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file.read_bytes() == snapshot_bytes
+          and again["provenance"]["approvalBases"] == kinds, f"retrying the approved import changed the staged bytes or the statement: {again}")
+    check({name: fingerprint(path) for name, path in layout5.ledgers.items()} == ledgers_before, "the approved world's ledgers changed")
+    step(f"an approved + origin world (SYNTHETIC, replay): staged with approval bases {kinds}, the INVOLVES and structural literals following the hand-written approvals "
+         "(an operator approval never reads as the verifier), verifiedAt = the deciding event's time, article text digests = the stored texts, sourceSupport = the "
+         "hand-written lineage groups (not article counts) and exact duplicate groups, none of it in the snapshot; a retry is a no-op with identical bytes")
+    return {"world": world5, "layout": layout5, "smoke": smoke5, "vid": vid, "bundle": bundle, "approvals": approvals, "origins": origins}
+
+
+def approved_read_phase(approved: dict, db, layout, previous: str) -> dict:
+    """The approved world over real HTTP: ONE more TEST-HARNESS activation (psql, like the other two), then the public graph and evidence reads.
+
+    The receipt now carries approval bases, origins, text digests and sourceSupport; `getEvidence` must still serve the span (it reads only the article's observation
+    pins) and no public body may carry any of those internal values."""
+    from datetime import timezone
+    smoke, vid, world, layout5 = approved["smoke"], approved["vid"], approved["world"], approved["layout"]
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout5.registry_path)}
+    bodies: list[str] = []
+
+    def get_json(web, path: str) -> tuple[int, dict]:
+        code, text = web.get(path)
+        bodies.append(text)
+        return code, (json.loads(text) if text.startswith("{") else {})
+
+    with smoke.web(web_env) as web:
+        code, graph = get_json(web, f"/api/v1/graph?graphVersion={vid}")
+        check(code == 409 and (graph.get("error") or {}).get("code") == "VERSION_UNAVAILABLE", f"the staged approved version was readable before activation: {code} {graph}")
+        check(db.scalar("SELECT count(*) FROM graph_activations") == 4, "unexpected activation history before the approved harness")
+        at = datetime.now(timezone.utc)
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid}', '{previous}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic approved activation', '{at.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid and db.scalar("SELECT count(*) FROM graph_activations") == 5,
+              "the approved harness activation did not apply")
+        harness_fingerprint = smoke.table_fingerprint()
+        code, graph = get_json(web, f"/api/v1/graph?graphVersion={vid}")
+        check(code == 200 and graph["metadata"]["graphVersion"] == vid, f"the approved graph read: {code} {str(graph)[:300]}")
+        issue_ids = {n["id"] for n in graph["nodes"] if n["kind"] == "issue"}
+        check(issue_ids == set(hs.expected_support(world)), f"the approved graph's issues are not the hand-written ones: {sorted(issue_ids)}")
+        evidence_reads = 0
+        for name, quote in (("a", hs.EVT_A), ("b", hs.QB)):
+            eid, span = hs.evidence_id(world, name, quote), hs.span(world, name, quote)
+            code, body = get_json(web, f"/api/v1/evidence/{eid}")
+            evidence_reads += 1
+            check(code == 200 and body["id"] == eid and body["quote"] == quote and body["start"] == span["start"] and body["end"] == span["end"]
+                  and body["articleId"] == span["documentId"] and body["articleVersion"] == span["documentVersion"] and body["quoteVerified"] is True
+                  and body["metadata"]["graphVersion"] == vid, f"approved evidence {name}: {code} {str(body)[:300]}")
+        joined = "\n".join(bodies)
+        reviewers = [want["reviewer"] for want in approved["approvals"].values() if want["reviewer"]]
+        leaked = [word for word in (*INTERNAL_WORDS, *reviewers, *(want["originId"] for want in approved["origins"].values() if want)) if word in joined]
+        check(not leaked, f"an approval basis, an origin or a support count reached a public read: {leaked}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step("approved world over real HTTP (ONE more test-harness activation): the staged version is unreadable before it, then the public graph serves its issues and "
+             "GET /api/v1/evidence serves two spans from the receipt that now holds approval bases, origins, text digests and sourceSupport; no public body carries any of them")
+    return {"harnessActivations": 1, "evidenceReads": evidence_reads}
+
+
+
+PATH_IDS = {**PUBLIC_IDS, "KRX:000999": "SYNTH:000003"}      # the chain world's tail company is a third synthetic catalog company
+PATH_TAIL = ("SYNTH:000003", "합성투자")
+PATH_MIDDLES = ("private", "known", "unmapped")
+# What must never reach a public body or the snapshot in ANY mode: the receipt-only path structure and S3 scope keys. The private middle company's id is separate (PATH_MIDDLE_ID):
+# the `known` world legitimately publishes it as a company.
+PATH_LEAKS = ("structuralPath", "pathCompanies", "businessScope", "productScope", "supplierCompanyId", "customerCompanyId")
+PATH_MIDDLE_ID = "SYNTH:000002"
+PATH_COUNTS = {"private": {"companies": 2, "issues": 2, "relations": 4, "articles": 3, "evidence": 7},
+               "known": {"companies": 3, "issues": 2, "relations": 5, "articles": 3, "evidence": 7},
+               "unmapped": {"companies": 2, "issues": 2, "relations": 4, "articles": 3, "evidence": 7}}
+
+
+def path_world_phase(args, db, layout, scratch: Path) -> dict:
+    """Structural paths over real processes: the producer's `chain` world (SYNTHETIC; rel-a also holds SYNTH-4 -> SYNTH-3 -> SYNTH-1) frozen three times by the installed
+    `zoop-ai-handoff`, once per middle company: `private` (SYNTH-3 mapped but unpublished: a private pathCompany, never a public node), `known` (SYNTH-3 is public too: a one- and
+    a two-relation edge) and `unmapped` (the operator did not map SYNTH-3: the two-relation path is unavailable, never invented). Every expectation is hand-written in
+    `hs.expected_chain`; nothing is read back from the importer or the verifier under test.
+
+    A catalogue company the path names only privately must still exist with an equal label (renamed: `company_mismatch`, nothing written); the staged snapshot carries NO path
+    data, path company or scope text; the retained receipt keeps the complete bundle and the new check and `structuralPath` note."""
+    # The back-dated path activation (path_read_phase) needs this world's S3 relations to become eligible clearly AFTER the last activation, whose timestamp is the real clock of
+    # the earlier harness (the world is built within milliseconds of it otherwise): a fixed margin, not a race.
+    time.sleep(2)
+    world = hs.build_world(scratch / "chain", chain=True)
+    layout6 = Layout(world, args.ingest_cli)
+    layout6.artifacts = layout.artifacts
+    smoke6 = Smoke(args, db, layout6)
+    status, result, _ = smoke6.jar.run("documents-paths", [base.item(ref) for ref in world.refs.values()], artifact_root=layout.artifacts)
+    check(status == 0 and result and result["status"] == "succeeded", f"the path world's document import failed: {result}")
+    db.run(f"INSERT INTO companies (id, name, name_key, search_text) VALUES ('{PATH_TAIL[0]}', '{PATH_TAIL[1]}', '', '')")
+    operator = hs.Operator(world)
+    exports = {}
+    decision_docs = {}      # per mode: the operator's decisions file each handoff was frozen over
+    for middle in PATH_MIDDLES:
+        decisions = hs.chain_decisions(world, middle)
+        for company in decisions["companies"]:
+            company["publicId"] = PATH_IDS.get(company["publicId"], company["publicId"])
+        decision_docs[middle] = decisions
+        exports[middle] = hs.freeze_export(operator, world, f"path-{middle}-1", decisions)
+        want, bundle = hs.expected_chain(middle, PATH_IDS), exports[middle]["bundle"]
+        check(bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5", f"{middle}: the producer's bundle is not schema 5")
+        check([c["id"] for c in bundle["companies"]] == want["companies"] and bundle["pathCompanies"] == want["pathCompanies"],
+              f"{middle}: companies {[c['id'] for c in bundle['companies']]} / path companies {bundle['pathCompanies']} are not the hand-written ones")
+        paths = {r["target"]: r["structuralPath"] for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO"}
+        check(paths == want["paths"], f"{middle}: structural paths {paths} are not the hand-written ones {want['paths']}")
+        check(all(r["structuralPath"] is None for r in bundle["relations"] if r["type"] != "STRUCTURALLY_RELATED_TO"), f"{middle}: a non-structural edge carries a path")
+    ledgers_before = {name: fingerprint(path) for name, path in layout6.ledgers.items()}
+    versions = {middle: version_id(f"path-{middle}-1") for middle in PATH_MIDDLES}
+    pins = {middle: (hs.digest(env["manifest"]), sha256(hs.canonical(env["bundle"]).encode("utf-8"))) for middle, env in exports.items()}
+    step(f"the chain world frozen three times by the installed zoop-ai-handoff ({', '.join(PATH_MIDDLES)} middle): companies, private path companies and every edge's path "
+         "equal the hand-written expectation")
+
+    # a path company that is not in the catalogue with an equal label: refused whole, nothing written --------------------------------------
+    before = smoke6.table_fingerprint()
+    db.run("UPDATE companies SET name = '다른 이름' WHERE id = 'SYNTH:000002'")
+    hs.write_operator(world, decisions=decision_docs["private"])
+    status, result, output = smoke6.graph_import("path-private-renamed", smoke6.request("path-private-1", *pins["private"]))
+    db.run("UPDATE companies SET name = '합성부품' WHERE id = 'SYNTH:000002'")
+    check(status != 0 and result and result["status"] == "failed" and result["failure"]["code"] == "company_mismatch",
+          f"a renamed private path company was not refused as company_mismatch: {result} {output[-500:]}")
+    check(smoke6.table_fingerprint() == before and not (layout.artifacts / "graph_snapshot" / f"{versions['private']}.json").exists()
+          and not (layout.artifacts / "verification_receipt" / f"{versions['private']}.json").exists(), "a refused path import left rows or files behind")
+
+    imported = {}
+    for middle in PATH_MIDDLES:
+        env, vid = exports[middle], versions[middle]
+        hs.write_operator(world, decisions=decision_docs[middle])
+        status, result, output = smoke6.graph_import(f"path-{middle}", smoke6.request(f"path-{middle}-1", *pins[middle]))
+        check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid,
+              f"{middle}: the path handoff was not staged: {result} {output[-800:]}")
+        check(result["counts"] == PATH_COUNTS[middle] and sum(result["evidenceRows"].values()) == 7 and result["active"] is False
+              and result["activation"] == "not-activated" and "pathCompanies" not in json.dumps(result),
+              f"{middle}: result {result}")
+        want = hs.expected_chain(middle, PATH_IDS)
+        snapshot_bytes = (layout.artifacts / "graph_snapshot" / f"{vid}.json").read_bytes()
+        snapshot = json.loads(snapshot_bytes.decode("utf-8"))
+        check(snapshot["snapshotFormat"] == 3 and sorted(c["companyId"] for c in snapshot["companies"]) == want["companies"],
+              f"{middle}: the snapshot's public companies are not the hand-written ones: {[c['companyId'] for c in snapshot['companies']]}")
+        # The middle company's id is a PUBLIC node only in the `known` world; in `private` and `unmapped` it must not appear in the snapshot at all. The receipt-only path
+        # keys and scope text are absent in every mode.
+        snapshot_text = snapshot_bytes.decode("utf-8")
+        leaked = [word for word in (*PATH_LEAKS, "소재 사업", "intermediate_company_unmapped", *((PATH_MIDDLE_ID,) if middle != "known" else ())) if word in snapshot_text]
+        check(not leaked, f"{middle}: path data reached the public snapshot: {leaked}")
+        receipt = json.loads((layout.artifacts / "verification_receipt" / f"{vid}.json").read_text("utf-8"))
+        check(receipt["bundle"] == env["bundle"] and receipt["manifest"] == env["manifest"], f"{middle}: the receipt does not retain the original")
+        app = receipt["appVerification"]
+        check("structural_path_closed_over_involves_basis_and_catalog" in app["checks"]
+              and app["structuralPath"] == "operator-mapped-basis-chain-not-causality-or-price-direction" and app["semanticTruth"] == "not-verified"
+              and app["activation"] == "none", f"{middle}: the receipt's statement of the path: {app}")
+        hs.write_operator(world, decisions=decision_docs[middle])
+        status, again, _ = smoke6.graph_import(f"path-{middle}-again", smoke6.request(f"path-{middle}-1", *pins[middle]))
+        check(status == 0 and again and again["outcome"] == "unchanged" and (layout.artifacts / "graph_snapshot" / f"{vid}.json").read_bytes() == snapshot_bytes,
+              f"{middle}: retrying changed the staged bytes: {again}")
+        imported[middle] = {"snapshot": snapshot, "receipt": receipt}
+    check(db.scalar("SELECT count(*) FROM graph_versions WHERE active") == 1 and smoke6.table_fingerprint()["activations"] == before["activations"],
+          "a path import moved the pointer or wrote an activation")
+    check({name: fingerprint(path) for name, path in layout6.ledgers.items()} == ledgers_before, "the path world's ledgers changed")
+    step("path imports: a renamed private path company is company_mismatch with nothing written; private / known / unmapped stage with the hand-written public companies, "
+         "NO path company, path or scope text in any snapshot, the complete bundle plus the structural_path check and the operator-mapped note in the receipt; retries are no-ops")
+    return {"world": world, "layout": layout6, "smoke": smoke6, "vids": versions, "exports": exports, "imported": imported}
+
+
+def path_read_phase(paths: dict, db, layout, previous: str) -> dict:
+    """The `private`-middle version over real HTTP: ONE more TEST-HARNESS activation (psql, like the others) BACK-DATED to just after the last activation, so that an asOf
+    between that activation and the moment the S3 relations became eligible selects this version while its structural bases are not yet verified.
+
+    A BASIS-ONLY span (SUP, and the second link's sentence) is cited by no issue and no relation, only by a structural basis: it is served (200, no eventIds) only when the
+    selected version's receipt proves exactly that relation's basis cites it, and every current rights / row / article / receipt gate still applies. Disclosure exclusions have
+    no store in the built application (nothing to drive over HTTP); the relation / issue / evidence exclusions are proven by the Java tests with the real pinned reader."""
+    import urllib.parse
+    from datetime import timezone
+    smoke, world, layout6, vid = paths["smoke"], paths["world"], paths["layout"], paths["vids"]["private"]
+    bundle = paths["exports"]["private"]["bundle"]
+    want = hs.expected_chain("private", PATH_IDS)
+    web_env = {"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts),
+               "ZOOP_DOCUMENT_READ_ARTIFACT_ROOT": str(layout.artifacts), "ZOOP_DOCUMENT_READ_INGESTION_SOURCES": str(layout6.registry_path)}
+    bases = [b for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO" for b in r["basis"]]
+    verified = min(datetime.fromisoformat(b["verifiedAt"]) for b in bases)
+    last = db.scalar("SELECT to_char(max(activated_at) AT TIME ZONE 'UTC' + interval '1 second', 'YYYY-MM-DD\"T\"HH24:MI:SS.US') || '+00:00' FROM graph_activations")
+    t0 = datetime.fromisoformat(last)
+    # The first basis became eligible at `verified`. The harness activation sits one second after the last activation (t0) and the asOf "before verification" half a second
+    # before `verified`, to the microsecond, so t0 <= asOf < verified is only a question of the margin the sleep at the start of this phase guarantees (>= 2 s).
+    before_verification = (verified - timedelta(milliseconds=500)).astimezone(timezone.utc)
+    check(t0 <= before_verification < verified, f"the path world was not built at least 1.5 s after the last activation ({t0} vs the first basis verification {verified}): cannot place the harness activation")
+    iso = lambda moment: moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")   # noqa: E731
+
+    snapshot = paths["imported"]["private"]["snapshot"]
+    basis_only = [("a", hs.SUP), ("a", hs.CHAIN)]
+    spans = {hs.evidence_id(world, name, quote): (name, quote, hs.span(world, name, quote)) for name, quote in basis_only}
+    direct_id = hs.evidence_id(world, "a", hs.EVT_A)
+    direct_events = [i["issueId"] for i in snapshot["issues"] if direct_id in i["evidenceIds"] or direct_id in i["geographyEvidenceIds"]]
+    check(direct_events and all(not any(eid in i["evidenceIds"] or eid in i["geographyEvidenceIds"] for i in snapshot["issues"]) for eid in spans)
+          and all(eid not in r["evidenceIds"] for r in snapshot["relations"] for eid in spans), "the authored basis spans are cited directly by an issue or a relation")
+    reads, graph_reads = 0, 0
+    bodies: list[str] = []
+
+    def get(web, evidence_id: str, **params) -> tuple[int, dict]:
+        nonlocal reads
+        reads += 1
+        query = urllib.parse.urlencode(params)
+        code, text = web.get(f"/api/v1/evidence/{evidence_id}" + (f"?{query}" if query else ""))
+        bodies.append(text)
+        return code, (json.loads(text) if text.startswith("{") else {})
+
+    def code_of(body: dict) -> str:
+        return (body.get("error") or {}).get("code", "")
+
+    def served(web, evidence_id: str, label: str, **params) -> dict:
+        code, body = get(web, evidence_id, **params)
+        check(code == 200 and body["id"] == evidence_id and body["quoteVerified"] is True, f"{label}: {code} {str(body)[:300]}")
+        return body
+
+    def withheld(web, evidence_id: str, label: str, **params) -> None:
+        code, body = get(web, evidence_id, **params)
+        check(code == 404 and code_of(body) == "EVIDENCE_UNAVAILABLE", f"{label}: expected 404 EVIDENCE_UNAVAILABLE, got {code} {str(body)[:300]}")
+
+    with smoke.web(web_env) as web:
+        code, body = get(web, direct_id, graphVersion=vid)
+        check(code == 409 and code_of(body) == "VERSION_UNAVAILABLE", f"the staged path version was readable before activation: {code} {body}")
+        activations_before = db.scalar("SELECT count(*) FROM graph_activations")
+        check(activations_before == 5, "unexpected activation history before the path harness")
+        db.run(f"""SELECT pg_advisory_xact_lock(x'7a6f6f7067726170'::bigint);
+            UPDATE graph_versions SET active = false WHERE active;
+            UPDATE graph_versions SET active = true WHERE id = '{vid}';
+            INSERT INTO graph_activations (version_id, previous_version_id, action, actor_kind, pointer_changed, admin_id,
+                admin_email_snapshot, reason, activated_at)
+            VALUES ('{vid}', '{previous}', 'activate', 'system', true, NULL, 'system',
+                'smoke harness: synthetic path activation', '{t0.isoformat()}')""")
+        check(db.scalar("SELECT id FROM graph_versions WHERE active") == vid and db.scalar("SELECT count(*) FROM graph_activations") == activations_before + 1,
+              "the path harness activation did not apply")
+        harness_fingerprint = smoke.table_fingerprint()
+        artifact_tree, registry_bytes = fingerprint(layout.artifacts), layout6.registry_path.read_bytes()
+
+        # basis200: a span only a structural basis rests on is served without events; the directly cited one keeps its event ----------
+        for eid, (name, quote, span) in spans.items():
+            body = served(web, eid, f"basis-only evidence {quote!r}")
+            check(body["quote"] == quote and body["start"] == span["start"] and body["end"] == span["end"] and body["articleId"] == span["documentId"]
+                  and body["articleVersion"] == span["documentVersion"] and body["eventIds"] == [] and body["metadata"]["graphVersion"] == vid
+                  and body["metadata"]["partial"] is False and body["sentiment"] is None and body["documentSummary"] is None,
+                  f"basis-only evidence body {quote!r}: {str(body)[:300]}")
+        direct = served(web, direct_id, "direct evidence")
+        check(direct["eventIds"] == direct_events and direct["metadata"]["graphVersion"] == vid, f"direct evidence changed: {direct['eventIds']} vs {direct_events}")
+        step("basis-only evidence over HTTP: the two spans only a structural basis cites are 200 with eventIds [] from the receipt of the selected version; the directly cited span keeps its event")
+
+        # asOf: before the basis was verified, before the article was published, after both -------------------------------------------
+        for eid, (name, quote, span) in spans.items():
+            withheld(web, eid, f"asOf {iso(before_verification)} (before the basis was verified) must not show basis-only evidence {quote!r}", asOf=iso(before_verification))
+        body = served(web, direct_id, "direct evidence at the same asOf", asOf=iso(before_verification))
+        check(body["metadata"]["graphVersion"] == vid and body["eventIds"] == direct_events,
+              f"the asOf before verification did not select the path version or changed the direct evidence: {body['metadata']} {body['eventIds']}")
+        now = datetime.now(timezone.utc)
+        for eid, (name, quote, span) in spans.items():
+            body = served(web, eid, f"asOf now serves basis-only evidence {quote!r}", asOf=iso(now))
+            check(body["metadata"]["graphVersion"] == vid and body["eventIds"] == [], f"asOf now: {body['metadata']} {body['eventIds']}")
+        for eid in (*spans, direct_id):
+            withheld(web, eid, "asOf 2026-10-07 (before the article's publication and the version) must not show the evidence", asOf="2026-10-07T00:00:00Z")
+        step("asOf: before the structural basis was verified only the basis-only spans are 404 (the direct one stays 200 on this version); at the current time they are 200; "
+             "before the publication (an earlier version) every span is 404")
+
+        # a wrong selected version -----------------------------------------------------------------------------------------------------
+        for eid in (*spans, direct_id):
+            withheld(web, eid, "the approved version (active before) does not contain the path world's evidence", graphVersion=previous)
+        for other in (paths["vids"]["known"], paths["vids"]["unmapped"]):
+            code, body = get(web, next(iter(spans)), graphVersion=other)
+            check(code == 409 and code_of(body) == "VERSION_UNAVAILABLE", f"a never-activated version was readable: {other} {code}")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step("wrong selected version: the previous active version withholds the evidence it never contained (404); never-activated versions are 409")
+
+        # current rights, article access and the receipt still decide ------------------------------------------------------------------
+        original = json.loads(registry_bytes.decode("utf-8"))["sources"][0]["grant"]
+        every = (*spans, direct_id)
+        for label, change in (("drop store", lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "store"]})),
+                              ("drop quote-display", lambda g: g.update({"allowedOperations": [o for o in g["allowedOperations"] if o != "quote-display"]})),
+                              ("disabled", lambda g: g.update({"enabled": False})),
+                              ("revision", lambda g: g.update({"revision": g["revision"] + "-next"})),
+                              ("grant id", lambda g: g.update({"grantId": g["grantId"] + "-other"}))):
+            smoke.set_registry(change)
+            for eid in every:
+                withheld(web, eid, f"a revoked grant ({label}) must withhold {eid}")
+            smoke.set_registry(lambda g: (g.clear(), g.update(original)))
+            for eid in every:
+                served(web, eid, f"restoring the grant ({label}) must restore {eid}")
+        article_id = next(iter(spans.values()))[2]["documentId"]
+        db.run(f"UPDATE articles SET access_status = 'private' WHERE id = '{article_id}'")
+        for eid in every:
+            withheld(web, eid, f"a private article must withhold {eid}")
+        db.run(f"UPDATE articles SET access_status = 'available' WHERE id = '{article_id}'")
+        receipt_path = layout.artifacts / "verification_receipt" / f"{vid}.json"
+        receipt_info, receipt_original = receipt_path.stat(), receipt_path.read_bytes()
+        receipt_path.write_bytes(receipt_original.replace(b'"activation":"none"', b'"activation":"nope"'))
+        check(receipt_path.read_bytes() != receipt_original, "the receipt tamper did not change any byte")
+        for eid in every:
+            withheld(web, eid, f"tampered receipt bytes must withhold {eid}")
+        receipt_path.write_bytes(receipt_original)
+        os.utime(receipt_path, ns=(receipt_info.st_atime_ns, receipt_info.st_mtime_ns))
+        for eid in every:
+            served(web, eid, f"restoring the receipt must restore {eid}")
+        check(fingerprint(layout.artifacts) == artifact_tree and layout6.registry_path.read_bytes() == registry_bytes,
+              "a failure scenario was not restored exactly (artifact tree or registry file)")
+        step("current gates: a revoked grant (store, quote-display, disabled, revision, grant id), a private article and tampered receipt bytes are 404 for basis-only AND direct evidence; "
+             "each restored byte-for-byte and served again")
+
+        # no public node or path data in any public body ----------------------------------------------------------------------------
+        code, text = web.get(f"/api/v1/graph?graphVersion={vid}")
+        bodies.append(text)
+        graph_reads += 1
+        graph = json.loads(text) if code == 200 else {}
+        check(code == 200 and graph["metadata"]["graphVersion"] == vid, f"the path graph read: {code} {text[:300]}")
+        nodes = {n["id"] for n in graph["nodes"]}
+        check("SYNTH:000002" not in nodes and set(want["companies"]) <= nodes, f"the private middle company is a public node, or a public company is missing: {sorted(nodes)}")
+        leaked = [word for word in (*PATH_LEAKS, PATH_MIDDLE_ID) if any(word in text_ for text_ in bodies)]
+        check(not leaked, f"a private company id, a path or a scope reached a public body: {leaked}")
+        check("소재 사업" not in text, "an S3 business scope reached the public graph")
+        check(smoke.table_fingerprint() == harness_fingerprint, "a public read changed a table")
+        step("no public node for the private middle company; no path, scope or private company id in any public graph or evidence body")
+    check(db.scalar("SELECT count(*) FROM graph_activations WHERE reason LIKE 'smoke harness:%'") == 4, "the harness activation count is not exactly four")
+    return {"harnessActivations": 1, "evidenceReads": reads, "graphReads": graph_reads}
+
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--jar", required=True, type=Path)
@@ -263,6 +1052,8 @@ def main() -> int:
     parser.add_argument("--psql", default=shutil.which("psql"), help="host psql (used without --psql-container)")
     parser.add_argument("--db-user", default=None)
     parser.add_argument("--db-name", default=None)
+    parser.add_argument("--no-with-evidence-read", dest="with_evidence_read", action="store_false",
+                        help="skip the public GET /api/v1/evidence/{id} phase (it needs the TEST-HARNESS activation of one staged version)")
     args = parser.parse_args()
     for name in ("DB_URL", "DB_USERNAME", "DB_PASSWORD"):
         check(os.environ.get(name), f"{name} must be set (a dedicated loopback database)")
@@ -429,9 +1220,38 @@ def main() -> int:
           "the receipt's manifest and bundle do not hash to the pins")
     check(receipt["appVerification"]["semanticTruth"] == "not-verified" and receipt["appVerification"]["activation"] == "none",
           "the receipt overclaims")
+    # The original mentions the receipt retains: per issue exactly the S2 values of each source document (title, action, time, period, status, background,
+    # participants as extracted), never the merged issue's, never verified. Hand-written from the authored world, not read from the producer's export.
+    receipt_issues = {i["id"]: i for i in receipt["bundle"]["issues"]}
+    check(receipt_issues["issue:supply-2026q3"]["mentions"] == expected_mentions(
+        world, ("a", "m-a", hs.EVT_A, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", DOC_A),
+        ("a2", "m-a2", hs.EVT_A2, "합성 공급 계약 체결 공개", "공급 계약 발표", "2026-09-30", "2026Q3", [MAPPED])),
+          f"supply mentions: {receipt_issues['issue:supply-2026q3']['mentions']}")
+    check(receipt_issues["issue:factory-2026q4"]["mentions"] == expected_mentions(
+        world, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
+          f"factory mentions: {receipt_issues['issue:factory-2026q4']['mentions']}")
+    check(receipt["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5", "the retained bundle is not schema 5")
+    # The selection facts the receipt retains, hand-written from the authored world: the supply issue's operator-chosen representative (document a) states every
+    # headline value, while a2 states the same value in every field but its title; the factory issue's only mention is unanimous. Which mentions state the issue's
+    # value is a selection fact, never a verification (`verification` stays `none`).
+    check(receipt_issues["issue:supply-2026q3"]["fieldProvenance"] == expected_field_provenance(
+        world, "operator-representative", (("a", "m-a"), ("a2", "m-a2")), title=(("a", "m-a"),)),
+          f"supply field provenance: {receipt_issues['issue:supply-2026q3']['fieldProvenance']}")
+    check(receipt_issues["issue:factory-2026q4"]["fieldProvenance"] == expected_field_provenance(world, "unanimous", (("b", "m-b"),)),
+          f"factory field provenance: {receipt_issues['issue:factory-2026q4']['fieldProvenance']}")
+    check(all(sorted(set(i["evidenceIds"])) == sorted({e for m in i["mentions"] for e in m["evidenceIds"]} | set(i["geography"]["evidenceIds"])
+                                                      | {e for v in i["fieldVerdicts"] for e in v["evidenceIds"]})
+              for i in receipt["bundle"]["issues"]), "an issue's evidence is not the union of its mentions', its geography's and its verdicts'")
+    check(all(i["fieldVerdicts"] == [] and i["fieldProvenance"]["withheld"] == [] for i in receipt["bundle"]["issues"]),
+          "the unreviewed world carries a verdict or a withheld field (no verdict means every value is shown, and nothing was verified)")
+    snapshot_text = snapshot_file.read_text("utf-8")
+    check(not any(word in snapshot_text for word in ('"participants"', '"sourceCompanyId"', '"fieldProvenance"', '"sameValueMentions"', '"fieldVerdicts"', '"withheld"',
+                                                     "issuer", "counterparty", "observer", "미등록 법인")),
+          "a mention value, a field provenance or a verdict reached the format 3 snapshot (they belong to the receipt only)")
     check(db.scalar("SELECT count(*) FROM artifacts WHERE kind IN ('graph_snapshot', 'verification_receipt')") == 2 + 2,
           "unexpected extra graph artifacts (two fixture snapshots and this import's two are expected)")
-    step("snapshot (format 3: period, assertion status, mention references, structured basis) and receipt files registered with the registry's hash and size; the receipt retains the original manifest and bundle")
+    step("snapshot (format 3: period, assertion status, mention references, structured basis, no mention values) and receipt files registered with the registry's hash and size; "
+         "the receipt retains the original manifest and bundle, including each issue's original mentions")
 
     # nothing public ----------------------------------------------------------------------------------------------------
     with smoke.web({"ZOOP_GRAPH_SNAPSHOT_SOURCE": "artifact", "ZOOP_GRAPH_SNAPSHOT_ARTIFACT_ROOT": str(layout.artifacts)}) as web:
@@ -544,12 +1364,121 @@ def main() -> int:
           "the collision snapshot dropped content")
     receipt3 = json.loads((layout.artifacts / "verification_receipt" / f"{vid3}.json").read_text("utf-8"))
     check(receipt3["bundle"] == collision["bundle"], "the collision receipt does not retain the producer's own mention ids")
+    supply_mentions = next(i for i in receipt3["bundle"]["issues"] if i["id"] == "issue:supply-2026q3")["mentions"]
+    check(supply_mentions == expected_mentions(world2, ("a", "m-a", hs.EVT_A, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", DOC_A),
+                                               ("a2", "m-a", hs.EVT_A2, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", [MAPPED]))
+          and len(supply_mentions) == 2 and {m["mentionId"] for m in supply_mentions} == {"m-a"}
+          and len({m["documentId"] for m in supply_mentions}) == 2, f"the collision receipt does not keep two original mentions with one local id: {supply_mentions}")
+    # Both documents state every value (a2's title equals a's here), yet the operator still chose a: the selection stays `operator-representative` and both
+    # identities are in every list, in mention order.
+    supply_provenance = next(i for i in receipt3["bundle"]["issues"] if i["id"] == "issue:supply-2026q3")["fieldProvenance"]
+    check(supply_provenance == expected_field_provenance(world2, "operator-representative", (("a", "m-a"), ("a2", "m-a"))),
+          f"the collision receipt's field provenance is not both identities in every list: {supply_provenance}")
     status, again, _ = smoke2.graph_import("collision-again", smoke2.request(hid3, manifest3, bundle3))
     check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file3.read_bytes() == snapshot_bytes3,
           f"retrying the collision import changed ids or bytes: {again}")
     check({name: fingerprint(path) for name, path in layout2.ledgers.items()} == ledgers2_before, "the collision world's ledgers changed")
     step("a legal producer collision (documents a and a2 both use local mention id m-a): staged with two distinct app mention ids, the right representative and "
          "the producer's own ids retained in the receipt; a retry is a no-op with identical bytes")
+
+    # a producer-authored VERDICT world: operator per-field verdicts withhold eventTime/period from the public projection -----------------------
+    # SYNTHETIC test review (`hs.verdict_cases`), never a real operator review. The expectations below are written out by hand from that authored world;
+    # nothing is read back from the importer under test.
+    world4, verdict_env = hs.verdict_export(scratch / "verdicts", PUBLIC_IDS)
+    layout4 = Layout(world4, args.ingest_cli)
+    layout4.artifacts = layout.artifacts
+    smoke4 = Smoke(args, db, layout4)
+    status, result, _ = smoke4.jar.run("documents-verdicts", [base.item(ref) for ref in world4.refs.values()], artifact_root=layout.artifacts)
+    check(status == 0 and result and result["status"] == "succeeded", f"the verdict world's document import failed: {result}")
+    ledgers4_before = {name: fingerprint(path) for name, path in layout4.ledgers.items()}
+    hid4, vid4 = hs.VERDICT_HANDOFF, version_id(hs.VERDICT_HANDOFF)
+    manifest4, bundle4 = hs.digest(verdict_env["manifest"]), sha256(hs.canonical(verdict_env["bundle"]).encode("utf-8"))
+    status, result, output = smoke4.graph_import("verdicts", smoke4.request(hid4, manifest4, bundle4))
+    check(status == 0 and result and result["status"] == "succeeded" and result["outcome"] == "staged" and result["graphVersionId"] == vid4
+          and result["counts"] == {"companies": 2, "issues": 2, "relations": 4, "articles": 3, "evidence": 9}
+          and result["evidenceRows"] == {"registered": 3, "existing": 6}, f"the verdict handoff was not staged with three new evidence rows: {result} {output[-800:]}")
+    supply_id, factory_id = "issue:supply-2026q3", "issue:factory-2026q4"
+    ev4 = lambda name, quote: hs.evidence_id(world4, name, quote)   # noqa: E731
+    verdict_spans = [("a", hs.PERIOD_A), ("a2", hs.PERIOD_A2), ("b", hs.PERIOD_B)]
+    rows4 = {r["id"]: r for r in db.rows("""SELECT id, article_id, article_version, quote, start_offset, end_offset, offset_unit, input_kind, quote_verified,
+        verification_artifact_id FROM evidence""")}
+    check(set(rows4) == set(rows) | {ev4(name, quote) for name, quote in verdict_spans}, "the verdict import did not add exactly the three verdict spans' evidence rows")
+    for name, quote in verdict_spans:
+        span = hs.span(world4, name, quote)
+        stored = rows4[ev4(name, quote)]
+        check(stored["quote"] == quote and stored["start_offset"] == span["start"] and stored["end_offset"] == span["end"]
+              and stored["article_id"] == span["documentId"] and stored["article_version"] == span["documentVersion"]
+              and stored["offset_unit"] == "unicode_code_point" and stored["input_kind"] == "body" and stored["quote_verified"] is True
+              and stored["verification_artifact_id"] == f"artifact-receipt-{vid4}", f"the verdict evidence row of {name} is not the exact span: {stored}")
+    snapshot_file4 = layout.artifacts / "graph_snapshot" / f"{vid4}.json"
+    receipt_file4 = layout.artifacts / "verification_receipt" / f"{vid4}.json"
+    snapshot_bytes4 = snapshot_file4.read_bytes()
+    snapshot4 = json.loads(snapshot_bytes4.decode("utf-8"))
+    issues4 = {i["issueId"]: i for i in snapshot4["issues"]}
+    check(snapshot4["snapshotFormat"] == 3 and set(issues4) == {supply_id, factory_id} and len(snapshot4["relations"]) == 4
+          and any(r["relationType"] == "STRUCTURALLY_RELATED_TO" for r in snapshot4["relations"]), "the verdict snapshot is not format 3 with the re-attested structural edge")
+    # The reviewed headline: the supply representative's event time is REJECTed (null, unknown precision) while its period is ALLOWed; the factory's only mention has its
+    # period HELD (null) and keeps its event time. The non-representative second document's HOLD/REJECT withhold nothing.
+    check((issues4[supply_id]["eventTime"], issues4[supply_id]["timePrecision"], issues4[supply_id]["period"]) == (None, "unknown", "2026Q3")
+          and (issues4[factory_id]["eventTime"], issues4[factory_id]["timePrecision"], issues4[factory_id]["period"]) == ("2026-11-15", "day", None),
+          f"the snapshot headline values are not the withheld ones: {[(i['eventTime'], i['timePrecision'], i['period']) for i in snapshot4['issues']]}")
+    check(issues4[supply_id]["evidenceIds"] == sorted({ev4("a", hs.EVT_A), ev4("a2", hs.EVT_A2), ev4("a", hs.GEO_A), ev4("a", hs.PERIOD_A), ev4("a2", hs.PERIOD_A2)})
+          and issues4[factory_id]["evidenceIds"] == sorted({ev4("b", hs.QB), ev4("b", hs.GEO_B), ev4("b", hs.PERIOD_B)}),
+          "an issue's evidence is not the union of its mentions', its geography's and its verdicts' spans")
+    snapshot_text4 = snapshot_bytes4.decode("utf-8")
+    check("2026-09-30" not in snapshot_text4 and "2026Q4" not in snapshot_text4 and "2026Q3" in snapshot_text4
+          and not any(word in snapshot_text4 for word in ('"fieldVerdicts"', '"withheld"', '"fieldProvenance"', "operator-field-verdict", "contradicted", "ambiguous", "unstated",
+                                                         hs.REVIEWER)),
+          "a rejected or held value, or a verdict, reached the public snapshot")
+    receipt4 = json.loads(receipt_file4.read_text("utf-8"))
+    check(receipt4["bundle"] == verdict_env["bundle"] and receipt4["manifest"] == verdict_env["manifest"], "the verdict receipt does not retain the original")
+    check(receipt4["bundle"]["schemaVersion"] == "zoop-graph-handoff-bundle-5" and receipt4["bundle"]["handoffId"] == hid4, "the verdict receipt is not bundle -5")
+    receipt_issues4 = {i["id"]: i for i in receipt4["bundle"]["issues"]}
+    # The ORIGINAL mentions are untouched by every verdict: the withheld supply time and the held factory period are still stated by their mentions.
+    check(receipt_issues4[supply_id]["mentions"] == expected_mentions(
+        world4, ("a", "m-a", hs.EVT_A, "합성 공급 계약", "공급 계약 발표", "2026-09-30", "2026Q3", DOC_A),
+        ("a2", "m-a2", hs.EVT_A2, "합성 공급 계약 체결 공개", "공급 계약 발표", "2026-09-30", "2026Q3", [MAPPED]))
+          and receipt_issues4[factory_id]["mentions"] == expected_mentions(
+              world4, ("b", "m-b", hs.QB, "합성 공장 착공", "공장 착공 알림", "2026-11-15", "2026Q4", DOC_B)),
+          "a verdict changed an original mention in the receipt")
+    check(receipt_issues4[supply_id]["fieldProvenance"] == expected_field_provenance(
+        world4, "operator-representative", (("a", "m-a"), ("a2", "m-a2")), withheld=("eventTime",), title=(("a", "m-a"),))
+          and receipt_issues4[factory_id]["fieldProvenance"] == expected_field_provenance(world4, "unanimous", (("b", "m-b"),), withheld=("period",)),
+          "the verdict receipt's field provenance is not the original selected values plus the withheld list")
+
+    def verdict_rows(issue: dict) -> list:
+        return sorted((v["mentionId"], v["field"], v["value"], v["decision"], v["reasonCode"], v["evidenceIds"], v["verification"], v["reviewer"]) for v in issue["fieldVerdicts"])
+    review = lambda *row: (*row, "operator-field-verdict", hs.REVIEWER)   # noqa: E731
+    check(verdict_rows(receipt_issues4[supply_id]) == sorted([
+        review("m-a", "eventTime", "2026-09-30", "REJECT", "contradicted", [ev4("a", hs.EVT_A)]),
+        review("m-a", "period", "2026Q3", "ALLOW", "stated", [ev4("a", hs.PERIOD_A)]),
+        review("m-a2", "eventTime", "2026-09-30", "HOLD", "unstated", []),
+        review("m-a2", "period", "2026Q3", "REJECT", "contradicted", [ev4("a2", hs.PERIOD_A2)])])
+          and verdict_rows(receipt_issues4[factory_id]) == [review("m-b", "period", "2026Q4", "HOLD", "ambiguous", [ev4("b", hs.PERIOD_B)])],
+          f"the receipt does not keep the operator's verdicts exactly: {receipt_issues4[supply_id]['fieldVerdicts']} {receipt_issues4[factory_id]['fieldVerdicts']}")
+    check({issue_id: issue["fieldVerdicts"] for issue_id, issue in receipt_issues4.items()} == hs.expected_verdicts(world4, hs.verdict_cases(world4)),
+          "the receipt's verdicts differ from the producer's hand-written expectation")
+    status, again, _ = smoke4.graph_import("verdicts-again", smoke4.request(hid4, manifest4, bundle4))
+    check(status == 0 and again and again["outcome"] == "unchanged" and snapshot_file4.read_bytes() == snapshot_bytes4,
+          f"retrying the verdict import changed the staged bytes: {again}")
+    check({name: fingerprint(path) for name, path in layout4.ledgers.items()} == ledgers4_before, "the verdict world's ledgers changed")
+    step("a producer-authored verdict world (SYNTHETIC review): staged with the supply representative's REJECTed time and the factory's HELD period null in the snapshot "
+         "(time precision unknown), the ALLOWed supply period and a non-representative HOLD/REJECT unchanged, the verdict spans registered and part of each issue's evidence, "
+         "and the receipt retaining every original mention value, each verdict and the withheld lists; a retry is a no-op with identical bytes")
+
+    harness = {"harnessActivations": 0, "evidenceReads": 0}
+    verdict_read = {"harnessActivations": 0, "evidenceReads": 0, "graphReads": 0}
+    approved_read = {"harnessActivations": 0, "evidenceReads": 0}
+    path_read = {"harnessActivations": 0, "evidenceReads": 0, "graphReads": 0}
+    approved = approved_world_phase(args, db, layout, scratch)
+    if args.with_evidence_read:
+        harness = evidence_read_phase(smoke, db, layout, world, vid2, (vid, vid3, vid4, approved["vid"]), active_before)
+        verdict_read = verdict_read_phase(smoke4, db, layout, layout4, world4, vid4, vid2, ev4)
+        approved_read = approved_read_phase(approved, db, layout, vid4)
+    # The path world is built LAST: its S3 relations became eligible after every earlier activation, which the back-dated path activation relies on.
+    paths = path_world_phase(args, db, layout, scratch)
+    if args.with_evidence_read:
+        path_read = path_read_phase(paths, db, layout, approved["vid"])
 
     # ledgers, logs --------------------------------------------------------------------------------------------------------
     check({name: fingerprint(path) for name, path in layout.ledgers.items()} == ledgers_before,
@@ -562,8 +1491,14 @@ def main() -> int:
         check(text not in joined, "source or review text reached a process output")
     step("every ledger is byte/mode/mtime identical; no path, secret or source text in any output")
 
-    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 3,
-                      "evidenceRows": 6, "stagedVersions": 3, "activationsWritten": 0, "importRuns": smoke.runs + smoke2.runs, "ledgerReadOnly": True}))
+    print(json.dumps({"status": "passed", "steps": len(base.STEPS), "providerCalls": 0, "modelCalls": 0, "handoffs": 5 + len(PATH_MIDDLES),
+                      "evidenceRows": db.scalar("SELECT count(*) FROM evidence"), "stagedVersions": 5 + len(PATH_MIDDLES), "importActivationsWritten": 0,
+                      "harnessActivations": harness["harnessActivations"] + verdict_read["harnessActivations"] + approved_read["harnessActivations"]
+                      + path_read["harnessActivations"],
+                      "evidenceReads": harness["evidenceReads"] + verdict_read["evidenceReads"] + approved_read["evidenceReads"] + path_read["evidenceReads"],
+                      "verdictGraphReads": verdict_read["graphReads"], "approvedRelations": len(approved["approvals"]),
+                      "pathGraphReads": path_read["graphReads"], "pathVariants": list(PATH_MIDDLES),
+                      "importRuns": smoke.runs + smoke2.runs + smoke4.runs + approved["smoke"].runs + paths["smoke"].runs, "ledgerReadOnly": True}))
     return 0
 
 

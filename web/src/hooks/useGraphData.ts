@@ -1,11 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getGraph } from '@/apis/graph/graph';
 import type { GraphRequest, GraphResponse } from '@/types/map/graph';
+
+export type GraphPrefetch = { key: string; data: GraphResponse };
+export const graphRequestKey = (
+  request: GraphRequest,
+  session: string | null,
+) =>
+  JSON.stringify([
+    session,
+    request.mode,
+    request.personalFilter,
+    request.companyId,
+    request.asOf,
+    request.graphVersion,
+    request.depth,
+    request.round,
+  ]);
 
 export function useGraphData(
   request: GraphRequest,
   session: string | null,
   retry: number,
+  prefetched?: RefObject<GraphPrefetch | null>,
 ) {
   const snapshotKey = JSON.stringify([
     request.companyId,
@@ -41,7 +58,7 @@ export function useGraphData(
         error: null,
       }));
       try {
-        const data = await getGraph({
+        const input = {
           mode,
           personalFilter,
           companyId,
@@ -49,7 +66,13 @@ export function useGraphData(
           graphVersion,
           depth,
           round,
-        });
+        };
+        const cached = prefetched?.current;
+        const data =
+          cached?.key === graphRequestKey(input, session)
+            ? cached.data
+            : await getGraph(input);
+        if (cached && prefetched?.current === cached) prefetched.current = null;
         if (sequence === latest.current)
           setState({ data, error: null, loading: false, session, snapshotKey });
       } catch (error) {
@@ -79,6 +102,7 @@ export function useGraphData(
     session,
     retry,
     snapshotKey,
+    prefetched,
   ]);
   // Never flash a previous member's personal response after logout/session replacement.
   return state.session === session && state.snapshotKey === snapshotKey

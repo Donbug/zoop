@@ -68,7 +68,6 @@ class World:
     held: str                # the relation candidate on HOLD: the only one a review may target
     held_revision: int       # its runtime event-chain revision at the end of the job's initial run
     eligible: str            # the relation candidate that is already eligible
-    verifier_hold: Path      # the verifier fixture whose revalidation answer is `insufficient` again
     s2_request: dict[str, Any]        # the authored S2 Submit the operator job was built from (topic requested)
     s2_plain_request: dict[str, Any]  # the same without a topic stage, under the job id `s2-plain`
     s2_replay: Path
@@ -87,7 +86,7 @@ def build_world(root: Path) -> World:
     return World(Path(info["root"]), Path(info["extraction"]), Path(info["ingestion"]), Path(info["registry"]), info["upstream"],
                  Path(info["producer"]), Path(info["verifier"]), Path(info["emptyProducer"]), Path(info["emptyVerifier"]), info["relations"],
                  info["counts"], info["replayCalls"], info["sourceTexts"], info["held"], info["heldRevision"], info["eligible"],
-                 Path(info["verifierHold"]), info["s2Request"], info["s2PlainRequest"], Path(info["s2Replay"]), Path(info["s2Topic"]),
+                 info["s2Request"], info["s2PlainRequest"], Path(info["s2Replay"]), Path(info["s2Topic"]),
                  info["s2Counts"], info["s2ReplayCalls"])
 
 
@@ -154,13 +153,13 @@ class RelationWorkspace(Workspace):
 
     def write_wrapper(self, hook: str) -> Path:
         """An executable stand-in command that runs the REAL installed relation CLI module after arming one process-kill fault inside the
-        pipeline engine (the pipeline's own smoke uses the same technique). The fault fires only while `arm` exists and only for `resume` or
-        `revalidate`, and disarms itself, so exactly one child dies. Everything else about the command is the real thing."""
+        pipeline engine (the pipeline's own smoke uses the same technique). The fault fires only while `arm` exists and only for `resume`,
+        and disarms itself, so exactly one child dies. Everything else about the command is the real thing."""
         script = self.root / "relation-wrapper.py"
         arm = self.root / "arm"
         script.write_text(
             f"#!{PIPELINE_PYTHON}\nimport os, runpy, sys\nfrom zoop_ai_pipeline.relation import Engine\n"
-            f"if sys.argv[1:2] in (['resume'], ['revalidate']) and os.path.exists({str(arm)!r}):\n    os.unlink({str(arm)!r})\n"
+            f"if sys.argv[1:2] == ['resume'] and os.path.exists({str(arm)!r}):\n    os.unlink({str(arm)!r})\n"
             + "".join(f"    {line}\n" for line in hook.splitlines())
             + "sys.argv[0] = 'zoop-ai-relation'\nrunpy.run_module('zoop_ai_pipeline.relation_cli', run_name='__main__')\n", encoding="utf-8")
         script.chmod(0o755)
@@ -322,17 +321,14 @@ class RelationService(ServiceProcess):
     def roperation(self, key: str, job_id: str = JOB, *, as_: str = "alpha") -> httpx.Response:
         return self.request("GET", f"/internal/v1/relation-jobs/{job_id}/reviews/{key}", as_=as_)
 
-    def roprecover(self, key: str, job_id: str = JOB, *, as_: str = "alpha") -> httpx.Response:
-        return self.request("POST", f"/internal/v1/relation-jobs/{job_id}/reviews/{key}/recover", as_=as_)
-
-    def rowait(self, key: str, states: set[str], *, job_id: str = JOB, timeout: float = 90, as_: str = "alpha") -> dict[str, Any]:
-        """Poll an operation until its revalidation is in one of `states`. Operation reads never touch the pipeline, so a 503 is a real failure."""
+    def reviewed(self, key: str, *, job_id: str = JOB, timeout: float = 90, as_: str = "alpha") -> dict[str, Any]:
+        """Poll an operation until its review is recorded. Operation reads never touch the pipeline, so a 503 is a real failure."""
         def reached() -> dict[str, Any] | None:
             response = self.roperation(key, job_id, as_=as_)
             assert response.status_code == 200, response.text
             body = response.json()
-            return body if body["revalidation"]["state"] in states else None
-        return wait_for(reached, timeout, 0.25, f"operation {key} revalidation in {sorted(states)}")
+            return body if body["review"]["state"] == "applied" else None
+        return wait_for(reached, timeout, 0.25, f"operation {key} review applied")
 
     def result_relation(self, relation: str, job_id: str = JOB, *, as_: str = "alpha") -> dict[str, Any]:
         """One relation of a delivered result (the job must be ready and every delivery gate must hold)."""
@@ -405,7 +401,7 @@ def ledger_rows(workspace: RelationWorkspace, sql: str) -> list[tuple]:
 
 def relation_processes(workspace: RelationWorkspace) -> list[int]:
     """Pids of live relation children bound to this workspace's pipeline ledger (exact owned argv; pgrep exit 1 is a genuine no-match)."""
-    pattern = (r"(zoop-ai-relation|relation-wrapper\.py) (submit|inspect|resume|cancel|review|revalidate) --state-dir "
+    pattern = (r"(zoop-ai-relation|relation-wrapper\.py) (submit|inspect|resume|cancel|review) --state-dir "
                + re.escape(str(workspace.relation_state)) + r"( |$)")
     found = subprocess.run([PGREP, "-f", "--", pattern], capture_output=True, text=True)
     if found.returncode == 1:
@@ -440,3 +436,24 @@ def walk_keys(node: Any):
     elif isinstance(node, list):
         for value in node:
             yield from walk_keys(value)
+
+
+APPROVAL_BASIS_KEYS = {"kind", "revision", "reviewer", "decidedAt"}
+
+
+def delivered_keys(node: Any):
+    """`walk_keys` for a DELIVERED relation result: the one designated audit field `approvalBasis` is a closed object `{kind, revision, reviewer, decidedAt}`
+    (the automatic verifier has `reviewer: null`, an operator's final approval names the approving principal). It is checked exactly and not descended into;
+    EVERY other key, including a `reviewer` or `note` anywhere else (the raw review history), is still reported and so still private."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield key
+            if key == "approvalBasis" and value is not None:
+                assert isinstance(value, dict) and set(value) == APPROVAL_BASIS_KEYS, value
+                assert value["kind"] in ("automatic-verifier", "operator-final-approval")
+                assert (value["reviewer"] is None) == (value["kind"] == "automatic-verifier") and isinstance(value["revision"], int), value
+                continue
+            yield from delivered_keys(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from delivered_keys(value)

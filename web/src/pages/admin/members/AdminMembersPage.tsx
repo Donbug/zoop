@@ -1,10 +1,10 @@
-import PageShell from '@/components/common/PageShell';
 import MemberManagement from '@/components/admin/members/MemberManagement';
 
+// A-ADM-05 회원·접근 관리 (/admin/members)
 export default function AdminMembersPage() {
   return (
-    <PageShell title="회원 관리">
+    <div data-screen-id="A-ADM-05">
       <MemberManagement />
-    </PageShell>
+    </div>
   );
 }

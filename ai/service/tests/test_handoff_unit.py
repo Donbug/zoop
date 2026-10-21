@@ -302,11 +302,147 @@ def test_the_documented_limits_are_enforced():
                    lambda b: b["articles"][0].update(title="x" * 2001), lambda b: b["articles"][0].update(url="x" * 4001),
                    lambda b: b["articles"][0].update(observations=[]), lambda b: b["relations"][0].update(basis=[{}, {}, {}]),
                    lambda b: b["issues"][0]["geography"].update(countries=["KR"] * 11), lambda b: b["companies"][0].update(id="a" * 201),
-                   lambda b: b["checks"].update(producerConfirmed=["x"] * 21)):
+                   lambda b: b["checks"].update(producerConfirmed=["x"] * 21),
+                   lambda b: b["issues"][0].update(mentions=[copy.deepcopy(b["issues"][0]["mentions"][0]) for _ in range(1001)]),
+                   lambda b: b["issues"][0]["mentions"][0].update(participants=[copy.deepcopy(b["issues"][0]["mentions"][0]["participants"][0]) for _ in range(1001)]),
+                   lambda b: b["issues"][0]["mentions"][0].update(evidenceIds=[]),
+                   lambda b: b["issues"][0]["mentions"][0].update(title="x" * (6 * 1024 * 1024 + 1))):
         broken = example_bundle()
         change(broken)
         with pytest.raises(ValidationError):
             Bundle.model_validate(broken)
+
+
+def test_native_empty_and_long_s2_mention_strings_are_relayed_verbatim_not_refused():
+    """S2 puts no emptiness or length rule on a mention's title/action/target/period or a participant's source id, name and role: the model keeps them as given."""
+    bundle = example_bundle()
+    mention = bundle["issues"][0]["mentions"][0]
+    mention.update(title="", action="", target="", period="")
+    mention["participants"][0].update(sourceCompanyId="", name="", role="")
+    mention["participants"][1].update(name="  공백 보존  ", role="x" * 50_000)
+    parsed = Bundle.model_validate(bundle)
+    assert parsed.wire() == bundle and canonical(parsed.wire()) == canonical(bundle)
+
+
+FIELDS = ("title", "action", "target", "eventTime", "period", "assertionStatus")
+
+
+def provenance_refusals() -> list[tuple[str, Callable[[dict], Any]]]:
+    def at_issue(change: Callable[[dict], Any]) -> Callable[[dict], Any]:
+        return lambda bundle: change(bundle["issues"][0]["fieldProvenance"])
+    cases: list[tuple[str, Callable[[dict], Any]]] = [
+        ("selection-unknown", at_issue(lambda p: p.update(selection="consensus"))),
+        ("selection-null", at_issue(lambda p: p.update(selection=None))),
+        ("verification-verified", at_issue(lambda p: p.update(verification="operator-field-verdict"))),
+        ("verification-null", at_issue(lambda p: p.update(verification=None))),
+        ("same-value-null", at_issue(lambda p: p.update(sameValueMentions=None))),
+        ("same-value-geography", at_issue(lambda p: p["sameValueMentions"].update(geography=[]))),
+        ("same-value-time-precision", at_issue(lambda p: p["sameValueMentions"].update(timePrecision=[]))),
+        ("field-decisions-in-provenance", at_issue(lambda p: p.update(fieldDecisions=[]))),
+        ("field-decisions-in-issue", lambda bundle: bundle["issues"][0].update(fieldDecisions=[])),
+        ("provenance-missing", lambda bundle: bundle["issues"][0].pop("fieldProvenance")),
+        ("provenance-null", lambda bundle: bundle["issues"][0].update(fieldProvenance=None)),
+        ("reference-extra-key", at_issue(lambda p: p["sameValueMentions"]["title"][0].update(articleId="doc-" + "c" * 64))),
+        ("reference-version-short", at_issue(lambda p: p["sameValueMentions"]["title"][0].update(documentVersion="a" * 63))),
+        ("reference-mention-empty", at_issue(lambda p: p["sameValueMentions"]["title"][0].update(mentionId=""))),
+        ("reference-index", at_issue(lambda p: p["sameValueMentions"].update(title=[0]))),
+        ("list-over-limit", at_issue(lambda p: p["sameValueMentions"].update(title=[copy.deepcopy(p["sameValueMentions"]["title"][0]) for _ in range(1001)]))),
+    ]
+    for field in FIELDS:
+        cases += [(f"{field}-empty", at_issue(lambda p, f=field: p["sameValueMentions"].update({f: []}))),
+                  (f"{field}-missing", at_issue(lambda p, f=field: p["sameValueMentions"].pop(f))),
+                  (f"{field}-null", at_issue(lambda p, f=field: p["sameValueMentions"].update({f: None})))]
+    return cases
+
+
+@pytest.mark.parametrize("name,change", provenance_refusals(), ids=[name for name, _ in provenance_refusals()])
+def test_the_field_provenance_is_closed_in_shape_and_a_malformed_one_is_refused(name, change):
+    for bundle in (example_bundle(), full_bundle()):
+        change(bundle)
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(bundle)
+
+
+def test_the_model_checks_the_shape_of_the_provenance_and_never_its_semantics():
+    """Exactness, order, closure and the selection rule belong to the producer: a shape-valid list the producer would refuse is relayed as it came, because
+    the service neither repairs nor judges it (the producer's validator and the application importer refuse it)."""
+    bundle = full_bundle()
+    mentions = bundle["issues"][0]["fieldProvenance"]["sameValueMentions"]
+    mentions["title"] = list(reversed(mentions["action"]))
+    mentions["target"] = mentions["action"] + mentions["action"]
+    parsed = Bundle.model_validate(bundle)
+    assert parsed.wire() == bundle and canonical(parsed.wire()) == canonical(bundle)
+
+
+def test_the_example_and_the_every_variant_fixture_state_a_truthful_provenance():
+    """The authored provenance of both fixtures equals what the producer's rule derives: exact equality of every headline value, null equal null."""
+    for bundle in (example_bundle(), full_bundle()):
+        issue = bundle["issues"][0]
+        provenance = issue["fieldProvenance"]
+        assert provenance["verification"] == "none"
+        assert provenance["selection"] == ("operator-representative" if issue["representative"] is not None else "unanimous")
+        assert set(provenance["sameValueMentions"]) == set(FIELDS)
+        for field in FIELDS:
+            expected = [{key: mention[key] for key in ("documentId", "documentVersion", "mentionId")} for mention in issue["mentions"] if mention[field] == issue[field]]
+            assert expected and provenance["sameValueMentions"][field] == expected, field
+        if provenance["selection"] == "unanimous":
+            assert all(len(provenance["sameValueMentions"][field]) == len(issue["mentions"]) for field in FIELDS)
+
+
+def verdict_refusals() -> list[tuple[str, Callable[[dict], Any]]]:
+    def at_verdict(change: Callable[[dict], Any]) -> Callable[[dict], Any]:
+        return lambda bundle: change(bundle["issues"][0]["fieldVerdicts"][0])
+    return [
+        ("missing-list", lambda b: b["issues"][0].pop("fieldVerdicts")), ("null-list", lambda b: b["issues"][0].update(fieldVerdicts=None)),
+        ("list-over-limit", lambda b: b["issues"][0].update(fieldVerdicts=[copy.deepcopy(b["issues"][0]["fieldVerdicts"][0]) for _ in range(2001)])),
+        ("withheld-missing", lambda b: b["issues"][0]["fieldProvenance"].pop("withheld")), ("withheld-null", lambda b: b["issues"][0]["fieldProvenance"].update(withheld=None)),
+        ("withheld-unknown-field", lambda b: b["issues"][0]["fieldProvenance"].update(withheld=["title"])),
+        ("withheld-over-limit", lambda b: b["issues"][0]["fieldProvenance"].update(withheld=["eventTime", "period", "period"])),
+        ("extra-key", at_verdict(lambda v: v.update(extra=1))), ("free-text-note", at_verdict(lambda v: v.update(note="review prose"))),
+        ("raw-spans", at_verdict(lambda v: v.update(evidence=[{"start": 0, "end": 1}]))), ("field-title", at_verdict(lambda v: v.update(field="title"))),
+        ("value-null", at_verdict(lambda v: v.update(value=None))), ("decision-lowercase", at_verdict(lambda v: v.update(decision="allow"))),
+        ("reason-unknown", at_verdict(lambda v: v.update(reasonCode="other"))), ("verification-none", at_verdict(lambda v: v.update(verification="none"))),
+        ("allow-without-spans", at_verdict(lambda v: v.update(evidenceIds=[]))), ("allow-wrong-reason", at_verdict(lambda v: v.update(reasonCode="ambiguous"))),
+        ("reject-stated", at_verdict(lambda v: v.update(decision="REJECT"))), ("hold-unstated-with-span", at_verdict(lambda v: v.update(decision="HOLD", reasonCode="unstated"))),
+        ("hold-ambiguous-no-span", at_verdict(lambda v: v.update(decision="HOLD", reasonCode="ambiguous", evidenceIds=[]))),
+        ("hold-contradicted", at_verdict(lambda v: v.update(decision="HOLD", reasonCode="contradicted"))),
+        ("evidence-bad-id", at_verdict(lambda v: v.update(evidenceIds=["x"]))),
+        ("evidence-over-limit", at_verdict(lambda v: v.update(evidenceIds=[v["evidenceIds"][0]] * 21))),
+        ("reviewer-bad", at_verdict(lambda v: v.update(reviewer="a b"))), ("mention-id-empty", at_verdict(lambda v: v.update(mentionId=""))),
+    ]
+
+
+@pytest.mark.parametrize("name,change", verdict_refusals(), ids=[name for name, _ in verdict_refusals()])
+def test_a_malformed_field_verdict_or_withheld_list_is_refused(name, change):
+    for bundle in (example_bundle(), full_bundle()):
+        change(bundle)
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(bundle)
+
+
+def test_verdict_shapes_are_accepted_and_relayed_exactly_without_semantic_judgement():
+    """All four legal decision/reason/span combinations pass, an empty list is legal (no verdict is not a verification) and a verdict the producer would refuse
+    (a value no mention carries) is still relayed: the service judges shape only."""
+    bundle = full_bundle()
+    base = bundle["issues"][0]["fieldVerdicts"][0]
+    span = base["evidenceIds"]
+    bundle["issues"][0]["fieldVerdicts"] = [
+        {**base, "decision": "ALLOW", "reasonCode": "stated", "evidenceIds": span}, {**base, "decision": "HOLD", "reasonCode": "unstated", "evidenceIds": []},
+        {**base, "decision": "HOLD", "reasonCode": "ambiguous", "evidenceIds": span}, {**base, "decision": "REJECT", "reasonCode": "contradicted", "evidenceIds": span},
+        {**base, "value": "not-a-mention-value"}]
+    bundle["issues"][0]["fieldProvenance"]["withheld"] = ["eventTime", "period"]
+    assert Bundle.model_validate(bundle).wire() == bundle
+    for empty in (example_bundle(), full_bundle()):
+        empty["issues"][0]["fieldVerdicts"] = []
+        assert Bundle.model_validate(empty).wire() == empty
+
+
+def test_the_fixtures_carry_closed_verdict_keys_and_no_review_prose():
+    for bundle in (example_bundle(), full_bundle()):
+        for verdict in bundle["issues"][0]["fieldVerdicts"]:
+            assert set(verdict) == {"documentId", "documentVersion", "mentionId", "field", "value", "decision", "reasonCode", "evidenceIds", "verification", "reviewer",
+                                    "decisionRef", "decisionVersion"} and verdict["verification"] == "operator-field-verdict"
+        assert bundle["issues"][0]["fieldProvenance"]["withheld"] == []
 
 
 def test_the_envelope_projection_drops_what_the_application_may_not_read_and_keeps_the_bundle_as_received():
@@ -321,6 +457,8 @@ def test_the_envelope_projection_drops_what_the_application_may_not_read_and_kee
     lambda out: out.pop("usage"), lambda out: out["usage"].update(providerCalls=1), lambda out: out["usage"].update(modelCalls=True),
     lambda out: out["delivery"].update(status="maybe"), lambda out: out.update(state="published"), lambda out: out.update(publication="published"),
     lambda out: out["delivery"].update(checkedAt="yesterday"), lambda out: out["receipt"].update(bundleDigest="short"),
+    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-1"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-2"),
+    lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-3"), lambda out: out["receipt"].update(bundleSchema="zoop-graph-handoff-bundle-4"),
     lambda out: out["receipt"].update(bundleBytes=0), lambda out: out["receipt"].update(bundleSchema="other"), lambda out: out.update(bundle=[]),
     lambda out: out.update(manifest=[]),
 ])
@@ -399,6 +537,18 @@ def test_every_withheld_shape_has_identity_state_and_a_reason_and_nothing_of_the
             text = json.dumps(wire)
             for private in (*SOURCE_DATA, "KRX:005930", "ev-", pins(example_bundle())["bundleDigest"]):
                 assert private not in text
+
+
+def test_a_handoff_frozen_under_the_earlier_bundle_schema_is_withheld_with_its_reason_and_no_receipt_content(tmp_path):
+    legacy = withheld_output(code="handoff_contract_changed")
+    service, _, _ = reads(tmp_path, result(legacy, 2), result(legacy, 2))
+    for operation in (service.status, service.bundle):
+        wire = body(operation(PRINCIPAL, HANDOFF, Observation()))
+        assert wire["delivery"] == {"state": "withheld", "reason": "handoff_contract_changed", "checkedAt": None}
+        assert wire["verification"] is None and wire.get("bundle") is None and wire.get("manifest") is None
+        text = json.dumps(wire)
+        for old in ("zoop-graph-handoff-bundle-1", "zoop-graph-handoff-bundle-2", "zoop-graph-handoff-bundle-3", "zoop-graph-handoff-bundle-4", "bundleSchema", "receipt", pins(example_bundle())["bundleDigest"]):
+            assert old not in text
 
 
 @pytest.mark.parametrize("code,status,public", [
@@ -517,3 +667,70 @@ def test_every_authored_handoff_example_validates_through_the_wire_models_and_wi
     for example in sample["errors"].values():
         HdErrorEnvelope.model_validate(example["value"])
     assert seal(copy.deepcopy(example_bundle())) == example_bundle()   # the authored content digest is a real digest of the authored content
+
+
+# ---- live provenance, the approval basis and source support ---------------------------------------------------------------------
+
+ORIGIN = {"originId": "origin-1", "reviewer": "reviewer-1", "decisionRef": "origin-2026-10-21:1", "decisionVersion": "v1", "verification": "operator-declared-origin"}
+
+
+def test_the_provenance_pairs_the_approval_basis_and_the_source_support_are_closed_and_exact():
+    bundle = example_bundle()
+    live = copy.deepcopy(bundle)
+    live["provenance"].update(executionMode="live", recordingKind="provider")
+    live["sources"][0]["provenance"].update(executionMode="live", recordingKind="provider")
+    assert Bundle.model_validate(live).wire() == live
+    manual = copy.deepcopy(bundle)
+    manual["sources"][0]["reviewUsed"][0]["approvalBasis"] = {"kind": "operator-final-approval", "revision": 1, "reviewer": "ops-1",
+                                                              "decidedAt": "2026-10-13T00:00:02+00:00"}
+    manual["relations"][0]["provenance"]["s3SemanticValidation"] = "manual-operator-final-approval"   # the INVOLVES edge says whose approval it rests on
+    assert Bundle.model_validate(manual).wire() == manual
+    declared = copy.deepcopy(bundle)
+    declared["articles"][0]["origin"] = dict(ORIGIN)
+    declared["issues"][0]["sourceSupport"].update(knownLineageCount=1, unknownLineageArticles=[], independentSourceCount=1)
+    assert Bundle.model_validate(declared).wire() == declared
+    used = lambda b: b["sources"][0]["reviewUsed"][0]  # noqa: E731
+    for change in (lambda b: b["provenance"].update(executionMode="live"), lambda b: b["provenance"].update(recordingKind="provider"),
+                   lambda b: b["sources"][0]["provenance"].update(executionMode="live"), lambda b: b["sources"][0].pop("provenance"),
+                   lambda b: used(b)["approvalBasis"].update(revision=9), lambda b: used(b)["approvalBasis"].update(reviewer="operator"),
+                   lambda b: used(b)["approvalBasis"].update(kind="operator-final-approval"), lambda b: used(b)["approvalBasis"].update(kind="operator-review"),
+                   lambda b: used(b).update(extra=1), lambda b: used(b).pop("approvalBasis"), lambda b: b["sources"][0].update(reviewUsed=[["rc-" + "4" * 64, 1]]),
+                   lambda b: b["policy"].update(sourceSupport="other"), lambda b: b["policy"].pop("sourceSupport"),
+                   lambda b: b["articles"][0].pop("textSha256"), lambda b: b["articles"][0].update(textSha256="short"),
+                   lambda b: b["articles"][0].update(origin={"originId": "o"}), lambda b: b["articles"][0].update(origin={**ORIGIN, "verification": "inferred"}),
+                   lambda b: b["issues"][0].pop("sourceSupport"), lambda b: b["issues"][0]["sourceSupport"].update(extra=1),
+                   lambda b: b["issues"][0]["sourceSupport"].update(duplicateGroups=[["doc-" + "c" * 64]]),      # a group has two members at least
+                   lambda b: b["issues"][0]["sourceSupport"].update(independentSourceCount=-1),
+                   lambda b: b["relations"][0]["provenance"].update(s3SemanticValidation="none")):
+        broken = copy.deepcopy(bundle)
+        change(broken)
+        with pytest.raises(ValidationError):
+            Bundle.model_validate(broken)
+
+
+REVIEWERS = ("ops@example.invalid", "검수자 김서진", "alpha", "Reviewer With Spaces & Punctuation!", "x" * 200, "é")
+
+
+@pytest.mark.parametrize("reviewer", REVIEWERS)
+def test_a_bounded_free_text_reviewer_is_relayed_exactly_by_the_handoff_and_the_relation_projection(reviewer):
+    """The producer (`handoff_contracts`) and the S3 review wire accept any non-blank reviewer of at most 200 characters, so neither service model may
+    redact it, reject it as an identifier pattern, or normalise it."""
+    from zoop_ai_service.handoff_wire import BApprovalBasis
+    from zoop_ai_service.relation_wire import RcApprovalBasis
+    wire = {"kind": "operator-final-approval", "revision": 2, "reviewer": reviewer, "decidedAt": "2026-10-20T00:00:00+00:00"}
+    assert BApprovalBasis.model_validate(wire).model_dump(by_alias=True)["reviewer"] == reviewer
+    assert RcApprovalBasis.model_validate({**wire}).model_dump(by_alias=True)["reviewer"] == reviewer
+
+
+@pytest.mark.parametrize("reviewer", ("", "   ", "\t\n", "x" * 201))
+def test_a_blank_or_over_long_reviewer_is_refused_and_the_automatic_verifier_has_none(reviewer):
+    from zoop_ai_service.handoff_wire import BApprovalBasis
+    from zoop_ai_service.relation_wire import RcApprovalBasis
+    wire = {"kind": "operator-final-approval", "revision": 2, "reviewer": reviewer, "decidedAt": "2026-10-20T00:00:00+00:00"}
+    for model in (BApprovalBasis, RcApprovalBasis):
+        with pytest.raises(ValidationError):
+            model.model_validate(wire)
+    automatic = {"kind": "automatic-verifier", "revision": 1, "reviewer": None, "decidedAt": "2026-10-20T00:00:00+00:00"}
+    assert BApprovalBasis.model_validate(automatic).reviewer is None and RcApprovalBasis.model_validate(automatic).reviewer is None
+    with pytest.raises(ValidationError):
+        BApprovalBasis.model_validate({**automatic, "reviewer": "someone"})   # a verifier verdict has no human reviewer

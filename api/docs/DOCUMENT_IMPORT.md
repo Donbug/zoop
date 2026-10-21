@@ -111,7 +111,8 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" \
 | `article_versions.version` | `documentVersion` 그대로 |
 | `title` / `url` | export의 `title`(빈 문자열 유지) / 정규화된 `url` |
 | `published_at`, `published_date`, `publication_precision` | authored export: `publishedAt` 있음 → (그 시각, NULL, `datetime`), 없음 → (NULL, NULL, `unknown`). **수집(collected_http) export**는 선언된 정밀도를 그대로 따른다: `instant` → (그 시각, NULL, `datetime`), `day` → (NULL, **그 날짜**, `day`; 자정·시간대를 지어내지 않음), `unresolved`(오프셋 없는 시각)·`unknown` → (NULL, NULL, `unknown`). `unresolved`의 선언 원문은 DB에 칸이 없으므로 결과 문서의 `collection.declaredPublication`에만 남는다 |
-| `publisher`, `raw_artifact_id` | NULL (내보내지 않음) |
+| `publisher` | export의 `observation.publisher` 그대로(공백 제거·유니코드 정규화 없음). 키가 없거나 명시적 `null`이면 NULL(선언된 발행 매체 없음). 값은 **운영자가 수집 대상·원장 항목에 선언한** 발행 매체 이름이며 `sourceId`·도메인·HTML·수집 업체에서 추정하지 않습니다. 문자열 1~200 코드 포인트, PostgreSQL에 저장 가능, 제어 문자(Cc) 없음, 공백(Z*)만으로 이뤄지지 않음. 문자열이 아니면 `export_invalid`, 위 규칙 위반은 `metadata_unsupported`입니다. import 요청에서는 읽지 않습니다(요청에 두 번째 권한을 만들지 않음) |
+| `raw_artifact_id` | NULL (내보내지 않음) |
 | `collected_at` | **처음 등록된 관찰**의 시각. authored export는 `observedAt`(원장 page 수신 시각), **collected_http export는 실제 HTTP 수집 시각 `collection.fetchedAt`**. import·replay 시각이 아님 |
 | `artifacts.id` | `textArtifactId` 그대로 (`text-<documentVersion>`) |
 | `artifacts.kind` / `media_type` | `extracted_text` / `text/plain; charset=utf-8` |
@@ -124,7 +125,7 @@ env -i PATH=/usr/bin:/bin HOME="$HOME" \
 
 1. `INSERT … ON CONFLICT (id) DO NOTHING`으로 article을 만들고 `SELECT … FOR UPDATE`로 잠급니다. provider·kind·`access_status`를 확인합니다.
 2. artifact를 같은 방식으로 넣고 kind·URI·sha256·bytes·media type이 같은지 비교합니다. 다른 id가 같은 URI를 쓰려 하면 `artifact_conflict`입니다.
-3. 버전을 같은 방식으로 넣고 title·publisher·published_at·published_date·precision·raw artifact·text artifact를 비교합니다(`version_conflict`). **`url`과 `collected_at`은 비교도 갱신도 하지 않고** 처음 값을 돌려줍니다.
+3. 버전을 같은 방식으로 넣고 title·publisher·published_at·published_date·precision·raw artifact·text artifact를 비교합니다(`version_conflict`). **`url`과 `collected_at`은 비교도 갱신도 하지 않고** 처음 값을 돌려줍니다. `publisher`는 버전에 묶입니다: 발행 매체를 선언한 관찰은 원장에서 같은 `documentId`의 **다른** `rawVersion`·`documentVersion`이므로 매체가 없는 이전 버전 행(NULL)과 충돌하지 않고 옆에 새 행으로 등록되며, 이전 행은 바뀌지도 채워지지도 않습니다. 같은 `documentVersion`에 다른 값(또는 NULL ↔ 값)이 오면 `version_conflict`입니다.
 4. 포인터 요청이 있으면: 현재 값이 이미 이 버전이면 `already-current`(쓰기 없음, 재실행이 멱등), 아니면 `UPDATE … WHERE current_version IS NOT DISTINCT FROM :expected`가 한 행을 바꾸면 `moved`, 아니면 `current_version_conflict`입니다. 버전은 해시라 순서가 없으므로 관찰 시각·발행 시각·replay 순서로 “최신”을 추론하지 않습니다. 오래된 버전으로 되돌리는 것도 명시적 결정이어야 합니다.
 
 DB는 JPA `ddl-auto: validate`와 제약·트리거로 같은 불변식을 지킵니다. CHECK(kind·상태·발행 정밀도 3종·bytes·sha256), `UNIQUE(storage_uri)`, `(id, current_version)` → `article_versions` 복합 FK, RESTRICT 삭제, `artifacts`·`article_versions` UPDATE 거부 트리거, `articles`의 신원 열 UPDATE 거부 트리거(`access_status`·`current_version`만 변경 가능).
@@ -204,7 +205,9 @@ DB_URL=jdbc:postgresql://127.0.0.1:<port>/<db> DB_USERNAME=<user> DB_PASSWORD=<d
 
 - 이 migration(`V20261014120000`)과 `artifacts`·`articles`·`article_versions`의 소유는 **로컬 제안**이며 담당 합의 전까지 확정이 아닙니다(소유 담당은 [migration 담당 경계](../../docs/development/api-migration-ownership.md)에서 확정). 다른 브랜치의 migration과 버전이 겹치면 병합 전에 이 파일의 이름만 바꿉니다. 첫 작성자는 이 경로이며 다른 기능은 `artifacts`를 다시 정의하지 말고 참조합니다.
 - 문서를 읽는 기능(`listCompanyDocuments`, `getEvidence` 등)은 저장 행을 권한으로 쓰면 안 됩니다. 응답 때마다 `articles.provider`의 **현재** grant와 `access_status='available'`을 다시 확인해야 하고, `current_version IS NULL`을 “현재 버전 없음”으로 다루며 시각으로 대체하면 안 됩니다. `getEvidence`는 이 규칙대로 읽습니다([문서 분석](DOCUMENT_ANALYSIS.md#근거-읽기-getevidence-부분-구현)); `listCompanyDocuments`는 아직 없습니다.
-- `articles.provider_key`·`lineage_key`·`publisher`·`raw_artifact_id`는 S2-1이 값을 내보낼 때까지 비어 있습니다. `day` 정밀도는 `zoop-ai-collect`로 수집한 export가 날짜만 선언했을 때 채워집니다.
+- 2026-10-20: graph 본문 근거를 읽는 `getEvidence` 경로는 S1 grant가 아니라 이 import가 쓰는 S2-1 source registry(같은 파일을 `ZOOP_DOCUMENT_READ_INGESTION_SOURCES`로 지정)의 **현재** `read`·`store`·`quote-display` 권리와 `access_status='available'`을 요청마다 다시 확인합니다([graph 본문 근거 경로](GRAPH_READ_HANDOFF.md#2026-10-20-getevidence의-graph-본문-근거-경로-로컬-작업-트리-미게시)).
+- `articles.provider_key`·`lineage_key`·`raw_artifact_id`는 S2-1이 값을 내보낼 때까지 비어 있습니다. `day` 정밀도는 `zoop-ai-collect`로 수집한 export가 날짜만 선언했을 때 채워집니다.
+- **발행 매체(`publisher`).** 선택적 `observation.publisher`는 수집 요청의 대상(`targets[]`) 또는 authored 원장 항목에 운영자가 선언한 값이며 export가 키를 생략하면 선언이 없는 것입니다(`null`을 내보내지 않으므로 이전 export·해시·NULL 버전은 그대로 import됩니다). **배포 순서: 이 파서(소비자)를 먼저 배포한 뒤에야 발행 매체를 선언한 export를 만들 수 있습니다.** 이전 파서는 알 수 없는 관찰 키를 `export_invalid`로 거절합니다. 저장된 값은 공개 `getEvidence`(S1 경로와 graph 경로 모두)가 `article.publisher`로 그대로 돌려주며, 매체가 없는 버전은 계속 `null`입니다. 이 값은 S2 분석 `Article`·handoff bundle·`sourceId`로 흘러가지 않습니다.
 - **수집 provenance(collected_http).** S2-1 export의 `observation`에 `provenance`·`collection` 키가 **둘 다** 있으면 그 관찰은 `zoop-ai-collect`가 HTTP로 가져온 것이고(authored export에는 두 키가 없고 이전과 정확히 같다), `IngestionExportParser`는 `collection`의 닫힌 키 집합(`provenance`, `collectionId`, `receipt{file,sha256}`, `fetchedAt`, `finalUrl`, `httpStatus`(2xx), `contentType`, `bodySha256`(= `locatorMetadata.rawHash`), `documentKind`, `network`, `published{raw,precision,date,basis}`)과 선언된 게시 시각·`publishedAt`의 일관성을 엄격히 검증하고 어긋나면 `export_invalid`/`published_at_unsupported`입니다. 요청 `kind`가 수집 때 선언된 `documentKind`와 다르면 `article_kind_conflict`입니다. 이 사실은 결과 문서의 `collection` 객체(`publicationPrecision`과 함께; 수집 항목에만 있고 authored 결과 키는 그대로)로 보존·보고되며 버리지 않습니다. `network: "synthetic_loopback"`은 로컬 합성 시험 서버의 바이트이며 외부 문서로 취급·표시하면 안 됩니다. receipt는 서명되지 않은 운영자 소유 기록이라 **일관성 증거일 뿐 암호학적 증명이나 license가 아닙니다**(권한은 grant가 정합니다).
 - `collected_at`·`url`은 가장 이른 관찰이 아니라 **처음 등록된** 관찰의 값입니다(행이 불변이라서).
 - 파일 저장소는 로컬 파일시스템 한 곳입니다. 보존·삭제 정책(ERD가 정하지 않음)과 원격 저장소는 없습니다.

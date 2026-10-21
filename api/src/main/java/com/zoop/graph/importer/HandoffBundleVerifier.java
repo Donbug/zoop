@@ -1,5 +1,7 @@
 package com.zoop.graph.importer;
 
+import java.time.DateTimeException;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,12 +16,14 @@ import java.util.regex.Pattern;
 import com.zoop.common.json.Canonical;
 import com.zoop.common.json.StrictJson;
 import com.zoop.common.json.StrictJson.Obj;
+import com.zoop.graph.importer.HandoffBundle.Approval;
 import com.zoop.graph.importer.HandoffBundle.Article;
 import com.zoop.graph.importer.HandoffBundle.Basis;
 import com.zoop.graph.importer.HandoffBundle.Company;
 import com.zoop.graph.importer.HandoffBundle.Evidence;
 import com.zoop.graph.importer.HandoffBundle.Issue;
 import com.zoop.graph.importer.HandoffBundle.ObservationPin;
+import com.zoop.graph.importer.HandoffBundle.Origin;
 import com.zoop.graph.importer.HandoffBundle.Relation;
 import com.zoop.graph.importer.HandoffBundle.SourcePin;
 import tools.jackson.databind.JsonNode;
@@ -27,7 +31,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The strict, closed validator of a {@code zoop-graph-handoff-bundle-1} and of its frozen manifest: a Java port of the
+ * The strict, closed validator of a {@code zoop-graph-handoff-bundle-5} and of its frozen manifest: a Java port of the
  * producer's own {@code validate_bundle} ({@code ai/pipeline/.../handoff_contracts.py}), so the app never trusts a producer
  * claim it did not recompute. Every object has exactly the keys the producer writes, every value its type and pattern, every
  * reference is closed (articles, evidence, companies, issues, relations, source pins, review revisions), every id formula
@@ -39,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class HandoffBundleVerifier {
     static final String MANIFEST_SCHEMA = "zoop-ai-handoff-1";
-    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-1";
+    static final String BUNDLE_SCHEMA = "zoop-graph-handoff-bundle-5";
     static final String POLICY = "zoop-public-projection-policy-1";
     static final String EVIDENCE_KIND = "graph-body-span";
     static final String OFFSET_UNIT = "unicode_code_point";
@@ -76,6 +80,38 @@ final class HandoffBundleVerifier {
             "documentVersion", "observation");
     private static final Set<String> OBSERVATION_KEYS = Set.of("roundId", "sourceId", "page", "ordinal", "documentId",
             "rawVersion", "documentVersion");
+    private static final Set<String> MENTION_KEYS = Set.of("documentId", "documentVersion", "mentionId", "articleId",
+            "articleVersion", "verification", "title", "action", "target", "eventTime", "timePrecision", "period",
+            "assertionStatus", "background", "participants", "evidenceIds");
+    private static final Set<String> PARTICIPANT_KEYS = Set.of("sourceCompanyId", "companyId", "name", "role");
+    /** The issue's wire field names whose original-mention agreement {@code fieldProvenance} records, in the producer's order. */
+    private static final List<String> PROVENANCE_FIELDS = List.of("title", "action", "target", "eventTime", "period",
+            "assertionStatus");
+    /** The two fields an operator field verdict can judge, in the producer's (and the canonical) order. */
+    private static final List<String> VERDICT_FIELDS = List.of("eventTime", "period");
+    private static final Set<String> VERDICT_KEYS = Set.of("documentId", "documentVersion", "mentionId", "field", "value",
+            "decision", "reasonCode", "evidenceIds", "verification", "reviewer", "decisionRef", "decisionVersion");
+    private static final Set<String> MENTION_REF_KEYS = Set.of("documentId", "documentVersion", "mentionId");
+    private static final Set<String> ASSERTION_STATUSES = Set.of("occurred", "announced", "planned", "forecast",
+            "cancelled", "unknown");
+    private static final int MAX_MENTIONS = 1_000;
+    private static final int MAX_PARTICIPANTS = 1_000;
+    private static final int MAX_VERDICTS = 2 * MAX_MENTIONS;
+    private static final int MAX_VERDICT_EVIDENCE = 20;
+    private static final Set<String> APPROVAL_KEYS = Set.of("kind", "revision", "reviewer", "decidedAt");
+    private static final Set<String> ORIGIN_KEYS = Set.of("originId", "reviewer", "decisionRef", "decisionVersion",
+            "verification");
+    private static final Set<String> SUPPORT_KEYS = Set.of("articleCount", "knownLineageCount", "unknownLineageArticles",
+            "independentSourceCount", "duplicateGroups");
+    /** The eligibility of an S3 relation was decided by the independent verifier (no reviewer). */
+    static final String AUTOMATIC = "automatic-verifier";
+    /** The eligibility of an S3 relation was decided by a human's final approval of a HOLD: not a verifier verdict. */
+    static final String OPERATOR_FINAL = "operator-final-approval";
+    static final String SOURCE_SUPPORT_POLICY = "origin-or-exact-text-union";
+    /** The only reason a structural path may be unavailable: a two-basis chain whose middle company the operator did not map. */
+    static final String UNMAPPED_MIDDLE = "intermediate_company_unmapped";
+    /** The longest business or product scope text of one structural basis, in Unicode code points. */
+    private static final int MAX_SCOPE_CODE_POINTS = 500;
 
     private HandoffBundleVerifier() {
     }
@@ -127,7 +163,7 @@ final class HandoffBundleVerifier {
     /** SHA-256 of the canonical JSON of the five public collections: the bundle's {@code digests.content}. */
     static String contentDigest(JsonNode bundle) {
         ObjectNode subset = StrictJson.newObject();
-        for (String key : List.of("companies", "issues", "relations", "evidence", "articles")) {
+        for (String key : List.of("companies", "pathCompanies", "issues", "relations", "evidence", "articles")) {
             subset.set(key, bundle.get(key));
         }
         return Canonical.digest(subset);
@@ -146,8 +182,8 @@ final class HandoffBundleVerifier {
 
     static HandoffBundle verify(JsonNode node) {
         Obj bundle = Obj.of(node).exactly(Set.of("schemaVersion", "handoffId", "manifestDigest", "provenance", "policy",
-                "sources", "companies", "issues", "relations", "evidence", "articles", "exclusions", "counts", "checks",
-                "readiness", "digests"));
+                "sources", "companies", "pathCompanies", "issues", "relations", "evidence", "articles", "exclusions", "counts",
+                "checks", "readiness", "digests"));
         need(BUNDLE_SCHEMA.equals(bundle.string("schemaVersion")));
         String handoffId = text(bundle, "handoffId", ID);
         String manifestDigest = text(bundle, "manifestDigest", HASH);
@@ -159,16 +195,19 @@ final class HandoffBundleVerifier {
                 && (sourceKind.equals("synthetic") || sourceKind.equals("actual")));
         String executionMode = producerProvenance.string("executionMode");
         String recordingKind = producerProvenance.string("recordingKind");
-        need(executionMode.equals("replay") && recordingKind.equals("authored-test"));
+        // Live provider evidence and replayed authored fixtures are the only two truthful pairings; sourceKind is independent.
+        need((executionMode.equals("replay") && recordingKind.equals("authored-test"))
+                || (executionMode.equals("live") && recordingKind.equals("provider")));
 
         Obj policy = bundle.object("policy").exactly(Set.of("version", "files", "evidenceIdKind", "offsetUnit", "geography",
-                "structural", "sequence"));
+                "structural", "sequence", "sourceSupport"));
         String policyVersion = policy.string("version");
         need(POLICY.equals(policyVersion) && EVIDENCE_KIND.equals(policy.string("evidenceIdKind"))
                 && OFFSET_UNIT.equals(policy.string("offsetUnit")));
         need("operator-field-verdict".equals(policy.string("geography")));
         need("manual-operator-review".equals(policy.string("structural")));
         need("s2-comparison-with-operator-decision".equals(policy.string("sequence")));
+        need(SOURCE_SUPPORT_POLICY.equals(policy.string("sourceSupport")));
         Obj filesNode = policy.object("files").exactly(Set.of("canonical", "decisions", "bindings"));
         Map<String, String> files = new LinkedHashMap<>();
         for (String name : List.of("canonical", "decisions", "bindings")) {
@@ -182,9 +221,9 @@ final class HandoffBundleVerifier {
         Set<String> jobs = new HashSet<>();
         Set<String> upstreams = new HashSet<>();
         Set<String> upstreamJobs = new HashSet<>();
-        Map<String, Set<String>> usedReviews = new HashMap<>();
+        Map<String, Map<String, Approval>> usedReviews = new LinkedHashMap<>();
         for (Obj source : sourceNodes) {
-            source.exactly(Set.of("relation", "upstream", "reviewDigest", "policies", "reviewUsed", "audit"));
+            source.exactly(Set.of("relation", "upstream", "reviewDigest", "policies", "reviewUsed", "audit", "provenance"));
             Obj relation = source.object("relation").exactly(Set.of("jobId", "inputDigest"));
             String jobId = text(relation, "jobId", ID);
             String relationInput = text(relation, "inputDigest", HASH);
@@ -193,6 +232,11 @@ final class HandoffBundleVerifier {
             String upstreamInput = text(upstream, "inputDigest", HASH);
             String upstreamDigest = text(upstream, "digest", HASH);
             String reviewDigest = text(source, "reviewDigest", HASH);
+            // Every source must carry exactly the bundle's own provenance: a bundle never copies the first job's mode.
+            Obj sourceProvenance = source.object("provenance").exactly(Set.of("sourceKind", "executionMode", "recordingKind"));
+            need(sourceKind.equals(sourceProvenance.string("sourceKind"))
+                    && executionMode.equals(sourceProvenance.string("executionMode"))
+                    && recordingKind.equals(sourceProvenance.string("recordingKind")));
             Obj versions = source.object("policies").exactly(Set.of("producer", "verifier", "impactProducer",
                     "impactVerifier", "policy", "revalidationPolicy", "impactPolicy"));
             for (String name : versions.node().propertyNames()) {
@@ -200,14 +244,16 @@ final class HandoffBundleVerifier {
             }
             JsonNode usedNodes = source.array("reviewUsed");
             need(usedNodes.size() <= MAX_RELATIONS);
-            Set<String> used = new HashSet<>();
+            Map<String, Approval> used = new LinkedHashMap<>();
+            String previousCandidate = null;
             for (JsonNode item : usedNodes.values()) {
-                need(item.isArray() && item.size() == 2);
-                JsonNode candidate = item.get(0);
-                JsonNode revision = item.get(1);
-                need(candidate.isString() && RC.matcher(candidate.stringValue()).matches());
-                need(revision.isIntegralNumber() && revision.canConvertToInt() && revision.intValue() >= 1);
-                need(used.add(candidate.stringValue()));
+                Obj use = Obj.of(item).exactly(Set.of("relationCandidateId", "revision", "approvalBasis"));
+                String candidate = text(use, "relationCandidateId", RC);
+                need(previousCandidate == null || compareCodePoints(previousCandidate, candidate) < 0);
+                previousCandidate = candidate;
+                int revision = use.count("revision");
+                need(revision >= 1);
+                used.put(candidate, approval(jobId, candidate, revision, use.object("approvalBasis")));
             }
             Obj audit = source.object("audit").exactly(Set.of("s3Relations", "eligibility", "reviewPending",
                     "impactCandidates", "eligibleNotPublicByType"));
@@ -266,7 +312,7 @@ final class HandoffBundleVerifier {
         need(articleNodes.size() <= MAX_ARTICLES);
         for (Obj a : articleNodes) {
             a.exactly(Set.of("articleId", "articleVersion", "documentId", "documentVersion", "rawVersion", "title", "url",
-                    "publishedAt", "publicationPrecision", "observations"));
+                    "publishedAt", "publicationPrecision", "observations", "textSha256", "origin"));
             String articleId = text(a, "articleId", ARTICLE_ID);
             String articleVersion = text(a, "articleVersion", HASH);
             String documentId = a.string("documentId");
@@ -279,6 +325,8 @@ final class HandoffBundleVerifier {
             need((precision.equals("datetime") && publishedAt != null) || (precision.equals("day") && publishedAt != null)
                     || (precision.equals("unknown") && publishedAt == null));
             need(!precision.equals("day") || DAY.matcher(publishedAt).matches());
+            String textSha256 = text(a, "textSha256", HASH);
+            Origin origin = a.isNull("origin") ? null : origin(a.object("origin"));
             List<Obj> observationNodes = a.objects("observations");
             need(observationNodes.size() >= 1 && observationNodes.size() <= 1000);
             List<ObservationPin> observations = new ArrayList<>();
@@ -294,7 +342,7 @@ final class HandoffBundleVerifier {
             String key = articleKey(articleId, articleVersion);
             need(!articles.containsKey(key));
             articles.put(key, new Article(articleId, articleVersion, documentId, documentVersion, rawVersion, title, url,
-                    publishedAt, precision, observations));
+                    publishedAt, precision, observations, textSha256, origin));
         }
         Set<String> evidenceArticles = new HashSet<>();
         for (Evidence e : evidence.values()) {
@@ -313,14 +361,21 @@ final class HandoffBundleVerifier {
         List<Obj> companyNodes = bundle.objects("companies");
         need(companyNodes.size() <= MAX_DECISIONS);
         for (Obj c : companyNodes) {
-            c.exactly(Set.of("id", "canonicalId", "label", "decisionRef"));
-            String id = text(c, "id", ID);
-            text(c, "canonicalId", ID);
-            text(c, "decisionRef", ID);
-            String label = c.string("label");
-            need(!companies.containsKey(id));
-            companies.put(id, new Company(id, label));
+            Company company = company(c);
+            need(!companies.containsKey(company.id()));
+            companies.put(company.id(), company);
         }
+        // pathCompanies: the private support references of structural paths. Same closed shape as a company, strictly ascending by
+        // id, never a public company or issue; their exact closure over the complete paths is checked with the relations below.
+        Map<String, Company> pathCompanies = new LinkedHashMap<>();
+        List<Obj> pathCompanyNodes = bundle.objects("pathCompanies");
+        need(pathCompanyNodes.size() <= MAX_DECISIONS);
+        for (Obj c : pathCompanyNodes) {
+            Company company = company(c);
+            need(!pathCompanies.containsKey(company.id()) && !companies.containsKey(company.id()));
+            pathCompanies.put(company.id(), company);
+        }
+        need(sortedUnique(new ArrayList<>(pathCompanies.keySet())));
 
         // issues --------------------------------------------------------------------------------------------------------
         Map<String, Issue> issues = new LinkedHashMap<>();
@@ -328,7 +383,8 @@ final class HandoffBundleVerifier {
         need(issueNodes.size() <= MAX_ISSUES);
         for (Obj i : issueNodes) {
             i.exactly(Set.of("id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period",
-                    "assertionStatus", "geography", "evidenceIds", "sourceEvents", "decisionRef", "representative"));
+                    "assertionStatus", "geography", "evidenceIds", "sourceEvents", "mentions", "decisionRef",
+                    "representative", "fieldProvenance", "fieldVerdicts", "sourceSupport"));
             String id = text(i, "id", ID);
             text(i, "canonicalId", ID);
             text(i, "decisionRef", ID);
@@ -352,7 +408,6 @@ final class HandoffBundleVerifier {
             need(countriesClass(countries).equals(geographyValue));
             List<String> evidenceIds = evidenceIds(i, "evidenceIds", 1, evidence, referenced);
             List<String> geographyEvidence = evidenceIds(geography, "evidenceIds", 1, evidence, referenced);
-            need(new HashSet<>(evidenceIds).containsAll(geographyEvidence));
 
             List<Obj> events = i.objects("sourceEvents");
             need(events.size() >= 1 && events.size() <= 1000);
@@ -362,27 +417,13 @@ final class HandoffBundleVerifier {
                 eventKeys.add(Canonical.write(event.node()));
             }
             need(sortedUnique(eventKeys));
-            for (Obj event : events) {
-                Obj observation = event.object("observation");
-                String documentId = event.string("documentId");
-                String documentVersion = event.string("documentVersion");
-                String rawVersion = observation.string("rawVersion");
-                String roundId = observation.string("roundId");
-                String sourceId = observation.string("sourceId");
-                int page = observation.count("page");
-                int ordinal = observation.count("ordinal");
-                boolean closed = false;
-                for (Article article : articles.values()) {
-                    if (article.documentId().equals(documentId) && article.documentVersion().equals(documentVersion)
-                            && article.rawVersion().equals(rawVersion)
-                            && article.observations().stream().anyMatch(ob -> ob.roundId().equals(roundId)
-                                    && ob.sourceId().equals(sourceId) && ob.page() == page && ob.ordinal() == ordinal)) {
-                        closed = true;
-                        break;
-                    }
-                }
-                need(closed);
-            }
+            Set<String> mentionEvidence = mentions(i, events, articles, companies, evidence, referenced);
+            Set<String> expectedEvidence = new HashSet<>(mentionEvidence);
+            expectedEvidence.addAll(geographyEvidence);
+            Obj representativeNode = i.isNull("representative") ? null : i.object("representative");
+            expectedEvidence.addAll(fieldSelection(i, representativeNode, evidence, referenced));
+            need(expectedEvidence.equals(new HashSet<>(evidenceIds)));
+            sourceSupport(i.object("sourceSupport"), evidenceIds, evidence, articles);
             List<Obj> basis = geography.objects("basis");
             need(basis.size() <= 1000 && basis.size() == events.size());
             for (int index = 0; index < basis.size(); index++) {
@@ -403,7 +444,8 @@ final class HandoffBundleVerifier {
                 sourceEvent(representative, upstreams);
                 need(eventKeys.contains(Canonical.write(representative.node())));
             }
-            need(!issues.containsKey(id) && !companies.containsKey(id));
+            // fieldProvenance and fieldVerdicts were checked above, together with the headline values they decide.
+            need(!issues.containsKey(id) && !companies.containsKey(id) && !pathCompanies.containsKey(id));
             issues.put(id, new Issue(id, title, action, target, eventTime, timePrecision, assertionStatus,
                     geographyValue, geographyPolicy, geographyEvidence, evidenceIds));
         }
@@ -417,11 +459,13 @@ final class HandoffBundleVerifier {
         Set<String> linkedIssues = new HashSet<>();
         Set<String> linkedCompanies = new HashSet<>();
         List<Relation> relations = new ArrayList<>();
+        Map<String, Set<String>> participants = new HashMap<>();
+        List<PendingPath> pendingPaths = new ArrayList<>();
         List<Obj> relationNodes = bundle.objects("relations");
         need(relationNodes.size() <= MAX_RELATIONS);
         for (Obj r : relationNodes) {
             r.exactly(Set.of("id", "type", "source", "target", "role", "assertionStatus", "evidenceIds", "basis",
-                    "provenance", "decisionRef", "sourceRefs"));
+                    "provenance", "decisionRef", "sourceRefs", "structuralPath"));
             String id = text(r, "id", ID);
             String type = r.string("type");
             need(PUBLIC_TYPES.contains(type) && relationIds.add(id));
@@ -437,6 +481,9 @@ final class HandoffBundleVerifier {
                 linkedIssues.add(target);
             } else {
                 linkedCompanies.add(target);
+                if (type.equals("INVOLVES")) {
+                    participants.computeIfAbsent(source, key -> new HashSet<>()).add(target);
+                }
             }
             String role = r.stringOrNull("role");
             String assertionStatus = r.stringOrNull("assertionStatus");
@@ -450,19 +497,26 @@ final class HandoffBundleVerifier {
             ArrayNode relationKeys = StrictJson.newArray();
             for (Obj b : basisNodes) {
                 b.exactly(Set.of("sourceRelation", "relationKey", "relationType", "validFrom", "validUntil", "countries",
-                        "verifiedAt", "sourceArticles", "evidenceIds"));
+                        "verifiedAt", "sourceArticles", "evidenceIds", "businessScope", "productScope"));
                 Obj sourceRelation = b.object("sourceRelation").exactly(Set.of("jobId", "relationCandidateId"));
                 String jobId = text(sourceRelation, "jobId", ID);
                 String candidate = text(sourceRelation, "relationCandidateId", RC);
-                need(jobs.contains(jobId) && usedReviews.get(jobId).contains(candidate));
+                need(jobs.contains(jobId) && usedReviews.get(jobId).containsKey(candidate));
                 basisRefs.add("s3-relation\n" + jobId + "\n" + candidate);
                 String relationKey = text(b, "relationKey", HASH);
                 relationKeys.add(relationKey);
                 need("SUPPLIES".equals(b.string("relationType")));
                 String verifiedAt = b.string("verifiedAt");
+                // The structural verification time is the time of the event that made the relation eligible, not a producer clock.
+                need(verifiedAt.equals(usedReviews.get(jobId).get(candidate).decidedAt()));
                 String validFrom = b.stringOrNull("validFrom");
                 String validUntil = b.stringOrNull("validUntil");
                 strings(b, "countries", 10);
+                // The scopes are the operator's S3 text copied as it stands: text, never an entity id and never a node.
+                for (String scope : List.of("businessScope", "productScope")) {
+                    String value = b.stringOrNull(scope);
+                    need(value == null || value.codePointCount(0, value.length()) <= MAX_SCOPE_CODE_POINTS);
+                }
                 List<String> basisEvidence = evidenceIds(b, "evidenceIds", 1, evidence, referenced);
                 List<Obj> links = b.objects("sourceArticles");
                 need(links.size() <= 1000);
@@ -482,6 +536,7 @@ final class HandoffBundleVerifier {
                 need(actualLinks.equals(new ArrayList<>(expectedLinks)));
                 basis.add(new Basis(verifiedAt, validFrom, validUntil));
             }
+            boolean allAutomatic = true;
             List<Obj> refs = r.objects("sourceRefs");
             need(refs.size() >= 1 && refs.size() <= MAX_RELATIONS);
             List<String> refKeys = new ArrayList<>();
@@ -496,7 +551,8 @@ final class HandoffBundleVerifier {
                             && upstreamJobs.contains(jobId));
                 } else {
                     need(kind.equals("s3-relation") && RC.matcher(refId).matches() && jobs.contains(jobId)
-                            && usedReviews.get(jobId).contains(refId));
+                            && usedReviews.get(jobId).containsKey(refId));
+                    allAutomatic &= AUTOMATIC.equals(usedReviews.get(jobId).get(refId).kind());
                 }
                 refKeys.add(kind + "\n" + jobId + "\n" + refId);
             }
@@ -510,8 +566,10 @@ final class HandoffBundleVerifier {
             switch (type) {
                 case "INVOLVES" -> {
                     provenance.exactly(Set.of("origin", "s3SemanticValidation"));
-                    need("s3-relation".equals(provenance.string("origin"))
-                            && "independent-verifier-supported-all-claims".equals(provenance.string("s3SemanticValidation")));
+                    // The automatic literal is true only when every contributing S3 relation was decided by the verifier.
+                    need("s3-relation".equals(provenance.string("origin")) && (allAutomatic
+                            ? "independent-verifier-supported-all-claims" : "manual-operator-final-approval")
+                                    .equals(provenance.string("s3SemanticValidation")));
                     need(r.isNull("decisionRef") && r.isNull("role") && basisNodes.isEmpty());
                 }
                 case "STRUCTURALLY_RELATED_TO" -> {
@@ -520,7 +578,8 @@ final class HandoffBundleVerifier {
                     need("manual-operator-review".equals(provenance.string("origin"))
                             && "none".equals(provenance.string("s3SemanticValidation"))
                             && "operator-asserted".equals(provenance.string("status"))
-                            && "s3-independent-verifier-supported-all-claims".equals(provenance.string("basisEligibility")));
+                            && (allAutomatic ? "s3-independent-verifier-supported-all-claims"
+                                    : "s3-operator-final-approval").equals(provenance.string("basisEligibility")));
                     for (String name : List.of("reviewer", "decisionRef", "decisionVersion")) {
                         text(provenance, name, ID);
                     }
@@ -543,6 +602,11 @@ final class HandoffBundleVerifier {
                             && r.isNull("assertionStatus") && refs.size() == 1 && basisNodes.isEmpty());
                 }
             }
+            if (type.equals("STRUCTURALLY_RELATED_TO")) {
+                pendingPaths.add(new PendingPath(source, target, r.object("structuralPath"), basisNodes.size()));
+            } else {
+                need(r.isNull("structuralPath"));
+            }
             need(id.equals("edge-" + Canonical.digest(preimage)));
             relations.add(new Relation(id, type, source, target, role, assertionStatus, evidenceIds, basis,
                     provenance.string("origin")));
@@ -550,6 +614,9 @@ final class HandoffBundleVerifier {
         need(issues.keySet().equals(linkedIssues));
         need(companies.keySet().equals(linkedCompanies));
         need(evidence.keySet().equals(referenced));
+        // The structural paths close over the INVOLVES participants of their issue, the public companies and the private support
+        // references: no orphan middle company, no public node is invented for a path.
+        need(structuralPaths(pendingPaths, participants, companies, pathCompanies).equals(pathCompanies.keySet()));
 
         // exclusions, counts, checks, readiness, digests ----------------------------------------------------------------
         Obj exclusions = bundle.object("exclusions").exactly(Set.of("counts", "items"));
@@ -586,11 +653,11 @@ final class HandoffBundleVerifier {
             need(exclusionCounts.count(entry.getKey()) == entry.getValue());
         }
 
-        Obj counts = bundle.object("counts").exactly(Set.of("companies", "issues", "relations", "evidence", "articles",
-                "exclusions"));
-        need(counts.count("companies") == companies.size() && counts.count("issues") == issues.size()
-                && counts.count("evidence") == evidence.size() && counts.count("articles") == articles.size()
-                && counts.count("exclusions") == items.size());
+        Obj counts = bundle.object("counts").exactly(Set.of("companies", "pathCompanies", "issues", "relations", "evidence",
+                "articles", "exclusions"));
+        need(counts.count("companies") == companies.size() && counts.count("pathCompanies") == pathCompanies.size()
+                && counts.count("issues") == issues.size() && counts.count("evidence") == evidence.size()
+                && counts.count("articles") == articles.size() && counts.count("exclusions") == items.size());
         Obj relationCounts = counts.object("relations").exactly(Set.copyOf(PUBLIC_TYPES));
         for (String type : PUBLIC_TYPES) {
             need(relationCounts.count(type) == typeCounts.get(type));
@@ -606,12 +673,440 @@ final class HandoffBundleVerifier {
         Obj digests = bundle.object("digests").exactly(Set.of("content"));
         need(digests.string("content").equals(contentDigest(node)));
 
+        List<Approval> approvals = new ArrayList<>();
+        usedReviews.values().forEach(perJob -> approvals.addAll(perJob.values()));
         return new HandoffBundle(handoffId, manifestDigest, sourceKind, executionMode, recordingKind, policyVersion, files,
-                pins, new ArrayList<>(companies.values()), new ArrayList<>(issues.values()), relations,
-                new ArrayList<>(evidence.values()), new ArrayList<>(articles.values()));
+                pins, new ArrayList<>(companies.values()), new ArrayList<>(pathCompanies.values()),
+                new ArrayList<>(issues.values()), relations, new ArrayList<>(evidence.values()),
+                new ArrayList<>(articles.values()), approvals);
+    }
+
+    /** One closed company object: the id, the label the app catalogue must hold, and the producer's own canonical id and ref. */
+    private static Company company(Obj node) {
+        node.exactly(Set.of("id", "canonicalId", "label", "decisionRef"));
+        String id = text(node, "id", ID);
+        text(node, "canonicalId", ID);
+        text(node, "decisionRef", ID);
+        return new Company(id, node.string("label"));
+    }
+
+    /** A STRUCTURALLY_RELATED_TO relation's path, held until every INVOLVES relation of the bundle is known. */
+    private record PendingPath(String issue, String target, Obj path, int basis) {
+    }
+
+    /**
+     * The closed {@code structuralPath} of every structural relation, checked against the issue's INVOLVES participants and the
+     * company sets. A {@code complete} path is the ordered company chain {@code [P, C]} or {@code [P, M, C]}, one link per
+     * basis: {@code P} is a participant of the relation's own issue, {@code C} is the relation target and not a participant, all
+     * ids are distinct, the middle is a mapped company (public, or a private path company), and each link's two endpoints are the
+     * adjacent chain ids in either order (the link's direction is the S3 supplier/customer direction, kept as stated). A path is
+     * {@code unavailable} only for a two-basis chain whose middle company is unmapped; a one-basis edge always has the complete
+     * two-company chain, and nothing is ever truncated or invented.
+     *
+     * @return the private path companies the complete paths use: the middles that are not public companies
+     */
+    private static Set<String> structuralPaths(List<PendingPath> pending, Map<String, Set<String>> participants,
+            Map<String, Company> companies, Map<String, Company> pathCompanies) {
+        Set<String> used = new HashSet<>();
+        for (PendingPath item : pending) {
+            Obj path = item.path();
+            String status = path.string("status");
+            if (status.equals("unavailable")) {
+                path.exactly(Set.of("status", "reason"));
+                need(UNMAPPED_MIDDLE.equals(path.string("reason")) && item.basis() == 2);
+                continue;
+            }
+            need(status.equals("complete"));
+            path.exactly(Set.of("status", "companyIds", "links"));
+            List<String> ids = strings(path, "companyIds", 3);
+            need(ids.size() >= 2 && ids.size() == item.basis() + 1 && new HashSet<>(ids).size() == ids.size());
+            for (String id : ids) {
+                need(ID.matcher(id).matches());
+            }
+            Set<String> involved = participants.getOrDefault(item.issue(), Set.of());
+            String first = ids.get(0);
+            String last = ids.get(ids.size() - 1);
+            need(involved.contains(first) && last.equals(item.target()) && !involved.contains(last));
+            need(companies.containsKey(first) && companies.containsKey(last));
+            for (int index = 1; index < ids.size() - 1; index++) {
+                String middle = ids.get(index);
+                need(companies.containsKey(middle) || pathCompanies.containsKey(middle));
+                if (!companies.containsKey(middle)) {
+                    used.add(middle);
+                }
+            }
+            List<Obj> links = path.objects("links");
+            need(links.size() == ids.size() - 1);
+            for (int index = 0; index < links.size(); index++) {
+                Obj link = links.get(index).exactly(Set.of("supplierCompanyId", "customerCompanyId"));
+                String supplier = text(link, "supplierCompanyId", ID);
+                String customer = text(link, "customerCompanyId", ID);
+                String from = ids.get(index);
+                String to = ids.get(index + 1);
+                need((supplier.equals(from) && customer.equals(to)) || (supplier.equals(to) && customer.equals(from)));
+            }
+        }
+        return used;
+    }
+
+    /**
+     * One S3 relation's effective eligibility decision. The deciding review revision repeats in {@code approvalBasis.revision}; an
+     * automatic verdict has no reviewer and a human's final approval names one. Neither says anything about the other: the
+     * approval basis is audit metadata, and a human approval is never read as an independent-verifier verdict.
+     */
+    private static Approval approval(String jobId, String candidate, int revision, Obj basis) {
+        basis.exactly(APPROVAL_KEYS);
+        String kind = basis.string("kind");
+        need(kind.equals(AUTOMATIC) || kind.equals(OPERATOR_FINAL));
+        need(basis.count("revision") == revision);
+        String reviewer = basis.stringOrNull("reviewer");
+        // The reviewer is the review wire's own free text (1..200 characters, e.g. an e-mail address): no id pattern is imposed.
+        need(kind.equals(AUTOMATIC) ? reviewer == null : reviewer != null && !reviewer.isBlank() && reviewer.length() <= 200);
+        String decidedAt = basis.string("decidedAt");
+        try {
+            OffsetDateTime.parse(decidedAt);
+        } catch (DateTimeException notATimestamp) {
+            throw new StrictJson.Malformed();
+        }
+        return new Approval(jobId, candidate, kind, revision, reviewer, decidedAt);
+    }
+
+    /** An operator's declared origin of a document version; {@code verification} is the literal that says it was declared. */
+    private static Origin origin(Obj origin) {
+        origin.exactly(ORIGIN_KEYS);
+        need("operator-declared-origin".equals(origin.string("verification")));
+        return new Origin(text(origin, "originId", ID), text(origin, "reviewer", ID), text(origin, "decisionRef", ID),
+                text(origin, "decisionVersion", ID));
+    }
+
+    /**
+     * The issue's {@code sourceSupport}, recomputed from the declared origins and the exact article texts; nothing the producer
+     * says is trusted. The issue's articles are the distinct articles its evidence rows cite, and an issue may cite one version
+     * of an article only (a second version is refused, never merged). Two articles are in one lineage group when they share a
+     * declared origin or their prepared text is exactly equal (SHA-256 of the text, a union-find, as in the PoC
+     * {@code _source_support}). {@code knownLineageCount} is the number of lineage GROUPS that contain a declared origin, not a
+     * number of articles; {@code unknownLineageArticles} are the articles without a declared origin; {@code independentSourceCount}
+     * is {@code null} when any article has no origin or a group holds more than one distinct origin, otherwise it equals the
+     * known group count; {@code duplicateGroups} are the groups of exactly equal text (two or more articles), never groups joined
+     * only through a shared origin. Publisher, URL, host, source id and title are never used.
+     */
+    private static void sourceSupport(Obj node, List<String> evidenceIds, Map<String, Evidence> evidence,
+            Map<String, Article> articles) {
+        node.exactly(SUPPORT_KEYS);
+        TreeMap<String, Article> members = new TreeMap<>(HandoffBundleVerifier::compareCodePoints);
+        for (String evidenceId : evidenceIds) {
+            Evidence row = evidence.get(evidenceId);
+            Article article = articles.get(articleKey(row.articleId(), row.articleVersion()));
+            need(article != null);
+            Article previous = members.put(row.articleId(), article);
+            need(previous == null || previous == article);
+        }
+        List<String> ids = new ArrayList<>(members.keySet());
+        List<Article> list = new ArrayList<>(members.values());
+        int[] parent = new int[list.size()];
+        for (int index = 0; index < parent.length; index++) {
+            parent[index] = index;
+        }
+        Map<String, Integer> firstOfOrigin = new HashMap<>();
+        Map<String, Integer> firstOfText = new HashMap<>();
+        List<String> unknown = new ArrayList<>();
+        for (int index = 0; index < list.size(); index++) {
+            Article article = list.get(index);
+            if (article.origin() == null) {
+                unknown.add(ids.get(index));
+            } else {
+                Integer same = firstOfOrigin.putIfAbsent(article.origin().originId(), index);
+                if (same != null) {
+                    parent[root(parent, index)] = root(parent, same);
+                }
+            }
+            Integer copy = firstOfText.putIfAbsent(article.textSha256(), index);
+            if (copy != null) {
+                parent[root(parent, index)] = root(parent, copy);
+            }
+        }
+        Map<Integer, Set<String>> lineages = new HashMap<>();
+        for (int index = 0; index < list.size(); index++) {
+            Set<String> origins = lineages.computeIfAbsent(root(parent, index), key -> new HashSet<>());
+            if (list.get(index).origin() != null) {
+                origins.add(list.get(index).origin().originId());
+            }
+        }
+        int known = 0;
+        boolean ambiguous = false;
+        for (Set<String> origins : lineages.values()) {
+            known += origins.isEmpty() ? 0 : 1;
+            ambiguous |= origins.size() > 1;
+        }
+        Integer independent = unknown.isEmpty() && !ambiguous ? known : null;
+        Map<String, List<String>> byText = new HashMap<>();
+        for (int index = 0; index < list.size(); index++) {
+            byText.computeIfAbsent(list.get(index).textSha256(), key -> new ArrayList<>()).add(ids.get(index));
+        }
+        List<List<String>> groups = new ArrayList<>();
+        for (List<String> group : byText.values()) {
+            if (group.size() > 1) {
+                groups.add(group);
+            }
+        }
+        groups.sort((first, second) -> {
+            for (int index = 0; index < Math.min(first.size(), second.size()); index++) {
+                int order = compareCodePoints(first.get(index), second.get(index));
+                if (order != 0) {
+                    return order;
+                }
+            }
+            return Integer.compare(first.size(), second.size());
+        });
+
+        need(node.count("articleCount") == list.size());
+        need(node.count("knownLineageCount") == known);
+        need(node.strings("unknownLineageArticles").equals(unknown));
+        need(independent == null ? node.isNull("independentSourceCount")
+                : !node.isNull("independentSourceCount") && node.count("independentSourceCount") == independent);
+        List<List<String>> actual = new ArrayList<>();
+        for (JsonNode group : node.array("duplicateGroups").values()) {
+            need(group.isArray());
+            List<String> members2 = new ArrayList<>();
+            for (JsonNode id : group.values()) {
+                need(id.isString());
+                members2.add(id.stringValue());
+            }
+            actual.add(members2);
+        }
+        need(actual.equals(groups));
+    }
+
+    private static int root(int[] parent, int index) {
+        int current = index;
+        while (parent[current] != current) {
+            parent[current] = parent[parent[current]];
+            current = parent[current];
+        }
+        return current;
     }
 
     // ------------------------------------------------------------------------------------------------ helpers ------------
+
+    /**
+     * The issue's original mentions: exactly the identities ({@code documentId}, {@code documentVersion}, S2 local
+     * {@code mentionId}) of its source events, one record each, strictly ascending. Each mention names the one bundle article of
+     * its document version, every carrying source event closes against that article, and every cited evidence row is on it. The
+     * values are the producer's S2 candidate or snapshot values ({@code verification} is always {@code none}); nothing is
+     * derived from the merged issue. Returns the union of the mentions' evidence ids.
+     */
+    private static Set<String> mentions(Obj issue, List<Obj> events, Map<String, Article> articles,
+            Map<String, Company> companies, Map<String, Evidence> evidence, Set<String> referenced) {
+        List<Obj> nodes = issue.objects("mentions");
+        need(nodes.size() >= 1 && nodes.size() <= MAX_MENTIONS);
+        List<String> keys = new ArrayList<>();
+        Map<String, Article> articleOf = new HashMap<>();
+        Set<String> union = new HashSet<>();
+        for (Obj mention : nodes) {
+            mention.exactly(MENTION_KEYS);
+            String documentId = text(mention, "documentId", ID);
+            String documentVersion = text(mention, "documentVersion", HASH);
+            String mentionId = mention.string("mentionId");
+            need(!mentionId.isEmpty());
+            String key = mentionKey(documentId, documentVersion, mentionId);
+            keys.add(key);
+            String articleId = text(mention, "articleId", ARTICLE_ID);
+            String articleVersion = text(mention, "articleVersion", HASH);
+            Article own = null;
+            int matching = 0;
+            for (Article article : articles.values()) {
+                if (article.documentId().equals(documentId) && article.documentVersion().equals(documentVersion)) {
+                    own = article;
+                    matching++;
+                }
+            }
+            need(matching == 1 && own.articleId().equals(articleId) && own.articleVersion().equals(articleVersion));
+            articleOf.put(key, own);
+
+            need("none".equals(mention.string("verification")));
+            mention.string("title");
+            mention.string("action");
+            mention.stringOrNull("target");
+            mention.stringOrNull("period");
+            String timePrecision = mention.string("timePrecision");
+            need(TIME_PRECISIONS.contains(timePrecision));
+            HandoffTime.mentionEventTime(mention.stringOrNull("eventTime"), timePrecision);
+            need(ASSERTION_STATUSES.contains(mention.string("assertionStatus")));
+            mention.bool("background");
+
+            List<Obj> participants = mention.objects("participants");
+            need(participants.size() <= MAX_PARTICIPANTS);
+            for (Obj participant : participants) {
+                participant.exactly(PARTICIPANT_KEYS);
+                String sourceCompanyId = participant.stringOrNull("sourceCompanyId");
+                String companyId = participant.stringOrNull("companyId");
+                need(companyId == null || (sourceCompanyId != null && companies.containsKey(companyId)));
+                participant.string("name");
+                participant.string("role");
+            }
+
+            List<String> cited = evidenceIds(mention, "evidenceIds", 1, evidence, referenced);
+            for (String evidenceId : cited) {
+                Evidence row = evidence.get(evidenceId);
+                need(row.articleId().equals(articleId) && row.articleVersion().equals(articleVersion));
+            }
+            union.addAll(cited);
+        }
+        need(sortedUnique(keys));
+
+        Set<String> carried = new HashSet<>();
+        for (Obj event : events) {
+            String key = mentionKey(event.string("documentId"), event.string("documentVersion"), event.string("mentionId"));
+            carried.add(key);
+            Article article = articleOf.get(key);
+            need(article != null);
+            Obj observation = event.object("observation");
+            String rawVersion = observation.string("rawVersion");
+            String roundId = observation.string("roundId");
+            String sourceId = observation.string("sourceId");
+            int page = observation.count("page");
+            int ordinal = observation.count("ordinal");
+            need(article.rawVersion().equals(rawVersion) && article.observations().stream().anyMatch(
+                    ob -> ob.roundId().equals(roundId) && ob.sourceId().equals(sourceId) && ob.page() == page
+                            && ob.ordinal() == ordinal));
+        }
+        need(carried.equals(new HashSet<>(keys)));
+        return union;
+    }
+
+    /**
+     * The issue's headline values, its {@code fieldProvenance} and its operator {@code fieldVerdicts}, recomputed together from
+     * the ORIGINAL mentions; nothing the producer says about them is trusted.
+     *
+     * <p>The <b>selected</b> value of a field is the operator representative's own mention value, or, when there is no
+     * representative, the one value every mention states (a unanimous issue whose mentions disagree is refused). Each verdict
+     * judges one original mention's {@code eventTime} or {@code period} string exactly as it stands there ({@code value}, never
+     * null), by closed decision and reason code (ALLOW/stated and HOLD/ambiguous and REJECT/contradicted cite at least one span;
+     * HOLD/unstated none), with only evidence rows of that mention's own article, one verdict per (mention, field), strictly
+     * ascending by mention identity and then field order. A field is <b>withheld</b> exactly when some HOLD or REJECT judges
+     * it on the selection basis (the representative's mention, or any mention when unanimous): the issue then carries
+     * {@code null} for it (and {@code unknown} precision for {@code eventTime}), never another mention's value; a field with
+     * no such verdict carries the selected value unchanged, and {@code timePrecision} is the selected mention's own.
+     * {@code fieldProvenance.withheld} must equal that recomputed list. {@code sameValueMentions} lists, in mention order, the
+     * mentions whose ORIGINAL value equals the selected one (JSON equality, {@code null} matches {@code null}, never the
+     * redacted {@code null}); it records selection, never verification. Returns the verdicts' evidence ids.
+     */
+    private static Set<String> fieldSelection(Obj issue, Obj representative, Map<String, Evidence> evidence,
+            Set<String> referenced) {
+        List<Obj> mentions = issue.objects("mentions");
+        List<String> everyone = new ArrayList<>();
+        Map<String, Obj> byKey = new HashMap<>();
+        for (Obj mention : mentions) {
+            String key = mentionKey(mention.string("documentId"), mention.string("documentVersion"), mention.string("mentionId"));
+            everyone.add(key);
+            byKey.put(key, mention);
+        }
+        String chosen = representative == null ? null : mentionKey(representative.string("documentId"),
+                representative.string("documentVersion"), representative.string("mentionId"));
+        need(chosen == null || byKey.containsKey(chosen));
+        Obj selectedMention = chosen == null ? mentions.get(0) : byKey.get(chosen);
+
+        // the verdicts --------------------------------------------------------------------------------------------------
+        List<Obj> verdicts = issue.objects("fieldVerdicts");
+        need(verdicts.size() <= MAX_VERDICTS);
+        Set<String> verdictEvidence = new HashSet<>();
+        Set<String> withheld = new HashSet<>();
+        String previousKey = null;
+        int previousField = -1;
+        for (Obj verdict : verdicts) {
+            verdict.exactly(VERDICT_KEYS);
+            String key = mentionKey(text(verdict, "documentId", ID), text(verdict, "documentVersion", HASH),
+                    verdict.string("mentionId"));
+            Obj mention = byKey.get(key);
+            need(mention != null && !verdict.string("mentionId").isEmpty());
+            String field = verdict.string("field");
+            int fieldIndex = VERDICT_FIELDS.indexOf(field);
+            need(fieldIndex >= 0);
+            if (previousKey != null) {
+                int order = compareCodePoints(previousKey, key);
+                need(order < 0 || (order == 0 && previousField < fieldIndex));
+            }
+            previousKey = key;
+            previousField = fieldIndex;
+            // The reviewed value is the mention's own current string: a verdict on an absent value has nothing to judge.
+            need(!mention.isNull(field) && verdict.string("value").equals(mention.string(field)));
+            String decision = verdict.string("decision");
+            String reason = verdict.string("reasonCode");
+            List<String> cited = evidenceIds(verdict, "evidenceIds", 0, evidence, referenced);
+            need(cited.size() <= MAX_VERDICT_EVIDENCE);
+            for (String evidenceId : cited) {
+                Evidence row = evidence.get(evidenceId);
+                need(row.articleId().equals(mention.string("articleId"))
+                        && row.articleVersion().equals(mention.string("articleVersion")));
+            }
+            switch (decision) {
+                case "ALLOW" -> need(reason.equals("stated") && !cited.isEmpty());
+                case "HOLD" -> need((reason.equals("unstated") && cited.isEmpty())
+                        || (reason.equals("ambiguous") && !cited.isEmpty()));
+                case "REJECT" -> need(reason.equals("contradicted") && !cited.isEmpty());
+                default -> need(false);
+            }
+            need("operator-field-verdict".equals(verdict.string("verification")));
+            for (String name : List.of("reviewer", "decisionRef", "decisionVersion")) {
+                text(verdict, name, ID);
+            }
+            verdictEvidence.addAll(cited);
+            if (!decision.equals("ALLOW") && (chosen == null || key.equals(chosen))) {
+                withheld.add(field);
+            }
+        }
+
+        // fieldProvenance -----------------------------------------------------------------------------------------------
+        Obj provenance = issue.object("fieldProvenance").exactly(Set.of("selection", "verification", "withheld",
+                "sameValueMentions"));
+        need(provenance.string("selection").equals(representative != null ? "operator-representative" : "unanimous"));
+        need("none".equals(provenance.string("verification")));
+        List<String> expectedWithheld = new ArrayList<>();
+        for (String field : VERDICT_FIELDS) {
+            if (withheld.contains(field)) {
+                expectedWithheld.add(field);
+            }
+        }
+        need(provenance.strings("withheld").equals(expectedWithheld));
+        Obj same = provenance.object("sameValueMentions").exactly(new HashSet<>(PROVENANCE_FIELDS));
+        for (String field : PROVENANCE_FIELDS) {
+            JsonNode selected = selectedMention.raw(field);
+            List<String> expected = new ArrayList<>();
+            for (int index = 0; index < mentions.size(); index++) {
+                if (mentions.get(index).raw(field).equals(selected)) {
+                    expected.add(everyone.get(index));
+                }
+            }
+            List<Obj> references = same.objects(field);
+            need(references.size() <= MAX_MENTIONS);
+            List<String> actual = new ArrayList<>();
+            for (Obj reference : references) {
+                reference.exactly(MENTION_REF_KEYS);
+                actual.add(mentionKey(reference.string("documentId"), reference.string("documentVersion"),
+                        reference.string("mentionId")));
+            }
+            need(!expected.isEmpty() && actual.equals(expected));
+            need(chosen == null ? expected.equals(everyone) : expected.contains(chosen));
+            // the headline: the selected value, or nothing at all when a verdict withholds it
+            if (withheld.contains(field)) {
+                need(issue.isNull(field));
+            } else {
+                need(issue.raw(field).equals(selected));
+            }
+        }
+        need(issue.string("timePrecision").equals(withheld.contains("eventTime") ? "unknown"
+                : selectedMention.string("timePrecision")));
+        return verdictEvidence;
+    }
+
+    /** The canonical JSON of the S2 mention identity: the document version and the document-local mention id. */
+    private static String mentionKey(String documentId, String documentVersion, String mentionId) {
+        ObjectNode identity = StrictJson.newObject();
+        identity.put("documentId", documentId);
+        identity.put("documentVersion", documentVersion);
+        identity.put("mentionId", mentionId);
+        return Canonical.write(identity);
+    }
 
     private static void sourceEvent(Obj event, Set<String> upstreams) {
         event.exactly(SOURCE_EVENT_KEYS);

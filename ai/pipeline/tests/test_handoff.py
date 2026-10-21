@@ -28,9 +28,9 @@ from scripts import graph_handoff_smoke as hs
 from scripts.ingestion_smoke import json_bytes
 from scripts.relation_smoke import find, tree
 from zoop_ai_pipeline import handoff_cli as cli
-from zoop_ai_pipeline.handoff import Handoff, Planner, article_metadata
-from zoop_ai_pipeline.handoff_contracts import (POLICY, SCHEMA, Bindings, Decisions, ExtractionFailure, Manifest, app_evidence_id, content_digest, countries_class,
-    time_precision, validate_bundle)
+from zoop_ai_pipeline.handoff import Handoff, HandoffPaths, Planner, Store, article_metadata
+from zoop_ai_pipeline.handoff_contracts import (POLICY, SCHEMA, Bindings, Decisions, ExtractionFailure, Manifest, Selector, app_evidence_id, content_digest,
+    countries_class, time_precision, validate_bundle)
 
 HASH = "a" * 64
 HOSTILE = ("x'}) DETACH DELETE n //", "a b", "é", "line\nbreak", "a\0b", "v" * 201, "")
@@ -65,6 +65,16 @@ from_after_event_day = world_fixture("from-after-event-day", dated=True, valid_f
 event_time_unknown = world_fixture("event-time-unknown", dated=True, event_time=None)                    # a dated basis cannot be compared with a missing event time
 event_time_month = world_fixture("event-time-month", dated=True, event_time="2026-09")                  # nor with a month-precision one (no midnight/first-of-month guess)
 event_time_unknown_undated = world_fixture("event-time-unknown-undated", dated=True, event_time=None, valid_from=None, valid_until=None)
+# Original mentions: one mention identity with different values in its two upstreams, and a member whose own event time is unusable (no offset) or merely coarser.
+upstreams_disagree = world_fixture("upstreams-disagree", snapshot_differs=True)
+a2_time_offsetless = world_fixture("a2-time-offsetless", a2_event_time="2026-09-30T10:00:00")
+a2_time_month = world_fixture("a2-time-month", a2_event_time="2026-09")
+a2_time_iso_week = world_fixture("a2-time-iso-week", a2_event_time="2026-W40-3")        # `date.fromisoformat` would call this a day; the app refuses it
+event_time_iso_week = world_fixture("event-time-iso-week", event_time="2026-W40-3")       # EVERY member of the supply issue, the issue's own time included, carries it
+event_time_no_seconds = world_fixture("event-time-no-seconds", event_time="2026-09-30T09:00Z")   # valid in the app's grammar: seconds are optional, `Z` is an offset
+# Operator final approval: the authored verifier HELD rel-a's SUPPLIES basis and rel-b's participation in event-a; the operator approved both through the real S3 review path.
+approved_world = world_fixture("approved", approve=True)
+chain_world = world_fixture("chain", chain=True)                                                         # rel-a also holds SYNTH-4 -> SYNTH-3: a two-relation structural basis
 
 
 @pytest.fixture(scope="module")
@@ -597,8 +607,17 @@ def test_a_damaged_stored_manifest_is_never_exported_or_reported_ready_and_is_ne
     frozen = rig.freeze()
     stored = rig.sql("SELECT manifest FROM handoffs")[0][0]
     assert stored == hs.canonical(rig.manifest())
-    for guard in ("immutable_handoffs_identity", "terminal_handoffs"):        # throwaway rig only: simulate on-disk corruption past both ledger guards
-        rig.sql(f"DROP TRIGGER {guard}")
+    guards = ("immutable_handoffs_identity", "terminal_handoffs")
+    originals = [rig.sql("SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?", (name,))[0][0] for name in guards]
+
+    def overwrite(text: str) -> None:
+        """Throwaway rig only: simulate on-disk corruption past both ledger guards, then put the ORIGINAL trigger SQL back so the ledger schema is intact
+        (the CLI's strict ownership preflight must pass and the damage must be found in the stored manifest itself)."""
+        for name in guards:
+            rig.sql(f"DROP TRIGGER {name}")
+        rig.sql("UPDATE handoffs SET manifest=?", (text,))
+        for sql in originals:
+            rig.sql(sql)
     damaged = json.loads(stored)
     cases = {"non-canonical whitespace": json.dumps(damaged, indent=1), "wrong digest": hs.canonical({**damaged, "sourceKind": "actual"}),
              "wrong source pin": hs.canonical({**damaged, "sources": [{**damaged["sources"][0], "reviewDigest": "f" * 64}, *damaged["sources"][1:]]}),
@@ -606,10 +625,10 @@ def test_a_damaged_stored_manifest_is_never_exported_or_reported_ready_and_is_ne
              "wrong handoff id": hs.canonical({**damaged, "handoffId": "other"}), "unknown field": hs.canonical({**damaged, "operatorPath": "/private/x"}),
              "not json": "{", "empty": ""}
     for name, text in cases.items():
-        rig.sql("UPDATE handoffs SET manifest=?", (text,))
+        overwrite(text)
         for command in ("inspect", "export"):
             error(rig.run(command, rig.sel(), expected=2), "handoff_artifact_invalid")
-    rig.sql("UPDATE handoffs SET manifest=?", (stored,))
+    overwrite(stored)
     assert rig.run("inspect", rig.sel())["state"] == "ready"
     out = rig.run("export", rig.sel())
     assert out["delivery"]["status"] == "current" and hs.digest(out["manifest"]) == frozen["receipt"]["manifestDigest"]
@@ -775,6 +794,12 @@ def test_decisions_and_bindings_refuse_duplicates_overlaps_and_unknown_keys(rig)
         "applicability not manual": {**good, "structural": [{**good["structural"][0], "applicability": {**good["structural"][0]["applicability"], "status": "verified"}}]},
         "empty geography evidence": {**good, "issues": [{**good["issues"][0], "geography": {**good["issues"][0]["geography"], "evidence": []}}]},
         "missing representative key": {**good, "issues": [{k: v for k, v in good["issues"][0].items() if k != "representative"}]},
+        "missing origins list": {k: v for k, v in good.items() if k != "origins"},
+        "duplicate origin for one document version": {**good, "origins": [good["origins"][0], {**good["origins"][0], "originId": "origin:other"}]},
+        "origin with an unknown key": {**good, "origins": [{**good["origins"][0], "publisher": "x"}]},
+        "origin without a decision reference": {**good, "origins": [{k: v for k, v in good["origins"][0].items() if k != "decisionRef"}]},
+        "origin with a bad document version": {**good, "origins": [{**good["origins"][0], "documentVersion": "x"}]},
+        "blank origin id": {**good, "origins": [{**good["origins"][0], "originId": ""}]},
     }.items():
         with pytest.raises(ValidationError):
             Decisions.model_validate(bad)
@@ -1157,4 +1182,723 @@ def test_a_day_article_validates_and_inconsistent_precision_is_refused(rig):
                 {"publishedAt": "2026-10-14", "publicationPrecision": "date"}):
         with pytest.raises(ExtractionFailure):
             validated(**bad)
+
+
+# ======================================================================================================================================
+# Original mentions (since bundle `-2`): what each source mention says, exactly as extracted, and nothing nobody decided. Their field provenance follows below.
+# ======================================================================================================================================
+
+MENTION_KEYS = {"documentId", "documentVersion", "mentionId", "articleId", "articleVersion", "verification", "title", "action", "target", "eventTime", "timePrecision",
+                "period", "assertionStatus", "background", "participants", "evidenceIds"}
+
+
+def mentions_of(bundle: dict) -> dict:
+    return {i["id"]: i["mentions"] for i in bundle["issues"]}
+
+
+def supply_of(bundle: dict) -> dict:
+    return next(i for i in bundle["issues"] if i["id"] == "issue:supply-2026q3")
+
+
+def participants_of(bundle: dict) -> dict:
+    """(issue, local mention id, participant name) -> public company id: the name is unique inside each authored mention."""
+    return {(i["id"], m["mentionId"], p["name"]): p["companyId"] for i in bundle["issues"] for m in i["mentions"] for p in m["participants"]}
+
+
+def keys_of(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield key
+            yield from keys_of(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from keys_of(item)
+
+
+def test_every_public_issue_carries_its_hand_written_original_mentions_with_reachable_evidence(rig):
+    bundle = rig.bundle()
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5"
+    assert mentions_of(bundle) == hs.expected_mentions(rig.world)
+    hs.assert_mentions_reachable(bundle)
+    assert rig.run("inspect", rig.sel())["receipt"]["bundleSchema"] == "zoop-graph-handoff-bundle-5"
+
+
+def test_a_mention_is_a_closed_unverified_source_record_and_no_decision_support_approval_publisher_or_impact_is_invented(rig):
+    bundle = rig.bundle()
+    mentions = [m for i in bundle["issues"] for m in i["mentions"]]
+    assert mentions and all(set(m) == MENTION_KEYS and m["verification"] == "none" and type(m["background"]) is bool for m in mentions)
+    assert all(set(p) == {"sourceCompanyId", "companyId", "name", "role"} for m in mentions for p in m["participants"])
+    assert not {"fieldDecisions", "approval", "publisher", "impact", "roleUnconfirmed", "verified"} & set(keys_of(bundle))
+    # Source support is a DERIVED issue-level summary (declared origins + exact text), never part of an original mention and never a verification.
+    assert all("sourceSupport" not in m for m in mentions) and all(set(i["sourceSupport"]) == {"articleCount", "knownLineageCount", "unknownLineageArticles",
+                                                                                              "independentSourceCount", "duplicateGroups"} for i in bundle["issues"])
+
+
+def test_a_mention_carried_by_two_upstreams_is_one_mention_and_every_source_event_identity_is_represented_exactly_once(rig):
+    bundle = rig.bundle()
+    for issue in bundle["issues"]:
+        identities = [(m["documentId"], m["documentVersion"], m["mentionId"]) for m in issue["mentions"]]
+        assert identities == sorted(set(identities)), issue["id"]
+        assert set(identities) == {(s["documentId"], s["documentVersion"], s["mentionId"]) for s in issue["sourceEvents"]}, issue["id"]
+    supply = supply_of(bundle)
+    assert len(supply["sourceEvents"]) == 3 and len(supply["mentions"]) == 2          # document a's `m-a` is carried by upstream a (candidate) and upstream b (snapshot)
+
+
+def test_two_documents_with_the_same_local_mention_id_are_two_mentions_each_with_its_own_evidence(collision_same, tmp_path):
+    bundle = collision_rig(collision_same, tmp_path).bundle()
+    supply = supply_of(bundle)
+    assert len(supply["sourceEvents"]) == 3 and [m["mentionId"] for m in supply["mentions"]] == ["m-a", "m-a"]
+    a, a2 = collision_same.refs["a"]["documentId"], collision_same.refs["a2"]["documentId"]
+    assert {m["documentId"]: m["evidenceIds"] for m in supply["mentions"]} == {a: [hs.evidence_id(collision_same, "a", hs.EVT_A)],
+                                                                               a2: [hs.evidence_id(collision_same, "a2", hs.EVT_A2)]}
+    hs.assert_mentions_reachable(bundle)
+
+
+def test_a_participant_is_public_only_where_every_carrying_upstream_maps_it_to_a_published_company(rig):
+    bundle = rig.bundle()
+    assert participants_of(bundle) == {
+        ("issue:supply-2026q3", "m-a", "합성기업"): "KRX:005930", ("issue:supply-2026q3", "m-a", "합성부품"): "KRX:000660", ("issue:supply-2026q3", "m-a", "미상 거래처"): None,
+        ("issue:supply-2026q3", "m-a2", "합성기업"): "KRX:005930",
+        ("issue:factory-2026q4", "m-b", "합성기업"): "KRX:005930", ("issue:factory-2026q4", "m-b", "합성협력"): None,              # mapped to a company no public decision carries
+        ("issue:factory-2026q4", "m-b", "미등록 법인"): None}                                                                    # no canonical entry at all
+    # The participant as extracted is kept whether or not it is mapped; a name without a company id stays a name.
+    assert {p["name"]: p["sourceCompanyId"] for i in bundle["issues"] for m in i["mentions"] for p in m["participants"]} == {
+        "합성기업": "SYNTH-1", "합성부품": "SYNTH-3", "미상 거래처": None, "합성협력": "SYNTH-2", "미등록 법인": "SYNTH-9"}
+
+
+def canonical_entry(rig, job: str, kind: str, ref: str) -> dict:
+    return next(e for e in rig.docs["canonical"]["entries"] if (e["upstream"]["jobId"], e["kind"], e["ref"]) == (job, kind, ref))
+
+
+def test_upstreams_that_map_one_company_id_to_different_companies_leave_the_participant_unmapped(rig):
+    canonical_entry(rig, "s2-b", "company", "SYNTH-3")["canonicalId"] = "co:synth-1"       # b: the issuer's company, a: the supplier's: two published companies, no agreement
+    rig.write()
+    got = participants_of(rig.bundle())
+    assert got[("issue:supply-2026q3", "m-a", "합성부품")] is None
+    assert got[("issue:supply-2026q3", "m-a", "합성기업")] == "KRX:005930"                 # both upstreams agree on SYNTH-1
+
+
+def test_a_company_id_that_one_carrying_upstream_cannot_map_is_unmapped_for_every_upstream(rig):
+    rig.docs["canonical"]["entries"].remove(canonical_entry(rig, "s2-b", "company", "SYNTH-3"))
+    rig.write()
+    got = participants_of(rig.bundle())
+    assert got[("issue:supply-2026q3", "m-a", "합성부품")] is None and got[("issue:supply-2026q3", "m-a", "합성기업")] == "KRX:005930"
+
+
+def test_a_company_the_operator_maps_but_this_bundle_does_not_publish_is_not_claimed(rig):
+    rig.docs["decisions"]["structural"] = []              # KRX:000660 is then the target of no relation, so the bundle no longer lists it
+    rig.write()
+    bundle = rig.bundle()
+    assert [c["id"] for c in bundle["companies"]] == ["KRX:005930"]
+    got = participants_of(bundle)
+    assert got[("issue:supply-2026q3", "m-a", "합성부품")] is None and got[("issue:supply-2026q3", "m-a", "합성기업")] == "KRX:005930"
+    assert "SYNTH-3" in {p["sourceCompanyId"] for m in supply_of(bundle)["mentions"] for p in m["participants"]}      # still there, as extracted
+
+
+def test_one_mention_identity_with_different_values_in_two_upstreams_excludes_the_issue_and_publishes_neither(upstreams_disagree, tmp_path):
+    bundle = Rig(upstreams_disagree, tmp_path).bundle()
+    assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None, "code": "mention_values_conflict"}]
+    assert issue_ids(bundle) == ["issue:factory-2026q4"]
+    assert mentions_of(bundle) == {"issue:factory-2026q4": hs.expected_mentions(upstreams_disagree)["issue:factory-2026q4"]}
+    text = json.dumps(bundle, ensure_ascii=False)
+    assert hs.ACTION_SNAPSHOT not in text and "공급 계약 발표" not in text                    # neither value, and no last-wins
+    assert {"mention_values_conflict", "issue_not_public"} <= set(excluded(bundle).values())      # what depended on the issue is excluded visibly, not dangling
+    validate_bundle(bundle)
+
+
+def test_a_members_event_time_without_an_offset_excludes_the_issue_although_the_issue_time_itself_is_clean(a2_time_offsetless, tmp_path):
+    bundle = Rig(a2_time_offsetless, tmp_path).bundle()
+    assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
+                                                                                         "code": "mention_event_time_unsupported"}]
+    assert issue_ids(bundle) == ["issue:factory-2026q4"] and "event_time_unsupported" not in set(excluded(bundle).values())
+
+
+def test_a_members_iso_week_event_time_is_unsupported_even_though_python_parses_it_as_a_day(a2_time_iso_week, tmp_path):
+    bundle = Rig(a2_time_iso_week, tmp_path).bundle()
+    assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
+                                                                                         "code": "mention_event_time_unsupported"}]
+    assert issue_ids(bundle) == ["issue:factory-2026q4"]
+
+
+def test_an_issue_whose_every_member_carries_an_iso_week_time_is_excluded_visibly_while_other_issues_still_freeze(event_time_iso_week, tmp_path):
+    bundle = Rig(event_time_iso_week, tmp_path).bundle()          # freeze and export both succeed
+    assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
+                                                                                         "code": "mention_event_time_unsupported"}]
+    assert issue_ids(bundle) == ["issue:factory-2026q4"] and "2026-W40-3" not in json.dumps(bundle)
+
+
+def test_a_datetime_without_seconds_is_a_valid_mention_time_and_exports_as_a_datetime(event_time_no_seconds, tmp_path):
+    bundle = Rig(event_time_no_seconds, tmp_path).bundle()
+    assert "issue:supply" not in {i["id"] for i in bundle["exclusions"]["items"]}
+    supply = supply_of(bundle)
+    assert (supply["eventTime"], supply["timePrecision"]) == ("2026-09-30T09:00Z", "datetime")
+    assert {m["mentionId"]: (m["eventTime"], m["timePrecision"]) for m in supply["mentions"]} == {"m-a": ("2026-09-30T09:00Z", "datetime"), "m-a2": ("2026-09-30T09:00Z", "datetime")}
+    assert next(r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO")["source"] == "issue:supply-2026q3"       # the operator's attestation still binds
+
+
+def test_a_members_coarser_event_time_keeps_its_own_precision_and_is_never_widened(a2_time_month, tmp_path):
+    supply = supply_of(Rig(a2_time_month, tmp_path).bundle())
+    assert (supply["eventTime"], supply["timePrecision"]) == ("2026-09-30", "day")
+    assert {m["mentionId"]: (m["eventTime"], m["timePrecision"]) for m in supply["mentions"]} == {"m-a": ("2026-09-30", "day"), "m-a2": ("2026-09", "month")}
+
+
+def test_counts_policy_and_attestations_are_the_earlier_bundles_so_operator_decisions_still_bind(rig):
+    bundle = rig.bundle()
+    assert set(bundle["counts"]) == {"companies", "pathCompanies", "issues", "relations", "evidence", "articles", "exclusions"} and bundle["counts"] == hs.expected(rig.world)["counts"]
+    assert bundle["policy"]["version"] == POLICY
+    edge = next(r for r in bundle["relations"] if r["type"] == "STRUCTURALLY_RELATED_TO")
+    assert edge["provenance"]["bindingDigest"] == hs.structural_binding(rig.world)         # the operator's hand-computed digest over the source events alone still binds
+    assert rig.run("inspect", rig.sel())["receipt"]["counts"] == bundle["counts"]
+
+
+def mention_mutations():
+    mentions = lambda b: supply_of(b)["mentions"]  # noqa: E731
+    three = lambda b: next(m for m in mentions(b) if len(m["participants"]) == 3)  # noqa: E731
+    return {
+        "the issue without its mentions": lambda b: supply_of(b).pop("mentions"),
+        "mentions that are not a list": lambda b: supply_of(b).update(mentions=None),
+        "unknown key in a mention": lambda b: mentions(b)[0].update(surprise=1),
+        "a mention without a key": lambda b: mentions(b)[0].pop("period"),
+        "a verified mention": lambda b: mentions(b)[0].update(verification="verified"),
+        "a field decision smuggled in": lambda b: mentions(b)[0].update(fieldDecisions={}),
+        "a time precision that is not the event time's": lambda b: three(b).update(timePrecision="month"),
+        "a time that cannot be classified": lambda b: three(b).update(eventTime="soon", timePrecision="unknown"),
+        "background that is not a boolean": lambda b: mentions(b)[0].update(background="false"),
+        "background as a number": lambda b: mentions(b)[0].update(background=0),
+        "an assertion status outside the S2 values": lambda b: mentions(b)[0].update(assertionStatus="verified"),
+        "a title that is not text": lambda b: mentions(b)[0].update(title=None),
+        "participants that are not a list": lambda b: mentions(b)[0].update(participants=None),
+        "a participant that is not an object": lambda b: mentions(b)[0].update(participants=["x"]),
+        "a participant with an unknown key": lambda b: three(b)["participants"][0].update(surprise=1),
+        "a participant name that is not text": lambda b: three(b)["participants"][0].update(name=None),
+        "a public company that is not in the bundle": lambda b: three(b)["participants"][0].update(companyId="KRX:999999"),
+        "a public company without a source company id": lambda b: three(b)["participants"][2].update(companyId="KRX:005930"),
+        "evidence of another article": lambda b: three(b).update(evidenceIds=[next(e["id"] for e in b["evidence"] if e["articleId"] != three(b)["articleId"])]),
+        "a mention without evidence": lambda b: three(b).update(evidenceIds=[]),
+        "duplicate mention evidence": lambda b: three(b).update(evidenceIds=three(b)["evidenceIds"] * 2),
+        "mentions out of order": lambda b: mentions(b).reverse(),
+        "a duplicated mention": lambda b: mentions(b).append(copy.deepcopy(mentions(b)[0])),
+        "a mention that is not a source event's": lambda b: three(b).update(mentionId="m-unknown"),
+        "a source event without its mention": lambda b: mentions(b).pop(),
+        "an article that is not the mention's own": lambda b: three(b).update(articleId=next(a["articleId"] for a in b["articles"] if a["articleId"] != three(b)["articleId"])),
+        "an article version that is not the bound one": lambda b: three(b).update(articleVersion="f" * 64),
+        "issue evidence missing a mention's evidence": lambda b: supply_of(b)["evidenceIds"].pop(),
+        "issue evidence beyond the mentions' and geography's": lambda b: supply_of(b).update(evidenceIds=sorted(
+            [*supply_of(b)["evidenceIds"], next(e["id"] for e in b["evidence"] if e["id"] not in supply_of(b)["evidenceIds"])])),
+        "the schema version before original mentions": lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-1"),
+        "the schema version before field provenance": lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-2"),
+        "the schema version before field verdicts": lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-3"),
+        "the schema version before structural paths": lambda b: b.update(schemaVersion="zoop-graph-handoff-bundle-4"),
+    }
+
+
+@pytest.mark.parametrize("name,change", list(mention_mutations().items()), ids=list(mention_mutations()))
+def test_mention_closure_is_refused_even_with_a_refreshed_content_digest(valid_bundle, name, change):
+    validate_bundle(valid_bundle)
+    broken = rehashed(valid_bundle, change)
+    assert broken["digests"]["content"] == content_digest(broken)
+    with pytest.raises(ExtractionFailure) as exc:
+        validate_bundle(broken)
+    assert exc.value.code == "handoff_bundle_invalid", name
+
+
+def test_mention_text_is_verbatim_so_empty_strings_and_nulls_are_valid(valid_bundle):
+    def blank(b):
+        supply = supply_of(b)
+        mention = mention_of(supply, "m-a2")                      # not the operator's representative `m-a`, so the issue keeps its values
+        mention.update(title="", action="", target=None, period=None, eventTime=None, timePrecision="unknown")
+        mention["participants"][0].update(name="", role="")
+        for field in ("title", "action", "target", "eventTime", "period"):            # by hand: the blanked mention no longer states the issue's value in these fields
+            same_of(supply)[field] = [r for r in same_of(supply)[field] if r["mentionId"] != "m-a2"]
+    validate_bundle(rehashed(valid_bundle, blank))
+
+
+# ======================================================================================================================================
+# Field provenance (bundle `-3`): HOW an issue's six headline values were selected and which original mentions state exactly the same value. A selection record,
+# never a verification: nothing here says a value is supported, approved or true. The expectations are written by hand from the authored world.
+# ======================================================================================================================================
+
+FIELDS = ("title", "action", "target", "eventTime", "period", "assertionStatus")
+FP = "issue.fieldProvenance"
+
+
+def ident(world, name: str, mention_id: str) -> dict:
+    """The hand-written identity of an authored mention: its document, document version and local mention id."""
+    ref = world.refs[name]
+    return {"documentId": ref["documentId"], "documentVersion": ref["documentVersion"], "mentionId": mention_id}
+
+
+def ascending(*identities: dict) -> list:
+    """The order of an issue's mentions and of every list of them: ascending by (document, version, local mention id)."""
+    return sorted(identities, key=lambda r: (r["documentId"], r["documentVersion"], r["mentionId"]))
+
+
+def same_of(issue: dict) -> dict:
+    return issue["fieldProvenance"]["sameValueMentions"]
+
+
+def factory_of(bundle: dict) -> dict:
+    return next(i for i in bundle["issues"] if i["id"] == "issue:factory-2026q4")
+
+
+def mention_of(issue: dict, mention_id: str) -> dict:
+    return next(m for m in issue["mentions"] if m["mentionId"] == mention_id)
+
+
+def references(issue: dict) -> list:
+    """The identity of every mention of the issue, in the issue's own order."""
+    return [{key: m[key] for key in ("documentId", "documentVersion", "mentionId")} for m in issue["mentions"]]
+
+
+def reference(issue: dict, mention_id: str) -> dict:
+    return next(r for r in references(issue) if r["mentionId"] == mention_id)
+
+
+def test_every_issue_records_how_its_values_were_selected_and_exactly_which_mentions_state_the_same_value(rig):
+    bundle = rig.bundle()
+    a, a2, b = ident(rig.world, "a", "m-a"), ident(rig.world, "a2", "m-a2"), ident(rig.world, "b", "m-b")
+    supply, factory = supply_of(bundle), factory_of(bundle)
+    # The operator named `m-a`: only the second document's TITLE differs from it, so every other field lists both mentions (in identity order) and the title lists `m-a` alone.
+    assert supply["representative"]["mentionId"] == "m-a"
+    assert supply["fieldProvenance"] == {"selection": "operator-representative", "verification": "none", "withheld": [],
+                                         "sameValueMentions": {"title": [a], **{field: ascending(a, a2) for field in FIELDS[1:]}}}
+    # No representative and one mention: unanimous, that mention in every field.
+    assert factory["representative"] is None
+    assert factory["fieldProvenance"] == {"selection": "unanimous", "verification": "none", "withheld": [], "sameValueMentions": {field: [b] for field in FIELDS}}
+    assert {i["id"]: i["fieldProvenance"] for i in bundle["issues"]} == hs.expected_field_provenance(rig.world)
+    hs.assert_field_provenance_closed(bundle)
+    assert set(supply) == {"id", "canonicalId", "title", "action", "target", "eventTime", "timePrecision", "period", "assertionStatus", "geography", "evidenceIds",
+                           "sourceEvents", "decisionRef", "representative", "fieldProvenance", "fieldVerdicts", "mentions", "sourceSupport"}              # per-field verdicts exist only where an operator wrote them
+    assert supply["fieldVerdicts"] == [] and factory["fieldVerdicts"] == []
+
+
+def test_a_representative_is_selected_even_where_every_mention_agrees_and_two_documents_sharing_a_local_id_are_two_entries(collision_same, tmp_path):
+    supply = supply_of(Rig(collision_same, tmp_path).bundle())
+    both = ascending(ident(collision_same, "a", "m-a"), ident(collision_same, "a2", "m-a"))
+    assert supply["representative"]["documentId"] == collision_same.refs["a"]["documentId"]
+    assert supply["fieldProvenance"] == {"selection": "operator-representative", "verification": "none", "withheld": [], "sameValueMentions": {field: both for field in FIELDS}}
+    assert both[0]["mentionId"] == both[1]["mentionId"] and both[0]["documentId"] != both[1]["documentId"]
+
+
+def test_without_a_representative_the_selection_is_unanimous_and_every_list_holds_every_mention(collision_same, tmp_path):
+    bundle = collision_rig(collision_same, tmp_path).bundle()                 # no representative: the producer excludes the issue unless every member agrees
+    supply = supply_of(bundle)
+    both = ascending(ident(collision_same, "a", "m-a"), ident(collision_same, "a2", "m-a"))
+    assert supply["representative"] is None
+    assert supply["fieldProvenance"] == {"selection": "unanimous", "verification": "none", "withheld": [], "sameValueMentions": {field: both for field in FIELDS}}
+    hs.assert_field_provenance_closed(bundle)
+
+
+def test_a_mention_whose_time_differs_only_in_form_is_not_listed_because_no_string_is_ever_normalised(a2_time_month, tmp_path):
+    supply = supply_of(Rig(a2_time_month, tmp_path).bundle())
+    a, a2 = ident(a2_time_month, "a", "m-a"), ident(a2_time_month, "a2", "m-a2")
+    assert (supply["eventTime"], mention_of(supply, "m-a2")["eventTime"]) == ("2026-09-30", "2026-09")           # a prefix of the day is not the day
+    assert same_of(supply)["eventTime"] == [a] and same_of(supply)["period"] == ascending(a, a2)
+
+
+def test_an_absent_value_is_listed_for_every_mention_that_also_states_nothing(event_time_unknown_undated, tmp_path):
+    supply = supply_of(Rig(event_time_unknown_undated, tmp_path).bundle())
+    assert (supply["eventTime"], supply["timePrecision"]) == (None, "unknown") and all(m["eventTime"] is None for m in supply["mentions"])
+    assert same_of(supply)["eventTime"] == ascending(ident(event_time_unknown_undated, "a", "m-a"), ident(event_time_unknown_undated, "a2", "m-a2"))     # null equals null
+
+
+def provenance_refusals() -> dict:
+    """name -> (corruption, `at` of the refusal). In the valid bundle the supply issue has the operator's representative `m-a` and a second mention `m-a2` whose TITLE alone
+    differs (title -> [m-a], every other field -> [m-a, m-a2]); the factory issue has one mention `m-b` and no representative. Each `at` is written by hand from the rules."""
+    prov = lambda b: supply_of(b)["fieldProvenance"]  # noqa: E731
+    same = lambda b: same_of(supply_of(b))  # noqa: E731
+    a = lambda b: reference(supply_of(b), "m-a")  # noqa: E731
+    a2 = lambda b: reference(supply_of(b), "m-a2")  # noqa: E731
+
+    def no_mention_states_period(b, listed):
+        issue = factory_of(b)
+        issue["period"] = "2099Q1"                                           # `m-b` says 2026Q4
+        same_of(issue)["period"] = listed(issue)
+
+    def title_of_the_other_mention(b):
+        issue = supply_of(b)
+        issue["title"] = mention_of(issue, "m-a2")["title"]                 # the issue no longer carries the representative's title
+        same_of(issue)["title"] = [reference(issue, "m-a2")]
+
+    def unanimous_over_differing_mentions(b):
+        issue = supply_of(b)
+        issue["representative"], issue["fieldProvenance"]["selection"] = None, "unanimous"
+        first = issue["mentions"][0]                                         # the shared value is the first mention's: only the unanimity rule can refuse the title list
+        issue["title"] = first["title"]
+        same_of(issue)["title"] = [{key: first[key] for key in ("documentId", "documentVersion", "mentionId")}]
+
+    def another_form(b, field, value, precision=None):
+        mention = mention_of(supply_of(b), "m-a2")
+        mention[field] = value
+        if precision:
+            mention["timePrecision"] = precision
+
+    def factory_values(b, issue_value, mention_value, field):
+        issue = factory_of(b)
+        issue[field] = issue_value
+        mention_of(issue, "m-b")[field] = mention_value
+
+    return {
+        "no provenance at all": (lambda b: supply_of(b).pop("fieldProvenance"), "issue"),
+        "an issue-level field decision": (lambda b: supply_of(b).update(fieldDecisions=[]), "issue"),
+        "provenance that is not an object": (lambda b: supply_of(b).update(fieldProvenance=None), FP),
+        "an unknown key": (lambda b: prov(b).update(surprise=1), FP),
+        "a field decision inside the provenance": (lambda b: prov(b).update(fieldDecisions=[]), FP),
+        "a missing selection": (lambda b: prov(b).pop("selection"), FP),
+        "a missing verification": (lambda b: prov(b).pop("verification"), FP),
+        "a missing sameValueMentions": (lambda b: prov(b).pop("sameValueMentions"), FP),
+        "unanimous although the operator named a representative": (lambda b: prov(b).update(selection="unanimous"), f"{FP}.selection"),
+        "operator-representative without a representative": (lambda b: factory_of(b)["fieldProvenance"].update(selection="operator-representative"), f"{FP}.selection"),
+        "a selection that is neither": (lambda b: prov(b).update(selection="consensus"), f"{FP}.selection"),
+        "a selection that is not text": (lambda b: prov(b).update(selection=None), f"{FP}.selection"),
+        "a verified selection": (lambda b: prov(b).update(verification="verified"), f"{FP}.verification"),
+        "a supported selection": (lambda b: prov(b).update(verification="supported"), f"{FP}.verification"),
+        "sameValueMentions that is not an object": (lambda b: prov(b).update(sameValueMentions=[]), f"{FP}.sameValueMentions"),
+        "a field missing": (lambda b: same(b).pop("target"), f"{FP}.sameValueMentions"),
+        "timePrecision listed as a field": (lambda b: same(b).update(timePrecision=list(same(b)["eventTime"])), f"{FP}.sameValueMentions"),
+        "geography listed as a field": (lambda b: same(b).update(geography=list(same(b)["title"])), f"{FP}.sameValueMentions"),
+        "a list that is not a list": (lambda b: same(b).update(action=None), f"{FP}.action"),
+        "a reference that is not an object": (lambda b: same(b)["action"].insert(0, "x"), f"{FP}.action"),
+        "a reference with an unknown key": (lambda b: same(b)["action"][0].update(articleId="x"), f"{FP}.action"),
+        "a reference without its mentionId": (lambda b: same(b)["action"][0].pop("mentionId"), f"{FP}.action"),
+        "a reference to a mention that is not the issue's": (lambda b: same(b)["action"][0].update(mentionId="m-unknown"), f"{FP}.action.exact"),
+        "a reference to another document version": (lambda b: same(b)["action"][0].update(documentVersion="f" * 64), f"{FP}.action.exact"),
+        "an equal-value mention omitted": (lambda b: same(b).update(action=[a(b)]), f"{FP}.action.exact"),
+        "the representative omitted while another mention is listed": (lambda b: same(b).update(action=[a2(b)]), f"{FP}.action.exact"),
+        "a differing mention included": (lambda b: same(b).update(title=references(supply_of(b))), f"{FP}.title.exact"),
+        "an equal-value mention listed twice": (lambda b: same(b)["action"].append(a(b)), f"{FP}.action.exact"),
+        "mentions listed out of order": (lambda b: same(b)["action"].reverse(), f"{FP}.action.exact"),
+        "an empty list although mentions state the value": (lambda b: same(b).update(period=[]), f"{FP}.period.exact"),
+        "an issue value no mention states, listed empty": (lambda b: no_mention_states_period(b, lambda issue: []), f"{FP}.period.exact"),
+        "an issue value no mention states, listed anyway": (lambda b: no_mention_states_period(b, references), f"{FP}.period.published"),
+        "lists copied from another issue": (lambda b: prov(b).update(sameValueMentions=copy.deepcopy(same_of(factory_of(b)))), f"{FP}.title.exact"),
+        "an issue value the representative does not carry": (title_of_the_other_mention, f"{FP}.title.exact"),
+        "unanimous although the mentions differ": (unanimous_over_differing_mentions, f"{FP}.title.unanimous"),
+        "a period with a trailing space listed as the same period": (lambda b: another_form(b, "period", "2026Q3 "), f"{FP}.period.exact"),
+        "another form of the same day listed as the same time": (lambda b: another_form(b, "eventTime", "2026-09-30T00:00+09:00", "datetime"), f"{FP}.eventTime.exact"),
+        "a null issue value listed for a mention stating text": (lambda b: factory_values(b, None, "2026Q4", "period"), f"{FP}.period.published"),
+        "a text issue value listed for a mention stating null": (lambda b: factory_values(b, "2026Q4", None, "period"), f"{FP}.period.published"),
+        "a null issue value listed for a mention stating empty text": (lambda b: factory_values(b, None, "", "target"), f"{FP}.target.published"),
+        "empty issue text listed for a mention stating null": (lambda b: factory_values(b, "", None, "target"), f"{FP}.target.published"),
+        "an issue precision coarser than the selected mention's time": (lambda b: supply_of(b).update(timePrecision="month"), "issue.timePrecision.selected"),
+        "an issue precision unknown although the selected mention states a day": (lambda b: supply_of(b).update(timePrecision="unknown"), "issue.timePrecision.selected"),
+        "an issue precision finer than the selected mention's time": (lambda b: factory_of(b).update(timePrecision="datetime"), "issue.timePrecision.selected"),
+        "a missing withheld list": (lambda b: prov(b).pop("withheld"), FP),
+        "a withheld list that is not a list of fields": (lambda b: prov(b).update(withheld="eventTime"), f"{FP}.withheld"),
+        "a withheld field no verdict withholds": (lambda b: prov(b).update(withheld=["period"]), f"{FP}.withheld"),
+    }
+
+
+@pytest.mark.parametrize("name,change,at", [(name, change, at) for name, (change, at) in provenance_refusals().items()], ids=list(provenance_refusals()))
+def test_field_provenance_is_refused_unless_it_is_exactly_what_the_mentions_say_even_with_a_refreshed_content_digest(valid_bundle, name, change, at):
+    validate_bundle(valid_bundle)
+    broken = rehashed(valid_bundle, change)
+    assert broken["digests"]["content"] == content_digest(broken)
+    with pytest.raises(ExtractionFailure) as exc:
+        validate_bundle(broken)
+    assert exc.value.code == "handoff_bundle_invalid" and exc.value.detail == {"at": at}, name
+
+
+def provenance_acceptances() -> dict:
+    """Changes that stay valid because the lists were adjusted by hand to what exact equality says (the refused counterparts leave the lists untouched)."""
+    def a2_value(b, field, value, listed, precision=None):
+        issue = supply_of(b)
+        mention = mention_of(issue, "m-a2")
+        mention[field] = value
+        if precision:
+            mention["timePrecision"] = precision
+        same_of(issue)[field] = [reference(issue, mention_id) for mention_id in listed]
+
+    def factory_values(b, issue_value, mention_value, field):
+        issue = factory_of(b)
+        issue[field] = issue_value
+        mention_of(issue, "m-b")[field] = mention_value                      # the list stays [m-b]: the two values are equal
+
+    def nothing_shared_with_the_representative(b):
+        issue = supply_of(b)
+        mention = mention_of(issue, "m-a2")
+        mention.update(action="다른 행동", target="다른 대상", eventTime="2026-10-01", period="2026Q4", assertionStatus="planned")
+        same_of(issue).update({field: [reference(issue, "m-a")] for field in FIELDS})
+
+    return {
+        "a period with a trailing space is not the representative's period": lambda b: a2_value(b, "period", "2026Q3 ", ["m-a"]),
+        "another form of the same day is not the representative's time": lambda b: a2_value(b, "eventTime", "2026-09-30T00:00+09:00", ["m-a"], "datetime"),
+        "null equals null": lambda b: factory_values(b, None, None, "period"),
+        "empty text equals empty text": lambda b: factory_values(b, "", "", "target"),
+        "a representative whose values no other mention shares": nothing_shared_with_the_representative,
+    }
+
+
+@pytest.mark.parametrize("name,change", list(provenance_acceptances().items()), ids=list(provenance_acceptances()))
+def test_field_provenance_that_follows_exact_value_equality_is_accepted(valid_bundle, name, change):
+    validate_bundle(valid_bundle)
+    validate_bundle(rehashed(valid_bundle, change))
+
+
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+def test_a_bundle_of_an_earlier_schema_is_never_a_valid_current_bundle(rig, valid_bundle, schema):
+    old = hs.legacy_bundle(valid_bundle, rig.manifest("old"), schema)
+    later = schema in (hs.BUNDLE_3, hs.BUNDLE_4)
+    assert old["schemaVersion"] == schema and all(("fieldProvenance" in i) == later and ("mentions" in i) == (schema != hs.BUNDLE_1)
+                                                  and ("fieldVerdicts" in i) == (schema == hs.BUNDLE_4) for i in old["issues"])
+    assert "pathCompanies" not in old and "pathCompanies" not in old["counts"] and all("structuralPath" not in r for r in old["relations"])
+    assert all("businessScope" not in b and "productScope" not in b for r in old["relations"] for b in r["basis"])
+    for broken in (old, {**old, "schemaVersion": "zoop-graph-handoff-bundle-5"}):          # nor does the current schema string make the earlier shape valid
+        with pytest.raises(ExtractionFailure) as exc:
+            validate_bundle(broken)
+        assert exc.value.code == "handoff_bundle_invalid"
+
+
+# ======================================================================================================================================
+# Handoffs frozen under an earlier bundle schema (`-1` before original mentions, `-2` before field provenance, `-3` before field verdicts, `-4` before structural paths): immutable history, decided from the ledger alone.
+# ======================================================================================================================================
+
+CONTRACT_CHANGED = {"status": "withheld", "code": "handoff_contract_changed"}
+LEGACY_ROWS = {"legacy-ready": ("ready", "written"), "legacy-reserved": ("reserved", "missing"), "legacy-failed": ("failed", "garbage")}
+
+
+def legacy_rig(rig, rows: dict | None = None, **plant) -> dict:
+    """The rig's handoff ledger holding rows of an earlier build (`schema=` `-1` or `-2`, default `-2`; `damaged=True` leaves the receipt without a schema). A real current
+    handoff creates the ledger first; the earlier rows are this build's own export minus what that build did not write, inserted with the ledger's own statements."""
+    bundle = rig.bundle("current-0")
+    return {name: hs.plant_legacy_handoff(rig.state, rig.manifest(name), bundle, row_state=state, artifact=artifact, **plant)
+            for name, (state, artifact) in (rows or LEGACY_ROWS).items()}
+
+
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+def test_a_handoff_frozen_under_an_earlier_bundle_schema_is_history_answered_from_the_ledger_alone(rig, schema):
+    planted = legacy_rig(rig, schema=schema)
+    assert {row["receipt"]["bundleSchema"] for row in planted.values()} == {schema}
+    manifests = {name: rig.manifest(name) for name in planted}
+    # Nothing a legacy answer must NOT need exists any more: the grant is revoked, an operator file is gone and another unreadable, the source ledgers are deleted,
+    # two of the three artifacts are missing or garbage, and the ledger directory has modes that any writer would reset to 0700/0600.
+    rig.grant(enabled=False)
+    (rig.root / "decisions.json").write_bytes(b"{")
+    (rig.root / "canonical.json").unlink()
+    for name in ("relation", "extraction"):
+        shutil.rmtree(rig.root / name)
+    os.chmod(rig.state, 0o755)
+    for path in rig.state.rglob("*"):
+        os.chmod(path, 0o755 if path.is_dir() else 0o644)
+    before = hs.ledger_snapshot(rig.state)
+    for name, row in planted.items():
+        seen = rig.run("inspect", rig.sel(name), expected=2)
+        assert seen["state"] == row["state"] and seen["next"] is None and seen["delivery"] == CONTRACT_CHANGED and seen["publication"] == "not-published", seen
+        assert seen["receipt"] == row["receipt"] and seen["attempts"] == row["attempts"] and "bundle" not in seen
+        assert rig.run("export", rig.sel(name), expected=2) == {"schemaVersion": SCHEMA, "handoffId": name, "state": row["state"], "publication": "not-published",
+                                                              "delivery": CONTRACT_CHANGED, "usage": {"providerCalls": 0, "modelCalls": 0}}
+        error(rig.run("recover", rig.sel(name), expected=2), "handoff_contract_changed")
+        error(rig.run("freeze", manifests[name], expected=2), "handoff_contract_changed")
+        error(rig.run("freeze", {**manifests[name], "sourceKind": "actual"}, expected=2), "handoff_contract_changed")        # not an input conflict: the row is history
+    assert hs.ledger_snapshot(rig.state) == before          # no byte, mode, mtime or file changed: nothing was opened for writing, created, settled or marked failed
+
+
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+def test_the_methods_recheck_the_contract_under_their_own_lock_without_the_cli_preflight(rig, schema):
+    planted = legacy_rig(rig, schema=schema)
+    manifests = {name: Manifest.model_validate(rig.manifest(name)) for name in planted}
+    paths = HandoffPaths(rig.root / "relation", rig.root / "extraction", rig.root / "ingestion", rig.sources, rig.root / "canonical.json", rig.root / "decisions.json",
+                         rig.root / "bindings.json")
+    before = stored(rig)
+    store = Store(rig.state, paths.relation, paths.extraction, paths.ingestion, mode="write")        # the WRITER, exactly what the preflight keeps legacy commands away from
+    try:
+        handoff = Handoff(store, paths)
+        for name in planted:
+            selector = Selector.model_validate(rig.sel(name))
+            for refused in (lambda: handoff.recover(selector), lambda: handoff.freeze(manifests[name])):  # noqa: B023
+                with pytest.raises(ExtractionFailure) as exc:
+                    refused()
+                assert exc.value.code == "handoff_contract_changed"
+            assert handoff.inspect(selector)["delivery"] == CONTRACT_CHANGED
+            assert handoff.export(selector)["delivery"] == CONTRACT_CHANGED
+    finally:
+        store.close()
+    assert stored(rig) == before          # no attempt was added, no state settled, no file written
+
+
+@pytest.mark.parametrize("schema", [hs.BUNDLE_1, hs.BUNDLE_2, hs.BUNDLE_3, hs.BUNDLE_4])
+def test_a_new_handoff_id_freezes_and_exports_beside_the_legacy_history_which_stays_as_it_was(rig, schema):
+    planted = legacy_rig(rig, schema=schema)
+
+    def history() -> dict:
+        return {"rows": rig.sql("SELECT * FROM handoffs WHERE handoff_id LIKE 'legacy-%' ORDER BY handoff_id"),
+                "attempts": rig.sql("SELECT * FROM attempts WHERE handoff_id LIKE 'legacy-%' ORDER BY handoff_id, n"),
+                "files": {name: (p["artifact"].read_bytes() if p["artifact"].exists() else None) for name, p in planted.items()}}
+
+    before = history()
+    bundle = rig.bundle("h2")
+    assert bundle["schemaVersion"] == "zoop-graph-handoff-bundle-5" and bundle["handoffId"] == "h2"
+    assert history() == before
+
+
+def test_a_receipt_that_names_no_bundle_schema_is_damaged_state_never_history(rig):
+    legacy_rig(rig, {"damaged": ("ready", "written")}, damaged=True)
+    for command in ("inspect", "export", "recover"):
+        error(rig.run(command, rig.sel("damaged"), expected=2), "handoff_state_invalid")
+
+
+# ======================================================================================================================================
+# Bundle `-4` extension: the S3 approval basis per source (automatic verifier vs the operator's FINAL approval), honest execution modes, operator-declared origins
+# and per-issue source support. Expectations are hand-written in scripts/graph_handoff_smoke.py (`expected_approvals`, `expected_origins`, `expected_support`).
+# ======================================================================================================================================
+
+def test_every_source_carries_its_automatic_approval_proof_and_the_hand_written_source_support(rig):
+    bundle = rig.bundle()
+    hs.assert_approvals_support_and_origins(rig.world, bundle)
+    assert all(u["approvalBasis"]["kind"] == "automatic-verifier" and u["approvalBasis"]["reviewer"] is None for s in bundle["sources"] for u in s["reviewUsed"])
+    assert supply_of(bundle)["sourceSupport"] == hs.expected_support(rig.world)["issue:supply-2026q3"]
+    assert supply_of(bundle)["sourceSupport"]["independentSourceCount"] == 1 and factory_of(bundle)["sourceSupport"]["independentSourceCount"] is None
+    assert bundle["provenance"] == {"declaredSourceKind": "synthetic", "observedSourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
+
+
+def test_an_operator_approved_relation_projects_with_its_own_basis_and_never_claims_independent_verification(approved_world, tmp_path):
+    rig = Rig(approved_world, tmp_path)
+    bundle = rig.bundle()
+    validate_bundle(bundle)
+    hs.assert_approvals_support_and_origins(approved_world, bundle)
+    used = [u for s in bundle["sources"] for u in s["reviewUsed"]]
+    manual = [u for u in used if u["approvalBasis"]["kind"] == "operator-final-approval"]
+    assert len(manual) == 2 and len(used) == 4 and all(u["approvalBasis"]["reviewer"] == hs.APPROVER and u["revision"] == 2 for u in manual)
+    literals = {r["source"]: r["provenance"]["s3SemanticValidation"] for r in bundle["relations"] if r["type"] == "INVOLVES"}
+    assert literals == {"issue:supply-2026q3": "manual-operator-final-approval", "issue:factory-2026q4": "independent-verifier-supported-all-claims"}
+    assert first_relation(bundle, "STRUCTURALLY_RELATED_TO")["provenance"]["basisEligibility"] == "s3-operator-final-approval"
+    assert hs.PRIVATE_NOTE not in json.dumps(bundle) and hs.PRIVATE_REVIEWER not in json.dumps(bundle)      # the review note never leaves the S3 ledger
+    # The approval is current only while it stands: a later final decision on the approved relation withholds the stored handoff.
+    approved = next(u["relationCandidateId"] for s in bundle["sources"] if s["relation"]["jobId"] == "rel-a" for u in s["reviewUsed"]
+                    if u["approvalBasis"]["kind"] == "operator-final-approval")
+    rig.review("rel-a", approved)
+    assert rig.run("export", rig.sel(), expected=2)["delivery"] == {"status": "withheld", "code": "review_revision_changed"}
+
+
+def test_an_undeclared_origin_is_unknown_and_an_unused_declaration_changes_nothing(rig):
+    first = rig.bundle("h1")
+    ids = {name: ref["documentId"] for name, ref in rig.world.refs.items()}
+    rig.docs["decisions"]["origins"].append({"documentId": "doc-never-cited", "documentVersion": "9" * 64, "originId": "origin:unused", "reviewer": "reviewer-a",
+                                             "decisionRef": "origin-2026-10-21:unused", "decisionVersion": "o1"})
+    rig.write()
+    second = rig.bundle("h2")
+    assert second["digests"]["content"] == first["digests"]["content"]               # an unused declaration is ignored, not exported
+    rig.docs["decisions"]["origins"] = [o for o in rig.docs["decisions"]["origins"] if o["documentId"] != ids["a2"]]
+    rig.write()
+    third = rig.bundle("h3")
+    assert supply_of(third)["sourceSupport"] == {"articleCount": 2, "knownLineageCount": 1, "unknownLineageArticles": [ids["a2"]], "independentSourceCount": None,
+                                                  "duplicateGroups": []}
+    assert {a["documentId"]: a["origin"] for a in third["articles"] if a["documentId"] == ids["a2"]} == {ids["a2"]: None}
+
+
+def test_a_publisher_is_never_an_origin(rig):
+    """Document a declares a publisher in its real collected export; no origin is declared at all, and the independent count stays unknown."""
+    rig.docs["decisions"]["origins"] = []
+    rig.write()
+    bundle = rig.bundle()
+    assert hs.PUBLISHERS["a"] not in json.dumps(bundle["issues"]) and all(a["origin"] is None for a in bundle["articles"])
+    assert supply_of(bundle)["sourceSupport"]["knownLineageCount"] == 0 and supply_of(bundle)["sourceSupport"]["independentSourceCount"] is None
+
+
+def test_an_issue_citing_two_versions_of_one_article_is_excluded_and_never_resolved_by_choosing_a_version(rig):
+    for binding in rig.docs["bindings"]["bindings"]:
+        if binding["documentId"] == rig.world.refs["a2"]["documentId"]:
+            binding["articleId"] = rig.world.refs["a"]["documentId"]               # the operator maps a2's version onto document a's article id
+    rig.write()
+    bundle = rig.bundle()
+    assert [i for i in bundle["exclusions"]["items"] if i["id"] == "issue:supply"] == [{"kind": "issue", "id": "issue:supply", "jobId": None,
+                                                                                         "code": "issue_article_versions_multiple"}]
+    assert issue_ids(bundle) == ["issue:factory-2026q4"]
+
+
+def test_the_execution_mode_is_one_truthful_pair_and_a_mixed_bundle_is_refused():
+    from types import SimpleNamespace as Job
+
+    from zoop_ai_pipeline.handoff import mode_of, single_mode
+    replay = {"sourceKind": "synthetic", "executionMode": "replay", "recordingKind": "authored-test"}
+    live = {"sourceKind": "synthetic", "executionMode": "live", "recordingKind": "provider"}
+    assert mode_of(replay) == ("replay", "authored-test") and mode_of(live) == ("live", "provider")
+    for bad in ({**replay, "recordingKind": "provider"}, {**live, "recordingKind": "authored-test"}, {"sourceKind": "synthetic"}, {**replay, "executionMode": "dry-run"}):
+        with pytest.raises(ExtractionFailure) as exc:
+            mode_of(bad)
+        assert exc.value.code == "provenance_conflict"
+    assert single_mode([Job(s3={"provenance": replay}), Job(s3={"provenance": replay})]) == ("replay", "authored-test")
+    assert single_mode([Job(s3={"provenance": live})]) == ("live", "provider")
+    for mixed in ([Job(s3={"provenance": replay}), Job(s3={"provenance": live})], [Job(s3={"provenance": live}), Job(s3={"provenance": replay})]):
+        with pytest.raises(ExtractionFailure) as exc:
+            single_mode(mixed)
+        assert exc.value.code == "provenance_mode_conflict"       # never the first source's mode
+
+
+def extension_refusals() -> dict:
+    """name -> (corruption of the valid (all automatic) bundle, `at` of the refusal). Each `at` is written by hand from the rules."""
+    first_use = lambda b: b["sources"][0]["reviewUsed"][0]  # noqa: E731
+    article_with_origin = lambda b: next(a for a in b["articles"] if a["origin"])  # noqa: E731
+
+    def bundle_and_sources(b, mode, recording):
+        b["provenance"].update(executionMode=mode, recordingKind=recording)
+        for s in b["sources"]:
+            s["provenance"].update(executionMode=mode, recordingKind=recording)
+
+    return {
+        "source support that overstates independence": (lambda b: supply_of(b)["sourceSupport"].update(independentSourceCount=2), "issue.sourceSupport.exact"),
+        "source support of an unknown-lineage issue with a count": (lambda b: factory_of(b)["sourceSupport"].update(independentSourceCount=1), "issue.sourceSupport.exact"),
+        "source support counting articles as groups": (lambda b: supply_of(b)["sourceSupport"].update(knownLineageCount=2), "issue.sourceSupport.exact"),
+        "source support with an invented duplicate group": (lambda b: supply_of(b)["sourceSupport"].update(duplicateGroups=[[a["articleId"] for a in b["articles"][:2]]]),
+                                                           "issue.sourceSupport.exact"),
+        "source support without a key": (lambda b: supply_of(b)["sourceSupport"].pop("duplicateGroups"), "issue.sourceSupport"),
+        "source support with an extra key": (lambda b: supply_of(b)["sourceSupport"].update(note="x"), "issue.sourceSupport"),
+        "issue without source support": (lambda b: supply_of(b).pop("sourceSupport"), "issue"),
+        "origin removed while the support still counts it": (lambda b: article_with_origin(b).update(origin=None), "issue.sourceSupport.exact"),
+        "origin with another verification label": (lambda b: article_with_origin(b)["origin"].update(verification="operator-verified"), "article.origin.verification"),
+        "origin with an extra key": (lambda b: article_with_origin(b)["origin"].update(publisher="x"), "article.origin"),
+        "origin that is not an object": (lambda b: article_with_origin(b).update(origin="origin:x"), "article.origin"),
+        "article without its text hash": (lambda b: b["articles"][0].pop("textSha256"), "article"),
+        "article with a malformed text hash": (lambda b: b["articles"][0].update(textSha256="x"), "article.textSha256"),
+        "policy without source support": (lambda b: b["policy"].pop("sourceSupport"), "policy"),
+        "policy with another source support rule": (lambda b: b["policy"].update(sourceSupport="publisher-heuristic"), "policy.sourceSupport"),
+        "INVOLVES claiming manual approval over automatic sources": (
+            lambda b: first_relation(b, "INVOLVES")["provenance"].update(s3SemanticValidation="manual-operator-final-approval"), "relation.provenance"),
+        "structural basis claiming manual approval over automatic sources": (
+            lambda b: first_relation(b, "STRUCTURALLY_RELATED_TO")["provenance"].update(basisEligibility="s3-operator-final-approval"), "relation.provenance"),
+        "a source silently turned into an operator approval": (
+            lambda b: first_use(b)["approvalBasis"].update(kind="operator-final-approval", reviewer="someone"), "relation.provenance"),
+        "automatic approval naming a reviewer": (lambda b: first_use(b)["approvalBasis"].update(reviewer="someone"), "source.reviewUsed.approvalBasis.reviewer"),
+        "operator approval without a reviewer": (lambda b: first_use(b)["approvalBasis"].update(kind="operator-final-approval"), "source.reviewUsed.approvalBasis.reviewer"),
+        "operator approval with a blank reviewer": (lambda b: first_use(b)["approvalBasis"].update(kind="operator-final-approval", reviewer="  "),
+                                                    "source.reviewUsed.approvalBasis.reviewer"),
+        "operator approval with an oversized reviewer": (lambda b: first_use(b)["approvalBasis"].update(kind="operator-final-approval", reviewer="r" * 201),
+                                                         "source.reviewUsed.approvalBasis.reviewer"),
+        "approval with an unknown kind": (lambda b: first_use(b)["approvalBasis"].update(kind="manual-operator-review"), "source.reviewUsed.approvalBasis.kind"),
+        "approval revision that is not the used revision": (lambda b: first_use(b)["approvalBasis"].update(revision=9), "source.reviewUsed.approvalBasis.revision"),
+        "approval with an extra key": (lambda b: first_use(b)["approvalBasis"].update(note="x"), "source.reviewUsed.approvalBasis"),
+        "approval time without an offset": (lambda b: first_use(b)["approvalBasis"].update(decidedAt="2026-10-21T00:00:00"), "source.reviewUsed.approvalBasis.decidedAt"),
+        "approval time that is a date only": (lambda b: first_use(b)["approvalBasis"].update(decidedAt="2026-10-21"), "source.reviewUsed.approvalBasis.decidedAt"),
+        "approval time that is not a timestamp": (lambda b: first_use(b)["approvalBasis"].update(decidedAt="garbage"), "source.reviewUsed.approvalBasis.decidedAt"),
+        "used review as the earlier pair": (lambda b: b["sources"][0].update(reviewUsed=[[u["relationCandidateId"], u["revision"]] for u in b["sources"][0]["reviewUsed"]]),
+                                            "source.reviewUsed"),
+        "structural verification time that is not the approval time": (
+            lambda b: first_relation(b, "STRUCTURALLY_RELATED_TO")["basis"][0].update(verifiedAt="2026-01-01T00:00:00+00:00"), "basis.verifiedAt.approval"),
+        "source reporting another execution mode": (lambda b: b["sources"][0]["provenance"].update(executionMode="live", recordingKind="provider"), "source.provenance.mixed"),
+        "bundle claiming live over replay sources": (lambda b: b["provenance"].update(executionMode="live", recordingKind="provider"), "source.provenance.mixed"),
+        "bundle with an impossible mode pair": (lambda b: bundle_and_sources(b, "live", "authored-test"), "provenance.mode"),
+        "bundle with a replay provider recording": (lambda b: bundle_and_sources(b, "replay", "provider"), "provenance.mode"),
+        "source without its provenance": (lambda b: b["sources"][0].pop("provenance"), "source"),
+    }
+
+
+@pytest.mark.parametrize("name,change,at", [(name, change, at) for name, (change, at) in extension_refusals().items()], ids=list(extension_refusals()))
+def test_approval_origin_support_and_mode_claims_are_refused_unless_exactly_proven_even_with_a_refreshed_content_digest(valid_bundle, name, change, at):
+    validate_bundle(valid_bundle)
+    broken = rehashed(valid_bundle, change)
+    assert broken["digests"]["content"] == content_digest(broken)
+    with pytest.raises(ExtractionFailure) as exc:
+        validate_bundle(broken)
+    assert exc.value.code == "handoff_bundle_invalid" and exc.value.detail == {"at": at}, name
+
+
+def test_a_bundle_whose_own_and_every_sources_mode_is_live_provider_is_valid_and_independent_of_the_source_kind(valid_bundle):
+    def live(b):
+        b["provenance"].update(executionMode="live", recordingKind="provider")
+        for s in b["sources"]:
+            s["provenance"].update(executionMode="live", recordingKind="provider")
+
+    validate_bundle(rehashed(valid_bundle, live))
+    assert valid_bundle["provenance"]["observedSourceKind"] == "synthetic"        # the material kind (synthetic or actual) is a separate, independently truthful fact
+
 

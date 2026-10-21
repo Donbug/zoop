@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "zoop-ai-s1-1",
+  "grants": [
+    {
+      "grantId": "brf-test-grant",
+      "revision": "synthetic-v1",
+      "sourceId": "authored-replay",
+      "enabled": true,
+      "rights": "known",
+      "allowedOperations": [
+        "read",
+        "store",
+        "model-send",
+        "quote-display"
+      ],
+      "recipients": [
+        "authored-replay"
+      ],
+      "purposes": [
+        "briefing-outlook",
+        "semantic-verification"
+      ],
+      "evidence": [
+        "합성시험 직접 작성 자료. 실제 뉴스·공시·권리 증빙 아님."
+      ],
+      "expiresAt": null
+    }
+  ]
+}
