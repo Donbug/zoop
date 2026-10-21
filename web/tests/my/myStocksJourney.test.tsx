@@ -35,7 +35,7 @@ beforeEach(() => {
   useAuthStore.getState().setSession(member());
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 });
-function open() {
+function open(initial = '/my') {
   return renderRoutes(
     [
       {
@@ -45,7 +45,7 @@ function open() {
       { path: '/login', element: <p>로그인 목적지</p> },
       { path: '/away', element: <p>다른 화면</p> },
     ],
-    '/my',
+    initial,
   );
 }
 async function search(user: ReturnType<typeof open>['user'], text = '삼성') {
@@ -138,6 +138,109 @@ test('같은 회원의 세션 갱신은 관심 검색어와 목록을 유지한�
     screen.getByRole('button', { name: 'NVIDIA 관심 종목에서 빼기' }),
   ).toBeTruthy();
 });
+
+test.each(['same', 'other', 'anonymous'] as const)(
+  '/my에서 지연된 세션 재확인(%s)은 화면을 내리지 않고 결과에 따라 상태를 유지하거나 폐기한다',
+  async (result) => {
+    const server = createFakeServer();
+    myMember(server, { watchlistIds: ['cmp-nvidia'] });
+    const { user, location } = open();
+    await search(user);
+    const pending = deferred<Response>();
+    server.on('GET', '/api/v1/auth/session', () => pending.promise);
+    let check!: Promise<unknown>;
+    await act(async () => {
+      check = loadSession(true).catch(() => null);
+    });
+    expect(useAuthStore.getState().status).toBe('checking');
+    expect(screen.queryByText('로그인 상태를 확인하고 있어요.')).toBeNull();
+    expect(screen.getByRole('list', { name: '‘삼성’ 검색 결과' })).toBeTruthy();
+
+    if (result === 'other') myMember(server, { watchlistIds: ['cmp-samsung'] });
+    await act(async () => {
+      pending.resolve(
+        json(
+          result === 'same'
+            ? { ...member(), csrfToken: 'rechecked-csrf' }
+            : result === 'other'
+              ? member('member-b')
+              : {
+                  authenticated: false,
+                  kind: 'anonymous',
+                  user: null,
+                  setup: null,
+                  csrfToken: null,
+                  expiresAt: null,
+                },
+        ),
+      );
+      await check;
+    });
+    if (result === 'same') {
+      expect(
+        screen.getByRole('list', { name: '‘삼성’ 검색 결과' }),
+      ).toBeTruthy();
+      expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe(
+        '삼성',
+      );
+      expect(
+        screen.getByRole('button', { name: 'NVIDIA 관심 종목에서 빼기' }),
+      ).toBeTruthy();
+    } else if (result === 'other') {
+      await screen.findByRole('button', {
+        name: '삼성전자 관심 종목에서 빼기',
+      });
+      expect(
+        screen.queryByRole('list', { name: '‘삼성’ 검색 결과' }),
+      ).toBeNull();
+      expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe(
+        '',
+      );
+    } else {
+      await screen.findByText('로그인 목적지');
+      expect(location()).toBe('/login');
+    }
+  },
+);
+
+test.each(['back', 'reopen'] as const)(
+  '연결 화면을 닫은 뒤(%s) 도착한 늦은 연결 성공은 기록을 한 번 더 되돌리지 않는다',
+  async (after) => {
+    const server = createFakeServer();
+    myMember(server);
+    const pending = deferred<Response>();
+    server.on('POST', '/api/v1/portfolio/connections', () => pending.promise);
+    const { user, router, location } = open('/away');
+    await act(async () => router.navigate('/my'));
+    await user.click(
+      await screen.findByRole('button', { name: '가상 계좌 연결하기' }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: '선택한 가상 계좌 연결하기' }),
+    );
+    await waitFor(() =>
+      expect(
+        server.calls('POST', '/api/v1/portfolio/connections'),
+      ).toHaveLength(1),
+    );
+    await act(async () => router.navigate(-1));
+    await screen.findByRole('button', { name: '가상 계좌 연결하기' });
+    expect(location()).toBe('/my');
+    if (after === 'reopen') {
+      await user.click(
+        screen.getByRole('button', { name: '가상 계좌 연결하기' }),
+      );
+      await screen.findByRole('button', { name: '선택한 가상 계좌 연결하기' });
+    }
+    await act(async () => pending.resolve(json(connectionBody(), 201)));
+    expect(location()).toBe(after === 'back' ? '/my' : '/my?account=connect');
+    if (after === 'reopen')
+      expect(
+        screen.getByRole('button', { name: '선택한 가상 계좌 연결하기' }),
+      ).toBeTruthy();
+    expect(screen.queryByText('다른 화면')).toBeNull();
+  },
+);
 
 test('이전 계좌 연결의 늦은 성공이 새 회원을 연결 화면으로 되돌리지 않는다', async () => {
   const server = createFakeServer();

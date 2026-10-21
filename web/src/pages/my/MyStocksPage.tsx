@@ -69,6 +69,7 @@ function MyStocksWorkspace({ ownerId }: { ownerId: string | null }) {
   // 내 종목에서 열었으면 기록을 하나 되돌려 앞으로 가기에 연결 화면이 남지 않게 한다.
   const closeConnect = () => {
     // 이전 회원의 연결 응답이나 화면을 떠난 뒤의 응답은 현재 경로를 바꾸지 않는다.
+    // 연결 화면 인스턴스의 수명은 ConnectScreen이 따로 확인한다.
     if (!active.current || selectMemberId(useAuthStore.getState()) !== ownerId)
       return;
     if ((location.state as { from?: string } | null)?.from === 'my') {
@@ -80,15 +81,7 @@ function MyStocksWorkspace({ ownerId }: { ownerId: string | null }) {
 
   return (
     <>
-      {connecting && (
-        <div className="mx-auto max-w-xl py-8">
-          <PortfolioConnect
-            source="my"
-            onBack={closeConnect}
-            onConnected={closeConnect}
-          />
-        </div>
-      )}
+      {connecting && <ConnectScreen onClose={closeConnect} />}
       <div hidden={connecting}>
         <PageShell title="내 종목">
           <HoldingsSection portfolio={portfolio} onConnect={openConnect} />
@@ -101,5 +94,25 @@ function MyStocksWorkspace({ ownerId }: { ownerId: string | null }) {
         </PageShell>
       </div>
     </>
+  );
+}
+
+// 연결 화면 한 번 열림의 수명. 뒤로 가기로 닫힌 뒤 도착한 늦은 연결 성공은 내 종목 화면이 살아 있어도
+// 경로를 다시 바꾸지 않는다(다시 연 연결 화면은 새 인스턴스라 따로 동작한다).
+function ConnectScreen({ onClose }: { onClose: () => void }) {
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
+  const close = () => {
+    if (open.current) onClose();
+  };
+  return (
+    <div className="mx-auto max-w-xl py-8">
+      <PortfolioConnect source="my" onBack={close} onConnected={close} />
+    </div>
   );
 }
